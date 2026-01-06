@@ -15,7 +15,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation, UseConstraintSets,
 };
 use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -800,7 +800,7 @@ fn is_subtype_in_invariant_position<'db>(
             db,
             base,
             inferable,
-            TypeRelation::Subtyping,
+            TypeRelation::Subtyping(UseConstraintSets::No),
             relation_visitor,
             disjointness_visitor,
         )
@@ -905,7 +905,9 @@ fn has_relation_in_invariant_position<'db>(
         (
             None,
             Some(base_mat),
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_),
+            TypeRelation::Subtyping(_)
+            | TypeRelation::Redundancy
+            | TypeRelation::SubtypingAssuming(_),
         ) => is_subtype_in_invariant_position(
             db,
             derived_type,
@@ -919,7 +921,9 @@ fn has_relation_in_invariant_position<'db>(
         (
             Some(derived_mat),
             None,
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_),
+            TypeRelation::Subtyping(_)
+            | TypeRelation::Redundancy
+            | TypeRelation::SubtypingAssuming(_),
         ) => is_subtype_in_invariant_position(
             db,
             derived_type,
@@ -931,11 +935,7 @@ fn has_relation_in_invariant_position<'db>(
             disjointness_visitor,
         ),
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
-        (
-            None,
-            Some(base_mat),
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-        ) => is_subtype_in_invariant_position(
+        (None, Some(base_mat), TypeRelation::Assignability(_)) => is_subtype_in_invariant_position(
             db,
             derived_type,
             MaterializationKind::Bottom,
@@ -945,20 +945,18 @@ fn has_relation_in_invariant_position<'db>(
             relation_visitor,
             disjointness_visitor,
         ),
-        (
-            Some(derived_mat),
-            None,
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-        ) => is_subtype_in_invariant_position(
-            db,
-            derived_type,
-            derived_mat,
-            base_type,
-            MaterializationKind::Top,
-            inferable,
-            relation_visitor,
-            disjointness_visitor,
-        ),
+        (Some(derived_mat), None, TypeRelation::Assignability(_)) => {
+            is_subtype_in_invariant_position(
+                db,
+                derived_type,
+                derived_mat,
+                base_type,
+                MaterializationKind::Top,
+                inferable,
+                relation_visitor,
+                disjointness_visitor,
+            )
+        }
     }
 }
 

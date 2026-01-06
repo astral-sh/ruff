@@ -13,6 +13,14 @@ use crate::{
     types::{Type, constraints::ConstraintSet, generics::InferableTypeVars},
 };
 
+/// Whether to use the new constraint set rules when comparing typevars. This will eventually be
+/// used across the board, but for now this gives us a way to opt into the new logic incrementally.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub(crate) enum UseConstraintSets {
+    No,
+    Yes,
+}
+
 /// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum TypeRelation<'db> {
@@ -44,7 +52,7 @@ pub(crate) enum TypeRelation<'db> {
     ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
-    Subtyping,
+    Subtyping(UseConstraintSets),
 
     /// The "assignability" relation.
     ///
@@ -82,7 +90,7 @@ pub(crate) enum TypeRelation<'db> {
     ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
-    Assignability,
+    Assignability(UseConstraintSets),
 
     /// The "redundancy" relation.
     ///
@@ -176,24 +184,27 @@ pub(crate) enum TypeRelation<'db> {
     ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
     ///   will return true!)
     SubtypingAssuming(ConstraintSet<'db>),
-
-    /// A placeholder for the new assignability relation that uses constraint sets to encode
-    /// relationships with a typevar. This will eventually replace `Assignability`, but allows us
-    /// to start using the new relation in a controlled manner in some places.
-    ConstraintSetAssignability,
 }
 
 impl TypeRelation<'_> {
     pub(crate) const fn is_assignability(self) -> bool {
-        matches!(self, TypeRelation::Assignability)
+        matches!(self, TypeRelation::Assignability(UseConstraintSets::No))
     }
 
-    pub(crate) const fn is_constraint_set_assignability(self) -> bool {
-        matches!(self, TypeRelation::ConstraintSetAssignability)
+    pub(crate) const fn is_any_assignability(self) -> bool {
+        matches!(self, TypeRelation::Assignability(_))
     }
 
     pub(crate) const fn is_subtyping(self) -> bool {
-        matches!(self, TypeRelation::Subtyping)
+        matches!(self, TypeRelation::Subtyping(UseConstraintSets::No))
+    }
+
+    pub(crate) const fn uses_constraint_set_rules(self) -> bool {
+        matches!(
+            self,
+            TypeRelation::Assignability(UseConstraintSets::Yes)
+                | TypeRelation::Subtyping(UseConstraintSets::Yes)
+        )
     }
 }
 
@@ -213,7 +224,12 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
-        self.has_relation_to(db, target, inferable, TypeRelation::Subtyping)
+        self.has_relation_to(
+            db,
+            target,
+            inferable,
+            TypeRelation::Subtyping(UseConstraintSets::No),
+        )
     }
 
     /// Return the constraints under which this type is a subtype of type `target`, assuming that
@@ -259,7 +275,12 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
-        self.has_relation_to(db, target, inferable, TypeRelation::Assignability)
+        self.has_relation_to(
+            db,
+            target,
+            inferable,
+            TypeRelation::Assignability(UseConstraintSets::No),
+        )
     }
 
     pub(super) fn when_constraint_set_assignable_to(
@@ -272,7 +293,7 @@ impl<'db> Type<'db> {
             db,
             target,
             inferable,
-            TypeRelation::ConstraintSetAssignability,
+            TypeRelation::Assignability(UseConstraintSets::Yes),
         )
     }
 
@@ -343,7 +364,7 @@ impl<'db> Type<'db> {
 
         // Handle the new constraint-set-based assignability relation next. Comparisons with a
         // typevar are translated directly into a constraint set.
-        if relation.is_constraint_set_assignability() {
+        if relation.uses_constraint_set_rules() {
             // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
             // tautology! We're moving the caller's subtyping/assignability requirement into a
             // constraint set. If the typevar has an upper bound or constraints, then the relation
@@ -435,8 +456,8 @@ impl<'db> Type<'db> {
                     "DynamicType::Divergent should have been handled in an earlier branch"
                 );
                 ConstraintSet::from(match relation {
-                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
-                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+                    TypeRelation::Subtyping(_) | TypeRelation::SubtypingAssuming(_) => false,
+                    TypeRelation::Assignability(_) => true,
                     TypeRelation::Redundancy => match target {
                         Type::Dynamic(_) => true,
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
@@ -445,8 +466,8 @@ impl<'db> Type<'db> {
                 })
             }
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
-                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
+                TypeRelation::Subtyping(_) | TypeRelation::SubtypingAssuming(_) => false,
+                TypeRelation::Assignability(_) => true,
                 TypeRelation::Redundancy => match self {
                     Type::Dynamic(_) => true,
                     Type::Intersection(intersection) => {
@@ -780,22 +801,17 @@ impl<'db> Type<'db> {
                     // to non-transitivity (highly undesirable); and pragmatically, a full implementation
                     // of redundancy may not generally lead to simpler types in many situations.
                     let self_ty = match relation {
-                        TypeRelation::Subtyping
+                        TypeRelation::Subtyping(_)
                         | TypeRelation::Redundancy
                         | TypeRelation::SubtypingAssuming(_) => self,
-                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                            self.bottom_materialization(db)
-                        }
+                        TypeRelation::Assignability(_) => self.bottom_materialization(db),
                     };
                     intersection.negative(db).iter().when_all(db, |&neg_ty| {
                         let neg_ty = match relation {
-                            TypeRelation::Subtyping
+                            TypeRelation::Subtyping(_)
                             | TypeRelation::Redundancy
                             | TypeRelation::SubtypingAssuming(_) => neg_ty,
-                            TypeRelation::Assignability
-                            | TypeRelation::ConstraintSetAssignability => {
-                                neg_ty.bottom_materialization(db)
-                            }
+                            TypeRelation::Assignability(_) => neg_ty.bottom_materialization(db),
                         };
                         self_ty.is_disjoint_from_impl(
                             db,
@@ -1799,7 +1815,7 @@ impl<'db> Type<'db> {
                                     db,
                                     neg_ty,
                                     inferable,
-                                    TypeRelation::Subtyping,
+                                    TypeRelation::Subtyping(UseConstraintSets::No),
                                     relation_visitor,
                                     disjointness_visitor,
                                 )
@@ -2169,7 +2185,7 @@ impl<'db> Type<'db> {
                         db,
                         instance,
                         inferable,
-                        TypeRelation::Subtyping,
+                        TypeRelation::Subtyping(UseConstraintSets::No),
                         relation_visitor,
                         disjointness_visitor,
                     )
@@ -2193,7 +2209,7 @@ impl<'db> Type<'db> {
                         db,
                         instance,
                         inferable,
-                        TypeRelation::Subtyping,
+                        TypeRelation::Subtyping(UseConstraintSets::No),
                         relation_visitor,
                         disjointness_visitor,
                     )
@@ -2287,7 +2303,7 @@ impl<'db> Type<'db> {
                             db,
                             Type::Callable(CallableType::unknown(db)),
                             inferable,
-                            TypeRelation::Assignability,
+                            TypeRelation::Assignability(UseConstraintSets::No),
                             relation_visitor,
                             disjointness_visitor,
                         )
@@ -2389,7 +2405,7 @@ impl<'db> Type<'db> {
                     db,
                     other,
                     inferable,
-                    TypeRelation::Assignability,
+                    TypeRelation::Assignability(UseConstraintSets::No),
                     relation_visitor,
                     disjointness_visitor,
                 )

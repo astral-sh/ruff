@@ -23,7 +23,7 @@ use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation, UseConstraintSets,
 };
 use crate::types::{NormalizedVisitor, TypeContext};
 
@@ -430,7 +430,7 @@ impl<'db> TypedDictType<'db> {
                         db,
                         other_field.declared_ty,
                         inferable,
-                        TypeRelation::Assignability,
+                        TypeRelation::Assignability(UseConstraintSets::No),
                         relation_visitor,
                         disjointness_visitor,
                     )
@@ -439,7 +439,7 @@ impl<'db> TypedDictType<'db> {
                             db,
                             self_field.declared_ty,
                             inferable,
-                            TypeRelation::Assignability,
+                            TypeRelation::Assignability(UseConstraintSets::No),
                             relation_visitor,
                             disjointness_visitor,
                         )
@@ -453,7 +453,7 @@ impl<'db> TypedDictType<'db> {
                         db,
                         other_field.declared_ty,
                         inferable,
-                        TypeRelation::Assignability,
+                        TypeRelation::Assignability(UseConstraintSets::No),
                         relation_visitor,
                         disjointness_visitor,
                     )
@@ -466,7 +466,7 @@ impl<'db> TypedDictType<'db> {
                         db,
                         self_field.declared_ty,
                         inferable,
-                        TypeRelation::Assignability,
+                        TypeRelation::Assignability(UseConstraintSets::No),
                         relation_visitor,
                         disjointness_visitor,
                     )

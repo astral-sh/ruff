@@ -24,7 +24,7 @@ use crate::types::constraints::{
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::{infer_deferred_types, infer_scope_types};
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation, UseConstraintSets,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
@@ -316,7 +316,7 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             inferable,
-            TypeRelation::Subtyping,
+            TypeRelation::Subtyping(UseConstraintSets::No),
             &HasRelationToVisitor::default(),
             &IsDisjointVisitor::default(),
         )
@@ -374,7 +374,7 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             inferable,
-            TypeRelation::ConstraintSetAssignability,
+            TypeRelation::Assignability(UseConstraintSets::Yes),
             &HasRelationToVisitor::default(),
             &IsDisjointVisitor::default(),
         )
@@ -391,7 +391,7 @@ impl<'db> CallableSignature<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        if relation.is_constraint_set_assignability() {
+        if relation.uses_constraint_set_rules() {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let self_is_single_paramspec = Self::signatures_is_single_paramspec(self_signatures);
             let other_is_single_paramspec = Self::signatures_is_single_paramspec(other_signatures);
@@ -1152,7 +1152,7 @@ impl<'db> Signature<'db> {
             db,
             other,
             inferable,
-            TypeRelation::ConstraintSetAssignability,
+            TypeRelation::Assignability(UseConstraintSets::Yes),
             &HasRelationToVisitor::default(),
             &IsDisjointVisitor::default(),
         )
@@ -1345,16 +1345,11 @@ impl<'db> Signature<'db> {
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            result.intersect(
-                db,
-                ConstraintSet::from(
-                    relation.is_assignability() || relation.is_constraint_set_assignability(),
-                ),
-            );
+            result.intersect(db, ConstraintSet::from(relation.is_any_assignability()));
             return result;
         }
 
-        if relation.is_constraint_set_assignability() {
+        if relation.uses_constraint_set_rules() {
             let self_is_paramspec = self.parameters.as_paramspec();
             let other_is_paramspec = other.parameters.as_paramspec();
 

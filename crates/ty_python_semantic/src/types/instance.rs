@@ -12,7 +12,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation, UseConstraintSets,
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
@@ -708,7 +708,7 @@ impl<'db> ProtocolInstanceType<'db> {
                     db,
                     protocol,
                     InferableTypeVars::None,
-                    TypeRelation::Subtyping,
+                    TypeRelation::Subtyping(UseConstraintSets::No),
                     &HasRelationToVisitor::default(),
                     &IsDisjointVisitor::default(),
                 )

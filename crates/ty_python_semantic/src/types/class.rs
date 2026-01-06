@@ -31,7 +31,7 @@ use crate::types::generics::{
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation, UseConstraintSets,
 };
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -617,7 +617,7 @@ impl<'db> ClassType<'db> {
             db,
             other,
             inferable,
-            TypeRelation::Subtyping,
+            TypeRelation::Subtyping(UseConstraintSets::No),
             &HasRelationToVisitor::default(),
             &IsDisjointVisitor::default(),
         )
@@ -635,14 +635,12 @@ impl<'db> ClassType<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping
+                    TypeRelation::Subtyping(_)
                     | TypeRelation::Redundancy
                     | TypeRelation::SubtypingAssuming(_) => {
                         ConstraintSet::from(other.is_object(db))
                     }
-                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                        ConstraintSet::from(!other.is_final(db))
-                    }
+                    TypeRelation::Assignability(_) => ConstraintSet::from(!other.is_final(db)),
                 },
 
                 // Protocol, Generic, and TypedDict are not represented by a ClassType.
