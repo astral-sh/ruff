@@ -1140,7 +1140,7 @@ required-version = "0.1.0"
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(version, "[VERSION]");
     settings.bind(|| {
-    assert_cmd_snapshot!(fixture
+        assert_cmd_snapshot!(fixture
         .check_command()
         .arg("--config")
         .arg("ruff.toml")
@@ -1216,7 +1216,7 @@ required-version = ">{version}"
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(version, "[VERSION]");
     settings.bind(|| {
-    assert_cmd_snapshot!(fixture
+        assert_cmd_snapshot!(fixture
         .check_command()
         .arg("--config")
         .arg("ruff.toml")
@@ -1257,7 +1257,7 @@ select = ["RUF999"]
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(version, "[VERSION]");
     settings.bind(|| {
-    assert_cmd_snapshot!(fixture
+        assert_cmd_snapshot!(fixture
         .check_command()
         .arg("--config")
         .arg("ruff.toml")

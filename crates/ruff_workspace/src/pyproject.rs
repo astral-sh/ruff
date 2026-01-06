@@ -117,7 +117,11 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn check_required_version(value: &toml::de::DeTable, path: &Path, table_path: &[&str]) -> Result<()> {
+fn check_required_version(
+    value: &toml::de::DeTable,
+    path: &Path,
+    table_path: &[&str],
+) -> Result<()> {
     let mut current = value;
     for key in table_path {
         let Some(next) = current.get(*key) else {

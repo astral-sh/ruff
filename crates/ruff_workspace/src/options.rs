@@ -1,13 +1,13 @@
+use anyhow::Result;
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::str::FromStr;
 use strum::IntoEnumIterator;
 use unicode_normalization::UnicodeNormalization;
-use anyhow::Result;
-use std::str::FromStr;
 
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;

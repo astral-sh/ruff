@@ -35,8 +35,7 @@ use ruff_linter::settings::{
     DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
 };
 use ruff_linter::{
-    RuleSelector, fs, warn_user_once, warn_user_once_by_id,
-    warn_user_once_by_message,
+    RuleSelector, fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message,
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
