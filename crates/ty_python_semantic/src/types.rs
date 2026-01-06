@@ -1456,6 +1456,10 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         // Avoid invoking the `IntersectionBuilder` for negations that are trivial.
+        //
+        // We verify that this always produces the same result as
+        // `IntersectionBuilder::new(db).add_negative(*self).build()` via the
+        // property test `all_negated_types_identical_to_intersection_with_single_negated_element`
         match self {
             Type::Never => Type::object(),
 
@@ -1491,13 +1495,15 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::WrapperDescriptor(_)
+            | Type::EnumLiteral(_)
+            | Type::TypeAlias(_)
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
                 FxOrderSet::default(),
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_) | Type::EnumLiteral(_) => {
+            Type::Union(_) | Type::Intersection(_) => {
                 IntersectionBuilder::new(db).add_negative(*self).build()
             }
         }
