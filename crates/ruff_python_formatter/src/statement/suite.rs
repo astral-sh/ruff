@@ -159,7 +159,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let first_comments = comments.leading_dangling_trailing(first);
 
         let (mut preceding, mut empty_line_after_docstring) = if let Some(verbatim_range) =
-            skip_range(first.statement(), iter.as_slice(), f)
+            skip_range(first.statement(), iter.as_slice(), f.context())
         {
             let preceding =
                 write_skipped_statements(first.statement(), &mut iter, verbatim_range, f)?;
@@ -411,7 +411,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
             }
 
-            if let Some(verbatim_range) = skip_range(following, iter.as_slice(), f) {
+            if let Some(verbatim_range) = skip_range(following, iter.as_slice(), f.context()) {
                 preceding = write_skipped_statements(following, &mut iter, verbatim_range, f)?;
                 preceding_comments = comments.leading_dangling_trailing(preceding);
             } else if following_comments
@@ -961,12 +961,16 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
     }
 }
 
-fn skip_range(first: &Stmt, statements: &[Stmt], f: &mut PyFormatter) -> Option<TextRange> {
+pub(crate) fn skip_range(
+    first: &Stmt,
+    statements: &[Stmt],
+    context: &PyFormatContext,
+) -> Option<TextRange> {
     let start = first.start();
     let mut last_statement = first;
 
-    let comments = f.context().comments();
-    let source = f.context().source();
+    let comments = context.comments();
+    let source = context.source();
 
     for statement in statements {
         if new_logical_line_between_statements(
