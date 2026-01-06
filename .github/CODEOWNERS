@@ -27,4 +27,4 @@
 /crates/ty_wasm/ @carljm @MichaReiser @sharkdp @dcreager @Gankra
 /scripts/ty_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
 /crates/ty_python_semantic/ @carljm @AlexWaygood @sharkdp @dcreager
-/crates/ty_module_resolver/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager @Gankra
+/crates/ty_module_resolver/ @carljm @MichaReiser @AlexWaygood Gankra
