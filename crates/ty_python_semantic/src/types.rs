@@ -1441,45 +1441,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::LiteralString)
     }
 
-    /// Returns `true` if this type could possibly be a supertype of `Sequence[T]`.
-    ///
-    /// This is used to optimize subtype checking for string literals. When checking
-    /// if `Literal["abc"]` is a subtype of some target, we first check if `str` is
-    /// a subtype. If not, we fall back to checking if `Sequence[Literal["a", "b", "c"]]`
-    /// is a subtype. However, creating the union of character literals is expensive,
-    /// so we skip it when the target couldn't possibly be satisfied by a Sequence.
-    ///
-    /// For example, `list[str]` cannot be a supertype of any `Sequence[T]` because
-    /// `list` is a subclass of `Sequence`, not a superclass.
-    pub(crate) fn could_be_sequence_supertype(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::NominalInstance(instance) => {
-                let class = instance.class(db);
-                // Reject known subclasses of Sequence - they can't be supertypes of Sequence
-                // e.g., list[str], tuple[str, ...], etc.
-                !class.is_known(db, KnownClass::List)
-                    && !class.is_known(db, KnownClass::Tuple)
-                    && !class.is_known(db, KnownClass::Str)
-                    && !class.is_known(db, KnownClass::Bytes)
-                    && !class.is_known(db, KnownClass::Bytearray)
-            }
-            // Union: if any element could be a Sequence supertype, return true
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|elem| elem.could_be_sequence_supertype(db)),
-            // Intersection: all positive elements must be possible Sequence supertypes
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .all(|elem| elem.could_be_sequence_supertype(db)),
-            // Dynamic types (Any, Unknown) could be anything
-            Type::Dynamic(_) => true,
-            // Everything else - be conservative and allow the check
-            _ => true,
-        }
-    }
-
     pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
         Self::StringLiteral(StringLiteralType::new(db, string))
     }
