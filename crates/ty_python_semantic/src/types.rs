@@ -4645,7 +4645,13 @@ impl<'db> Type<'db> {
                     let first_spec = specs_iter.next()?;
                     let mut builder = TupleSpecBuilder::from(&*first_spec);
                     for spec in specs_iter {
-                        builder = builder.intersect(db, &spec);
+                        // Two tuples cannot have incompatible specs unless the tuples themselves
+                        // are disjoint. `IntersectionBuilder` eagerly simplifies such
+                        // intersections to `Never`, so this should always return `Some`.
+                        let Some(intersected) = builder.intersect(db, &spec) else {
+                            return Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
+                        };
+                        builder = intersected;
                     }
                     Some(Cow::Owned(builder.build()))
                 }

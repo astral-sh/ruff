@@ -218,6 +218,7 @@ fn render_markdown(docstring: &str) -> String {
                 output.push('\n');
             }
         }
+        first_line = false;
 
         // If we're in a literal block and we find a non-empty dedented line, end the block
         // TODO: we should remove all the trailing blank lines
@@ -273,6 +274,22 @@ fn render_markdown(docstring: &str) -> String {
                 block_indent = line_indent;
                 in_any_code = true;
                 in_markdown_with_fence = Some(fence.to_owned());
+                // Render the line verbatim without its indent and move on.
+                //
+                // If there's any indent this is really just Bad Syntax but it "makes sense"
+                // to someone writing docs like this:
+                //
+                // Returns:
+                //     Some details...
+                //     ```
+                //     some_example()
+                //     ```
+                //     etc etc...
+                //
+                // We "make this work" by stripping the indent on the fences but preserving the
+                // full indent of the lines between the fences
+                output.push_str(line);
+                continue;
             }
         // If we're in a markdown code fence and this line seems to terminate it, end the block
         } else if let Some(fence) = &in_markdown_with_fence
@@ -281,6 +298,9 @@ fn render_markdown(docstring: &str) -> String {
             in_any_code = false;
             block_indent = 0;
             in_markdown_with_fence = None;
+            // Render the line without its indent and move on.
+            output.push_str(line);
+            continue;
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
@@ -446,8 +466,6 @@ fn render_markdown(docstring: &str) -> String {
             // Print the line verbatim, it's in code
             output.push_str(line);
         }
-
-        first_line = false;
     }
     // Flush codeblock
     if in_any_code {
@@ -1208,6 +1226,74 @@ mod tests {
         ");
     }
 
+    // If an explicit markdown codefence is indented, eat the indent so it renders
+    // "the way the user expects" (as written this is basically invalid markdown,
+    // but it's nice if we handle it anyway because it makes visual sense).
+    #[test]
+    fn explicit_markdown_block_with_indent_tick() {
+        let docstring = r#"
+        My cool func...
+        
+        Returns:
+            Some details
+            `````python
+            x_y = thing_do();
+            ``` # this should't close the fence!
+            a_b = other_thing();
+            `````
+            And so on.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func...  
+          
+        Returns:  
+        &nbsp;&nbsp;&nbsp;&nbsp;Some details  
+        `````python
+            x_y = thing_do();
+            ``` # this should't close the fence!
+            a_b = other_thing();
+        `````  
+        &nbsp;&nbsp;&nbsp;&nbsp;And so on.
+        ");
+    }
+
+    // If an explicit markdown codefence is indented, eat the indent so it renders
+    // "the way the user expects" (as written this is basically invalid markdown,
+    // but it's nice if we handle it anyway because it makes visual sense).
+    #[test]
+    fn explicit_markdown_block_with_indent_tilde() {
+        let docstring = r#"
+        My cool func...
+        
+        Returns:
+            Some details
+            ~~~~~~python
+            x_y = thing_do();
+            ~~~ # this should't close the fence!
+            a_b = other_thing();
+            ~~~~~~
+            And so on.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func...  
+          
+        Returns:  
+        &nbsp;&nbsp;&nbsp;&nbsp;Some details  
+        ~~~~~~python
+            x_y = thing_do();
+            ~~~ # this should't close the fence!
+            a_b = other_thing();
+        ~~~~~~  
+        &nbsp;&nbsp;&nbsp;&nbsp;And so on.
+        ");
+    }
+
     // What do we do when we hit the end of the docstring with an unclosed markdown block?
     #[test]
     fn explicit_markdown_block_with_unclosed_fence_tick() {
@@ -1267,7 +1353,7 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @r"
         My cool func:  
           
-                ``````we still think this is a codefence```
+        ``````we still think this is a codefence```
             x_y = thing_do();
         ```````````` and are sloppy as heck with indentation and closing shrugggg
         ");
@@ -1290,7 +1376,7 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @r"
         My cool func:  
           
-                ~~~~~~we still think this is a codefence~~~
+        ~~~~~~we still think this is a codefence~~~
             x_y = thing_do();
         ~~~~~~~~~~~~~ and are sloppy as heck with indentation and closing shrugggg
         ");

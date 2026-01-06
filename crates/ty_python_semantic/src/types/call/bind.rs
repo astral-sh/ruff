@@ -1122,6 +1122,7 @@ impl<'db> Bindings<'db> {
                                     class_literal.type_check_only(db),
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
+                                    class_literal.total_ordering(db),
                                 )));
                             }
                         }

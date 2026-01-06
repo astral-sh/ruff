@@ -1516,6 +1516,9 @@ pub struct ClassLiteral<'db> {
 
     pub(crate) dataclass_params: Option<DataclassParams<'db>>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
+
+    /// Whether this class is decorated with `@functools.total_ordering`
+    pub(crate) total_ordering: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -1538,6 +1541,17 @@ impl<'db> ClassLiteral<'db> {
 
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Tuple)
+    }
+
+    /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
+    /// `__ge__`) in its own body (not inherited). Used by `@total_ordering` to determine if
+    /// synthesis is valid.
+    #[salsa::tracked]
+    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+        let body_scope = self.body_scope(db);
+        ["__lt__", "__le__", "__gt__", "__ge__"]
+            .iter()
+            .any(|method| !class_member(db, body_scope, method).is_undefined())
     }
 
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
@@ -2383,6 +2397,41 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
     ) -> Option<Type<'db>> {
         let dataclass_params = self.dataclass_params(db);
+
+        // Handle `@functools.total_ordering`: synthesize comparison methods
+        // for classes that have `@total_ordering` and define at least one
+        // ordering method. The decorator requires at least one of __lt__,
+        // __le__, __gt__, or __ge__ to be defined (either in this class or
+        // inherited from a superclass, excluding `object`).
+        if self.total_ordering(db) && matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
+            // Check if any class in the MRO (excluding object) defines at least one
+            // ordering method in its own body (not synthesized).
+            let has_ordering_method = self
+                .iter_mro(db, specialization)
+                .filter_map(super::class_base::ClassBase::into_class)
+                .filter(|class| !class.class_literal(db).0.is_known(db, KnownClass::Object))
+                .any(|class| class.class_literal(db).0.has_own_ordering_method(db));
+
+            if has_ordering_method {
+                let instance_ty =
+                    Type::instance(db, self.apply_optional_specialization(db, specialization));
+
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_or_keyword(Name::new_static("other"))
+                                .with_annotated_type(instance_ty),
+                        ],
+                    ),
+                    Some(KnownClass::Bool.to_instance(db)),
+                );
+
+                return Some(Type::function_like_callable(db, signature));
+            }
+        }
 
         let field_policy = CodeGeneratorKind::from_class(db, self, specialization)?;
 

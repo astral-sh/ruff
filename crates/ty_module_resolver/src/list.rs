@@ -619,7 +619,7 @@ mod tests {
             list_snapshot(&db),
             @r#"
         [
-            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, None),
+            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, Some(Functools)),
         ]
         "#,
         );
@@ -662,7 +662,7 @@ mod tests {
             @r#"
         [
             Module::File("asyncio", "std-custom", "/typeshed/stdlib/asyncio/__init__.pyi", Package, None),
-            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, None),
+            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, Some(Functools)),
             Module::File("random", "std-custom", "/typeshed/stdlib/random.pyi", Module, None),
         ]
         "#,
@@ -755,7 +755,7 @@ mod tests {
         [
             Module::File("asyncio", "std-custom", "/typeshed/stdlib/asyncio/__init__.pyi", Package, None),
             Module::File("collections", "std-custom", "/typeshed/stdlib/collections/__init__.pyi", Package, Some(Collections)),
-            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, None),
+            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, Some(Functools)),
         ]
         "#,
         );
@@ -1091,7 +1091,7 @@ mod tests {
             list_snapshot(&db),
             @r#"
         [
-            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, None),
+            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, Some(Functools)),
         ]
         "#,
         );
@@ -1107,7 +1107,7 @@ mod tests {
             list_snapshot(&db),
             @r#"
         [
-            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, None),
+            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, Some(Functools)),
         ]
         "#,
         );
@@ -1129,7 +1129,7 @@ mod tests {
             list_snapshot(&db),
             @r#"
         [
-            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, None),
+            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, Some(Functools)),
         ]
         "#,
         );
@@ -1191,7 +1191,7 @@ mod tests {
             list_snapshot(&db),
             @r#"
         [
-            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, None),
+            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, Some(Functools)),
         ]
         "#,
         );
