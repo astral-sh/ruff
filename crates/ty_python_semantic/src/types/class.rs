@@ -4413,6 +4413,7 @@ pub enum KnownClass {
     SupportsIndex,
     Iterable,
     Iterator,
+    Sequence,
     Mapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
@@ -4529,6 +4530,7 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
@@ -4617,6 +4619,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -4704,6 +4707,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -4791,6 +4795,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -4910,7 +4915,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
-            | Self::Mapping => false,
+            | Self::Mapping
+            | Self::Sequence => false,
         }
     }
 
@@ -4984,6 +4990,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -5076,6 +5083,7 @@ impl KnownClass {
             Self::Super => "super",
             Self::Iterable => "Iterable",
             Self::Iterator => "Iterator",
+            Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
@@ -5412,6 +5420,7 @@ impl KnownClass {
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             | Self::ProtocolMeta
             | Self::SupportsIndex => KnownModule::Typing,
@@ -5551,6 +5560,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
@@ -5643,6 +5653,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
@@ -5707,6 +5718,7 @@ impl KnownClass {
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
             "Iterable" => &[Self::Iterable],
             "Iterator" => &[Self::Iterator],
+            "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
@@ -5850,6 +5862,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
