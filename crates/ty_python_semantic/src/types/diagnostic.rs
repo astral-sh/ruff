@@ -125,6 +125,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
+    registry.register_lint(&INVALID_TOTAL_ORDERING);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -2325,6 +2326,46 @@ declare_lint! {
     pub(crate) static INVALID_FROZEN_DATACLASS_SUBCLASS = {
         summary: "detects dataclasses with invalid frozen/non-frozen subclassing",
         status: LintStatus::stable("0.0.1-alpha.35"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for classes decorated with `@functools.total_ordering` that don't
+    /// define any ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`).
+    ///
+    /// ## Why is this bad?
+    /// The `@total_ordering` decorator requires the class to define at least one
+    /// ordering method. If none is defined, Python raises a `ValueError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from functools import total_ordering
+    ///
+    /// @total_ordering
+    /// class MyClass:  # Error: no ordering method defined
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```python
+    /// from functools import total_ordering
+    ///
+    /// @total_ordering
+    /// class MyClass:
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    ///
+    ///     def __lt__(self, other: "MyClass") -> bool:
+    ///         return True
+    /// ```
+    pub(crate) static INVALID_TOTAL_ORDERING = {
+        summary: "detects `@total_ordering` classes without an ordering method",
+        status: LintStatus::stable("0.0.10"),
         default_level: Level::Error,
     }
 }
@@ -4616,6 +4657,27 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
 
         diagnostic.sub(sub);
     }
+}
+
+pub(super) fn report_invalid_total_ordering(
+    context: &InferContext<'_, '_>,
+    class: ClassLiteral<'_>,
+    decorator: &ast::Decorator,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_TOTAL_ORDERING, decorator) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "Class decorated with `@total_ordering` must define at least one ordering method",
+    );
+    diagnostic.set_primary_message(format_args!(
+        "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+        class.name(db)
+    ));
+    diagnostic.info("The decorator will raise `ValueError` at runtime");
 }
 
 /// This function receives an unresolved `from foo import bar` import,
