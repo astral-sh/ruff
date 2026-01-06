@@ -1636,6 +1636,148 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
+    /// Calls a closure for each pair of elements that could potentially be compared at runtime
+    /// between `self` and `other`.
+    ///
+    /// For two fixed-length tuples, this yields pairs at matching positions.
+    /// For variable-length tuples, this yields all pairs of elements that could overlap at runtime,
+    /// including prefix/suffix elements matched by position, and variable elements that could
+    /// align with any position in the other tuple.
+    pub(crate) fn try_for_each_element_pair<F, E>(&self, other: &Self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(Type<'db>, Type<'db>) -> Result<(), E>,
+    {
+        match (self, other) {
+            // Both fixed-length: just zip elements at matching positions.
+            (Tuple::Fixed(left), Tuple::Fixed(right)) => {
+                for (l, r) in left.iter_all_elements().zip(right.iter_all_elements()) {
+                    f(l, r)?;
+                }
+            }
+
+            // Both variable-length: all possible element pairings.
+            (Tuple::Variable(left), Tuple::Variable(right)) => {
+                // 1. Prefix elements at matching positions.
+                for (l, r) in left.prefix_elements().iter().zip(right.prefix_elements()) {
+                    f(*l, *r)?;
+                }
+
+                // 2. Left's extra prefix elements with right's variable.
+                for l in left
+                    .prefix_elements()
+                    .iter()
+                    .skip(right.prefix_elements().len())
+                {
+                    f(*l, right.variable())?;
+                }
+
+                // 3. Right's extra prefix elements with left's variable.
+                for r in right
+                    .prefix_elements()
+                    .iter()
+                    .skip(left.prefix_elements().len())
+                {
+                    f(left.variable(), *r)?;
+                }
+
+                // 4. Variable elements with each other.
+                f(left.variable(), right.variable())?;
+
+                // 5. Left's extra suffix elements with right's variable.
+                for l in left
+                    .suffix_elements()
+                    .iter()
+                    .rev()
+                    .skip(right.suffix_elements().len())
+                {
+                    f(*l, right.variable())?;
+                }
+
+                // 6. Right's extra suffix elements with left's variable.
+                for r in right
+                    .suffix_elements()
+                    .iter()
+                    .rev()
+                    .skip(left.suffix_elements().len())
+                {
+                    f(left.variable(), *r)?;
+                }
+
+                // 7. Suffix elements at matching positions (from the end).
+                for (l, r) in left
+                    .suffix_elements()
+                    .iter()
+                    .rev()
+                    .zip(right.suffix_elements().iter().rev())
+                {
+                    f(*l, *r)?;
+                }
+            }
+
+            // Left variable, right fixed.
+            (Tuple::Variable(left), Tuple::Fixed(right)) => {
+                // Left's prefix with right's corresponding elements.
+                for (l, r) in left.prefix_elements().iter().zip(right.all_elements()) {
+                    f(*l, *r)?;
+                }
+
+                // Left's suffix with right's corresponding elements (from end).
+                for (l, r) in left
+                    .suffix_elements()
+                    .iter()
+                    .rev()
+                    .zip(right.all_elements().iter().rev())
+                {
+                    f(*l, *r)?;
+                }
+
+                // Left's variable with right's "middle" elements.
+                let middle_start = left.prefix_elements().len();
+                let middle_end = right.len().saturating_sub(left.suffix_elements().len());
+                for r in right
+                    .all_elements()
+                    .iter()
+                    .skip(middle_start)
+                    .take(middle_end.saturating_sub(middle_start))
+                {
+                    f(left.variable(), *r)?;
+                }
+            }
+
+            // Left fixed, right variable.
+            (Tuple::Fixed(left), Tuple::Variable(right)) => {
+                // Left's elements with right's prefix.
+                for (l, r) in left.all_elements().iter().zip(right.prefix_elements()) {
+                    f(*l, *r)?;
+                }
+
+                // Left's elements (from end) with right's suffix.
+                for (l, r) in left
+                    .all_elements()
+                    .iter()
+                    .rev()
+                    .zip(right.suffix_elements().iter().rev())
+                {
+                    f(*l, *r)?;
+                }
+
+                // Left's "middle" elements with right's variable.
+                let middle_start = right.prefix_elements().len();
+                let middle_end = left.len().saturating_sub(right.suffix_elements().len());
+                for l in left
+                    .all_elements()
+                    .iter()
+                    .skip(middle_start)
+                    .take(middle_end.saturating_sub(middle_start))
+                {
+                    f(*l, right.variable())?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Return the `TupleSpec` for the singleton `sys.version_info`
     pub(crate) fn version_info_spec(db: &'db dyn Db) -> TupleSpec<'db> {
         let python_version = Program::get(db).python_version(db);
