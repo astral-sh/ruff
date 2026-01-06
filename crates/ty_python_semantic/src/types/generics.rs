@@ -500,13 +500,17 @@ impl<'db> GenericContext<'db> {
 
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = self.variables(db).map(Type::TypeVar).collect();
-        self.specialize(db, types)
+        let types: Box<[Type]> = self.variables(db).map(Type::TypeVar).collect();
+        self.specialize_owned(db, types)
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = vec![Type::unknown(); self.len(db)];
-        self.specialize(db, types.into())
+        match self.len(db) {
+            0 => self.specialize(db, [].as_slice()),
+            1 => self.specialize(db, [Type::unknown(); 1].as_slice()),
+            2 => self.specialize(db, [Type::unknown(); 2].as_slice()),
+            len => self.specialize_owned(db, vec![Type::unknown(); len].into_boxed_slice()),
+        }
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
@@ -545,7 +549,23 @@ impl<'db> GenericContext<'db> {
     /// otherwise, you will be left with a partial specialization. (Use
     /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
     /// in this generic context.)
-    pub(crate) fn specialize(
+    pub(crate) fn specialize(self, db: &'db dyn Db, types: &[Type<'db>]) -> Specialization<'db> {
+        assert_eq!(self.len(db), types.len());
+        Specialization::new(db, self, types, None, None)
+    }
+
+    /// Creates a specialization of this generic context. Panics if the length of `types` does not
+    /// match the number of typevars in the generic context.
+    ///
+    /// You must provide a specific type for each typevar; no defaults are used. (Use
+    /// [`specialize_partial`](Self::specialize_partial) if you might not have types for every
+    /// typevar.)
+    ///
+    /// The types you provide should not mention any of the typevars in this generic context;
+    /// otherwise, you will be left with a partial specialization. (Use
+    /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
+    /// in this generic context.)
+    pub(crate) fn specialize_owned(
         self,
         db: &'db dyn Db,
         types: Box<[Type<'db>]>,

@@ -4127,7 +4127,7 @@ impl<'db> Type<'db> {
                                             .with_annotated_type(
                                                 KnownClass::Dict.to_specialized_instance(
                                                     db,
-                                                    [str_instance, Type::any()],
+                                                    &[str_instance, Type::any()],
                                                 ),
                                             ),
                                     ],
@@ -4377,7 +4377,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(
                                         KnownClass::Iterable.to_specialized_instance(
                                             db,
-                                            [Type::TypeVar(element_ty)],
+                                            &[Type::TypeVar(element_ty)],
                                         ),
                                     )],
                                 ),
@@ -5840,7 +5840,7 @@ impl<'db> Type<'db> {
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
         if self.is_typed_dict() {
             return KnownClass::Dict
-                .to_specialized_class_type(db, [KnownClass::Str.to_instance(db), Type::object()])
+                .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), Type::object()])
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown);
@@ -8370,7 +8370,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         let upper_bound = TypeVarBoundOrConstraints::UpperBound(match kind {
             ParamSpecAttrKind::Args => Type::homogeneous_tuple(db, Type::object()),
             ParamSpecAttrKind::Kwargs => KnownClass::Dict
-                .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()])
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
                 .top_materialization(db),
         });
 
@@ -13079,11 +13079,11 @@ pub(crate) mod tests {
         let recursive = UnionType::from_elements(
             &db,
             [
-                KnownClass::List.to_specialized_instance(&db, [div]),
+                KnownClass::List.to_specialized_instance(&db, &[div]),
                 Type::none(&db),
             ],
         );
-        let nested_rec = KnownClass::List.to_specialized_instance(&db, [recursive]);
+        let nested_rec = KnownClass::List.to_specialized_instance(&db, &[recursive]);
         assert_eq!(
             nested_rec.display(&db).to_string(),
             "list[list[Divergent] | None]"

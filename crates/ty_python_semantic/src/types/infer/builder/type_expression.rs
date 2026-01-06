@@ -262,7 +262,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         )
                     }) {
                         let hinted_type = if list.len() == 1 {
-                            KnownClass::List.to_specialized_instance(db, inner_types)
+                            KnownClass::List.to_specialized_instance(db, &inner_types)
                         } else {
                             Type::heterogeneous_tuple(db, inner_types)
                         };
@@ -787,13 +787,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if any_over_type(self.db(), value_ty, &|ty| ty.is_divergent(), true) {
             let value_ty = value_ty.apply_specialization(
                 db,
-                generic_context.specialize(
+                generic_context.specialize_owned(
                     db,
                     std::iter::repeat_n(
                         todo_type!("specialized recursive generic type alias"),
                         generic_context.len(db),
                     )
-                    .collect(),
+                    .collect::<Box<[Type]>>(),
                 ),
             );
             return if in_type_expression {
@@ -1131,7 +1131,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         let ty = class.to_specialized_instance(
             self.db(),
-            args.iter().map(|node| self.infer_type_expression(node)),
+            &args
+                .iter()
+                .map(|node| self.infer_type_expression(node))
+                .collect::<Box<[Type]>>(),
         );
         if arguments.is_tuple_expr() {
             self.store_expression_type(arguments, ty);

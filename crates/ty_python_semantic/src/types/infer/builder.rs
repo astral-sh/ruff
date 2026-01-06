@@ -2836,7 +2836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         KnownClass::Dict.to_specialized_instance(
                             self.db(),
-                            [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                            &[KnownClass::Str.to_instance(self.db()), Type::unknown()],
                         )
                     }
 
@@ -2848,14 +2848,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // The diagnostic for this case is handled in `in_type_expression`.
                         KnownClass::Dict.to_specialized_instance(
                             self.db(),
-                            [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                            &[KnownClass::Str.to_instance(self.db()), Type::unknown()],
                         )
                     }
                 }
             } else {
                 KnownClass::Dict.to_specialized_instance(
                     self.db(),
-                    [KnownClass::Str.to_instance(self.db()), annotated_type],
+                    &[KnownClass::Str.to_instance(self.db()), annotated_type],
                 )
             };
             self.add_declaration_with_binding(
@@ -2866,7 +2866,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let inferred_ty = KnownClass::Dict.to_specialized_instance(
                 self.db(),
-                [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                &[KnownClass::Str.to_instance(self.db()), Type::unknown()],
             );
 
             self.add_binding(parameter.into(), definition)
@@ -3392,7 +3392,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 KnownClass::BaseExceptionGroup
             };
-            class.to_specialized_instance(self.db(), [symbol_ty])
+            class.to_specialized_instance(self.db(), &[symbol_ty])
         } else {
             symbol_ty
         }
@@ -8007,7 +8007,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let infer_elt_ty = |builder: &mut Self, elt, tcx| builder.infer_expression(elt, tcx);
         self.infer_collection_literal(elts, tcx, infer_elt_ty, KnownClass::List)
             .unwrap_or_else(|| {
-                KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
+                KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
             })
     }
 
@@ -8022,7 +8022,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let infer_elt_ty = |builder: &mut Self, elt, tcx| builder.infer_expression(elt, tcx);
         self.infer_collection_literal(elts, tcx, infer_elt_ty, KnownClass::Set)
             .unwrap_or_else(|| {
-                KnownClass::Set.to_specialized_instance(self.db(), [Type::unknown()])
+                KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
             })
     }
 
@@ -8049,7 +8049,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // unsupported.
         if let Some(Type::Dynamic(DynamicType::Todo(_))) = tcx.annotation {
             return KnownClass::Dict
-                .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()]);
+                .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()]);
         }
 
         let items = items
@@ -8069,7 +8069,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_collection_literal(items, tcx, infer_elt_ty, KnownClass::Dict)
             .unwrap_or_else(|| {
                 KnownClass::Dict
-                    .to_specialized_instance(self.db(), [Type::unknown(), Type::unknown()])
+                    .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()])
             })
     }
 
@@ -8339,11 +8339,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if evaluation_mode.is_async() {
             KnownClass::AsyncGeneratorType
-                .to_specialized_instance(self.db(), [yield_type, Type::none(self.db())])
+                .to_specialized_instance(self.db(), &[yield_type, Type::none(self.db())])
         } else {
             KnownClass::GeneratorType.to_specialized_instance(
                 self.db(),
-                [yield_type, Type::none(self.db()), Type::none(self.db())],
+                &[yield_type, Type::none(self.db()), Type::none(self.db())],
             )
         }
     }
@@ -8373,20 +8373,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .zip(inferred_element_types.iter())
                 .all(|(annotated, inferred)| inferred.is_assignable_to(self.db(), *annotated))
         {
-            collection_class
-                .to_specialized_instance(self.db(), annotated_element_types.iter().copied())
+            collection_class.to_specialized_instance(
+                self.db(),
+                &annotated_element_types
+                    .iter()
+                    .copied()
+                    .collect::<Box<[Type]>>(),
+            )
         } else {
             collection_class.to_specialized_instance(
                 self.db(),
-                inferred_element_types.iter().map(|ty| {
-                    UnionType::from_elements(
-                        self.db(),
-                        [
-                            ty.promote_literals(self.db(), TypeContext::default()),
-                            Type::unknown(),
-                        ],
-                    )
-                }),
+                &inferred_element_types
+                    .iter()
+                    .map(|ty| {
+                        UnionType::from_elements(
+                            self.db(),
+                            [
+                                ty.promote_literals(self.db(), TypeContext::default()),
+                                Type::unknown(),
+                            ],
+                        )
+                    })
+                    .collect::<Box<[Type]>>(),
             )
         }
     }
@@ -12195,7 +12203,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .expect("A known stdlib class is available");
 
                 return class
-                    .to_specialized_class_type(self.db(), [element_ty])
+                    .to_specialized_class_type(self.db(), &[element_ty])
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
             }
@@ -12253,7 +12261,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .expect("Stdlib class available");
 
                 return class
-                    .to_specialized_class_type(self.db(), [first_ty, second_ty])
+                    .to_specialized_class_type(self.db(), &[first_ty, second_ty])
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
             }
@@ -13115,7 +13123,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_to_slice_argument(ty_step),
         ) {
             (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
-                KnownClass::Slice.to_specialized_instance(self.db(), [lower, upper, step])
+                KnownClass::Slice.to_specialized_instance(self.db(), &[lower, upper, step])
             }
             _ => KnownClass::Slice.to_instance(self.db()),
         }
