@@ -88,8 +88,30 @@ pub(crate) struct Suppression {
     /// Whether this suppression actually suppressed a diagnostic
     used: Cell<bool>,
 
-    disable_comment: Option<SuppressionComment>,
-    enable_comment: Option<SuppressionComment>,
+    comments: DisableEnableComments,
+}
+
+#[derive(Debug)]
+pub(crate) enum DisableEnableComments {
+    /// An implicitly closed disable comment without a matching enable comment.
+    Disable(SuppressionComment),
+    /// A matching pair of disable and enable comments.
+    DisableEnable(SuppressionComment, SuppressionComment),
+}
+
+impl DisableEnableComments {
+    pub(crate) fn disable_comment(&self) -> &SuppressionComment {
+        match self {
+            DisableEnableComments::Disable(comment) => comment,
+            DisableEnableComments::DisableEnable(disable, _) => disable,
+        }
+    }
+    pub(crate) fn enable_comment(&self) -> Option<&SuppressionComment> {
+        match self {
+            DisableEnableComments::Disable(_) => None,
+            DisableEnableComments::DisableEnable(_, enable) => Some(enable),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -214,12 +236,13 @@ impl Suppressions {
                         },
                     );
                 }
-            } else if suppression.disable_comment.is_some() && suppression.enable_comment.is_none()
-            {
+            } else if let DisableEnableComments::Disable(comment) = &suppression.comments {
                 // UnmatchedSuppressionComment
-                let range = suppression.disable_comment.as_ref().unwrap().range;
-                if unmatched_ranges.insert(range) {
-                    context.report_diagnostic_if_enabled(UnmatchedSuppressionComment {}, range);
+                if unmatched_ranges.insert(comment.range) {
+                    context.report_diagnostic_if_enabled(
+                        UnmatchedSuppressionComment {},
+                        comment.range,
+                    );
                 }
             }
         }
@@ -261,26 +284,25 @@ impl Suppressions {
         highlight_only_code: bool,
         kind: T,
     ) {
-        if let Some(disable_comment) = suppression.disable_comment.as_ref() {
-            let (range, edit) = Suppressions::delete_code_or_comment(
+        let disable_comment = suppression.comments.disable_comment();
+        let (range, edit) = Suppressions::delete_code_or_comment(
+            locator,
+            suppression,
+            disable_comment,
+            highlight_only_code,
+        );
+        let mut diagnostic = context.report_diagnostic(kind, range);
+        if let Some(enable_comment) = suppression.comments.enable_comment() {
+            let (enable_range, enable_range_edit) = Suppressions::delete_code_or_comment(
                 locator,
                 suppression,
-                disable_comment,
+                enable_comment,
                 highlight_only_code,
             );
-            let mut diagnostic = context.report_diagnostic(kind, range);
-            if let Some(enable_comment) = suppression.enable_comment.as_ref() {
-                let (enable_range, enable_range_edit) = Suppressions::delete_code_or_comment(
-                    locator,
-                    suppression,
-                    enable_comment,
-                    highlight_only_code,
-                );
-                diagnostic.secondary_annotation("", enable_range);
-                diagnostic.set_fix(Fix::safe_edits(edit, [enable_range_edit]));
-            } else {
-                diagnostic.set_fix(Fix::safe_edit(edit));
-            }
+            diagnostic.secondary_annotation("", enable_range);
+            diagnostic.set_fix(Fix::safe_edits(edit, [enable_range_edit]));
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(edit));
         }
     }
 
@@ -441,8 +463,10 @@ impl<'a> SuppressionsBuilder<'a> {
                     self.valid.push(Suppression {
                         code: code.into(),
                         range: combined_range,
-                        disable_comment: Some(comment.comment.clone()),
-                        enable_comment: Some(other.comment.clone()),
+                        comments: DisableEnableComments::DisableEnable(
+                            comment.comment.clone(),
+                            other.comment.clone(),
+                        ),
                         used: false.into(),
                     });
                 }
@@ -459,8 +483,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     self.valid.push(Suppression {
                         code: code.into(),
                         range: implicit_range,
-                        disable_comment: Some(comment.comment.clone()),
-                        enable_comment: None,
+                        comments: DisableEnableComments::Disable(comment.comment.clone()),
                         used: false.into(),
                     });
                 }
@@ -1634,14 +1657,14 @@ def bar():
                     "disable_comment",
                     &DebugSuppressionComment {
                         source: self.source,
-                        comment: self.suppression.disable_comment.clone(),
+                        comment: Some(self.suppression.comments.disable_comment().clone()),
                     },
                 )
                 .field(
                     "enable_comment",
                     &DebugSuppressionComment {
                         source: self.source,
-                        comment: self.suppression.enable_comment.clone(),
+                        comment: self.suppression.comments.enable_comment().cloned(),
                     },
                 )
                 .finish()
