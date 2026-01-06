@@ -1,7 +1,7 @@
 use compact_str::CompactString;
 use core::fmt;
 use ruff_db::diagnostic::Diagnostic;
-use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
 use rustc_hash::FxHashSet;
@@ -176,7 +176,6 @@ impl Suppressions {
                         locator,
                         suppression,
                         true,
-                        Applicability::Safe,
                         InvalidRuleCode {
                             rule_code: suppression.code.to_string(),
                             kind: InvalidRuleCodeKind::Suppression,
@@ -209,7 +208,6 @@ impl Suppressions {
                         locator,
                         suppression,
                         false,
-                        Applicability::Safe,
                         UnusedNOQA {
                             codes: Some(codes),
                             kind: UnusedNOQAKind::Suppression,
@@ -261,7 +259,6 @@ impl Suppressions {
         locator: &Locator,
         suppression: &Suppression,
         highlight_only_code: bool,
-        applicability: Applicability,
         kind: T,
     ) {
         if let Some(disable_comment) = suppression.disable_comment.as_ref() {
@@ -273,16 +270,16 @@ impl Suppressions {
             );
             let mut diagnostic = context.report_diagnostic(kind, range);
             if let Some(enable_comment) = suppression.enable_comment.as_ref() {
-                let (range2, edit2) = Suppressions::delete_code_or_comment(
+                let (enable_range, enable_range_edit) = Suppressions::delete_code_or_comment(
                     locator,
                     suppression,
                     enable_comment,
                     highlight_only_code,
                 );
-                diagnostic.secondary_annotation("", range2);
-                diagnostic.set_fix(Fix::applicable_edits(edit, vec![edit2], applicability));
+                diagnostic.secondary_annotation("", enable_range);
+                diagnostic.set_fix(Fix::safe_edits(edit, [enable_range_edit]));
             } else {
-                diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
+                diagnostic.set_fix(Fix::safe_edit(edit));
             }
         }
     }
