@@ -148,6 +148,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
+    registry.register_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
@@ -2078,6 +2079,46 @@ declare_lint! {
         summary: "detects subclasses of final classes",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for classes that inherit from a dataclass with `order=True`.
+    ///
+    /// ## Why is this bad?
+    /// When a dataclass has `order=True`, comparison methods (`__lt__`, `__le__`, `__gt__`, `__ge__`)
+    /// are generated that compare instances as tuples of their fields. These methods raise a
+    /// `TypeError` at runtime when comparing instances of different classes in the inheritance
+    /// hierarchy, even if one is a subclass of the other.
+    ///
+    /// This violates the [Liskov Substitution Principle] because child class instances cannot be
+    /// used in all contexts where parent class instances are expected.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass(order=True)
+    /// class Parent:
+    ///     value: int
+    ///
+    /// class Child(Parent):  # Ty emits a warning here
+    ///     pass
+    ///
+    /// # At runtime, this raises TypeError:
+    /// # Child(1) < Parent(2)
+    /// ```
+    ///
+    /// Consider using [`functools.total_ordering`][total_ordering] instead, which does not have this limitation.
+    ///
+    /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+    /// [total_ordering]: https://docs.python.org/3/library/functools.html#functools.total_ordering
+    pub(crate) static SUBCLASS_OF_DATACLASS_WITH_ORDER = {
+        summary: "detects subclasses of dataclasses with `order=True`",
+        status: LintStatus::stable("0.0.17"),
+        default_level: Level::Warn,
     }
 }
 
