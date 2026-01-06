@@ -326,6 +326,12 @@ reveal_type(Bing() + Foo(42))  # revealed: Foo
 reveal_type(Foo(3.14) < Bing())  # revealed: bool
 reveal_type(Bing() < Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) in Bing())  # revealed: bool
+
+3.14 + Bing()  # error: [unsupported-operator]
+Bing() + 3.14  # error: [unsupported-operator]
+3.14 < Bing()  # error: [unsupported-operator]
+Bing() < 3.14  # error: [unsupported-operator]
+3.14 in Bing()  # error: [unsupported-operator]
 ```
 
 ## A `NewType` definition must be a simple variable assignment
