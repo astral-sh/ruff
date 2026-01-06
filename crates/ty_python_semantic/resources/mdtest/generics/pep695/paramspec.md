@@ -688,6 +688,46 @@ reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, 
 reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 ```
 
+### Overloads with subtitution of `P.args` and `P.kwargs`
+
+This is regression test for <https://github.com/astral-sh/ty/issues/2027>
+
+```py
+from typing import Callable, Never, overload
+
+class Task[**P, R]:
+    def __init__(self, func: Callable[P, R]) -> None:
+        self.func = func
+
+    @overload
+    def __call__(self: "Task[P, R]", *args: P.args, **kwargs: P.kwargs) -> R: ...
+    @overload
+    def __call__(self: "Task[P, Never]", *args: P.args, **kwargs: P.kwargs) -> None: ...
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R | None:
+        return self.func(*args, **kwargs)
+
+def returns_str(x: int) -> str:
+    return str(x)
+
+def never_returns(x: int) -> Never:
+    raise Exception()
+
+t1 = Task(returns_str)
+reveal_type(t1)  # revealed: Task[(x: int), str]
+reveal_type(t1(1))  # revealed: str
+reveal_type(t1(x=1))  # revealed: str
+# error: [no-matching-overload]
+reveal_type(t1("a"))  # revealed: Unknown
+# error: [no-matching-overload]
+reveal_type(t1(y=1))  # revealed: Unknown
+
+t2 = Task(never_returns)
+# TODO: This should be `Task[(x: int), Never]`
+reveal_type(t2)  # revealed: Task[(x: int), Unknown]
+# TODO: This should be `Never`
+reveal_type(t2(1))  # revealed: Unknown
+```
+
 ## ParamSpec attribute assignability
 
 When comparing signatures with `ParamSpec` attributes (`P.args` and `P.kwargs`), two different
