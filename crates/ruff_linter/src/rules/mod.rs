@@ -2,6 +2,7 @@ pub mod airflow;
 pub mod eradicate;
 pub mod fastapi;
 pub mod flake8_2020;
+pub mod flake8_annotation_complexity;
 pub mod flake8_annotations;
 pub mod flake8_async;
 pub mod flake8_bandit;
