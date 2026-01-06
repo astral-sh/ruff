@@ -948,6 +948,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .map(|p| Box::new(self.predicate_kind(p))),
                 pattern.name.as_ref().map(|name| name.id.clone()),
             ),
+            ast::Pattern::MatchSequence(pattern) => {
+                let predicates = pattern
+                    .patterns
+                    .iter()
+                    .map(|pattern| self.predicate_kind(pattern))
+                    .collect();
+                PatternPredicateKind::Sequence(predicates)
+            }
             _ => PatternPredicateKind::Unsupported,
         }
     }

@@ -429,6 +429,10 @@ class Foo: ...
 class Bar: ...
 
 def test4(val: Intersection[tuple[Foo], tuple[Bar]]):
-    # TODO: should be `Foo & Bar`
-    reveal_type(val[0])  # revealed: @Todo(Subscript expressions on intersections)
+    # Intersection of tuples is simplified element-wise
+    reveal_type(val[0])  # revealed: Foo & Bar
+
+def test5(val: Intersection[tuple[Foo, ...], tuple[Bar, ...]]):
+    # Intersection of homogeneous variable tuples is simplified element-wise
+    reveal_type(val[0])  # revealed: Foo & Bar
 ```
