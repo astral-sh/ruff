@@ -307,27 +307,6 @@ def apply_decorator(cls: type[Base]) -> None:
     def inner() -> None: ...
 ```
 
-### `_SpecialForm` subclass decorator
-
-Classes that inherit from `typing._SpecialForm` are used as decorators in `typing_extensions`. The
-typeshed stub for `_SpecialForm` doesn't include `__init__`, but the runtime implementation accepts
-a callable. We skip constructor validation for these classes:
-
-```py
-from typing import _SpecialForm
-
-# error: [subclass-of-final-class]
-class _ExtensionsSpecialForm(_SpecialForm, _root=True):
-    pass
-
-# No error here about too-many-positional-arguments.
-@_ExtensionsSpecialForm
-def LiteralString(self, params):
-    raise TypeError(f"{self} is not subscriptable")
-
-reveal_type(LiteralString)  # revealed: _ExtensionsSpecialForm
-```
-
 ## Class decorators
 
 Class decorator calls are validated, emitting diagnostics for invalid arguments:
