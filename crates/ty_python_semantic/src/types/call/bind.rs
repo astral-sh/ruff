@@ -23,7 +23,7 @@ use smallvec::{SmallVec, smallvec, smallvec_inline};
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{Definedness, Place, known_module_symbol};
+use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
@@ -1022,7 +1022,11 @@ impl<'db> Bindings<'db> {
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
                                 match instance_ty.static_member(db, attr_name.value(db)) {
-                                    Place::Defined(ty, _, Definedness::AlwaysDefined, _) => {
+                                    Place::Defined(DefinedPlace {
+                                        ty,
+                                        definedness: Definedness::AlwaysDefined,
+                                        ..
+                                    }) => {
                                         if ty.is_dynamic() {
                                             // Here, we attempt to model the fact that an attribute lookup on
                                             // a dynamic type could fail
@@ -1032,9 +1036,11 @@ impl<'db> Bindings<'db> {
                                             ty
                                         }
                                     }
-                                    Place::Defined(ty, _, Definedness::PossiblyUndefined, _) => {
-                                        union_with_default(ty)
-                                    }
+                                    Place::Defined(DefinedPlace {
+                                        ty,
+                                        definedness: Definedness::PossiblyUndefined,
+                                        ..
+                                    }) => union_with_default(ty),
                                     Place::Undefined => default,
                                 },
                             );
@@ -2829,7 +2835,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 )
                 .place
             {
-                Place::Defined(getitem_method, _, Definedness::AlwaysDefined, _) => getitem_method
+                Place::Defined(DefinedPlace {
+                    ty: getitem_method,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) => getitem_method
                     .try_call(db, &CallArguments::positional([Type::unknown()]))
                     .ok()
                     .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
@@ -3436,7 +3446,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     )
                     .place
                 {
-                    Place::Defined(keys_method, _, Definedness::AlwaysDefined, _) => keys_method
+                    Place::Defined(DefinedPlace {
+                        ty: keys_method,
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }) => keys_method
                         .try_call(self.db, &CallArguments::none())
                         .ok()
                         .and_then(|bindings| {
@@ -3482,14 +3496,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         )
                         .place
                     {
-                        Place::Defined(keys_method, _, Definedness::AlwaysDefined, _) => {
-                            keys_method
-                                .try_call(self.db, &CallArguments::positional([Type::unknown()]))
-                                .ok()
-                                .map_or_else(Type::unknown, |bindings| {
-                                    bindings.return_type(self.db)
-                                })
-                        }
+                        Place::Defined(DefinedPlace {
+                            ty: getitem_method,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        }) => getitem_method
+                            .try_call(self.db, &CallArguments::positional([Type::unknown()]))
+                            .ok()
+                            .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
                         _ => Type::unknown(),
                     },
                 )
