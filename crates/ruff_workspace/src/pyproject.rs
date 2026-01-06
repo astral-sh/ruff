@@ -40,22 +40,27 @@ impl Pyproject {
     }
 }
 
-/// Parse a `ruff.toml` file.
-fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
+fn parse_toml<P: AsRef<Path>>(path: P) -> Result<toml::Value> {
     let path = path.as_ref();
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
-    check_required_version(&contents, path, &[])?;
     toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
+}
+
+/// Parse a `ruff.toml` file.
+fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
+    let path = path.as_ref();
+    let toml = parse_toml(path)?;
+    check_required_version(&toml, path, &[])?;
+    toml.try_into().with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let path = path.as_ref();
-    let contents = std::fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    check_required_version(&contents, path, &["tool", "ruff"])?;
-    toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
+    let toml = parse_toml(path)?;
+    check_required_version(&toml, path, &["tool", "ruff"])?;
+    toml.try_into().with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -100,10 +105,8 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn check_required_version(contents: &str, path: &Path, table_path: &[&str]) -> Result<()> {
-    let value: toml::Value =
-        toml::from_str(contents).with_context(|| format!("Failed to parse {}", path.display()))?;
-    let mut current = &value;
+fn check_required_version(value: &toml::Value, path: &Path, table_path: &[&str]) -> Result<()> {
+    let mut current = value;
     for key in table_path {
         match current.get(*key) {
             Some(next) => {
