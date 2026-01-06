@@ -264,19 +264,19 @@ impl Suppressions {
         applicability: Applicability,
         kind: T,
     ) {
-        if suppression.disable_comment.is_some() {
+        if let Some(disable_comment) = suppression.disable_comment.as_ref() {
             let (range, edit) = Suppressions::delete_code_or_comment(
                 locator,
                 suppression,
-                suppression.disable_comment.as_ref().unwrap(),
+                disable_comment,
                 highlight_only_code,
             );
             let mut diagnostic = context.report_diagnostic(kind, range);
-            if suppression.enable_comment.is_some() {
+            if let Some(enable_comment) = suppression.enable_comment.as_ref() {
                 let (range2, edit2) = Suppressions::delete_code_or_comment(
                     locator,
                     suppression,
-                    suppression.enable_comment.as_ref().unwrap(),
+                    enable_comment,
                     highlight_only_code,
                 );
                 diagnostic.secondary_annotation("", range2);
