@@ -10,7 +10,10 @@ use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelati
 use crate::types::{CallableTypeKind, TypeContext};
 use crate::{
     Db, FxOrderSet,
-    place::{Definedness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
+    place::{
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, place_from_bindings,
+        place_from_declarations,
+    },
     semantic_index::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
@@ -738,7 +741,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 let attribute_type = if self.name == "__call__" {
                     other
                 } else {
-                    let Place::Defined { ty: attribute_type, origin: _, definedness: Definedness::AlwaysDefined, widening: _ } = other
+                    let Place::Defined(DefinedPlace {
+                        ty: attribute_type,
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }) = other
                         .invoke_descriptor_protocol(
                             db,
                             self.name,
@@ -783,11 +790,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
                 other.member(db, self.name).place,
-                Place::Defined { ty: _, origin: _, definedness: Definedness::AlwaysDefined, widening: _ }
+                Place::Defined(DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                })
             )),
             ProtocolMemberKind::Other(member_type) => {
-                let Place::Defined { ty: attribute_type, origin: _, definedness: Definedness::AlwaysDefined, widening: _ } =
-                    other.member(db, self.name).place
+                let Place::Defined(DefinedPlace {
+                    ty: attribute_type,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) = other.member(db, self.name).place
                 else {
                     return ConstraintSet::from(false);
                 };

@@ -8,7 +8,7 @@ use super::{
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
@@ -4058,14 +4058,14 @@ pub(super) fn report_invalid_method_override<'db>(
             .place
     };
 
-    if let Place::Defined {
+    if let Place::Defined(DefinedPlace {
         ty: Type::FunctionLiteral(subclass_function),
         ..
-    } = class_member(subclass)
-        && let Place::Defined {
+    }) = class_member(subclass)
+        && let Place::Defined(DefinedPlace {
             ty: Type::FunctionLiteral(superclass_function),
             ..
-        } = class_member(superclass)
+        }) = class_member(superclass)
         && let Ok(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)
         && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)

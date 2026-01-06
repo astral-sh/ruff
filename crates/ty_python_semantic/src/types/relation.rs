@@ -1,6 +1,6 @@
 use ruff_python_ast::name::Name;
 
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::types::constraints::{IteratorConstraintsExtension, OptionConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::{
@@ -1940,14 +1940,15 @@ impl<'db> Type<'db> {
                 disjointness_visitor.visit((self, other), || {
                     protocol.interface(db).members(db).when_any(db, |member| {
                         match other.member(db, member.name()).place {
-                            Place::Defined { ty: attribute_type, origin: _, definedness: _, widening: _ } => member
-                                .has_disjoint_type_from(
-                                    db,
-                                    attribute_type,
-                                    inferable,
-                                    disjointness_visitor,
-                                    relation_visitor,
-                                ),
+                            Place::Defined(DefinedPlace {
+                                ty: attribute_type, ..
+                            }) => member.has_disjoint_type_from(
+                                db,
+                                attribute_type,
+                                inferable,
+                                disjointness_visitor,
+                                relation_visitor,
+                            ),
                             Place::Undefined => ConstraintSet::from(false),
                         }
                     })

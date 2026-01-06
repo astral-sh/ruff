@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::place::{
-    ConsideredDefinitions, Place, PlaceAndQualifiers, RequiresExplicitReExport, place_by_id,
-    place_from_bindings,
+    ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
+    place_by_id, place_from_bindings,
 };
 use crate::semantic_index::{place_table, scope::ScopeId, use_def_map};
 use crate::types::Type;
@@ -68,7 +68,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             }
 
             if let PlaceAndQualifiers {
-                place: Place::Defined { ty: ty, origin: _, definedness: _, widening: _ },
+                place: Place::Defined(DefinedPlace { ty, .. }),
                 qualifiers,
             } = place_and_quals
             {
@@ -82,10 +82,18 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 Member {
                     inner: match inferred {
                         Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined { ty: _, origin: origin, definedness: boundness, widening: widening } => {
-                            Place::Defined { ty: ty, origin: origin, definedness: boundness, widening: widening }
-                                .with_qualifiers(qualifiers)
-                        }
+                        Place::Defined(DefinedPlace {
+                            origin,
+                            definedness,
+                            widening,
+                            ..
+                        }) => Place::Defined(DefinedPlace {
+                            ty,
+                            origin,
+                            definedness,
+                            widening,
+                        })
+                        .with_qualifiers(qualifiers),
                     },
                 }
             } else {
