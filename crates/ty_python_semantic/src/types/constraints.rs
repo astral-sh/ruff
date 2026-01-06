@@ -1004,9 +1004,8 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => {}
             Node::AlwaysFalse => {}
             Node::Interior(interior) => {
-                let mut map = interior.sequent_map(db).clone();
-                let mut path = PathAssignments::default();
-                self.for_each_path_inner(db, &mut f, &mut map, &mut path);
+                let mut path = interior.path_assignments(db);
+                self.for_each_path_inner(db, &mut f, &mut path);
             }
         }
     }
@@ -1015,7 +1014,6 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         f: &mut dyn FnMut(&PathAssignments<'db>),
-        map: &mut SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) {
         match self {
@@ -1024,24 +1022,12 @@ impl<'db> Node<'db> {
             Node::Interior(interior) => {
                 let constraint = interior.constraint(db);
                 let source_order = interior.source_order(db);
-                path.walk_edge(
-                    db,
-                    map,
-                    constraint.when_true(),
-                    source_order,
-                    |map, path, _| {
-                        interior.if_true(db).for_each_path_inner(db, f, map, path);
-                    },
-                );
-                path.walk_edge(
-                    db,
-                    map,
-                    constraint.when_false(),
-                    source_order,
-                    |map, path, _| {
-                        interior.if_false(db).for_each_path_inner(db, f, map, path);
-                    },
-                );
+                path.walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                    interior.if_true(db).for_each_path_inner(db, f, path);
+                });
+                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                    interior.if_false(db).for_each_path_inner(db, f, path);
+                });
             }
         }
     }
@@ -1052,19 +1038,13 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                let mut map = interior.sequent_map(db).clone();
-                let mut path = PathAssignments::default();
-                self.is_always_satisfied_inner(db, &mut map, &mut path)
+                let mut path = interior.path_assignments(db);
+                self.is_always_satisfied_inner(db, &mut path)
             }
         }
     }
 
-    fn is_always_satisfied_inner(
-        self,
-        db: &'db dyn Db,
-        map: &mut SequentMap<'db>,
-        path: &mut PathAssignments<'db>,
-    ) -> bool {
+    fn is_always_satisfied_inner(self, db: &'db dyn Db, path: &mut PathAssignments<'db>) -> bool {
         match self {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
@@ -1075,34 +1055,18 @@ impl<'db> Node<'db> {
                 let constraint = interior.constraint(db);
                 let source_order = interior.source_order(db);
                 let true_always_satisfied = path
-                    .walk_edge(
-                        db,
-                        map,
-                        constraint.when_true(),
-                        source_order,
-                        |map, path, _| {
-                            interior
-                                .if_true(db)
-                                .is_always_satisfied_inner(db, map, path)
-                        },
-                    )
+                    .walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                        interior.if_true(db).is_always_satisfied_inner(db, path)
+                    })
                     .unwrap_or(true);
                 if !true_always_satisfied {
                     return false;
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(
-                    db,
-                    map,
-                    constraint.when_false(),
-                    source_order,
-                    |map, path, _| {
-                        interior
-                            .if_false(db)
-                            .is_always_satisfied_inner(db, map, path)
-                    },
-                )
+                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                    interior.if_false(db).is_always_satisfied_inner(db, path)
+                })
                 .unwrap_or(true)
             }
         }
@@ -1114,19 +1078,13 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
-                let mut map = interior.sequent_map(db).clone();
-                let mut path = PathAssignments::default();
-                self.is_never_satisfied_inner(db, &mut map, &mut path)
+                let mut path = interior.path_assignments(db);
+                self.is_never_satisfied_inner(db, &mut path)
             }
         }
     }
 
-    fn is_never_satisfied_inner(
-        self,
-        db: &'db dyn Db,
-        map: &mut SequentMap<'db>,
-        path: &mut PathAssignments<'db>,
-    ) -> bool {
+    fn is_never_satisfied_inner(self, db: &'db dyn Db, path: &mut PathAssignments<'db>) -> bool {
         match self {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
@@ -1137,30 +1095,18 @@ impl<'db> Node<'db> {
                 let constraint = interior.constraint(db);
                 let source_order = interior.source_order(db);
                 let true_never_satisfied = path
-                    .walk_edge(
-                        db,
-                        map,
-                        constraint.when_true(),
-                        source_order,
-                        |map, path, _| interior.if_true(db).is_never_satisfied_inner(db, map, path),
-                    )
+                    .walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                        interior.if_true(db).is_never_satisfied_inner(db, path)
+                    })
                     .unwrap_or(true);
                 if !true_never_satisfied {
                     return false;
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(
-                    db,
-                    map,
-                    constraint.when_false(),
-                    source_order,
-                    |map, path, _| {
-                        interior
-                            .if_false(db)
-                            .is_never_satisfied_inner(db, map, path)
-                    },
-                )
+                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                    interior.if_false(db).is_never_satisfied_inner(db, path)
+                })
                 .unwrap_or(true)
             }
         }
@@ -1445,13 +1391,12 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
-        map: &mut SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
-            Node::Interior(interior) => interior.abstract_one_inner(db, should_remove, map, path),
+            Node::Interior(interior) => interior.abstract_one_inner(db, should_remove, path),
         }
     }
 
@@ -2041,8 +1986,7 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
-        let mut map = self.sequent_map(db).clone();
-        let mut path = PathAssignments::default();
+        let mut path = self.path_assignments(db);
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
             _ => false,
@@ -2068,15 +2012,13 @@ impl<'db> InteriorNode<'db> {
                 }
                 false
             },
-            &mut map,
             &mut path,
         )
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
-        let mut map = self.sequent_map(db).clone();
-        let mut path = PathAssignments::default();
+        let mut path = self.path_assignments(db);
         self.abstract_one_inner(
             db,
             // Remove any node that constrains some other typevar than `bound_typevar`, and any
@@ -2092,7 +2034,6 @@ impl<'db> InteriorNode<'db> {
                 }
                 false
             },
-            &mut map,
             &mut path,
         )
     }
@@ -2101,7 +2042,6 @@ impl<'db> InteriorNode<'db> {
         self,
         db: &'db dyn Db,
         should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
-        map: &mut SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
@@ -2123,13 +2063,10 @@ impl<'db> InteriorNode<'db> {
             let if_true = path
                 .walk_edge(
                     db,
-                    map,
                     self_constraint.when_true(),
                     self_source_order,
-                    |map, path, new_range| {
-                        let branch =
-                            self.if_true(db)
-                                .abstract_one_inner(db, should_remove, map, path);
+                    |path, new_range| {
+                        let branch = self.if_true(db).abstract_one_inner(db, should_remove, path);
                         path.assignments[new_range]
                             .iter()
                             .filter(|(assignment, _)| {
@@ -2149,13 +2086,12 @@ impl<'db> InteriorNode<'db> {
             let if_false = path
                 .walk_edge(
                     db,
-                    map,
                     self_constraint.when_false(),
                     self_source_order,
-                    |map, path, new_range| {
-                        let branch =
-                            self.if_false(db)
-                                .abstract_one_inner(db, should_remove, map, path);
+                    |path, new_range| {
+                        let branch = self
+                            .if_false(db)
+                            .abstract_one_inner(db, should_remove, path);
                         path.assignments[new_range]
                             .iter()
                             .filter(|(assignment, _)| {
@@ -2178,24 +2114,19 @@ impl<'db> InteriorNode<'db> {
             let if_true = path
                 .walk_edge(
                     db,
-                    map,
                     self_constraint.when_true(),
                     self_source_order,
-                    |map, path, _| {
-                        self.if_true(db)
-                            .abstract_one_inner(db, should_remove, map, path)
-                    },
+                    |path, _| self.if_true(db).abstract_one_inner(db, should_remove, path),
                 )
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
                 .walk_edge(
                     db,
-                    map,
                     self_constraint.when_false(),
                     self_source_order,
-                    |map, path, _| {
+                    |path, _| {
                         self.if_false(db)
-                            .abstract_one_inner(db, should_remove, map, path)
+                            .abstract_one_inner(db, should_remove, path)
                     },
                 )
                 .unwrap_or(Node::AlwaysFalse);
@@ -2272,6 +2203,13 @@ impl<'db> InteriorNode<'db> {
             map.add(db, constraint);
         }
         map
+    }
+
+    fn path_assignments(self, db: &'db dyn Db) -> PathAssignments<'db> {
+        PathAssignments {
+            map: self.sequent_map(db).clone(),
+            assignments: FxOrderMap::default(),
+        }
     }
 
     /// Returns a simplified version of a BDD.
@@ -3352,8 +3290,9 @@ impl<'db> SequentMap<'db> {
 
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct PathAssignments<'db> {
+    map: SequentMap<'db>,
     assignments: FxOrderMap<ConstraintAssignment<'db>, usize>,
 }
 
@@ -3383,10 +3322,9 @@ impl<'db> PathAssignments<'db> {
     fn walk_edge<R>(
         &mut self,
         db: &'db dyn Db,
-        map: &mut SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
         source_order: usize,
-        f: impl FnOnce(&mut SequentMap<'db>, &mut Self, Range<usize>) -> R,
+        f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
         // Record a snapshot of the assignments that we already knew held — both so that we can
         // pass along the range of which assignments are new, and so that we can reset back to this
@@ -3403,7 +3341,7 @@ impl<'db> PathAssignments<'db> {
             edge = %assignment.display(db),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, map, assignment, source_order);
+        let found_conflict = self.add_assignment(db, assignment, source_order);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -3423,7 +3361,7 @@ impl<'db> PathAssignments<'db> {
                 "new assignments",
             );
             let end = self.assignments.len();
-            Some(f(map, self, start..end))
+            Some(f(self, start..end))
         };
 
         // Reset back to where we were before following this edge, so that the caller can reuse a
@@ -3453,7 +3391,6 @@ impl<'db> PathAssignments<'db> {
     fn add_assignment(
         &mut self,
         db: &'db dyn Db,
-        map: &mut SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
         source_order: usize,
     ) -> Result<(), PathAssignmentConflict> {
@@ -3487,7 +3424,7 @@ impl<'db> PathAssignments<'db> {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
-        for ante in &map.single_tautologies {
+        for ante in &self.map.single_tautologies {
             if self.assignment_holds(ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
                 // it's false.
@@ -3504,7 +3441,7 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for (ante1, ante2) in &map.pair_impossibilities {
+        for (ante1, ante2) in &self.map.pair_impossibilities {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
@@ -3524,7 +3461,7 @@ impl<'db> PathAssignments<'db> {
         }
 
         let mut new_assignments = Vec::new();
-        for ((ante1, ante2), posts) in &map.pair_implications {
+        for ((ante1, ante2), posts) in &self.map.pair_implications {
             for post in posts {
                 if self.assignment_holds(ante1.when_true())
                     && self.assignment_holds(ante2.when_true())
@@ -3534,7 +3471,7 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for (ante, posts) in &map.single_implications {
+        for (ante, posts) in &self.map.single_implications {
             for post in posts {
                 if self.assignment_holds(ante.when_true()) {
                     new_assignments.push(post.when_true());
@@ -3543,7 +3480,7 @@ impl<'db> PathAssignments<'db> {
         }
 
         for new_assignment in new_assignments {
-            self.add_assignment(db, map, new_assignment, source_order)?;
+            self.add_assignment(db, new_assignment, source_order)?;
         }
 
         Ok(())
