@@ -5,6 +5,7 @@ use ruff_diagnostics::{Edit, Fix};
 
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -2737,6 +2738,66 @@ impl<'db> Type<'db> {
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
 
+            // A string literal `Literal["abc"]` is a subtype of `Sequence[Literal["a", "b", "c"]]`
+            // because strings are sequences of their characters.
+            (Type::StringLiteral(string_literal), _) => {
+                // First try the fallback to `str` instance
+                let str_fallback_result =
+                    self.literal_fallback_instance(db)
+                        .when_some_and(|instance| {
+                            instance.has_relation_to_impl(
+                                db,
+                                target,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        });
+
+                // If that succeeds, return it
+                if !str_fallback_result.is_never_satisfied(db) {
+                    return str_fallback_result;
+                }
+
+                // Check if target is Sequence[X] and if all chars are subtypes of X
+                if let Type::NominalInstance(instance) = target {
+                    let class = instance.class(db);
+                    let (class_literal, specialization) = class.class_literal(db);
+                    if class_literal.is_known(db, KnownClass::Sequence) {
+                        if let Some(spec) = specialization {
+                            if let [element_type] = spec.types(db) {
+                                // Check if each unique character is a subtype of element_type
+                                let value = string_literal.value(db);
+                                let unique_chars: BTreeSet<char> = value.chars().collect();
+
+                                // For empty string, it's always a valid Sequence
+                                if unique_chars.is_empty() {
+                                    return ConstraintSet::from(true);
+                                }
+
+                                // Check each character and accumulate constraints
+                                return unique_chars.iter().when_all(db, |c| {
+                                    let char_literal =
+                                        Type::string_literal(db, &c.to_string());
+                                    char_literal.has_relation_to_impl(
+                                        db,
+                                        *element_type,
+                                        inferable,
+                                        relation,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    )
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Fallback: not a subtype
+                ConstraintSet::from(false)
+            }
+
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
             (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
@@ -2750,12 +2811,11 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            // Except for the special `LiteralString` case above,
+            // Except for the special `LiteralString` and `StringLiteral` cases above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
             (
-                Type::StringLiteral(_)
-                | Type::LiteralString
+                Type::LiteralString
                 | Type::BooleanLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
