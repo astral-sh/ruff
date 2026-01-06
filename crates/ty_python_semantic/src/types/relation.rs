@@ -962,15 +962,13 @@ impl<'db> Type<'db> {
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
 
-            (Type::StringLiteral(_), Type::NominalInstance(instance))
-                if instance.has_known_class(db, KnownClass::Str) =>
-            {
-                ConstraintSet::from(true)
-            }
-
             // A string literal `Literal["abc"]` is a subtype of `str` *and* of
             // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
-            (Type::StringLiteral(value), _) => {
+            (Type::StringLiteral(value), Type::NominalInstance(instance)) => {
+                if instance.has_known_class(db, KnownClass::Str) {
+                    return ConstraintSet::from(true);
+                }
+
                 let chars: FxHashSet<char> = value.value(db).chars().collect();
 
                 let spec = match chars.len() {
@@ -1026,6 +1024,7 @@ impl<'db> Type<'db> {
             // unless `self` is exactly equivalent to `target` (handled above)
             (
                 Type::LiteralString
+                | Type::StringLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
