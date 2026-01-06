@@ -120,121 +120,73 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "utils",
             "setup_teardown",
-            "BaseSetupTeardownContext",
-        ] => Replacement::Rename {
+            rest @ ("BaseSetupTeardownContext" | "SetupTeardownContext"),
+        ] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.definitions._internal.setup_teardown",
-            name: "BaseSetupTeardownContext",
-        },
-        ["airflow", "utils", "setup_teardown", "SetupTeardownContext"] => Replacement::Rename {
-            module: "airflow.sdk.definitions._internal.setup_teardown",
-            name: "SetupTeardownContext",
+            name: rest.to_string(),
         },
         // airflow.utils.xcom
-        ["airflow", "utils", "xcom", "XCOM_RETURN_KEY"] => Replacement::Rename {
+        ["airflow", "utils", "xcom", "XCOM_RETURN_KEY"] => Replacement::SourceModuleMoved {
             module: "airflow.models.xcom",
-            name: "XCOM_RETURN_KEY",
+            name: "XCOM_RETURN_KEY".to_string(),
         },
         // airflow.utils.task_group
-        ["airflow", "utils", "task_group", "TaskGroup"] => Replacement::Rename {
+        ["airflow", "utils", "task_group", "TaskGroup"] => Replacement::SourceModuleMoved {
             module: "airflow.sdk",
-            name: "TaskGroup",
+            name: "TaskGroup".to_string(),
         },
         // airflow.utils.timezone
-        ["airflow", "utils", "timezone", "coerce_datetime"] => Replacement::Rename {
+        [
+            "airflow",
+            "utils",
+            "timezone",
+            rest @ ("coerce_datetime" | "convert_to_utc" | "datetime" | "make_naive" | "parse"
+            | "utc" | "utcnow"),
+        ] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.timezone",
-            name: "coerce_datetime",
-        },
-        ["airflow", "utils", "timezone", "convert_to_utc"] => Replacement::Rename {
-            module: "airflow.sdk.timezone",
-            name: "convert_to_utc",
-        },
-        ["airflow", "utils", "timezone", "datetime"] => Replacement::Rename {
-            module: "airflow.sdk.timezone",
-            name: "datetime",
-        },
-        ["airflow", "utils", "timezone", "make_naive"] => Replacement::Rename {
-            module: "airflow.sdk.timezone",
-            name: "make_naive",
-        },
-        ["airflow", "utils", "timezone", "parse"] => Replacement::Rename {
-            module: "airflow.sdk.timezone",
-            name: "parse",
-        },
-        ["airflow", "utils", "timezone", "utc"] => Replacement::Rename {
-            module: "airflow.sdk.timezone",
-            name: "utc",
-        },
-        ["airflow", "utils", "timezone", "utcnow"] => Replacement::Rename {
-            module: "airflow.sdk.timezone",
-            name: "utcnow",
+            name: rest.to_string(),
         },
         // airflow.utils.decorators
-        ["airflow", "utils", "decorators", "remove_task_decorator"] => Replacement::Rename {
-            module: "airflow.sdk.definitions._internal.decorators",
-            name: "remove_task_decorator",
-        },
         [
             "airflow",
             "utils",
             "decorators",
-            "fixup_decorator_warning_stack",
-        ] => Replacement::Rename {
+            rest @ ("remove_task_decorator" | "fixup_decorator_warning_stack"),
+        ] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.definitions._internal.decorators",
-            name: "fixup_decorator_warning_stack",
+            name: rest.to_string(),
         },
         // airflow.models.abstractoperator
-        ["airflow", "models", "abstractoperator", "AbstractOperator"] => Replacement::Rename {
-            module: "airflow.sdk.definitions._internal.abstractoperator",
-            name: "AbstractOperator",
-        },
-        ["airflow", "models", "abstractoperator", "NotMapped"] => Replacement::Rename {
-            module: "airflow.sdk.definitions._internal.abstractoperator",
-            name: "NotMapped",
-        },
         [
             "airflow",
             "models",
             "abstractoperator",
-            "TaskStateChangeCallback",
-        ] => Replacement::Rename {
+            rest @ ("AbstractOperator" | "NotMapped" | "TaskStateChangeCallback"),
+        ] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.definitions._internal.abstractoperator",
-            name: "TaskStateChangeCallback",
+            name: rest.to_string(),
         },
         // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", "BaseOperator"] => Replacement::Rename {
+        ["airflow", "models", "baseoperator", "BaseOperator"] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.bases.operator",
-            name: "BaseOperator",
+            name: "BaseOperator".to_string(),
         },
         // airflow.macros
-        ["airflow", "macros", "ds_add"] => Replacement::Rename {
+        [
+            "airflow",
+            "macros",
+            rest @ ("ds_add" | "ds_format" | "datetime_diff_for_humans" | "ds_format_locale"),
+        ] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.execution_time.macros",
-            name: "ds_add",
-        },
-        ["airflow", "macros", "ds_format"] => Replacement::Rename {
-            module: "airflow.sdk.execution_time.macros",
-            name: "ds_format",
-        },
-        ["airflow", "macros", "datetime_diff_for_humans"] => Replacement::Rename {
-            module: "airflow.sdk.execution_time.macros",
-            name: "datetime_diff_for_humans",
-        },
-        ["airflow", "macros", "ds_format_locale"] => Replacement::Rename {
-            module: "airflow.sdk.execution_time.macros",
-            name: "ds_format_locale",
+            name: rest.to_string(),
         },
         // airflow.io
-        ["airflow", "io", "get_fs"] => Replacement::Rename {
-            module: "airflow.sdk.io",
-            name: "get_fs",
-        },
-        ["airflow", "io", "has_fs"] => Replacement::Rename {
-            module: "airflow.sdk.io",
-            name: "has_fs",
-        },
-        ["airflow", "io", "Properties"] => Replacement::Rename {
-            module: "airflow.sdk.io",
-            name: "Properties",
-        },
+        ["airflow", "io", rest @ ("get_fs" | "has_fs" | "Properties")] => {
+            Replacement::SourceModuleMoved {
+                module: "airflow.sdk.io",
+                name: rest.to_string(),
+            }
+        }
         _ => return,
     };
 
