@@ -2770,52 +2770,38 @@ struct SequentMap<'db> {
     single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxOrderSet<ConstrainedTypeVar<'db>>>,
     /// Constraints that we have already processed
     processed: FxHashSet<ConstrainedTypeVar<'db>>,
-    /// Constraints that enqueued to be processed
-    enqueued: Vec<ConstrainedTypeVar<'db>>,
 }
 
 impl<'db> SequentMap<'db> {
     fn add(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
-        self.enqueue_constraint(constraint);
-
-        while let Some(constraint) = self.enqueued.pop() {
-            // If we've already processed this constraint, we can skip it.
-            if !self.processed.insert(constraint) {
-                continue;
-            }
-
-            // First see if we can create any sequents from the constraint on its own.
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                constraint = %constraint.display(db),
-                "add sequents for constraint",
-            );
-            self.add_sequents_for_single(db, constraint);
-
-            // Then check this constraint against all of the other ones we've seen so far, seeing
-            // if they're related to each other.
-            let processed = std::mem::take(&mut self.processed);
-            for other in &processed {
-                if constraint != *other {
-                    tracing::trace!(
-                        target: "ty_python_semantic::types::constraints::SequentMap",
-                        left = %constraint.display(db),
-                        right = %other.display(db),
-                        "add sequents for constraint pair",
-                    );
-                    self.add_sequents_for_pair(db, constraint, *other);
-                }
-            }
-            self.processed = processed;
-        }
-    }
-
-    fn enqueue_constraint(&mut self, constraint: ConstrainedTypeVar<'db>) {
         // If we've already processed this constraint, we can skip it.
-        if self.processed.contains(&constraint) {
+        if !self.processed.insert(constraint) {
             return;
         }
-        self.enqueued.push(constraint);
+
+        // First see if we can create any sequents from the constraint on its own.
+        tracing::trace!(
+            target: "ty_python_semantic::types::constraints::SequentMap",
+            constraint = %constraint.display(db),
+            "add sequents for constraint",
+        );
+        self.add_sequents_for_single(db, constraint);
+
+        // Then check this constraint against all of the other ones we've seen so far, seeing
+        // if they're related to each other.
+        let processed = std::mem::take(&mut self.processed);
+        for other in &processed {
+            if constraint != *other {
+                tracing::trace!(
+                    target: "ty_python_semantic::types::constraints::SequentMap",
+                    left = %constraint.display(db),
+                    right = %other.display(db),
+                    "add sequents for constraint pair",
+                );
+                self.add_sequents_for_pair(db, constraint, *other);
+            }
+        }
+        self.processed = processed;
     }
 
     fn pair_key(
@@ -2959,7 +2945,6 @@ impl<'db> SequentMap<'db> {
         };
 
         self.add_single_implication(db, constraint, post_constraint);
-        self.enqueue_constraint(post_constraint);
     }
 
     fn add_sequents_for_pair(
@@ -3099,7 +3084,6 @@ impl<'db> SequentMap<'db> {
         let post_constraint =
             ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
         self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
-        self.enqueue_constraint(post_constraint);
     }
 
     fn add_mutual_sequents_for_same_typevars(
@@ -3149,7 +3133,6 @@ impl<'db> SequentMap<'db> {
                     _ => return,
                 };
                 self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
-                self.enqueue_constraint(post_constraint);
             };
 
         try_one_direction(left_constraint, right_constraint);
@@ -3203,7 +3186,6 @@ impl<'db> SequentMap<'db> {
                 );
                 self.add_single_implication(db, intersection_constraint, left_constraint);
                 self.add_single_implication(db, intersection_constraint, right_constraint);
-                self.enqueue_constraint(intersection_constraint);
             }
 
             // The sequent map only needs to include constraints that might appear in a BDD. If the
@@ -3460,13 +3442,13 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        let mut new_assignments = Vec::new();
+        let mut new_constraints = Vec::new();
         for ((ante1, ante2), posts) in &self.map.pair_implications {
             for post in posts {
                 if self.assignment_holds(ante1.when_true())
                     && self.assignment_holds(ante2.when_true())
                 {
-                    new_assignments.push(post.when_true());
+                    new_constraints.push(*post);
                 }
             }
         }
@@ -3474,13 +3456,14 @@ impl<'db> PathAssignments<'db> {
         for (ante, posts) in &self.map.single_implications {
             for post in posts {
                 if self.assignment_holds(ante.when_true()) {
-                    new_assignments.push(post.when_true());
+                    new_constraints.push(*post);
                 }
             }
         }
 
-        for new_assignment in new_assignments {
-            self.add_assignment(db, new_assignment, source_order)?;
+        for new_constraint in new_constraints {
+            self.map.add(db, new_constraint);
+            self.add_assignment(db, new_constraint.when_true(), source_order)?;
         }
 
         Ok(())
