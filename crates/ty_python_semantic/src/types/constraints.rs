@@ -747,12 +747,16 @@ impl<'db> ConstrainedTypeVar<'db> {
         if !self.typevar(db).is_same_typevar_as(db, other.typevar(db)) {
             return false;
         }
+
+        // Note that we check that the bounds are _subtypes_ of each other, because we do not want
+        // dynamic types like `Any` to be pivots that we can use to compute transitive sequent map
+        // relationships.
         other
             .lower(db)
-            .is_constraint_set_assignable_to(db, self.lower(db))
+            .is_constraint_set_subtype_of(db, self.lower(db))
             && self
                 .upper(db)
-                .is_constraint_set_assignable_to(db, other.upper(db))
+                .is_constraint_set_subtype_of(db, other.upper(db))
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -763,7 +767,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
-        if !lower.is_constraint_set_assignable_to(db, upper) {
+        if !lower.is_constraint_set_subtype_of(db, upper) {
             return IntersectionResult::Disjoint;
         }
 
