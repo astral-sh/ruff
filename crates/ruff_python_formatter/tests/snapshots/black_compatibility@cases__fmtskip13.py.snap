@@ -1,0 +1,149 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+---
+## Input
+
+```python
+t = (
+    {"foo": "very long string", "bar": "another very long string", "baz": "we should run out of space by now"},  # fmt: skip
+    {"foo": "bar"},
+)
+
+t = (
+    {
+        "foo": "very long string",
+        "bar": "another very long string",
+        "baz": "we should run out of space by now",
+    },  # fmt: skip
+    {"foo": "bar"},
+)
+
+
+t = (
+    {"foo": "very long string", "bar": "another very long string", "baz": "we should run out of space by now"},  # fmt: skip
+    {"foo": "bar",},
+)
+
+t = (
+    {
+        "foo": "very long string",
+        "bar": "another very long string",
+        "baz": "we should run out of space by now",
+    },  # fmt: skip
+    {"foo": "bar",},
+)
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,5 +1,9 @@
+ t = (
+-    {"foo": "very long string", "bar": "another very long string", "baz": "we should run out of space by now"},  # fmt: skip
++    {
++        "foo": "very long string",
++        "bar": "another very long string",
++        "baz": "we should run out of space by now",
++    },  # fmt: skip
+     {"foo": "bar"},
+ )
+ 
+@@ -14,8 +18,12 @@
+ 
+ 
+ t = (
+-    {"foo": "very long string", "bar": "another very long string", "baz": "we should run out of space by now"},  # fmt: skip
+     {
++        "foo": "very long string",
++        "bar": "another very long string",
++        "baz": "we should run out of space by now",
++    },  # fmt: skip
++    {
+         "foo": "bar",
+     },
+ )
+```
+
+## Ruff Output
+
+```python
+t = (
+    {
+        "foo": "very long string",
+        "bar": "another very long string",
+        "baz": "we should run out of space by now",
+    },  # fmt: skip
+    {"foo": "bar"},
+)
+
+t = (
+    {
+        "foo": "very long string",
+        "bar": "another very long string",
+        "baz": "we should run out of space by now",
+    },  # fmt: skip
+    {"foo": "bar"},
+)
+
+
+t = (
+    {
+        "foo": "very long string",
+        "bar": "another very long string",
+        "baz": "we should run out of space by now",
+    },  # fmt: skip
+    {
+        "foo": "bar",
+    },
+)
+
+t = (
+    {
+        "foo": "very long string",
+        "bar": "another very long string",
+        "baz": "we should run out of space by now",
+    },  # fmt: skip
+    {
+        "foo": "bar",
+    },
+)
+```
+
+## Black Output
+
+```python
+t = (
+    {"foo": "very long string", "bar": "another very long string", "baz": "we should run out of space by now"},  # fmt: skip
+    {"foo": "bar"},
+)
+
+t = (
+    {
+        "foo": "very long string",
+        "bar": "another very long string",
+        "baz": "we should run out of space by now",
+    },  # fmt: skip
+    {"foo": "bar"},
+)
+
+
+t = (
+    {"foo": "very long string", "bar": "another very long string", "baz": "we should run out of space by now"},  # fmt: skip
+    {
+        "foo": "bar",
+    },
+)
+
+t = (
+    {
+        "foo": "very long string",
+        "bar": "another very long string",
+        "baz": "we should run out of space by now",
+    },  # fmt: skip
+    {
+        "foo": "bar",
+    },
+)
+```
