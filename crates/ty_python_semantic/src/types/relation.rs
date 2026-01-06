@@ -1,3 +1,4 @@
+use compact_str::ToCompactString;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -7,7 +8,7 @@ use crate::types::constraints::{IteratorConstraintsExtension, OptionConstraintsE
 use crate::types::enums::is_single_member_enum;
 use crate::types::{
     CallableType, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, PairVisitor, ProtocolInstanceType, SubclassOfInner,
+    MemberLookupPolicy, PairVisitor, ProtocolInstanceType, StringLiteralType, SubclassOfInner,
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{
@@ -983,7 +984,9 @@ impl<'db> Type<'db> {
                         .value(db)
                         .chars()
                         .filter(|c| seen.insert(*c))
-                        .map(|c| Type::string_literal(db, &c.to_string()))
+                        .map(|c| {
+                            Type::StringLiteral(StringLiteralType::new(db, c.to_compact_string()))
+                        })
                         .collect();
 
                     let spec =
