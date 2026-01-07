@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt::Write;
 use std::sync::{LazyLock, Mutex};
@@ -5197,35 +5198,49 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_specialized_class_type<'db>(
+    pub(crate) fn to_specialized_class_type<'t, 'db, T>(
         self,
         db: &'db dyn Db,
-        specialization: &[Type<'db>],
-    ) -> Option<ClassType<'db>> {
-        let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
-            return None;
-        };
+        specialization: T,
+    ) -> Option<ClassType<'db>>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
+        fn inner<'db>(
+            db: &'db dyn Db,
+            class: KnownClass,
+            specialization: Cow<[Type<'db>]>,
+        ) -> Option<ClassType<'db>> {
+            let Type::ClassLiteral(class_literal) = class.to_class_literal(db) else {
+                return None;
+            };
 
-        let generic_context = class_literal.generic_context(db)?;
+            let generic_context = class_literal.generic_context(db)?;
 
-        if specialization.len() != generic_context.len(db) {
-            // a cache of the `KnownClass`es that we have already seen mismatched-arity
-            // specializations for (and therefore that we've already logged a warning for)
-            static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
-            if MESSAGES.lock().unwrap().insert(self) {
-                tracing::info!(
-                    "Wrong number of types when specializing {}. \
+            if specialization.len() != generic_context.len(db) {
+                // a cache of the `KnownClass`es that we have already seen mismatched-arity
+                // specializations for (and therefore that we've already logged a warning for)
+                static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> =
+                    LazyLock::new(Mutex::default);
+                if MESSAGES.lock().unwrap().insert(class) {
+                    tracing::info!(
+                        "Wrong number of types when specializing {}. \
                  Falling back to default specialization for the symbol instead.",
-                    self.display(db)
-                );
+                        class.display(db)
+                    );
+                }
+                return Some(class_literal.default_specialization(db));
             }
-            return Some(class_literal.default_specialization(db));
+
+            Some(
+                class_literal
+                    .apply_specialization(db, |_| generic_context.specialize(db, specialization)),
+            )
         }
 
-        Some(
-            class_literal
-                .apply_specialization(db, |_| generic_context.specialize(db, specialization)),
-        )
+        let specialization = specialization.into();
+        inner(db, self, specialization)
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
@@ -5234,11 +5249,15 @@ impl KnownClass {
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
     #[track_caller]
-    pub(crate) fn to_specialized_instance<'db>(
+    pub(crate) fn to_specialized_instance<'t, 'db, T>(
         self,
         db: &'db dyn Db,
-        specialization: &[Type<'db>],
-    ) -> Type<'db> {
+        specialization: T,
+    ) -> Type<'db>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
         debug_assert_ne!(
             self,
             KnownClass::Tuple,

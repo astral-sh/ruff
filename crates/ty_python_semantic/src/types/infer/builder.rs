@@ -8373,17 +8373,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .zip(inferred_element_types.iter())
                 .all(|(annotated, inferred)| inferred.is_assignable_to(self.db(), *annotated))
         {
-            collection_class.to_specialized_instance(
-                self.db(),
-                &annotated_element_types
-                    .iter()
-                    .copied()
-                    .collect::<Box<[Type]>>(),
-            )
+            collection_class.to_specialized_instance(self.db(), annotated_element_types)
         } else {
             collection_class.to_specialized_instance(
                 self.db(),
-                &inferred_element_types
+                inferred_element_types
                     .iter()
                     .map(|ty| {
                         UnionType::from_elements(
@@ -8394,7 +8388,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ],
                         )
                     })
-                    .collect::<Box<[Type]>>(),
+                    .collect::<Vec<_>>(),
             )
         }
     }
