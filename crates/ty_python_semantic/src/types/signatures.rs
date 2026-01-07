@@ -390,10 +390,9 @@ impl<'db> CallableSignature<'db> {
                     Some((self_bound_typevar, self_return_type)),
                     Some((other_bound_typevar, other_return_type)),
                 ) => {
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::equality_constraint(
                         db,
                         self_bound_typevar,
-                        Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
                     );
                     let return_types_match = self_return_type.zip(other_return_type).when_some_and(
@@ -420,12 +419,8 @@ impl<'db> CallableSignature<'db> {
                             )),
                             CallableTypeKind::ParamSpecValue,
                         ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        self_bound_typevar,
-                        Type::Never,
-                        upper,
-                    );
+                    let param_spec_matches =
+                        ConstraintSet::upper_bound_constraint(db, self_bound_typevar, upper);
                     let return_types_match = self_return_type.when_some_and(|self_return_type| {
                         other_signatures
                             .iter()
@@ -453,12 +448,8 @@ impl<'db> CallableSignature<'db> {
                             )),
                             CallableTypeKind::ParamSpecValue,
                         ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        other_bound_typevar,
-                        lower,
-                        Type::object(),
-                    );
+                    let param_spec_matches =
+                        ConstraintSet::lower_bound_constraint(db, other_bound_typevar, lower);
                     let return_types_match = other_return_type.when_some_and(|other_return_type| {
                         self_signatures
                             .iter()
@@ -1105,7 +1096,7 @@ impl<'db> Signature<'db> {
                 CallableTypeKind::ParamSpecValue,
             ));
             let param_spec_matches =
-                ConstraintSet::constrain_typevar(db, self_bound_typevar, Type::Never, upper);
+                ConstraintSet::upper_bound_constraint(db, self_bound_typevar, upper);
             let return_types_match = self.return_ty.when_some_and(|self_return_type| {
                 other
                     .overloads
@@ -1347,10 +1338,9 @@ impl<'db> Signature<'db> {
             // the other signature.
             match (self_is_paramspec, other_is_paramspec) {
                 (Some(self_bound_typevar), Some(other_bound_typevar)) => {
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::equality_constraint(
                         db,
                         self_bound_typevar,
-                        Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
                     );
                     result.intersect(db, param_spec_matches);
@@ -1363,12 +1353,8 @@ impl<'db> Signature<'db> {
                         CallableSignature::single(Signature::new(other.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        self_bound_typevar,
-                        Type::Never,
-                        upper,
-                    );
+                    let param_spec_matches =
+                        ConstraintSet::upper_bound_constraint(db, self_bound_typevar, upper);
                     result.intersect(db, param_spec_matches);
                     return result;
                 }
@@ -1379,12 +1365,8 @@ impl<'db> Signature<'db> {
                         CallableSignature::single(Signature::new(self.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        other_bound_typevar,
-                        lower,
-                        Type::object(),
-                    );
+                    let param_spec_matches =
+                        ConstraintSet::lower_bound_constraint(db, other_bound_typevar, lower);
                     result.intersect(db, param_spec_matches);
                     return result;
                 }

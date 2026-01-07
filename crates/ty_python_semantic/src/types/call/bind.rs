@@ -1233,7 +1233,10 @@ impl<'db> Bindings<'db> {
                         else {
                             return;
                         };
-                        let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                        // XXX: Replace this with lower, upper, and equality
+                        let lower = ConstraintSet::lower_bound_constraint(db, *typevar, *lower);
+                        let upper = ConstraintSet::upper_bound_constraint(db, *typevar, *upper);
+                        let constraints = lower.and(db, || upper);
                         let tracked = TrackedConstraintSet::new(db, constraints);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),

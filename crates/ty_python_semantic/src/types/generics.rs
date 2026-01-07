@@ -12,7 +12,7 @@ use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintBound, ConstraintSet, IteratorConstraintsExtension};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
@@ -1659,20 +1659,23 @@ impl<'db> SpecializationBuilder<'db> {
             mappings.clear();
             for (constraint, _) in path {
                 let typevar = constraint.typevar(self.db);
-                let lower = constraint.lower(self.db);
-                let upper = constraint.upper(self.db);
+                let bound = constraint.bound(self.db);
                 let bounds = mappings.entry(typevar).or_default();
-                bounds.lower.insert(lower);
-                bounds.upper.insert(upper);
-
-                if let Type::TypeVar(lower_bound_typevar) = lower {
-                    let bounds = mappings.entry(lower_bound_typevar).or_default();
-                    bounds.upper.insert(Type::TypeVar(typevar));
-                }
-
-                if let Type::TypeVar(upper_bound_typevar) = upper {
-                    let bounds = mappings.entry(upper_bound_typevar).or_default();
-                    bounds.lower.insert(Type::TypeVar(typevar));
+                match bound {
+                    ConstraintBound::Lower(lower) => {
+                        bounds.lower.insert(lower);
+                        if let Type::TypeVar(lower_bound_typevar) = lower {
+                            let bounds = mappings.entry(lower_bound_typevar).or_default();
+                            bounds.upper.insert(Type::TypeVar(typevar));
+                        }
+                    }
+                    ConstraintBound::Upper(upper) => {
+                        bounds.upper.insert(upper);
+                        if let Type::TypeVar(upper_bound_typevar) = upper {
+                            let bounds = mappings.entry(upper_bound_typevar).or_default();
+                            bounds.lower.insert(Type::TypeVar(typevar));
+                        }
+                    }
                 }
             }
 
