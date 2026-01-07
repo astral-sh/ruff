@@ -136,16 +136,14 @@ fn check_required_version(
     let required_version = current
         .get("required-version")
         .or_else(|| current.get("required_version"))
-        .and_then(|value| match value.get_ref() {
-            toml::de::DeValue::String(value) => Some(value.as_ref()),
-            _ => None,
-        });
+        .and_then(|value| value.get_ref().as_str());
 
     let Some(required_version) = required_version else {
         return Ok(());
     };
 
-    let required_version = RequiredVersion::try_from(required_version.to_string())
+    let required_version: RequiredVersion = required_version
+        .parse()
         .with_context(|| format!("Failed to parse {}", path.display()))?;
     validate_required_version(&required_version)?;
     Ok(())
