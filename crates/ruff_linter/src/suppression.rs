@@ -91,6 +91,12 @@ pub(crate) struct Suppression {
     comments: DisableEnableComments,
 }
 
+impl Suppression {
+    fn codes(&self) -> &[TextRange] {
+        &self.comments.disable_comment().codes
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum DisableEnableComments {
     /// An implicitly closed disable comment without a matching enable comment.
@@ -111,12 +117,6 @@ impl DisableEnableComments {
             DisableEnableComments::Disable(_) => None,
             DisableEnableComments::DisableEnable(_, enable) => Some(enable),
         }
-    }
-}
-
-impl Suppression {
-    fn codes(&self) -> &[TextRange] {
-        &self.disable_comment.as_ref().unwrap().codes
     }
 }
 
