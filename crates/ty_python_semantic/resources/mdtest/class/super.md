@@ -266,17 +266,17 @@ class Foo[T]:
         reveal_type(super())
         return self
     # TypeVar bounded by `type[Foo]` rather than `Foo`
+    # TODO: Should error on signature - `self` is annotated as a class type, not an instance type
     def method11[S: type[Foo[int]]](self: S, other: S) -> S:
-        # error: [invalid-super-argument]
-        # revealed: Unknown
-        reveal_type(super())
+        # Delegates to the bound to resolve the super type
+        reveal_type(super())  # revealed: <super: <class 'Foo'>, <class 'Foo[int]'>>
         return self
     # TypeVar bounded by `type[Foo]`, used in `type[T]` position
+    # TODO: Should error on signature - `cls` would be `type[type[Foo[int]]]`, a metaclass
+    # Delegates to `type[Unknown]` since `type[type[Foo[int]]]` can't be constructed
     @classmethod
     def method12[S: type[Foo[int]]](cls: type[S]) -> S:
-        # error: [invalid-super-argument]
-        # revealed: Unknown
-        reveal_type(super())
+        reveal_type(super())  # revealed: <super: <class 'Foo'>, Unknown>
         raise NotImplementedError
 
 type Alias = Bar
@@ -688,8 +688,7 @@ super(B, B())[0]
 
 When a parent class uses `Self` in a parameter type and a subclass overrides it with a concrete
 type, passing that parameter to `super().__init__()` is a type error. This is because `Self` in the
-parent could represent a further subclass, but the concrete type is invariant. The fix is to use
-`Self` consistently in the subclass.
+parent could represent a further subclass. The fix is to use `Self` consistently in the subclass.
 
 ```toml
 [environment]
@@ -698,25 +697,26 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
+from collections.abc import Mapping
 from typing import Self
 
 class Parent:
-    def __init__(self, children: dict[str, Self] | None = None) -> None:
+    def __init__(self, children: Mapping[str, Self] | None = None) -> None:
         self.children = children
 
 class Child(Parent):
-    def __init__(self, children: dict[str, Child] | None = None) -> None:
-        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `dict[str, Self@__init__] | None`, found `dict[str, Child] | None`"
+    def __init__(self, children: Mapping[str, Child] | None = None) -> None:
+        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
         super().__init__(children)
 
 # The fix is to use `Self` consistently in the subclass:
 
 class Parent2:
-    def __init__(self, children: dict[str, Self] | None = None) -> None:
+    def __init__(self, children: Mapping[str, Self] | None = None) -> None:
         self.children = children
 
 class Child2(Parent2):
-    def __init__(self, children: dict[str, Self] | None = None) -> None:
+    def __init__(self, children: Mapping[str, Self] | None = None) -> None:
         super().__init__(children)  # OK
 ```
 

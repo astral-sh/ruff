@@ -323,6 +323,37 @@ impl<'db> BoundSuperType<'db> {
         let delegate_to =
             |type_to_delegate_to| BoundSuperType::build(db, pivot_class_type, type_to_delegate_to);
 
+        // Delegate but rewrite errors to preserve TypeVar context.
+        let delegate_with_error_mapped =
+            |type_to_delegate_to, error_context: Option<TypeVarInstance<'db>>| {
+                delegate_to(type_to_delegate_to).map_err(|err| match err {
+                    BoundSuperError::AbstractOwnerType {
+                        owner_type: _,
+                        pivot_class: _,
+                        typevar_context: _,
+                    } => BoundSuperError::AbstractOwnerType {
+                        owner_type,
+                        pivot_class: pivot_class_type,
+                        typevar_context: error_context,
+                    },
+                    BoundSuperError::FailingConditionCheck {
+                        pivot_class,
+                        owner: _,
+                        typevar_context: _,
+                    } => BoundSuperError::FailingConditionCheck {
+                        pivot_class,
+                        owner: owner_type,
+                        typevar_context: error_context,
+                    },
+                    BoundSuperError::InvalidPivotClassType { pivot_class } => {
+                        BoundSuperError::InvalidPivotClassType { pivot_class }
+                    }
+                    BoundSuperError::UnavailableImplicitArguments => {
+                        BoundSuperError::UnavailableImplicitArguments
+                    }
+                })
+            };
+
         // We don't use `ClassBase::try_from_type` here because:
         // - There are objects that may validly be present in a class's bases list
         //   but are not valid as pivot classes, e.g. `typing.ChainMap`
@@ -395,11 +426,9 @@ impl<'db> BoundSuperType<'db> {
                             )));
                         }
                         None => {
-                            return Err(BoundSuperError::AbstractOwnerType {
-                                owner_type,
-                                pivot_class: pivot_class_type,
-                                typevar_context: Some(typevar),
-                            });
+                            // Delegate to the constraint to get better error messages
+                            // if the constraint is incompatible with the pivot class.
+                            builder = builder.add(delegate_to(*constraint)?);
                         }
                     }
                 }
@@ -427,11 +456,9 @@ impl<'db> BoundSuperType<'db> {
                             if let Some(class) = class {
                                 SuperOwnerKind::ClassTypeVar(bound_typevar, class)
                             } else {
-                                return Err(BoundSuperError::AbstractOwnerType {
-                                    owner_type,
-                                    pivot_class: pivot_class_type,
-                                    typevar_context: Some(typevar),
-                                });
+                                let subclass_of = SubclassOfType::try_from_instance(db, bound)
+                                    .unwrap_or_else(SubclassOfType::subclass_of_unknown);
+                                return delegate_with_error_mapped(subclass_of, Some(typevar));
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
@@ -512,11 +539,7 @@ impl<'db> BoundSuperType<'db> {
                         if let Some(class) = class {
                             SuperOwnerKind::InstanceTypeVar(bound_typevar, class)
                         } else {
-                            return Err(BoundSuperError::AbstractOwnerType {
-                                owner_type,
-                                pivot_class: pivot_class_type,
-                                typevar_context: Some(typevar),
-                            });
+                            return delegate_with_error_mapped(bound, Some(typevar));
                         }
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
