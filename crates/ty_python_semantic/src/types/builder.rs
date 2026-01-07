@@ -28,14 +28,13 @@
 //!
 //! In practice, there are two kinds of unions found in the wild: relatively-small unions made up
 //! of normal user types (classes, etc), and large unions made up of literals, which can occur via
-//! large enums (not yet implemented) or from string/integer/bytes literals, which can grow due to
-//! literal arithmetic or operations on literal strings/bytes. For normal unions, it's most
-//! efficient to just store the member types in a vector, and do O(n^2) `is_subtype_of` checks to
-//! maintain the union in simplified form. But literal unions can grow to a size where this becomes
-//! a performance problem. For this reason, we group literal types in `UnionBuilder`. Since every
-//! different string literal type shares exactly the same possible super-types, and none of them
-//! are subtypes of each other (unless exactly the same literal type), we can avoid many
-//! unnecessary `is_subtype_of` checks.
+//! large enums or from string/integer/bytes literals, which can grow due to literal arithmetic or
+//! operations on literal strings/bytes. For normal unions, it's most efficient to just store the
+//! member types in a vector, and do O(n^2) redundancy checks to maintain the union in simplified
+//! form. But literal unions can grow to a size where this becomes a performance problem. For this
+//! reason, we group literal types in `UnionBuilder`. Since every different string literal type
+//! shares exactly the same possible super-types, and none of them are subtypes of each other
+//! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
@@ -110,22 +109,22 @@ impl<'db> UnionElement<'db> {
         // to determine whether the element should be retained in the set.
         //
         // If `ignore` or `collapse` is `true` for any element in the set,
-        // we no longer need to do any expensive subtyping checks for any
+        // we no longer need to do any expensive redundancy checks for any
         // further elements in the set:
         //
-        // - if `ignore` is `true`, this indicates that `other_type` is a
-        //   subtype of one of the literals in this set. Given this fact,
+        // - if `ignore` is `true`, this indicates that `other_type` is
+        //   redundant with one of the literals in this set. Given this fact,
         //   it cannot be possible for any other literals in this set to be
-        //   a subtype of `other_type`.
+        //   redundant with `other_type`.
         // - if `collapse` is `true`, all literals of this kind will be
         //   removed from the union, so it's irrelevant to answer the
         //   question of which literals should remain in this set.
         //
-        // We therefore only ask if `ty` is a subtype of `other_type` if
+        // We therefore only ask if `ty` is redundant with `other_type` if
         // both `ignore` and `collapse` are `false`. If either is `true`,
-        // we skip the expensive subtype check and return `true`.
+        // we skip the expensive redundancy check and return `true`.
         let mut should_retain_type = |ty| {
-            if ignore || other_type.is_subtype_of(db, ty) {
+            if ignore || other_type.is_redundant_with(db, ty) {
                 ignore = true;
                 return true;
             }
@@ -133,7 +132,7 @@ impl<'db> UnionElement<'db> {
                 collapse = true;
                 return true;
             }
-            !ty.is_subtype_of(db, other_type)
+            !ty.is_redundant_with(db, other_type)
         };
 
         let should_keep = match self {
@@ -142,7 +141,7 @@ impl<'db> UnionElement<'db> {
                     literals.retain(|literal| should_retain_type(Type::IntLiteral(*literal)));
                     !literals.is_empty()
                 } else {
-                    !Type::IntLiteral(literals[0]).is_subtype_of(db, other_type)
+                    !Type::IntLiteral(literals[0]).is_redundant_with(db, other_type)
                 }
             }
             UnionElement::StringLiterals(literals) => {
@@ -150,7 +149,7 @@ impl<'db> UnionElement<'db> {
                     literals.retain(|literal| should_retain_type(Type::StringLiteral(*literal)));
                     !literals.is_empty()
                 } else {
-                    !Type::StringLiteral(literals[0]).is_subtype_of(db, other_type)
+                    !Type::StringLiteral(literals[0]).is_redundant_with(db, other_type)
                 }
             }
             UnionElement::BytesLiterals(literals) => {
@@ -158,7 +157,7 @@ impl<'db> UnionElement<'db> {
                     literals.retain(|literal| should_retain_type(Type::BytesLiteral(*literal)));
                     !literals.is_empty()
                 } else {
-                    !Type::BytesLiteral(literals[0]).is_subtype_of(db, other_type)
+                    !Type::BytesLiteral(literals[0]).is_redundant_with(db, other_type)
                 }
             }
             UnionElement::Type(existing) => return ReduceResult::Type(*existing),
@@ -367,10 +366,10 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::Type(existing) => {
                             // e.g. `existing` could be `Literal[""] & Any`,
                             // and `ty` could be `Literal[""]`
-                            if ty.is_subtype_of(self.db, *existing) {
+                            if ty.is_redundant_with(self.db, *existing) {
                                 return;
                             }
-                            if existing.is_subtype_of(self.db, ty) {
+                            if existing.is_redundant_with(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
                             }
@@ -412,12 +411,12 @@ impl<'db> UnionBuilder<'db> {
                             continue;
                         }
                         UnionElement::Type(existing) => {
-                            if ty.is_subtype_of(self.db, *existing) {
+                            if ty.is_redundant_with(self.db, *existing) {
                                 return;
                             }
                             // e.g. `existing` could be `Literal[b""] & Any`,
                             // and `ty` could be `Literal[b""]`
-                            if existing.is_subtype_of(self.db, ty) {
+                            if existing.is_redundant_with(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
                             }
@@ -459,12 +458,12 @@ impl<'db> UnionBuilder<'db> {
                             continue;
                         }
                         UnionElement::Type(existing) => {
-                            if ty.is_subtype_of(self.db, *existing) {
+                            if ty.is_redundant_with(self.db, *existing) {
                                 return;
                             }
                             // e.g. `existing` could be `Literal[1] & Any`,
                             // and `ty` could be `Literal[1]`
-                            if existing.is_subtype_of(self.db, ty) {
+                            if existing.is_redundant_with(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
                             }
