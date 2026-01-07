@@ -772,6 +772,18 @@ impl<'db> ConstrainedTypeVar<'db> {
             return IntersectionResult::CannotSimplify;
         }
 
+        // TODO: For now, we also treat upper bound unions as unsimplifiable if they become too
+        // big. Upper bounds are intersected together, and the intersections of large unions can
+        // become quite large indeed. We are looking at a better representation that would let us
+        // model them directly, but for now, we punt.
+        #[allow(clippy::items_after_statements)]
+        const MAX_UNION_UPPER_BOUND_SIZE: usize = 3;
+        if let Some(union_type) = upper.as_union()
+            && union_type.elements(db).len() > MAX_UNION_UPPER_BOUND_SIZE
+        {
+            return IntersectionResult::CannotSimplify;
+        }
+
         IntersectionResult::Simplified(Self::new(db, self.typevar(db), lower, upper))
     }
 
