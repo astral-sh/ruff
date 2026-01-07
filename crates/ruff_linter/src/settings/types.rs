@@ -618,7 +618,7 @@ impl FromStr for RequiredVersion {
                 VersionSpecifier::equals_version(version),
             )))
         } else {
-            Ok(Self(VersionSpecifiers::from_str(&value)?))
+            Ok(Self(VersionSpecifiers::from_str(value)?))
         }
     }
 }
