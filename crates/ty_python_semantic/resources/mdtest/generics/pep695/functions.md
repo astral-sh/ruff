@@ -960,16 +960,18 @@ that `S ≤ T`. However, we should only consider fully static types when looking
 this kind of transitive relationship. The same pattern does not hold for `S ≤ Any ∧ Any ≤ T`;
 because the two `Any`s can materialize to different types, we cannot infer that `S ≤ T`.
 
-We have lower level tests of this in XXX. `functools.reduce` has a signature that exercises this
-behavior, as well, so we also include this regression test.
+We have lower level tests of this in [`type_properties/implies_subtype_of.md`][implies_subtype_of].
+`functools.reduce` has a signature that exercises this behavior, as well, so we also include this
+regression test.
 
 ```py
 from functools import reduce
 
 def _(keys: list[str]):
     # TODO: revealed: int
-    # revealed: Unknown | str | Literal[0]
+    # revealed: Unknown | Literal[0]
     reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
 ```
 
+[implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

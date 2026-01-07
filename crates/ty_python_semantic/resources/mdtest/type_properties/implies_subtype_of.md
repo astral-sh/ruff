@@ -573,8 +573,6 @@ def concrete_pivot[T, U]():
     # If [T ≤ Any ∧ Any ≤ U], then the two `Any`s might materialize to different types. That means
     # [T ≤ U] is NOT necessarily true.
     constraints = ConstraintSet.range(Never, T, Any) & ConstraintSet.range(Any, U, object)
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(not constraints.implies_subtype_of(T, U))
 ```
 
