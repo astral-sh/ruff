@@ -1,10 +1,11 @@
+use std::borrow::Cow;
+use std::ops::Deref;
+use std::sync::Arc;
+
 use ruff_diagnostics::SourceMap;
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
-use std::borrow::Cow;
-use std::ops::Deref;
-use std::sync::Arc;
 
 use crate::Db;
 use crate::files::{File, FilePath};
