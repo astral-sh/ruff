@@ -537,4 +537,45 @@ def identity2[T](t: T) -> T:
     return t
 ```
 
+## Transitivity
+
+### Transitivity can propagate across typevars
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+def concrete_pivot[T, U]():
+    # If [int ≤ T ∧ T ≤ U], then [int ≤ U] must be true as well.
+    constraints = ConstraintSet.range(int, T, object) & ConstraintSet.range(T, U, object)
+    static_assert(constraints.implies_subtype_of(int, U))
+```
+
+### Transitivity can propagate across fully static concrete types
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, static_assert
+
+def concrete_pivot[T, U]():
+    # If [T ≤ int ∧ int ≤ U], then [T ≤ U] must be true as well.
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(int, U, object)
+    static_assert(constraints.implies_subtype_of(T, U))
+```
+
+### Transitivity cannot propagate across non-fully-static concrete types
+
+```py
+from typing import Any, Never
+from ty_extensions import ConstraintSet, static_assert
+
+def concrete_pivot[T, U]():
+    # If [T ≤ Any ∧ Any ≤ U], then the two `Any`s might materialize to different types. That means
+    # [T ≤ U] is NOT necessarily true.
+    constraints = ConstraintSet.range(Never, T, Any) & ConstraintSet.range(Any, U, object)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(not constraints.implies_subtype_of(T, U))
+```
+
 [subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
