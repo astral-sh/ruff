@@ -212,6 +212,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [ssort](https://pypi.org/project/ssort/)
+    #[prefix = "SS"]
+    SSort,
 }
 
 pub trait RuleNamespace: Sized {
