@@ -888,7 +888,7 @@ class GenericClass[T]:
 def _(x: list[str]):
     # TODO: This fails because we are not propagating GenericClass's generic context into the
     # Callable that we create for it.
-    # revealed: [T](x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(into_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_callable(GenericClass)))

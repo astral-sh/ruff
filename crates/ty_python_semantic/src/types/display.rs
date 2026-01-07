@@ -27,6 +27,7 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
+    BindingContext,
     SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeGuardLike, TypedDictType,
     UnionType, WrapperDescriptorKind, visitor,
 };
@@ -44,6 +45,10 @@ pub struct DisplaySettings<'db> {
     /// Disallow Signature printing to introduce a name
     /// (presumably because we rendered one already)
     pub disallow_signature_name: bool,
+    /// Scopes that are currently active in the display context (e.g. function scopes
+    /// whose type parameters are currently being displayed).
+    /// Used to suppress redundant `@{scope}` suffixes for type variables.
+    pub active_scopes: Rc<FxHashSet<crate::semantic_index::definition::Definition<'db>>>,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -83,6 +88,19 @@ impl<'db> DisplaySettings<'db> {
     pub fn disallow_signature_name(&self) -> Self {
         Self {
             disallow_signature_name: true,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn with_active_scopes(
+        &self,
+        scopes: impl IntoIterator<Item = crate::semantic_index::definition::Definition<'db>>,
+    ) -> Self {
+        let mut active_scopes = (*self.active_scopes).clone();
+        active_scopes.extend(scopes);
+        Self {
+            active_scopes: Rc::new(active_scopes),
             ..self.clone()
         }
     }
@@ -746,7 +764,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(
                         f.with_type(Type::TypeVar(bound_typevar)),
                         "{}",
-                        bound_typevar.identity(self.db).display(self.db)
+                        bound_typevar
+                            .identity(self.db)
+                            .display_with(self.db, self.settings.clone())
                     )?;
                     f.write_char(']')
                 }
@@ -977,7 +997,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             }
             Type::TypeVar(bound_typevar) => {
                 f.set_invalid_type_annotation();
-                write!(f, "{}", bound_typevar.identity(self.db).display(self.db))
+                write!(
+                    f,
+                    "{}",
+                    bound_typevar
+                        .identity(self.db)
+                        .display_with(self.db, self.settings.clone())
+                )
             }
             Type::AlwaysTruthy => f.with_type(self.ty).write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.with_type(self.ty).write_str("AlwaysFalsy"),
@@ -1040,6 +1066,19 @@ impl<'db> BoundTypeVarIdentity<'db> {
         DisplayBoundTypeVarIdentity {
             bound_typevar_identity: self,
             db,
+            settings: DisplaySettings::default(),
+        }
+    }
+
+    pub(crate) fn display_with(
+        self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> impl Display {
+        DisplayBoundTypeVarIdentity {
+            bound_typevar_identity: self,
+            db,
+            settings,
         }
     }
 }
@@ -1047,13 +1086,22 @@ impl<'db> BoundTypeVarIdentity<'db> {
 struct DisplayBoundTypeVarIdentity<'db> {
     bound_typevar_identity: BoundTypeVarIdentity<'db>,
     db: &'db dyn Db,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
-        if let Some(binding_context) = self.bound_typevar_identity.binding_context.name(self.db) {
-            write!(f, "@{binding_context}")?;
+        if let Some(binding_context_name) = self.bound_typevar_identity.binding_context.name(self.db) {
+            let mut suppressed = false;
+            if let BindingContext::Definition(definition) = self.bound_typevar_identity.binding_context {
+                if self.settings.active_scopes.contains(&definition) {
+                    suppressed = true;
+                }
+            }
+            if !suppressed {
+                write!(f, "@{binding_context_name}")?;
+            }
         }
         if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
             write!(f, ".{paramspec_attr}")?;
@@ -1723,27 +1771,40 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             f.write_str(&name)?;
         }
 
+        let settings = if let Some(generic_context) = self.generic_context {
+            self.settings.with_active_scopes(
+                generic_context
+                    .variables(self.db)
+                    .filter_map(|bound| match bound.binding_context(self.db) {
+                        BindingContext::Definition(def) => Some(def),
+                        BindingContext::Synthetic => None,
+                    }),
+            )
+        } else {
+            self.settings.clone()
+        };
+
         // Display type parameters if present, but only when the caller hasn't
         // already displayed them (indicated by disallow_signature_name being false)
         if !self.settings.disallow_signature_name {
             DisplayOptionalGenericContext {
                 generic_context: self.generic_context,
                 db: self.db,
-                settings: self.settings.clone(),
+                settings: settings.clone(),
             }
             .fmt_detailed(&mut f)?;
         }
 
         // Parameters
         self.parameters
-            .display_with(self.db, self.settings.clone())
+            .display_with(self.db, settings.clone())
             .fmt_detailed(&mut f)?;
 
         // Return type
         let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
         f.write_str(" -> ")?;
         return_ty
-            .display_with(self.db, self.settings.singleline())
+            .display_with(self.db, settings.singleline())
             .fmt_detailed(&mut f)?;
 
         if self.parameters.is_top() {

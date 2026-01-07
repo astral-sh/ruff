@@ -6892,8 +6892,26 @@ impl<'db> TypeMapping<'_, 'db> {
         context: GenericContext<'db>,
     ) -> GenericContext<'db> {
         match self {
-            TypeMapping::ApplySpecialization(_)
-            | TypeMapping::UniqueSpecialization { .. }
+            TypeMapping::ApplySpecialization(specialization) => {
+                // Filter out type variables that are already specialized
+                // (i.e., mapped to a non-TypeVar type)
+                GenericContext::from_typevar_instances(
+                    db,
+                    context.variables(db).filter(|bound_typevar| {
+                        // Keep the type variable if it's not in the specialization
+                        // or if it's mapped to itself (still a TypeVar)
+                        match specialization.get(db, *bound_typevar) {
+                            None => true,
+                            Some(Type::TypeVar(mapped_typevar)) => {
+                                // Still a TypeVar, keep it if it's mapping to itself
+                                mapped_typevar.identity(db) == bound_typevar.identity(db)
+                            }
+                            Some(_) => false, // Specialized to a concrete type, filter out
+                        }
+                    }),
+                )
+            }
+            TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)

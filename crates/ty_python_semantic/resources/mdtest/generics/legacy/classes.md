@@ -817,7 +817,7 @@ class WithOverloadedMethod(Generic[T]):
     def method(self, x: S | T) -> S | T:
         return x
 
-# revealed: Overload[(self, x: int) -> int, [S](self, x: S@method) -> S@method | int]
+# revealed: Overload[(self, x: int) -> int, [S](self, x: S) -> S | int]
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
