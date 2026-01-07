@@ -5,8 +5,8 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::TextRange;
 use ty_project::Db;
-use ty_python_semantic::create_suppression_fix;
 use ty_python_semantic::lint::LintId;
+use ty_python_semantic::suppress_single;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 
 /// A `QuickFix` Code Action
@@ -42,7 +42,7 @@ pub fn code_actions(
     // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
-        edits: create_suppression_fix(db, file, lint_id, diagnostic_range).into_edits(),
+        edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
         preferred: false,
     });
 
@@ -435,6 +435,38 @@ mod tests {
           - + "test"
         3 + + "test"  # ty:ignore[unresolved-reference]
         "#);
+    }
+
+    #[test]
+    fn add_ignore_line_continuation_empty_lines() {
+        let test = CodeActionTest::with_source(
+            r#"b = bbbbb \
+    [  ccc # test
+
+        + <START>ddd<END>  \
+
+    ] # test
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:4:11
+          |
+        2 |     [  ccc # test
+        3 |
+        4 |         + ddd  \
+          |           ^^^
+        5 |
+        6 |     ] # test
+          |
+        2 |     [  ccc # test
+        3 | 
+        4 |         + ddd  \
+          - 
+        5 +   # ty:ignore[unresolved-reference]
+        6 |     ] # test
+        ");
     }
 
     #[test]
