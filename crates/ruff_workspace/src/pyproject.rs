@@ -52,7 +52,7 @@ fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str])
     let root = toml::de::DeTable::parse(&contents)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
 
-    check_required_version(root.get_ref(), path, table_path)?;
+    check_required_version(root.get_ref(), table_path)?;
 
     let deserializer = toml::de::Deserializer::from(root);
     T::deserialize(deserializer)
@@ -117,11 +117,7 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn check_required_version(
-    value: &toml::de::DeTable,
-    path: &Path,
-    table_path: &[&str],
-) -> Result<()> {
+fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Result<()> {
     let mut current = value;
     for key in table_path {
         let Some(next) = current.get(*key) else {
