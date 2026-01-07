@@ -182,7 +182,7 @@ impl<'db> UnionElement<'db> {
                     literals.retain(|literal| should_retain_type(Type::EnumLiteral(*literal)));
                     !literals.is_empty()
                 } else {
-                    !Type::EnumLiteral(literals[0]).is_subtype_of(db, other_type)
+                    !Type::EnumLiteral(literals[0]).is_redundant_with(db, other_type)
                 }
             }
             UnionElement::Type(existing) => return ReduceResult::Type(*existing),
@@ -564,12 +564,12 @@ impl<'db> UnionBuilder<'db> {
                             continue;
                         }
                         UnionElement::Type(existing) => {
-                            if ty.is_subtype_of(self.db, *existing) {
+                            if ty.is_redundant_with(self.db, *existing) {
                                 return;
                             }
                             // e.g. `existing` could be `Literal[Foo.X] & Any`,
                             // and `ty` could be `Literal[Foo.X]`
-                            if existing.is_subtype_of(self.db, ty) {
+                            if existing.is_redundant_with(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
                             }
