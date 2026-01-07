@@ -4,7 +4,7 @@
 use ruff_python_ast::Stmt;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::{
-    CommentRanges, has_leading_content, has_trailing_content, is_python_whitespace,
+    BlockRanges, CommentRanges, has_leading_content, has_trailing_content, is_python_whitespace,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -26,6 +26,9 @@ pub struct Indexer {
 
     /// The range of all comments in the source document.
     comment_ranges: CommentRanges,
+
+    /// The ranges of all indent/dedent blocks in the source document.
+    block_ranges: BlockRanges,
 }
 
 impl Indexer {
@@ -36,6 +39,8 @@ impl Indexer {
         let mut multiline_ranges_builder = MultilineRangesBuilder::default();
         let mut continuation_lines = Vec::new();
         let mut comment_ranges = Vec::new();
+        let mut indent_ranges = Vec::new();
+        let mut dedent_ranges = Vec::new();
 
         // Token, end
         let mut prev_end = TextSize::default();
@@ -76,6 +81,12 @@ impl Indexer {
                 TokenKind::Comment => {
                     comment_ranges.push(token.range());
                 }
+                TokenKind::Indent => {
+                    indent_ranges.push(token.range());
+                }
+                TokenKind::Dedent => {
+                    dedent_ranges.push(token.range());
+                }
                 _ => {}
             }
 
@@ -87,12 +98,18 @@ impl Indexer {
             interpolated_string_ranges: interpolated_string_ranges_builder.finish(),
             multiline_ranges: multiline_ranges_builder.finish(),
             comment_ranges: CommentRanges::new(comment_ranges),
+            block_ranges: BlockRanges::new(indent_ranges, dedent_ranges),
         }
     }
 
     /// Returns the byte offset ranges of comments.
     pub const fn comment_ranges(&self) -> &CommentRanges {
         &self.comment_ranges
+    }
+
+    /// Returns the block indent/dedent ranges.
+    pub const fn block_ranges(&self) -> &BlockRanges {
+        &self.block_ranges
     }
 
     /// Returns the byte offset ranges of interpolated strings.
