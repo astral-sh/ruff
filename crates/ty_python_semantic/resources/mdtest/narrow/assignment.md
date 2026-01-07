@@ -96,7 +96,7 @@ reveal_type(a.dynamically_added)  # revealed: Literal[0]
 # error: [unresolved-reference]
 does.nt.exist = 0
 # error: [unresolved-reference]
-reveal_type(does.nt.exist)  # revealed: Unknown
+reveal_type(does.nt.exist)  # revealed: Literal[0]
 ```
 
 ### Narrowing chain
@@ -299,6 +299,30 @@ def _():
     # error: [possibly-missing-attribute]
     reveal_type(b.a.x)  # revealed: list[int | None]
     reveal_type(b.a)  # revealed: A | None
+
+class D: ...
+
+class E:
+    def __init__(self):
+        self.d = D()
+
+class F:
+    def __init__(self):
+        self.e = E()
+
+class Mock: ...
+
+f = F()
+reveal_type(f.e)  # revealed: Unknown | E
+f.e = Mock()
+reveal_type(f.e)  # revealed: Mock
+
+f2 = F()
+reveal_type(f2.e.d)  # revealed: Unknown | D
+f2.e.d = Mock()
+# Strictly speaking, this narrowing is not safe because the inferred attribute type includes `Unknown` (`Unknown` is a data descriptor type),
+# but we enable it for practical convenience.
+reveal_type(f2.e.d)  # revealed: Mock
 ```
 
 ## Invalid assignments are not used for narrowing

@@ -13852,11 +13852,13 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
+            // However, strictly applying this rule would disable narrowing for most implicit attributes.
+            // Therefore, for practical convenience, we will relax the rule and disable narrowing only if the attribute type is static and a data descriptor type.
             if value_ty
                 .class_member(db, attr.id.clone())
                 .place
                 .ignore_possibly_undefined()
-                .is_some_and(|ty| ty.may_be_data_descriptor(db))
+                .is_some_and(|ty| ty.is_static_and_may_be_data_descriptor(db))
             {
                 bound_ty = declared_ty;
             }
