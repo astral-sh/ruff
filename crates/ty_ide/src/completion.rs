@@ -118,7 +118,7 @@ impl<'db> Completions<'db> {
     /// Convert this collection into a simple
     /// sequence of completions.
     fn into_completions(mut self) -> Vec<Completion<'db>> {
-        self.items.sort_by(|c1, c2| self.context.compare(c1, c2));
+        self.items.sort_by(rank);
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
         // A user should refine its completion request if the searched symbol doesn't appear in the first 1k results.
@@ -129,7 +129,7 @@ impl<'db> Completions<'db> {
 
     // Convert this collection into a list of "import..." fixes
     fn into_imports(mut self) -> Vec<ImportEdit> {
-        self.items.sort_by(|c1, c2| self.context.compare(c1, c2));
+        self.items.sort_by(rank);
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
         self.items
@@ -145,7 +145,7 @@ impl<'db> Completions<'db> {
 
     // Convert this collection into a list of "qualify..." fixes
     fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
-        self.items.sort_by(|c1, c2| self.context.compare(c1, c2));
+        self.items.sort_by(rank);
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
         self.items
@@ -284,6 +284,9 @@ pub struct Completion<'db> {
     /// The documentation associated with this item, if
     /// available.
     pub documentation: Option<Docstring>,
+    /// Information used to sort this completion relative to others
+    /// in the same collection.
+    relevance: Relevance,
 }
 
 impl<'db> Completion<'db> {
@@ -374,7 +377,7 @@ impl<'db> CompletionBuilder<'db> {
         mut self,
         db: &'db dyn Db,
         ctx: &CollectionContext<'db>,
-        _query: &QueryPattern,
+        query: &QueryPattern,
     ) -> Completion<'db> {
         // Tags completions with context-specific if they are
         // known to be usable in a `raise` context and we have
@@ -394,6 +397,7 @@ impl<'db> CompletionBuilder<'db> {
         let kind = self
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
+        let relevance = Relevance::new(ctx, query, &self);
         Completion {
             name: self.name,
             qualified: self.qualified,
@@ -406,6 +410,7 @@ impl<'db> CompletionBuilder<'db> {
             is_type_check_only: self.is_type_check_only,
             is_context_specific: self.is_context_specific,
             documentation: self.documentation,
+            relevance,
         }
     }
 
@@ -993,49 +998,6 @@ impl<'db> CollectionContext<'db> {
         }
         false
     }
-
-    /// Return an ordering relating the two completions.
-    ///
-    /// A `Ordering::Less` is returned when `c1` should be ranked
-    /// above `c2`. A `Ordering::Greater` is returned when `c1` should be
-    /// ranked below `c2`. In other words, a standard ascending sort
-    /// used with this comparison routine will yields the "best ranked"
-    /// completions first.
-    fn compare(&self, c1: &Completion<'_>, c2: &Completion<'_>) -> Ordering {
-        self.rank(c1).cmp(&self.rank(c2))
-    }
-
-    /// Return a rank for the given completion.
-    ///
-    /// A smaller rank means the completion should appear higher in the
-    /// results shown to end users.
-    // Not currently using `self`, but we intend to in the future.
-    // i.e., the context should be able to influence ranking in
-    // some way.
-    #[allow(clippy::unused_self)]
-    fn rank<'c>(&self, c: &'c Completion<'_>) -> Relevance<'c> {
-        Relevance {
-            definitively_usable: if c.is_context_specific {
-                Sort::Higher
-            } else {
-                Sort::Even
-            },
-            current_module: c.module_name.map(|_| Sort::Lower).unwrap_or(Sort::Higher),
-            keyword: if c.kind == Some(CompletionKind::Keyword) {
-                Sort::Higher
-            } else {
-                Sort::Even
-            },
-            builtin: if c.builtin { Sort::Lower } else { Sort::Even },
-            name_kind: NameKind::classify(&c.name),
-            type_check_only: if c.is_type_check_only {
-                Sort::Lower
-            } else {
-                Sort::Even
-            },
-            name: &c.name,
-        }
-    }
 }
 
 /// Relevance information assigned to a single completion.
@@ -1050,7 +1012,7 @@ impl<'db> CollectionContext<'db> {
 /// matter. The most important or overriding criteria should appear
 /// first.
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-struct Relevance<'a> {
+struct Relevance {
     /// This is set when we know that a symbol in the current context
     /// is affirmatively usable or not. That is, other symbols in the
     /// results may not be usable (we may not know for sure), but
@@ -1082,10 +1044,35 @@ struct Relevance<'a> {
     /// Sorts based on whether this symbol is only available during
     /// type checking and not at runtime.
     type_check_only: Sort,
-    /// The name of a symbol. This is kind of a last ditch thing that
-    /// we fallback to in order to provide some stable and predictable
-    /// ordering, but otherwise means we've mostly given up.
-    name: &'a str,
+}
+
+impl Relevance {
+    /// Return a rank for the given completion.
+    ///
+    /// A smaller rank means the completion should appear higher in the
+    /// results shown to end users.
+    fn new(_ctx: &CollectionContext, _query: &QueryPattern, c: &CompletionBuilder) -> Relevance {
+        Relevance {
+            definitively_usable: if c.is_context_specific {
+                Sort::Higher
+            } else {
+                Sort::Even
+            },
+            current_module: c.module_name.map(|_| Sort::Lower).unwrap_or(Sort::Higher),
+            keyword: if c.kind == Some(CompletionKind::Keyword) {
+                Sort::Higher
+            } else {
+                Sort::Even
+            },
+            builtin: if c.builtin { Sort::Lower } else { Sort::Even },
+            name_kind: NameKind::classify(&c.name),
+            type_check_only: if c.is_type_check_only {
+                Sort::Lower
+            } else {
+                Sort::Even
+            },
+        }
+    }
 }
 
 /// An instruction to indicate an ordering preference.
@@ -2222,6 +2209,21 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
         })
     }
     imp(db, ty, &CompletionKindVisitor::default())
+}
+
+/// Return an ordering relating the two completions.
+///
+/// A `Ordering::Less` is returned when `c1` should be ranked above
+/// `c2`. A `Ordering::Greater` is returned when `c1` should be ranked
+/// below `c2`. In other words, a standard ascending sort used with
+/// this comparison routine will yields the "best ranked" completions
+/// first.
+///
+/// Note that this could have been implemented via `Eq` and `Ord`
+/// impls on `Completion`, but is instead a separate function to avoid
+/// conflating relevance ranking with identity.
+fn rank(c1: &Completion<'_>, c2: &Completion<'_>) -> Ordering {
+    (&c1.relevance, &c1.name).cmp(&(&c2.relevance, &c2.name))
 }
 
 #[cfg(test)]
