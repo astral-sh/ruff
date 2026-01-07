@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 15
-Added: 23
+Added: 20
 
 --- Removed ---
 E741 Ambiguous variable name: `I`
@@ -301,6 +301,7 @@ RUF100 [*] Unused suppression (non-enabled: `E501`)
    |     ^^^^^^^^^^^^^^^^^^^^^
 47 |     I = 1
 48 |     # ruff: enable[E501]
+   |     --------------------
    |
 help: Remove unused suppression
 43 | def f():
@@ -308,26 +309,10 @@ help: Remove unused suppression
 45 |     # logged to user
    -     # ruff: disable[E501]
 46 |     I = 1
-47 |     # ruff: enable[E501]
-48 | 
-
-
-RUF100 [*] Unused suppression (non-enabled: `E501`)
-  --> suppressions.py:48:5
-   |
-46 |     # ruff: disable[E501]
-47 |     I = 1
-48 |     # ruff: enable[E501]
-   |     ^^^^^^^^^^^^^^^^^^^^
-   |
-help: Remove unused suppression
-45 |     # logged to user
-46 |     # ruff: disable[E501]
-47 |     I = 1
    -     # ruff: enable[E501]
+47 | 
 48 | 
-49 | 
-50 | def f():
+49 | def f():
 
 
 RUF100 [*] Unused `noqa` directive (unused: `E741`, `F841`)
@@ -563,6 +548,9 @@ RUF102 [*] Invalid rule code in suppression: YF829
    |                     ^^^^^
 94 |     # ruff: disable[F841, RQW320]
 95 |     value = 0
+96 |     # ruff: enable[F841, RQW320]
+97 |     # ruff: enable[YF829]
+   |                    -----
    |
 help: Remove the rule code
 90 | 
@@ -572,6 +560,10 @@ help: Remove the rule code
 93 |     # ruff: disable[F841, RQW320]
 94 |     value = 0
 95 |     # ruff: enable[F841, RQW320]
+   -     # ruff: enable[YF829]
+96 | 
+97 | 
+98 | def f():
 
 
 RUF102 [*] Invalid rule code in suppression: RQW320
@@ -583,6 +575,8 @@ RUF102 [*] Invalid rule code in suppression: RQW320
    |                           ^^^^^^
 95 |     value = 0
 96 |     # ruff: enable[F841, RQW320]
+   |                          ------
+97 |     # ruff: enable[YF829]
    |
 help: Remove the rule code
 91 | def f():
@@ -591,46 +585,11 @@ help: Remove the rule code
    -     # ruff: disable[F841, RQW320]
 94 +     # ruff: disable[F841]
 95 |     value = 0
-96 |     # ruff: enable[F841, RQW320]
-97 |     # ruff: enable[YF829]
-
-
-RUF102 [*] Invalid rule code in suppression: RQW320
-  --> suppressions.py:96:26
-   |
-94 |     # ruff: disable[F841, RQW320]
-95 |     value = 0
-96 |     # ruff: enable[F841, RQW320]
-   |                          ^^^^^^
-97 |     # ruff: enable[YF829]
-   |
-help: Remove the rule code
-93 |     # ruff: disable[YF829]
-94 |     # ruff: disable[F841, RQW320]
-95 |     value = 0
    -     # ruff: enable[F841, RQW320]
 96 +     # ruff: enable[F841]
 97 |     # ruff: enable[YF829]
 98 | 
 99 | 
-
-
-RUF102 [*] Invalid rule code in suppression: YF829
-  --> suppressions.py:97:20
-   |
-95 |     value = 0
-96 |     # ruff: enable[F841, RQW320]
-97 |     # ruff: enable[YF829]
-   |                    ^^^^^
-   |
-help: Remove the rule code
-94 |     # ruff: disable[F841, RQW320]
-95 |     value = 0
-96 |     # ruff: enable[F841, RQW320]
-   -     # ruff: enable[YF829]
-97 | 
-98 | 
-99 | def f():
 
 
 RUF103 [*] Invalid suppression comment: missing suppression codes like `[E501, ...]`
