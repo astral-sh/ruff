@@ -116,7 +116,7 @@ def foo(
     Ok(())
 }
 
-/// Regression test for https://github.com/astral-sh/ty/issues/2310
+/// Regression test for <https://github.com/astral-sh/ty/issues/2310>
 #[test]
 fn stack_size() -> Result<()> {
     use std::fmt::Write;
