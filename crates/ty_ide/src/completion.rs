@@ -993,8 +993,8 @@ impl<'db> CollectionContext<'db> {
     // i.e., the context should be able to influence ranking in
     // some way.
     #[allow(clippy::unused_self)]
-    fn rank<'c>(&self, c: &'c Completion<'_>) -> Rank<'c> {
-        Rank {
+    fn rank<'c>(&self, c: &'c Completion<'_>) -> Relevance<'c> {
+        Relevance {
             definitively_usable: if c.is_context_specific {
                 Sort::Higher
             } else {
@@ -1018,7 +1018,7 @@ impl<'db> CollectionContext<'db> {
     }
 }
 
-/// A ranking assigned to a single completion.
+/// Relevance information assigned to a single completion.
 ///
 /// A "lesser" rank means the completion appears higher in the
 /// completion results shown to an end user. That is, we sort
@@ -1030,7 +1030,7 @@ impl<'db> CollectionContext<'db> {
 /// matter. The most important or overriding criteria should appear
 /// first.
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
-struct Rank<'a> {
+struct Relevance<'a> {
     /// This is set when we know that a symbol in the current context
     /// is affirmatively usable or not. That is, other symbols in the
     /// results may not be usable (we may not know for sure), but
