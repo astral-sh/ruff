@@ -8,7 +8,7 @@ use super::{
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
-use crate::place::TypeOrigin;
+use crate::place::{DefinedPlace, TypeOrigin};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::{NodeWithScopeKind, Scope, ScopeKind};
 use crate::semantic_index::symbol::Symbol;
@@ -1186,8 +1186,10 @@ impl<'db> ClassType<'db> {
             )
             .place;
 
-        if let Place::Defined(Type::BoundMethod(metaclass_dunder_call_function), _, _, _) =
-            metaclass_dunder_call_function_symbol
+        if let Place::Defined(DefinedPlace {
+            ty: Type::BoundMethod(metaclass_dunder_call_function),
+            ..
+        }) = metaclass_dunder_call_function_symbol
         {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
@@ -1249,7 +1251,7 @@ impl<'db> ClassType<'db> {
         // If the class defines an `__init__` method, then we synthesize a callable type with the
         // same parameters as the `__init__` method after it is bound, and with the return type of
         // the concrete type of `Self`.
-        let synthesized_dunder_init_callable = if let Place::Defined(ty, _, _, _) =
+        let synthesized_dunder_init_callable = if let Place::Defined(DefinedPlace { ty, .. }) =
             dunder_init_function_symbol
         {
             let signature = match ty {
@@ -1324,8 +1326,10 @@ impl<'db> ClassType<'db> {
                     )
                     .place;
 
-                if let Place::Defined(Type::FunctionLiteral(mut new_function), _, _, _) =
-                    new_function_symbol
+                if let Place::Defined(DefinedPlace {
+                    ty: Type::FunctionLiteral(mut new_function),
+                    ..
+                }) = new_function_symbol
                 {
                     if let Some(class_generic_context) = class_generic_context {
                         new_function =
@@ -1516,6 +1520,9 @@ pub struct ClassLiteral<'db> {
 
     pub(crate) dataclass_params: Option<DataclassParams<'db>>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
+
+    /// Whether this class is decorated with `@functools.total_ordering`
+    pub(crate) total_ordering: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -1538,6 +1545,17 @@ impl<'db> ClassLiteral<'db> {
 
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Tuple)
+    }
+
+    /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
+    /// `__ge__`) in its own body (not inherited). Used by `@total_ordering` to determine if
+    /// synthesis is valid.
+    #[salsa::tracked]
+    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+        let body_scope = self.body_scope(db);
+        ["__lt__", "__le__", "__gt__", "__ge__"]
+            .iter()
+            .any(|method| !class_member(db, body_scope, method).is_undefined())
     }
 
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
@@ -2250,7 +2268,7 @@ impl<'db> ClassLiteral<'db> {
 
             (
                 PlaceAndQualifiers {
-                    place: Place::Defined(ty, _, _, _),
+                    place: Place::Defined(DefinedPlace { ty, .. }),
                     qualifiers,
                 },
                 Some(dynamic_type),
@@ -2384,6 +2402,41 @@ impl<'db> ClassLiteral<'db> {
     ) -> Option<Type<'db>> {
         let dataclass_params = self.dataclass_params(db);
 
+        // Handle `@functools.total_ordering`: synthesize comparison methods
+        // for classes that have `@total_ordering` and define at least one
+        // ordering method. The decorator requires at least one of __lt__,
+        // __le__, __gt__, or __ge__ to be defined (either in this class or
+        // inherited from a superclass, excluding `object`).
+        if self.total_ordering(db) && matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
+            // Check if any class in the MRO (excluding object) defines at least one
+            // ordering method in its own body (not synthesized).
+            let has_ordering_method = self
+                .iter_mro(db, specialization)
+                .filter_map(super::class_base::ClassBase::into_class)
+                .filter(|class| !class.class_literal(db).0.is_known(db, KnownClass::Object))
+                .any(|class| class.class_literal(db).0.has_own_ordering_method(db));
+
+            if has_ordering_method {
+                let instance_ty =
+                    Type::instance(db, self.apply_optional_specialization(db, specialization));
+
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_or_keyword(Name::new_static("other"))
+                                .with_annotated_type(instance_ty),
+                        ],
+                    ),
+                    Some(KnownClass::Bool.to_instance(db)),
+                );
+
+                return Some(Type::function_like_callable(db, signature));
+            }
+        }
+
         let field_policy = CodeGeneratorKind::from_class(db, self, specialization)?;
 
         let mut transformer_params =
@@ -2464,8 +2517,11 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let dunder_set = field_ty.class_member(db, "__set__".into());
-                if let Place::Defined(dunder_set, _, Definedness::AlwaysDefined, _) =
-                    dunder_set.place
+                if let Place::Defined(DefinedPlace {
+                    ty: dunder_set,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) = dunder_set.place
                 {
                     // The descriptor handling below is guarded by this not-dynamic check, because
                     // dynamic types like `Any` are valid (data) descriptors: since they have all
@@ -3377,7 +3433,13 @@ impl<'db> ClassLiteral<'db> {
                 }
                 ClassBase::Class(class) => {
                     if let member @ PlaceAndQualifiers {
-                        place: Place::Defined(ty, origin, boundness, _),
+                        place:
+                            Place::Defined(DefinedPlace {
+                                ty,
+                                origin,
+                                definedness: boundness,
+                                ..
+                            }),
                         qualifiers,
                     } = class.own_instance_member(db, name).inner
                     {
@@ -3429,12 +3491,12 @@ impl<'db> ClassLiteral<'db> {
                 Definedness::PossiblyUndefined
             };
 
-            Place::Defined(
-                union.build(),
-                TypeOrigin::Inferred,
-                boundness,
-                Widening::None,
-            )
+            Place::Defined(DefinedPlace {
+                ty: union.build(),
+                origin: TypeOrigin::Inferred,
+                definedness: boundness,
+                widening: Widening::None,
+            })
             .with_qualifiers(union_qualifiers)
         }
     }
@@ -3799,7 +3861,12 @@ impl<'db> ClassLiteral<'db> {
 
             match declared_and_qualifiers {
                 PlaceAndQualifiers {
-                    place: mut declared @ Place::Defined(declared_ty, _, declaredness, _),
+                    place:
+                        mut declared @ Place::Defined(DefinedPlace {
+                            ty: declared_ty,
+                            definedness: declaredness,
+                            ..
+                        }),
                     qualifiers,
                 } => {
                     // For the purpose of finding instance attributes, ignore `ClassVar`
@@ -3840,12 +3907,15 @@ impl<'db> ClassLiteral<'db> {
                                 }
                             } else {
                                 Member {
-                                    inner: Place::Defined(
-                                        UnionType::from_elements(db, [declared_ty, implicit_ty]),
-                                        TypeOrigin::Declared,
-                                        declaredness,
-                                        Widening::None,
-                                    )
+                                    inner: Place::Defined(DefinedPlace {
+                                        ty: UnionType::from_elements(
+                                            db,
+                                            [declared_ty, implicit_ty],
+                                        ),
+                                        origin: TypeOrigin::Declared,
+                                        definedness: declaredness,
+                                        widening: Widening::None,
+                                    })
                                     .with_qualifiers(qualifiers),
                                 }
                             }
@@ -3881,12 +3951,15 @@ impl<'db> ClassLiteral<'db> {
                             .ignore_possibly_undefined()
                             {
                                 Member {
-                                    inner: Place::Defined(
-                                        UnionType::from_elements(db, [declared_ty, implicit_ty]),
-                                        TypeOrigin::Declared,
-                                        declaredness,
-                                        Widening::None,
-                                    )
+                                    inner: Place::Defined(DefinedPlace {
+                                        ty: UnionType::from_elements(
+                                            db,
+                                            [declared_ty, implicit_ty],
+                                        ),
+                                        origin: TypeOrigin::Declared,
+                                        definedness: declaredness,
+                                        widening: Widening::None,
+                                    })
                                     .with_qualifiers(qualifiers),
                                 }
                             } else {
@@ -5207,16 +5280,17 @@ impl KnownClass {
     ) -> Result<ClassLiteral<'_>, KnownClassLookupError<'_>> {
         let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place;
         match symbol {
-            Place::Defined(Type::ClassLiteral(class_literal), _, Definedness::AlwaysDefined, _) => {
-                Ok(class_literal)
-            }
-            Place::Defined(
-                Type::ClassLiteral(class_literal),
-                _,
-                Definedness::PossiblyUndefined,
-                _,
-            ) => Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal }),
-            Place::Defined(found_type, _, _, _) => {
+            Place::Defined(DefinedPlace {
+                ty: Type::ClassLiteral(class_literal),
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => Ok(class_literal),
+            Place::Defined(DefinedPlace {
+                ty: Type::ClassLiteral(class_literal),
+                definedness: Definedness::PossiblyUndefined,
+                ..
+            }) => Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal }),
+            Place::Defined(DefinedPlace { ty: found_type, .. }) => {
                 Err(KnownClassLookupError::SymbolNotAClass { found_type })
             }
             Place::Undefined => Err(KnownClassLookupError::ClassNotFound),
@@ -6095,7 +6169,11 @@ enum SlotsKind {
 
 impl SlotsKind {
     fn from(db: &dyn Db, base: ClassLiteral) -> Self {
-        let Place::Defined(slots_ty, _, bound, _) = base
+        let Place::Defined(DefinedPlace {
+            ty: slots_ty,
+            definedness: bound,
+            ..
+        }) = base
             .own_class_member(db, base.inherited_generic_context(db), None, "__slots__")
             .inner
             .place
