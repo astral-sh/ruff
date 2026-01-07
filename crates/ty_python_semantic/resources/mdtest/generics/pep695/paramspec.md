@@ -783,3 +783,20 @@ class Container[**P]:
         # error: [invalid-argument-type] "Argument to bound method `method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
         return self.method(f)
 ```
+
+## `ParamSpec` inference with un-annotated return type
+
+Regression test for an issue where `ParamSpec` inference failed when the callable we were inferring
+from did not have an annotated return type.
+
+```py
+from typing import Callable
+
+def infer_paramspec[**P](func: Callable[P, None]) -> Callable[P, None]:
+    return func
+
+def f(x: int, y: str):
+    pass
+
+reveal_type(infer_paramspec(f))  # revealed: (x: int, y: str) -> None
+```

@@ -420,7 +420,7 @@ impl<'db> Completion<'db> {
         }
     }
 
-    fn argument(name: &str, ty: Option<Type<'db>>, documentation: Option<&str>) -> Self {
+    fn argument(name: &str, ty: Type<'db>, documentation: Option<&str>) -> Self {
         let insert = Some(format!("{name}=").into_boxed_str());
         let documentation = documentation.map(|d| Docstring::new(d.to_owned()));
 
@@ -428,7 +428,7 @@ impl<'db> Completion<'db> {
             name: name.into(),
             qualified: None,
             insert,
-            ty,
+            ty: Some(ty),
             kind: Some(CompletionKind::Variable),
             module_name: None,
             import: None,
@@ -1134,7 +1134,7 @@ fn add_class_arg_completions<'db>(
     };
 
     if !is_set("metaclass") {
-        let ty = Some(KnownClass::Type.to_subclass_of(model.db()));
+        let ty = KnownClass::Type.to_subclass_of(model.db());
         completions.add(Completion::argument("metaclass", ty, None));
     }
 
@@ -1148,7 +1148,7 @@ fn add_class_arg_completions<'db>(
     //
     // See https://peps.python.org/pep-0728/
     if is_typed_dict && !is_set("total") {
-        let ty = Some(KnownClass::Bool.to_instance(model.db()));
+        let ty = KnownClass::Bool.to_instance(model.db());
         completions.add(Completion::argument("total", ty, None));
     }
 }
