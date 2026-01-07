@@ -2,14 +2,15 @@ use compact_str::CompactString;
 use core::fmt;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
-use rustc_hash::FxHashSet;
+use ruff_python_index::Indexer;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
-use ruff_python_trivia::Cursor;
+use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
@@ -125,10 +126,17 @@ pub struct Suppressions {
 }
 
 impl Suppressions {
-    pub fn from_tokens(settings: &LinterSettings, source: &str, tokens: &Tokens) -> Suppressions {
+    pub fn from_tokens(
+        settings: &LinterSettings,
+        source: &str,
+        tokens: &Tokens,
+        indexer: &Indexer,
+    ) -> Suppressions {
         if is_range_suppressions_enabled(settings) {
             let builder = SuppressionsBuilder::new(source);
-            builder.load_from_tokens(tokens)
+            builder.load_from_tokens_indexed(tokens, indexer)
+            // let builder = SuppressionsBuilder::new(source);
+            // builder.load_from_tokens(tokens)
         } else {
             Suppressions::default()
         }
@@ -303,7 +311,7 @@ impl Suppressions {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct SuppressionsBuilder<'a> {
     source: &'a str,
 
@@ -312,6 +320,7 @@ pub(crate) struct SuppressionsBuilder<'a> {
     errors: Vec<ParseError>,
 
     pending: Vec<PendingSuppressionComment<'a>>,
+    pending_by_indent: FxHashMap<TextRange, Vec<SuppressionComment>>,
 }
 
 impl<'a> SuppressionsBuilder<'a> {
@@ -322,6 +331,89 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
+    pub(crate) fn load_from_tokens_indexed(
+        mut self,
+        tokens: &Tokens,
+        indexer: &Indexer,
+    ) -> Suppressions {
+        let global_indent = TextRange::empty(0.into());
+
+        dbg!(indexer.block_ranges());
+        'outer: for comment_range in indexer.comment_ranges() {
+            dbg!(comment_range);
+            dbg!(self.source.slice(&comment_range));
+            let mut parser = SuppressionParser::new(self.source, comment_range);
+            match parser.parse_comment() {
+                Ok(comment) => {
+                    let Some(indent) = indentation(self.source, &comment_range) else {
+                        // trailing suppressions are not supported
+                        self.invalid.push(InvalidSuppression {
+                            kind: InvalidSuppressionKind::Trailing,
+                            comment,
+                        });
+                        continue;
+                    };
+                    let comment_indent = indent.text_len();
+
+                    let token_index = match tokens.binary_search_by_start(comment_range.start()) {
+                        Ok(index) => index,
+                        Err(index) => index,
+                    };
+                    let precedes_dedent = tokens[token_index..]
+                        .iter()
+                        .find(|t| !t.kind().is_trivia())
+                        .is_some_and(|token| matches!(token.kind(), TokenKind::Dedent));
+
+                    let block_ranges = indexer.block_ranges().containing(&comment_range);
+                    dbg!(&block_ranges);
+
+                    // no blocks, global scope
+                    if block_ranges.is_empty() && comment_indent == 0.into() {
+                        self.pending_by_indent
+                            .entry(global_indent)
+                            .or_default()
+                            .push(comment);
+                        continue 'outer;
+                    }
+
+                    for block in indexer
+                        .block_ranges()
+                        .containing(&comment_range)
+                        .iter()
+                        .rev()
+                    {
+                        let block_indent = block.indent.len();
+
+                        if comment_indent == block_indent {
+                            self.pending_by_indent
+                                .entry(block.indent)
+                                .or_default()
+                                .push(comment);
+                            continue 'outer;
+                        } else if comment_indent < block_indent && precedes_dedent {
+                            continue;
+                        }
+                        break;
+                    }
+
+                    // weirdly indented? ¯\_(ツ)_/¯
+                    self.invalid.push(InvalidSuppression {
+                        kind: InvalidSuppressionKind::Indentation,
+                        comment,
+                    });
+                }
+                Err(ParseError {
+                    kind: ParseErrorKind::NotASuppression,
+                    ..
+                }) => {}
+                Err(error) => self.errors.push(error),
+            }
+        }
+
+        dbg!(self);
+
+        Suppressions::default()
+    }
     pub(crate) fn load_from_tokens(mut self, tokens: &Tokens) -> Suppressions {
         let default_indent = "";
         let mut indents: Vec<&str> = vec![];
@@ -642,6 +734,7 @@ mod tests {
 
     use insta::assert_debug_snapshot;
     use itertools::Itertools;
+    use ruff_python_index::Indexer;
     use ruff_python_parser::{Mode, ParseOptions, parse};
     use ruff_text_size::{TextRange, TextSize};
     use similar::DiffableStr;
@@ -1568,10 +1661,12 @@ def bar():
         /// Parse all suppressions and errors in a module for testing
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
             let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
+            let indexer = Indexer::from_tokens(parsed.tokens(), source);
             let suppressions = Suppressions::from_tokens(
                 &LinterSettings::default().with_preview_mode(),
                 source,
                 parsed.tokens(),
+                &indexer,
             );
             DebugSuppressions {
                 source,
