@@ -61,8 +61,8 @@ AbstractOperator()
 NotMapped()
 TaskStateChangeCallback()
 
-# airflow.models.baseoperator -> airflow.sdk.bases.operator
-from airflow.sdk.bases.operator import BaseOperator
+# airflow.models.baseoperator -> airflow.sdk
+from airflow.sdk import BaseOperator
 
 BaseOperator()
 
