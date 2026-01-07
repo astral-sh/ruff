@@ -635,9 +635,6 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
         if let Some(ty) = parameter.annotated_type() {
             visitor.visit_type(db, ty);
         }
-        if let Some(default) = parameter.default_type() {
-            visitor.visit_type(db, default);
-        }
     }
     if let ParametersKind::ParamSpec(bound_typevar) = &signature.parameters.kind() {
         walk_bound_type_var_type(db, *bound_typevar, visitor);
