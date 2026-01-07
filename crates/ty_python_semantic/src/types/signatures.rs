@@ -1684,13 +1684,12 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
                 .iter()
                 .filter_map(|parameter| match parameter.form {
                     ParameterForm::Type => None,
-                    ParameterForm::Value => {
-                        let ty = parameter.annotated_type();
-                        Some(
-                            ty.with_polarity(TypeVarVariance::Contravariant)
-                                .variance_of(db, typevar),
-                        )
-                    }
+                    ParameterForm::Value => Some(
+                        parameter
+                            .annotated_type()
+                            .with_polarity(TypeVarVariance::Contravariant)
+                            .variance_of(db, typevar),
+                    ),
                 }),
             Some(self.return_ty.variance_of(db, typevar)),
         )

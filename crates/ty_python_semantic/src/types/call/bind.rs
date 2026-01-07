@@ -3048,11 +3048,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
-                let parameter = &parameters[parameter_index];
-                let expected_type = parameter.annotated_type();
-
                 let specialization_result = builder.infer_map(
-                    expected_type,
+                    parameters[parameter_index].annotated_type(),
                     variadic_argument_type.unwrap_or(argument_type),
                     |(identity, variance, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
@@ -3321,10 +3318,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         };
 
-        if !matches!(
-            self.signature.parameters()[*parameter_index].annotated_type(),
-            Type::TypeVar(typevar) if typevar.is_paramspec(self.db)
-        ) {
+        let Type::TypeVar(typevar) = self.signature.parameters()[*parameter_index].annotated_type()
+        else {
+            return false;
+        };
+        if !typevar.is_paramspec(self.db) {
             return false;
         }
 
@@ -4716,9 +4714,9 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         .exactly_one()
         .ok()?;
     let signature = &binding.signature;
-    let return_ty = signature.return_ty;
 
-    let yield_ty = return_ty
+    let yield_ty = signature
+        .return_ty
         .try_iterate_with_mode(db, EvaluationMode::Async)
         .ok()?
         .homogeneous_element_type(db);

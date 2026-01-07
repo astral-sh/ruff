@@ -1896,8 +1896,8 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
-            let annotated_type = self.param.annotated_type();
             if self.param.should_annotation_be_displayed() {
+                let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
                 annotated_type
                     .display_with(self.db, self.settings.clone())

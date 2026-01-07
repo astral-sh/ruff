@@ -1269,7 +1269,6 @@ impl<'db> ClassType<'db> {
                         .get_positional(0)
                         .filter(|parameter| !parameter.inferred_annotation)
                         .map(Parameter::annotated_type)
-                        .filter(|ty| !ty.is_unknown())
                         .filter(|ty| {
                             ty.as_typevar()
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))

@@ -264,12 +264,11 @@ fn create_parameters_from_offsets<'db>(
                 parameter_kinds.get(i),
                 Some(ParameterKind::PositionalOnly { .. })
             );
-            let ty = parameter_types.get(i).copied().unwrap_or(Type::unknown());
 
             ParameterDetails {
                 name: param_name.to_string(),
                 label,
-                ty,
+                ty: parameter_types[i],
                 documentation: param_docs.get(param_name).cloned(),
                 is_positional_only,
             }
