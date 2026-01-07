@@ -1617,6 +1617,38 @@ impl<'db> SpecializationBuilder<'db> {
             upper: FxOrderSet<Type<'db>>,
         }
 
+        impl<'db> Bounds<'db> {
+            fn add_lower(&mut self, _db: &'db dyn Db, ty: Type<'db>) {
+                // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
+                // element is typically cheap (in that it does not involve a combinatorial
+                // explosion from distributing the clause through an existing disjunction). So we
+                // don't need to be as clever here as in `add_upper`.
+                self.lower.insert(ty);
+            }
+
+            fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+                // Upper bounds are intersectioned. If `ty` is a union, that involves distributing
+                // the union elements through the existing type. That makes it worth checking first
+                // whether any of the types in the upper bound are redundant.
+
+                // First check if there's an existing upper bound clause that is a subtype of the
+                // new type. If so, adding the new type does nothing to the intersection.
+                if self
+                    .upper
+                    .iter()
+                    .any(|existing| existing.is_subtype_of(db, ty))
+                {
+                    return;
+                }
+
+                // Otherwise remove any existing clauses that are a supertype of the new type,
+                // since the intersection will clip them to the new type.
+                self.upper
+                    .retain(|existing| !ty.is_subtype_of(db, *existing));
+                self.upper.insert(ty);
+            }
+        }
+
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
@@ -1642,17 +1674,17 @@ impl<'db> SpecializationBuilder<'db> {
                 let lower = constraint.lower(self.db);
                 let upper = constraint.upper(self.db);
                 let bounds = mappings.entry(typevar).or_default();
-                bounds.lower.insert(lower);
-                bounds.upper.insert(upper);
+                bounds.add_lower(self.db, lower);
+                bounds.add_upper(self.db, upper);
 
                 if let Type::TypeVar(lower_bound_typevar) = lower {
                     let bounds = mappings.entry(lower_bound_typevar).or_default();
-                    bounds.upper.insert(Type::TypeVar(typevar));
+                    bounds.add_upper(self.db, Type::TypeVar(typevar));
                 }
 
                 if let Type::TypeVar(upper_bound_typevar) = upper {
                     let bounds = mappings.entry(upper_bound_typevar).or_default();
-                    bounds.lower.insert(Type::TypeVar(typevar));
+                    bounds.add_lower(self.db, Type::TypeVar(typevar));
                 }
             }
 
