@@ -28,14 +28,13 @@
 //!
 //! In practice, there are two kinds of unions found in the wild: relatively-small unions made up
 //! of normal user types (classes, etc), and large unions made up of literals, which can occur via
-//! large enums (not yet implemented) or from string/integer/bytes literals, which can grow due to
-//! literal arithmetic or operations on literal strings/bytes. For normal unions, it's most
-//! efficient to just store the member types in a vector, and do O(n^2) `is_subtype_of` checks to
-//! maintain the union in simplified form. But literal unions can grow to a size where this becomes
-//! a performance problem. For this reason, we group literal types in `UnionBuilder`. Since every
-//! different string literal type shares exactly the same possible super-types, and none of them
-//! are subtypes of each other (unless exactly the same literal type), we can avoid many
-//! unnecessary `is_subtype_of` checks.
+//! large enums or from string/integer/bytes literals, which can grow due to literal arithmetic or
+//! operations on literal strings/bytes. For normal unions, it's most efficient to just store the
+//! member types in a vector, and do O(n^2) redundancy checks to maintain the union in simplified
+//! form. But literal unions can grow to a size where this becomes a performance problem. For this
+//! reason, we group literal types in `UnionBuilder`. Since every different string literal type
+//! shares exactly the same possible super-types, and none of them are subtypes of each other
+//! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
