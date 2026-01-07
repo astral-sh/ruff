@@ -168,7 +168,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
         // airflow.models.baseoperator
         ["airflow", "models", "baseoperator", "BaseOperator"] => Replacement::SourceModuleMoved {
-            module: "airflow.sdk.bases.operator",
+            module: "airflow.sdk",
             name: "BaseOperator".to_string(),
         },
         // airflow.macros
