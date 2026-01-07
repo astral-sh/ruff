@@ -341,11 +341,11 @@ class Impl:
 
 ```py
 from foo.bar.both import Both
-from foo.bar.impl import Impl
-from foo.bar.fake import Fake  # error: "Cannot resolve"
+from foo.bar.impl import Impl  # error: [unresolved-import]
+from foo.bar.fake import Fake  # error: [unresolved-import]
 
 reveal_type(Both().both)  # revealed: str
-reveal_type(Impl().impl)  # revealed: str
+reveal_type(Impl().impl)  # revealed: Unknown
 reveal_type(Fake().fake)  # revealed: Unknown
 ```
 
