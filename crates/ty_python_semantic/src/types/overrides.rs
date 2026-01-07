@@ -10,7 +10,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     lint::LintId,
-    place::Place,
+    place::{DefinedPlace, Place},
     semantic_index::{
         definition::DefinitionKind, place::ScopedPlaceId, place_table, scope::ScopeId,
         symbol::ScopedSymbolId, use_def_map,
@@ -110,8 +110,10 @@ fn check_class_declaration<'db>(
         first_reachable_definition,
     } = member;
 
-    let Place::Defined(type_on_subclass_instance, _, _, _) =
-        Type::instance(db, class).member(db, &member.name).place
+    let Place::Defined(DefinedPlace {
+        ty: type_on_subclass_instance,
+        ..
+    }) = Type::instance(db, class).member(db, &member.name).place
     else {
         return;
     };
@@ -190,7 +192,10 @@ fn check_class_declaration<'db>(
                     .unwrap_or_default();
         }
 
-        let Place::Defined(superclass_type, _, _, _) = Type::instance(db, superclass)
+        let Place::Defined(DefinedPlace {
+            ty: superclass_type,
+            ..
+        }) = Type::instance(db, superclass)
             .member(db, &member.name)
             .place
         else {

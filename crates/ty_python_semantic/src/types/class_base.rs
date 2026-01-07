@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::types::class::CodeGeneratorKind;
-use crate::types::generics::Specialization;
+use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
@@ -335,7 +335,9 @@ impl<'db> ClassBase<'db> {
         if let Some(specialization) = specialization {
             let new_self = self.apply_type_mapping_impl(
                 db,
-                &TypeMapping::Specialization(specialization),
+                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                    specialization,
+                )),
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );

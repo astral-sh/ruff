@@ -711,6 +711,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
 
@@ -869,6 +870,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         def s(x: str, /) -> str:
@@ -1049,6 +1051,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         def s(x: str, /) -> str:
@@ -1229,6 +1232,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         def s(x: str, /) -> str:
@@ -1475,6 +1479,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         def s(x: str, /) -> str:
@@ -1726,6 +1731,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
 
@@ -1815,6 +1821,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         x[: int] = i(1)
@@ -1864,7 +1871,8 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class A:
             def __init__(self, y):
                 self.x = int(1)
@@ -1939,6 +1947,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def my_func(command: str):
             match command.split():
                 case ["get", ab]:
@@ -1958,6 +1967,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def my_func(command: str):
             match command.split():
                 case ["get", *ab]:
@@ -1977,6 +1987,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def my_func(command: str):
             match command.split():
                 case ["get", ("a" | "b") as ab]:
@@ -2002,6 +2013,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class Click:
             __match_args__ = ("position", "button")
             def __init__(self, pos, btn):
@@ -2023,7 +2035,10 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @"type Alias1[AB: int = bool] = tuple[AB, list[AB]]");
+        assert_snapshot!(test.inlay_hints(), @"
+
+        type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+        ");
     }
 
     #[test]
@@ -2035,7 +2050,8 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import Callable
         type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
         ");
@@ -2049,7 +2065,10 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @"type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]");
+        assert_snapshot!(test.inlay_hints(), @"
+
+        type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+        ");
     }
 
     #[test]
@@ -2071,6 +2090,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a = 1
         b = 1.0
         c = True
@@ -2104,6 +2124,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a = (1, 2)
         b = (1.0, 2.0)
         c = (True, False)
@@ -2137,6 +2158,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a1, a2 = (1, 2)
         b1, b2 = (1.0, 2.0)
         c1, c2 = (True, False)
@@ -2170,6 +2192,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a1, a2 = 1, 2
         b1, b2 = 1.0, 2.0
         c1, c2 = True, False
@@ -2203,6 +2226,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a[: list[Unknown | int]] = [1, 2]
         b[: list[Unknown | int | float]] = [1.0, 2.0]
         c[: list[Unknown | bool]] = [True, False]
@@ -2933,6 +2957,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class MyClass:
             def __init__(self):
                 self.x: int = 1
@@ -3099,6 +3124,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
                 self.x[: list[T@MyClass]] = x
@@ -3982,7 +4008,8 @@ mod tests {
                 variable_types: false,
                 ..Default::default()
             }),
-            @r"
+            @"
+
         def i(x: int, /) -> int:
             return x
 
@@ -3999,7 +4026,8 @@ mod tests {
             foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         foo([x=]1)
         ---------------------------------------------
@@ -4031,7 +4059,8 @@ mod tests {
             foo(y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         x = 1
         y = 2
@@ -4072,7 +4101,8 @@ mod tests {
             foo(val.y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         class MyClass:
             def __init__(self):
@@ -4117,7 +4147,8 @@ mod tests {
             foo(x.y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         class MyClass:
             def __init__(self):
@@ -4163,7 +4194,8 @@ mod tests {
             foo(val.y())",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         class MyClass:
             def __init__(self):
@@ -4213,7 +4245,8 @@ mod tests {
             foo(val.y()[1])",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import List
 
         def foo(x: int): pass
@@ -4261,6 +4294,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def foo(x: int): pass
         x[: list[Unknown | int]] = [1]
         y[: list[Unknown | int]] = [2]
@@ -4417,7 +4451,8 @@ mod tests {
             foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, /): pass
         foo(1)
         ");
@@ -4431,7 +4466,8 @@ mod tests {
             foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(*args: int): pass
         foo(1)
         ");
@@ -4445,7 +4481,8 @@ mod tests {
             foo(x=1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(**kwargs: int): pass
         foo(x=1)
         ");
@@ -4459,7 +4496,8 @@ mod tests {
             foo(x=1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(*, x: int): pass
         foo(x=1)
         ");
@@ -4477,7 +4515,8 @@ mod tests {
         );
 
         // `*t` fills both `b` and `c`, so no hint is shown for it
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(a: str, b: int, c: int, d: str): ...
         t: tuple[int, int] = (23, 42)
         foo([a=]'foo', *t, d='bar')
@@ -4511,7 +4550,8 @@ mod tests {
             foo('foo', *t, 'bar')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(a: str, b: int, c: str): ...
         t: tuple[int] = (42,)
         foo([a=]'foo', [b=]*t, [c=]'bar')
@@ -4577,7 +4617,8 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, /, y: int): pass
         foo(1, [y=]2)
         ---------------------------------------------
@@ -4606,7 +4647,8 @@ mod tests {
             foo(1, 2, 3)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, /, *args: int): pass
         foo(1, 2, 3)
         ");
@@ -4620,7 +4662,8 @@ mod tests {
             foo(1, x=2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, /, **kwargs: int): pass
         foo(1, x=2)
         ");
@@ -4636,7 +4679,8 @@ mod tests {
             f = Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             def __init__(self, x: int): pass
         Foo([x=]1)
@@ -4691,7 +4735,8 @@ mod tests {
             f = Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             def __new__(cls, x: int): pass
         Foo([x=]1)
@@ -4747,7 +4792,8 @@ mod tests {
             Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class MetaFoo:
             def __call__(self, x: int): pass
         class Foo(metaclass=MetaFoo):
@@ -4783,7 +4829,8 @@ mod tests {
                 x(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import Callable
         def foo(x: Callable[[int], int]):
             x(1)
@@ -4799,7 +4846,8 @@ mod tests {
             Foo().bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             def bar(self, y: int): pass
         Foo().bar([y=]2)
@@ -4833,7 +4881,8 @@ mod tests {
             Foo.bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             @classmethod
             def bar(cls, y: int): pass
@@ -4869,7 +4918,8 @@ mod tests {
             Foo.bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             @staticmethod
             def bar(y: int): pass
@@ -4904,7 +4954,8 @@ mod tests {
             foo('abc')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int | str): pass
         foo([x=]1)
         foo([x=]'abc')
@@ -4953,7 +5004,8 @@ mod tests {
             foo(1, 'hello', True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, y: str, z: bool): pass
         foo([x=]1, [y=]'hello', [z=]True)
         ---------------------------------------------
@@ -5012,7 +5064,8 @@ mod tests {
             foo(1, z=True, y='hello')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, y: str, z: bool): pass
         foo([x=]1, z=True, y='hello')
         ---------------------------------------------
@@ -5043,7 +5096,8 @@ mod tests {
             foo(1, 'custom', True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, y: str = 'default', z: bool = False): pass
         foo([x=]1)
         foo([x=]1, [y=]'custom')
@@ -5171,7 +5225,8 @@ mod tests {
             baz(foo(5), bar(bar('test')), True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int) -> int:
             return x * 2
 
@@ -5306,7 +5361,8 @@ mod tests {
             A().foo(42).bar('test').baz()",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class A:
             def foo(self, value: int) -> 'A':
                 return self
@@ -5365,7 +5421,8 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: str) -> str:
             return x
         def bar(y: int): pass
@@ -5401,7 +5458,8 @@ mod tests {
             bar(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         foo[: (x) -> Unknown] = lambda x: x * 2
         bar[: (a, b) -> Unknown] = lambda a, b: a + b
         foo([x=]5)
@@ -5457,6 +5515,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import LiteralString
         def my_func(x: LiteralString):
             y[: LiteralString] = x
@@ -5511,6 +5570,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def branch(cond: int):
             if cond < 10:
                 x = 1
@@ -5661,6 +5721,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class Foo[T]: ...
 
         a[: <class 'Foo[int]'>] = Foo[int]
@@ -5711,6 +5772,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f(x: list[str]):
             y[: type[list[str]]] = type(x)
         ---------------------------------------------
@@ -5784,7 +5846,8 @@ mod tests {
             ab = F.whatever",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class F:
             @property
             def whatever(self): ...
@@ -5831,7 +5894,8 @@ mod tests {
             foo(1, 'pos', 3.14, e=42, f='custom')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
         foo(1, 'pos', [c=]3.14, [d=]False, e=42)
         foo(1, 'pos', [c=]3.14, e=42, f='custom')
@@ -5905,7 +5969,8 @@ mod tests {
             pass",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from foo import bar
 
         bar([x=]1)
@@ -5945,7 +6010,8 @@ mod tests {
             foo('hello')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import overload
 
         @overload
@@ -6007,7 +6073,8 @@ mod tests {
         assert_snapshot!(test.inlay_hints_with_settings(&InlayHintSettings {
             call_argument_names: false,
             ..Default::default()
-        }), @r"
+        }), @"
+
         def foo(x: int): pass
         foo(1)
         ");
@@ -6023,7 +6090,8 @@ mod tests {
             bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         def bar(y: int): pass
         foo([x=]1)
@@ -6057,7 +6125,8 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(_x: int, y: int): pass
         foo(1, [y=]2)
         ---------------------------------------------
@@ -6090,7 +6159,8 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(
             x: int,
             y: int
@@ -6146,6 +6216,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def foo(x: int, *y: bool, z: str | int | list[str]): ...
 
         a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
@@ -6289,6 +6360,7 @@ mod tests {
         test.with_extra_file("foo.py", "'''Foo module'''");
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         import foo
 
         a[: <module 'foo'>] = foo
@@ -6337,6 +6409,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import Literal
 
         a[: <special-form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
@@ -6425,6 +6498,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from types import FunctionType
 
         a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
@@ -6477,6 +6551,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f(): ...
 
         a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
@@ -6566,6 +6641,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import NewType
 
         N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
@@ -6703,6 +6779,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f[T](x: type[T]):
             y[: type[T@f]] = x
         ---------------------------------------------
@@ -6750,6 +6827,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import Protocol, TypeVar
         T = TypeVar([name=]'T')
         Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
@@ -6818,7 +6896,8 @@ mod tests {
         P = ParamSpec('P')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import ParamSpec
         P = ParamSpec([name=]'P')
         ---------------------------------------------
@@ -6851,6 +6930,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing_extensions import TypeAliasType
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
@@ -6900,7 +6980,8 @@ mod tests {
         Ts = TypeVarTuple('Ts')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing_extensions import TypeVarTuple
         Ts = TypeVarTuple([name=]'Ts')
         ---------------------------------------------
@@ -6935,6 +7016,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f(xyxy: object):
             if isinstance(xyxy, list):
                 x[: Top[list[Unknown]]] = xyxy

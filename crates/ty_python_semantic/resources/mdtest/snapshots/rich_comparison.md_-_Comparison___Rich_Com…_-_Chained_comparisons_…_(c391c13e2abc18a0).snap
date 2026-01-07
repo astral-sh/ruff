@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: rich_comparison.md - Comparison: Rich Comparison - Chained comparisons with objects that don't implement `__bool__` correctly
 mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/rich_comparison.md

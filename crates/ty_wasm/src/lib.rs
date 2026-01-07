@@ -428,6 +428,7 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|comp| {
+                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
                 let kind = comp.kind(&self.db).map(CompletionKind::from);
                 let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
@@ -443,7 +444,7 @@ impl Workspace {
                     }
                 });
                 Completion {
-                    name: comp.name.into(),
+                    name,
                     kind,
                     detail: type_display,
                     module_name: comp.module_name.map(ToString::to_string),
