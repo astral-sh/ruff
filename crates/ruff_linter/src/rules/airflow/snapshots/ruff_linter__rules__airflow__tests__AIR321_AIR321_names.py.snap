@@ -379,12 +379,12 @@ AIR321 [*] `airflow.models.baseoperator.BaseOperator` is removed in Airflow 3.1
 68 |
 69 | # airflow.macros
    |
-help: Use `BaseOperator` from `airflow.sdk.bases.operator` instead.
+help: Use `BaseOperator` from `airflow.sdk` instead.
 62 | TaskStateChangeCallback()
 63 | 
 64 | # airflow.models.baseoperator
    - from airflow.models.baseoperator import BaseOperator
-65 + from airflow.sdk.bases.operator import BaseOperator
+65 + from airflow.sdk import BaseOperator
 66 | 
 67 | BaseOperator()
 68 | 
