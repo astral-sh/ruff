@@ -36,6 +36,7 @@ pub enum PythonVersion {
     Py312,
     Py313,
     Py314,
+    Py315,
 }
 
 impl Default for PythonVersion {
@@ -58,6 +59,7 @@ impl TryFrom<ast::PythonVersion> for PythonVersion {
             ast::PythonVersion::PY312 => Ok(Self::Py312),
             ast::PythonVersion::PY313 => Ok(Self::Py313),
             ast::PythonVersion::PY314 => Ok(Self::Py314),
+            ast::PythonVersion::PY315 => Ok(Self::Py315),
             _ => Err(format!("unrecognized python version {value}")),
         }
     }
@@ -88,6 +90,7 @@ impl PythonVersion {
             Self::Py312 => (3, 12),
             Self::Py313 => (3, 13),
             Self::Py314 => (3, 14),
+            Self::Py315 => (3, 15),
         }
     }
 }

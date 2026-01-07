@@ -312,6 +312,10 @@
         {
           "description": "Python 3.14",
           "const": "3.14"
+        },
+        {
+          "description": "Python 3.15",
+          "const": "3.15"
         }
       ]
     },
