@@ -10115,6 +10115,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ""
                             },
                         ));
+                        diagnostic.help(
+                            "See this FAQ for more information: \
+                            <https://docs.astral.sh/ty/reference/typing-faq/\
+                            #why-does-ty-say-callable-has-no-attribute-__name__>",
+                        );
                     } else {
                         hint_if_stdlib_attribute_exists_on_other_versions(
                             db,
