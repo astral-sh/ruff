@@ -7741,6 +7741,68 @@ TypedDi<CURSOR>
         );
     }
 
+    /// Tests that `xs = ["..."]; xs[0].<CURSOR>` gets completions
+    /// appropriate for `str`.
+    #[test]
+    fn dynamic_type_list_no_type_annotation() {
+        let builder = completion_test_builder(
+            r#"
+my_list = ["foo"]
+my_list[0].remove<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @r"
+        removeprefix
+        removesuffix
+        ",
+        );
+    }
+
+    /// Tests that when we have `Any | T` that we offer
+    /// completions for `T`.
+    #[test]
+    fn dynamic_type_with_type_annotation() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Any
+
+def f(x: Any | str):
+    x.remove<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @r"
+        removeprefix
+        removesuffix
+        ",
+        );
+    }
+
+    /// Tests that when we have `(U & Any) | T` that we offer
+    /// completions for `T`.
+    #[test]
+    fn dynamic_type_with_intersection_type_annotation() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Any
+from ty_extensions import Intersection
+
+def f(x: Intersection[int, Any] | str):
+    x.remove<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @r"
+        removeprefix
+        removesuffix
+        ",
+        );
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///

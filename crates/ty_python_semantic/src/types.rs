@@ -1064,7 +1064,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    const fn is_dynamic(&self) -> bool {
+    pub(crate) const fn is_dynamic(&self) -> bool {
         matches!(self, Type::Dynamic(_))
     }
 
