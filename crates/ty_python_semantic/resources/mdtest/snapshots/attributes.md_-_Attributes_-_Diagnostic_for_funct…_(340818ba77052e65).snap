@@ -2,7 +2,6 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
-
 ---
 mdtest name: attributes.md - Attributes - Diagnostic for function attribute accessed on `Callable` type
 mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
@@ -32,6 +31,7 @@ error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute 
 5 |     x.__annotate__  # error: [unresolved-attribute]
   |
 help: Function objects have a `__name__` attribute, but not all callable objects are functions
+help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 info: rule `unresolved-attribute` is enabled by default
 
 ```
@@ -46,6 +46,7 @@ error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute 
   |     ^^^^^^^^^^^^^^
   |
 help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
+help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 info: rule `unresolved-attribute` is enabled by default
 
 ```

@@ -19,8 +19,8 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
 use ruff_db::files::File;
-use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::{STACK_SIZE, max_parallelism};
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
@@ -625,12 +625,7 @@ fn set_colored_override(color: Option<TerminalColor>) {
 fn setup_rayon() {
     ThreadPoolBuilder::default()
         .num_threads(max_parallelism().get())
-        // Use a reasonably large stack size to avoid running into stack overflows too easily. The
-        // size was chosen in such a way as to still be able to handle large expressions involving
-        // binary operators (x + x + … + x) both during the AST walk in semantic index building as
-        // well as during type checking. Using this stack size, we can handle handle expressions
-        // that are several times larger than the corresponding limits in existing type checkers.
-        .stack_size(16 * 1024 * 1024)
+        .stack_size(STACK_SIZE)
         .build_global()
         .unwrap();
 }

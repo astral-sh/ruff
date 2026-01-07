@@ -607,13 +607,21 @@ impl TryFrom<String> for RequiredVersion {
     type Error = pep440_rs::VersionSpecifiersParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl FromStr for RequiredVersion {
+    type Err = pep440_rs::VersionSpecifiersParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
-        if let Ok(version) = pep440_rs::Version::from_str(&value) {
+        if let Ok(version) = pep440_rs::Version::from_str(value) {
             Ok(Self(VersionSpecifiers::from(
                 VersionSpecifier::equals_version(version),
             )))
         } else {
-            Ok(Self(VersionSpecifiers::from_str(&value)?))
+            Ok(Self(VersionSpecifiers::from_str(value)?))
         }
     }
 }

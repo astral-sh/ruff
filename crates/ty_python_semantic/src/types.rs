@@ -1064,7 +1064,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    const fn is_dynamic(&self) -> bool {
+    pub(crate) const fn is_dynamic(&self) -> bool {
         matches!(self, Type::Dynamic(_))
     }
 
@@ -1925,7 +1925,7 @@ impl<'db> Type<'db> {
                 SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
                     Some(CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::unknown(), Some(Type::from(subclass_of_ty))),
+                        Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
                     )))
                 }
             },
@@ -1968,7 +1968,7 @@ impl<'db> Type<'db> {
                             [Parameter::positional_only(None)
                                 .with_annotated_type(newtype.base(db).instance_type(db))],
                         ),
-                        Some(Type::NewTypeInstance(newtype)),
+                        Type::NewTypeInstance(newtype),
                     ),
                 )))
             }
@@ -3811,7 +3811,7 @@ impl<'db> Type<'db> {
                         [Parameter::positional_only(Some(Name::new_static("func")))
                             .with_annotated_type(Type::object())],
                     ),
-                    None,
+                    Type::unknown(),
                 ),
             )
             .into(),
@@ -3836,7 +3836,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any()),
                             ],
                         ),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
+                        KnownClass::ConstraintSet.to_instance(db),
                     ),
                 )
                 .into(),
@@ -3851,7 +3851,7 @@ impl<'db> Type<'db> {
                                     .type_form()
                                     .with_annotated_type(Type::any())],
                             ),
-                            Some(KnownClass::Bool.to_instance(db)),
+                            KnownClass::Bool.to_instance(db),
                         ),
                     )
                     .into()
@@ -3878,7 +3878,7 @@ impl<'db> Type<'db> {
                                         .with_annotated_type(Type::any()),
                                 ],
                             ),
-                            Some(Type::TypeVar(val_ty)),
+                            Type::TypeVar(val_ty),
                         ),
                     )
                     .into()
@@ -3897,7 +3897,7 @@ impl<'db> Type<'db> {
                                     // errors instead of `type-assertion-failure` errors.
                                     .with_annotated_type(Type::any())],
                             ),
-                            Some(Type::none(db)),
+                            Type::none(db),
                         ),
                     )
                     .into()
@@ -3916,7 +3916,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any()),
                             ],
                         ),
-                        Some(Type::any()),
+                        Type::any(),
                     ),
                 )
                 .into(),
@@ -3932,7 +3932,7 @@ impl<'db> Type<'db> {
                                     [Parameter::positional_only(Some(Name::new_static("cls")))
                                         .with_annotated_type(Type::none(db))],
                                 ),
-                                None,
+                                Type::unknown(),
                             ),
                             // def dataclass(cls: type[_T], /) -> type[_T]: ...
                             Signature::new(
@@ -3941,7 +3941,7 @@ impl<'db> Type<'db> {
                                     [Parameter::positional_only(Some(Name::new_static("cls")))
                                         .with_annotated_type(KnownClass::Type.to_instance(db))],
                                 ),
-                                None,
+                                Type::unknown(),
                             ),
                             // TODO: make this overload Python-version-dependent
 
@@ -3994,7 +3994,7 @@ impl<'db> Type<'db> {
                                             .with_default_type(Type::BooleanLiteral(false)),
                                     ],
                                 ),
-                                None,
+                                Type::unknown(),
                             ),
                         ],
                     )
@@ -4029,7 +4029,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any())
                                     .with_default_type(Type::BooleanLiteral(false))],
                             ),
-                            Some(KnownClass::Bool.to_instance(db)),
+                            KnownClass::Bool.to_instance(db),
                         ),
                     )
                     .into()
@@ -4053,7 +4053,7 @@ impl<'db> Type<'db> {
                                         .with_annotated_type(Type::object())
                                         .with_default_type(Type::string_literal(db, ""))],
                                 ),
-                                Some(KnownClass::Str.to_instance(db)),
+                                KnownClass::Str.to_instance(db),
                             ),
                             Signature::new(
                                 Parameters::new(
@@ -4083,7 +4083,7 @@ impl<'db> Type<'db> {
                                         .with_default_type(Type::string_literal(db, "strict")),
                                     ],
                                 ),
-                                Some(KnownClass::Str.to_instance(db)),
+                                KnownClass::Str.to_instance(db),
                             ),
                         ],
                     )
@@ -4110,7 +4110,7 @@ impl<'db> Type<'db> {
                                     [Parameter::positional_only(Some(Name::new_static("o")))
                                         .with_annotated_type(Type::any())],
                                 ),
-                                Some(type_instance),
+                                type_instance,
                             ),
                             Signature::new(
                                 Parameters::new(
@@ -4132,7 +4132,7 @@ impl<'db> Type<'db> {
                                             ),
                                     ],
                                 ),
-                                Some(type_instance),
+                                type_instance,
                             ),
                         ],
                     )
@@ -4145,11 +4145,8 @@ impl<'db> Type<'db> {
                     //    def __init__(self) -> None: ...
                     //    def __new__(cls) -> Self: ...
                     // ```
-                    Binding::single(
-                        self,
-                        Signature::new(Parameters::empty(), Some(Type::object())),
-                    )
-                    .into()
+                    Binding::single(self, Signature::new(Parameters::empty(), Type::object()))
+                        .into()
                 }
 
                 Some(KnownClass::Enum) => {
@@ -4179,7 +4176,7 @@ impl<'db> Type<'db> {
                                             .with_annotated_type(Type::any()),
                                     ],
                                 ),
-                                Some(KnownClass::Super.to_instance(db)),
+                                KnownClass::Super.to_instance(db),
                             ),
                             Signature::new(
                                 Parameters::new(
@@ -4187,12 +4184,9 @@ impl<'db> Type<'db> {
                                     [Parameter::positional_only(Some(Name::new_static("t")))
                                         .with_annotated_type(Type::any())],
                                 ),
-                                Some(KnownClass::Super.to_instance(db)),
+                                KnownClass::Super.to_instance(db),
                             ),
-                            Signature::new(
-                                Parameters::empty(),
-                                Some(KnownClass::Super.to_instance(db)),
-                            ),
+                            Signature::new(Parameters::empty(), KnownClass::Super.to_instance(db)),
                         ],
                     )
                     .into()
@@ -4234,7 +4228,7 @@ impl<'db> Type<'db> {
                                         .with_default_type(Type::IntLiteral(1)),
                                 ],
                             ),
-                            Some(KnownClass::Deprecated.to_instance(db)),
+                            KnownClass::Deprecated.to_instance(db),
                         ),
                     )
                     .into()
@@ -4276,7 +4270,7 @@ impl<'db> Type<'db> {
                                         .with_default_type(Type::empty_tuple(db)),
                                 ],
                             ),
-                            None,
+                            Type::unknown(),
                         ),
                     )
                     .into()
@@ -4288,7 +4282,7 @@ impl<'db> Type<'db> {
                             db,
                             [Parameter::positional_only(None).with_annotated_type(Type::any())],
                         ),
-                        Some(Type::any()),
+                        Type::any(),
                     );
                     let setter_signature = Signature::new(
                         Parameters::new(
@@ -4298,14 +4292,14 @@ impl<'db> Type<'db> {
                                 Parameter::positional_only(None).with_annotated_type(Type::any()),
                             ],
                         ),
-                        Some(Type::none(db)),
+                        Type::none(db),
                     );
                     let deleter_signature = Signature::new(
                         Parameters::new(
                             db,
                             [Parameter::positional_only(None).with_annotated_type(Type::any())],
                         ),
-                        Some(Type::any()),
+                        Type::any(),
                     );
 
                     Binding::single(
@@ -4349,7 +4343,7 @@ impl<'db> Type<'db> {
                                         .with_default_type(Type::none(db)),
                                 ],
                             ),
-                            None,
+                            Type::unknown(),
                         ),
                     )
                     .into()
@@ -4372,7 +4366,7 @@ impl<'db> Type<'db> {
                     CallableBinding::from_overloads(
                         self,
                         [
-                            Signature::new(Parameters::empty(), Some(Type::empty_tuple(db))),
+                            Signature::new(Parameters::empty(), Type::empty_tuple(db)),
                             Signature::new_generic(
                                 Some(GenericContext::from_typevar_instances(db, [element_ty])),
                                 Parameters::new(
@@ -4387,7 +4381,7 @@ impl<'db> Type<'db> {
                                         ),
                                     )],
                                 ),
-                                Some(Type::homogeneous_tuple(db, Type::TypeVar(element_ty))),
+                                Type::homogeneous_tuple(db, Type::TypeVar(element_ty)),
                             ),
                         ],
                     )
@@ -4404,7 +4398,7 @@ impl<'db> Type<'db> {
                     Signature::new_generic(
                         class.generic_context(db),
                         Parameters::gradual_form(),
-                        self.to_instance(db),
+                        self.to_instance(db).unwrap_or(Type::unknown()),
                     ),
                 )
                 .into(),
@@ -4430,7 +4424,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any()),
                             ],
                         ),
-                        None,
+                        Type::unknown(),
                     ),
                 )
                 .into()
@@ -4445,7 +4439,10 @@ impl<'db> Type<'db> {
                 // TODO check call vs signatures of `__new__` and/or `__init__`
                 Binding::single(
                     self,
-                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                    Signature::new(
+                        Parameters::gradual_form(),
+                        self.to_instance(db).unwrap_or(Type::unknown()),
+                    ),
                 )
                 .into()
             }
@@ -4463,7 +4460,10 @@ impl<'db> Type<'db> {
                 // TODO check call vs signatures of `__new__` and/or `__init__`
                 SubclassOfInner::TypeVar(_) => Binding::single(
                     self,
-                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                    Signature::new(
+                        Parameters::gradual_form(),
+                        self.to_instance(db).unwrap_or(Type::unknown()),
+                    ),
                 )
                 .into(),
             },
@@ -4530,11 +4530,8 @@ impl<'db> Type<'db> {
                 // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
                 // decorator adds methods to the class
                 let returns = IntersectionType::from_elements(db, [typevar_meta, Type::any()]);
-                let signature = Signature::new_generic(
-                    Some(context),
-                    Parameters::new(db, parameters),
-                    Some(returns),
-                );
+                let signature =
+                    Signature::new_generic(Some(context), Parameters::new(db, parameters), returns);
                 Binding::single(self, signature).into()
             }
 
@@ -4551,7 +4548,7 @@ impl<'db> Type<'db> {
                         [Parameter::positional_only(None)
                             .with_annotated_type(newtype.base(db).instance_type(db))],
                     ),
-                    Some(Type::NewTypeInstance(newtype)),
+                    Type::NewTypeInstance(newtype),
                 ),
             )
             .into(),
@@ -10405,7 +10402,7 @@ impl<'db> CallableType<'db> {
     ) -> CallableType<'db> {
         CallableType::new(
             db,
-            CallableSignature::single(Signature::new(parameters, None)),
+            CallableSignature::single(Signature::new(parameters, Type::unknown())),
             CallableTypeKind::ParamSpecValue,
         )
     }
@@ -11008,7 +11005,7 @@ impl<'db> KnownBoundMethodType<'db> {
                                     .with_annotated_type(KnownClass::Type.to_instance(db)),
                             ],
                         ),
-                        None,
+                        Type::unknown(),
                     ),
                     Signature::new(
                         Parameters::new(
@@ -11024,7 +11021,7 @@ impl<'db> KnownBoundMethodType<'db> {
                                     .with_default_type(Type::none(db)),
                             ],
                         ),
-                        None,
+                        Type::unknown(),
                     ),
                 ]
                 .into_iter(),
@@ -11043,7 +11040,7 @@ impl<'db> KnownBoundMethodType<'db> {
                                 .with_annotated_type(Type::object()),
                         ],
                     ),
-                    None,
+                    Type::unknown(),
                 )))
             }
             KnownBoundMethodType::StrStartswith(_) => {
@@ -11076,7 +11073,7 @@ impl<'db> KnownBoundMethodType<'db> {
                                 .with_default_type(Type::none(db)),
                         ],
                     ),
-                    Some(KnownClass::Bool.to_instance(db)),
+                    KnownClass::Bool.to_instance(db),
                 )))
             }
 
@@ -11096,7 +11093,7 @@ impl<'db> KnownBoundMethodType<'db> {
                                 .with_annotated_type(Type::any()),
                         ],
                     ),
-                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                    KnownClass::ConstraintSet.to_instance(db),
                 )))
             }
 
@@ -11104,7 +11101,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::empty(),
-                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                    KnownClass::ConstraintSet.to_instance(db),
                 )))
             }
 
@@ -11121,7 +11118,7 @@ impl<'db> KnownBoundMethodType<'db> {
                                 .with_annotated_type(Type::any()),
                         ],
                     ),
-                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                    KnownClass::ConstraintSet.to_instance(db),
                 )))
             }
 
@@ -11132,7 +11129,7 @@ impl<'db> KnownBoundMethodType<'db> {
                         [Parameter::positional_only(Some(Name::new_static("other")))
                             .with_annotated_type(KnownClass::ConstraintSet.to_instance(db))],
                     ),
-                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                    KnownClass::ConstraintSet.to_instance(db),
                 )))
             }
 
@@ -11148,7 +11145,7 @@ impl<'db> KnownBoundMethodType<'db> {
                             ))
                             .with_default_type(Type::none(db))],
                     ),
-                    Some(KnownClass::Bool.to_instance(db)),
+                    KnownClass::Bool.to_instance(db),
                 )))
             }
 
@@ -11161,10 +11158,10 @@ impl<'db> KnownBoundMethodType<'db> {
                                 .with_annotated_type(KnownClass::ConstraintSet.to_instance(db)),
                         ],
                     ),
-                    Some(UnionType::from_elements(
+                    UnionType::from_elements(
                         db,
                         [KnownClass::Specialization.to_instance(db), Type::none(db)],
-                    )),
+                    ),
                 )))
             }
         }
@@ -11211,7 +11208,7 @@ impl WrapperDescriptorKind {
                                 .with_annotated_type(type_instance),
                         ],
                     ),
-                    None,
+                    Type::unknown(),
                 ),
                 Signature::new(
                     Parameters::new(
@@ -11229,7 +11226,7 @@ impl WrapperDescriptorKind {
                                 .with_default_type(none),
                         ],
                     ),
-                    None,
+                    Type::unknown(),
                 ),
             ]
         }
@@ -11255,7 +11252,7 @@ impl WrapperDescriptorKind {
                                 .with_annotated_type(object),
                         ],
                     ),
-                    None,
+                    Type::unknown(),
                 )))
             }
         }

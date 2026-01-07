@@ -420,7 +420,7 @@ impl<'db> Completion<'db> {
         }
     }
 
-    fn argument(name: &str, ty: Option<Type<'db>>, documentation: Option<&str>) -> Self {
+    fn argument(name: &str, ty: Type<'db>, documentation: Option<&str>) -> Self {
         let insert = Some(format!("{name}=").into_boxed_str());
         let documentation = documentation.map(|d| Docstring::new(d.to_owned()));
 
@@ -428,7 +428,7 @@ impl<'db> Completion<'db> {
             name: name.into(),
             qualified: None,
             insert,
-            ty,
+            ty: Some(ty),
             kind: Some(CompletionKind::Variable),
             module_name: None,
             import: None,
@@ -1134,7 +1134,7 @@ fn add_class_arg_completions<'db>(
     };
 
     if !is_set("metaclass") {
-        let ty = Some(KnownClass::Type.to_subclass_of(model.db()));
+        let ty = KnownClass::Type.to_subclass_of(model.db());
         completions.add(Completion::argument("metaclass", ty, None));
     }
 
@@ -1148,7 +1148,7 @@ fn add_class_arg_completions<'db>(
     //
     // See https://peps.python.org/pep-0728/
     if is_typed_dict && !is_set("total") {
-        let ty = Some(KnownClass::Bool.to_instance(model.db()));
+        let ty = KnownClass::Bool.to_instance(model.db());
         completions.add(Completion::argument("total", ty, None));
     }
 }
@@ -7737,6 +7737,68 @@ TypedDi<CURSOR>
         _FilterConfigurationTypedDict :: from logging.config import _FilterConfigurationTypedDict
 
         _FormatterConfigurationTypedDict :: from logging.config import _FormatterConfigurationTypedDict
+        ",
+        );
+    }
+
+    /// Tests that `xs = ["..."]; xs[0].<CURSOR>` gets completions
+    /// appropriate for `str`.
+    #[test]
+    fn dynamic_type_list_no_type_annotation() {
+        let builder = completion_test_builder(
+            r#"
+my_list = ["foo"]
+my_list[0].remove<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @r"
+        removeprefix
+        removesuffix
+        ",
+        );
+    }
+
+    /// Tests that when we have `Any | T` that we offer
+    /// completions for `T`.
+    #[test]
+    fn dynamic_type_with_type_annotation() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Any
+
+def f(x: Any | str):
+    x.remove<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @r"
+        removeprefix
+        removesuffix
+        ",
+        );
+    }
+
+    /// Tests that when we have `(U & Any) | T` that we offer
+    /// completions for `T`.
+    #[test]
+    fn dynamic_type_with_intersection_type_annotation() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Any
+from ty_extensions import Intersection
+
+def f(x: Intersection[int, Any] | str):
+    x.remove<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @r"
+        removeprefix
+        removesuffix
         ",
         );
     }

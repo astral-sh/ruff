@@ -1,9 +1,11 @@
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::dfa;
 use regex_automata::dfa::Automaton;
+use regex_automata::util::pool::Pool;
 use ruff_db::system::SystemPath;
 use std::fmt::Formatter;
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
+use std::sync::Arc;
 use tracing::warn;
 
 use crate::glob::portable::AbsolutePortableGlobPattern;
@@ -37,6 +39,8 @@ pub(crate) struct IncludeFilter {
     literal_pattern_indices: Box<[usize]>,
     #[get_size(size_fn = dfa_memory_usage)]
     dfa: Option<dfa::dense::DFA<Vec<u32>>>,
+    #[get_size(ignore)]
+    matches: Arc<Pool<Vec<usize>>>,
 }
 
 #[allow(clippy::ref_option)]
@@ -57,13 +61,14 @@ impl IncludeFilter {
             };
         }
 
-        let matches = self.glob_set.matches(path);
+        let mut matches = self.matches.get();
+        self.glob_set.matches_into(path, &mut matches);
 
         if matches.is_empty() {
             MatchFile::No
         } else {
-            for match_index in matches {
-                if self.literal_pattern_indices.contains(&match_index) {
+            for match_index in matches.iter() {
+                if self.literal_pattern_indices.contains(match_index) {
                     return MatchFile::Literal;
                 }
             }
@@ -291,6 +296,7 @@ impl IncludeFilterBuilder {
             dfa,
             literal_pattern_indices: self.literal_pattern_indices.into(),
             original_patterns: self.original_patterns.into(),
+            matches: Arc::new(Pool::new(Vec::new)),
         })
     }
 }

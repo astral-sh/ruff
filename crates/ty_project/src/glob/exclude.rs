@@ -124,7 +124,7 @@ struct Gitignore {
     set: GlobSet,
     globs: Vec<IgnoreGlob>,
     #[get_size(ignore)]
-    matches: Option<Arc<Pool<Vec<usize>>>>,
+    matches: Arc<Pool<Vec<usize>>>,
 }
 
 impl Gitignore {
@@ -140,7 +140,7 @@ impl Gitignore {
             return Match::None;
         }
 
-        let mut matches = self.matches.as_ref().unwrap().get();
+        let mut matches = self.matches.get();
         let candidate = Candidate::new(path);
         self.set.matches_candidate_into(&candidate, &mut matches);
         for &i in matches.iter().rev() {
@@ -232,7 +232,7 @@ impl GitignoreBuilder {
         Ok(Gitignore {
             set,
             globs: self.globs.clone(),
-            matches: Some(Arc::new(Pool::new(Vec::new))),
+            matches: Arc::new(Pool::new(Vec::new)),
         })
     }
 
