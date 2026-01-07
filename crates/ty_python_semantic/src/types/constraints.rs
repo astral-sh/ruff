@@ -2198,11 +2198,7 @@ impl<'db> InteriorNode<'db> {
         });
         constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
 
-        let mut map = SequentMap::default();
-        for (constraint, _) in constraints {
-            map.add(db, constraint);
-        }
-        map
+        SequentMap::new(constraints.into_iter().map(|(constraint, _)| constraint))
     }
 
     fn path_assignments(self, db: &'db dyn Db) -> PathAssignments<'db> {
@@ -2768,14 +2764,33 @@ struct SequentMap<'db> {
     >,
     /// Sequents of the form `C → D`
     single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxOrderSet<ConstrainedTypeVar<'db>>>,
-    /// Constraints that we have already processed
-    processed: FxHashSet<ConstrainedTypeVar<'db>>,
+    /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
+    /// ensures a stable order for all of the derived constraints that we create, while still
+    /// letting us create them lazily.)
+    discovered: FxOrderMap<ConstrainedTypeVar<'db>, bool>,
 }
 
 impl<'db> SequentMap<'db> {
+    fn new(constraints: impl IntoIterator<Item = ConstrainedTypeVar<'db>>) -> Self {
+        let discovered = constraints
+            .into_iter()
+            .map(|constraint| (constraint, false))
+            .collect();
+        Self {
+            single_tautologies: FxHashSet::default(),
+            pair_impossibilities: FxHashSet::default(),
+            pair_implications: FxHashMap::default(),
+            single_implications: FxHashMap::default(),
+            discovered,
+        }
+    }
+
     fn add(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
         // If we've already processed this constraint, we can skip it.
-        if !self.processed.insert(constraint) {
+        let (new_index, existing) = self.discovered.insert_full(constraint, true);
+        let already_processed =
+            existing.expect("should not process constraint before discovering it");
+        if already_processed {
             return;
         }
 
@@ -2789,19 +2804,27 @@ impl<'db> SequentMap<'db> {
 
         // Then check this constraint against all of the other ones we've seen so far, seeing
         // if they're related to each other.
-        let processed = std::mem::take(&mut self.processed);
-        for other in &processed {
-            if constraint != *other {
+        for other_index in 0..self.discovered.len() {
+            if new_index != other_index {
+                let other_constraint = self.discovered.keys()[other_index];
+                let (left, right) = if new_index < other_index {
+                    (constraint, other_constraint)
+                } else {
+                    (other_constraint, constraint)
+                };
                 tracing::trace!(
                     target: "ty_python_semantic::types::constraints::SequentMap",
-                    left = %constraint.display(db),
-                    right = %other.display(db),
+                    left = %left.display(db),
+                    right = %right.display(db),
                     "add sequents for constraint pair",
                 );
-                self.add_sequents_for_pair(db, constraint, *other);
+                self.add_sequents_for_pair(db, left, right);
             }
         }
-        self.processed = processed;
+    }
+
+    fn discover_constraint(&mut self, constraint: ConstrainedTypeVar<'db>) {
+        self.discovered.insert(constraint, false);
     }
 
     fn pair_key(
@@ -2851,6 +2874,7 @@ impl<'db> SequentMap<'db> {
         ante2: ConstrainedTypeVar<'db>,
         post: ConstrainedTypeVar<'db>,
     ) {
+        self.discover_constraint(post);
         // If either antecedent implies the consequent on its own, this new sequent is redundant.
         if ante1.implies(db, post) || ante2.implies(db, post) {
             return;
@@ -2883,6 +2907,7 @@ impl<'db> SequentMap<'db> {
         if ante == post {
             return;
         }
+        self.discover_constraint(post);
         if self
             .single_implications
             .entry(ante)
@@ -3406,6 +3431,8 @@ impl<'db> PathAssignments<'db> {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
+        self.map.add(db, assignment.constraint());
+
         for ante in &self.map.single_tautologies {
             if self.assignment_holds(ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
@@ -3462,7 +3489,6 @@ impl<'db> PathAssignments<'db> {
         }
 
         for new_constraint in new_constraints {
-            self.map.add(db, new_constraint);
             self.add_assignment(db, new_constraint.when_true(), source_order)?;
         }
 
