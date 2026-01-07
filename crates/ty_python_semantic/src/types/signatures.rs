@@ -219,23 +219,31 @@ impl<'db> CallableSignature<'db> {
             }
         }
 
-        if let TypeMapping::ApplySpecialization(specialization) = type_mapping
-            && let [self_signature] = self.overloads.as_slice()
-            && let Some((prefix_parameters, paramspec)) = self_signature
-                .parameters
-                .find_paramspec_from_args_kwargs(db)
-            && let Some(paramspec_value) = specialization.get(db, paramspec)
-            && let Some(result) = try_apply_type_mapping_for_paramspec(
-                db,
-                self_signature,
-                prefix_parameters,
-                paramspec_value,
-                type_mapping,
-                tcx,
-                visitor,
-            )
-        {
-            result
+        if let TypeMapping::ApplySpecialization(specialization) = type_mapping {
+            Self::from_overloads(self.overloads.iter().flat_map(|signature| {
+                if let Some((prefix, paramspec)) =
+                    signature.parameters.find_paramspec_from_args_kwargs(db)
+                    && let Some(value) = specialization.get(db, paramspec)
+                    && let Some(result) = try_apply_type_mapping_for_paramspec(
+                        db,
+                        signature,
+                        prefix,
+                        value,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )
+                {
+                    result.overloads
+                } else {
+                    smallvec_inline![signature.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor
+                    )]
+                }
+            }))
         } else {
             Self::from_overloads(
                 self.overloads.iter().map(|signature| {
