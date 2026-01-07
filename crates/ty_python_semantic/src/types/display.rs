@@ -791,8 +791,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
 
                 match function.signature(self.db).overloads.as_slice() {
                     [signature] => {
+                        let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
                         let type_parameters = DisplayOptionalGenericContext {
-                            generic_context: signature.generic_context.as_ref(),
+                            generic_context: bound_signature.generic_context.as_ref(),
                             db: self.db,
                             settings: self.settings.clone(),
                         };
@@ -804,8 +805,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         f.write_char('.')?;
                         f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;
-                        signature
-                            .bind_self(self.db, Some(typing_self_ty))
+                        bound_signature
                             .display_with(self.db, self.settings.disallow_signature_name())
                             .fmt_detailed(f)
                     }
@@ -1453,9 +1453,7 @@ impl<'db> DisplayGenericContext<'_, 'db> {
     fn fmt_normal(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let variables = self.generic_context.variables(self.db);
 
-        let non_implicit_variables: Vec<_> = variables
-            .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_self(self.db))
-            .collect();
+        let non_implicit_variables: Vec<_> = variables.collect();
 
         if non_implicit_variables.is_empty() {
             return Ok(());

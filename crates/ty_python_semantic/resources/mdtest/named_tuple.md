@@ -268,7 +268,7 @@ class Person(NamedTuple):
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
-reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Person._asdict)  # revealed: def _asdict[Self](self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: (self: Self, *, name: str = ..., age: int | None = ...) -> Self
 
 reveal_type(Person._make(("Alice", 42)))  # revealed: Person
@@ -372,7 +372,7 @@ class Point(NamedTuple):
     y: int
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
-reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Point._asdict)  # revealed: def _asdict[Self](self) -> dict[str, Any]
 reveal_type(Point._replace)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
 
 # Point is assignable to NamedTuple.
