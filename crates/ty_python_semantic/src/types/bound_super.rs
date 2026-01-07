@@ -417,8 +417,15 @@ impl<'db> BoundSuperType<'db> {
                     let typevar = bound_typevar.typevar(db);
                     match typevar.bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            if let Type::NominalInstance(instance) = bound {
-                                SuperOwnerKind::ClassTypeVar(bound_typevar, instance.class(db))
+                            let class = match bound {
+                                Type::NominalInstance(instance) => Some(instance.class(db)),
+                                Type::ProtocolInstance(protocol) => protocol
+                                    .to_nominal_instance()
+                                    .map(|instance| instance.class(db)),
+                                _ => None,
+                            };
+                            if let Some(class) = class {
+                                SuperOwnerKind::ClassTypeVar(bound_typevar, class)
                             } else {
                                 return Err(BoundSuperError::AbstractOwnerType {
                                     owner_type,
@@ -495,8 +502,15 @@ impl<'db> BoundSuperType<'db> {
                 let typevar = bound_typevar.typevar(db);
                 match typevar.bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if let Type::NominalInstance(instance) = bound {
-                            SuperOwnerKind::InstanceTypeVar(bound_typevar, instance.class(db))
+                        let class = match bound {
+                            Type::NominalInstance(instance) => Some(instance.class(db)),
+                            Type::ProtocolInstance(protocol) => protocol
+                                .to_nominal_instance()
+                                .map(|instance| instance.class(db)),
+                            _ => None,
+                        };
+                        if let Some(class) = class {
+                            SuperOwnerKind::InstanceTypeVar(bound_typevar, class)
                         } else {
                             return Err(BoundSuperError::AbstractOwnerType {
                                 owner_type,

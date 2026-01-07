@@ -733,9 +733,8 @@ _T_co = TypeVar("_T_co", covariant=True)
 class MyProtocol(Protocol, Generic[_T_co]):
     def __class_getitem__(cls, item):
         # Accessing parent's __class_getitem__ through super()
-        # TODO: This should work - Protocol-inheriting classes can use super()
-        # error: [invalid-super-argument]
+        reveal_type(super())  # revealed: <super: <class 'MyProtocol'>, type[Self@__class_getitem__]>
         parent_method = super().__class_getitem__
-        reveal_type(parent_method)  # revealed: Unknown
+        reveal_type(parent_method)  # revealed: @Todo(super in generic class)
         return parent_method(item)
 ```
