@@ -216,15 +216,19 @@ impl Project {
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
     pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        ProjectFilesFilter::from_project(db, self)
-            .is_file_included(path, GlobFilterCheckMode::Adhoc)
-            == IncludeResult::Included
+        matches!(
+            ProjectFilesFilter::from_project(db, self)
+                .is_file_included(path, GlobFilterCheckMode::Adhoc),
+            IncludeResult::Included { .. }
+        )
     }
 
     pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        ProjectFilesFilter::from_project(db, self)
-            .is_directory_included(path, GlobFilterCheckMode::Adhoc)
-            == IncludeResult::Included
+        matches!(
+            ProjectFilesFilter::from_project(db, self)
+                .is_directory_included(path, GlobFilterCheckMode::Adhoc),
+            IncludeResult::Included { .. }
+        )
     }
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
