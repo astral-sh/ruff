@@ -23,11 +23,13 @@ use crate::types::constraints::{
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::{infer_deferred_types, infer_scope_types};
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
+    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -217,53 +219,38 @@ impl<'db> CallableSignature<'db> {
             }
         }
 
-        match type_mapping {
-            TypeMapping::Specialization(specialization) => {
-                if let [self_signature] = self.overloads.as_slice()
-                    && let Some((prefix_parameters, paramspec)) = self_signature
-                        .parameters
-                        .find_paramspec_from_args_kwargs(db)
-                    && let Some(paramspec_value) = specialization.get(db, paramspec)
+        if let TypeMapping::ApplySpecialization(specialization) = type_mapping {
+            Self::from_overloads(self.overloads.iter().flat_map(|signature| {
+                if let Some((prefix, paramspec)) =
+                    signature.parameters.find_paramspec_from_args_kwargs(db)
+                    && let Some(value) = specialization.get(db, paramspec)
                     && let Some(result) = try_apply_type_mapping_for_paramspec(
                         db,
-                        self_signature,
-                        prefix_parameters,
-                        paramspec_value,
+                        signature,
+                        prefix,
+                        value,
                         type_mapping,
                         tcx,
                         visitor,
                     )
                 {
-                    return result;
-                }
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                if let [self_signature] = self.overloads.as_slice()
-                    && let Some((prefix_parameters, paramspec)) = self_signature
-                        .parameters
-                        .find_paramspec_from_args_kwargs(db)
-                    && let Some(paramspec_value) = partial.get(db, paramspec)
-                    && let Some(result) = try_apply_type_mapping_for_paramspec(
+                    result.overloads
+                } else {
+                    smallvec_inline![signature.apply_type_mapping_impl(
                         db,
-                        self_signature,
-                        prefix_parameters,
-                        paramspec_value,
                         type_mapping,
                         tcx,
-                        visitor,
-                    )
-                {
-                    return result;
+                        visitor
+                    )]
                 }
-            }
-            _ => {}
+            }))
+        } else {
+            Self::from_overloads(
+                self.overloads.iter().map(|signature| {
+                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }),
+            )
         }
-
-        Self::from_overloads(
-            self.overloads
-                .iter()
-                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-        )
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1860,7 +1847,7 @@ impl<'db> Parameters<'db> {
     ///
     /// Internally, this is represented as `(*Any, **Any)` that accepts parameters of type [`Any`].
     ///
-    /// [`Any`]: crate::types::DynamicType::Any
+    /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
         Self {
             value: vec![

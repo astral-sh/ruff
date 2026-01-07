@@ -96,7 +96,7 @@ mod tests {
     fn add_ignore() {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10"#);
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:1:5
           |
@@ -112,7 +112,7 @@ mod tests {
     fn add_ignore_existing_comment() {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  # fmt: off"#);
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:1:5
           |
@@ -128,7 +128,7 @@ mod tests {
     fn add_ignore_trailing_whitespace() {
         let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  "#);
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:1:5
           |
@@ -148,7 +148,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -169,7 +169,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -190,7 +190,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -211,7 +211,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
@@ -236,7 +236,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -269,7 +269,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -301,7 +301,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:3:9
           |
@@ -445,7 +445,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNDEFINED_REVEAL), @r"
+        assert_snapshot!(test.code_actions(&UNDEFINED_REVEAL), @"
         info[code-action]: import typing.reveal_type
          --> main.py:2:1
           |
@@ -577,7 +577,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:2:1
           |
@@ -614,7 +614,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:3:1
           |
@@ -652,7 +652,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
         info[code-action]: import importlib.abc.ExecutionLoader
          --> main.py:3:1
           |

@@ -14,7 +14,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
@@ -887,7 +887,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db))
                     .write_str("method-wrapper")?;
                 f.write_str(" '")?;
-                if let Place::Defined(member_ty, _, _, _) =
+                if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
                     class_ty.member(self.db, member_name).place
                 {
                     f.with_type(member_ty).write_str(member_name)?;

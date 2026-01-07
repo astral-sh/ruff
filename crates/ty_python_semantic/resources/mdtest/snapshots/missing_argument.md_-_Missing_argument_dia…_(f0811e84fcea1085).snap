@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: missing_argument.md - Missing argument diagnostics
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/missing_argument.md

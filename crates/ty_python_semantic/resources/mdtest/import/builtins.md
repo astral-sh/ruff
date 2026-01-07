@@ -32,6 +32,7 @@ typeshed = "/typeshed"
 `/typeshed/stdlib/builtins.pyi`:
 
 ```pyi
+class object: ...
 class Custom: ...
 
 custom_builtin: Custom

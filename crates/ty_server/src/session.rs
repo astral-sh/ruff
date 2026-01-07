@@ -1575,6 +1575,9 @@ impl DocumentHandle {
                         {
                             db.project().remove_file(db, file);
                         }
+
+                        // Bump the file's revision back to using the file system's revision.
+                        file.sync(db);
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every
@@ -1598,6 +1601,8 @@ impl DocumentHandle {
                     if let Some(virtual_file) = db.files().try_virtual_file(virtual_path) {
                         db.project().close_file(db, virtual_file.file());
                         virtual_file.close(db);
+                        // Bump the file's revision back to using the file system's revision.
+                        virtual_file.sync(db);
                     } else {
                         tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
                     }

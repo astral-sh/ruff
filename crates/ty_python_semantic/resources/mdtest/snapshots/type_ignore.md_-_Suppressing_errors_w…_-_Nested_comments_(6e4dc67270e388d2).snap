@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: type_ignore.md - Suppressing errors with `type: ignore` - Nested comments
 mdtest path: crates/ty_python_semantic/resources/mdtest/suppressions/type_ignore.md

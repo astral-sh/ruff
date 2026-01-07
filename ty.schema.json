@@ -312,6 +312,10 @@
         {
           "description": "Python 3.14",
           "const": "3.14"
+        },
+        {
+          "description": "Python 3.15",
+          "const": "3.15"
         }
       ]
     },
@@ -786,6 +790,16 @@
             }
           ]
         },
+        "invalid-total-ordering": {
+          "title": "detects `@total_ordering` classes without an ordering method",
+          "description": "## What it does\nChecks for classes decorated with `@functools.total_ordering` that don't\ndefine any ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`).\n\n## Why is this bad?\nThe `@total_ordering` decorator requires the class to define at least one\nordering method. If none is defined, Python raises a `ValueError` at runtime.\n\n## Example\n\n```python\nfrom functools import total_ordering\n\n@total_ordering\nclass MyClass:  # Error: no ordering method defined\n    def __eq__(self, other: object) -> bool:\n        return True\n```\n\nUse instead:\n\n```python\nfrom functools import total_ordering\n\n@total_ordering\nclass MyClass:\n    def __eq__(self, other: object) -> bool:\n        return True\n\n    def __lt__(self, other: \"MyClass\") -> bool:\n        return True\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-alias-type": {
           "title": "detects invalid TypeAliasType definitions",
           "description": "## What it does\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n```python\nfrom typing import TypeAliasType\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\nNewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal\n```",
@@ -849,6 +863,16 @@
         "invalid-type-variable-constraints": {
           "title": "detects invalid type variable constraints",
           "description": "## What it does\nChecks for constrained [type variables] with only one constraint.\n\n## Why is this bad?\nA constrained type variable must have at least two constraints.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar('T', str)  # invalid constrained TypeVar\n```\n\nUse instead:\n```python\nT = TypeVar('T', str, int)  # valid constrained TypeVar\n# or\nT = TypeVar('T', bound=str)  # valid bound TypeVar\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-typed-dict-statement": {
+          "title": "detects invalid statements in `TypedDict` class bodies",
+          "description": "## What it does\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For\nexample, method definitions and field values aren't allowed. None of these will be\navailable on \"instances of the `TypedDict`\" at runtime (as `dict` is the runtime class of\nall \"`TypedDict` instances\").\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
           "default": "error",
           "oneOf": [
             {

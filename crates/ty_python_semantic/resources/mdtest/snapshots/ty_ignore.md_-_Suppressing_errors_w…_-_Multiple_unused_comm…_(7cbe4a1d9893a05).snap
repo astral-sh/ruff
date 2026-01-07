@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: ty_ignore.md - Suppressing errors with `ty: ignore` - Multiple unused comments
 mdtest path: crates/ty_python_semantic/resources/mdtest/suppressions/ty_ignore.md

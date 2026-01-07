@@ -12,7 +12,6 @@ info:
     - "--target-version"
     - py39
     - input.py
-snapshot_kind: text
 ---
 success: false
 exit_code: 1
