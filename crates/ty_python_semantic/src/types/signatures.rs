@@ -219,53 +219,30 @@ impl<'db> CallableSignature<'db> {
             }
         }
 
-        match type_mapping {
-            TypeMapping::Specialization(specialization) => {
-                if let [self_signature] = self.overloads.as_slice()
-                    && let Some((prefix_parameters, paramspec)) = self_signature
-                        .parameters
-                        .find_paramspec_from_args_kwargs(db)
-                    && let Some(paramspec_value) = specialization.get(db, paramspec)
-                    && let Some(result) = try_apply_type_mapping_for_paramspec(
-                        db,
-                        self_signature,
-                        prefix_parameters,
-                        paramspec_value,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    )
-                {
-                    return result;
-                }
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                if let [self_signature] = self.overloads.as_slice()
-                    && let Some((prefix_parameters, paramspec)) = self_signature
-                        .parameters
-                        .find_paramspec_from_args_kwargs(db)
-                    && let Some(paramspec_value) = partial.get(db, paramspec)
-                    && let Some(result) = try_apply_type_mapping_for_paramspec(
-                        db,
-                        self_signature,
-                        prefix_parameters,
-                        paramspec_value,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    )
-                {
-                    return result;
-                }
-            }
-            _ => {}
+        if let TypeMapping::ApplySpecialization(specialization) = type_mapping
+            && let [self_signature] = self.overloads.as_slice()
+            && let Some((prefix_parameters, paramspec)) = self_signature
+                .parameters
+                .find_paramspec_from_args_kwargs(db)
+            && let Some(paramspec_value) = specialization.get(db, paramspec)
+            && let Some(result) = try_apply_type_mapping_for_paramspec(
+                db,
+                self_signature,
+                prefix_parameters,
+                paramspec_value,
+                type_mapping,
+                tcx,
+                visitor,
+            )
+        {
+            result
+        } else {
+            Self::from_overloads(
+                self.overloads.iter().map(|signature| {
+                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }),
+            )
         }
-
-        Self::from_overloads(
-            self.overloads
-                .iter()
-                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-        )
     }
 
     pub(crate) fn find_legacy_typevars_impl(
