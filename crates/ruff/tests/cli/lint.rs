@@ -1127,6 +1127,35 @@ import os
 }
 
 #[test]
+fn required_version_fails_to_parse() -> Result<()> {
+    let fixture = CliTest::with_file(
+        "ruff.toml",
+        r#"
+required-version = "pikachu"
+"#,
+    )?;
+    assert_cmd_snapshot!(fixture
+        .check_command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
+      Cause: Failed to parse [TMP]/ruff.toml
+      Cause: TOML parse error at line 2, column 20
+      |
+    2 | required-version = "pikachu"
+      |                    ^^^^^^^^^
+    Failed to parse version: Unexpected end of version specifier, expected operator:
+    pikachu
+    ^^^^^^^
+    "#);
+    Ok(())
+}
+
+#[test]
 fn required_version_exact_mismatch() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 

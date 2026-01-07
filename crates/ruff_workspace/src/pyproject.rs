@@ -135,17 +135,16 @@ fn check_required_version(
 
     let required_version = current
         .get("required-version")
-        .or_else(|| current.get("required_version"))
         .and_then(|value| value.get_ref().as_str());
 
     let Some(required_version) = required_version else {
         return Ok(());
     };
 
-    let required_version: RequiredVersion = required_version
-        .parse()
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
-    validate_required_version(&required_version)?;
+    // If it doesn't parse, we just fall through to normal parsing; it will give a nicer error message.
+    if let Ok(required_version) = required_version.parse::<RequiredVersion>() {
+        validate_required_version(&required_version)?;
+    }
     Ok(())
 }
 
