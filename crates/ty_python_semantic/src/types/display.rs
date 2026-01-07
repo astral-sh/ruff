@@ -1669,6 +1669,7 @@ impl<'db> Signature<'db> {
     ) -> DisplaySignature<'a, 'db> {
         DisplaySignature {
             definition: self.definition(),
+            generic_context: self.generic_context.as_ref(),
             parameters: self.parameters(),
             return_ty: self.return_ty,
             db,
@@ -1679,6 +1680,7 @@ impl<'db> Signature<'db> {
 
 pub(crate) struct DisplaySignature<'a, 'db> {
     definition: Option<Definition<'db>>,
+    generic_context: Option<&'a GenericContext<'db>>,
     parameters: &'a Parameters<'db>,
     return_ty: Option<Type<'db>>,
     db: &'db dyn Db,
@@ -1719,6 +1721,17 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         {
             f.write_str("def ")?;
             f.write_str(&name)?;
+        }
+
+        // Display type parameters if present, but only when the caller hasn't
+        // already displayed them (indicated by disallow_signature_name being false)
+        if !self.settings.disallow_signature_name {
+            DisplayOptionalGenericContext {
+                generic_context: self.generic_context,
+                db: self.db,
+                settings: self.settings.clone(),
+            }
+            .fmt_detailed(&mut f)?;
         }
 
         // Parameters

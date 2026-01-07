@@ -1167,7 +1167,7 @@ from dataclasses import dataclass
 class Wrap[T]:
     data: T
 
-reveal_type(Wrap[int].__init__)  # revealed: (self: Wrap[int], data: int) -> None
+reveal_type(Wrap[int].__init__)  # revealed: [T](self: Wrap[int], data: int) -> None
 
 @dataclass
 class WrappedInt(Wrap[int]):
@@ -1180,7 +1180,7 @@ reveal_type(WrappedInt.__init__)  # revealed: (self: WrappedInt, data: int, othe
 class WrappedIntAndExtraData[T](Wrap[int]):
     extra_data: T
 
-# revealed: (self: WrappedIntAndExtraData[bytes], data: int, extra_data: bytes) -> None
+# revealed: [T](self: WrappedIntAndExtraData[bytes], data: int, extra_data: bytes) -> None
 reveal_type(WrappedIntAndExtraData[bytes].__init__)
 ```
 
@@ -1205,10 +1205,10 @@ def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
     return ChildOfParentDataclass(x)
 
 # TODO: ParentDataclass.__init__ should show generic types, not Unknown
-# revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
+# revealed: [T](self: ParentDataclass[Unknown], value: Unknown) -> None
 reveal_type(ParentDataclass.__init__)
 
-# revealed: (self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
+# revealed: [T](self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
 reveal_type(ChildOfParentDataclass.__init__)
 
 result_int = uses_dataclass(42)
