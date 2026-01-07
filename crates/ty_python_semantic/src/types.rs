@@ -1073,7 +1073,7 @@ impl<'db> Type<'db> {
     }
 
     /// Is a value of this type only usable in typing contexts?
-    pub(crate) fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
+    pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
             Type::FunctionLiteral(f) => {

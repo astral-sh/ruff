@@ -427,12 +427,6 @@ pub struct Completion<'db> {
     pub builtin: bool,
 }
 
-impl<'db> Completion<'db> {
-    pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
-        self.ty.is_some_and(|ty| ty.is_type_check_only(db))
-    }
-}
-
 pub trait HasType {
     /// Returns the inferred type of `self`.
     ///

@@ -88,6 +88,10 @@ struct Completions<'db> {
     db: &'db dyn Db,
     context: CollectionContext<'db>,
     items: Vec<Completion<'db>>,
+    /// The query used to match against candidate completions.
+    ///
+    /// If a completion's name doesn't match this query, then
+    /// it isn't included in the collection.
     query: QueryPattern,
 }
 
@@ -155,7 +159,7 @@ impl<'db> Completions<'db> {
 
                 Some(ImportEdit {
                     label: format!("qualify {}", item.insert.as_ref()?),
-                    edit: Edit::replacement(item.insert?.into_string(), range.start(), range.end()),
+                    edit: Edit::replacement(item.insert?.to_string(), range.start(), range.end()),
                 })
             })
             .collect()
@@ -168,18 +172,20 @@ impl<'db> Completions<'db> {
     /// This might not add the completion for a variety of reasons.
     /// For example, if the symbol name does not match this collection's
     /// query.
-    fn add(&mut self, completion: Completion<'db>) -> bool {
-        if !self.query.is_match_symbol_name(completion.name.as_str()) {
+    fn add(&mut self, builder: CompletionBuilder<'db>) -> bool {
+        if !self.query.is_match_symbol_name(builder.name.as_str()) {
             return false;
         }
-        self.add_skip_query(completion)
+        self.add_skip_query(builder)
     }
 
     /// Attempts to add the given semantic completion to this collection.
     ///
     /// When added, `true` is returned.
     fn add_semantic(&mut self, completion: SemanticCompletion<'db>) -> bool {
-        self.add(Completion::from_semantic_completion(self.db, completion))
+        self.add(CompletionBuilder::from_semantic_completion(
+            self.db, completion,
+        ))
     }
 
     /// Attempts to add the given completion to this collection.
@@ -192,23 +198,12 @@ impl<'db> Completions<'db> {
     /// This may still choose not to add the completion. For example,
     /// when the completion context determines that the given suggestion
     /// is never valid.
-    fn add_skip_query(&mut self, mut completion: Completion<'db>) -> bool {
-        // Tags completions with context-specific if they are
-        // known to be usable in a `raise` context and we have
-        // determined a raisable type `raisable_ty`.
-        //
-        // It's possible that some completions are usable in a `raise`
-        // but aren't marked here. That is, false negatives are
-        // possible but false positives are not.
-        if let Some(raisable_ty) = self.context.raisable_ty {
-            if let Some(ty) = completion.ty {
-                completion.is_context_specific |= ty.is_assignable_to(self.db, raisable_ty);
-            }
-        }
-        if self.context.exclude(self.db, &completion) {
+    fn add_skip_query(&mut self, builder: CompletionBuilder<'db>) -> bool {
+        if self.context.exclude(self.db, &builder) {
             return false;
         }
-        self.items.push(completion);
+        self.items
+            .push(builder.build(self.db, &self.context, &self.query));
         true
     }
 }
@@ -224,13 +219,13 @@ impl<'db> Extend<SemanticCompletion<'db>> for Completions<'db> {
     }
 }
 
-impl<'db> Extend<Completion<'db>> for Completions<'db> {
+impl<'db> Extend<CompletionBuilder<'db>> for Completions<'db> {
     fn extend<T>(&mut self, it: T)
     where
-        T: IntoIterator<Item = Completion<'db>>,
+        T: IntoIterator<Item = CompletionBuilder<'db>>,
     {
-        for c in it {
-            self.add(c);
+        for builder in it {
+            self.add(builder);
         }
     }
 }
@@ -247,7 +242,7 @@ pub struct Completion<'db> {
     /// when the completion is selected.
     ///
     /// When this is not set, `name` is used.
-    pub insert: Option<Box<str>>,
+    pub insert: Option<Name>,
     /// The type of this completion, if available.
     ///
     /// Generally speaking, this is always available
@@ -257,16 +252,9 @@ pub struct Completion<'db> {
     pub ty: Option<Type<'db>>,
     /// The "kind" of this completion.
     ///
-    /// When this is set, it takes priority over any kind
-    /// inferred from `ty`.
-    ///
     /// Usually this is set when `ty` is `None`, since it
     /// may be cheaper to compute at scale (e.g., for
     /// unimported symbol completions).
-    ///
-    /// Callers should use [`Completion::kind`] to get the
-    /// kind, which will take type information into account
-    /// if this kind is not present.
     pub kind: Option<CompletionKind>,
     /// The name of the module that this completion comes from.
     ///
@@ -299,144 +287,175 @@ pub struct Completion<'db> {
 }
 
 impl<'db> Completion<'db> {
-    fn from_semantic_completion(
-        db: &'db dyn Db,
-        semantic: SemanticCompletion<'db>,
-    ) -> Completion<'db> {
-        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
-        let documentation = definition.and_then(|def| def.docstring(db));
-        let is_type_check_only = semantic.is_type_check_only(db);
-        Completion {
-            name: semantic.name,
-            qualified: None,
-            insert: None,
-            ty: semantic.ty,
-            kind: None,
-            module_name: None,
-            import: None,
-            builtin: semantic.builtin,
-            is_type_check_only,
-            is_context_specific: false,
-            documentation,
-        }
+    fn builder(name: impl Into<Name>) -> CompletionBuilder<'db> {
+        CompletionBuilder::new(name)
     }
+}
 
-    /// Returns the "kind" of this completion.
+/// A builder for construction a `Completion`.
+struct CompletionBuilder<'db> {
+    // See comments on `Completion` for the meaning of fields.
+    name: Name,
+    qualified: Option<Name>,
+    insert: Option<Name>,
+    ty: Option<Type<'db>>,
+    kind: Option<CompletionKind>,
+    module_name: Option<&'db ModuleName>,
+    import: Option<Edit>,
+    builtin: bool,
+    is_context_specific: bool,
+    is_type_check_only: bool,
+    documentation: Option<Docstring>,
+}
+
+impl<'db> CompletionBuilder<'db> {
+    /// Start building a new completion with the given name.
     ///
-    /// This is meant to be a very general classification of this completion.
-    /// Typically, this is communicated from the LSP server to a client, and
-    /// the client uses this information to help improve the UX (perhaps by
-    /// assigning an icon of some kind to the completion).
-    pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
-        type CompletionKindVisitor<'db> =
-            CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
-
-        fn imp<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            visitor: &CompletionKindVisitor<'db>,
-        ) -> Option<CompletionKind> {
-            Some(match ty {
-                Type::FunctionLiteral(_)
-                | Type::DataclassDecorator(_)
-                | Type::WrapperDescriptor(_)
-                | Type::DataclassTransformer(_)
-                | Type::Callable(_) => CompletionKind::Function,
-                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
-                Type::ModuleLiteral(_) => CompletionKind::Module,
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    CompletionKind::Class
-                }
-                // This is a little weird for "struct." I'm mostly interpreting
-                // "struct" here as a more general "object." ---AG
-                Type::NominalInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::BoundSuper(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_) => CompletionKind::Struct,
-                Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BytesLiteral(_) => CompletionKind::Value,
-                Type::EnumLiteral(_) => CompletionKind::Enum,
-                Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::TypeVar(_) => CompletionKind::TypeParameter,
-                Type::Union(union) => union
-                    .elements(db)
-                    .iter()
-                    .find_map(|&ty| imp(db, ty, visitor))?,
-                Type::Intersection(intersection) => intersection
-                    .iter_positive(db)
-                    .find_map(|ty| imp(db, ty, visitor))?,
-                Type::Dynamic(_)
-                | Type::Never
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy => return None,
-                Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
-                }
-            })
-        }
-        self.kind.or_else(|| {
-            self.ty
-                .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
-        })
-    }
-
-    fn keyword(name: &str) -> Self {
-        Completion {
+    /// All other values given to the completion by default are
+    /// valid, but callers will generally want to fill in as much
+    /// as is appropriate.
+    fn new(name: impl Into<Name>) -> CompletionBuilder<'db> {
+        CompletionBuilder {
             name: name.into(),
             qualified: None,
             insert: None,
             ty: None,
-            kind: Some(CompletionKind::Keyword),
+            kind: None,
             module_name: None,
             import: None,
             builtin: false,
-            is_type_check_only: false,
             is_context_specific: false,
+            is_type_check_only: false,
             documentation: None,
         }
     }
 
-    fn value_keyword(name: &str, ty: Type<'db>) -> Completion<'db> {
+    fn from_semantic_completion(
+        db: &'db dyn Db,
+        semantic: SemanticCompletion<'db>,
+    ) -> CompletionBuilder<'db> {
+        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
+        let documentation = definition.and_then(|def| def.docstring(db));
+        Completion::builder(semantic.name)
+            .ty(semantic.ty)
+            .builtin(semantic.builtin)
+            .docstring(documentation)
+    }
+
+    /// A convenience constructor for a "keyword" completion.
+    ///
+    /// This is just like `CompletionBuilder::new`, but sets the kind
+    /// to "keyword."
+    fn keyword(name: impl Into<Name>) -> CompletionBuilder<'db> {
+        Completion::builder(name).kind(CompletionKind::Keyword)
+    }
+
+    /// A convenience constructor for an "argument" completion.
+    ///
+    /// This is used for either class or function based arguments.
+    fn argument(name: impl Into<Name>) -> CompletionBuilder<'db> {
+        let name = name.into();
+        let insert = compact_str::format_compact!("{name}=");
+        Completion::builder(name)
+            .kind(CompletionKind::Variable)
+            .insert(insert)
+            .context_specific(true)
+    }
+
+    /// Use this builder to construct a `Completion`.
+    ///
+    /// `ctx` is any information about the position of the
+    /// cursor in the source code that could impact the relevance
+    /// ranking of the completion.
+    ///
+    /// `query` is the pattern that the completion must match in
+    /// order to be suggested as a candidate.
+    fn build(
+        mut self,
+        db: &'db dyn Db,
+        ctx: &CollectionContext<'db>,
+        _query: &QueryPattern,
+    ) -> Completion<'db> {
+        // Tags completions with context-specific if they are
+        // known to be usable in a `raise` context and we have
+        // determined a raisable type `raisable_ty`.
+        //
+        // It's possible that some completions are usable in a `raise`
+        // but aren't marked here. That is, false negatives are
+        // possible but false positives are not.
+        if let Some(raisable_ty) = ctx.raisable_ty {
+            if let Some(ty) = self.ty {
+                self.is_context_specific |= ty.is_assignable_to(db, raisable_ty);
+            }
+        }
+        if let Some(ty) = self.ty {
+            self.is_type_check_only = ty.is_type_check_only(db);
+        }
+        let kind = self
+            .kind
+            .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         Completion {
-            name: name.into(),
-            qualified: None,
-            insert: None,
-            ty: Some(ty),
-            kind: Some(CompletionKind::Keyword),
-            module_name: None,
-            import: None,
-            builtin: true,
-            is_type_check_only: false,
-            is_context_specific: false,
-            documentation: None,
+            name: self.name,
+            qualified: self.qualified,
+            insert: self.insert,
+            ty: self.ty,
+            kind,
+            module_name: self.module_name,
+            import: self.import,
+            builtin: self.builtin,
+            is_type_check_only: self.is_type_check_only,
+            is_context_specific: self.is_context_specific,
+            documentation: self.documentation,
         }
     }
 
-    fn argument(name: &str, ty: Type<'db>, documentation: Option<&str>) -> Self {
-        let insert = Some(format!("{name}=").into_boxed_str());
-        let documentation = documentation.map(|d| Docstring::new(d.to_owned()));
+    fn qualified(mut self, qualified: impl Into<Name>) -> CompletionBuilder<'db> {
+        self.qualified = Some(qualified.into());
+        self
+    }
 
-        Completion {
-            name: name.into(),
-            qualified: None,
-            insert,
-            ty: Some(ty),
-            kind: Some(CompletionKind::Variable),
-            module_name: None,
-            import: None,
-            builtin: false,
-            is_type_check_only: false,
-            is_context_specific: true,
-            documentation,
-        }
+    fn insert(mut self, insert: impl Into<Name>) -> CompletionBuilder<'db> {
+        self.insert = Some(insert.into());
+        self
+    }
+
+    fn ty(mut self, ty: impl Into<Option<Type<'db>>>) -> CompletionBuilder<'db> {
+        self.ty = ty.into();
+        self
+    }
+
+    fn kind(mut self, kind: impl Into<Option<CompletionKind>>) -> CompletionBuilder<'db> {
+        self.kind = kind.into();
+        self
+    }
+
+    fn module_name(mut self, name: &'db ModuleName) -> CompletionBuilder<'db> {
+        self.module_name = Some(name);
+        self
+    }
+
+    fn import(mut self, edit: impl Into<Option<Edit>>) -> CompletionBuilder<'db> {
+        self.import = edit.into();
+        self
+    }
+
+    fn builtin(mut self, yes: bool) -> CompletionBuilder<'db> {
+        self.builtin = yes;
+        self
+    }
+
+    fn context_specific(mut self, yes: bool) -> CompletionBuilder<'db> {
+        self.is_context_specific = yes;
+        self
+    }
+
+    fn documentation(self, docs: impl Into<String>) -> CompletionBuilder<'db> {
+        self.docstring(Docstring::new(docs.into()))
+    }
+
+    fn docstring(mut self, docs: impl Into<Option<Docstring>>) -> CompletionBuilder<'db> {
+        self.documentation = docs.into();
+        self
     }
 
     /// Returns true when this completion refers to the
@@ -953,23 +972,24 @@ impl<'db> CollectionContext<'db> {
     ///
     /// This is useful when one wants to collect completions
     /// outside of any known or specific context. In general,
-    /// the "none" context does not additional filtering.
+    /// the "none" context does no additional filtering.
     fn none() -> CollectionContext<'db> {
         CollectionContext::default()
     }
 
-    /// Whether the given completion should be excluded based on this context.
+    /// Whether the completion that would be built from the
+    /// given builder should be excluded based on this context.
     ///
     /// This only returns `true` when it is definitively known that the
-    /// given completion is never valid for this context.
-    fn exclude(&self, db: &dyn Db, c: &Completion<'_>) -> bool {
-        if self.is_raising_exception && c.is_notimplemented(db) {
+    /// completion would never be valid for this context.
+    fn exclude(&self, db: &dyn Db, builder: &CompletionBuilder<'_>) -> bool {
+        if self.is_raising_exception && builder.is_notimplemented(db) {
             return true;
         }
-        if c.kind == Some(CompletionKind::Keyword)
+        if builder.kind == Some(CompletionKind::Keyword)
             && let Some(ref valid_keywords) = self.valid_keywords
         {
-            return !valid_keywords.contains(c.name.as_str());
+            return !valid_keywords.contains(builder.name.as_str());
         }
         false
     }
@@ -1029,7 +1049,7 @@ impl<'db> CollectionContext<'db> {
 /// `Ord`. This means that the ordering of the fields on this struct
 /// matter. The most important or overriding criteria should appear
 /// first.
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 struct Relevance<'a> {
     /// This is set when we know that a symbol in the current context
     /// is affirmatively usable or not. That is, other symbols in the
@@ -1069,7 +1089,7 @@ struct Relevance<'a> {
 }
 
 /// An instruction to indicate an ordering preference.
-#[derive(Debug, Default, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd, Ord)]
 enum Sort {
     /// Assign a higher rank. The suggestion will appear higher
     /// in the completion results.
@@ -1135,7 +1155,7 @@ fn add_class_arg_completions<'db>(
 
     if !is_set("metaclass") {
         let ty = KnownClass::Type.to_subclass_of(model.db());
-        completions.add(Completion::argument("metaclass", ty, None));
+        completions.add(CompletionBuilder::argument("metaclass").ty(ty));
     }
 
     let is_typed_dict = class_def
@@ -1149,7 +1169,7 @@ fn add_class_arg_completions<'db>(
     // See https://peps.python.org/pep-0728/
     if is_typed_dict && !is_set("total") {
         let ty = KnownClass::Bool.to_instance(model.db());
-        completions.add(Completion::argument("total", ty, None));
+        completions.add(CompletionBuilder::argument("total").ty(ty));
     }
 }
 
@@ -1184,11 +1204,11 @@ fn add_function_arg_completions<'db>(
             if p.is_positional_only || set_function_args.contains(&p.name.as_str()) {
                 continue;
             }
-            completions.add(Completion::argument(
-                &p.name,
-                p.ty,
-                p.documentation.as_deref(),
-            ));
+            let mut builder = CompletionBuilder::argument(&p.name).ty(p.ty);
+            if let Some(ref docs) = p.documentation {
+                builder = builder.documentation(docs);
+            }
+            completions.add(builder);
         }
     }
 }
@@ -1291,7 +1311,7 @@ fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'
         ("False", Type::BooleanLiteral(false)),
     ];
     for (name, ty) in keyword_values {
-        completions.add(Completion::value_keyword(name, ty));
+        completions.add(CompletionBuilder::keyword(name).ty(ty).builtin(true));
     }
 
     // Note that we specifically omit the `type` keyword here, since
@@ -1307,7 +1327,7 @@ fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'
         "yield", "case", "match",
     ];
     for name in keywords {
-        completions.add(Completion::keyword(name));
+        completions.add(CompletionBuilder::keyword(name));
     }
 }
 
@@ -1356,27 +1376,17 @@ fn add_unimported_completions<'db>(
                 let qualified = name.to_string();
                 (name, qualified, ImportRequest::module(name))
             });
-        // FIXME: `all_symbols` doesn't account for wildcard imports.
-        // Since we're looking at every module, this is probably
-        // "fine," but it might mean that we import a symbol from the
-        // "wrong" module.
         let import_action = importer.import(request, &members);
-        // N.B. We use `add` here because `all_symbols` already
-        // takes our query into account.
-        completions.add_skip_query(Completion {
-            name: ast::name::Name::new(name),
-            qualified: Some(ast::name::Name::new(qualified)),
-            insert: Some(import_action.symbol_text().into()),
-            ty: None,
-            kind: symbol.kind().to_completion_kind(),
-            module_name: Some(module_name),
-            import: import_action.import().cloned(),
-            builtin: false,
-            // TODO: `is_type_check_only` requires inferring the type of the symbol
-            is_type_check_only: false,
-            is_context_specific: false,
-            documentation: None,
-        });
+        // N.B. We use `add_skip_query` here because `all_symbols`
+        // already takes our query into account.
+        completions.add_skip_query(
+            Completion::builder(name)
+                .qualified(qualified)
+                .insert(import_action.symbol_text())
+                .kind(symbol.kind().to_completion_kind())
+                .module_name(module_name)
+                .import(import_action.import().cloned()),
+        );
     }
 }
 
@@ -2053,7 +2063,7 @@ impl<'a> ImportStatement<'a> {
                 } => {
                     completions.extend(model.import_submodule_completions_for_name(parent));
                     if import_keyword_allowed {
-                        completions.add(Completion::keyword("import"));
+                        completions.add(CompletionBuilder::keyword("import"));
                     }
                 }
                 FromImportKind::Attribute => {
@@ -2061,10 +2071,10 @@ impl<'a> ImportStatement<'a> {
                 }
             },
             ImportStatement::Incomplete(IncompleteImport::As) => {
-                completions.add(Completion::keyword("as"));
+                completions.add(CompletionBuilder::keyword("as"));
             }
             ImportStatement::Incomplete(IncompleteImport::Import) => {
-                completions.add(Completion::keyword("import"));
+                completions.add(CompletionBuilder::keyword("import"));
             }
         }
     }
@@ -2143,6 +2153,75 @@ fn token_suffix_by_kinds<const N: usize>(
     Some(std::array::from_fn(|i| {
         &tokens[tokens.len() - (kinds.len() - i)]
     }))
+}
+
+/// Returns the "kind" of a completion using just its type information.
+///
+/// This is meant to be a very general classification of this completion.
+/// Typically, this is communicated from the LSP server to a client, and
+/// the client uses this information to help improve the UX (perhaps by
+/// assigning an icon of some kind to the completion).
+///
+/// This is done on a best effort basis and may not return anything. In
+/// general, if callers have more specific knowledge about the kind of
+/// a completion, then they should use that to explicitly set its kind
+/// on `CompletionBuilder`.
+fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
+    type CompletionKindVisitor<'db> =
+        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
+
+    fn imp<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visitor: &CompletionKindVisitor<'db>,
+    ) -> Option<CompletionKind> {
+        Some(match ty {
+            Type::FunctionLiteral(_)
+            | Type::DataclassDecorator(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassTransformer(_)
+            | Type::Callable(_) => CompletionKind::Function,
+            Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
+            Type::ModuleLiteral(_) => CompletionKind::Module,
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                CompletionKind::Class
+            }
+            // This is a little weird for "struct." I'm mostly interpreting
+            // "struct" here as a more general "object." ---AG
+            Type::NominalInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::BoundSuper(_)
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_) => CompletionKind::Struct,
+            Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_) => CompletionKind::Value,
+            Type::EnumLiteral(_) => CompletionKind::Enum,
+            Type::ProtocolInstance(_) => CompletionKind::Interface,
+            Type::TypeVar(_) => CompletionKind::TypeParameter,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .find_map(|&ty| imp(db, ty, visitor))?,
+            Type::Intersection(intersection) => intersection
+                .iter_positive(db)
+                .find_map(|ty| imp(db, ty, visitor))?,
+            Type::Dynamic(_)
+            | Type::Never
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => return None,
+            Type::TypeAlias(alias) => {
+                visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+            }
+        })
+    }
+    imp(db, ty, &CompletionKindVisitor::default())
 }
 
 #[cfg(test)]
@@ -5379,7 +5458,7 @@ from os.<CURSOR>
         let test = builder.build();
 
         let completion = test.completions().iter().find(|c| c.name == "rec").unwrap();
-        assert_eq!(completion.kind(builder.db()), Some(CompletionKind::Struct));
+        assert_eq!(completion.kind, Some(CompletionKind::Struct));
     }
 
     #[test]
