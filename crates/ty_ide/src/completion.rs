@@ -3330,7 +3330,7 @@ quux.<CURSOR>
         __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self@__new__
+        __new__ :: def __new__[Self](cls) -> Self
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method Quux.__repr__() -> str
@@ -3411,19 +3411,19 @@ C.<CURSOR>
         __mro__ :: tuple[type, ...]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self@__new__
-        __or__ :: bound method <class 'C'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
+        __new__ :: def __new__[Self](cls) -> Self
+        __or__ :: bound method <class 'C'>.__or__[Self](value: Any, /) -> UnionType | Self
         __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
         __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
         __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: def __repr__(self) -> str
-        __ror__ :: bound method <class 'C'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
+        __ror__ :: bound method <class 'C'>.__ror__[Self](value: Any, /) -> UnionType | Self
         __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'C'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self@__subclasses__]
+        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self]
         __subclasshook__ :: bound method <class 'C'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -3481,18 +3481,18 @@ Meta.<CURSOR>
                 __mro__ :: tuple[type, ...]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
-                __or__ :: def __or__[Self](self: Self@__or__, value: Any, /) -> UnionType | Self@__or__
+                __or__ :: def __or__[Self](self: Self, value: Any, /) -> UnionType | Self
                 __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __ror__ :: def __ror__[Self](self: Self@__ror__, value: Any, /) -> UnionType | Self@__ror__
+                __ror__ :: def __ror__[Self](self: Self, value: Any, /) -> UnionType | Self
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: def __subclasscheck__(self, subclass: type, /) -> bool
-                __subclasses__ :: def __subclasses__[Self](self: Self@__subclasses__) -> list[Self@__subclasses__]
+                __subclasses__ :: def __subclasses__[Self](self: Self) -> list[Self]
                 __subclasshook__ :: bound method <class 'Meta'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -3610,19 +3610,19 @@ Quux.<CURSOR>
         __mro__ :: tuple[type, ...]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self@__new__
-        __or__ :: bound method <class 'Quux'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
+        __new__ :: def __new__[Self](cls) -> Self
+        __or__ :: bound method <class 'Quux'>.__or__[Self](value: Any, /) -> UnionType | Self
         __prepare__ :: bound method <class 'type'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
         __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
         __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: def __repr__(self) -> str
-        __ror__ :: bound method <class 'Quux'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
+        __ror__ :: bound method <class 'Quux'>.__ror__[Self](value: Any, /) -> UnionType | Self
         __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'Quux'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self@__subclasses__]
+        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self]
         __subclasshook__ :: bound method <class 'Quux'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -3663,8 +3663,8 @@ Answer.<CURSOR>
                 __bool__ :: bound method <class 'Answer'>.__bool__() -> Literal[True]
                 __class__ :: <class 'EnumMeta'>
                 __contains__ :: bound method <class 'Answer'>.__contains__(value: object) -> bool
-                __copy__ :: def __copy__(self) -> Self@__copy__
-                __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self@__deepcopy__
+                __copy__ :: def __copy__[Self](self) -> Self
+                __deepcopy__ :: def __deepcopy__[Self](self, memo: Any) -> Self
                 __delattr__ :: def __delattr__(self, name: str, /) -> None
                 __dict__ :: dict[str, Any]
                 __dictoffset__ :: int
@@ -3674,34 +3674,34 @@ Answer.<CURSOR>
                 __flags__ :: int
                 __format__ :: def __format__(self, format_spec: str) -> str
                 __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
-                __getitem__ :: bound method <class 'Answer'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT@__getitem__
+                __getitem__ :: bound method <class 'Answer'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
                 __init_subclass__ :: bound method <class 'Answer'>.__init_subclass__() -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
-                __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT@__iter__]
+                __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
                 __members__ :: MappingProxyType[str, Answer]
                 __module__ :: str
                 __mro__ :: tuple[type, ...]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
-                __new__ :: def __new__(cls, value: object) -> Self@__new__
-                __or__ :: bound method <class 'Answer'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
+                __new__ :: def __new__[Self](cls, value: object) -> Self
+                __or__ :: bound method <class 'Answer'>.__or__[Self](value: Any, /) -> UnionType | Self
                 __order__ :: str
                 __prepare__ :: bound method <class 'EnumMeta'>.__prepare__(cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT@__reversed__]
-                __ror__ :: bound method <class 'Answer'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
+                __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT]
+                __ror__ :: bound method <class 'Answer'>.__ror__[Self](value: Any, /) -> UnionType | Self
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
-                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self@__subclasses__]
+                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self]
                 __subclasshook__ :: bound method <class 'Answer'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -3743,7 +3743,7 @@ quux.<CURSOR>
         index :: bound method Quux.index(value: Any, start: SupportsIndex = 0, stop: SupportsIndex = ..., /) -> int
         x :: int
         y :: str
-        __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], (value: tuple[_T@__add__, ...], /) -> tuple[int | str | _T@__add__, ...]]
+        __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], [_T](value: tuple[_T, ...], /) -> tuple[int | str | _T, ...]]
         __annotations__ :: dict[str, Any]
         __class__ :: type[Quux]
         __class_getitem__ :: bound method type[Quux].__class_getitem__(item: Any, /) -> GenericAlias
