@@ -778,6 +778,57 @@ fn src_option() -> Result<()> {
     Ok(())
 }
 
+/// Test that glob patterns in `src` are expanded.
+#[test]
+fn src_glob_expansion() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // Create multiple lib directories with packages.
+    root.child("libs")
+        .child("lib_a")
+        .child("pkg_a")
+        .child("__init__.py")
+        .write_str("def func_a(): pass")?;
+    root.child("libs")
+        .child("lib_b")
+        .child("pkg_b")
+        .child("__init__.py")
+        .write_str("def func_b(): pass")?;
+
+    // Create an app that imports from both packages.
+    root.child("app").child("__init__.py").write_str("")?;
+    root.child("app")
+        .child("main.py")
+        .write_str("from pkg_a import func_a\nfrom pkg_b import func_b")?;
+
+    // Use a glob pattern to include all lib directories.
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        src = ["libs/*"]
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("app").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "app/__init__.py": [],
+          "app/main.py": [
+            "libs/lib_a/pkg_a/__init__.py",
+            "libs/lib_b/pkg_b/__init__.py"
+          ]
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
 #[test]
 fn notebook_with_magic() -> Result<()> {
     let tempdir = TempDir::new()?;
