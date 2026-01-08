@@ -29,3 +29,31 @@ HookLineageCollector().create_asset(*args, extra="value")
 kwargs = {"uri": "value", "name": "test"}
 hlc.create_asset(**kwargs)
 HookLineageCollector().create_asset(**kwargs)
+
+# airflow.Dataset
+from airflow import Dataset
+
+# second argument is of type dict, should raise diagnostic
+Dataset("ds1", {"extra": "metadata"})
+Dataset("ds1", {})
+Dataset("uri", dict())
+# second argument is not of type dict, should not raise diagnostic
+Dataset("ds1")
+Dataset("ds1", extra={"key": "value"})
+Dataset(uri="ds1", extra={"key": "value"})
+
+# airflow.datasets.Dataset
+from airflow.datasets import Dataset
+
+Dataset("ds2", {"extra": "metadata"})
+Dataset("ds2")
+Dataset("ds2", extra={"key": "value"})
+Dataset(uri="ds2", extra={"key": "value"})
+
+# airflow.sdk.Asset
+from airflow.sdk import Asset
+
+Asset("asset1", {"extra": "metadata"})
+Asset("asset1")
+Asset("asset1", extra={"key": "value"})
+Asset(uri="asset1", extra={"key": "value"})

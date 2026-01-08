@@ -51,7 +51,8 @@ impl Violation for Airflow3IncompatibleFunctionSignature {
             change_type,
         } = self;
         match change_type {
-            FunctionSignatureChangeType::KeywordOnly { .. } => {
+            FunctionSignatureChangeType::KeywordOnly { .. }
+            | FunctionSignatureChangeType::PositionalArgumentChange { .. } => {
                 format!("`{function_name}` signature is changed in Airflow 3.0")
             }
         }
@@ -60,7 +61,10 @@ impl Violation for Airflow3IncompatibleFunctionSignature {
     fn fix_title(&self) -> Option<String> {
         let Airflow3IncompatibleFunctionSignature { change_type, .. } = self;
         match change_type {
-            FunctionSignatureChangeType::KeywordOnly { message } => Some(message.to_string()),
+            FunctionSignatureChangeType::KeywordOnly { message }
+            | FunctionSignatureChangeType::PositionalArgumentChange { message } => {
+                Some(message.to_string())
+            }
         }
     }
 }
@@ -78,26 +82,31 @@ pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, expr:
         return;
     };
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    // Handle method calls on instances
+    if let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() {
+        // Resolve the qualified name: try variable assignments first, then fall back to direct
+        // constructor calls.
+        let qualified_name = typing::resolve_assignment(value, checker.semantic()).or_else(|| {
+            value
+                .as_call_expr()
+                .and_then(|call| checker.semantic().resolve_qualified_name(&call.func))
+        });
+
+        if let Some(qualified_name) = qualified_name {
+            check_method_arguments(checker, &qualified_name, attr, arguments);
+        }
+        return;
+    }
+
+    // Handle direct constructor calls
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
         return;
     };
 
-    // Resolve the qualified name: try variable assignments first, then fall back to direct
-    // constructor calls.
-    let qualified_name = typing::resolve_assignment(value, checker.semantic()).or_else(|| {
-        value
-            .as_call_expr()
-            .and_then(|call| checker.semantic().resolve_qualified_name(&call.func))
-    });
-
-    let Some(qualified_name) = qualified_name else {
-        return;
-    };
-
-    check_keyword_only_method(checker, &qualified_name, attr, arguments);
+    check_constructor_arguments(checker, &qualified_name, arguments, func);
 }
 
-fn check_keyword_only_method(
+fn check_method_arguments(
     checker: &Checker,
     qualified_name: &QualifiedName,
     attr: &Identifier,
@@ -121,8 +130,58 @@ fn check_keyword_only_method(
     }
 }
 
+fn check_constructor_arguments(
+    checker: &Checker,
+    qualified_name: &QualifiedName,
+    arguments: &Arguments,
+    func: &Expr,
+) {
+    if let ["airflow", "Dataset"]
+    | ["airflow", "datasets", "Dataset"]
+    | ["airflow", "sdk", "Asset"] = qualified_name.segments()
+    {
+        if let Some(second_arg) = arguments.find_positional(1) {
+            if is_dict_expression(checker, second_arg) {
+                let function_name = qualified_name.segments().last().unwrap_or(&"").to_string();
+                checker.report_diagnostic(
+                    Airflow3IncompatibleFunctionSignature {
+                        function_name,
+                        change_type: FunctionSignatureChangeType::PositionalArgumentChange {
+                            message: "The second argument should not be a dictionary. Pass `extra` as a keyword argument (e.g., `extra={...}`)",
+                        },
+                    },
+                    func.range(),
+                );
+            }
+        }
+    }
+}
+
+/// Check if an expression is a dictionary (either a literal or a `dict()` call).
+fn is_dict_expression(checker: &Checker, expr: &Expr) -> bool {
+    // Check for dict literal: {} or {"key": "value"}
+    if expr.is_dict_expr() {
+        return true;
+    }
+
+    // Check for dict() call
+    if let Expr::Call(call) = expr {
+        if checker
+            .semantic()
+            .resolve_builtin_symbol(&call.func)
+            .is_some_and(|name| name == "dict")
+        {
+            return true;
+        }
+    }
+
+    false
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FunctionSignatureChangeType {
     /// Function signature changed to only accept keyword arguments.
     KeywordOnly { message: &'static str },
+    /// Function signature changed to not accept certain positional arguments.
+    PositionalArgumentChange { message: &'static str },
 }
