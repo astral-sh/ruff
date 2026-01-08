@@ -236,6 +236,7 @@ impl<'db> SuperOwnerKind<'db> {
                 instance.recursive_type_normalized_impl(db, div, nested)?,
             )),
             SuperOwnerKind::InstanceTypeVar(_, _) | SuperOwnerKind::ClassTypeVar(_, _) => {
+                // TODO: we might need to normalize the nested class here?
                 Some(self)
             }
         }
