@@ -14,39 +14,31 @@ Released on 2026-01-08.
 
 ### Bug fixes
 
-- Fix GitHub Actions output format for multi-line diagnostics ([#22108](https://github.com/astral-sh/ruff/pull/22108))
+- Fix GitHub format for multi-line diagnostics ([#22108](https://github.com/astral-sh/ruff/pull/22108))
 - \[`flake8-unused-arguments`\] Mark `**kwargs` in `TypeVar` as used (`ARG001`) ([#22214](https://github.com/astral-sh/ruff/pull/22214))
-- [ty] Fix generally poor ranking in playground completions ([#22442](https://github.com/astral-sh/ruff/pull/22442))
 
 ### Rule changes
 
-- Add `help:` subdiagnostics for several Ruff rules that can sometimes appear to disagree with ty ([#22331](https://github.com/astral-sh/ruff/pull/22331))
+- Add `help:` subdiagnostics for several Ruff rules that can sometimes appear to disagree with `ty` ([#22331](https://github.com/astral-sh/ruff/pull/22331))
 - \[`pylint`\] Demote `PLW1510` fix to display-only ([#22318](https://github.com/astral-sh/ruff/pull/22318))
 - \[`pylint`\] Ignore identical members (`PLR1714`) ([#22220](https://github.com/astral-sh/ruff/pull/22220))
 - \[`pylint`\] Improve diagnostic range for `PLC0206` ([#22312](https://github.com/astral-sh/ruff/pull/22312))
 - \[`ruff`\] Improve fix title for `RUF102` invalid rule code ([#22100](https://github.com/astral-sh/ruff/pull/22100))
-- flake8-simplify: avoid unnecessary builtins import for SIM105 ([#22358](https://github.com/astral-sh/ruff/pull/22358))
+- \[`flake8-simplify`\]: Avoid unnecessary builtins import for `SIM105` ([#22358](https://github.com/astral-sh/ruff/pull/22358))
 
 ### Configuration
 
 - Allow Python 3.15 as valid `target-version` value in preview ([#22419](https://github.com/astral-sh/ruff/pull/22419))
-- Check required-version before parsing rules ([#22410](https://github.com/astral-sh/ruff/pull/22410))
+- Check `required-version` before parsing rules ([#22410](https://github.com/astral-sh/ruff/pull/22410))
 - Include configured `src` directories when resolving graphs ([#22451](https://github.com/astral-sh/ruff/pull/22451))
 
 ### Documentation
 
-- Update T201 suggestion to not use root logger to satisfy LOG015 ([#22059](https://github.com/astral-sh/ruff/pull/22059))
-- Decrease Markdown heading level ([#22152](https://github.com/astral-sh/ruff/pull/22152))
-- Document options for more rules ([#22295](https://github.com/astral-sh/ruff/pull/22295))
-- Document the options used by more rules ([#22198](https://github.com/astral-sh/ruff/pull/22198))
-- Fix iter example in usafe fixes doc ([#22118](https://github.com/astral-sh/ruff/pull/22118))
-- \[`flake8_print`\] better suggestion for basicConfig in `T201` docs ([#22101](https://github.com/astral-sh/ruff/pull/22101))
+- Update `T201` suggestion to not use root logger to satisfy `LOG015` ([#22059](https://github.com/astral-sh/ruff/pull/22059))
+- Fix `iter` example in unsafe fixes doc ([#22118](https://github.com/astral-sh/ruff/pull/22118))
+- \[`flake8_print`\] better suggestion for `basicConfig` in `T201` docs ([#22101](https://github.com/astral-sh/ruff/pull/22101))
 - \[`pylint`\] Restore the fix safety docs for `PLW0133` ([#22211](https://github.com/astral-sh/ruff/pull/22211))
-- docs: fix jupyter notebook discovery info for editors ([#22447](https://github.com/astral-sh/ruff/pull/22447))
-
-### Other changes
-
-- Remove in-workflow deployment to Cloudflare Pages ([#22098](https://github.com/astral-sh/ruff/pull/22098))
+- Fix Jupyter notebook discovery info for editors ([#22447](https://github.com/astral-sh/ruff/pull/22447))
 
 ### Contributors
 
