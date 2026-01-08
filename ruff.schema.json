@@ -907,6 +907,21 @@
         }
       ]
     },
+    "Flake8AnnotationComplexityOptions": {
+      "description": "Options for the `flake8-annotation-complexity` plugin",
+      "type": "object",
+      "properties": {
+        "max-annotation-complexity": {
+          "description": "Maximum annotation complexity",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int"
+        }
+      },
+      "additionalProperties": false
+    },
     "Flake8AnnotationsOptions": {
       "description": "Options for the `flake8-annotations` plugin.",
       "type": "object",
@@ -2121,6 +2136,17 @@
           "items": {
             "$ref": "#/definitions/RuleSelector"
           }
+        },
+        "flake8-annotation-complexity": {
+          "description": "Options for the `flake8-annotation-complexity` plugin",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8AnnotationComplexityOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "flake8-annotations": {
           "description": "Options for the `flake8-annotations` plugin.",
@@ -4251,6 +4277,10 @@
         "T20",
         "T201",
         "T203",
+        "TAE",
+        "TAE0",
+        "TAE00",
+        "TAE002",
         "TC",
         "TC0",
         "TC00",

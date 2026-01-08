@@ -554,6 +554,9 @@ pub struct LintOptions {
         "#
     )]
     pub future_annotations: Option<bool>,
+
+    /// Options for the `flake8-annotation-complexity` plugin
+    pub flake8_annotation_complexity: Option<Flake8AnnotationComplexityOptions>,
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -1005,6 +1008,32 @@ pub struct LintCommonOptions {
     )]
     pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
+}
+
+/// Options for the `flake8-annotation-complexity` plugin
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8AnnotationComplexityOptions {
+    /// Maximum annotation complexity
+    #[option(
+        default = "3",
+        value_type = "isize",
+        example = "max_annotation_complexity = 4"
+    )]
+    max_annotation_complexity: Option<isize>,
+}
+
+impl Flake8AnnotationComplexityOptions {
+    pub fn into_settings(
+        self,
+    ) -> ruff_linter::rules::flake8_annotation_complexity::settings::Settings {
+        ruff_linter::rules::flake8_annotation_complexity::settings::Settings {
+            max_annotation_complexity: self.max_annotation_complexity.unwrap_or(3),
+        }
+    }
 }
 
 /// Options for the `flake8-annotations` plugin.
@@ -3942,6 +3971,7 @@ pub struct LintOptionsWire {
     task_tags: Option<Vec<String>>,
     typing_modules: Option<Vec<String>>,
     unfixable: Option<Vec<RuleSelector>>,
+    flake8_annotation_complexity: Option<Flake8AnnotationComplexityOptions>,
     flake8_annotations: Option<Flake8AnnotationsOptions>,
     flake8_bandit: Option<Flake8BanditOptions>,
     flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
@@ -3999,6 +4029,7 @@ impl From<LintOptionsWire> for LintOptions {
             task_tags,
             typing_modules,
             unfixable,
+            flake8_annotation_complexity,
             flake8_annotations,
             flake8_bandit,
             flake8_boolean_trap,
@@ -4084,6 +4115,7 @@ impl From<LintOptionsWire> for LintOptions {
                 extend_per_file_ignores,
             },
             exclude,
+            flake8_annotation_complexity,
             pydoclint,
             ruff,
             preview,

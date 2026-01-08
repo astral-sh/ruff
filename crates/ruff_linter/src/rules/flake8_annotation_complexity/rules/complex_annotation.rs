@@ -61,20 +61,22 @@ fn get_annoation_complexity(expr: &Expr) -> isize {
     0
 }
 
-// TODO: use config value
-const MAX_COMPLEXITY_VALUE: isize = 3;
-
 /// TAE002
 pub(crate) fn complex_annotation(checker: &Checker, function_def: &StmtFunctionDef) {
+    let max_complexity = checker
+        .settings()
+        .flake8_annotation_complexity
+        .max_annotation_complexity;
+
     for arg in function_def.parameters.iter_non_variadic_params() {
         if let Some(type_annotation) = arg.annotation() {
             let annoation_complexity = get_annoation_complexity(type_annotation);
-            if annoation_complexity > MAX_COMPLEXITY_VALUE {
+            if annoation_complexity > max_complexity {
                 checker.report_diagnostic(
                     ComplexAnnotation {
                         symbol_name: arg.name().to_string(),
                         complexity_value: annoation_complexity,
-                        max_complexity_value: MAX_COMPLEXITY_VALUE,
+                        max_complexity_value: max_complexity,
                     },
                     type_annotation.range(),
                 );
