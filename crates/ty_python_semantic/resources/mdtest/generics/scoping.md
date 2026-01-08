@@ -351,13 +351,19 @@ class C[T]:
 Methods can have type parameters that are scoped to the method itself, while also referring to type parameters from the enclosing class.
 
 ```py
-class C[T]:
-    def m[U](self, x: T, y: U) -> tuple[T, U]:
-        return x, y
+from typing import Generic, TypeVar
 
-# revealed: def m[U](self, x: int, y: U) -> tuple[int, U]
-reveal_type(C[int].m)
+from ty_extensions import into_callable
 
-# revealed: bound method C[int].m[U](x: int, y: U) -> tuple[int, U]
-reveal_type(C[int]().m)
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Foo(Generic[T]):
+    def bar(self, x: T, y: S) -> tuple[T, S]:
+        raise NotImplementedError
+
+def f(x: type[Foo[T]]) -> T:
+    # revealed: [S](self, x: T@f, y: S) -> tuple[T@f, S]
+    reveal_type(into_callable(x.bar))
+    raise NotImplementedError
 ```
