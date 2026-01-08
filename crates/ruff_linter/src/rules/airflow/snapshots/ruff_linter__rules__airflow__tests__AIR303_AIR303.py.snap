@@ -112,3 +112,62 @@ AIR303 `create_asset` signature is changed in Airflow 3.0
 28 | # Double-starred keyword arguments
    |
 help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:37:1
+   |
+36 | # second argument is of type dict, should raise diagnostic
+37 | Dataset("ds1", {"extra": "metadata"})
+   | ^^^^^^^
+38 | Dataset("ds1", {})
+39 | Dataset("uri", dict())
+   |
+help: The second argument should not be a dictionary. Pass `extra` as a keyword argument (e.g., `extra={...}`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:38:1
+   |
+36 | # second argument is of type dict, should raise diagnostic
+37 | Dataset("ds1", {"extra": "metadata"})
+38 | Dataset("ds1", {})
+   | ^^^^^^^
+39 | Dataset("uri", dict())
+40 | # second argument is not of type dict, should not raise diagnostic
+   |
+help: The second argument should not be a dictionary. Pass `extra` as a keyword argument (e.g., `extra={...}`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:39:1
+   |
+37 | Dataset("ds1", {"extra": "metadata"})
+38 | Dataset("ds1", {})
+39 | Dataset("uri", dict())
+   | ^^^^^^^
+40 | # second argument is not of type dict, should not raise diagnostic
+41 | Dataset("ds1")
+   |
+help: The second argument should not be a dictionary. Pass `extra` as a keyword argument (e.g., `extra={...}`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:48:1
+   |
+46 | from airflow.datasets import Dataset
+47 |
+48 | Dataset("ds2", {"extra": "metadata"})
+   | ^^^^^^^
+49 | Dataset("ds2")
+50 | Dataset("ds2", extra={"key": "value"})
+   |
+help: The second argument should not be a dictionary. Pass `extra` as a keyword argument (e.g., `extra={...}`)
+
+AIR303 `Asset` signature is changed in Airflow 3.0
+  --> AIR303.py:56:1
+   |
+54 | from airflow.sdk import Asset
+55 |
+56 | Asset("asset1", {"extra": "metadata"})
+   | ^^^^^
+57 | Asset("asset1")
+58 | Asset("asset1", extra={"key": "value"})
+   |
+help: The second argument should not be a dictionary. Pass `extra` as a keyword argument (e.g., `extra={...}`)
