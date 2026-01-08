@@ -720,9 +720,10 @@ impl<'db> Signature<'db> {
     /// 2. Any explicitly annotated parameter (not inferred)
     pub(crate) fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
         let return_contains_self = self.return_ty.contains_self(db);
-        let param_contains_self = self.parameters().iter().any(|p| {
-            p.should_annotation_be_displayed() && p.annotated_type().contains_self(db)
-        });
+        let param_contains_self = self
+            .parameters()
+            .iter()
+            .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db));
         !return_contains_self && !param_contains_self
     }
 

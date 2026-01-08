@@ -791,7 +791,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 match function.signature(self.db).overloads.as_slice() {
                     [signature] => {
                         let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
-                        let hide_unused_self = bound_signature.should_hide_self_from_display(self.db);
+                        let hide_unused_self =
+                            bound_signature.should_hide_self_from_display(self.db);
                         let type_parameters = DisplayOptionalGenericContext {
                             generic_context: bound_signature.generic_context.as_ref(),
                             db: self.db,
@@ -1473,13 +1474,17 @@ pub struct DisplayGenericContext<'a, 'db> {
 
 impl<'db> DisplayGenericContext<'_, 'db> {
     fn fmt_normal(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let mut variables = self.generic_context.variables(self.db).filter(|bound_typevar| {
-            // If hide_unused_self is true and this is a Self typevar, skip it
-            if self.hide_unused_self && bound_typevar.typevar(self.db).is_self(self.db) {
-                return false;
-            }
-            true
-        }).peekable();
+        let mut variables = self
+            .generic_context
+            .variables(self.db)
+            .filter(|bound_typevar| {
+                // If hide_unused_self is true and this is a Self typevar, skip it
+                if self.hide_unused_self && bound_typevar.typevar(self.db).is_self(self.db) {
+                    return false;
+                }
+                true
+            })
+            .peekable();
 
         if variables.peek().is_none() {
             return Ok(());
@@ -1775,9 +1780,10 @@ impl<'db> DisplaySignature<'_, 'db> {
 
     pub(crate) fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
         let return_contains_self = self.return_ty.contains_self(db);
-        let param_contains_self = self.parameters.iter().any(|p| {
-            p.should_annotation_be_displayed() && p.annotated_type().contains_self(db)
-        });
+        let param_contains_self = self
+            .parameters
+            .iter()
+            .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db));
         !return_contains_self && !param_contains_self
     }
 }
