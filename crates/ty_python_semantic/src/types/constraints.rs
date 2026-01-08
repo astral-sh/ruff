@@ -768,6 +768,8 @@ impl<'db> ConstrainedTypeVar<'db> {
             return IntersectionResult::Disjoint;
         }
 
+        // We do not create lower bounds that are unions, or upper bounds that are intersections,
+        // since those can be broken apart into BDDs over simpler constraints.
         if lower.is_union() || upper.is_nontrivial_intersection(db) {
             return IntersectionResult::CannotSimplify;
         }
@@ -775,11 +777,12 @@ impl<'db> ConstrainedTypeVar<'db> {
         // TODO: For now, we also treat upper bound unions as unsimplifiable if they become too
         // big. Upper bounds are intersected together, and the intersections of large unions can
         // become quite large indeed. We are looking at a better representation that would let us
-        // model them directly, but for now, we punt.
-        #[allow(clippy::items_after_statements)]
-        const MAX_UNION_UPPER_BOUND_SIZE: usize = 3;
-        if let Some(union_type) = upper.as_union()
-            && union_type.elements(db).len() > MAX_UNION_UPPER_BOUND_SIZE
+        // model them directly, but for now, we punt. Instead of hard-coding a specific size
+        // threshold, we skip any upper bounds that are "larger" than either of constraints being
+        // intersected.
+        let upper_size = upper.union_clause_count(db);
+        if upper_size > self.upper(db).union_clause_count(db)
+            || upper_size > other.upper(db).union_clause_count(db)
         {
             return IntersectionResult::CannotSimplify;
         }

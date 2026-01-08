@@ -1359,6 +1359,12 @@ impl<'db> Type<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
+    pub(crate) fn union_clause_count(self, db: &'db dyn Db) -> usize {
+        self.as_union()
+            .map(|union_type| union_type.elements(db).len())
+            .unwrap_or(1)
+    }
+
     /// Returns whether this is a "real" intersection type. (Negated types are represented by an
     /// intersection containing a single negative branch, which this method does _not_ consider a
     /// "real" intersection.)
