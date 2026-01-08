@@ -10,3 +10,7 @@ TypeVa<CURSOR: typing.TypeVar>
 
 # We should prefer `typing` over `ctypes`.
 cast<CURSOR: typing.cast>
+
+# We should prefer a non-stdlib project import
+# over a stdlib `typing` import.
+NoRetur<CURSOR: sub1.NoReturn>
