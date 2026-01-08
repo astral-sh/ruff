@@ -39,7 +39,7 @@
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, ClassType, EnumLiteralType, IntersectionType, KnownClass,
+    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     NegativeIntersectionElements, StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
@@ -312,8 +312,8 @@ impl<'db> UnionBuilder<'db> {
                 UnionElement::BytesLiterals(_) => {
                     replace_with.push(KnownClass::Bytes.to_instance(self.db));
                 }
-                UnionElement::EnumLiterals { enum_class, .. } => {
-                    replace_with.push(Type::instance(self.db, ClassType::NonGeneric(*enum_class)));
+                UnionElement::EnumLiterals { literals, .. } => {
+                    replace_with.push(literals[0].enum_class_instance(self.db));
                 }
                 UnionElement::Type(_) => {}
             }
@@ -529,9 +529,10 @@ impl<'db> UnionBuilder<'db> {
                     enum_metadata(self.db, enum_class).expect("Class of enum literal is an enum");
 
                 if metadata.members.len() == 1 {
-                    let enum_class_instance =
-                        Type::instance(self.db, ClassType::NonGeneric(enum_class));
-                    self.add_in_place_impl(enum_class_instance, seen_aliases);
+                    self.add_in_place_impl(
+                        enum_member_to_add.enum_class_instance(self.db),
+                        seen_aliases,
+                    );
                     return;
                 }
 
@@ -555,8 +556,7 @@ impl<'db> UnionBuilder<'db> {
                                     MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
                                 };
                             if literals.len() >= enum_literals_limit {
-                                let replace_with =
-                                    Type::instance(self.db, ClassType::NonGeneric(enum_class));
+                                let replace_with = literals[0].enum_class_instance(self.db);
                                 self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
                             }
@@ -586,9 +586,10 @@ impl<'db> UnionBuilder<'db> {
                 if let Some(found) = found {
                     let newly_added = found.insert(enum_member_to_add);
                     if newly_added && found.len() == metadata.members.len() {
-                        let enum_class_instance =
-                            Type::instance(self.db, ClassType::NonGeneric(enum_class));
-                        self.add_in_place_impl(enum_class_instance, seen_aliases);
+                        self.add_in_place_impl(
+                            enum_member_to_add.enum_class_instance(self.db),
+                            seen_aliases,
+                        );
                         return;
                     }
                 } else {
