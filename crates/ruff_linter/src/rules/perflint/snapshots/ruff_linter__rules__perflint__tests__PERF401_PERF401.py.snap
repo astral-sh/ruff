@@ -189,7 +189,7 @@ PERF401 Use a list comprehension to create a transformed list
     |
 help: Replace for loop with list comprehension
 
-PERF401 Use a list comprehension to create a transformed list
+PERF401 Use `list.extend` to create a transformed list
    --> PERF401.py:229:9
     |
 227 |     result = []
@@ -198,7 +198,7 @@ PERF401 Use a list comprehension to create a transformed list
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 230 |     return result
     |
-help: Replace for loop with list comprehension
+help: Replace for loop with list.extend
 
 PERF401 Use a list comprehension to create a transformed list
    --> PERF401.py:239:9
@@ -247,7 +247,7 @@ PERF401 Use a list comprehension to create a transformed list
     |
 help: Replace for loop with list comprehension
 
-PERF401 Use a list comprehension to create a transformed list
+PERF401 Use `list.extend` to create a transformed list
    --> PERF401.py:276:13
     |
 274 |     for i in src:
@@ -257,7 +257,7 @@ PERF401 Use a list comprehension to create a transformed list
 277 |
 278 |     for i in src:
     |
-help: Replace for loop with list comprehension
+help: Replace for loop with list.extend
 
 PERF401 Use `list.extend` to create a transformed list
    --> PERF401.py:280:13
@@ -292,5 +292,17 @@ PERF401 Use a list comprehension to create a transformed list
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 293 |
 294 | G_INDEX = None
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:313:9
+    |
+311 |     xs = []
+312 |     for [x, y] in [(1, 2)]:
+313 |         xs.append(x + y)  # PERF401
+    |         ^^^^^^^^^^^^^^^^
+314 |
+315 | def f():
     |
 help: Replace for loop with list comprehension
