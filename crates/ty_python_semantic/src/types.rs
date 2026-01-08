@@ -1446,12 +1446,16 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn single_char_string_literal(db: &'db dyn Db, c: char) -> Self {
-        #[salsa::tracked]
+        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
         fn single_char_string_literal_inner(db: &dyn Db, c: char, _: ()) -> StringLiteralType<'_> {
             StringLiteralType::new(db, c.to_compact_string())
         }
 
-        Self::StringLiteral(single_char_string_literal_inner(db, c, ()))
+        Self::StringLiteral(if c.is_ascii() {
+            single_char_string_literal_inner(db, c, ())
+        } else {
+            StringLiteralType::new(db, c.to_compact_string())
+        })
     }
 
     pub(crate) fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {
