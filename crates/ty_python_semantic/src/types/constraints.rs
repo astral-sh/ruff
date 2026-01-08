@@ -758,9 +758,25 @@ impl<'db> ConstrainedTypeVar<'db> {
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
     fn intersect(self, db: &'db dyn Db, other: Self) -> IntersectionResult<'db> {
+        // TODO: For now, we treat some upper bounds as unsimplifiable if they become "too big".
+        // When intersecting constraints, the upper bounds are also intersected together. If the
+        // lhs and rhs upper bounds are unions of intersections (e.g. `(a & b) | (c & d)`), then
+        // intersecting them together will require distributing across every pair of union
+        // elements. That can quickly balloon in size. We are looking at a better representation
+        // that would let us model this case more directly, but for now, we punt.
+        let self_upper = self.upper(db);
+        let other_upper = other.upper(db);
+        let estimated_upper_bound_size = self_upper.union_size(db)
+            * other_upper.union_size(db)
+            * (self_upper.intersection_size(db) + other_upper.intersection_size(db));
+        const MAX_UPPER_BOUND_SIZE: usize = 4;
+        if estimated_upper_bound_size >= MAX_UPPER_BOUND_SIZE {
+            return IntersectionResult::CannotSimplify;
+        }
+
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
         let lower = UnionType::from_elements(db, [self.lower(db), other.lower(db)]);
-        let upper = IntersectionType::from_elements(db, [self.upper(db), other.upper(db)]);
+        let upper = IntersectionType::from_elements(db, [self_upper, other_upper]);
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
@@ -771,19 +787,6 @@ impl<'db> ConstrainedTypeVar<'db> {
         // We do not create lower bounds that are unions, or upper bounds that are intersections,
         // since those can be broken apart into BDDs over simpler constraints.
         if lower.is_union() || upper.is_nontrivial_intersection(db) {
-            return IntersectionResult::CannotSimplify;
-        }
-
-        // TODO: For now, we also treat upper bound unions as unsimplifiable if they become too
-        // big. Upper bounds are intersected together, and the intersections of large unions can
-        // become quite large indeed. We are looking at a better representation that would let us
-        // model them directly, but for now, we punt. Instead of hard-coding a specific size
-        // threshold, we skip any upper bounds that are "larger" than either of constraints being
-        // intersected.
-        let upper_size = upper.union_clause_count(db);
-        if upper_size > self.upper(db).union_clause_count(db)
-            || upper_size > other.upper(db).union_clause_count(db)
-        {
             return IntersectionResult::CannotSimplify;
         }
 

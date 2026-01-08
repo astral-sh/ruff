@@ -1359,12 +1359,6 @@ impl<'db> Type<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
-    pub(crate) fn union_clause_count(self, db: &'db dyn Db) -> usize {
-        self.as_union()
-            .map(|union_type| union_type.elements(db).len())
-            .unwrap_or(1)
-    }
-
     /// Returns whether this is a "real" intersection type. (Negated types are represented by an
     /// intersection containing a single negative branch, which this method does _not_ consider a
     /// "real" intersection.)
@@ -1372,6 +1366,31 @@ impl<'db> Type<'db> {
         match self {
             Type::Intersection(intersection) => !intersection.is_simple_negation(db),
             _ => false,
+        }
+    }
+
+    /// Returns the number of union clauses in this type. If the type is not a union, returns 1.
+    pub(crate) fn union_size(self, db: &'db dyn Db) -> usize {
+        self.as_union()
+            .map(|union_type| union_type.elements(db).len())
+            .unwrap_or(1)
+    }
+
+    /// Returns the number of intersection clauses in this type. If the type is a union, this is
+    /// the maximum of the `intersection_size` of each union element. If the type is not a union
+    /// nor an intersection, returns 1.
+    pub(crate) fn intersection_size(self, db: &'db dyn Db) -> usize {
+        match self {
+            Type::Intersection(intersection) => {
+                intersection.positive(db).len() + intersection.negative(db).len()
+            }
+            Type::Union(union_type) => union_type
+                .elements(db)
+                .iter()
+                .map(|element| element.intersection_size(db))
+                .max()
+                .unwrap_or(1),
+            _ => 1,
         }
     }
 
