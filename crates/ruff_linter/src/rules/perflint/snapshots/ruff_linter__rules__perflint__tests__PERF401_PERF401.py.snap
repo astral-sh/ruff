@@ -294,3 +294,13 @@ PERF401 Use a list comprehension to create a transformed list
 294 | G_INDEX = None
     |
 help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:313:9
+    |
+311 |     xs = []
+312 |     for x, y in [(1, 2)]:
+313 |         xs.append(x + y)  # PERF401
+    |         ^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with list comprehension
