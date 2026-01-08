@@ -2928,6 +2928,7 @@ dependencies = [
  "filetime",
  "globwalk",
  "ignore",
+ "indexmap",
  "indoc",
  "insta",
  "insta-cmd",
