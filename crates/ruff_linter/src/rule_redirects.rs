@@ -1,14 +1,30 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+use crate::warn_user_once;
+
+const DEPRECATED_SELECTORS: [&str; 3] = ["R", "U", "IC"];
+
+fn check_for_deprecation(code: &str) {
+    if DEPRECATED_SELECTORS.contains(&code) {
+        warn_user_once!(
+            "Using `{code}` as a selector is deprecated and will be removed in a future version."
+        );
+    }
+}
+
 /// Returns the redirect target for the given code.
 pub(crate) fn get_redirect_target(code: &str) -> Option<&'static str> {
+    check_for_deprecation(code);
+
     REDIRECTS.get(code).copied()
 }
 
 /// Returns the code and the redirect target if the given code is a redirect.
 /// (The same code is returned to obtain it with a static lifetime).
 pub(crate) fn get_redirect(code: &str) -> Option<(&'static str, &'static str)> {
+    check_for_deprecation(code);
+
     REDIRECTS.get_key_value(code).map(|(k, v)| (*k, *v))
 }
 
