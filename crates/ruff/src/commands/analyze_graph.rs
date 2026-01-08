@@ -59,14 +59,26 @@ pub(crate) fn analyze_graph(
         })
         .collect::<FxHashMap<_, _>>();
 
-    // Create a database from the source roots.
-    let src_roots = package_roots
+    // Create a database from the source roots, combining detected package roots with configured
+    // `src` paths.
+    let mut src_roots: Vec<SystemPathBuf> = package_roots
         .values()
         .filter_map(|package| package.as_deref())
         .filter_map(|package| package.parent())
         .map(Path::to_path_buf)
         .filter_map(|path| SystemPathBuf::from_path_buf(path).ok())
         .collect();
+
+    // Add configured `src` paths, filtering to only include existing directories.
+    src_roots.extend(
+        pyproject_config
+            .settings
+            .linter
+            .src
+            .iter()
+            .filter(|path| path.is_dir())
+            .filter_map(|path| SystemPathBuf::from_path_buf(path.clone()).ok()),
+    );
 
     let db = ModuleDb::from_src_roots(
         src_roots,
