@@ -12,8 +12,8 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    #[test_case(Rule::ComplexArumentAnnotation, Path::new("TAE002.py"))]
-    #[test_case(Rule::ComplexArumentAnnotation, Path::new("TAE002_quoted.py"))]
+    #[test_case(Rule::ComplexAnnotation, Path::new("TAE002.py"))]
+    #[test_case(Rule::ComplexAnnotation, Path::new("TAE002_quoted.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

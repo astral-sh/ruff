@@ -351,11 +351,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::PropertyWithoutReturn) {
                 ruff::rules::property_without_return(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::ComplexArumentAnnotation) {
-                flake8_annotation_complexity::rules::complex_argument_annotation(
-                    checker,
-                    function_def,
-                );
+            if checker.is_rule_enabled(Rule::ComplexAnnotation) {
+                flake8_annotation_complexity::rules::complex_annotation(checker, function_def);
             }
         }
         Stmt::Return(_) => {

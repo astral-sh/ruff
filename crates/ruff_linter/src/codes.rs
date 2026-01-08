@@ -483,7 +483,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Annotations, "401") => rules::flake8_annotations::rules::AnyType,
 
         // flake8-annotation-complexity
-        (Flake8AnnotationComplexity, "002") => rules::flake8_annotation_complexity::rules::ComplexArumentAnnotation,
+        (Flake8AnnotationComplexity, "002") => rules::flake8_annotation_complexity::rules::ComplexAnnotation,
 
         // flake8-future-annotations
         (Flake8FutureAnnotations, "100") => rules::flake8_future_annotations::rules::FutureRewritableTypeAnnotation,
