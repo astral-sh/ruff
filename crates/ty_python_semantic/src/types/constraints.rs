@@ -481,10 +481,35 @@ impl<'db> ConstraintSet<'db> {
         db: &'db dyn Db,
         to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
-        let node = self.node.exists(db, to_remove, self.support);
+        let to_remove: Vec<_> = to_remove.into_iter().collect();
+        let node = self
+            .node
+            .exists(db, to_remove.iter().copied(), self.support);
+        let to_remove_set: FxHashSet<_> = to_remove.into_iter().collect();
+        let mentions_removed = |ty: Type<'db>| match ty {
+            Type::TypeVar(bound_typevar) => to_remove_set.contains(&bound_typevar.identity(db)),
+            _ => false,
+        };
+        let support_constraints: FxOrderSet<_> = self
+            .support
+            .iter(db)
+            .filter(|constraint| {
+                let identity = constraint.typevar(db).identity(db);
+                if to_remove_set.contains(&identity) {
+                    return false;
+                }
+                if any_over_type(db, constraint.lower(db), &mentions_removed, false) {
+                    return false;
+                }
+                if any_over_type(db, constraint.upper(db), &mentions_removed, false) {
+                    return false;
+                }
+                true
+            })
+            .collect();
         Self {
             node,
-            support: self.support,
+            support: Support::new(db, support_constraints),
         }
     }
 
@@ -537,13 +562,6 @@ impl<'db> Support<'db> {
         match self {
             Support::Empty => Either::Left(std::iter::empty()),
             Support::Constraints(inner) => Either::Right(inner.constraints(db).iter().copied()),
-        }
-    }
-
-    fn get_index_of(self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> Option<usize> {
-        match self {
-            Support::Empty => None,
-            Support::Constraints(inner) => inner.constraints(db).get_index_of(&constraint),
         }
     }
 
@@ -1137,8 +1155,36 @@ impl<'db> Node<'db> {
         support: Support<'db>,
         mut f: impl FnMut(&PathAssignments<'db>),
     ) {
+        let mut present = FxHashSet::default();
+        self.for_each_constraint(db, &mut |constraint, _| {
+            present.insert(constraint);
+        });
+        let missing = support
+            .iter(db)
+            .filter(|constraint| !present.contains(constraint))
+            .collect::<Vec<_>>();
         let mut path = support.path_assignments(db, self);
-        self.for_each_path_inner(db, &mut f, &mut path);
+        self.for_each_path_with_missing(db, &missing, &mut f, &mut path);
+    }
+
+    fn for_each_path_with_missing(
+        self,
+        db: &'db dyn Db,
+        missing: &[ConstrainedTypeVar<'db>],
+        f: &mut dyn FnMut(&PathAssignments<'db>),
+        path: &mut PathAssignments<'db>,
+    ) {
+        if let Some((constraint, rest)) = missing.split_first() {
+            let source_order = path.support_source_order_for(*constraint);
+            path.walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                self.for_each_path_with_missing(db, rest, f, path);
+            });
+            path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                self.for_each_path_with_missing(db, rest, f, path);
+            });
+        } else {
+            self.for_each_path_inner(db, f, path);
+        }
     }
 
     fn for_each_path_inner(
@@ -1669,152 +1715,40 @@ impl<'db> Node<'db> {
         mut f: impl FnMut(Option<&[RepresentativeBounds<'db>]>),
     ) {
         let retained = self.retain_one(db, bound_typevar, support);
-        let mut existing = FxHashSet::default();
-        retained.for_each_constraint(db, &mut |constraint, _| {
-            existing.insert(constraint);
-        });
-        let missing_constraints = support
+        let support = support
             .iter(db)
-            .filter(|constraint| {
-                constraint.typevar(db).identity(db) == bound_typevar
-                    && !existing.contains(constraint)
-            })
-            .collect::<Vec<_>>();
-        retained.find_representative_types_with_missing(
-            db,
-            support,
-            &missing_constraints,
-            &mut Vec::default(),
-            &mut f,
-        );
-    }
-
-    fn find_representative_types_inner(
-        self,
-        db: &'db dyn Db,
-        support: Support<'db>,
-        current_bounds: &mut Vec<RepresentativeBounds<'db>>,
-        f: &mut dyn FnMut(Option<&[RepresentativeBounds<'db>]>),
-    ) {
-        match self {
-            Node::AlwaysTrue => {
-                // If we reach the `true` terminal, the path we've been following represents one
-                // representative type.
-                if current_bounds.is_empty() {
-                    f(None);
-                    return;
-                }
-
-                // If `lower ≰ upper`, then this path represents an invalid specialization and
-                // should be skipped.
-                let greatest_lower_bound =
-                    UnionType::from_elements(db, current_bounds.iter().map(|bounds| bounds.lower));
-                let least_upper_bound = IntersectionType::from_elements(
-                    db,
-                    current_bounds.iter().map(|bounds| bounds.upper),
-                );
-                if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
-                    return;
-                }
-
-                // We've been tracking the lower and upper bound that the types for this path must
-                // satisfy. Pass those bounds along and let the caller choose a representative type
-                // from within that range.
-                f(Some(current_bounds));
+            .filter(|constraint| constraint.typevar(db).identity(db) == bound_typevar)
+            .collect();
+        let support = Support::new(db, support);
+        retained.for_each_path(db, support, |path| {
+            let mut bounds: Vec<_> = path
+                .positive_constraints()
+                .map(|(constraint, source_order)| {
+                    RepresentativeBounds::new(
+                        constraint.lower(db),
+                        constraint.upper(db),
+                        source_order,
+                    )
+                })
+                .collect();
+            if bounds.is_empty() {
+                f(None);
+                return;
             }
 
-            Node::AlwaysFalse => {
-                // If we reach the `false` terminal, the path we've been following represents an
-                // invalid specialization, so we skip it.
+            // If `lower ≰ upper`, then this path represents an invalid specialization and should
+            // be skipped.
+            let greatest_lower_bound =
+                UnionType::from_elements(db, bounds.iter().map(|bounds| bounds.lower));
+            let least_upper_bound =
+                IntersectionType::from_elements(db, bounds.iter().map(|bounds| bounds.upper));
+            if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
+                return;
             }
 
-            Node::Interior(interior) => {
-                let reset_point = current_bounds.len();
-                let constraint = interior.constraint(db);
-                let source_order = support
-                    .get_index_of(db, constraint)
-                    .map(|index| index + 1)
-                    .unwrap_or(interior.source_order(db));
-
-                // For an interior node, there are two outgoing paths: one for the `if_true`
-                // branch, and one for the `if_false` branch.
-                //
-                // For the `if_true` branch, this node's constraint places additional restrictions
-                // on the types that satisfy the current path through the BDD. So we intersect the
-                // current glb/lub with the constraint's bounds to get the new glb/lub for the
-                // recursive call.
-                current_bounds.push(RepresentativeBounds::new(
-                    constraint.lower(db),
-                    constraint.upper(db),
-                    source_order,
-                ));
-                interior.if_true(db).find_representative_types_inner(
-                    db,
-                    support,
-                    current_bounds,
-                    f,
-                );
-                current_bounds.truncate(reset_point);
-
-                // For the `if_false` branch, then the types that satisfy the current path through
-                // the BDD do _not_ satisfy the node's constraint. Because we used `retain_one` to
-                // abstract the BDD to a single typevar, we don't need to worry about how that
-                // negative constraint affects the lower/upper bound that we're tracking. The
-                // abstraction process will have compared the negative constraint with all of the
-                // other constraints in the BDD, and added new interior nodes to handle the
-                // combination of those constraints. So we can recurse down the `if_false` branch
-                // without updating the lower/upper bounds, relying on the other constraints along
-                // the path to incorporate that negative "hole" in the set of valid types for this
-                // path.
-                interior.if_false(db).find_representative_types_inner(
-                    db,
-                    support,
-                    current_bounds,
-                    f,
-                );
-            }
-        }
-    }
-
-    fn find_representative_types_with_missing(
-        self,
-        db: &'db dyn Db,
-        support: Support<'db>,
-        missing_constraints: &[ConstrainedTypeVar<'db>],
-        current_bounds: &mut Vec<RepresentativeBounds<'db>>,
-        f: &mut dyn FnMut(Option<&[RepresentativeBounds<'db>]>),
-    ) {
-        if let Some((constraint, rest)) = missing_constraints.split_first() {
-            let source_order = support
-                .get_index_of(db, *constraint)
-                .map(|index| index + 1)
-                .unwrap_or(0);
-            let lower = constraint.lower(db);
-            let upper = constraint.upper(db);
-            let greatest_lower_bound = UnionType::from_elements(
-                db,
-                current_bounds
-                    .iter()
-                    .map(|bounds| bounds.lower)
-                    .chain(std::iter::once(lower)),
-            );
-            let least_upper_bound = IntersectionType::from_elements(
-                db,
-                current_bounds
-                    .iter()
-                    .map(|bounds| bounds.upper)
-                    .chain(std::iter::once(upper)),
-            );
-            if greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
-                current_bounds.push(RepresentativeBounds::new(lower, upper, source_order));
-                self.find_representative_types_with_missing(db, support, rest, current_bounds, f);
-                current_bounds.pop();
-            }
-
-            self.find_representative_types_with_missing(db, support, rest, current_bounds, f);
-        } else {
-            self.find_representative_types_inner(db, support, current_bounds, f);
-        }
+            bounds.sort_by_key(|bounds| bounds.source_order);
+            f(Some(&bounds));
+        });
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
@@ -3643,6 +3577,13 @@ impl<'db> PathAssignments<'db> {
             assignments: FxIndexMap::default(),
             discovered,
         }
+    }
+
+    fn support_source_order_for(&self, constraint: ConstrainedTypeVar<'db>) -> usize {
+        self.discovered
+            .get_index_of(&constraint)
+            .map(|index| index + 1)
+            .unwrap_or(0)
     }
 
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
