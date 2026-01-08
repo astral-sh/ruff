@@ -294,7 +294,8 @@ pub(crate) const fn is_s310_resolve_string_literal_bindings_enabled(
 
 // https://github.com/astral-sh/ruff/pull/21623
 pub(crate) const fn is_range_suppressions_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
+    // settings.preview.is_enabled()
+    true
 }
 
 // https://github.com/astral-sh/ruff/pull/22419
