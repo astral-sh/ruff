@@ -14,6 +14,7 @@ license.workspace = true
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["cache", "serde"] }
+ruff_diagnostics = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_memory_usage = { workspace = true }
 ruff_options_metadata = { workspace = true }
@@ -30,7 +31,7 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
-get-size2 = { workspace = true }
+get-size2 = { workspace = true, features = ["ordermap"] }
 globset = { workspace = true }
 notify = { workspace = true }
 ordermap = { workspace = true, features = ["serde"] }
@@ -48,8 +49,10 @@ toml = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["redactions", "ron"] }
 ruff_db = { workspace = true, features = ["testing"] }
+ruff_python_trivia = { workspace = true }
+
+insta = { workspace = true, features = ["redactions", "ron"] }
 
 [features]
 default = ["zstd"]

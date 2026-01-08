@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
@@ -47,5 +48,17 @@ pub struct CancellationToken {
 impl CancellationToken {
     pub fn is_cancelled(&self) -> bool {
         self.cancelled.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+/// The operation was canceled by the provided [`CancellationToken`].
+#[derive(Debug)]
+pub struct Canceled;
+
+impl std::error::Error for Canceled {}
+
+impl std::fmt::Display for Canceled {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("operation was canceled")
     }
 }

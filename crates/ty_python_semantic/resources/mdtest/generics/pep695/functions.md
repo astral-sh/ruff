@@ -953,3 +953,29 @@ class Builder(Generic[TMsg]):
     def _handler(self, stream: Stream[Msg]) -> Stream[Msg]:
         return stream
 ```
+
+## Regressions
+
+### Only consider fully static types as pivots for transitivity
+
+This is a regression test for [ty#2371]. When working with constraint sets, we track transitive
+relationships between the constraints in the set. For instance, in `S ≤ int ∧ int ≤ T`, we can infer
+that `S ≤ T`. However, we should only consider fully static types when looking for a "pivot" for
+this kind of transitive relationship. The same pattern does not hold for `S ≤ Any ∧ Any ≤ T`;
+because the two `Any`s can materialize to different types, we cannot infer that `S ≤ T`.
+
+We have lower level tests of this in [`type_properties/implies_subtype_of.md`][implies_subtype_of].
+`functools.reduce` has a signature that exercises this behavior, as well, so we also include this
+regression test.
+
+```py
+from functools import reduce
+
+def _(keys: list[str]):
+    # TODO: revealed: int
+    # revealed: Unknown | Literal[0]
+    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+```
+
+[implies_subtype_of]: ../../type_properties/implies_subtype_of.md
+[ty#2371]: https://github.com/astral-sh/ty/issues/2371

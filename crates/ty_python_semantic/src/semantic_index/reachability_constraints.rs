@@ -899,9 +899,7 @@ impl ReachabilityConstraints {
                 let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
                     .fold((true, true), |(none, all), overload| {
                         let overload_returns_never =
-                            overload.return_ty.is_some_and(|return_type| {
-                                return_type.is_equivalent_to(db, Type::Never)
-                            });
+                            overload.return_ty.is_equivalent_to(db, Type::Never);
 
                         (
                             none && !overload_returns_never,

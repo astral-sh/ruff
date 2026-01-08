@@ -236,10 +236,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class,
-            NominalInstanceInner::Object => KnownClass::Object
-                .try_to_class_literal(db)
-                .expect("Typeshed should always have a `object` class in `builtins.pyi`")
-                .default_specialization(db),
+            NominalInstanceInner::Object => ClassType::object(db),
         }
     }
 

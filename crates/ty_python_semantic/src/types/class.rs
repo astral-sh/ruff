@@ -428,10 +428,12 @@ pub enum ClassType<'db> {
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
-        KnownClass::Object
-            .to_class_literal(db)
-            .to_class_type(db)
-            .unwrap()
+        ClassType::NonGeneric(
+            KnownClass::Object
+                .to_class_literal(db)
+                .as_class_literal()
+                .expect("`object` should always be a non-generic class in typeshed"),
+        )
     }
 
     pub(super) const fn is_generic(self) -> bool {
@@ -856,7 +858,7 @@ impl<'db> ClassType<'db> {
             let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
                 .with_annotated_type(index_annotation);
             let parameters = Parameters::new(db, [self_parameter, index_parameter]);
-            Signature::new(parameters, Some(return_annotation))
+            Signature::new(parameters, return_annotation)
         }
 
         let (class_literal, specialization) = self.class_literal(db);
@@ -893,7 +895,7 @@ impl<'db> ClassType<'db> {
                 );
 
                 let synthesized_dunder_method =
-                    Type::function_like_callable(db, Signature::new(parameters, Some(return_type)));
+                    Type::function_like_callable(db, Signature::new(parameters, return_type));
 
                 Member::definitely_declared(synthesized_dunder_method)
             }
@@ -1131,7 +1133,7 @@ impl<'db> ClassType<'db> {
 
                 let synthesized_dunder = Type::function_like_callable(
                     db,
-                    Signature::new_generic(inherited_generic_context, parameters, None),
+                    Signature::new_generic(inherited_generic_context, parameters, Type::unknown()),
                 );
 
                 Member::definitely_declared(synthesized_dunder)
@@ -1212,14 +1214,12 @@ impl<'db> ClassType<'db> {
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
             let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
-                signature.return_ty.is_some_and(|return_ty| {
-                    !return_ty.is_assignable_to(
-                        db,
-                        self_ty
-                            .to_instance(db)
-                            .expect("ClassType should be instantiable"),
-                    )
-                })
+                !signature.return_ty.is_assignable_to(
+                    db,
+                    self_ty
+                        .to_instance(db)
+                        .expect("ClassType should be instantiable"),
+                )
             });
 
             let instance_ty = Type::instance(db, self);
@@ -1268,7 +1268,7 @@ impl<'db> ClassType<'db> {
                         .parameters()
                         .get_positional(0)
                         .filter(|parameter| !parameter.inferred_annotation)
-                        .and_then(Parameter::annotated_type)
+                        .map(Parameter::annotated_type)
                         .filter(|ty| {
                             ty.as_typevar()
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
@@ -1283,7 +1283,7 @@ impl<'db> ClassType<'db> {
                     Signature::new_generic(
                         generic_context,
                         signature.parameters().clone(),
-                        Some(return_type),
+                        return_type,
                     )
                     .with_definition(signature.definition())
                     .bind_self(db, Some(instance_ty))
@@ -1347,7 +1347,7 @@ impl<'db> ClassType<'db> {
                         Signature::new_generic(
                             class_generic_context,
                             Parameters::empty(),
-                            Some(correct_return_type),
+                            correct_return_type,
                         ),
                     ))
                 }
@@ -2333,7 +2333,7 @@ impl<'db> ClassLiteral<'db> {
                         db,
                         [Parameter::positional_only(Some(Name::new_static("self")))],
                     ),
-                    Some(field.declared_ty),
+                    field.declared_ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
                 let property = PropertyInstanceType::new(db, Some(property_getter), None);
@@ -2430,7 +2430,7 @@ impl<'db> ClassLiteral<'db> {
                                 .with_annotated_type(instance_ty),
                         ],
                     ),
-                    Some(KnownClass::Bool.to_instance(db)),
+                    KnownClass::Bool.to_instance(db),
                 );
 
                 return Some(Type::function_like_callable(db, signature));
@@ -2489,7 +2489,7 @@ impl<'db> ClassLiteral<'db> {
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
 
-        let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
+        let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
                 let (init, mut default_ty, kw_only, alias) = match &field.kind {
                     FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None),
@@ -2542,9 +2542,7 @@ impl<'db> ClassLiteral<'db> {
                                 if let Some(value_param) =
                                     overload.signature.parameters().get_positional(2)
                                 {
-                                    value_types = value_types.add(
-                                        value_param.annotated_type().unwrap_or_else(Type::unknown),
-                                    );
+                                    value_types = value_types.add(value_param.annotated_type());
                                 } else if overload.signature.parameters().is_gradual() {
                                     value_types = value_types.add(Type::unknown());
                                 }
@@ -2616,12 +2614,12 @@ impl<'db> ClassLiteral<'db> {
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     // TODO: could be `Self`.
                     .with_annotated_type(instance_ty);
-                signature_from_fields(vec![self_parameter], Some(Type::none(db)))
+                signature_from_fields(vec![self_parameter], Type::none(db))
             }
             (CodeGeneratorKind::NamedTuple, "__new__") => {
                 let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
                     .with_annotated_type(KnownClass::Type.to_instance(db));
-                signature_from_fields(vec![cls_parameter], Some(Type::none(db)))
+                signature_from_fields(vec![cls_parameter], Type::none(db))
             }
             (CodeGeneratorKind::NamedTuple, "_replace" | "__replace__") => {
                 if name == "__replace__"
@@ -2640,7 +2638,7 @@ impl<'db> ClassLiteral<'db> {
                 ));
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     .with_annotated_type(self_ty);
-                signature_from_fields(vec![self_parameter], Some(self_ty))
+                signature_from_fields(vec![self_parameter], self_ty)
             }
             (CodeGeneratorKind::NamedTuple, "_fields") => {
                 // Synthesize a precise tuple type for _fields using literal string types.
@@ -2667,7 +2665,7 @@ impl<'db> ClassLiteral<'db> {
                                 .with_annotated_type(instance_ty),
                         ],
                     ),
-                    Some(KnownClass::Bool.to_instance(db)),
+                    KnownClass::Bool.to_instance(db),
                 );
 
                 Some(Type::function_like_callable(db, signature))
@@ -2684,7 +2682,7 @@ impl<'db> ClassLiteral<'db> {
                             [Parameter::positional_or_keyword(Name::new_static("self"))
                                 .with_annotated_type(instance_ty)],
                         ),
-                        Some(KnownClass::Int.to_instance(db)),
+                        KnownClass::Int.to_instance(db),
                     );
 
                     Some(Type::function_like_callable(db, signature))
@@ -2760,7 +2758,7 @@ impl<'db> ClassLiteral<'db> {
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     .with_annotated_type(instance_ty);
 
-                signature_from_fields(vec![self_parameter], Some(instance_ty))
+                signature_from_fields(vec![self_parameter], instance_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
                 if has_dataclass_param(DataclassFlags::FROZEN) {
@@ -2774,7 +2772,7 @@ impl<'db> ClassLiteral<'db> {
                                 Parameter::positional_or_keyword(Name::new_static("value")),
                             ],
                         ),
-                        Some(Type::Never),
+                        Type::Never,
                     );
 
                     return Some(Type::function_like_callable(db, signature));
@@ -2819,7 +2817,7 @@ impl<'db> ClassLiteral<'db> {
                                         .with_annotated_type(Type::any()),
                                 ],
                             ),
-                            Some(Type::none(db)),
+                            Type::none(db),
                         )),
                         CallableTypeKind::FunctionLike,
                     )));
@@ -2840,7 +2838,7 @@ impl<'db> ClassLiteral<'db> {
                                     .with_annotated_type(field.declared_ty),
                             ],
                         ),
-                        Some(Type::none(db)),
+                        Type::none(db),
                     )
                 });
 
@@ -2867,7 +2865,7 @@ impl<'db> ClassLiteral<'db> {
                                     .with_annotated_type(key_type),
                             ],
                         ),
-                        Some(field.declared_ty),
+                        field.declared_ty,
                     )
                 });
 
@@ -2903,7 +2901,7 @@ impl<'db> ClassLiteral<'db> {
                                         .with_annotated_type(Type::Never),
                                 ],
                             ),
-                            Some(Type::none(db)),
+                            Type::none(db),
                         )),
                         CallableTypeKind::FunctionLike,
                     )));
@@ -2923,7 +2921,7 @@ impl<'db> ClassLiteral<'db> {
                                     .with_annotated_type(key_type),
                             ],
                         ),
-                        Some(Type::none(db)),
+                        Type::none(db),
                     )
                 });
 
@@ -2957,11 +2955,11 @@ impl<'db> ClassLiteral<'db> {
                                         .with_annotated_type(key_type),
                                 ],
                             ),
-                            Some(if field.is_required() {
+                            if field.is_required() {
                                 field.declared_ty
                             } else {
                                 UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
-                            }),
+                            },
                         );
 
                         let t_default = BoundTypeVarInstance::synthetic(
@@ -2983,14 +2981,14 @@ impl<'db> ClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            Some(if field.is_required() {
+                            if field.is_required() {
                                 field.declared_ty
                             } else {
                                 UnionType::from_elements(
                                     db,
                                     [field.declared_ty, Type::TypeVar(t_default)],
                                 )
-                            }),
+                            },
                         );
 
                         [get_sig, get_with_default_sig]
@@ -3007,10 +3005,7 @@ impl<'db> ClassLiteral<'db> {
                                         .with_annotated_type(KnownClass::Str.to_instance(db)),
                                 ],
                             ),
-                            Some(UnionType::from_elements(
-                                db,
-                                [Type::unknown(), Type::none(db)],
-                            )),
+                            UnionType::from_elements(db, [Type::unknown(), Type::none(db)]),
                         )
                     }))
                     .chain(std::iter::once({
@@ -3033,10 +3028,10 @@ impl<'db> ClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            Some(UnionType::from_elements(
+                            UnionType::from_elements(
                                 db,
                                 [Type::unknown(), Type::TypeVar(t_default)],
-                            )),
+                            ),
                         )
                     }));
 
@@ -3070,7 +3065,7 @@ impl<'db> ClassLiteral<'db> {
                                         .with_annotated_type(key_type),
                                 ],
                             ),
-                            Some(field.declared_ty),
+                            field.declared_ty,
                         );
 
                         // `.pop()` with a default value
@@ -3093,10 +3088,10 @@ impl<'db> ClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            Some(UnionType::from_elements(
+                            UnionType::from_elements(
                                 db,
                                 [field.declared_ty, Type::TypeVar(t_default)],
-                            )),
+                            ),
                         );
 
                         [pop_sig, pop_with_default_sig]
@@ -3126,7 +3121,7 @@ impl<'db> ClassLiteral<'db> {
                                     .with_annotated_type(field.declared_ty),
                             ],
                         ),
-                        Some(field.declared_ty),
+                        field.declared_ty,
                     )
                 });
 
@@ -3148,7 +3143,7 @@ impl<'db> ClassLiteral<'db> {
                             Parameter::keyword_variadic(Name::new_static("kwargs")),
                         ],
                     ),
-                    Some(Type::none(db)),
+                    Type::none(db),
                 );
 
                 Some(Type::function_like_callable(db, signature))
