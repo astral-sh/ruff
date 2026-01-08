@@ -84,3 +84,26 @@ pub(crate) fn complex_annotation(checker: &Checker, function_def: &StmtFunctionD
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::get_annoation_complexity;
+    use ruff_python_parser::parse_expression;
+    use test_case::test_case;
+
+    #[test_case(r"int", 0)]
+    #[test_case(r"dict[str, Any]", 1)]
+    #[test_case(r"dict[str, list[dict[str, str]]]", 3)]
+    #[test_case(r"dict[str, int | str | bool]", 1)]
+    #[test_case(r"dict[str, Union[int, str, bool]]", 2)]
+    #[test_case(r#""dict[str, list[list]]""#, 2)]
+    #[test_case(r#"dict[str, "list[str]"]"#, 2)]
+    fn get_annoation_complexity_yields_expected_value(
+        annotation: &str,
+        expected_complexity: isize,
+    ) {
+        let expr = parse_expression(annotation).unwrap();
+        let complexity = get_annoation_complexity(&expr.expr());
+        assert_eq!(complexity, expected_complexity);
+    }
+}
