@@ -1033,6 +1033,9 @@ struct Relevance {
     /// completion evaluation framework should be more representative
     /// of real world conditions.
     keyword: Sort,
+    /// In some instances, a symbol is from a very commonly used module
+    /// that we want to boost over other symbols.
+    special_module: Sort,
     /// Sorts based on whether the symbol comes from the `builtins`
     /// module. i.e., Python's initial basis. We usually sort these
     /// lower to give priority to symbols in a tighter scope.
@@ -1064,6 +1067,16 @@ impl Relevance {
             } else {
                 Sort::Even
             },
+            special_module: c
+                .module_name
+                .and_then(|name| {
+                    if name.as_str() == "typing" {
+                        Some(Sort::Higher)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(Sort::Even),
             builtin: if c.builtin { Sort::Lower } else { Sort::Even },
             name_kind: NameKind::classify(&c.name),
             type_check_only: if c.is_type_check_only {
