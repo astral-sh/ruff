@@ -764,12 +764,12 @@ impl<'db> ConstrainedTypeVar<'db> {
         // intersecting them together will require distributing across every pair of union
         // elements. That can quickly balloon in size. We are looking at a better representation
         // that would let us model this case more directly, but for now, we punt.
+        const MAX_UPPER_BOUND_SIZE: usize = 4;
         let self_upper = self.upper(db);
         let other_upper = other.upper(db);
         let estimated_upper_bound_size = self_upper.union_size(db)
             * other_upper.union_size(db)
             * (self_upper.intersection_size(db) + other_upper.intersection_size(db));
-        const MAX_UPPER_BOUND_SIZE: usize = 4;
         if estimated_upper_bound_size >= MAX_UPPER_BOUND_SIZE {
             return IntersectionResult::CannotSimplify;
         }
