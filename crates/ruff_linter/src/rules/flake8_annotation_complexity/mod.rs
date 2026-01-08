@@ -31,4 +31,19 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn no_errors_when_high_max_annotation_complexity() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_annotation_complexity/TAE002.py"),
+            &LinterSettings {
+                flake8_annotation_complexity: super::settings::Settings {
+                    max_annotation_complexity: 100,
+                },
+                ..LinterSettings::for_rule(Rule::ComplexAnnotation)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }
