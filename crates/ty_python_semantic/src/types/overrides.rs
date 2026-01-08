@@ -148,7 +148,6 @@ fn check_class_declaration<'db>(
 
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
-    let mut has_typeddict_in_mro = false;
     let mut liskov_diagnostic_emitted = false;
     let mut overridden_final_method = None;
 
@@ -157,10 +156,6 @@ fn check_class_declaration<'db>(
             ClassBase::Protocol | ClassBase::Generic => continue,
             ClassBase::Dynamic(_) => {
                 has_dynamic_superclass = true;
-                continue;
-            }
-            ClassBase::TypedDict => {
-                has_typeddict_in_mro = true;
                 continue;
             }
             ClassBase::Class(class) => class,
@@ -267,6 +262,12 @@ fn check_class_declaration<'db>(
             continue;
         }
 
+        // TypedDict classes cannot have methods, so there's no point in checking for Liskov
+        // violations. We already emit `invalid-typed-dict-statement` for this case.
+        if literal.is_typed_dict(db) {
+            continue;
+        }
+
         let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db) else {
             continue;
         };
@@ -291,7 +292,7 @@ fn check_class_declaration<'db>(
     }
 
     if !subclass_overrides_superclass_declaration && !has_dynamic_superclass {
-        if has_typeddict_in_mro {
+        if literal.is_typed_dict(db) {
             if !KnownClass::TypedDictFallback
                 .to_instance(db)
                 .member(db, &member.name)

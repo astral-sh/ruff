@@ -647,10 +647,8 @@ impl<'db> ClassType<'db> {
                     }
                 },
 
-                // Protocol, Generic, and TypedDict are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => {
-                    ConstraintSet::from(false)
-                }
+                // Protocol and Generic are not represented by a ClassType.
+                ClassBase::Protocol | ClassBase::Generic => ConstraintSet::from(false),
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
@@ -1965,8 +1963,15 @@ impl<'db> ClassLiteral<'db> {
             return known.is_typed_dict_subclass();
         }
 
-        self.iter_mro(db, None)
-            .any(|base| matches!(base, ClassBase::TypedDict))
+        self.explicit_bases(db).iter().any(|base| {
+            if matches!(base, Type::SpecialForm(SpecialFormType::TypedDict)) {
+                return true;
+            }
+            if let Some(class) = base.to_class_type(db) {
+                return class.class_literal(db).0.is_typed_dict(db);
+            }
+            false
+        })
     }
 
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
@@ -2208,6 +2213,32 @@ impl<'db> ClassLiteral<'db> {
                 ClassBase::Class(class) => {
                     let known = class.known(db);
 
+                    // For TypedDicts, when we reach the `dict` base, fall back to TypedDictFallback.
+                    if known == Some(KnownClass::Dict) && self.is_typed_dict(db) {
+                        return KnownClass::TypedDictFallback
+                            .to_class_literal(db)
+                            .find_name_in_mro_with_policy(db, name, policy)
+                            .expect("Will return Some() when called on class literal")
+                            .map_type(|ty| {
+                                ty.apply_type_mapping(
+                                    db,
+                                    &TypeMapping::ReplaceSelf {
+                                        new_upper_bound: determine_upper_bound(
+                                            db,
+                                            self,
+                                            None,
+                                            |base| {
+                                                base.into_class().is_some_and(|c| {
+                                                    c.is_known(db, KnownClass::Dict)
+                                                })
+                                            },
+                                        ),
+                                    },
+                                    TypeContext::default(),
+                                )
+                            });
+                    }
+
                     if known == Some(KnownClass::Object)
                         // Only exclude `object` members if this is not an `object` class itself
                         && (policy.mro_no_object_fallback() && !self.is_known(db, KnownClass::Object))
@@ -2233,26 +2264,6 @@ impl<'db> ClassLiteral<'db> {
                                 .inner,
                         )
                     });
-                }
-                ClassBase::TypedDict => {
-                    return KnownClass::TypedDictFallback
-                        .to_class_literal(db)
-                        .find_name_in_mro_with_policy(db, name, policy)
-                        .expect("Will return Some() when called on class literal")
-                        .map_type(|ty| {
-                            ty.apply_type_mapping(
-                                db,
-                                &TypeMapping::ReplaceSelf {
-                                    new_upper_bound: determine_upper_bound(
-                                        db,
-                                        self,
-                                        None,
-                                        ClassBase::is_typed_dict,
-                                    ),
-                                },
-                                TypeContext::default(),
-                            )
-                        });
                 }
             }
             if lookup_result.is_ok() {
@@ -3171,20 +3182,18 @@ impl<'db> ClassLiteral<'db> {
                 .to_class_literal(db)
                 .find_name_in_mro_with_policy(db, name, policy)
                 .expect("`find_name_in_mro_with_policy` will return `Some()` when called on class literal")
-                .map_type(|ty|
+                .map_type(|ty| {
                     ty.apply_type_mapping(
                         db,
                         &TypeMapping::ReplaceSelf {
-                            new_upper_bound: determine_upper_bound(
-                                db,
-                                self,
-                                specialization,
-                                ClassBase::is_typed_dict
-                            )
+                            new_upper_bound: determine_upper_bound(db, self, specialization, |base| {
+                                base.into_class()
+                                    .is_some_and(|c| c.is_known(db, KnownClass::Dict))
+                            }),
                         },
-                                TypeContext::default(),
+                        TypeContext::default(),
                     )
-                )
+                })
         }
     }
 
@@ -3408,13 +3417,10 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if self.is_typed_dict(db) {
-            return Place::Undefined.into();
-        }
-
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut is_definitely_bound = false;
+        let mut found_declared = false;
 
         for superclass in self.iter_mro(db, specialization) {
             match superclass {
@@ -3442,12 +3448,18 @@ impl<'db> ClassLiteral<'db> {
                             if origin.is_declared() {
                                 // We found a definitely-declared attribute. Discard possibly collected
                                 // inferred types from subclasses and return the declared type.
+                                // But first check if this is a TypedDict; its fields are accessed
+                                // through the TypedDict type machinery, not instance_member.
+                                if self.is_typed_dict(db) {
+                                    return Place::Undefined.into();
+                                }
                                 return member;
                             }
 
                             is_definitely_bound = true;
                         }
 
+                        found_declared = true;
                         // If the attribute is not definitely declared on this class, keep looking higher
                         // up in the MRO, and build a union of all inferred types (and possibly-declared
                         // types):
@@ -3457,29 +3469,18 @@ impl<'db> ClassLiteral<'db> {
                         union_qualifiers |= qualifiers;
                     }
                 }
-                ClassBase::TypedDict => {
-                    return KnownClass::TypedDictFallback
-                        .to_instance(db)
-                        .instance_member(db, name)
-                        .map_type(|ty| {
-                            ty.apply_type_mapping(
-                                db,
-                                &TypeMapping::ReplaceSelf {
-                                    new_upper_bound: Type::instance(
-                                        db,
-                                        self.unknown_specialization(db),
-                                    ),
-                                },
-                                TypeContext::default(),
-                            )
-                        });
-                }
             }
         }
 
         if union.is_empty() {
             Place::Undefined.with_qualifiers(TypeQualifiers::empty())
         } else {
+            // Check if this is a TypedDict; its fields are accessed through the
+            // TypedDict type machinery, not instance_member.
+            if found_declared && self.is_typed_dict(db) {
+                return Place::Undefined.into();
+            }
+
             let boundness = if is_definitely_bound {
                 Definedness::AlwaysDefined
             } else {
