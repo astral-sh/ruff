@@ -32,8 +32,6 @@ third-party-over-stdlib,main.py,0,1
 tighter-over-looser-scope,main.py,0,3
 tstring-completions,main.py,0,1
 ty-extensions-lower-stdlib,main.py,0,1
-type-var-typing-over-ast,main.py,0,1
-type-var-typing-over-ast,main.py,1,10
 typing-gets-priority,main.py,0,1
 typing-gets-priority,main.py,1,1
 typing-gets-priority,main.py,2,1
