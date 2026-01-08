@@ -988,7 +988,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ")?;
-                Type::from(bound_super.owner(self.db))
+                bound_super
+                    .owner(self.db)
+                    .owner_type(self.db)
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")
@@ -1680,7 +1682,7 @@ impl<'db> Signature<'db> {
 pub(crate) struct DisplaySignature<'a, 'db> {
     definition: Option<Definition<'db>>,
     parameters: &'a Parameters<'db>,
-    return_ty: Option<Type<'db>>,
+    return_ty: Type<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
@@ -1727,9 +1729,8 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .fmt_detailed(&mut f)?;
 
         // Return type
-        let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
         f.write_str(" -> ")?;
-        return_ty
+        self.return_ty
             .display_with(self.db, self.settings.singleline())
             .fmt_detailed(&mut f)?;
 
@@ -1897,17 +1898,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
-            if let Some(annotated_type) = self.param.annotated_type() {
-                if self.param.should_annotation_be_displayed() {
-                    f.write_str(": ")?;
-                    annotated_type
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                }
+            if self.param.should_annotation_be_displayed() {
+                let annotated_type = self.param.annotated_type();
+                f.write_str(": ")?;
+                annotated_type
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_type) = self.param.default_type() {
-                if self.param.annotated_type().is_some() {
+                if self.param.should_annotation_be_displayed() {
                     f.write_str(" = ")?;
                 } else {
                     f.write_str("=")?;
@@ -1940,10 +1940,13 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     _ => f.write_str("...")?,
                 }
             }
-        } else if let Some(ty) = self.param.annotated_type() {
+        } else {
             // This case is specifically for the `Callable` signature where name and default value
-            // cannot be provided.
-            ty.display_with(self.db, self.settings.clone())
+            // cannot be provided. For unnamed parameters we always display the type, to ensure we
+            // have something visible in the parameter slot.
+            self.param
+                .annotated_type()
+                .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         Ok(())
@@ -2646,9 +2649,12 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(db, parameters), return_ty)
-            .display(db)
-            .to_string()
+        Signature::new(
+            Parameters::new(db, parameters),
+            return_ty.unwrap_or(Type::unknown()),
+        )
+        .display(db)
+        .to_string()
     }
 
     fn display_signature_multiline<'db>(
@@ -2656,9 +2662,12 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(db, parameters), return_ty)
-            .display_with(db, super::DisplaySettings::default().multiline())
-            .to_string()
+        Signature::new(
+            Parameters::new(db, parameters),
+            return_ty.unwrap_or(Type::unknown()),
+        )
+        .display_with(db, super::DisplaySettings::default().multiline())
+        .to_string()
     }
 
     #[test]
@@ -2822,7 +2831,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @"
+            @r"
         (
             x=...,
             y: str = ...
@@ -2840,7 +2849,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @"
+            @r"
         (
             x,
             y,
@@ -2859,7 +2868,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @"
+            @r"
         (
             x,
             /,
@@ -2878,7 +2887,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @"
+            @r"
         (
             *,
             x,
@@ -2897,7 +2906,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @"
+            @r"
         (
             x,
             *,
@@ -2936,7 +2945,7 @@ mod tests {
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
-            @"
+            @r"
         (
             a,
             b: int,

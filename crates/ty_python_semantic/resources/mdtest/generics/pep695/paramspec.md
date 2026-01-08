@@ -688,6 +688,46 @@ reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, 
 reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 ```
 
+### Overloads with subtitution of `P.args` and `P.kwargs`
+
+This is regression test for <https://github.com/astral-sh/ty/issues/2027>
+
+```py
+from typing import Callable, Never, overload
+
+class Task[**P, R]:
+    def __init__(self, func: Callable[P, R]) -> None:
+        self.func = func
+
+    @overload
+    def __call__(self: "Task[P, R]", *args: P.args, **kwargs: P.kwargs) -> R: ...
+    @overload
+    def __call__(self: "Task[P, Never]", *args: P.args, **kwargs: P.kwargs) -> None: ...
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R | None:
+        return self.func(*args, **kwargs)
+
+def returns_str(x: int) -> str:
+    return str(x)
+
+def never_returns(x: int) -> Never:
+    raise Exception()
+
+t1 = Task(returns_str)
+reveal_type(t1)  # revealed: Task[(x: int), str]
+reveal_type(t1(1))  # revealed: str
+reveal_type(t1(x=1))  # revealed: str
+# error: [no-matching-overload]
+reveal_type(t1("a"))  # revealed: Unknown
+# error: [no-matching-overload]
+reveal_type(t1(y=1))  # revealed: Unknown
+
+t2 = Task(never_returns)
+# TODO: This should be `Task[(x: int), Never]`
+reveal_type(t2)  # revealed: Task[(x: int), Unknown]
+# TODO: This should be `Never`
+reveal_type(t2(1))  # revealed: Unknown
+```
+
 ## ParamSpec attribute assignability
 
 When comparing signatures with `ParamSpec` attributes (`P.args` and `P.kwargs`), two different
@@ -742,4 +782,21 @@ class Container[**P]:
         # error: [invalid-return-type] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
         # error: [invalid-argument-type] "Argument to bound method `method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
         return self.method(f)
+```
+
+## `ParamSpec` inference with un-annotated return type
+
+Regression test for an issue where `ParamSpec` inference failed when the callable we were inferring
+from did not have an annotated return type.
+
+```py
+from typing import Callable
+
+def infer_paramspec[**P](func: Callable[P, None]) -> Callable[P, None]:
+    return func
+
+def f(x: int, y: str):
+    pass
+
+reveal_type(infer_paramspec(f))  # revealed: (x: int, y: str) -> None
 ```

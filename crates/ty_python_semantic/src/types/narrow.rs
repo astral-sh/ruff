@@ -629,13 +629,24 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     /// Check if a type is directly narrowable by `len()` (without considering unions or intersections).
     ///
-    /// These are types where we know `__bool__` and `__len__` are consistent and the type
-    /// cannot be subclassed with a `__bool__` that disagrees.
+    /// In order for this to return `true`, we must know that the truthiness of the object returned by
+    /// `len(obj)` will always be consistent with the truthiness of `obj` for all `obj`s of type `ty`.
+    ///
+    /// We know that this is true for:
+    /// - Certain `Literal` types where we know that `__len__` is always well-behaved, and where we
+    ///   know that the type cannot be subclassed (because it's a `Literal` type).
+    /// - Tuple types (we generally assume that tuples have well-behaved `__len__` methods,
+    ///   and much of our special-casing for tuples elsewhere depends on this assumption).
+    /// - Arbitrary user types that return `Literal` types from both `__len__` and `__bool__`,
+    ///   where the returned `Literal` types are mutually consistent in their truthiness.
     fn is_base_type_narrowable_by_len(db: &'db dyn Db, ty: Type<'db>) -> bool {
         match ty {
             Type::StringLiteral(_) | Type::LiteralString | Type::BytesLiteral(_) => true,
-            Type::NominalInstance(instance) => instance.tuple_spec(db).is_some(),
-            _ => false,
+            Type::NominalInstance(instance) if instance.tuple_spec(db).is_some() => true,
+            _ => ty.len(db).is_some_and(|len_ty| {
+                let len_ty_bool = len_ty.bool(db);
+                len_ty_bool != Truthiness::Ambiguous && len_ty_bool == ty.bool(db)
+            }),
         }
     }
 

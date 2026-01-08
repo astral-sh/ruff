@@ -1687,10 +1687,10 @@ mod implicit_globals {
                         [Parameter::positional_only(Some(Name::new_static("format")))
                             .with_annotated_type(KnownClass::Int.to_instance(db))],
                     ),
-                    Some(KnownClass::Dict.to_specialized_instance(
+                    KnownClass::Dict.to_specialized_instance(
                         db,
                         [KnownClass::Str.to_instance(db), Type::any()],
-                    )),
+                    ),
                 );
                 Place::Defined(
                     DefinedPlace::new(Type::function_like_callable(db, signature))

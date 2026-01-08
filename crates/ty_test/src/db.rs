@@ -335,13 +335,17 @@ impl WritableSystem for MdtestSystem {
         self.as_system().create_new_file(&self.normalize_path(path))
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> ruff_db::system::Result<()> {
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> ruff_db::system::Result<()> {
         self.as_system()
-            .write_file(&self.normalize_path(path), content)
+            .write_file_bytes(&self.normalize_path(path), content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
         self.as_system()
             .create_directory_all(&self.normalize_path(path))
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }
