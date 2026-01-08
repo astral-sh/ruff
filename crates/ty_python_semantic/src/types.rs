@@ -1,4 +1,4 @@
-use compact_str::CompactString;
+use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
@@ -1443,6 +1443,15 @@ impl<'db> Type<'db> {
 
     pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
         Self::StringLiteral(StringLiteralType::new(db, string))
+    }
+
+    pub(crate) fn single_char_string_literal(db: &'db dyn Db, c: char) -> Self {
+        #[salsa::tracked]
+        fn single_char_string_literal_inner(db: &dyn Db, c: char, _: ()) -> StringLiteralType<'_> {
+            StringLiteralType::new(db, c.to_compact_string())
+        }
+
+        Self::StringLiteral(single_char_string_literal_inner(db, c, ()))
     }
 
     pub(crate) fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {

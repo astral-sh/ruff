@@ -1,4 +1,3 @@
-use compact_str::ToCompactString;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -8,7 +7,7 @@ use crate::types::constraints::{IteratorConstraintsExtension, OptionConstraintsE
 use crate::types::enums::is_single_member_enum;
 use crate::types::{
     CallableType, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, PairVisitor, ProtocolInstanceType, StringLiteralType, SubclassOfInner,
+    MemberLookupPolicy, PairVisitor, ProtocolInstanceType, SubclassOfInner,
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{
@@ -1041,9 +1040,7 @@ impl<'db> Type<'db> {
             // Note that this strictly holds true for all type relations!
             // However, as an optimisation (to avoid interning many single-character string-literal types),
             // we only recognise this as being true for assignability.
-            (Type::StringLiteral(value), Type::NominalInstance(instance))
-                if relation.is_assignability() =>
-            {
+            (Type::StringLiteral(value), Type::NominalInstance(instance)) => {
                 let other_class = instance.class(db);
 
                 if other_class.is_known(db, KnownClass::Str) {
@@ -1054,22 +1051,14 @@ impl<'db> Type<'db> {
 
                 let spec = match chars.len() {
                     0 => Type::Never,
-                    1 => Type::StringLiteral(StringLiteralType::new(
-                        db,
-                        chars.iter().next().unwrap().to_compact_string(),
-                    )),
+                    1 => Type::single_char_string_literal(db, *chars.iter().next().unwrap()),
                     _ => {
                         // Optimisation: since we know this union will only include string-literal types,
                         // avoid eagerly creating string-literal types when unnecessary, and avoid going
                         // via the union-builder.
                         let union_elements: Box<[Type<'db>]> = chars
                             .iter()
-                            .map(|c| {
-                                Type::StringLiteral(StringLiteralType::new(
-                                    db,
-                                    c.to_compact_string(),
-                                ))
-                            })
+                            .map(|c| Type::single_char_string_literal(db, *c))
                             .collect();
                         Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
                     }
@@ -1077,8 +1066,8 @@ impl<'db> Type<'db> {
 
                 KnownClass::Sequence
                     .to_specialized_class_type(db, [spec])
-                    .when_some_and(|class| {
-                        class.has_relation_to_impl(
+                    .when_some_and(|sequence| {
+                        sequence.has_relation_to_impl(
                             db,
                             other_class,
                             inferable,
@@ -1088,6 +1077,8 @@ impl<'db> Type<'db> {
                         )
                     })
             }
+
+            (Type::StringLiteral(_), _) => ConstraintSet::from(false),
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
@@ -1106,8 +1097,7 @@ impl<'db> Type<'db> {
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
             (
-                Type::StringLiteral(_)
-                | Type::LiteralString
+                Type::LiteralString
                 | Type::BooleanLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
