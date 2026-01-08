@@ -16,11 +16,12 @@ use ruff_python_ast::PythonVersion;
 use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule};
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext,
-    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
-    pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    flake8_annotation_complexity, flake8_annotations, flake8_bandit, flake8_boolean_trap,
+    flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_copyright, flake8_errmsg,
+    flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
+    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
+    isort, mccabe, pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade,
+    ruff,
 };
 use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
 use crate::{RuleSelector, codes, fs};
@@ -255,6 +256,7 @@ pub struct LinterSettings {
     pub future_annotations: bool,
 
     // Plugins
+    pub flake8_annotation_complexity: flake8_annotation_complexity::settings::Settings,
     pub flake8_annotations: flake8_annotations::settings::Settings,
     pub flake8_bandit: flake8_bandit::settings::Settings,
     pub flake8_boolean_trap: flake8_boolean_trap::settings::Settings,
@@ -424,6 +426,8 @@ impl LinterSettings {
 
             task_tags: TASK_TAGS.iter().map(ToString::to_string).collect(),
             typing_modules: vec![],
+            flake8_annotation_complexity: flake8_annotation_complexity::settings::Settings::default(
+            ),
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_boolean_trap: flake8_boolean_trap::settings::Settings::default(),

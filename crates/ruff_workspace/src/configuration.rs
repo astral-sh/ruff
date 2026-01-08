@@ -45,9 +45,9 @@ use ruff_python_formatter::{
 };
 
 use crate::options::{
-    AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
-    Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
-    Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
+    AnalyzeOptions, Flake8AnnotationComplexityOptions, Flake8AnnotationsOptions,
+    Flake8BanditOptions, Flake8BooleanTrapOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
+    Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
@@ -337,6 +337,10 @@ impl Configuration {
                 logger_objects: lint.logger_objects.unwrap_or_default(),
                 typing_modules: lint.typing_modules.unwrap_or_default(),
                 // Plugins
+                flake8_annotation_complexity: lint
+                    .flake8_annotation_complexity
+                    .map(Flake8AnnotationComplexityOptions::into_settings)
+                    .unwrap_or_default(),
                 flake8_annotations: lint
                     .flake8_annotations
                     .map(Flake8AnnotationsOptions::into_settings)
@@ -655,6 +659,7 @@ pub struct LintConfiguration {
     pub future_annotations: Option<bool>,
 
     // Plugins
+    pub flake8_annotation_complexity: Option<Flake8AnnotationComplexityOptions>,
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
     pub flake8_bandit: Option<Flake8BanditOptions>,
     pub flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
@@ -772,6 +777,7 @@ impl LintConfiguration {
             future_annotations: options.future_annotations,
 
             // Plugins
+            flake8_annotation_complexity: options.flake8_annotation_complexity,
             flake8_annotations: options.common.flake8_annotations,
             flake8_bandit: options.common.flake8_bandit,
             flake8_boolean_trap: options.common.flake8_boolean_trap,
@@ -1159,6 +1165,9 @@ impl LintConfiguration {
             typing_modules: self.typing_modules.or(config.typing_modules),
 
             // Plugins
+            flake8_annotation_complexity: self
+                .flake8_annotation_complexity
+                .combine(config.flake8_annotation_complexity),
             flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),
             flake8_bandit: self.flake8_bandit.combine(config.flake8_bandit),
             flake8_boolean_trap: self.flake8_boolean_trap.combine(config.flake8_boolean_trap),
