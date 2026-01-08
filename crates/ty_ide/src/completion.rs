@@ -11,7 +11,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{KnownModule, ModuleName};
+use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
@@ -49,32 +49,36 @@ pub fn completion<'db>(
         }
         ContextKind::NonImport(ref non_import) => {
             let model = SemanticModel::new(db, file);
-            let (semantic_completions, scoped) = match non_import.target {
+            match non_import.target {
                 CompletionTargetAst::ObjectDot { expr } => {
-                    (model.attribute_completions(expr), None)
+                    completions.extend(model.attribute_completions(expr));
                 }
                 CompletionTargetAst::Scoped(scoped) => {
-                    (model.scoped_completions(scoped.node), Some(scoped))
-                }
-            };
-
-            completions.extend(semantic_completions);
-            if scoped.is_some() {
-                add_keyword_completions(db, &mut completions);
-                add_argument_completions(db, &model, &context.cursor, &mut completions);
-            }
-            if settings.auto_import {
-                if let Some(scoped) = scoped {
-                    add_unimported_completions(
-                        db,
-                        file,
-                        &parsed,
-                        scoped,
-                        |module_name: &ModuleName, symbol: &str| {
-                            ImportRequest::import_from(module_name.as_str(), symbol)
-                        },
-                        &mut completions,
-                    );
+                    for semantic_completion in model.scoped_completions(scoped.node) {
+                        let module_dependency_kind = if semantic_completion.builtin {
+                            ModuleDependencyKind::Builtin
+                        } else {
+                            ModuleDependencyKind::Current
+                        };
+                        completions.add(
+                            CompletionBuilder::from_semantic_completion(db, semantic_completion)
+                                .module_dependency_kind(module_dependency_kind),
+                        );
+                    }
+                    add_keyword_completions(db, &mut completions);
+                    add_argument_completions(db, &model, &context.cursor, &mut completions);
+                    if settings.auto_import {
+                        add_unimported_completions(
+                            db,
+                            file,
+                            &parsed,
+                            scoped,
+                            |module_name: &ModuleName, symbol: &str| {
+                                ImportRequest::import_from(module_name.as_str(), symbol)
+                            },
+                            &mut completions,
+                        );
+                    }
                 }
             }
         }
@@ -309,6 +313,7 @@ struct CompletionBuilder<'db> {
     is_context_specific: bool,
     is_type_check_only: bool,
     documentation: Option<Docstring>,
+    module_dependency_kind: Option<ModuleDependencyKind>,
 }
 
 impl<'db> CompletionBuilder<'db> {
@@ -330,6 +335,7 @@ impl<'db> CompletionBuilder<'db> {
             is_context_specific: false,
             is_type_check_only: false,
             documentation: None,
+            module_dependency_kind: None,
         }
     }
 
@@ -460,6 +466,11 @@ impl<'db> CompletionBuilder<'db> {
 
     fn docstring(mut self, docs: impl Into<Option<Docstring>>) -> CompletionBuilder<'db> {
         self.documentation = docs.into();
+        self
+    }
+
+    fn module_dependency_kind(mut self, kind: ModuleDependencyKind) -> CompletionBuilder<'db> {
+        self.module_dependency_kind = Some(kind);
         self
     }
 
@@ -1019,11 +1030,6 @@ struct Relevance {
     /// symbols that we know for sure are usable should get ranked
     /// above symbols that we're unsure about.
     definitively_usable: Sort,
-    /// This lets one sort completions based on whether they're in the
-    /// current module or not. e.g., `Sort::Lower` for symbols outside
-    /// the module and `Sort::Higher` for symbols inside the module
-    /// that are already in scope.
-    current_module: Sort,
     /// At time of writing (2025-11-11), keyword completions are
     /// classified as builtins, which makes them sort after everything
     /// else. But we probably want keyword completions to sort *before*
@@ -1033,17 +1039,23 @@ struct Relevance {
     /// completion evaluation framework should be more representative
     /// of real world conditions.
     keyword: Sort,
-    /// In some instances, a symbol is from a very commonly used module
-    /// that we want to boost over other symbols.
-    special_module: Sort,
-    /// Sorts based on whether the symbol comes from the `builtins`
-    /// module. i.e., Python's initial basis. We usually sort these
-    /// lower to give priority to symbols in a tighter scope.
-    builtin: Sort,
     /// Sorts based on the "kind" of a name. i.e., Its export status.
     /// We sort normal names the highest. Then dunder names and finally
     /// any other name that starts with a single underscore.
     name_kind: NameKind,
+    /// The "dependency kind" of the module where this symbol
+    /// originates from.
+    ///
+    /// This lets us, e.g., prioritize first party project modules
+    /// over third party dependencies. This applies to both symbols
+    /// already in scope and unimported symbols, essentially forming a
+    /// preference ordering for symbols based on where they came from.
+    ///
+    /// Not all completions have this set. For example, keywords or
+    /// arguments. We assume that if it's not set, then there is some
+    /// other sorting criteria being applied or that it is generally
+    /// more specific than completions where this is set.
+    module_dependency_kind: Option<ModuleDependencyKind>,
     /// Sorts based on whether this symbol is only available during
     /// type checking and not at runtime.
     type_check_only: Sort,
@@ -1061,29 +1073,110 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            current_module: c.module_name.map(|_| Sort::Lower).unwrap_or(Sort::Higher),
             keyword: if c.kind == Some(CompletionKind::Keyword) {
                 Sort::Higher
             } else {
                 Sort::Even
             },
-            special_module: c
-                .module_name
-                .and_then(|name| {
-                    if name.as_str() == "typing" {
-                        Some(Sort::Higher)
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or(Sort::Even),
-            builtin: if c.builtin { Sort::Lower } else { Sort::Even },
             name_kind: NameKind::classify(&c.name),
+            module_dependency_kind: c.module_dependency_kind,
             type_check_only: if c.is_type_check_only {
                 Sort::Lower
             } else {
                 Sort::Even
             },
+        }
+    }
+}
+
+/// The dependency "kind" of a module.
+///
+/// Everything above "current" is applied to unimported symbols. It
+/// categorizes them by where the module is defined. We only support
+/// three broad categories right now: stdlib, third party and project.
+/// Ideally, we would distinguish between _direct_ third party code and
+/// _indirect_ third party code, but ty doesn't yet understand how to
+/// do this (as of 2026-01-08).
+///
+/// Note that these are defined in a particular order. That
+/// is, modules in the project get higher priority than those
+/// not in the project.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
+enum ModuleDependencyKind {
+    /// Symbols already in scope in the user's current module.
+    ///
+    /// Note that this doesn't necessarily mean that the symbol is
+    /// *defined* in the current module. e.g., `numpy.arra<CURSOR>`
+    /// will return `array` from `numpy`, and its module dependency
+    /// kind is considered `Current`.
+    Current,
+    /// Reserved for the Python initial basis. We want these
+    /// symbols to appear high since they are used so frequently,
+    /// but not higher than symbols already in scope in the
+    /// current module.
+    Builtin,
+    /// Symbols defined somewhere in the user's project.
+    Project,
+    /// A namespace package somewhat defies classification, since
+    /// it can exist over multiple search paths. Since std doesn't
+    /// use namespace packages, we just assume that they are roughly
+    /// equivalent to third party packages.
+    ///
+    /// This is an erroneous assumption when the namespace
+    /// package is within the user's project. Probably we
+    /// could do better once we know how to navigate namespace
+    /// packages better. Regardless, we put this between
+    /// `Project` and `ThirdParty` as a bad compromise for now.
+    Namespace,
+    /// Symbols defined somewhere in a dependency, direct or
+    /// indirect.
+    ThirdParty,
+    /// Symbols from "special" standard library modules that
+    /// are so commonly used---but commonly have names in
+    /// conflict with other stdlib modules---that we want to
+    /// prioritize them above other stdlib modules.
+    ///
+    /// `typing` is a good example of this. It has lots of
+    /// symbols that also exist in other modules. e.g.,
+    /// `TypeVar` in `ast`, `cast` in `ctypes` and
+    /// `Protocol` in `asyncio`.
+    StdlibSpecial,
+    /// Symbols from the standard library get ranked last by
+    /// the logic that they are least specific to the end user's
+    /// context.
+    ///
+    /// This is somewhat specious since while they are least
+    /// specific, some stdlib modules are very commonly used.
+    Stdlib,
+}
+
+impl ModuleDependencyKind {
+    /// Determines the "kind" of a symbol based on the module it is
+    /// defined in.
+    ///
+    /// Note that this can never return `ModuleDependencyKind::Current`.
+    /// Callers are expected to handle that case themselves.
+    fn from_module(db: &dyn Db, module: Module<'_>) -> ModuleDependencyKind {
+        if module.is_known(db, KnownModule::Builtins) {
+            return ModuleDependencyKind::Builtin;
+        }
+
+        let Some(sp) = module.search_path(db) else {
+            return ModuleDependencyKind::Namespace;
+        };
+        if sp.is_standard_library() {
+            if module.is_known(db, KnownModule::Typing) {
+                ModuleDependencyKind::StdlibSpecial
+            } else {
+                ModuleDependencyKind::Stdlib
+            }
+        } else if sp.is_site_packages() {
+            ModuleDependencyKind::ThirdParty
+        } else {
+            // We assume anything else, including
+            // "extra" search paths and editable installs,
+            // are part of the end user's code.
+            ModuleDependencyKind::Project
         }
     }
 }
@@ -1385,7 +1478,8 @@ fn add_unimported_completions<'db>(
                 .insert(import_action.symbol_text())
                 .kind(symbol.kind().to_completion_kind())
                 .module_name(module_name)
-                .import(import_action.import().cloned()),
+                .import(import_action.import().cloned())
+                .module_dependency_kind(ModuleDependencyKind::from_module(db, symbol.module())),
         );
     }
 }

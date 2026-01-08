@@ -1,3 +1,6 @@
+# Many of these came from discussion in:
+# <https://github.com/astral-sh/ty/issues/1274>
+
 # We should prefer `typing` over `asyncio` here.
 class Foo(Protoco<CURSOR: typing.Protocol>): ...
 
