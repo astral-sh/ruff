@@ -1014,10 +1014,9 @@ impl<'db> ConstrainedTypeVar<'db> {
 /// Terminal nodes (`false` and `true`) have their own dedicated enum variants. The
 /// [`Interior`][InteriorNode] variant represents interior nodes.
 ///
-/// BDD nodes are _quasi-reduced_, which means that there are no duplicate nodes (which we handle
-/// via Salsa interning). Unlike the typical BDD representation, which is (fully) reduced, we do
-/// allow redundant nodes, with `if_true` and `if_false` edges that point at the same node. That
-/// means that our BDDs "remember" all of the individual constraints that they were created with.
+/// BDD nodes are fully reduced and contain no duplicate nodes (which we handle via Salsa
+/// interning). We track the constraints that were explicitly added to a constraint set separately,
+/// so the BDD itself can be fully reduced without losing that information.
 ///
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
 /// visits variables in the same order. [`ConstrainedTypeVar::ordering`] defines the variable
@@ -1038,7 +1037,7 @@ enum Node<'db> {
 }
 
 impl<'db> Node<'db> {
-    /// Creates a new BDD node, ensuring that it is quasi-reduced.
+    /// Creates a new BDD node, ensuring that it is fully reduced.
     fn new(
         db: &'db dyn Db,
         constraint: ConstrainedTypeVar<'db>,
@@ -1054,8 +1053,8 @@ impl<'db> Node<'db> {
                 root_constraint.ordering(db) > constraint.ordering(db)
             })
         );
-        if if_true == Node::AlwaysFalse && if_false == Node::AlwaysFalse {
-            return Node::AlwaysFalse;
+        if if_true == if_false {
+            return if_true;
         }
         let max_source_order = source_order
             .max(if_true.max_source_order(db))
@@ -1320,21 +1319,7 @@ impl<'db> Node<'db> {
 
     fn or_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
         match (self, other) {
-            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
-            (Node::AlwaysTrue, Node::Interior(other_interior)) => Node::new(
-                db,
-                other_interior.constraint(db),
-                Node::AlwaysTrue,
-                Node::AlwaysTrue,
-                other_interior.source_order(db) + other_offset,
-            ),
-            (Node::Interior(self_interior), Node::AlwaysTrue) => Node::new(
-                db,
-                self_interior.constraint(db),
-                Node::AlwaysTrue,
-                Node::AlwaysTrue,
-                self_interior.source_order(db),
-            ),
+            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
             (Node::AlwaysFalse, _) => other.with_adjusted_source_order(db, other_offset),
             (_, Node::AlwaysFalse) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
@@ -1458,21 +1443,7 @@ impl<'db> Node<'db> {
 
     fn and_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
         match (self, other) {
-            (Node::AlwaysFalse, Node::AlwaysFalse) => Node::AlwaysFalse,
-            (Node::AlwaysFalse, Node::Interior(other_interior)) => Node::new(
-                db,
-                other_interior.constraint(db),
-                Node::AlwaysFalse,
-                Node::AlwaysFalse,
-                other_interior.source_order(db) + other_offset,
-            ),
-            (Node::Interior(self_interior), Node::AlwaysFalse) => Node::new(
-                db,
-                self_interior.constraint(db),
-                Node::AlwaysFalse,
-                Node::AlwaysFalse,
-                self_interior.source_order(db),
-            ),
+            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
             (Node::AlwaysTrue, _) => other.with_adjusted_source_order(db, other_offset),
             (_, Node::AlwaysTrue) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
@@ -4286,17 +4257,13 @@ mod tests {
     fn test_display_graph_output() {
         let expected = indoc! {r#"
             <0> (U = bool) 2/4
-            ┡━₁ <1> (U = str) 1/4
-            │   ┡━₁ <2> (T = bool) 4/4
-            │   │   ┡━₁ <3> (T = str) 3/3
-            │   │   │   ┡━₁ always
-            │   │   │   └─₀ always
-            │   │   └─₀ <4> (T = str) 3/3
-            │   │       ┡━₁ always
-            │   │       └─₀ never
-            │   └─₀ <2> SHARED
-            └─₀ <5> (U = str) 1/4
-                ┡━₁ <2> SHARED
+            ┡━₁ <1> (T = bool) 4/4
+            │   ┡━₁ always
+            │   └─₀ <2> (T = str) 3/3
+            │       ┡━₁ always
+            │       └─₀ never
+            └─₀ <3> (U = str) 1/4
+                ┡━₁ <1> SHARED
                 └─₀ never
         "#}
         .trim_end();
