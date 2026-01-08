@@ -3167,6 +3167,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     false,
                 )
             };
+            let has_dynamic = |ty: Type<'db>| {
+                any_over_type(self.db, ty, &|ty| matches!(ty, Type::Dynamic(_)), false)
+            };
 
             let infer_from_context =
                 |expected_ty: Type<'db>,
@@ -3180,7 +3183,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                     // If the return type is already assignable to the annotated type, we ignore the rest of
                     // the type context and prefer the narrower inferred type.
-                    if guard_return_ty.is_assignable_to(self.db, expected_ty) {
+                    if guard_return_ty.is_assignable_to(self.db, expected_ty)
+                        && !has_dynamic(guard_return_ty)
+                    {
                         return None;
                     }
 
@@ -3202,16 +3207,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             if let Some(Type::Union(union)) = normalized_expected_ty
                 && union.elements(self.db).len() <= Self::MAX_UNION_CONTEXT_ARMS
                 && has_inferable_typevar(declared_return_ty)
-                && !context_return_ty.is_assignable_to(self.db, call_expression_tcx)
+                && (!context_return_ty.is_assignable_to(self.db, call_expression_tcx)
+                    || has_dynamic(context_return_ty))
             {
                 struct UnionCandidate<'db> {
                     specialization: Specialization<'db>,
                     return_ty: Type<'db>,
                 }
-
-                let has_dynamic = |ty: Type<'db>| {
-                    any_over_type(self.db, ty, &|ty| matches!(ty, Type::Dynamic(_)), false)
-                };
 
                 let compare_candidates =
                     |left: &UnionCandidate<'db>, right: &UnionCandidate<'db>| {
@@ -3257,9 +3259,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     }
                 }
 
-                if !candidates.is_empty() {
-                    candidates.sort_by(compare_candidates);
-                    let best = candidates.remove(0);
+                if let Some(best) = candidates.into_iter().min_by(compare_candidates) {
                     self.specialization = Some(best.specialization);
                     self.return_ty = best.return_ty;
                     return;
