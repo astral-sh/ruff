@@ -64,7 +64,11 @@ pub fn all_symbols<'db>(
                     continue;
                 }
                 s.spawn(move |_| {
-                    let symbols_for_file_span = tracing::debug_span!(parent: all_symbols_span, "symbols_for_file_global_only", ?file);
+                    let symbols_for_file_span = tracing::debug_span!(
+                        parent: all_symbols_span,
+                        "symbols_for_file_global_only",
+                        path = %file.path(&*db),
+                    );
                     let _entered = symbols_for_file_span.entered();
 
                     if query.is_match_symbol_name(module.name(&*db)) {
@@ -94,11 +98,13 @@ pub fn all_symbols<'db>(
         let key1 = (
             s1.name_in_file()
                 .unwrap_or_else(|| s1.module().name(db).as_str()),
+            s1.module().name(db).as_str(),
             s1.file.path(db).as_str(),
         );
         let key2 = (
             s2.name_in_file()
                 .unwrap_or_else(|| s2.module().name(db).as_str()),
+            s2.module().name(db).as_str(),
             s2.file.path(db).as_str(),
         );
         key1.cmp(&key2)
