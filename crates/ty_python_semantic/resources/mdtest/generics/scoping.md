@@ -344,11 +344,11 @@ class C[T]:
     ok2: Inner[T]
 ```
 
-[scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables
 
 ## Mixed-scope type parameters
 
-Methods can have type parameters that are scoped to the method itself, while also referring to type parameters from the enclosing class.
+Methods can have type parameters that are scoped to the method itself, while also referring to type
+parameters from the enclosing class.
 
 ```py
 from typing import Generic, TypeVar
@@ -367,3 +367,5 @@ def f(x: type[Foo[T]]) -> T:
     reveal_type(into_callable(x.bar))
     raise NotImplementedError
 ```
+
+[scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables
