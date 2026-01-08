@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotation_complexity/mod.rs
 ---
-TAE002 Type annotation for argument `d` is too complex (4 > 3)
+TAE002 Type annotation for `d` is too complex (4 > 3)
   --> TAE002.py:14:39
    |
 12 | # Error
