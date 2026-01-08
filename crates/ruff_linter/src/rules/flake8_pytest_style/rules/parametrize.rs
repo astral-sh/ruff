@@ -705,10 +705,8 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
     //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
     // ```
     let argvalues_edits = unpack_single_element_items(checker, argvalues);
-    let argnames_edit = Edit::range_replacement(
-        unparse_expr_in_sequence(value, checker),
-        argnames.range(),
-    );
+    let argnames_edit =
+        Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
     let fix = if checker.comment_ranges().intersects(argnames_edit.range())
         || argvalues_edits
             .iter()
