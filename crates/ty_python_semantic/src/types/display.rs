@@ -25,11 +25,10 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
-    BindingContext,
-    SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeGuardLike, TypedDictType,
-    UnionType, WrapperDescriptorKind, visitor,
+    BindingContext, BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, MaterializationKind, Protocol,
+    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeGuardLike,
+    TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -1092,9 +1091,13 @@ struct DisplayBoundTypeVarIdentity<'db> {
 impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
-        if let Some(binding_context_name) = self.bound_typevar_identity.binding_context.name(self.db) {
+        if let Some(binding_context_name) =
+            self.bound_typevar_identity.binding_context.name(self.db)
+        {
             let mut suppressed = false;
-            if let BindingContext::Definition(definition) = self.bound_typevar_identity.binding_context {
+            if let BindingContext::Definition(definition) =
+                self.bound_typevar_identity.binding_context
+            {
                 if self.settings.active_scopes.contains(&definition) {
                     suppressed = true;
                 }
@@ -1770,14 +1773,13 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         }
 
         let settings = if let Some(generic_context) = self.generic_context {
-            self.settings.with_active_scopes(
-                generic_context
-                    .variables(self.db)
-                    .filter_map(|bound| match bound.binding_context(self.db) {
+            self.settings
+                .with_active_scopes(generic_context.variables(self.db).filter_map(|bound| {
+                    match bound.binding_context(self.db) {
                         BindingContext::Definition(def) => Some(def),
                         BindingContext::Synthetic => None,
-                    }),
-            )
+                    }
+                }))
         } else {
             self.settings.clone()
         };
@@ -1800,7 +1802,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
 
         // Return type
         f.write_str(" -> ")?;
-        return_ty
+        self.return_ty
             .display_with(self.db, settings.singleline())
             .fmt_detailed(&mut f)?;
 
