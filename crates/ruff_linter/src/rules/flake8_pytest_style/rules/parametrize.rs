@@ -705,7 +705,10 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
     //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
     // ```
     let argvalues_edits = unpack_single_element_items(checker, argvalues);
-    let argnames_edit = Edit::range_replacement(checker.generator().expr(value), argnames.range());
+    let argnames_edit = Edit::range_replacement(
+        unparse_expr_in_sequence(value, checker),
+        argnames.range(),
+    );
     let fix = if checker.comment_ranges().intersects(argnames_edit.range())
         || argvalues_edits
             .iter()
@@ -743,11 +746,48 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
         }
 
         edits.push(Edit::range_replacement(
-            checker.generator().expr(elt),
+            unparse_expr_in_sequence(elt, checker),
             value.range(),
         ));
     }
     edits
+}
+
+fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {
+    let content = checker.generator().expr(expr);
+    // The generator may unparse tuples without outer parentheses at level 0.
+    // For example, `(1, 2)` becomes `1, 2` and `((1,),)` becomes `(1,),`.
+    // When these are used as elements in a list, it causes syntax errors.
+    // We detect this by checking if the content ends with a trailing comma
+    // that is not inside parentheses.
+    if let Expr::Tuple(tuple) = expr {
+        if !tuple.is_empty() && !is_parenthesized(&content) {
+            return format!("({content})");
+        }
+    }
+    content
+}
+
+/// Check if the content is fully parenthesized (starts with '(' and the matching ')' is at the end).
+fn is_parenthesized(content: &str) -> bool {
+    if !content.starts_with('(') {
+        return false;
+    }
+    let mut depth = 0;
+    for (i, c) in content.chars().enumerate() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    // If we close the first paren before the end, it's not fully parenthesized
+                    return i == content.len() - 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 fn handle_value_rows(
