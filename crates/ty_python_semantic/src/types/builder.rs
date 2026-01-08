@@ -42,7 +42,7 @@ use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     NegativeIntersectionElements, StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,108 +94,13 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum UnionElement<'db> {
-    IntLiterals(FxOrderSet<i64>),
-    StringLiterals(FxOrderSet<StringLiteralType<'db>>),
-    BytesLiterals(FxOrderSet<BytesLiteralType<'db>>),
-    EnumLiterals {
-        enum_class: ClassLiteral<'db>,
-        literals: FxOrderSet<EnumLiteralType<'db>>,
-    },
+    IntLiterals,
+    StringLiterals,
+    BytesLiterals,
+    EnumLiterals { enum_class: ClassLiteral<'db> },
     Type(Type<'db>),
-}
-
-impl<'db> UnionElement<'db> {
-    /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
-    fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
-        let mut other_type_negated_cache = None;
-        let mut other_type_negated =
-            || *other_type_negated_cache.get_or_insert_with(|| other_type.negate(db));
-
-        let mut collapse = false;
-        let mut ignore = false;
-
-        // A closure called for each element in a set of literals
-        // to determine whether the element should be retained in the set.
-        //
-        // If `ignore` or `collapse` is `true` for any element in the set,
-        // we no longer need to do any expensive redundancy checks for any
-        // further elements in the set:
-        //
-        // - if `ignore` is `true`, this indicates that `other_type` is
-        //   redundant with one of the literals in this set. Given this fact,
-        //   it cannot be possible for any other literals in this set to be
-        //   redundant with `other_type`.
-        // - if `collapse` is `true`, all literals of this kind will be
-        //   removed from the union, so it's irrelevant to answer the
-        //   question of which literals should remain in this set.
-        //
-        // We therefore only ask if `ty` is redundant with `other_type` if
-        // both `ignore` and `collapse` are `false`. If either is `true`,
-        // we skip the expensive redundancy check and return `true`.
-        let mut should_retain_type = |ty| {
-            if ignore || other_type.is_redundant_with(db, ty) {
-                ignore = true;
-                return true;
-            }
-            if collapse || other_type_negated().is_subtype_of(db, ty) {
-                collapse = true;
-                return true;
-            }
-            !ty.is_redundant_with(db, other_type)
-        };
-
-        let should_keep = match self {
-            UnionElement::IntLiterals(literals) => {
-                if other_type.splits_literals(db, LiteralKind::Int) {
-                    literals.retain(|literal| should_retain_type(Type::IntLiteral(*literal)));
-                    !literals.is_empty()
-                } else {
-                    !Type::IntLiteral(literals[0]).is_redundant_with(db, other_type)
-                }
-            }
-            UnionElement::StringLiterals(literals) => {
-                if other_type.splits_literals(db, LiteralKind::String) {
-                    literals.retain(|literal| should_retain_type(Type::StringLiteral(*literal)));
-                    !literals.is_empty()
-                } else {
-                    !Type::StringLiteral(literals[0]).is_redundant_with(db, other_type)
-                }
-            }
-            UnionElement::BytesLiterals(literals) => {
-                if other_type.splits_literals(db, LiteralKind::Bytes) {
-                    literals.retain(|literal| should_retain_type(Type::BytesLiteral(*literal)));
-                    !literals.is_empty()
-                } else {
-                    !Type::BytesLiteral(literals[0]).is_redundant_with(db, other_type)
-                }
-            }
-            UnionElement::EnumLiterals {
-                enum_class,
-                literals,
-            } => {
-                let literal_kind = LiteralKind::Enum {
-                    enum_class: *enum_class,
-                };
-                if other_type.splits_literals(db, literal_kind) {
-                    literals.retain(|literal| should_retain_type(Type::EnumLiteral(*literal)));
-                    !literals.is_empty()
-                } else {
-                    !Type::EnumLiteral(literals[0]).is_redundant_with(db, other_type)
-                }
-            }
-            UnionElement::Type(existing) => return ReduceResult::Type(*existing),
-        };
-
-        if ignore {
-            ReduceResult::Ignore
-        } else if collapse {
-            ReduceResult::CollapseToObject
-        } else {
-            ReduceResult::KeepIf(should_keep)
-        }
-    }
 }
 
 enum ReduceResult<'db> {
@@ -244,6 +149,10 @@ const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
+    int_literals: FxIndexSet<i64>,
+    str_literals: FxIndexSet<StringLiteralType<'db>>,
+    bytes_literals: FxIndexSet<BytesLiteralType<'db>>,
+    enum_literals: FxIndexMap<ClassLiteral<'db>, FxIndexSet<EnumLiteralType<'db>>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
     order_elements: bool,
@@ -259,6 +168,10 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
+            int_literals: FxIndexSet::default(),
+            str_literals: FxIndexSet::default(),
+            bytes_literals: FxIndexSet::default(),
+            enum_literals: FxIndexMap::default(),
             unpack_aliases: true,
             order_elements: false,
             cycle_recovery: false,
@@ -299,21 +212,116 @@ impl<'db> UnionBuilder<'db> {
         self.elements.push(UnionElement::Type(Type::object()));
     }
 
+    /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
+    fn try_reduce_element(
+        &mut self,
+        element: UnionElement<'db>,
+        other_type: Type<'db>,
+    ) -> ReduceResult<'db> {
+        let mut other_type_negated_cache = None;
+        let mut other_type_negated =
+            || *other_type_negated_cache.get_or_insert_with(|| other_type.negate(self.db));
+
+        let mut collapse = false;
+        let mut ignore = false;
+
+        // A closure called for each element in a set of literals
+        // to determine whether the element should be retained in the set.
+        //
+        // If `ignore` or `collapse` is `true` for any element in the set,
+        // we no longer need to do any expensive redundancy checks for any
+        // further elements in the set:
+        //
+        // - if `ignore` is `true`, this indicates that `other_type` is
+        //   redundant with one of the literals in this set. Given this fact,
+        //   it cannot be possible for any other literals in this set to be
+        //   redundant with `other_type`.
+        // - if `collapse` is `true`, all literals of this kind will be
+        //   removed from the union, so it's irrelevant to answer the
+        //   question of which literals should remain in this set.
+        //
+        // We therefore only ask if `ty` is redundant with `other_type` if
+        // both `ignore` and `collapse` are `false`. If either is `true`,
+        // we skip the expensive redundancy check and return `true`.
+        let mut should_retain_type = |ty| {
+            if ignore || other_type.is_redundant_with(self.db, ty) {
+                ignore = true;
+                return true;
+            }
+            if collapse || other_type_negated().is_subtype_of(self.db, ty) {
+                collapse = true;
+                return true;
+            }
+            !ty.is_redundant_with(self.db, other_type)
+        };
+
+        let should_keep = match element {
+            UnionElement::IntLiterals => {
+                if other_type.splits_literals(self.db, LiteralKind::Int) {
+                    self.int_literals
+                        .retain(|literal| should_retain_type(Type::IntLiteral(*literal)));
+                    !self.int_literals.is_empty()
+                } else {
+                    !Type::IntLiteral(self.int_literals[0]).is_redundant_with(self.db, other_type)
+                }
+            }
+            UnionElement::StringLiterals => {
+                if other_type.splits_literals(self.db, LiteralKind::String) {
+                    self.str_literals
+                        .retain(|literal| should_retain_type(Type::StringLiteral(*literal)));
+                    !self.str_literals.is_empty()
+                } else {
+                    !Type::StringLiteral(self.str_literals[0])
+                        .is_redundant_with(self.db, other_type)
+                }
+            }
+            UnionElement::BytesLiterals => {
+                if other_type.splits_literals(self.db, LiteralKind::Bytes) {
+                    self.bytes_literals
+                        .retain(|literal| should_retain_type(Type::BytesLiteral(*literal)));
+                    !self.bytes_literals.is_empty()
+                } else {
+                    !Type::BytesLiteral(self.bytes_literals[0])
+                        .is_redundant_with(self.db, other_type)
+                }
+            }
+            UnionElement::EnumLiterals { enum_class } => {
+                let literal_kind = LiteralKind::Enum { enum_class };
+                let literals = &mut self.enum_literals[&enum_class];
+                if other_type.splits_literals(self.db, literal_kind) {
+                    literals.retain(|literal| should_retain_type(Type::EnumLiteral(*literal)));
+                    !literals.is_empty()
+                } else {
+                    !Type::EnumLiteral(literals[0]).is_redundant_with(self.db, other_type)
+                }
+            }
+            UnionElement::Type(existing) => return ReduceResult::Type(existing),
+        };
+
+        if ignore {
+            ReduceResult::Ignore
+        } else if collapse {
+            ReduceResult::CollapseToObject
+        } else {
+            ReduceResult::KeepIf(should_keep)
+        }
+    }
+
     fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
         let mut replace_with = vec![];
         for elem in &self.elements {
             match elem {
-                UnionElement::IntLiterals(_) => {
+                UnionElement::IntLiterals => {
                     replace_with.push(KnownClass::Int.to_instance(self.db));
                 }
-                UnionElement::StringLiterals(_) => {
+                UnionElement::StringLiterals => {
                     replace_with.push(KnownClass::Str.to_instance(self.db));
                 }
-                UnionElement::BytesLiterals(_) => {
+                UnionElement::BytesLiterals => {
                     replace_with.push(KnownClass::Bytes.to_instance(self.db));
                 }
-                UnionElement::EnumLiterals { literals, .. } => {
-                    replace_with.push(literals[0].enum_class_instance(self.db));
+                UnionElement::EnumLiterals { enum_class, .. } => {
+                    replace_with.push(enum_class.to_non_generic_instance(self.db));
                 }
                 UnionElement::Type(_) => {}
             }
@@ -358,20 +366,21 @@ impl<'db> UnionBuilder<'db> {
                     .recursively_defined
                     .or(union.recursively_defined(self.db));
                 if self.cycle_recovery && self.recursively_defined.is_yes() {
-                    let literals = self.elements.iter().fold(0, |acc, elem| match elem {
-                        UnionElement::IntLiterals(literals) => acc + literals.len(),
-                        UnionElement::StringLiterals(literals) => acc + literals.len(),
-                        UnionElement::BytesLiterals(literals) => acc + literals.len(),
-                        UnionElement::EnumLiterals { literals, .. } => acc + literals.len(),
-                        UnionElement::Type(_) => acc,
-                    });
+                    let literals = self
+                        .int_literals
+                        .len()
+                        .saturating_add(self.str_literals.len())
+                        .saturating_add(self.bytes_literals.len())
+                        .saturating_add(self.enum_literals.values().map(FxIndexSet::len).sum());
                     if should_widen(literals, self.recursively_defined) {
                         self.widen_literal_types(seen_aliases);
                     }
                 }
             }
+
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
+
             Type::TypeAlias(alias) if self.unpack_aliases => {
                 if seen_aliases.contains(&ty) {
                     // Union contains itself recursively via a type alias. This is an error, just
@@ -381,30 +390,47 @@ impl<'db> UnionBuilder<'db> {
                     self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
                 }
             }
-            // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
-            // add it to, or an existing element that is a super-type of string literals, which
-            // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
-            // containing it.
+
             Type::StringLiteral(literal) => {
-                let mut found = None;
+                let current_string_literals_len = self.str_literals.len();
+
+                if current_string_literals_len > 0 && self.str_literals.contains(&literal) {
+                    return;
+                }
+
+                if should_widen(current_string_literals_len, self.recursively_defined) {
+                    let replace_with = KnownClass::Str.to_instance(self.db);
+                    self.add_in_place_impl(replace_with, seen_aliases);
+                    return;
+                }
+
                 let mut to_remove = None;
+
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
-                        UnionElement::StringLiterals(literals) => {
-                            if should_widen(literals.len(), self.recursively_defined) {
-                                let replace_with = KnownClass::Str.to_instance(self.db);
-                                self.add_in_place_impl(replace_with, seen_aliases);
-                                return;
-                            }
-                            found = Some(literals);
-                            continue;
-                        }
                         UnionElement::Type(existing) => {
+                            if current_string_literals_len == 0 {
+                                if ty.is_redundant_with(self.db, *existing) {
+                                    return;
+                                }
+                            } else {
+                                // We already have 1 string literal in this union,
+                                // so we can skip redundancy checks against most elements.
+                                // We do need to watch out for `AlwaysTruthy` and `AlwaysFalsy`,
+                                // however, since those split string literals.
+                                match existing {
+                                    Type::AlwaysFalsy if literal.value(self.db).is_empty() => {
+                                        return;
+                                    }
+                                    Type::AlwaysTruthy if !literal.value(self.db).is_empty() => {
+                                        return;
+                                    }
+                                    _ => {}
+                                }
+                            }
+
                             // e.g. `existing` could be `Literal[""] & Any`,
                             // and `ty` could be `Literal[""]`
-                            if ty.is_redundant_with(self.db, *existing) {
-                                return;
-                            }
                             if existing.is_redundant_with(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
@@ -416,39 +442,55 @@ impl<'db> UnionBuilder<'db> {
                                 return;
                             }
                         }
-                        _ => {}
+                        _ => continue,
                     }
                 }
-                if let Some(found) = found {
-                    found.insert(literal);
-                } else {
-                    self.elements
-                        .push(UnionElement::StringLiterals(FxOrderSet::from_iter([
-                            literal,
-                        ])));
+
+                self.str_literals.insert(literal);
+                if current_string_literals_len == 0 {
+                    self.elements.push(UnionElement::StringLiterals);
                 }
                 if let Some(index) = to_remove {
                     self.elements.swap_remove(index);
                 }
             }
-            // Same for bytes literals as for string literals, above.
+
             Type::BytesLiteral(literal) => {
-                let mut found = None;
+                let current_bytes_literals_len = self.bytes_literals.len();
+
+                if current_bytes_literals_len > 0 && self.bytes_literals.contains(&literal) {
+                    return;
+                }
+
+                if should_widen(current_bytes_literals_len, self.recursively_defined) {
+                    let replace_with = KnownClass::Bytes.to_instance(self.db);
+                    self.add_in_place_impl(replace_with, seen_aliases);
+                    return;
+                }
+
                 let mut to_remove = None;
+
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
-                        UnionElement::BytesLiterals(literals) => {
-                            if should_widen(literals.len(), self.recursively_defined) {
-                                let replace_with = KnownClass::Bytes.to_instance(self.db);
-                                self.add_in_place_impl(replace_with, seen_aliases);
-                                return;
-                            }
-                            found = Some(literals);
-                            continue;
-                        }
                         UnionElement::Type(existing) => {
-                            if ty.is_redundant_with(self.db, *existing) {
-                                return;
+                            if current_bytes_literals_len == 0 {
+                                if ty.is_redundant_with(self.db, *existing) {
+                                    return;
+                                }
+                            } else {
+                                // We already have 1 bytes literal in this union,
+                                // so we can skip redundancy checks against most elements.
+                                // We do need to watch out for `AlwaysTruthy` and `AlwaysFalsy`,
+                                // however, since those split string literals.
+                                match existing {
+                                    Type::AlwaysFalsy if literal.value(self.db).is_empty() => {
+                                        return;
+                                    }
+                                    Type::AlwaysTruthy if !literal.value(self.db).is_empty() => {
+                                        return;
+                                    }
+                                    _ => {}
+                                }
                             }
                             // e.g. `existing` could be `Literal[b""] & Any`,
                             // and `ty` could be `Literal[b""]`
@@ -463,39 +505,55 @@ impl<'db> UnionBuilder<'db> {
                                 return;
                             }
                         }
-                        _ => {}
+                        _ => continue,
                     }
                 }
-                if let Some(found) = found {
-                    found.insert(literal);
-                } else {
-                    self.elements
-                        .push(UnionElement::BytesLiterals(FxOrderSet::from_iter([
-                            literal,
-                        ])));
+
+                self.bytes_literals.insert(literal);
+                if current_bytes_literals_len ==0 {
+                    self.elements.push(UnionElement::BytesLiterals);
                 }
                 if let Some(index) = to_remove {
                     self.elements.swap_remove(index);
                 }
             }
-            // And same for int literals as well.
+
             Type::IntLiteral(literal) => {
-                let mut found = None;
+                let current_int_literals_len = self.int_literals.len();
+
+                if current_int_literals_len > 0 && self.int_literals.contains(&literal) {
+                    return;
+                }
+
+                if should_widen(current_int_literals_len, self.recursively_defined) {
+                    let replace_with = KnownClass::Int.to_instance(self.db);
+                    self.add_in_place_impl(replace_with, seen_aliases);
+                    return;
+                }
+
                 let mut to_remove = None;
+
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
-                        UnionElement::IntLiterals(literals) => {
-                            if should_widen(literals.len(), self.recursively_defined) {
-                                let replace_with = KnownClass::Int.to_instance(self.db);
-                                self.add_in_place_impl(replace_with, seen_aliases);
-                                return;
-                            }
-                            found = Some(literals);
-                            continue;
-                        }
                         UnionElement::Type(existing) => {
-                            if ty.is_redundant_with(self.db, *existing) {
-                                return;
+                            if current_int_literals_len == 0 {
+                                if ty.is_redundant_with(self.db, *existing) {
+                                    return;
+                                }
+                            } else {
+                                // We already have 1 int literal in this union,
+                                // so we can skip redundancy checks against most elements.
+                                // We do need to watch out for `AlwaysTruthy` and `AlwaysFalsy`,
+                                // however, since those split string literals.
+                                match existing {
+                                    Type::AlwaysFalsy if literal == 0 => {
+                                        return;
+                                    }
+                                    Type::AlwaysTruthy if literal != 0 => {
+                                        return;
+                                    }
+                                    _ => {}
+                                }
                             }
                             // e.g. `existing` could be `Literal[1] & Any`,
                             // and `ty` could be `Literal[1]`
@@ -510,19 +568,19 @@ impl<'db> UnionBuilder<'db> {
                                 return;
                             }
                         }
-                        _ => {}
+                        _ => continue,
                     }
                 }
-                if let Some(found) = found {
-                    found.insert(literal);
-                } else {
-                    self.elements
-                        .push(UnionElement::IntLiterals(FxOrderSet::from_iter([literal])));
+
+                self.int_literals.insert(literal);
+                if self.int_literals.len() == 1 {
+                    self.elements.push(UnionElement::IntLiterals);
                 }
                 if let Some(index) = to_remove {
                     self.elements.swap_remove(index);
                 }
             }
+
             Type::EnumLiteral(enum_member_to_add) => {
                 let enum_class = enum_member_to_add.enum_class(self.db);
                 let metadata =
@@ -536,33 +594,35 @@ impl<'db> UnionBuilder<'db> {
                     return;
                 }
 
-                let mut found = None;
                 let mut to_remove = None;
+                let literals = self.enum_literals.entry(enum_class).or_default();
+                let current_enum_literals_len = literals.len();
+
+                if current_enum_literals_len > 0 && literals.contains(&enum_member_to_add) {
+                    return;
+                } else if metadata.members.len() == current_enum_literals_len + 1 {
+                    self.add_in_place_impl(
+                        enum_member_to_add.enum_class_instance(self.db),
+                        seen_aliases,
+                    );
+                    return;
+                }
+
+                // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
+                // for why we avoid using the `should_widen` closure here.
+                let enum_literals_limit = if self.recursively_defined.is_yes() && cycle_recovery {
+                    MAX_RECURSIVE_UNION_LITERALS
+                } else {
+                    MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
+                };
+                if current_enum_literals_len >= enum_literals_limit {
+                    let replace_with = literals[0].enum_class_instance(self.db);
+                    self.add_in_place_impl(replace_with, seen_aliases);
+                    return;
+                }
+
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
-                        UnionElement::EnumLiterals {
-                            enum_class: existing_enum_class,
-                            literals,
-                        } => {
-                            if *existing_enum_class != enum_class {
-                                continue;
-                            }
-                            // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
-                            // for why we avoid using the `should_widen` closure here.
-                            let enum_literals_limit =
-                                if self.recursively_defined.is_yes() && cycle_recovery {
-                                    MAX_RECURSIVE_UNION_LITERALS
-                                } else {
-                                    MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
-                                };
-                            if literals.len() >= enum_literals_limit {
-                                let replace_with = literals[0].enum_class_instance(self.db);
-                                self.add_in_place_impl(replace_with, seen_aliases);
-                                return;
-                            }
-                            found = Some(literals);
-                            continue;
-                        }
                         UnionElement::Type(existing) => {
                             if ty.is_redundant_with(self.db, *existing) {
                                 return;
@@ -580,32 +640,25 @@ impl<'db> UnionBuilder<'db> {
                                 return;
                             }
                         }
-                        _ => {}
+                        _ => continue,
                     }
                 }
-                if let Some(found) = found {
-                    let newly_added = found.insert(enum_member_to_add);
-                    if newly_added && found.len() == metadata.members.len() {
-                        self.add_in_place_impl(
-                            enum_member_to_add.enum_class_instance(self.db),
-                            seen_aliases,
-                        );
-                        return;
-                    }
-                } else {
-                    self.elements.push(UnionElement::EnumLiterals {
-                        enum_class,
-                        literals: FxOrderSet::from_iter([enum_member_to_add]),
-                    });
+
+                literals.insert(enum_member_to_add);
+                if literals.len() == 1 {
+                    self.elements
+                        .push(UnionElement::EnumLiterals { enum_class });
                 }
                 if let Some(index) = to_remove {
                     self.elements.swap_remove(index);
                 }
             }
+
             // Adding `object` to a union results in `object`.
             ty if ty.is_object() => {
                 self.collapse_to_object();
             }
+
             _ => {
                 self.push_type(ty, seen_aliases);
             }
@@ -627,8 +680,8 @@ impl<'db> UnionBuilder<'db> {
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
-        for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, ty) {
+        for i in 0..self.elements.len() {
+            let element_type = match self.try_reduce_element(self.elements[i], ty) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -689,15 +742,19 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
-        let mut to_remove = to_remove.into_iter();
-        if let Some(first) = to_remove.next() {
-            self.elements[first] = UnionElement::Type(ty);
-            // We iterate in descending order to keep remaining indices valid after `swap_remove`.
-            for index in to_remove.rev() {
-                self.elements.swap_remove(index);
+        self.elements.push(UnionElement::Type(ty));
+
+        // We iterate in descending order to keep remaining indices valid after `swap_remove`.
+        for index in to_remove.into_iter().rev() {
+            match self.elements.swap_remove(index) {
+                UnionElement::BytesLiterals => self.bytes_literals.clear(),
+                UnionElement::IntLiterals => self.int_literals.clear(),
+                UnionElement::StringLiterals => self.str_literals.clear(),
+                UnionElement::EnumLiterals { enum_class } => {
+                    self.enum_literals.swap_remove(&enum_class);
+                }
+                UnionElement::Type(_) => {}
             }
-        } else {
-            self.elements.push(UnionElement::Type(ty));
         }
     }
 
@@ -709,17 +766,22 @@ impl<'db> UnionBuilder<'db> {
         let mut types = vec![];
         for element in self.elements {
             match element {
-                UnionElement::IntLiterals(literals) => {
-                    types.extend(literals.into_iter().map(Type::IntLiteral));
+                UnionElement::IntLiterals => {
+                    types.extend(self.int_literals.iter().copied().map(Type::IntLiteral));
                 }
-                UnionElement::StringLiterals(literals) => {
-                    types.extend(literals.into_iter().map(Type::StringLiteral));
+                UnionElement::StringLiterals => {
+                    types.extend(self.str_literals.iter().copied().map(Type::StringLiteral));
                 }
-                UnionElement::BytesLiterals(literals) => {
-                    types.extend(literals.into_iter().map(Type::BytesLiteral));
+                UnionElement::BytesLiterals => {
+                    types.extend(self.bytes_literals.iter().copied().map(Type::BytesLiteral));
                 }
-                UnionElement::EnumLiterals { literals, .. } => {
-                    types.extend(literals.into_iter().map(Type::EnumLiteral));
+                UnionElement::EnumLiterals { enum_class } => {
+                    types.extend(
+                        self.enum_literals[&enum_class]
+                            .iter()
+                            .copied()
+                            .map(Type::EnumLiteral),
+                    );
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
