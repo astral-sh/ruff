@@ -791,11 +791,22 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 match function.signature(self.db).overloads.as_slice() {
                     [signature] => {
                         let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
+                        // Compute hide_unused_self for the bound signature
+                        let hide_unused_self = {
+                            let return_contains_self =
+                                bound_signature.return_ty.contains_self(self.db);
+                            let param_contains_self =
+                                bound_signature.parameters().iter().any(|p| {
+                                    p.should_annotation_be_displayed()
+                                        && p.annotated_type().contains_self(self.db)
+                                });
+                            !return_contains_self && !param_contains_self
+                        };
                         let type_parameters = DisplayOptionalGenericContext {
                             generic_context: bound_signature.generic_context.as_ref(),
                             db: self.db,
                             settings: self.settings.clone(),
-                            hide_unused_self: false,
+                            hide_unused_self,
                         };
                         f.set_invalid_type_annotation();
                         f.write_str("bound method ")?;
@@ -1236,11 +1247,19 @@ pub(crate) struct DisplayOverloadLiteral<'db> {
 impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let signature = self.literal.signature(self.db);
+        // Compute hide_unused_self
+        let hide_unused_self = {
+            let return_contains_self = signature.return_ty.contains_self(self.db);
+            let param_contains_self = signature.parameters().iter().any(|p| {
+                p.should_annotation_be_displayed() && p.annotated_type().contains_self(self.db)
+            });
+            !return_contains_self && !param_contains_self
+        };
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
             db: self.db,
             settings: self.settings.clone(),
-            hide_unused_self: false,
+            hide_unused_self,
         };
 
         f.set_invalid_type_annotation();
@@ -1285,11 +1304,22 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
 
         match signature.overloads.as_slice() {
             [signature] => {
+                // Compute hide_unused_self: hide Self if it's not displayed in return type
+                // or any explicitly annotated parameter
+                let hide_unused_self = {
+                    let return_contains_self = signature.return_ty.contains_self(self.db);
+                    let param_contains_self = signature.parameters().iter().any(|p| {
+                        p.should_annotation_be_displayed()
+                            && p.annotated_type().contains_self(self.db)
+                    });
+                    !return_contains_self && !param_contains_self
+                };
+
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
                     settings: self.settings.clone(),
-                    hide_unused_self: false,
+                    hide_unused_self,
                 };
                 f.set_invalid_type_annotation();
                 f.write_str("def ")?;

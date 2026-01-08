@@ -144,7 +144,7 @@ from typing import Any
 def _(a: Any, tuple_of_any: tuple[Any]):
     reveal_type(inspect.getattr_static(a, "x", "default"))  # revealed: Any | Literal["default"]
 
-    # revealed: def index[Self](self, value: Any, start: SupportsIndex = 0, stop: SupportsIndex = ..., /) -> int
+    # revealed: def index(self, value: Any, start: SupportsIndex = 0, stop: SupportsIndex = ..., /) -> int
     reveal_type(inspect.getattr_static(tuple_of_any, "index", "default"))
 ```
 
