@@ -37,11 +37,7 @@ pub fn completion<'db>(
     let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
         return vec![];
     };
-    let query = context
-        .cursor
-        .typed
-        .map(QueryPattern::fuzzy)
-        .unwrap_or_else(QueryPattern::matches_all_symbols);
+    let query = UserQuery::fuzzy(context.cursor.typed);
     let mut completions = Completions::new(db, context.collection_context(db), query);
     match context.kind {
         ContextKind::Import(ref import) => {
@@ -96,7 +92,7 @@ struct Completions<'db> {
     ///
     /// If a completion's name doesn't match this query, then
     /// it isn't included in the collection.
-    query: QueryPattern,
+    query: UserQuery,
 }
 
 impl<'db> Completions<'db> {
@@ -106,11 +102,7 @@ impl<'db> Completions<'db> {
     /// the user has typed as part of the next symbol they are writing.
     /// This collection will treat it as a query when present, and only
     /// add completions that match it.
-    fn new(
-        db: &'db dyn Db,
-        context: CollectionContext<'db>,
-        query: QueryPattern,
-    ) -> Completions<'db> {
+    fn new(db: &'db dyn Db, context: CollectionContext<'db>, query: UserQuery) -> Completions<'db> {
         Completions {
             db,
             context,
@@ -177,7 +169,7 @@ impl<'db> Completions<'db> {
     /// For example, if the symbol name does not match this collection's
     /// query.
     fn add(&mut self, builder: CompletionBuilder<'db>) -> bool {
-        if !self.query.is_match_symbol_name(builder.name.as_str()) {
+        if !self.query.is_match(builder.name.as_str()) {
             return false;
         }
         self.add_skip_query(builder)
@@ -383,7 +375,7 @@ impl<'db> CompletionBuilder<'db> {
         mut self,
         db: &'db dyn Db,
         ctx: &CollectionContext<'db>,
-        query: &QueryPattern,
+        query: &UserQuery,
     ) -> Completion<'db> {
         // Tags completions with context-specific if they are
         // known to be usable in a `raise` context and we have
@@ -967,6 +959,43 @@ impl<'m> ContextCursor<'m> {
     }
 }
 
+#[derive(Clone, Debug)]
+struct UserQuery {
+    pattern: QueryPattern,
+    exact: Option<Box<str>>,
+}
+
+impl UserQuery {
+    fn fuzzy(typed: Option<&str>) -> UserQuery {
+        let pattern = typed
+            .map(QueryPattern::fuzzy)
+            .unwrap_or_else(QueryPattern::matches_all_symbols);
+        let exact = typed.map(Into::into);
+        UserQuery { pattern, exact }
+    }
+
+    fn exactly(name: &str) -> UserQuery {
+        let pattern = QueryPattern::exactly(name);
+        let exact = Some(name.into());
+        UserQuery { pattern, exact }
+    }
+
+    fn will_match_everything(&self) -> bool {
+        self.pattern.will_match_everything()
+    }
+
+    fn is_match(&self, name: &str) -> bool {
+        self.pattern.is_match_symbol_name(name)
+    }
+
+    fn is_match_exact(&self, name: &str) -> bool {
+        self.exact
+            .as_ref()
+            .map(|exact| &**exact == name)
+            .unwrap_or(false)
+    }
+}
+
 /// Context used to help filter completions when collecting them.
 #[derive(Clone, Debug, Default)]
 struct CollectionContext<'db> {
@@ -1030,6 +1059,9 @@ struct Relevance {
     /// symbols that we know for sure are usable should get ranked
     /// above symbols that we're unsure about.
     definitively_usable: Sort,
+    /// When there's an *exact* name match from the end user's query
+    /// with the completion's name, we give strong deference to it.
+    exact: Sort,
     /// At time of writing (2025-11-11), keyword completions are
     /// classified as builtins, which makes them sort after everything
     /// else. But we probably want keyword completions to sort *before*
@@ -1066,9 +1098,14 @@ impl Relevance {
     ///
     /// A smaller rank means the completion should appear higher in the
     /// results shown to end users.
-    fn new(_ctx: &CollectionContext, _query: &QueryPattern, c: &CompletionBuilder) -> Relevance {
+    fn new(_ctx: &CollectionContext, query: &UserQuery, c: &CompletionBuilder) -> Relevance {
         Relevance {
             definitively_usable: if c.is_context_specific {
+                Sort::Higher
+            } else {
+                Sort::Even
+            },
+            exact: if query.is_match_exact(&c.name) {
                 Sort::Higher
             } else {
                 Sort::Even
@@ -1358,7 +1395,7 @@ pub(crate) fn unresolved_fixes(
 ) -> Vec<ImportEdit> {
     let mut results = Vec::new();
     let scoped = ScopedTarget { node };
-    let query = QueryPattern::exactly(symbol);
+    let query = UserQuery::exactly(symbol);
     let ctx = CollectionContext::none();
 
     // Request imports we could add to put the symbol in scope
@@ -1452,7 +1489,7 @@ fn add_unimported_completions<'db>(
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
-    for symbol in all_symbols(db, file, &completions.query) {
+    for symbol in all_symbols(db, file, &completions.query.pattern) {
         if symbol.file() == file || symbol.module().is_known(db, KnownModule::Builtins) {
             continue;
         }
@@ -2517,9 +2554,9 @@ type<CURSOR>
 
         assert_snapshot!(
             test.type_signatures().skip_auto_import().build().snapshot(),
-            @"
-        TypeError :: <class 'TypeError'>
+            @r"
         type :: <class 'type'>
+        TypeError :: <class 'TypeError'>
         ",
         );
     }

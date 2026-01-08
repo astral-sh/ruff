@@ -4,7 +4,7 @@ auto-import-includes-modules,main.py,1,7
 auto-import-includes-modules,main.py,2,1
 auto-import-skips-current-module,main.py,0,1
 class-arg-completion,main.py,0,1
-exact-over-fuzzy,main.py,0,2
+exact-over-fuzzy,main.py,0,1
 fstring-completions,main.py,0,1
 higher-level-symbols-preferred,main.py,0,
 higher-level-symbols-preferred,main.py,1,1
@@ -35,5 +35,5 @@ ty-extensions-lower-stdlib,main.py,0,1
 typing-gets-priority,main.py,0,1
 typing-gets-priority,main.py,1,1
 typing-gets-priority,main.py,2,1
-typing-gets-priority,main.py,3,3
+typing-gets-priority,main.py,3,1
 typing-gets-priority,main.py,4,1
