@@ -19,7 +19,7 @@ import-keyword-completion,main.py,0,1
 internal-typeshed-hidden,main.py,0,2
 local-over-auto-import,main.py,0,1
 none-completion,main.py,0,1
-numpy-array,main.py,0,159
+numpy-array,main.py,0,160
 numpy-array,main.py,1,1
 object-attr-instance-methods,main.py,0,1
 object-attr-instance-methods,main.py,1,1
@@ -30,10 +30,10 @@ scope-prioritize-closer,main.py,0,2
 scope-simple-long-identifier,main.py,0,1
 tighter-over-looser-scope,main.py,0,3
 tstring-completions,main.py,0,1
-ty-extensions-lower-stdlib,main.py,0,9
-type-var-typing-over-ast,main.py,0,3
-type-var-typing-over-ast,main.py,1,253
-typing-gets-priority,main.py,0,31
-typing-gets-priority,main.py,1,3
-typing-gets-priority,main.py,2,3
-typing-gets-priority,main.py,3,96
+ty-extensions-lower-stdlib,main.py,0,1
+type-var-typing-over-ast,main.py,0,1
+type-var-typing-over-ast,main.py,1,14
+typing-gets-priority,main.py,0,1
+typing-gets-priority,main.py,1,1
+typing-gets-priority,main.py,2,1
+typing-gets-priority,main.py,3,3
