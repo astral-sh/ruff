@@ -344,7 +344,6 @@ class C[T]:
     ok2: Inner[T]
 ```
 
-
 ## Mixed-scope type parameters
 
 Methods can have type parameters that are scoped to the method itself, while also referring to type
