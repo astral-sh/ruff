@@ -292,6 +292,7 @@ impl<'db> Completion<'db> {
 }
 
 /// A builder for construction a `Completion`.
+#[derive(Debug)]
 struct CompletionBuilder<'db> {
     // See comments on `Completion` for the meaning of fields.
     name: Name,
@@ -1075,6 +1076,17 @@ struct Relevance {
     /// We sort normal names the highest. Then dunder names and finally
     /// any other name that starts with a single underscore.
     name_kind: NameKind,
+    /// When the symbol is already in scope, we want to rank it higher
+    /// than symbols not in scope.
+    ///
+    /// This is redundant with `module_dependency_kind`, but lets us
+    /// add extra weight to symbols in scope over, e.g., other weights
+    /// like `is_module`.
+    is_in_scope: Sort,
+    /// If the symbol refers to a module, we give it priority over
+    /// other non-module symbols, even when those symbols are in
+    /// the user's project.
+    is_module: Sort,
     /// The "dependency kind" of the module where this symbol
     /// originates from.
     ///
@@ -1116,6 +1128,25 @@ impl Relevance {
                 Sort::Even
             },
             name_kind: NameKind::classify(&c.name),
+            is_in_scope: if c.module_dependency_kind == Some(ModuleDependencyKind::Current) {
+                Sort::Higher
+            } else {
+                Sort::Even
+            },
+            is_module: if c.kind == Some(CompletionKind::Module)
+                // We only up-rank top-level modules.
+                // Doing this for sub-modules generates too
+                // much noise.
+                && !c
+                    .qualified
+                    .as_ref()
+                    .map(|q| q.contains('.'))
+                    .unwrap_or(true)
+            {
+                Sort::Higher
+            } else {
+                Sort::Even
+            },
             module_dependency_kind: c.module_dependency_kind,
             type_check_only: if c.is_type_check_only {
                 Sort::Lower
