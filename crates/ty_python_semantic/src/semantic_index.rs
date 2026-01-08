@@ -783,7 +783,9 @@ mod tests {
 
         fn first_public_declaration(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
             self.end_of_scope_symbol_declarations(symbol)
-                .find_map(|declaration_with_constraint| declaration_with_constraint.declaration.definition())
+                .find_map(|declaration_with_constraint| {
+                    declaration_with_constraint.declaration.definition()
+                })
         }
 
         fn first_binding_at_use(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
