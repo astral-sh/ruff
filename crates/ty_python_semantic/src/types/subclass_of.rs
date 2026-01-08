@@ -224,13 +224,16 @@ impl<'db> SubclassOfType<'db> {
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(!relation.is_subtyping())
+                ConstraintSet::from_bool(db, !relation.is_subtyping())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                ConstraintSet::from(other_class.is_object(db) || relation.is_assignability())
+                ConstraintSet::from_bool(
+                    db,
+                    other_class.is_object(db) || relation.is_assignability(),
+                )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(relation.is_assignability())
+                ConstraintSet::from_bool(db, relation.is_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
@@ -264,10 +267,10 @@ impl<'db> SubclassOfType<'db> {
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(db, false)
             }
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                ConstraintSet::from(!self_class.could_coexist_in_mro_with(db, other_class))
+                ConstraintSet::from_bool(db, !self_class.could_coexist_in_mro_with(db, other_class))
             }
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
                 unreachable!()

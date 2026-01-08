@@ -89,25 +89,41 @@ use crate::{Db, FxOrderMap, FxOrderSet};
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
+    fn when_none_or<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 
     /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
+    fn when_some_and<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 }
 
 impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
+    fn when_none_or<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::always(),
+            None => ConstraintSet::always(db),
         }
     }
 
-    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
+    fn when_some_and<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::never(),
+            None => ConstraintSet::never(db),
         }
     }
 }
@@ -146,7 +162,7 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::never();
+        let mut result = ConstraintSet::never(db);
         for child in self {
             if result.union(db, f(child)).is_always_satisfied(db) {
                 return result;
@@ -160,7 +176,7 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always();
+        let mut result = ConstraintSet::always(db);
         for child in self {
             if result.intersect(db, f(child)).is_never_satisfied(db) {
                 return result;
@@ -184,18 +200,22 @@ where
 pub struct ConstraintSet<'db> {
     /// The BDD representing this constraint set
     node: Node<'db>,
+    /// The set of constraints explicitly added to this constraint set.
+    support: Support<'db>,
 }
 
 impl<'db> ConstraintSet<'db> {
-    fn never() -> Self {
+    fn never(db: &'db dyn Db) -> Self {
         Self {
             node: Node::AlwaysFalse,
+            support: Support::empty(db),
         }
     }
 
-    fn always() -> Self {
+    fn always(db: &'db dyn Db) -> Self {
         Self {
             node: Node::AlwaysTrue,
+            support: Support::empty(db),
         }
     }
 
@@ -206,8 +226,10 @@ impl<'db> ConstraintSet<'db> {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
+        let (node, support) = ConstrainedTypeVar::new_node_with_support(db, typevar, lower, upper);
         Self {
-            node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
+            node,
+            support: Support::new(db, support),
         }
     }
 
@@ -324,8 +346,24 @@ impl<'db> ConstraintSet<'db> {
         lhs: Type<'db>,
         rhs: Type<'db>,
     ) -> Self {
+        let (_, constraint_support) = match (lhs, rhs) {
+            (Type::TypeVar(bound_typevar), _) => ConstrainedTypeVar::new_node_with_support(
+                db,
+                bound_typevar,
+                Type::Never,
+                rhs.bottom_materialization(db),
+            ),
+            (_, Type::TypeVar(bound_typevar)) => ConstrainedTypeVar::new_node_with_support(
+                db,
+                bound_typevar,
+                lhs.top_materialization(db),
+                Type::object(),
+            ),
+            _ => panic!("at least one type should be a typevar"),
+        };
         Self {
             node: self.node.implies_subtype_of(db, lhs, rhs),
+            support: self.support.union(db, Support::new(db, constraint_support)),
         }
     }
 
@@ -360,7 +398,10 @@ impl<'db> ConstraintSet<'db> {
                 result = result.and_with_offset(db, bound_typevar.valid_specializations(db));
             }
         });
-        Self { node: result }
+        Self {
+            node: result,
+            support: self.support,
+        }
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -369,6 +410,7 @@ impl<'db> ConstraintSet<'db> {
     /// nodes.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.or_with_offset(db, other.node);
+        self.support = self.support.union(db, other.support);
         *self
     }
 
@@ -378,6 +420,7 @@ impl<'db> ConstraintSet<'db> {
     /// nodes.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.and_with_offset(db, other.node);
+        self.support = self.support.union(db, other.support);
         *self
     }
 
@@ -385,6 +428,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
         Self {
             node: self.node.negate(db),
+            support: self.support,
         }
     }
 
@@ -429,6 +473,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         ConstraintSet {
             node: self.node.iff_with_offset(db, other.node),
+            support: self.support.union(db, other.support),
         }
     }
 
@@ -443,7 +488,10 @@ impl<'db> ConstraintSet<'db> {
         to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
         let node = self.node.exists(db, to_remove);
-        Self { node }
+        Self {
+            node,
+            support: self.support,
+        }
     }
 
     pub(crate) fn for_each_path(self, db: &'db dyn Db, f: impl FnMut(&PathAssignments<'db>)) {
@@ -470,9 +518,34 @@ impl<'db> ConstraintSet<'db> {
     }
 }
 
-impl From<bool> for ConstraintSet<'_> {
-    fn from(b: bool) -> Self {
-        if b { Self::always() } else { Self::never() }
+impl<'db> ConstraintSet<'db> {
+    pub(crate) fn from_bool(db: &'db dyn Db, b: bool) -> Self {
+        if b { Self::always(db) } else { Self::never(db) }
+    }
+}
+
+/// The set of constraints explicitly added to a constraint set.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct Support<'db> {
+    #[returns(ref)]
+    constraints: FxOrderSet<ConstrainedTypeVar<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for Support<'_> {}
+
+impl<'db> Support<'db> {
+    fn empty(db: &'db dyn Db) -> Self {
+        Support::new(db, FxOrderSet::default())
+    }
+
+    fn union(self, db: &'db dyn Db, other: Self) -> Self {
+        let constraints: FxOrderSet<_> = self
+            .constraints(db)
+            .union(other.constraints(db))
+            .copied()
+            .collect();
+        Support::new(db, constraints)
     }
 }
 
@@ -524,9 +597,20 @@ impl<'db> ConstrainedTypeVar<'db> {
     fn new_node(
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Node<'db> {
+        let (node, _) = Self::new_node_with_support(db, typevar, lower, upper);
+        node
+    }
+
+    fn new_node_with_support(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
         mut lower: Type<'db>,
         mut upper: Type<'db>,
-    ) -> Node<'db> {
+    ) -> (Node<'db>, FxOrderSet<ConstrainedTypeVar<'db>>) {
+        let mut support = FxOrderSet::default();
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
         // be a union type. Because the following equivalences hold, we can break these bounds
         // apart and create an equivalent BDD with more nodes but simpler constraints. (Fewer,
@@ -538,12 +622,12 @@ impl<'db> ConstrainedTypeVar<'db> {
         if let Type::Union(lower_union) = lower {
             let mut result = Node::AlwaysTrue;
             for lower_element in lower_union.elements(db) {
-                result = result.and_with_offset(
-                    db,
-                    ConstrainedTypeVar::new_node(db, typevar, *lower_element, upper),
-                );
+                let (node, node_support) =
+                    ConstrainedTypeVar::new_node_with_support(db, typevar, *lower_element, upper);
+                result = result.and_with_offset(db, node);
+                support.extend(node_support);
             }
-            return result;
+            return (result, support);
         }
         // A negated type ¬α is represented as an intersection with no positive elements, and a
         // single negative element. We _don't_ want to treat that an "intersection" for the
@@ -553,18 +637,22 @@ impl<'db> ConstrainedTypeVar<'db> {
         {
             let mut result = Node::AlwaysTrue;
             for upper_element in upper_intersection.iter_positive(db) {
-                result = result.and_with_offset(
-                    db,
-                    ConstrainedTypeVar::new_node(db, typevar, lower, upper_element),
-                );
+                let (node, node_support) =
+                    ConstrainedTypeVar::new_node_with_support(db, typevar, lower, upper_element);
+                result = result.and_with_offset(db, node);
+                support.extend(node_support);
             }
             for upper_element in upper_intersection.iter_negative(db) {
-                result = result.and_with_offset(
+                let (node, node_support) = ConstrainedTypeVar::new_node_with_support(
                     db,
-                    ConstrainedTypeVar::new_node(db, typevar, lower, upper_element.negate(db)),
+                    typevar,
+                    lower,
+                    upper_element.negate(db),
                 );
+                result = result.and_with_offset(db, node);
+                support.extend(node_support);
             }
-            return result;
+            return (result, support);
         }
 
         // Two identical typevars must always solve to the same type, so it is not useful to have
@@ -591,12 +679,9 @@ impl<'db> ConstrainedTypeVar<'db> {
                     })
                 }) =>
             {
-                return Node::new_constraint(
-                    db,
-                    ConstrainedTypeVar::new(db, typevar, Type::Never, Type::object()),
-                    1,
-                )
-                .negate(db);
+                let constraint = ConstrainedTypeVar::new(db, typevar, Type::Never, Type::object());
+                support.insert(constraint);
+                return (Node::new_constraint(db, constraint, 1).negate(db), support);
             }
             _ => {}
         }
@@ -621,7 +706,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
         if !lower.is_constraint_set_assignable_to(db, upper) {
-            return Node::AlwaysFalse;
+            return (Node::AlwaysFalse, support);
         }
 
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
@@ -638,66 +723,66 @@ impl<'db> ConstrainedTypeVar<'db> {
                 } else {
                     (typevar, lower)
                 };
-                Node::new_constraint(
+                let constraint = ConstrainedTypeVar::new(
                     db,
-                    ConstrainedTypeVar::new(
-                        db,
-                        typevar,
-                        Type::TypeVar(bound),
-                        Type::TypeVar(bound),
-                    ),
-                    1,
-                )
+                    typevar,
+                    Type::TypeVar(bound),
+                    Type::TypeVar(bound),
+                );
+                support.insert(constraint);
+                (Node::new_constraint(db, constraint, 1), support)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
             (Type::TypeVar(lower), Type::TypeVar(upper))
                 if typevar.can_be_bound_for(db, lower) && typevar.can_be_bound_for(db, upper) =>
             {
-                let lower = Node::new_constraint(
-                    db,
-                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
-                    1,
-                );
-                let upper = Node::new_constraint(
-                    db,
-                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
-                    1,
-                );
-                lower.and(db, upper)
+                let lower_constraint =
+                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar));
+                let upper_constraint =
+                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object());
+                support.insert(lower_constraint);
+                support.insert(upper_constraint);
+                let lower = Node::new_constraint(db, lower_constraint, 1);
+                let upper = Node::new_constraint(db, upper_constraint, 1);
+                (lower.and(db, upper), support)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, lower) => {
-                let lower = Node::new_constraint(
-                    db,
-                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
-                    1,
-                );
-                let upper = if upper.is_object() {
-                    Node::AlwaysTrue
+                let lower_constraint =
+                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar));
+                support.insert(lower_constraint);
+                let lower = Node::new_constraint(db, lower_constraint, 1);
+                let (upper, upper_support) = if upper.is_object() {
+                    (Node::AlwaysTrue, FxOrderSet::default())
                 } else {
-                    Self::new_node(db, typevar, Type::Never, upper)
+                    Self::new_node_with_support(db, typevar, Type::Never, upper)
                 };
-                lower.and(db, upper)
+                support.extend(upper_support);
+                (lower.and(db, upper), support)
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
             (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, upper) => {
-                let lower = if lower.is_never() {
-                    Node::AlwaysTrue
+                let (lower, lower_support) = if lower.is_never() {
+                    (Node::AlwaysTrue, FxOrderSet::default())
                 } else {
-                    Self::new_node(db, typevar, lower, Type::object())
+                    Self::new_node_with_support(db, typevar, lower, Type::object())
                 };
-                let upper = Node::new_constraint(
-                    db,
-                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
-                    1,
-                );
-                lower.and(db, upper)
+                support.extend(lower_support);
+                let upper_constraint =
+                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object());
+                support.insert(upper_constraint);
+                let upper = Node::new_constraint(db, upper_constraint, 1);
+                (lower.and(db, upper), support)
             }
 
-            _ => Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper), 1),
+            _ => {
+                let constraint = ConstrainedTypeVar::new(db, typevar, lower, upper);
+                support.insert(constraint);
+                (Node::new_constraint(db, constraint, 1), support)
+            }
         }
     }
 
@@ -864,10 +949,9 @@ impl<'db> ConstrainedTypeVar<'db> {
 /// Terminal nodes (`false` and `true`) have their own dedicated enum variants. The
 /// [`Interior`][InteriorNode] variant represents interior nodes.
 ///
-/// BDD nodes are _quasi-reduced_, which means that there are no duplicate nodes (which we handle
-/// via Salsa interning). Unlike the typical BDD representation, which is (fully) reduced, we do
-/// allow redundant nodes, with `if_true` and `if_false` edges that point at the same node. That
-/// means that our BDDs "remember" all of the individual constraints that they were created with.
+/// BDD nodes are fully reduced and contain no duplicate nodes (which we handle via Salsa
+/// interning). We track the constraints that were explicitly added to a constraint set separately,
+/// so the BDD itself can be fully reduced without losing that information.
 ///
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
 /// visits variables in the same order. [`ConstrainedTypeVar::ordering`] defines the variable
@@ -888,7 +972,7 @@ enum Node<'db> {
 }
 
 impl<'db> Node<'db> {
-    /// Creates a new BDD node, ensuring that it is quasi-reduced.
+    /// Creates a new BDD node, ensuring that it is fully reduced.
     fn new(
         db: &'db dyn Db,
         constraint: ConstrainedTypeVar<'db>,
@@ -904,8 +988,8 @@ impl<'db> Node<'db> {
                 root_constraint.ordering(db) > constraint.ordering(db)
             })
         );
-        if if_true == Node::AlwaysFalse && if_false == Node::AlwaysFalse {
-            return Node::AlwaysFalse;
+        if if_true == if_false {
+            return if_true;
         }
         let max_source_order = source_order
             .max(if_true.max_source_order(db))
@@ -1143,21 +1227,7 @@ impl<'db> Node<'db> {
 
     fn or_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
         match (self, other) {
-            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
-            (Node::AlwaysTrue, Node::Interior(other_interior)) => Node::new(
-                db,
-                other_interior.constraint(db),
-                Node::AlwaysTrue,
-                Node::AlwaysTrue,
-                other_interior.source_order(db) + other_offset,
-            ),
-            (Node::Interior(self_interior), Node::AlwaysTrue) => Node::new(
-                db,
-                self_interior.constraint(db),
-                Node::AlwaysTrue,
-                Node::AlwaysTrue,
-                self_interior.source_order(db),
-            ),
+            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
             (Node::AlwaysFalse, _) => other.with_adjusted_source_order(db, other_offset),
             (_, Node::AlwaysFalse) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
@@ -1183,21 +1253,7 @@ impl<'db> Node<'db> {
 
     fn and_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
         match (self, other) {
-            (Node::AlwaysFalse, Node::AlwaysFalse) => Node::AlwaysFalse,
-            (Node::AlwaysFalse, Node::Interior(other_interior)) => Node::new(
-                db,
-                other_interior.constraint(db),
-                Node::AlwaysFalse,
-                Node::AlwaysFalse,
-                other_interior.source_order(db) + other_offset,
-            ),
-            (Node::Interior(self_interior), Node::AlwaysFalse) => Node::new(
-                db,
-                self_interior.constraint(db),
-                Node::AlwaysFalse,
-                Node::AlwaysFalse,
-                self_interior.source_order(db),
-            ),
+            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
             (Node::AlwaysTrue, _) => other.with_adjusted_source_order(db, other_offset),
             (_, Node::AlwaysTrue) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
@@ -3963,26 +4019,14 @@ mod tests {
     fn test_display_graph_output() {
         let expected = indoc! {r#"
             (T = str) 3/4
-            ┡━₁ (T = bool) 4/4
-            │   ┡━₁ (U = str) 1/2
-            │   │   ┡━₁ (U = bool) 2/2
-            │   │   │   ┡━₁ always
-            │   │   │   └─₀ always
-            │   │   └─₀ (U = bool) 2/2
-            │   │       ┡━₁ always
-            │   │       └─₀ never
-            │   └─₀ (U = str) 1/2
-            │       ┡━₁ (U = bool) 2/2
-            │       │   ┡━₁ always
-            │       │   └─₀ always
-            │       └─₀ (U = bool) 2/2
-            │           ┡━₁ always
-            │           └─₀ never
+            ┡━₁ (U = str) 1/2
+            │   ┡━₁ always
+            │   └─₀ (U = bool) 2/2
+            │       ┡━₁ always
+            │       └─₀ never
             └─₀ (T = bool) 4/4
                 ┡━₁ (U = str) 1/2
-                │   ┡━₁ (U = bool) 2/2
-                │   │   ┡━₁ always
-                │   │   └─₀ always
+                │   ┡━₁ always
                 │   └─₀ (U = bool) 2/2
                 │       ┡━₁ always
                 │       └─₀ never

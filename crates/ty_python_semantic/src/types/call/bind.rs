@@ -1313,7 +1313,7 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSet::from(true);
+                        let constraints = ConstraintSet::from_bool(db, true);
                         let tracked = TrackedConstraintSet::new(db, constraints);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1324,7 +1324,7 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSet::from(false);
+                        let constraints = ConstraintSet::from_bool(db, false);
                         let tracked = TrackedConstraintSet::new(db, constraints);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),

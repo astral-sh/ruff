@@ -17,6 +17,7 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+    default_disjoint_visitor, default_relation_visitor,
 };
 use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -793,12 +794,12 @@ fn is_subtype_in_invariant_position<'db>(
         // This should be removed and properly handled in the respective
         // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
         // `Type::has_relation_to_impl`. Right now, we cannot generally
-        // return `ConstraintSet::from(true)` from that branch, as that
+        // return `ConstraintSet::from_bool(db, true)` from that branch, as that
         // leads to union simplification, which means that we lose track
         // of type variables without recording the constraints under which
         // the relation holds.
         if matches!(base, Type::TypeVar(_)) || matches!(derived, Type::TypeVar(_)) {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(db, true);
         }
 
         derived.has_relation_to_impl(
@@ -1272,7 +1273,7 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(db, false);
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -1331,7 +1332,7 @@ impl<'db> Specialization<'db> {
                     relation_visitor,
                     disjointness_visitor,
                 ),
-                TypeVarVariance::Bivariant => ConstraintSet::from(true),
+                TypeVarVariance::Bivariant => ConstraintSet::from_bool(db, true),
             }
         })
     }
@@ -1346,8 +1347,8 @@ impl<'db> Specialization<'db> {
             db,
             other,
             inferable,
-            &IsDisjointVisitor::default(),
-            &HasRelationToVisitor::default(),
+            &default_disjoint_visitor(db),
+            &default_relation_visitor(db),
         )
     }
 
@@ -1361,7 +1362,7 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(db, true);
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -1399,13 +1400,13 @@ impl<'db> Specialization<'db> {
                 ),
 
                 // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
-                TypeVarVariance::Covariant => ConstraintSet::from(false),
+                TypeVarVariance::Covariant => ConstraintSet::from_bool(db, false),
 
                 // If `Foo[T]` is contravariant in `T`, `Foo[A | B]` is a subtype of `Foo[A]` and `Foo[B]`
-                TypeVarVariance::Contravariant => ConstraintSet::from(false),
+                TypeVarVariance::Contravariant => ConstraintSet::from_bool(db, false),
 
                 // If `Foo[T]` is bivariant in `T`, `Foo[A]` and `Foo[B]` are mutual subtypes.
-                TypeVarVariance::Bivariant => ConstraintSet::from(false),
+                TypeVarVariance::Bivariant => ConstraintSet::from_bool(db, false),
             },
         )
     }
@@ -1418,14 +1419,14 @@ impl<'db> Specialization<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(db, false);
         }
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(db, false);
         }
 
-        let mut result = ConstraintSet::from(true);
+        let mut result = ConstraintSet::from_bool(db, true);
         for ((bound_typevar, self_type), other_type) in generic_context
             .variables(db)
             .zip(self.types(db))
@@ -1443,7 +1444,7 @@ impl<'db> Specialization<'db> {
                 | TypeVarVariance::Contravariant => {
                     self_type.is_equivalent_to_impl(db, *other_type, inferable, visitor)
                 }
-                TypeVarVariance::Bivariant => ConstraintSet::from(true),
+                TypeVarVariance::Bivariant => ConstraintSet::from_bool(db, true),
             };
             if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
@@ -1451,7 +1452,7 @@ impl<'db> Specialization<'db> {
         }
 
         match (self.tuple_inner(db), other.tuple_inner(db)) {
-            (Some(_), None) | (None, Some(_)) => return ConstraintSet::from(false),
+            (Some(_), None) | (None, Some(_)) => return ConstraintSet::from_bool(db, false),
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible =
