@@ -910,7 +910,15 @@ impl Session {
 
                 let db = self.project_db_mut(path);
                 match system_path_to_file(db, system_path) {
-                    Ok(file) => db.project().open_file(db, file),
+                    Ok(file) => {
+                        let project = db.project();
+
+                        // Only mark this file as open if it's part of the project.
+                        // This ensures that we don't show diagnostics for files outside the project.
+                        if project.is_file_included(db, system_path) {
+                            project.open_file(db, file);
+                        }
+                    }
                     Err(err) => tracing::warn!("Failed to open file {system_path}: {err}"),
                 }
             }
