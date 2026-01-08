@@ -898,6 +898,16 @@ impl<'db> Type<'db> {
         matches!(self, Type::Never)
     }
 
+    /// Returns `true` if this type contains a `Self` type variable.
+    pub(crate) fn contains_self(&self, db: &'db dyn Db) -> bool {
+        any_over_type(
+            db,
+            *self,
+            &|ty| matches!(ty, Type::TypeVar(tv) if tv.typevar(db).is_self(db)),
+            false,
+        )
+    }
+
     /// Returns `true` if `self` is [`Type::Callable`].
     pub(crate) const fn is_callable_type(&self) -> bool {
         matches!(self, Type::Callable(..))

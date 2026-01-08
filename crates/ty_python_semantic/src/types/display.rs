@@ -795,6 +795,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                             generic_context: bound_signature.generic_context.as_ref(),
                             db: self.db,
                             settings: self.settings.clone(),
+                            hide_unused_self: false,
                         };
                         f.set_invalid_type_annotation();
                         f.write_str("bound method ")?;
@@ -1239,6 +1240,7 @@ impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
             generic_context: signature.generic_context.as_ref(),
             db: self.db,
             settings: self.settings.clone(),
+            hide_unused_self: false,
         };
 
         f.set_invalid_type_annotation();
@@ -1287,6 +1289,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
                     settings: self.settings.clone(),
+                    hide_unused_self: false,
                 };
                 f.set_invalid_type_annotation();
                 f.write_str("def ")?;
@@ -1403,6 +1406,7 @@ impl<'db> GenericContext<'db> {
             db,
             settings: DisplaySettings::default(),
             full: true,
+            hide_unused_self: false,
         }
     }
 
@@ -1416,6 +1420,7 @@ impl<'db> GenericContext<'db> {
             db,
             settings,
             full: false,
+            hide_unused_self: false,
         }
     }
 }
@@ -1424,14 +1429,22 @@ struct DisplayOptionalGenericContext<'a, 'db> {
     generic_context: Option<&'a GenericContext<'db>>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
+    /// If true, hide `Self` type variables from the generic context prefix
+    /// when they are not displayed in the signature body.
+    hide_unused_self: bool,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayOptionalGenericContext<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(generic_context) = self.generic_context {
-            generic_context
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f)
+            DisplayGenericContext {
+                generic_context,
+                db: self.db,
+                settings: self.settings.clone(),
+                full: false,
+                hide_unused_self: self.hide_unused_self,
+            }
+            .fmt_detailed(f)
         } else {
             Ok(())
         }
@@ -1450,13 +1463,23 @@ pub struct DisplayGenericContext<'a, 'db> {
     #[expect(dead_code)]
     settings: DisplaySettings<'db>,
     full: bool,
+    /// If true, hide `Self` type variables from the generic context prefix.
+    hide_unused_self: bool,
 }
 
 impl<'db> DisplayGenericContext<'_, 'db> {
     fn fmt_normal(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let variables = self.generic_context.variables(self.db);
 
-        let non_implicit_variables: Vec<_> = variables.collect();
+        let non_implicit_variables: Vec<_> = variables
+            .filter(|bound_typevar| {
+                // If hide_unused_self is true and this is a Self typevar, skip it
+                if self.hide_unused_self && bound_typevar.typevar(self.db).is_self(self.db) {
+                    return false;
+                }
+                true
+            })
+            .collect();
 
         if non_implicit_variables.is_empty() {
             return Ok(());
@@ -1787,10 +1810,22 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         // Display type parameters if present, but only when the caller hasn't
         // already displayed them (indicated by disallow_signature_name being false)
         if !self.settings.disallow_signature_name {
+            // Check if Self should be hidden from the generic context.
+            // Hide Self if it's not displayed in the return type and not in any
+            // explicitly annotated parameter.
+            let hide_unused_self = {
+                let return_contains_self = self.return_ty.contains_self(self.db);
+                let param_contains_self = self.parameters.iter().any(|p| {
+                    p.should_annotation_be_displayed() && p.annotated_type().contains_self(self.db)
+                });
+                !return_contains_self && !param_contains_self
+            };
+
             DisplayOptionalGenericContext {
                 generic_context: self.generic_context,
                 db: self.db,
                 settings: settings.clone(),
+                hide_unused_self,
             }
             .fmt_detailed(&mut f)?;
         }

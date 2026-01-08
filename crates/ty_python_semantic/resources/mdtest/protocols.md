@@ -426,9 +426,9 @@ from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 reveal_protocol_interface(Foo)
 # revealed: {"__index__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsIndex)
-# revealed: {"__abs__": MethodMember(`[Self](self, /) -> Unknown`)}
+# revealed: {"__abs__": MethodMember(`(self, /) -> Unknown`)}
 reveal_protocol_interface(SupportsAbs)
-# revealed: {"__iter__": MethodMember(`[Self](self, /) -> Iterator[Unknown]`), "__next__": MethodMember(`[Self](self, /) -> Unknown`)}
+# revealed: {"__iter__": MethodMember(`(self, /) -> Iterator[Unknown]`), "__next__": MethodMember(`(self, /) -> Unknown`)}
 reveal_protocol_interface(Iterator)
 
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
@@ -448,9 +448,9 @@ do not implement any special handling for generic aliases passed to the function
 reveal_type(get_protocol_members(SupportsAbs[int]))  # revealed: frozenset[str]
 reveal_type(get_protocol_members(Iterator[int]))  # revealed: frozenset[str]
 
-# revealed: {"__abs__": MethodMember(`[Self](self, /) -> int`)}
+# revealed: {"__abs__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsAbs[int])
-# revealed: {"__iter__": MethodMember(`[Self](self, /) -> Iterator[int]`), "__next__": MethodMember(`[Self](self, /) -> int`)}
+# revealed: {"__iter__": MethodMember(`(self, /) -> Iterator[int]`), "__next__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(Iterator[int])
 
 class BaseProto(Protocol):
