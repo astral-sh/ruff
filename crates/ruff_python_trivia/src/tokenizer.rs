@@ -523,6 +523,10 @@ impl<'a> SimpleTokenizer<'a> {
         Self::new(source, range)
     }
 
+    pub fn kinds(self) -> SimpleTokenKindIterator<'a> {
+        SimpleTokenKindIterator(self)
+    }
+
     fn next_token(&mut self) -> SimpleToken {
         self.cursor.start_token();
 
@@ -558,6 +562,30 @@ impl<'a> SimpleTokenizer<'a> {
         self.offset += token_len;
 
         token
+    }
+
+    fn next_token_kind(&mut self) -> SimpleTokenKind {
+        self.cursor.start_token();
+
+        let Some(first) = self.cursor.bump() else {
+            return SimpleTokenKind::EndOfFile;
+        };
+
+        if self.bogus {
+            // Emit a single final bogus token
+            // Set the cursor to EOF
+            self.cursor = Cursor::new("");
+            self.offset = self.source.text_len();
+            return SimpleTokenKind::Bogus;
+        }
+
+        let kind = self.next_token_inner(first);
+
+        let token_len = self.cursor.token_len();
+
+        self.offset += token_len;
+
+        kind
     }
 
     fn next_token_inner(&mut self, first: char) -> SimpleTokenKind {
@@ -805,6 +833,28 @@ impl Iterator for SimpleTokenizer<'_> {
         let token = self.next_token();
 
         if token.kind == SimpleTokenKind::EndOfFile {
+            None
+        } else {
+            Some(token)
+        }
+    }
+}
+
+pub struct SimpleTokenKindIterator<'a>(SimpleTokenizer<'a>);
+
+impl<'a> SimpleTokenKindIterator<'a> {
+    pub fn skip_trivia(self) -> impl Iterator<Item = SimpleTokenKind> + 'a {
+        self.filter(|t| !t.is_trivia())
+    }
+}
+
+impl Iterator for SimpleTokenKindIterator<'_> {
+    type Item = SimpleTokenKind;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.0.next_token_kind();
+
+        if token == SimpleTokenKind::EndOfFile {
             None
         } else {
             Some(token)
