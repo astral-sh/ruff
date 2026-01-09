@@ -1617,7 +1617,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let Type::StringLiteral(key_literal) = subscript_key_type else {
             return None;
         };
-        if !is_supported_tag_literal(rhs_type) {
+        if !is_supported_tag_literal(self.db, rhs_type) {
             return None;
         }
 
@@ -1695,7 +1695,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let index = i32::try_from(index).ok()?;
 
         // The comparison value must be a supported literal type.
-        if !is_supported_tag_literal(rhs_type) {
+        if !is_supported_tag_literal(self.db, rhs_type) {
             return None;
         }
 
@@ -1765,13 +1765,14 @@ fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) ->
     }
 }
 
-fn is_supported_tag_literal(ty: Type) -> bool {
-    matches!(
-        ty,
-        // TODO: We'd like to support `EnumLiteral` also, but we have to be careful with types like
-        // `IntEnum` and `StrEnum` that have custom `__eq__` methods.
-        Type::StringLiteral(_) | Type::BytesLiteral(_) | Type::IntLiteral(_)
-    )
+fn is_supported_tag_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::StringLiteral(_) | Type::BytesLiteral(_) | Type::IntLiteral(_) => true,
+        // Enum literals are supported as long as the enum class does not override
+        // `__eq__` or `__ne__` with a custom implementation.
+        Type::EnumLiteral(_) => !ty.overrides_equality(db),
+        _ => false,
+    }
 }
 
 // See the comment above the call to this function.
@@ -1785,7 +1786,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         typeddict
             .items(db)
             .get(field_name)
-            .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
+            .is_none_or(|field| is_supported_tag_literal(db, field.declared_ty))
     };
 
     match ty {
@@ -1843,6 +1844,6 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
         elem.as_nominal_instance()
             .and_then(|inst| inst.tuple_spec(db))
             .and_then(|spec| spec.py_index(db, index).ok())
-            .is_none_or(is_supported_tag_literal)
+            .is_none_or(|ty| is_supported_tag_literal(db, ty))
     })
 }

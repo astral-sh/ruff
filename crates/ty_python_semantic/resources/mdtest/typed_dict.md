@@ -2050,6 +2050,59 @@ def _(u: Foo | Bar | Baz | Bing):
         reveal_type(u)  # revealed: Bing
 ```
 
+Enum literals are also supported as tags, as long as the enum class does not override `__eq__`:
+
+```py
+from enum import Enum
+
+class Tag(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+class WithEnumTagA(TypedDict):
+    tag: Literal[Tag.A]
+
+class WithEnumTagB(TypedDict):
+    tag: Literal[Tag.B]
+
+class WithEnumTagC(TypedDict):
+    tag: Literal[Tag.C]
+
+def _(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
+    if u["tag"] == Tag.A:
+        reveal_type(u)  # revealed: WithEnumTagA
+    elif u["tag"] == Tag.B:
+        reveal_type(u)  # revealed: WithEnumTagB
+    else:
+        reveal_type(u)  # revealed: WithEnumTagC
+```
+
+However, if an enum overrides `__eq__`, we cannot safely narrow based on its values:
+
+```py
+class WackyTag(Enum):
+    X = 1
+    Y = 2
+
+    def __eq__(self, other):
+        return True
+
+class WithWackyTagX(TypedDict):
+    tag: Literal[WackyTag.X]
+
+class WithWackyTagY(TypedDict):
+    tag: Literal[WackyTag.Y]
+
+def _(u: WithWackyTagX | WithWackyTagY):
+    if u["tag"] == WackyTag.X:
+        # We cannot narrow here because WackyTag overrides `__eq__`.
+        reveal_type(u)  # revealed: WithWackyTagX | WithWackyTagY
+    else:
+        # We cannot narrow here either.
+        reveal_type(u)  # revealed: WithWackyTagX | WithWackyTagY
+```
+
 We can descend into intersections to discover `TypedDict` types that need narrowing:
 
 ```py
@@ -2224,6 +2277,61 @@ def match_statements(u: Foo | Bar | Baz | Bing):
             reveal_type(u)  # revealed: Baz
         case _:
             reveal_type(u)  # revealed: Bing
+```
+
+Enum literals are supported as tags in match statements:
+
+```py
+from enum import Enum
+
+class Tag(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+class WithEnumTagA(TypedDict):
+    tag: Literal[Tag.A]
+
+class WithEnumTagB(TypedDict):
+    tag: Literal[Tag.B]
+
+class WithEnumTagC(TypedDict):
+    tag: Literal[Tag.C]
+
+def match_enum_tags(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
+    match u["tag"]:
+        case Tag.A:
+            reveal_type(u)  # revealed: WithEnumTagA
+        case Tag.B:
+            reveal_type(u)  # revealed: WithEnumTagB
+        case _:
+            reveal_type(u)  # revealed: WithEnumTagC
+```
+
+If an enum overrides `__eq__`, we cannot safely narrow based on its values in match statements:
+
+```py
+class WackyTag(Enum):
+    X = 1
+    Y = 2
+
+    def __eq__(self, other):
+        return True
+
+class WithWackyTagX(TypedDict):
+    tag: Literal[WackyTag.X]
+
+class WithWackyTagY(TypedDict):
+    tag: Literal[WackyTag.Y]
+
+def match_wacky_enum_tags(u: WithWackyTagX | WithWackyTagY):
+    match u["tag"]:
+        case WackyTag.X:
+            # We cannot narrow here because WackyTag overrides `__eq__`.
+            reveal_type(u)  # revealed: WithWackyTagX | WithWackyTagY
+        case _:
+            # We cannot narrow here either.
+            reveal_type(u)  # revealed: WithWackyTagX | WithWackyTagY
 ```
 
 We can also narrow a single `TypedDict` type to `Never`:
