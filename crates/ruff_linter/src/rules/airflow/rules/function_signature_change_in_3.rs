@@ -147,7 +147,7 @@ fn check_constructor_arguments(
                     Airflow3IncompatibleFunctionSignature {
                         function_name,
                         change_type: FunctionSignatureChangeType::PositionalArgumentChange {
-                            message: "Use keyword argument `extra=` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)",
+                            message: "Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)",
                         },
                     },
                     func.range(),
