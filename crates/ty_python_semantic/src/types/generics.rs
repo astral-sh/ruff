@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
+use std::mem;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
@@ -27,7 +28,8 @@ use crate::types::{
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type, walk_type_var_bounds,
+    TypeVarVariance, UnionBuilder, UnionType, declaration_type, walk_bound_type_var_type,
+    walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -1069,26 +1071,94 @@ impl<'db> Specialization<'db> {
         {
             let mut specialization = specialization.borrow_mut();
 
+            let synthetic_bounds_or_constraints = |ty: Type<'db>| {
+                if !constrain {
+                    return None;
+                }
+
+                let inferable_type_vars: FxOrderSet<_> =
+                    collect_inferable_type_vars(ty, *inferable, db);
+
+                if inferable_type_vars.is_empty() {
+                    // If we are creating a non-inferable synthetic type variable, constrain it
+                    // such that it satisfies the same constraints as the type it replaced.
+                    return Some(TypeVarBoundOrConstraints::Constraints(
+                        TypeVarConstraints::new(db, vec![ty].into_boxed_slice()),
+                    ));
+                }
+
+                // Otherwise, we are creating an inferable synthetic type variable, and so must
+                // preserve the bounds and constraints of the inferable type variables we are replacing.
+                let mut specializations = vec![Vec::new()];
+
+                for bound_typevar in &inferable_type_vars {
+                    match bound_typevar.typevar(db).bound_or_constraints(db) {
+                        // If the type variable being replaced has multiple constraints, the
+                        // synthetic type variable will have an upper bound of the union
+                        // of those constraints.
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            for specialization in mem::take(&mut specializations) {
+                                // Expand the constraints for each element of the union.
+                                for constraint in constraints.elements(db) {
+                                    let mut specialization = specialization.clone();
+
+                                    // Note we use a gradual type here to emulate an inferable type
+                                    // variable. We cannot specialize to the constraint directly,
+                                    // as it may be in non-covariant position in the outer type
+                                    // that forms the upper bound.
+                                    specialization.push(IntersectionType::from_elements(
+                                        db,
+                                        [Type::any(), *constraint],
+                                    ));
+
+                                    specializations.push(specialization);
+                                }
+                            }
+                        }
+
+                        // Otherwise, we can replace the type variable with its singular upper
+                        // bound directly.
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            for specialization in &mut specializations {
+                                specialization.push(IntersectionType::from_elements(
+                                    db,
+                                    [Type::any(), bound],
+                                ));
+                            }
+                        }
+
+                        // An unbounded type variable has an implicit upper bound of `object`.
+                        None => {
+                            for specialization in &mut specializations {
+                                specialization.push(Type::any());
+                            }
+                        }
+                    }
+                }
+
+                let generic_context =
+                    GenericContext::from_typevar_instances(db, inferable_type_vars);
+
+                // Form the upper bound of the synthetic type variable from the union
+                // of those constraints.
+                let mut upper_bounds = UnionBuilder::new(db);
+                for specialization in specializations {
+                    let specialization = generic_context.specialize(db, &specialization);
+                    upper_bounds = upper_bounds.add(ty.apply_specialization(db, specialization));
+                }
+
+                Some(TypeVarBoundOrConstraints::UpperBound(upper_bounds.build()))
+            };
+
             self.types_and_variables(db)
                 .map(|(typevar, ty)| {
-                    let bounds_or_constraints = if *constrain {
-                        match ty {
-                            _ if contains_inferable_type_var(ty, *inferable, db) => None,
-                            _ => Some(TypeVarBoundOrConstraints::Constraints(
-                                TypeVarConstraints::new(db, vec![ty].into_boxed_slice()),
-                            )),
-                        }
-                    } else {
-                        None
-                    };
-
                     // Create a unique synthetic type variable.
                     let name = format!("_T{}", specialization.len() + skip);
                     let synthetic = BoundTypeVarInstance::synthetic_with_bounds_or_constraints(
                         db,
                         Name::new(name),
                         typevar.variance(db),
-                        bounds_or_constraints,
+                        synthetic_bounds_or_constraints(ty),
                     );
 
                     specialization.insert(synthetic, ty);
@@ -2090,27 +2160,6 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
         polarity: TypeVarVariance,
         f: &mut dyn FnMut(TypeVarAssignment<'db>, TypeVarVariance) -> Option<Type<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
-        // Ensure that the type mappings being created are valid, to avoid having to map the
-        // synthesized errors back to their original types.
-        let mut builder = SpecializationBuilder::new(self.db, self.inferable);
-        builder.infer_map(formal, actual, |_| None)?;
-
-        // Because we ignore the bounds and constraints of the synthetic type variables that
-        // replace inferable type variables, we may attempt to create invalid type mappings
-        // in the process, and so ignore all errors after this point.
-        self.infer_map_with_variance_impl_checked(formal, actual, polarity, f);
-
-        Ok(())
-    }
-
-    // Note that this method should only be called after verifying that the type mappings are valid.
-    fn infer_map_with_variance_impl_checked(
-        &mut self,
-        formal: Type<'db>,
-        actual: Type<'db>,
-        polarity: TypeVarVariance,
-        f: &mut dyn FnMut(TypeVarAssignment<'db>, TypeVarVariance) -> Option<Type<'db>>,
-    ) {
         // Synthesize the formal and actual types.
         let (synthetic_formal, synthetic_formal_specialization) =
             synthetic_specialization(formal, 0, true, self.inferable, self.db);
@@ -2124,11 +2173,9 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
         if synthetic_actual_specialization.types(self.db).is_empty()
             || synthetic_formal_specialization.types(self.db).is_empty()
         {
-            let _ = self.infer_map_impl(formal, actual, &mut |type_assignment| {
+            return self.infer_map_impl(formal, actual, &mut |type_assignment| {
                 f(type_assignment, polarity)
             });
-
-            return;
         }
 
         let mut synthetic_inferable = FxHashSet::default();
@@ -2150,22 +2197,26 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
             let mut synthetic_builder =
                 SpecializationBuilder::new(self.db, self.inferable.merge(&synthetic_inferable));
 
-            let _ =
+            let result =
                 synthetic_builder.infer_map(synthetic_formal, synthetic_actual, |(typevar, ty)| {
                     assigned_variables.insert(typevar.identity(self.db), typevar);
                     Some(ty)
                 });
+
+            // If the synthetic inference resulted in an error, we must perform inference on the
+            // original types to return the correct error message.
+            if result.is_err() {
+                return self.infer_map(formal, actual, |_| None);
+            }
 
             synthetic_builder.into_type_mappings()
         };
 
         // We can't recurse any further, just perform a regular inference with the current polarity.
         if synthetic_type_mappings.is_empty() {
-            let _ = self.infer_map_impl(formal, actual, &mut |type_assignment| {
+            return self.infer_map_impl(formal, actual, &mut |type_assignment| {
                 f(type_assignment, polarity)
             });
-
-            return;
         }
 
         for (identity, synthetic_type) in synthetic_type_mappings {
@@ -2211,14 +2262,16 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
                     .variance_of(self.db, synthetic_type_var)
                     .compose(polarity);
 
-                self.infer_map_with_variance_impl_checked(formal_type, actual_type, variance, f);
+                self.infer_map_with_variance_impl(formal_type, actual_type, variance, f)?;
             } else {
                 // We can't recurse any further, just perform a regular inference with the current polarity.
-                let _ = self.infer_map_impl(formal_type, actual_type, &mut |type_assignment| {
+                self.infer_map_impl(formal_type, actual_type, &mut |type_assignment| {
                     f(type_assignment, polarity)
-                });
+                })?;
             }
         }
+
+        Ok(())
     }
 
     /// Infer type mappings for the specialization in the reverse direction, i.e., where the
@@ -2341,8 +2394,52 @@ fn contains_inferable_type_var<'db>(
         recursion_guard: TypeCollector::default(),
     };
     visitor.visit_type(db, ty);
-
     visitor.result.get()
+}
+
+// Returns the set of inferable type variables contained in the given type.
+fn collect_inferable_type_vars<'db>(
+    ty: Type<'db>,
+    inferable: InferableTypeVars<'_, 'db>,
+    db: &'db dyn Db,
+) -> FxOrderSet<BoundTypeVarInstance<'db>> {
+    struct CollectTypeVars<'a, 'db> {
+        typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
+        inferable: InferableTypeVars<'a, 'db>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for CollectTypeVars<'_, 'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_bound_type_var_type(
+            &self,
+            db: &'db dyn Db,
+            bound_typevar: BoundTypeVarInstance<'db>,
+        ) {
+            if bound_typevar.is_inferable(db, self.inferable) {
+                self.typevars.borrow_mut().insert(bound_typevar);
+            }
+
+            let typevar = bound_typevar.typevar(db);
+            if let Some(bound_or_constraints) = typevar.bound_or_constraints(db) {
+                walk_type_var_bounds(db, bound_or_constraints, self);
+            }
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+    let visitor = CollectTypeVars {
+        inferable,
+        typevars: RefCell::default(),
+        recursion_guard: TypeCollector::default(),
+    };
+    visitor.visit_type(db, ty);
+    visitor.typevars.into_inner()
 }
 
 // Assign each type variable on the given type to a unique synthetic type variable, returning the

@@ -6866,8 +6866,7 @@ pub enum TypeMapping<'a, 'db> {
         specialization: RefCell<FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>>,
 
         // Whether or not to constrain a given synthetic type variable to the type
-        // it replaces, unless it is replacing a type that contains an inferable
-        // type variable.
+        // it replaces.
         constrain: bool,
 
         // The inferable type variables contained in the type being mapped.
