@@ -857,7 +857,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if class.total_ordering(self.db()) {
                 let has_ordering_method = class
                     .iter_mro(self.db(), None)
-                    .filter_map(super::super::class_base::ClassBase::into_class)
+                    .filter_map(ClassBase::into_class)
                     .filter(|base_class| {
                         !base_class
                             .class_literal(self.db())

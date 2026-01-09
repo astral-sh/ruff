@@ -244,3 +244,36 @@ reveal_type(n1 > n2)  # revealed: bool
 n1 <= n2  # error: [unsupported-operator]
 n1 >= n2  # error: [unsupported-operator]
 ```
+
+## Function call form
+
+When `total_ordering` is called as a function (not as a decorator), the same validation is
+performed:
+
+```py
+from functools import total_ordering
+
+class NoOrderingMethod:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+# error: [invalid-total-ordering]
+InvalidOrderedClass = total_ordering(NoOrderingMethod)
+```
+
+When the class does define an ordering method, no error is emitted:
+
+```py
+from functools import total_ordering
+
+class HasOrderingMethod:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __lt__(self, other: "HasOrderingMethod") -> bool:
+        return True
+
+# No error (class defines `__lt__`).
+ValidOrderedClass = total_ordering(HasOrderingMethod)
+reveal_type(ValidOrderedClass)  # revealed: type[HasOrderingMethod]
+```
