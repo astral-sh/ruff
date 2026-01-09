@@ -24,10 +24,10 @@ use crate::{Db, declare_lint, lint::LintId};
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
+    /// Checks for `ty: ignore` or `type: ignore` directives that are no longer applicable.
     ///
     /// ## Why is this bad?
-    /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
+    /// A `ty: ignore` directive that no longer matches any diagnostic violations is likely
     /// included by mistake, and should be removed to avoid confusion.
     ///
     /// ## Examples
@@ -41,9 +41,9 @@ declare_lint! {
     /// a = 20 / 2
     /// ```
     pub static UNUSED_IGNORE_COMMENT = {
-        summary: "detects unused `type: ignore` comments",
+        summary: "detects unused `ty: ignore` and `type: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Ignore,
+        default_level: Level::Warn,
     }
 }
 
