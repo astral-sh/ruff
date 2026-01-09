@@ -60,7 +60,7 @@ use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY,
     INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
-    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
     INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
@@ -86,6 +86,7 @@ use crate::types::diagnostic::{
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
     report_unsupported_binary_operation, report_unsupported_comparison,
 };
+use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
     is_implicit_classmethod, is_implicit_staticmethod,
@@ -625,9 +626,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
+            // (2) Check that the class is not an enum and generic
+            if is_enum_class_by_inheritance(self.db(), class)
+                && class.generic_context(self.db()).is_some()
+            {
+                if let Some(builder) = self.context.report_lint(&INVALID_GENERIC_ENUM, class_node) {
+                    builder.into_diagnostic(format_args!(
+                        "Enum class `{}` cannot be generic",
+                        class.name(self.db())
+                    ));
+                }
+            }
+
             let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class, None);
 
-            // (2) If it's a `NamedTuple` class, check that no field without a default value
+            // (3) If it's a `NamedTuple` class, check that no field without a default value
             // appears after a field with a default value.
             if is_named_tuple {
                 let mut field_with_default_encountered = None;
@@ -668,7 +681,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut disjoint_bases = IncompatibleBases::default();
 
-            // (3) Iterate through the class's explicit bases to check for various possible errors:
+            // (4) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
@@ -782,7 +795,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (4) Check that the class's MRO is resolvable
+            // (5) Check that the class's MRO is resolvable
             match class.try_mro(self.db(), None) {
                 Err(mro_error) => match mro_error.reason() {
                     MroErrorKind::DuplicateBases(duplicates) => {
@@ -853,7 +866,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (5) Check that @total_ordering has a valid ordering method in the MRO
+            // (6) Check that @total_ordering has a valid ordering method in the MRO
             if class.total_ordering(self.db()) {
                 let has_ordering_method = class
                     .iter_mro(self.db(), None)
@@ -885,7 +898,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) Check that the class's metaclass can be determined without error.
+            // (7) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Cycle => {
@@ -966,7 +979,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) If the class is generic, verify that its generic context does not violate any of
+            // (8) If the class is generic, verify that its generic context does not violate any of
             // the typevar scoping rules.
             if let (Some(legacy), Some(inherited)) = (
                 class.legacy_generic_context(self.db()),

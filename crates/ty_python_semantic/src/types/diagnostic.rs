@@ -73,6 +73,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
@@ -917,6 +918,39 @@ declare_lint! {
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for enum classes that are also generic.
+    ///
+    /// ## Why is this bad?
+    /// Enum classes cannot be generic. Python does not support generic enums,
+    /// and attempting to create one will result in a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from enum import Enum
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")
+    ///
+    /// # error: enum class cannot be generic
+    /// class E[T](Enum):
+    ///     A = 1
+    ///
+    /// # error: enum class cannot be generic
+    /// class F(Enum, Generic[T]):
+    ///     A = 1
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: Enum](https://docs.python.org/3/library/enum.html)
+    pub(crate) static INVALID_GENERIC_ENUM = {
+        summary: "detects generic enum classes",
+        status: LintStatus::stable("0.0.10"),
         default_level: Level::Error,
     }
 }

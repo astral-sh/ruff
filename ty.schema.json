@@ -640,6 +640,16 @@
             }
           ]
         },
+        "invalid-generic-enum": {
+          "title": "detects generic enum classes",
+          "description": "## What it does\nChecks for enum classes that are also generic.\n\n## Why is this bad?\nEnum classes cannot be generic. Python does not support generic enums,\nand attempting to create one will result in a `TypeError` at runtime.\n\n## Examples\n```python\nfrom enum import Enum\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\n\n# error: enum class cannot be generic\nclass E[T](Enum):\n    A = 1\n\n# error: enum class cannot be generic\nclass F(Enum, Generic[T]):\n    A = 1\n```\n\n## References\n- [Python documentation: Enum](https://docs.python.org/3/library/enum.html)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-ignore-comment": {
           "title": "detects ignore comments that use invalid syntax",
           "description": "## What it does\nChecks for `type: ignore` and `ty: ignore` comments that are syntactically incorrect.\n\n## Why is this bad?\nA syntactically incorrect ignore comment is probably a mistake and is useless.\n\n## Examples\n```py\na = 20 / 0  # type: ignoree\n```\n\nUse instead:\n\n```py\na = 20 / 0  # type: ignore\n```",
