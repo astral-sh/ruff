@@ -489,6 +489,9 @@ pub(crate) fn format_source(
                 formatted,
             )))
         }
+        SourceKind::Markdown(source) => {
+            unimplemented!()
+        }
     }
 }
 
