@@ -260,17 +260,19 @@ impl<'db> Bindings<'db> {
         self.evaluate_known_cases(db, argument_types, dataclass_field_specifiers);
 
         // For intersection types, we filter out elements where the call fails.
-        // Only if ALL elements fail do we report an error.
+        // Only if ALL elements fail do we report errors for each failing element.
         if self.return_type_aggregation == ReturnTypeAggregation::Intersection {
-            // Keep only elements where the call succeeded
-            self.elements.retain(|binding| binding.as_result().is_ok());
+            let any_succeeded = self.elements.iter().any(|b| b.as_result().is_ok());
 
-            if self.elements.is_empty() {
-                // All elements failed; report not callable
-                return Err(CallErrorKind::NotCallable);
+            if any_succeeded {
+                // At least one element succeeded - filter out the failing ones
+                self.elements.retain(|binding| binding.as_result().is_ok());
+                return Ok(());
             }
-            // At least one element succeeded
-            return Ok(());
+
+            // All elements failed - keep them all so we can report individual errors
+            // Return BindingError so report_diagnostics will report each element's error
+            return Err(CallErrorKind::BindingError);
         }
 
         // For union types:
@@ -385,13 +387,27 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        // If this is not a union, then report a diagnostic for any
+        // If this is not a union/intersection, then report a diagnostic for any
         // errors as normal.
         if let Some(binding) = self.single_element() {
             binding.report_diagnostics(context, node, None);
             return;
         }
 
+        // For intersection types where all elements failed, report each element's error
+        // with intersection context.
+        if self.return_type_aggregation == ReturnTypeAggregation::Intersection {
+            for binding in self {
+                let intersection_diag = IntersectionDiagnostic {
+                    callable_type: self.callable_type(),
+                    binding,
+                };
+                binding.report_diagnostics(context, node, Some(&intersection_diag));
+            }
+            return;
+        }
+
+        // For union types, report each element's error with union context.
         for binding in self {
             let union_diag = UnionDiagnostic {
                 callable_type: self.callable_type(),
@@ -2335,7 +2351,7 @@ impl<'db> CallableBinding<'db> {
         &self,
         context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
-        union_diag: Option<&UnionDiagnostic<'_, '_>>,
+        compound_diag: Option<&dyn CompoundDiagnostic>,
     ) {
         if !self.is_callable() {
             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
@@ -2343,8 +2359,8 @@ impl<'db> CallableBinding<'db> {
                     "Object of type `{}` is not callable",
                     self.callable_type.display(context.db()),
                 ));
-                if let Some(union_diag) = union_diag {
-                    union_diag.add_union_context(context.db(), &mut diag);
+                if let Some(compound_diag) = compound_diag {
+                    compound_diag.add_context(context.db(), &mut diag);
                 }
             }
             return;
@@ -2356,8 +2372,8 @@ impl<'db> CallableBinding<'db> {
                     "Object of type `{}` is not callable (possibly missing `__call__` method)",
                     self.callable_type.display(context.db()),
                 ));
-                if let Some(union_diag) = union_diag {
-                    union_diag.add_union_context(context.db(), &mut diag);
+                if let Some(compound_diag) = compound_diag {
+                    compound_diag.add_context(context.db(), &mut diag);
                 }
             }
             return;
@@ -2373,7 +2389,7 @@ impl<'db> CallableBinding<'db> {
                     node,
                     self.signature_type,
                     callable_description.as_ref(),
-                    union_diag,
+                    compound_diag,
                     None,
                 );
             }
@@ -2411,7 +2427,7 @@ impl<'db> CallableBinding<'db> {
                         node,
                         self.signature_type,
                         callable_description.as_ref(),
-                        union_diag,
+                        compound_diag,
                         matching_overload.as_ref(),
                     );
                     return;
@@ -2493,8 +2509,8 @@ impl<'db> CallableBinding<'db> {
                     }
                 }
 
-                if let Some(union_diag) = union_diag {
-                    union_diag.add_union_context(context.db(), &mut diag);
+                if let Some(compound_diag) = compound_diag {
+                    compound_diag.add_context(context.db(), &mut diag);
                 }
             }
         }
@@ -3862,7 +3878,7 @@ impl<'db> Binding<'db> {
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
-        union_diag: Option<&UnionDiagnostic<'_, '_>>,
+        compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'db>>,
     ) {
         for error in &self.errors {
@@ -3871,7 +3887,7 @@ impl<'db> Binding<'db> {
                 node,
                 callable_ty,
                 callable_description,
-                union_diag,
+                compound_diag,
                 matching_overload,
             );
         }
@@ -4212,7 +4228,7 @@ impl<'db> BindingError<'db> {
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
-        union_diag: Option<&UnionDiagnostic<'_, '_>>,
+        compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'_>>,
     ) {
         let callable_kind = match callable_ty {
@@ -4369,8 +4385,8 @@ impl<'db> BindingError<'db> {
                     diag.sub(sub);
                 }
 
-                if let Some(union_diag) = union_diag {
-                    union_diag.add_union_context(context.db(), &mut diag);
+                if let Some(compound_diag) = compound_diag {
+                    compound_diag.add_context(context.db(), &mut diag);
                 }
             }
 
@@ -4389,8 +4405,8 @@ impl<'db> BindingError<'db> {
                 );
                 diag.set_primary_message(format_args!("Found `{provided_ty_display}`"));
 
-                if let Some(union_diag) = union_diag {
-                    union_diag.add_union_context(context.db(), &mut diag);
+                if let Some(compound_diag) = compound_diag {
+                    compound_diag.add_context(context.db(), &mut diag);
                 }
             }
 
@@ -4408,8 +4424,8 @@ impl<'db> BindingError<'db> {
                     builder.into_diagnostic("Argument expression after ** must be a mapping type");
                 diag.set_primary_message(format_args!("Found `{provided_ty_display}`"));
 
-                if let Some(union_diag) = union_diag {
-                    union_diag.add_union_context(context.db(), &mut diag);
+                if let Some(compound_diag) = compound_diag {
+                    compound_diag.add_context(context.db(), &mut diag);
                 }
             }
 
@@ -4429,8 +4445,8 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ));
-                    if let Some(union_diag) = union_diag {
-                        union_diag.add_union_context(context.db(), &mut diag);
+                    if let Some(compound_diag) = compound_diag {
+                        compound_diag.add_context(context.db(), &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
@@ -4453,8 +4469,8 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ));
-                    if let Some(union_diag) = union_diag {
-                        union_diag.add_union_context(context.db(), &mut diag);
+                    if let Some(compound_diag) = compound_diag {
+                        compound_diag.add_context(context.db(), &mut diag);
                     } else {
                         let span = callable_ty.parameter_span(
                             context.db(),
@@ -4486,8 +4502,8 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ));
-                    if let Some(union_diag) = union_diag {
-                        union_diag.add_union_context(context.db(), &mut diag);
+                    if let Some(compound_diag) = compound_diag {
+                        compound_diag.add_context(context.db(), &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
@@ -4515,8 +4531,8 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ));
-                    if let Some(union_diag) = union_diag {
-                        union_diag.add_union_context(context.db(), &mut diag);
+                    if let Some(compound_diag) = compound_diag {
+                        compound_diag.add_context(context.db(), &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
@@ -4542,8 +4558,8 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ));
-                    if let Some(union_diag) = union_diag {
-                        union_diag.add_union_context(context.db(), &mut diag);
+                    if let Some(compound_diag) = compound_diag {
+                        compound_diag.add_context(context.db(), &mut diag);
                     }
                 }
             }
@@ -4596,8 +4612,8 @@ impl<'db> BindingError<'db> {
                     diag.sub(sub);
                 }
 
-                if let Some(union_diag) = union_diag {
-                    union_diag.add_union_context(context.db(), &mut diag);
+                if let Some(compound_diag) = compound_diag {
+                    compound_diag.add_context(context.db(), &mut diag);
                 }
             }
 
@@ -4607,7 +4623,7 @@ impl<'db> BindingError<'db> {
                     node,
                     callable_ty,
                     callable_description,
-                    union_diag,
+                    compound_diag,
                     matching_overload,
                 );
             }
@@ -4623,8 +4639,8 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ));
-                    if let Some(union_diag) = union_diag {
-                        union_diag.add_union_context(context.db(), &mut diag);
+                    if let Some(compound_diag) = compound_diag {
+                        compound_diag.add_context(context.db(), &mut diag);
                     }
                 }
             }
@@ -4643,8 +4659,8 @@ impl<'db> BindingError<'db> {
                         "This type includes all possible callables, so it cannot safely be called \
                         because there is no valid set of arguments for it",
                     );
-                    if let Some(union_diag) = union_diag {
-                        union_diag.add_union_context(context.db(), &mut diag);
+                    if let Some(compound_diag) = compound_diag {
+                        compound_diag.add_context(context.db(), &mut diag);
                     }
                 }
             }
@@ -4678,6 +4694,12 @@ impl<'db> BindingError<'db> {
     }
 }
 
+/// Trait for adding context about compound types (unions/intersections) to diagnostics.
+trait CompoundDiagnostic {
+    /// Adds context about any relevant compound type function types to the given diagnostic.
+    fn add_context(&self, db: &dyn Db, diag: &mut Diagnostic);
+}
+
 /// Contains additional context for union specific diagnostics.
 ///
 /// This is used when a function call is inconsistent with one or more variants
@@ -4690,10 +4712,8 @@ struct UnionDiagnostic<'b, 'db> {
     binding: &'b CallableBinding<'db>,
 }
 
-impl UnionDiagnostic<'_, '_> {
-    /// Adds context about any relevant union function types to the given
-    /// diagnostic.
-    fn add_union_context(&self, db: &'_ dyn Db, diag: &mut Diagnostic) {
+impl CompoundDiagnostic for UnionDiagnostic<'_, '_> {
+    fn add_context(&self, db: &dyn Db, diag: &mut Diagnostic) {
         let sub = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             format_args!(
@@ -4707,6 +4727,40 @@ impl UnionDiagnostic<'_, '_> {
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Attempted to call union type `{}`",
+                self.callable_type.display(db)
+            ),
+        );
+        diag.sub(sub);
+    }
+}
+
+/// Contains additional context for intersection specific diagnostics.
+///
+/// This is used when a function call is inconsistent with all elements
+/// of an intersection. This can be used to attach sub-diagnostics that clarify that
+/// the error is part of an intersection.
+struct IntersectionDiagnostic<'b, 'db> {
+    /// The type of the intersection.
+    callable_type: Type<'db>,
+    /// The specific binding that failed.
+    binding: &'b CallableBinding<'db>,
+}
+
+impl CompoundDiagnostic for IntersectionDiagnostic<'_, '_> {
+    fn add_context(&self, db: &dyn Db, diag: &mut Diagnostic) {
+        let sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "Intersection element `{callable_ty}` is incompatible with this call site",
+                callable_ty = self.binding.callable_type.display(db),
+            ),
+        );
+        diag.sub(sub);
+
+        let sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "Attempted to call intersection type `{}`",
                 self.callable_type.display(db)
             ),
         );

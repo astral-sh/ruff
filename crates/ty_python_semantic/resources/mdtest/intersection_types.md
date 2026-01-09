@@ -987,6 +987,24 @@ def _(
     reveal_type(x())  # revealed: Bar
 ```
 
+If all elements are callable but all reject the specific call (e.g., incompatible arguments), we
+show errors for each failing element:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+def _(
+    x: Intersection[Callable[[int], str], Callable[[str], int]],
+) -> None:
+    # Both callables reject a `float` argument:
+    # - `Callable[[int], str]` expects `int`
+    # - `Callable[[str], int]` expects `str`
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    x(1.0)
+```
+
 If no positive element is callable, the intersection is not callable:
 
 ```py
@@ -997,7 +1015,7 @@ class B: ...
 
 def _(x: Intersection[A, B]) -> None:
     # error: [call-non-callable] "Object of type `A & B` is not callable"
-    x()
+    reveal_type(x())  # revealed: Unknown
 ```
 
 ## Invalid
