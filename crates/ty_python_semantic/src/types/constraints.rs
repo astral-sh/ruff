@@ -1098,11 +1098,10 @@ impl<'db> Node<'db> {
         path: &mut PathAssignments<'db>,
     ) {
         if let Some((constraint, rest)) = missing.split_first() {
-            let source_order = path.support_source_order_for(*constraint);
-            path.walk_edge(db, constraint.when_true(), source_order, |path, _| {
+            path.walk_edge(db, constraint.when_true(), |path, _| {
                 self.for_each_path_with_missing(db, rest, f, path);
             });
-            path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+            path.walk_edge(db, constraint.when_false(), |path, _| {
                 self.for_each_path_with_missing(db, rest, f, path);
             });
         } else {
@@ -1121,11 +1120,10 @@ impl<'db> Node<'db> {
             Node::AlwaysFalse => {}
             Node::Interior(interior) => {
                 let constraint = interior.constraint(db);
-                let source_order = path.support_source_order_for(constraint);
-                path.walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                path.walk_edge(db, constraint.when_true(), |path, _| {
                     interior.if_true(db).for_each_path_inner(db, f, path);
                 });
-                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                path.walk_edge(db, constraint.when_false(), |path, _| {
                     interior.if_false(db).for_each_path_inner(db, f, path);
                 });
             }
@@ -1153,9 +1151,8 @@ impl<'db> Node<'db> {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
-                let source_order = path.support_source_order_for(constraint);
                 let true_always_satisfied = path
-                    .walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                    .walk_edge(db, constraint.when_true(), |path, _| {
                         interior.if_true(db).is_always_satisfied_inner(db, path)
                     })
                     .unwrap_or(true);
@@ -1164,7 +1161,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                path.walk_edge(db, constraint.when_false(), |path, _| {
                     interior.if_false(db).is_always_satisfied_inner(db, path)
                 })
                 .unwrap_or(true)
@@ -1193,9 +1190,8 @@ impl<'db> Node<'db> {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
-                let source_order = path.support_source_order_for(constraint);
                 let true_never_satisfied = path
-                    .walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                    .walk_edge(db, constraint.when_true(), |path, _| {
                         interior.if_true(db).is_never_satisfied_inner(db, path)
                     })
                     .unwrap_or(true);
@@ -1204,7 +1200,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                path.walk_edge(db, constraint.when_false(), |path, _| {
                     interior.if_false(db).is_never_satisfied_inner(db, path)
                 })
                 .unwrap_or(true)
@@ -2100,7 +2096,6 @@ impl<'db> InteriorNode<'db> {
         path: &mut PathAssignments<'db>,
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
-        let self_source_order = path.support_source_order_for(self_constraint);
         if should_remove(self_constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
             // with the OR of its if_false/if_true edges. That is, the result is true if there's
@@ -2110,68 +2105,50 @@ impl<'db> InteriorNode<'db> {
             // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
             // corresponding branch.
             let if_true = path
-                .walk_edge(
-                    db,
-                    self_constraint.when_true(),
-                    self_source_order,
-                    |path, new_range| {
-                        let branch = self.if_true(db).abstract_one_inner(db, should_remove, path);
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|(assignment, _)| {
-                                // Don't add back any derived facts if they are ones that we would have
-                                // removed!
-                                !should_remove(assignment.constraint())
-                            })
-                            .fold(branch, |branch, (assignment, _)| {
-                                branch.and(db, Node::new_satisfied_constraint(db, *assignment))
-                            })
-                    },
-                )
+                .walk_edge(db, self_constraint.when_true(), |path, new_range| {
+                    let branch = self.if_true(db).abstract_one_inner(db, should_remove, path);
+                    path.assignments[new_range]
+                        .iter()
+                        .filter(|(assignment, _)| {
+                            // Don't add back any derived facts if they are ones that we would have
+                            // removed!
+                            !should_remove(assignment.constraint())
+                        })
+                        .fold(branch, |branch, (assignment, _)| {
+                            branch.and(db, Node::new_satisfied_constraint(db, *assignment))
+                        })
+                })
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
-                .walk_edge(
-                    db,
-                    self_constraint.when_false(),
-                    self_source_order,
-                    |path, new_range| {
-                        let branch = self
-                            .if_false(db)
-                            .abstract_one_inner(db, should_remove, path);
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|(assignment, _)| {
-                                // Don't add back any derived facts if they are ones that we would have
-                                // removed!
-                                !should_remove(assignment.constraint())
-                            })
-                            .fold(branch, |branch, (assignment, _)| {
-                                branch.and(db, Node::new_satisfied_constraint(db, *assignment))
-                            })
-                    },
-                )
+                .walk_edge(db, self_constraint.when_false(), |path, new_range| {
+                    let branch = self
+                        .if_false(db)
+                        .abstract_one_inner(db, should_remove, path);
+                    path.assignments[new_range]
+                        .iter()
+                        .filter(|(assignment, _)| {
+                            // Don't add back any derived facts if they are ones that we would have
+                            // removed!
+                            !should_remove(assignment.constraint())
+                        })
+                        .fold(branch, |branch, (assignment, _)| {
+                            branch.and(db, Node::new_satisfied_constraint(db, *assignment))
+                        })
+                })
                 .unwrap_or(Node::AlwaysFalse);
             if_true.or(db, if_false)
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
             let if_true = path
-                .walk_edge(
-                    db,
-                    self_constraint.when_true(),
-                    self_source_order,
-                    |path, _| self.if_true(db).abstract_one_inner(db, should_remove, path),
-                )
+                .walk_edge(db, self_constraint.when_true(), |path, _| {
+                    self.if_true(db).abstract_one_inner(db, should_remove, path)
+                })
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
-                .walk_edge(
-                    db,
-                    self_constraint.when_false(),
-                    self_source_order,
-                    |path, _| {
-                        self.if_false(db)
-                            .abstract_one_inner(db, should_remove, path)
-                    },
-                )
+                .walk_edge(db, self_constraint.when_false(), |path, _| {
+                    self.if_false(db)
+                        .abstract_one_inner(db, should_remove, path)
+                })
                 .unwrap_or(Node::AlwaysFalse);
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
@@ -3248,13 +3225,6 @@ impl<'db> PathAssignments<'db> {
         }
     }
 
-    fn support_source_order_for(&self, constraint: ConstrainedTypeVar<'db>) -> usize {
-        self.discovered
-            .get_index_of(&constraint)
-            .map(|index| index + 1)
-            .unwrap_or(0)
-    }
-
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
     /// constraint that the BDD node checks, and whether we are following the `if_true` or
     /// `if_false` edge.
@@ -3281,7 +3251,6 @@ impl<'db> PathAssignments<'db> {
         &mut self,
         db: &'db dyn Db,
         assignment: ConstraintAssignment<'db>,
-        source_order: usize,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
         // Record a snapshot of the assignments that we already knew held — both so that we can
@@ -3299,6 +3268,11 @@ impl<'db> PathAssignments<'db> {
             edge = %assignment.display(db),
             "walk edge",
         );
+        let source_order = self
+            .discovered
+            .get_index_of(&assignment.constraint())
+            .map(|index| index + 1)
+            .unwrap_or(0);
         let found_conflict = self.add_assignment(db, assignment, source_order);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
