@@ -52,14 +52,14 @@ fn config_override_python_version() -> anyhow::Result<()> {
     ----- stderr -----
     "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -86,7 +86,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -102,9 +102,9 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-platform").arg("all"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python-platform").arg("all"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -120,7 +120,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -168,7 +168,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     ----- stderr -----
     "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -185,7 +185,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -203,7 +203,7 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     // If `./src` didn't take priority over `.` here, we would report
     // "Module `src.package` has no member `nonexistent_submodule`"
     // instead of "Module `package` has no member `nonexistent_submodule`".
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -218,7 +218,7 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -243,7 +243,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.8/bin/python"), @r###"
+    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.8/bin/python"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -262,7 +262,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     let pypy_case = CliTest::with_files([
         ("pythons/pypy3.8/bin/python", ""),
@@ -270,7 +270,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.8/bin/python"), @r###"
+    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.8/bin/python"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -289,7 +289,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     let free_threaded_case = CliTest::with_files([
         ("pythons/Python3.13t/bin/python", ""),
@@ -300,7 +300,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
         ("test.py", "import string.templatelib"),
     ])?;
 
-    assert_cmd_snapshot!(free_threaded_case.command().arg("--python").arg("pythons/Python3.13t/bin/python"), @r###"
+    assert_cmd_snapshot!(free_threaded_case.command().arg("--python").arg("pythons/Python3.13t/bin/python"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -319,7 +319,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -384,7 +384,7 @@ import colorama
     // Try all 4 pythons with absolute paths to our fauxbrew install
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .arg("--python").arg(case.root().join("opt/homebrew/bin/python3")), @r"
+        .arg("--python").arg(case.root().join("opt/homebrew/bin/python3")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -425,7 +425,7 @@ import colorama
 
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/bin/python3")), @r"
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/bin/python3")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -466,7 +466,7 @@ import colorama
 
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3")), @r"
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -507,7 +507,7 @@ import colorama
 
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13")), @r"
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -579,7 +579,7 @@ import bar",
         "strange-venv-location/bin/python",
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--python").arg("strange-venv-location/bin/python"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python").arg("strange-venv-location/bin/python"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -600,7 +600,7 @@ import bar",
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -628,7 +628,7 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
         ("test.py", "import foo, bar, baz"),
     ])?;
 
-    assert_cmd_snapshot!(case.command().arg("--python").arg(".venv"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python").arg(".venv"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -649,7 +649,7 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -675,7 +675,7 @@ fn many_search_paths() -> anyhow::Result<()> {
             .arg("--extra-search-path").arg("extra4")
             .arg("--extra-search-path").arg("extra5")
             .arg("--extra-search-path").arg("extra6"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -711,7 +711,7 @@ fn many_search_paths() -> anyhow::Result<()> {
             .arg("--extra-search-path").arg("extra5")
             .arg("--extra-search-path").arg("extra6")
             .arg("-v"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -772,7 +772,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -831,7 +831,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -906,7 +906,7 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
     ----- stderr -----
     "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r"
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -953,27 +953,27 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ])?;
 
     // Passing a path to the installation works
-    assert_cmd_snapshot!(case.command().arg("--python").arg("my-venv"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python").arg("my-venv"), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     // And so does passing a path to the executable inside the installation
-    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     // But random other paths inside the installation are rejected
-    assert_cmd_snapshot!(case.command().arg("--python").arg(other_venv_path), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python").arg(other_venv_path), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -981,10 +981,10 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ----- stderr -----
     ty failed
       Cause: Invalid `--python` argument `<temp_dir>/my-venv/foo/some_other_file.txt`: does not point to a Python executable or a directory on disk
-    "###);
+    ");
 
     // And so are paths that do not exist on disk
-    assert_cmd_snapshot!(case.command().arg("--python").arg("not-a-directory-or-executable"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python").arg("not-a-directory-or-executable"), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -993,7 +993,7 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ty failed
       Cause: Invalid `--python` argument `<temp_dir>/not-a-directory-or-executable`: does not point to a Python executable or a directory on disk
       Cause: No such file or directory (os error 2)
-    "###);
+    ");
 
     Ok(())
 }
@@ -1020,24 +1020,24 @@ fn python_cli_argument_system_installation() -> anyhow::Result<()> {
     ])?;
 
     // Passing a path to the installation works
-    assert_cmd_snapshot!(case.command().arg("--python").arg("Python3.11"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python").arg("Python3.11"), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     // And so does passing a path to the executable inside the installation
-    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @r###"
+    assert_cmd_snapshot!(case.command().arg("--python").arg(path_to_executable), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -1063,7 +1063,7 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
         ("test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1081,7 +1081,7 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
        |
 
       Cause: No such file or directory (os error 2)
-    "###);
+    "#);
 
     Ok(())
 }
@@ -1100,7 +1100,7 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
         ("test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1117,7 +1117,7 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Could not find a `site-packages` directory for this Python installation/executable
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -1138,7 +1138,7 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
         ("test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1155,7 +1155,7 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -1256,14 +1256,14 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -1417,7 +1417,7 @@ home = ./
 
     // Run with nothing set, should find the working venv
     assert_cmd_snapshot!(case.command()
-        .current_dir(case.root().join("project")), @r###"
+        .current_dir(case.root().join("project")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1435,12 +1435,12 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Run with VIRTUAL_ENV set, should find the active venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1457,12 +1457,12 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with CONDA_PREFIX set, should find the child conda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env")), @r###"
+        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1480,13 +1480,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV set (unequal), should find working venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("CONDA_DEFAULT_ENV", "base"), @r###"
+        .env("CONDA_DEFAULT_ENV", "base"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1504,7 +1504,7 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (unequal) and VIRTUAL_ENV set,
     // should find child active venv
@@ -1512,7 +1512,7 @@ home = ./
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
         .env("CONDA_DEFAULT_ENV", "base")
-        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1529,13 +1529,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (equal!) set, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("CONDA_DEFAULT_ENV", "conda-env"), @r###"
+        .env("CONDA_DEFAULT_ENV", "conda-env"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1553,13 +1553,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with _CONDA_ROOT and CONDA_PREFIX (unequal!) set, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @r###"
+        .env("_CONDA_ROOT", "conda"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1577,13 +1577,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @r###"
+        .env("_CONDA_ROOT", "conda"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1600,7 +1600,7 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -1673,7 +1673,7 @@ home = ./
 
     // Run with nothing set, should fail to find anything
     assert_cmd_snapshot!(case.command()
-        .current_dir(case.root().join("project")), @r###"
+        .current_dir(case.root().join("project")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1738,12 +1738,12 @@ home = ./
     Found 4 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Run with VIRTUAL_ENV set, should find the active venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1760,12 +1760,12 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with CONDA_PREFIX set, should find the child conda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env")), @r###"
+        .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1783,13 +1783,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV set (unequal), should find base conda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("CONDA_DEFAULT_ENV", "base"), @r###"
+        .env("CONDA_DEFAULT_ENV", "base"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1806,7 +1806,7 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (unequal) and VIRTUAL_ENV set,
     // should find child active venv
@@ -1814,7 +1814,7 @@ home = ./
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
         .env("CONDA_DEFAULT_ENV", "base")
-        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1831,13 +1831,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (unequal!) set, should find base conda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("CONDA_DEFAULT_ENV", "base"), @r###"
+        .env("CONDA_DEFAULT_ENV", "base"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1854,13 +1854,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with _CONDA_ROOT and CONDA_PREFIX (unequal!) set, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @r###"
+        .env("_CONDA_ROOT", "conda"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1878,13 +1878,13 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @r###"
+        .env("_CONDA_ROOT", "conda"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1901,7 +1901,7 @@ home = ./
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -1941,14 +1941,14 @@ fn ty_environment_is_only_environment() -> anyhow::Result<()> {
     ])?;
 
     let case = case.with_ty_at(ty_executable_path)?;
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2019,7 +2019,7 @@ fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
     ])?
     .with_ty_at(ty_executable_path)?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2036,7 +2036,7 @@ fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2096,7 +2096,7 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command()
             .env("VIRTUAL_ENV", case.root().join("active-venv")),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2154,7 +2154,7 @@ fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
     ])?
     .with_ty_at(ty_executable_path)?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2173,7 +2173,7 @@ fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2191,7 +2191,7 @@ fn src_root_deprecation_warning() -> anyhow::Result<()> {
         ("src/test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2206,7 +2206,7 @@ fn src_root_deprecation_warning() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -2227,7 +2227,7 @@ fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
         ("app/test.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2245,7 +2245,7 @@ fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -2272,7 +2272,7 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
 
     // The test should pass because environment.root points to ./app where my_module.py exists
     // If src.root took precedence, it would fail because my_module.py doesn't exist in ./src
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2290,7 +2290,7 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -2311,14 +2311,14 @@ fn default_root_src_layout() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2346,14 +2346,14 @@ fn default_root_project_name_folder() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2374,14 +2374,14 @@ fn default_root_flat_layout() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2402,14 +2402,14 @@ fn default_root_tests_folder() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2432,7 +2432,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2455,7 +2455,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -2476,14 +2476,14 @@ fn default_root_python_folder() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2506,7 +2506,7 @@ fn default_root_python_package() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2529,7 +2529,7 @@ fn default_root_python_package() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -2552,7 +2552,7 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2575,7 +2575,7 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -2594,7 +2594,7 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(),
-        @r###"
+        @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2615,18 +2615,18 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     assert_cmd_snapshot!(case.command()
         .env("PYTHONPATH", case.root().join("baz-dir")),
-        @r###"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -2649,7 +2649,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(),
-        @r###"
+        @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2686,20 +2686,68 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    "#);
 
     let pythonpath =
         std::env::join_paths([case.root().join("baz-dir"), case.root().join("foo-dir")])?;
     assert_cmd_snapshot!(case.command()
         .env("PYTHONPATH", pythonpath),
-        @r###"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
+
+    Ok(())
+}
+
+/// Test behavior when `VIRTUAL_ENV` is set but points to a non-existent path.
+#[test]
+fn missing_virtual_env() -> anyhow::Result<()> {
+    let working_venv_package1_path = if cfg!(windows) {
+        "project/.venv/Lib/site-packages/package1/__init__.py"
+    } else {
+        "project/.venv/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let case = CliTest::with_files([
+        (
+            "project/test.py",
+            r#"
+            from package1 import WorkingVenv
+            "#,
+        ),
+        (
+            "project/.venv/pyvenv.cfg",
+            r#"
+home = ./
+
+            "#,
+        ),
+        (
+            working_venv_package1_path,
+            r#"
+            class WorkingVenv: ...
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", case.root().join("nonexistent-venv")), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: Failed to discover local Python environment
+      Cause: Invalid `VIRTUAL_ENV` environment variable `<temp_dir>/nonexistent-venv`: does not point to a directory on disk
+      Cause: No such file or directory (os error 2)
+    ");
 
     Ok(())
 }

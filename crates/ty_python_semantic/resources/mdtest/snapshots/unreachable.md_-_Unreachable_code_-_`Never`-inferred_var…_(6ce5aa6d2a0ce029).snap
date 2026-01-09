@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: unreachable.md - Unreachable code - `Never`-inferred variables in type expressions
 mdtest path: crates/ty_python_semantic/resources/mdtest/unreachable.md

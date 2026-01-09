@@ -1,5 +1,112 @@
 # Changelog
 
+## 0.14.11
+
+Released on 2026-01-08.
+
+### Preview features
+
+- Consolidate diagnostics for matched disable/enable suppression comments ([#22099](https://github.com/astral-sh/ruff/pull/22099))
+- Report diagnostics for invalid/unmatched range suppression comments ([#21908](https://github.com/astral-sh/ruff/pull/21908))
+- \[`airflow`\] Passing positional argument into `airflow.lineage.hook.HookLineageCollector.create_asset` is not allowed (`AIR303`) ([#22046](https://github.com/astral-sh/ruff/pull/22046))
+- \[`refurb`\] Mark `FURB192` fix as always unsafe ([#22210](https://github.com/astral-sh/ruff/pull/22210))
+- \[`ruff`\] Add `non-empty-init-module` (`RUF067`) ([#22143](https://github.com/astral-sh/ruff/pull/22143))
+
+### Bug fixes
+
+- Fix GitHub format for multi-line diagnostics ([#22108](https://github.com/astral-sh/ruff/pull/22108))
+- \[`flake8-unused-arguments`\] Mark `**kwargs` in `TypeVar` as used (`ARG001`) ([#22214](https://github.com/astral-sh/ruff/pull/22214))
+
+### Rule changes
+
+- Add `help:` subdiagnostics for several Ruff rules that can sometimes appear to disagree with `ty` ([#22331](https://github.com/astral-sh/ruff/pull/22331))
+- \[`pylint`\] Demote `PLW1510` fix to display-only ([#22318](https://github.com/astral-sh/ruff/pull/22318))
+- \[`pylint`\] Ignore identical members (`PLR1714`) ([#22220](https://github.com/astral-sh/ruff/pull/22220))
+- \[`pylint`\] Improve diagnostic range for `PLC0206` ([#22312](https://github.com/astral-sh/ruff/pull/22312))
+- \[`ruff`\] Improve fix title for `RUF102` invalid rule code ([#22100](https://github.com/astral-sh/ruff/pull/22100))
+- \[`flake8-simplify`\]: Avoid unnecessary builtins import for `SIM105` ([#22358](https://github.com/astral-sh/ruff/pull/22358))
+
+### Configuration
+
+- Allow Python 3.15 as valid `target-version` value in preview ([#22419](https://github.com/astral-sh/ruff/pull/22419))
+- Check `required-version` before parsing rules ([#22410](https://github.com/astral-sh/ruff/pull/22410))
+- Include configured `src` directories when resolving graphs ([#22451](https://github.com/astral-sh/ruff/pull/22451))
+
+### Documentation
+
+- Update `T201` suggestion to not use root logger to satisfy `LOG015` ([#22059](https://github.com/astral-sh/ruff/pull/22059))
+- Fix `iter` example in unsafe fixes doc ([#22118](https://github.com/astral-sh/ruff/pull/22118))
+- \[`flake8_print`\] better suggestion for `basicConfig` in `T201` docs ([#22101](https://github.com/astral-sh/ruff/pull/22101))
+- \[`pylint`\] Restore the fix safety docs for `PLW0133` ([#22211](https://github.com/astral-sh/ruff/pull/22211))
+- Fix Jupyter notebook discovery info for editors ([#22447](https://github.com/astral-sh/ruff/pull/22447))
+
+### Contributors
+
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@cenviity](https://github.com/cenviity)
+- [@njhearp](https://github.com/njhearp)
+- [@cbachhuber](https://github.com/cbachhuber)
+- [@jelle-openai](https://github.com/jelle-openai)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@ValdonVitija](https://github.com/ValdonVitija)
+- [@BurntSushi](https://github.com/BurntSushi)
+- [@Jkhall81](https://github.com/Jkhall81)
+- [@PeterJCLaw](https://github.com/PeterJCLaw)
+- [@harupy](https://github.com/harupy)
+- [@amyreese](https://github.com/amyreese)
+- [@sjyangkevin](https://github.com/sjyangkevin)
+- [@woodruffw](https://github.com/woodruffw)
+
+## 0.14.10
+
+Released on 2025-12-18.
+
+### Preview features
+
+- [formatter] Fluent formatting of method chains ([#21369](https://github.com/astral-sh/ruff/pull/21369))
+- [formatter] Keep lambda parameters on one line and parenthesize the body if it expands ([#21385](https://github.com/astral-sh/ruff/pull/21385))
+- \[`flake8-implicit-str-concat`\] New rule to prevent implicit string concatenation in collections (`ISC004`) ([#21972](https://github.com/astral-sh/ruff/pull/21972))
+- \[`flake8-use-pathlib`\] Make fixes unsafe when types change in compound statements (`PTH104`, `PTH105`, `PTH109`, `PTH115`) ([#22009](https://github.com/astral-sh/ruff/pull/22009))
+- \[`refurb`\] Extend support for `Path.open` (`FURB101`, `FURB103`) ([#21080](https://github.com/astral-sh/ruff/pull/21080))
+
+### Bug fixes
+
+- \[`pyupgrade`\] Fix parsing named Unicode escape sequences (`UP032`) ([#21901](https://github.com/astral-sh/ruff/pull/21901))
+
+### Rule changes
+
+- \[`eradicate`\] Ignore `ruff:disable` and `ruff:enable` comments in `ERA001` ([#22038](https://github.com/astral-sh/ruff/pull/22038))
+- \[`flake8-pytest-style`\] Allow `match` and `check` keyword arguments without an expected exception type (`PT010`) ([#21964](https://github.com/astral-sh/ruff/pull/21964))
+- [syntax-errors] Annotated name cannot be global ([#20868](https://github.com/astral-sh/ruff/pull/20868))
+
+### Documentation
+
+- Add `uv` and `ty` to the Ruff README ([#21996](https://github.com/astral-sh/ruff/pull/21996))
+- Document known lambda formatting deviations from Black ([#21954](https://github.com/astral-sh/ruff/pull/21954))
+- Update `setup.md` ([#22024](https://github.com/astral-sh/ruff/pull/22024))
+- \[`flake8-bandit`\] Fix broken link (`S704`) ([#22039](https://github.com/astral-sh/ruff/pull/22039))
+
+### Other changes
+
+- Fix playground Share button showing "Copied!" before clipboard copy completes ([#21942](https://github.com/astral-sh/ruff/pull/21942))
+
+### Contributors
+
+- [@dylwil3](https://github.com/dylwil3)
+- [@charliecloudberry](https://github.com/charliecloudberry)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@chirizxc](https://github.com/chirizxc)
+- [@ntBre](https://github.com/ntBre)
+- [@zanieb](https://github.com/zanieb)
+- [@amyreese](https://github.com/amyreese)
+- [@hauntsaninja](https://github.com/hauntsaninja)
+- [@11happy](https://github.com/11happy)
+- [@mahiro72](https://github.com/mahiro72)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@phongddo](https://github.com/phongddo)
+- [@PeterJCLaw](https://github.com/PeterJCLaw)
+
 ## 0.14.9
 
 Released on 2025-12-11.

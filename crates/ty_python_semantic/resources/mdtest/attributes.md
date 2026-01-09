@@ -1208,7 +1208,7 @@ def _(flag: bool):
     reveal_type(C1.y)  # revealed: int | str
 
     C1.y = 100
-    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'C1'> | <class 'C1'>`"
+    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:8'>`"
     C1.y = "problematic"
 
     class C2:
@@ -1867,7 +1867,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
-        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
+        # error: [invalid-assignment]
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
@@ -2000,6 +2000,64 @@ import argparse
 
 def _(ns: argparse.Namespace):
     ns.whatever = 42
+```
+
+### `__setattr__` is a fallback for explicitly defined attributes
+
+When a class has both a custom `__setattr__` method and explicitly defined attributes, the
+`__setattr__` method is treated as a fallback. The type of the explicit attribute takes precedence
+over the `__setattr__` parameter type.
+
+This matches the behavior of other type checkers and reflects the common pattern in libraries like
+PyTorch, where `__setattr__` may have a narrow type signature but forwards to
+`super().__setattr__()` for attributes that don't match.
+
+```py
+from typing import Union
+
+class Tensor: ...
+
+class Module:
+    def __setattr__(self, name: str, value: Union[Tensor, "Module"]) -> None:
+        super().__setattr__(name, value)
+
+class MyModule(Module):
+    some_param: int  # Explicit attribute with type `int`
+
+def use_module(m: MyModule, param: int) -> None:
+    # This is allowed because `some_param` is explicitly defined with type `int`,
+    # even though `__setattr__` only accepts `Union[Tensor, Module]`.
+    m.some_param = param
+
+    # But assigning to an attribute that's not explicitly defined will still
+    # use `__setattr__` for validation.
+    # error: [unresolved-attribute] "Cannot assign object of type `int` to attribute `undefined_param` on type `MyModule` with custom `__setattr__` method."
+    m.undefined_param = param
+```
+
+### `__setattr__` returning `Never` blocks all assignments
+
+When `__setattr__` returns `Never` (indicating an immutable class), all attribute assignments are
+blocked, even if the value type doesn't match `__setattr__`'s parameter type.
+
+```py
+from typing import NoReturn
+
+class Immutable:
+    x: float
+
+    def __setattr__(self, name: str, value: int) -> NoReturn:
+        raise AttributeError("Immutable")
+
+def _(obj: Immutable) -> None:
+    # Even though `"foo"` doesn't match `__setattr__`'s `value: int` parameter,
+    # we still detect that `__setattr__` returns `Never` and block the assignment.
+    # error: [invalid-assignment] "Cannot assign to attribute `x` on type `Immutable` whose `__setattr__` method returns `Never`/`NoReturn`"
+    obj.x = "foo"
+
+    # Same for assignments that would match `__setattr__`'s parameter type.
+    # error: [invalid-assignment] "Cannot assign to attribute `x` on type `Immutable` whose `__setattr__` method returns `Never`/`NoReturn`"
+    obj.x = 42
 ```
 
 ## Objects of all types have a `__class__` method
@@ -2773,6 +2831,23 @@ import baz
 reveal_type(foo.bar)  # revealed: Unknown
 # error: [possibly-missing-attribute]
 reveal_type(baz.bar)  # revealed: Unknown
+```
+
+## Diagnostic for function attribute accessed on `Callable` type
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable
+
+def f(x: Callable):
+    x.__name__  # error: [unresolved-attribute]
+    x.__annotate__  # error: [unresolved-attribute]
 ```
 
 ## References

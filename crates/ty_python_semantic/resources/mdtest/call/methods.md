@@ -444,20 +444,18 @@ When a `@classmethod` is additionally decorated with another decorator, it is st
 class method:
 
 ```py
-from __future__ import annotations
-
 def does_nothing[T](f: T) -> T:
     return f
 
 class C:
     @classmethod
     @does_nothing
-    def f1(cls: type[C], x: int) -> str:
+    def f1(cls, x: int) -> str:
         return "a"
 
     @does_nothing
     @classmethod
-    def f2(cls: type[C], x: int) -> str:
+    def f2(cls, x: int) -> str:
         return "a"
 
 reveal_type(C.f1(1))  # revealed: str
@@ -590,6 +588,31 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+When a `@staticmethod` is decorated with `@contextmanager`, accessing it from an instance should not
+bind `self`:
+
+```py
+from contextlib import contextmanager
+from collections.abc import Iterator
+
+class D:
+    @staticmethod
+    @contextmanager
+    def ctx(num: int) -> Iterator[int]:
+        yield num
+
+    def use_ctx(self) -> None:
+        # Accessing via self should not bind self
+        with self.ctx(10) as x:
+            reveal_type(x)  # revealed: int
+
+# Accessing via class works
+reveal_type(D.ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
+
+# Accessing via instance should also work (no self-binding)
+reveal_type(D().ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
+```
+
 ### `__new__`
 
 `__new__` is an implicit `@staticmethod`; accessing it on an instance does not bind the `cls`
@@ -600,9 +623,9 @@ from typing_extensions import Self
 
 reveal_type(object.__new__)  # revealed: def __new__(cls) -> Self@__new__
 reveal_type(object().__new__)  # revealed: def __new__(cls) -> Self@__new__
-# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
 reveal_type(int.__new__)
-# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
 reveal_type((42).__new__)
 
 class X:

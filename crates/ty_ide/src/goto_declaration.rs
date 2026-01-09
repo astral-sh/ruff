@@ -46,7 +46,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:5:10
           |
@@ -74,7 +74,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:5
           |
@@ -104,7 +104,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:6:12
           |
@@ -134,7 +134,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:12
           |
@@ -162,7 +162,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:8
           |
@@ -192,7 +192,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:31
           |
@@ -368,7 +368,7 @@ FOO = 0
             .build();
 
         // Should find the submodule file itself
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
@@ -383,6 +383,29 @@ FOO = 0
           | -
         2 | FOO = 0
           |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_from_import_rhs_is_module() {
+        let test = CursorTest::builder()
+            .source("lib/__init__.py", r#""#)
+            .source("lib/module.py", r#""#)
+            .source("main.py", r#"from lib import module<CURSOR>"#)
+            .build();
+
+        // Should resolve to the actual function definition, not the import statement
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:1:17
+          |
+        1 | from lib import module
+          |                 ^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+        --> lib/module.py:1:1
+         |
+         |
         ");
     }
 
@@ -634,7 +657,7 @@ FOO = 0
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:30
           |
@@ -676,7 +699,7 @@ FOO = 0
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:17
           |
@@ -846,7 +869,7 @@ def another_helper(path):
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:7:7
           |
@@ -1103,7 +1126,7 @@ def another_helper(path):
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
           --> main.py:11:9
            |
@@ -1137,7 +1160,7 @@ def another_helper(path):
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:7:7
           |
@@ -1171,7 +1194,7 @@ def another_helper(path):
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:7:9
           |
@@ -1390,7 +1413,7 @@ def function():
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:9:7
           |
@@ -1622,7 +1645,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
           --> main.py:10:30
            |
@@ -1661,7 +1684,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
           --> main.py:11:17
            |
@@ -1748,7 +1771,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:13
           |
@@ -1772,7 +1795,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:37
           |
@@ -1797,7 +1820,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:15
           |
@@ -1824,7 +1847,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:43
           |
@@ -1850,7 +1873,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:14
           |
@@ -1874,7 +1897,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:38
           |
@@ -1907,7 +1930,7 @@ def function():
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
           --> main.py:11:3
            |
@@ -1980,7 +2003,7 @@ def function():
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:9:9
           |
@@ -2014,7 +2037,7 @@ class MyClass:
         );
 
         // Should find the ClassType defined in the class body, not fail to resolve
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:5:40
           |
@@ -2047,7 +2070,7 @@ class MyClass:
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:5:25
           |
@@ -2143,7 +2166,7 @@ def ab(a: str): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
@@ -2253,7 +2276,7 @@ def ab(a: int): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
@@ -2308,7 +2331,7 @@ def ab(a: int): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
@@ -2366,7 +2389,7 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
@@ -2428,7 +2451,7 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
@@ -2479,7 +2502,7 @@ def ab(a: int, *, c: int): ...
         // This happens because DefinitionKind::ImportFromSubmodule claims the entire ImportFrom node,
         // which is correct but unhelpful. Unfortunately even if it only claimed the LHS identifier it
         // would highlight `subpkg.submod` which is strictly better but still isn't what we want.
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:4:5
           |
@@ -2523,7 +2546,7 @@ def ab(a: int, *, c: int): ...
         // It's a bit confusing because this symbol is essentially the LHS *and* RHS of
         // `subpkg = mypackage.subpkg`. As in, it's both defining a local `subpkg` and
         // loading the module `mypackage.subpkg`, so, it's understandable to get confused!
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:2:7
           |
@@ -2584,7 +2607,7 @@ def ab(a: int, *, c: int): ...
             .build();
 
         // Going to the submod module is correct!
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:2:14
           |
@@ -2623,7 +2646,7 @@ def ab(a: int, *, c: int): ...
             .build();
 
         // Going to the subpkg module is correct!
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:2:7
           |
@@ -2662,7 +2685,7 @@ def ab(a: int, *, c: int): ...
             .build();
 
         // Going to the subpkg `int` is correct!
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:2:21
           |
@@ -2712,7 +2735,7 @@ def ab(a: int, *, c: int): ...
         // * `the RHS `subpkg` in the import is a second instance of `subpkg = ...`
         //    that *immediately* overwrites the `ImportFromSubmodule`'s definition
         //    This span seemingly doesn't appear at all!? Is it getting hidden by the LHS span?
-        assert_snapshot!(test.goto_declaration(), @r"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:4:5
           |

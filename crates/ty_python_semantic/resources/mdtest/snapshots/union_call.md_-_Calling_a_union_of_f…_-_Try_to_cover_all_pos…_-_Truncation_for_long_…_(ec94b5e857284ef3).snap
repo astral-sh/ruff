@@ -1,8 +1,8 @@
 ---
 source: crates/ty_test/src/lib.rs
-assertion_line: 427
 expression: snapshot
 ---
+
 ---
 mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - Truncation for long unions and literals
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md

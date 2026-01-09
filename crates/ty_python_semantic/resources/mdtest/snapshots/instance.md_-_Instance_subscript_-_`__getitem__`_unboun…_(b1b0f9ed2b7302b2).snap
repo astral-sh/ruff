@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: instance.md - Instance subscript - `__getitem__` unbound
 mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/instance.md
@@ -14,20 +15,20 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/instance.md
 ```
 1 | class NotSubscriptable: ...
 2 | 
-3 | a = NotSubscriptable()[0]  # error: [non-subscriptable]
+3 | a = NotSubscriptable()[0]  # error: [not-subscriptable]
 ```
 
 # Diagnostics
 
 ```
-error[non-subscriptable]: Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method
+error[not-subscriptable]: Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method
  --> src/mdtest_snippet.py:3:5
   |
 1 | class NotSubscriptable: ...
 2 |
-3 | a = NotSubscriptable()[0]  # error: [non-subscriptable]
+3 | a = NotSubscriptable()[0]  # error: [not-subscriptable]
   |     ^^^^^^^^^^^^^^^^^^^^^
   |
-info: rule `non-subscriptable` is enabled by default
+info: rule `not-subscriptable` is enabled by default
 
 ```

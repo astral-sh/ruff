@@ -1880,6 +1880,38 @@
             "object",
             "null"
           ],
+          "properties": {
+            "first-party": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "future": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "local-folder": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "standard-library": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "third-party": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
           "additionalProperties": {
             "type": "array",
             "items": {
@@ -2852,7 +2884,8 @@
         "py311",
         "py312",
         "py313",
-        "py314"
+        "py314",
+        "py315"
       ]
     },
     "Quote": {
@@ -2926,6 +2959,13 @@
             "boolean",
             "null"
           ]
+        },
+        "strictly-empty-init-modules": {
+          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\ndocstrings (see `RUF067`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -2951,6 +2991,7 @@
         "AIR30",
         "AIR301",
         "AIR302",
+        "AIR303",
         "AIR31",
         "AIR311",
         "AIR312",
@@ -3482,6 +3523,7 @@
         "ISC001",
         "ISC002",
         "ISC003",
+        "ISC004",
         "LOG",
         "LOG0",
         "LOG00",
@@ -4045,11 +4087,14 @@
         "RUF064",
         "RUF065",
         "RUF066",
+        "RUF067",
         "RUF1",
         "RUF10",
         "RUF100",
         "RUF101",
         "RUF102",
+        "RUF103",
+        "RUF104",
         "RUF2",
         "RUF20",
         "RUF200",

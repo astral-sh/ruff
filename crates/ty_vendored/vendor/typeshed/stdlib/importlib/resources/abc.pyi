@@ -1,4 +1,5 @@
 import sys
+from _typeshed import StrPath
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator
 from io import BufferedReader
@@ -65,7 +66,7 @@ if sys.version_info >= (3, 11):
             """
 
         @abstractmethod
-        def joinpath(self, *descendants: str) -> Traversable:
+        def joinpath(self, *descendants: StrPath) -> Traversable:
             """
             Return Traversable resolved with any descendants applied.
 
@@ -97,7 +98,7 @@ if sys.version_info >= (3, 11):
             The base name of this object without any parent references.
             """
 
-        def __truediv__(self, child: str, /) -> Traversable:
+        def __truediv__(self, child: StrPath, /) -> Traversable:
             """
             Return Traversable child in self
             """

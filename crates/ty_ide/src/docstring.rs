@@ -196,6 +196,7 @@ fn render_markdown(docstring: &str) -> String {
     let mut first_line = true;
     let mut block_indent = 0;
     let mut in_doctest = false;
+    let mut in_markdown_with_fence = None;
     let mut starting_literal = None;
     let mut in_literal = false;
     let mut in_any_code = false;
@@ -217,6 +218,7 @@ fn render_markdown(docstring: &str) -> String {
                 output.push('\n');
             }
         }
+        first_line = false;
 
         // If we're in a literal block and we find a non-empty dedented line, end the block
         // TODO: we should remove all the trailing blank lines
@@ -252,6 +254,53 @@ fn render_markdown(docstring: &str) -> String {
             // TODO: is there something more specific? `pycon`?
             output.push_str(FENCE);
             output.push_str("python\n");
+        }
+
+        // If we're not in a codeblock and we see a markdown codefence, start one
+        let has_tick_fence = line.starts_with("```");
+        let has_tilde_fence = line.starts_with("~~~");
+        if !in_any_code && (has_tick_fence || has_tilde_fence) {
+            let without_leading_fence = if has_tick_fence {
+                line.trim_start_matches('`')
+            } else {
+                line.trim_start_matches('~')
+            };
+            let fence_len = line.len() - without_leading_fence.len();
+            let fence = &line[..fence_len];
+            // If we don't see this amount of ticks again on the line, assume we're opening a markdown block
+            // (We *don't* want to consider ```hello``` as a codefence, that's inline code!)
+            if !without_leading_fence.contains(fence) {
+                // Unlike other blocks we don't need to emit fences because it's already markdown
+                block_indent = line_indent;
+                in_any_code = true;
+                in_markdown_with_fence = Some(fence.to_owned());
+                // Render the line verbatim without its indent and move on.
+                //
+                // If there's any indent this is really just Bad Syntax but it "makes sense"
+                // to someone writing docs like this:
+                //
+                // Returns:
+                //     Some details...
+                //     ```
+                //     some_example()
+                //     ```
+                //     etc etc...
+                //
+                // We "make this work" by stripping the indent on the fences but preserving the
+                // full indent of the lines between the fences
+                output.push_str(line);
+                continue;
+            }
+        // If we're in a markdown code fence and this line seems to terminate it, end the block
+        } else if let Some(fence) = &in_markdown_with_fence
+            && line.starts_with(fence)
+        {
+            in_any_code = false;
+            block_indent = 0;
+            in_markdown_with_fence = None;
+            // Render the line without its indent and move on.
+            output.push_str(line);
+            continue;
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
@@ -417,13 +466,15 @@ fn render_markdown(docstring: &str) -> String {
             // Print the line verbatim, it's in code
             output.push_str(line);
         }
-
-        first_line = false;
     }
     // Flush codeblock
     if in_any_code {
         output.push('\n');
-        output.push_str(FENCE);
+        if let Some(fence) = &in_markdown_with_fence {
+            output.push_str(fence);
+        } else {
+            output.push_str(FENCE);
+        }
     }
 
     output
@@ -1061,7 +1112,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         Some much-updated docs  
           
         **version-added:** *3.0*  
@@ -1089,9 +1140,245 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         **wow this is some changes deprecated:** *1.2.3*  
         &nbsp;&nbsp;&nbsp;&nbsp;x = 2
+        ");
+    }
+
+    // We should not parse the contents of a markdown codefence
+    #[test]
+    fn explicit_markdown_block_with_ps1_contents() {
+        let docstring = r#"
+        My cool func:
+        
+        ```python
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ```
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ```python
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ```
+        ");
+    }
+
+    // We should not parse the contents of a markdown codefence
+    #[test]
+    fn explicit_markdown_block_with_underscore_contents_tick() {
+        let docstring = r#"
+        My cool func:
+        
+        `````python
+        x_y = thing_do();
+        ``` # this should't close the fence!
+        a_b = other_thing();
+        `````
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        `````python
+        x_y = thing_do();
+        ``` # this should't close the fence!
+        a_b = other_thing();
+        `````
+        ");
+    }
+
+    // `~~~` also starts a markdown codefence
+    #[test]
+    fn explicit_markdown_block_with_underscore_contents_tilde() {
+        let docstring = r#"
+        My cool func:
+        
+        ~~~~~python
+        x_y = thing_do();
+        ~~~ # this should't close the fence!
+        a_b = other_thing();
+        ~~~~~
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ~~~~~python
+        x_y = thing_do();
+        ~~~ # this should't close the fence!
+        a_b = other_thing();
+        ~~~~~
+        ");
+    }
+
+    // If an explicit markdown codefence is indented, eat the indent so it renders
+    // "the way the user expects" (as written this is basically invalid markdown,
+    // but it's nice if we handle it anyway because it makes visual sense).
+    #[test]
+    fn explicit_markdown_block_with_indent_tick() {
+        let docstring = r#"
+        My cool func...
+        
+        Returns:
+            Some details
+            `````python
+            x_y = thing_do();
+            ``` # this should't close the fence!
+            a_b = other_thing();
+            `````
+            And so on.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func...  
+          
+        Returns:  
+        &nbsp;&nbsp;&nbsp;&nbsp;Some details  
+        `````python
+            x_y = thing_do();
+            ``` # this should't close the fence!
+            a_b = other_thing();
+        `````  
+        &nbsp;&nbsp;&nbsp;&nbsp;And so on.
+        ");
+    }
+
+    // If an explicit markdown codefence is indented, eat the indent so it renders
+    // "the way the user expects" (as written this is basically invalid markdown,
+    // but it's nice if we handle it anyway because it makes visual sense).
+    #[test]
+    fn explicit_markdown_block_with_indent_tilde() {
+        let docstring = r#"
+        My cool func...
+        
+        Returns:
+            Some details
+            ~~~~~~python
+            x_y = thing_do();
+            ~~~ # this should't close the fence!
+            a_b = other_thing();
+            ~~~~~~
+            And so on.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func...  
+          
+        Returns:  
+        &nbsp;&nbsp;&nbsp;&nbsp;Some details  
+        ~~~~~~python
+            x_y = thing_do();
+            ~~~ # this should't close the fence!
+            a_b = other_thing();
+        ~~~~~~  
+        &nbsp;&nbsp;&nbsp;&nbsp;And so on.
+        ");
+    }
+
+    // What do we do when we hit the end of the docstring with an unclosed markdown block?
+    #[test]
+    fn explicit_markdown_block_with_unclosed_fence_tick() {
+        let docstring = r#"
+        My cool func:
+        
+        ````python
+        x_y = thing_do();
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ````python
+        x_y = thing_do();
+        ````
+        ");
+    }
+
+    // What do we do when we hit the end of the docstring with an unclosed markdown block?
+    #[test]
+    fn explicit_markdown_block_with_unclosed_fence_tilde() {
+        let docstring = r#"
+        My cool func:
+        
+        ~~~~~python
+        x_y = thing_do();
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ~~~~~python
+        x_y = thing_do();
+        ~~~~~
+        ");
+    }
+
+    // Demonstration of where we're unreasonably lax about markdown block parsing.
+    // It's fine to break this test, it's not particularly intentional behaviour.
+    #[test]
+    fn explicit_markdown_block_messy_corners_tick() {
+        let docstring = r#"
+        My cool func:
+        
+                ``````we still think this is a codefence```
+            x_y = thing_do();
+        ```````````` and are sloppy as heck with indentation and closing shrugggg
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ``````we still think this is a codefence```
+            x_y = thing_do();
+        ```````````` and are sloppy as heck with indentation and closing shrugggg
+        ");
+    }
+
+    // Demonstration of where we're unreasonably lax about markdown block parsing.
+    // It's fine to break this test, it's not particularly intentional behaviour.
+    #[test]
+    fn explicit_markdown_block_messy_corners_tilde() {
+        let docstring = r#"
+        My cool func:
+        
+                ~~~~~~we still think this is a codefence~~~
+            x_y = thing_do();
+        ~~~~~~~~~~~~~ and are sloppy as heck with indentation and closing shrugggg
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ~~~~~~we still think this is a codefence~~~
+            x_y = thing_do();
+        ~~~~~~~~~~~~~ and are sloppy as heck with indentation and closing shrugggg
         ");
     }
 
@@ -1157,7 +1444,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         wow this is some code  
         ```````````abc
             x = 2
@@ -1233,7 +1520,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description  
           
         ```````````python
@@ -1262,7 +1549,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description  
           
         ```````````python
@@ -1285,7 +1572,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         ```````````python
         >>> thing.do_thing()
         wow it did the thing
@@ -1311,7 +1598,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description:    
         ```````````python
             >>> thing.do_thing()
@@ -1335,7 +1622,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         And so you can see that  
         ```````````python
             >>> thing.do_thing()
@@ -1372,7 +1659,7 @@ mod tests {
         );
         assert_eq!(&param_docs["param3"], "A parameter without type annotation");
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1385,7 +1672,7 @@ mod tests {
             str: The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1437,7 +1724,7 @@ mod tests {
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Parameters
@@ -1456,7 +1743,7 @@ mod tests {
             The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Parameters  
@@ -1579,7 +1866,7 @@ mod tests {
             "NumPy-style parameter"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1592,7 +1879,7 @@ mod tests {
             NumPy-style parameter
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1636,7 +1923,7 @@ mod tests {
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         :param str param1: The first parameter description
@@ -1647,7 +1934,7 @@ mod tests {
         :rtype: str
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         :param str param1: The first parameter description  
@@ -1697,7 +1984,7 @@ mod tests {
             "NumPy-style parameter"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1712,7 +1999,7 @@ mod tests {
             NumPy-style parameter
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1766,7 +2053,7 @@ mod tests {
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Parameters
@@ -1785,7 +2072,7 @@ mod tests {
             The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Parameters  
@@ -1839,7 +2126,7 @@ mod tests {
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Parameters
@@ -1853,7 +2140,7 @@ mod tests {
                 A parameter without type annotation
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Parameters  
@@ -1905,7 +2192,7 @@ mod tests {
             Some(&"The first parameter".to_string())
         );
 
-        assert_snapshot!(docstring_windows.render_plaintext(), @r"
+        assert_snapshot!(docstring_windows.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1913,7 +2200,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_windows.render_markdown(), @r"
+        assert_snapshot!(docstring_windows.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1921,7 +2208,7 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_mac.render_plaintext(), @r"
+        assert_snapshot!(docstring_mac.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1929,7 +2216,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_mac.render_markdown(), @r"
+        assert_snapshot!(docstring_mac.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1937,7 +2224,7 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_unix.render_plaintext(), @r"
+        assert_snapshot!(docstring_unix.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1945,7 +2232,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_unix.render_markdown(), @r"
+        assert_snapshot!(docstring_unix.render_markdown(), @"
         This is a function description.  
           
         Args:  

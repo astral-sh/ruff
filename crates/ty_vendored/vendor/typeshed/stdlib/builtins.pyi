@@ -1835,14 +1835,22 @@ class bytes(Sequence[int]):
 
         The original string is never truncated.
         """
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def fromhex(cls, string: str | ReadableBuffer, /) -> Self:
+            """Create a bytes object from a string of hexadecimal numbers.
 
-    @classmethod
-    def fromhex(cls, string: str, /) -> Self:
-        """Create a bytes object from a string of hexadecimal numbers.
+            Spaces between two numbers are accepted.
+            Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
+            """
+    else:
+        @classmethod
+        def fromhex(cls, string: str, /) -> Self:
+            """Create a bytes object from a string of hexadecimal numbers.
 
-        Spaces between two numbers are accepted.
-        Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
-        """
+            Spaces between two numbers are accepted.
+            Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
+            """
 
     @staticmethod
     def maketrans(frm: ReadableBuffer, to: ReadableBuffer, /) -> bytes:
@@ -2331,14 +2339,22 @@ class bytearray(MutableSequence[int]):
 
         The original string is never truncated.
         """
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def fromhex(cls, string: str | ReadableBuffer, /) -> Self:
+            """Create a bytearray object from a string of hexadecimal numbers.
 
-    @classmethod
-    def fromhex(cls, string: str, /) -> Self:
-        """Create a bytearray object from a string of hexadecimal numbers.
+            Spaces between two numbers are accepted.
+            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            """
+    else:
+        @classmethod
+        def fromhex(cls, string: str, /) -> Self:
+            """Create a bytearray object from a string of hexadecimal numbers.
 
-        Spaces between two numbers are accepted.
-        Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
-        """
+            Spaces between two numbers are accepted.
+            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            """
 
     @staticmethod
     def maketrans(frm: ReadableBuffer, to: ReadableBuffer, /) -> bytes:
@@ -2414,7 +2430,7 @@ class bytearray(MutableSequence[int]):
             """Resize the internal buffer of bytearray to len.
 
             size
-              New size to resize to..
+              New size to resize to.
             """
 
 _IntegerFormats: TypeAlias = Literal[
@@ -2579,10 +2595,21 @@ class memoryview(Sequence[_I]):
 
     def __release_buffer__(self, buffer: memoryview, /) -> None:
         """Release the buffer object that exposes the underlying memory of the object."""
-    # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
-    # See https://github.com/python/cpython/issues/125420
-    index: ClassVar[None]  # type: ignore[assignment]
-    count: ClassVar[None]  # type: ignore[assignment]
+    if sys.version_info >= (3, 14):
+        def index(self, value: object, start: SupportsIndex = 0, stop: SupportsIndex = sys.maxsize, /) -> int:
+            """Return the index of the first occurrence of a value.
+
+            Raises ValueError if the value is not present.
+            """
+
+        def count(self, value: object, /) -> int:
+            """Count the number of occurrences of a value."""
+    else:
+        # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
+        # See https://github.com/python/cpython/issues/125420
+        index: ClassVar[None]  # type: ignore[assignment]
+        count: ClassVar[None]  # type: ignore[assignment]
+
     if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """See PEP 585"""
@@ -4518,7 +4545,11 @@ class BaseException:
 
     args: tuple[Any, ...]
     __cause__: BaseException | None
+    """exception cause"""
+
     __context__: BaseException | None
+    """exception context"""
+
     __suppress_context__: bool
     __traceback__: TracebackType | None
     def __init__(self, *args: object) -> None: ...
@@ -4547,6 +4578,7 @@ class SystemExit(BaseException):
     """Request to exit from the interpreter."""
 
     code: sys._ExitCode
+    """exception code"""
 
 class Exception(BaseException):
     """Common base class for all non-exit exceptions."""
@@ -4556,18 +4588,28 @@ class StopIteration(Exception):
     """Signal the end from iterator.__next__()."""
 
     value: Any
+    """generator return value"""
 
 @disjoint_base
 class OSError(Exception):
     """Base class for I/O related errors."""
 
     errno: int | None
+    """POSIX exception code"""
+
     strerror: str | None
+    """exception strerror"""
+
     # filename, filename2 are actually str | bytes | None
     filename: Any
+    """exception filename"""
+
     filename2: Any
+    """second exception filename"""
+
     if sys.platform == "win32":
         winerror: int
+        """Win32 exception code"""
 
 EnvironmentError = OSError
 IOError = OSError
@@ -4587,7 +4629,10 @@ if sys.version_info >= (3, 10):
 
         def __init__(self, *args: object, name: str | None = None, obj: object = None) -> None: ...
         name: str | None
+        """attribute name"""
+
         obj: object
+        """object"""
 
 else:
     class AttributeError(Exception):
@@ -4605,10 +4650,17 @@ class ImportError(Exception):
 
     def __init__(self, *args: object, name: str | None = None, path: str | None = None) -> None: ...
     name: str | None
+    """module name"""
+
     path: str | None
+    """module path"""
+
     msg: str  # undocumented
+    """exception message"""
+
     if sys.version_info >= (3, 12):
         name_from: str | None  # undocumented
+        """name imported from module"""
 
 class LookupError(Exception):
     """Base class for lookup errors."""
@@ -4623,6 +4675,7 @@ if sys.version_info >= (3, 10):
 
         def __init__(self, *args: object, name: str | None = None) -> None: ...
         name: str | None
+        """name"""
 
 else:
     class NameError(Exception):
@@ -4642,16 +4695,31 @@ class SyntaxError(Exception):
     """Invalid syntax."""
 
     msg: str
+    """exception msg"""
+
     filename: str | None
+    """exception filename"""
+
     lineno: int | None
+    """exception lineno"""
+
     offset: int | None
+    """exception offset"""
+
     text: str | None
+    """exception text"""
+
     # Errors are displayed differently if this attribute exists on the exception.
     # The value is always None.
     print_file_and_line: None
+    """exception print_file_and_line"""
+
     if sys.version_info >= (3, 10):
         end_lineno: int | None
+        """exception end lineno"""
+
         end_offset: int | None
+        """exception end offset"""
 
     @overload
     def __init__(self) -> None: ...
@@ -4770,10 +4838,20 @@ class UnicodeDecodeError(UnicodeError):
     """Unicode decoding error."""
 
     encoding: str
+    """exception encoding"""
+
     object: bytes
+    """exception object"""
+
     start: int
+    """exception start"""
+
     end: int
+    """exception end"""
+
     reason: str
+    """exception reason"""
+
     def __init__(self, encoding: str, object: ReadableBuffer, start: int, end: int, reason: str, /) -> None: ...
 
 @disjoint_base
@@ -4781,10 +4859,20 @@ class UnicodeEncodeError(UnicodeError):
     """Unicode encoding error."""
 
     encoding: str
+    """exception encoding"""
+
     object: str
+    """exception object"""
+
     start: int
+    """exception start"""
+
     end: int
+    """exception end"""
+
     reason: str
+    """exception reason"""
+
     def __init__(self, encoding: str, object: str, start: int, end: int, reason: str, /) -> None: ...
 
 @disjoint_base
@@ -4792,10 +4880,20 @@ class UnicodeTranslateError(UnicodeError):
     """Unicode translation error."""
 
     encoding: None
+    """exception encoding"""
+
     object: str
+    """exception object"""
+
     start: int
+    """exception start"""
+
     end: int
+    """exception end"""
+
     reason: str
+    """exception reason"""
+
     def __init__(self, object: str, start: int, end: int, reason: str, /) -> None: ...
 
 class Warning(Exception):

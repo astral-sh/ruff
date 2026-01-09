@@ -40,25 +40,22 @@ impl ExcludeFilter {
     }
 
     fn matches(&self, path: &SystemPath, mode: GlobFilterCheckMode, directory: bool) -> bool {
+        // If the path is excluded, return `ignore`
+        if self.ignore.matched(path, directory).is_ignore() {
+            return true;
+        }
+
         match mode {
             GlobFilterCheckMode::TopDown => {
-                match self.ignore.matched(path, directory) {
-                    // No hit or an allow hit means the file or directory is not excluded.
-                    Match::None | Match::Allow => false,
-                    Match::Ignore => true,
-                }
+                // No hit or an allow hit means the file or directory is not excluded.
+                false
             }
             GlobFilterCheckMode::Adhoc => {
-                for ancestor in path.ancestors() {
-                    match self.ignore.matched(ancestor, directory) {
-                        // If the path is allowlisted or there's no hit, try the parent to ensure we don't return false
-                        // for a folder where there's an exclude for a parent.
-                        Match::None | Match::Allow => {}
-                        Match::Ignore => return true,
-                    }
-                }
-
-                false
+                // If the path is allowlisted or there's no hit, try the parent to ensure we don't return false
+                // for a folder where there's an exclude for a parent.
+                path.ancestors()
+                    .skip(1)
+                    .any(|ancestor| self.ignore.matched(ancestor, true).is_ignore())
             }
         }
     }
@@ -124,7 +121,7 @@ struct Gitignore {
     set: GlobSet,
     globs: Vec<IgnoreGlob>,
     #[get_size(ignore)]
-    matches: Option<Arc<Pool<Vec<usize>>>>,
+    matches: Arc<Pool<Vec<usize>>>,
 }
 
 impl Gitignore {
@@ -140,7 +137,7 @@ impl Gitignore {
             return Match::None;
         }
 
-        let mut matches = self.matches.as_ref().unwrap().get();
+        let mut matches = self.matches.get();
         let candidate = Candidate::new(path);
         self.set.matches_candidate_into(&candidate, &mut matches);
         for &i in matches.iter().rev() {
@@ -185,6 +182,12 @@ enum Match {
     /// The path matches an allow pattern (a negative pattern).
     /// It should not be ignored.
     Allow,
+}
+
+impl Match {
+    const fn is_ignore(self) -> bool {
+        matches!(self, Match::Ignore)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -232,7 +235,7 @@ impl GitignoreBuilder {
         Ok(Gitignore {
             set,
             globs: self.globs.clone(),
-            matches: Some(Arc::new(Pool::new(Vec::new))),
+            matches: Arc::new(Pool::new(Vec::new)),
         })
     }
 

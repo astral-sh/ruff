@@ -5,15 +5,16 @@ use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use rustc_hash::FxHashMap;
+use ty_module_resolver::{
+    KnownModule, Module, ModuleName, list_modules, resolve_module, resolve_real_shadowable_module,
+};
 
-use crate::module_name::ModuleName;
-use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
+use crate::Db;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{Type, binding_type, infer_scope_types};
-use crate::{Db, resolve_real_shadowable_module};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -105,7 +106,7 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
     pub fn import_completions(&self) -> Vec<Completion<'db>> {
-        let typing_extensions = ModuleName::new("typing_extensions").unwrap();
+        let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
         let is_typing_extensions_available = self.file.is_stub(self.db)
             || resolve_real_shadowable_module(self.db, self.file, &typing_extensions).is_some();
         list_modules(self.db)
@@ -234,7 +235,7 @@ impl<'db> SemanticModel<'db> {
             );
         }
         // Builtins are available in all scopes.
-        let builtins = ModuleName::new("builtins").expect("valid module name");
+        let builtins = ModuleName::new_static("builtins").expect("valid module name");
         completions.extend(self.module_completions(&builtins));
         completions
     }
@@ -380,7 +381,7 @@ pub struct MemberDefinition<'db> {
 /// single-underscore names. This matches the order of the variants defined for
 /// this enum, which is in turn picked up by the derived trait implementation
 /// for `Ord`.
-#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum NameKind {
     Normal,
     Dunder,
@@ -424,12 +425,6 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
-}
-
-impl<'db> Completion<'db> {
-    pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
-        self.ty.is_some_and(|ty| ty.is_type_check_only(db))
-    }
 }
 
 pub trait HasType {

@@ -156,7 +156,7 @@ from typing import Union
 
 IntOrStr = Union[int, str]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special form 'int | str'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 
 def _(x: int | str | bytes | memoryview | range):
     if isinstance(x, IntOrStr):
@@ -213,8 +213,7 @@ def f(x: dict[str, int] | list[str], y: object):
         reveal_type(x)  # revealed: list[str]
 
     if isinstance(y, t.Callable):
-        # TODO: a better top-materialization for `Callable`s (https://github.com/astral-sh/ty/issues/1426)
-        reveal_type(y)  # revealed: () -> object
+        reveal_type(y)  # revealed: Top[(...) -> object]
 ```
 
 ## Class types

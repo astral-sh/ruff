@@ -97,7 +97,7 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = EllipsisType) -> None
+reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ...) -> None
 
 # For a stub module, we don't know that `__file__` is a string (at runtime it may be entirely
 # unset, but we follow typeshed here):

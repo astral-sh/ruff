@@ -4,36 +4,36 @@ mod printer;
 mod python_version;
 mod version;
 
-pub use args::Cli;
-use ty_project::metadata::settings::TerminalSettings;
-use ty_static::EnvVars;
-
 use std::fmt::Write;
 use std::process::{ExitCode, Termination};
-
-use anyhow::Result;
 use std::sync::Mutex;
 
-use crate::args::{CheckCommand, Command, TerminalColor};
-use crate::logging::{VerbosityLevel, setup_tracing};
-use crate::printer::Printer;
+use anyhow::Result;
 use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use ruff_db::cancellation::{Canceled, CancellationToken, CancellationTokenSource};
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
 use ruff_db::files::File;
-use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::{STACK_SIZE, max_parallelism};
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
+use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, watch};
+use ty_project::{CollectReporter, Db, suppress_all_diagnostics, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
+use ty_static::EnvVars;
+
+use crate::args::{CheckCommand, Command, TerminalColor};
+use crate::logging::{VerbosityLevel, setup_tracing};
+use crate::printer::Printer;
+pub use args::Cli;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
     setup_rayon();
@@ -111,6 +111,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
 
+    let mode = if args.add_ignore {
+        MainLoopMode::AddIgnore
+    } else {
+        MainLoopMode::Check
+    };
+
     let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
@@ -118,9 +124,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .config_file
         .as_ref()
         .map(|path| SystemPath::absolute(path, &cwd));
+    let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {
-        Some(config_file) => ProjectMetadata::from_config_file(config_file.clone(), &system)?,
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+        }
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
@@ -130,15 +139,17 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let project = db.project();
 
-    db.project()
-        .set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+    project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+    project.set_force_exclude(&mut db, force_exclude);
+
     if !check_paths.is_empty() {
-        db.project().set_included_paths(&mut db, check_paths);
+        project.set_included_paths(&mut db, check_paths);
     }
 
     let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(project_options_overrides, printer);
+        MainLoop::new(mode, project_options_overrides, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -209,6 +220,8 @@ impl Termination for ExitStatus {
 }
 
 struct MainLoop {
+    mode: MainLoopMode,
+
     /// Sender that can be used to send messages to the main loop.
     sender: crossbeam_channel::Sender<MainLoopMessage>,
 
@@ -222,24 +235,38 @@ struct MainLoop {
     printer: Printer,
 
     project_options_overrides: ProjectOptionsOverrides,
+
+    /// Cancellation token that gets set by Ctrl+C.
+    /// Used for long-running operations on the main thread. Operations on background threads
+    /// use Salsa's cancellation mechanism.
+    cancellation_token: CancellationToken,
 }
 
 impl MainLoop {
     fn new(
+        mode: MainLoopMode,
         project_options_overrides: ProjectOptionsOverrides,
         printer: Printer,
     ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
+        let cancellation_token_source = CancellationTokenSource::new();
+        let cancellation_token = cancellation_token_source.token();
+
         (
             Self {
+                mode,
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
                 project_options_overrides,
                 printer,
+                cancellation_token,
             },
-            MainLoopCancellationToken { sender },
+            MainLoopCancellationToken {
+                sender,
+                source: cancellation_token_source,
+            },
         )
     }
 
@@ -273,9 +300,6 @@ impl MainLoop {
         let mut revision = 0u64;
 
         while let Ok(message) = self.receiver.recv() {
-            if self.watcher.is_some() {
-                Printer::clear_screen()?;
-            }
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
@@ -310,86 +334,90 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
-                    let terminal_settings = db.project().settings(db).terminal();
-                    let display_config = DisplayDiagnosticConfig::default()
-                        .format(terminal_settings.output_format.into())
-                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
-                        .show_fix_diff(true);
-
-                    if check_revision == revision {
-                        if db.project().files(db).is_empty() {
-                            tracing::warn!("No python files found under the given path(s)");
-                        }
-
-                        // TODO: We should have an official flag to silence workspace diagnostics.
-                        if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
-                            return Ok(ExitStatus::Success);
-                        }
-
-                        let is_human_readable = terminal_settings.output_format.is_human_readable();
-
-                        if result.is_empty() {
-                            if is_human_readable {
-                                writeln!(
-                                    self.printer.stream_for_success_summary(),
-                                    "{}",
-                                    "All checks passed!".green().bold()
-                                )?;
-                            }
-
-                            if self.watcher.is_none() {
-                                return Ok(ExitStatus::Success);
-                            }
-                        } else {
-                            let diagnostics_count = result.len();
-
-                            let mut stdout = self.printer.stream_for_details().lock();
-                            let exit_status =
-                                exit_status_from_diagnostics(&result, terminal_settings);
-
-                            // Only render diagnostics if they're going to be displayed, since doing
-                            // so is expensive.
-                            if stdout.is_enabled() {
-                                write!(
-                                    stdout,
-                                    "{}",
-                                    DisplayDiagnostics::new(db, &display_config, &result)
-                                )?;
-                            }
-
-                            if is_human_readable {
-                                writeln!(
-                                    self.printer.stream_for_failure_summary(),
-                                    "Found {} diagnostic{}",
-                                    diagnostics_count,
-                                    if diagnostics_count > 1 { "s" } else { "" }
-                                )?;
-                            }
-
-                            if exit_status.is_internal_error() {
-                                tracing::warn!(
-                                    "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
-                                );
-                            }
-
-                            if self.watcher.is_none() {
-                                return Ok(exit_status);
-                            }
-                        }
-                    } else {
+                    if check_revision != revision {
                         tracing::debug!(
                             "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
                         );
+                        continue;
                     }
+
+                    if db.project().files(db).is_empty() {
+                        tracing::warn!("No python files found under the given path(s)");
+                    }
+
+                    let result = match self.mode {
+                        MainLoopMode::Check => {
+                            // TODO: We should have an official flag to silence workspace diagnostics.
+                            if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
+                                return Ok(ExitStatus::Success);
+                            }
+
+                            self.write_diagnostics(db, &result)?;
+
+                            if self.cancellation_token.is_cancelled() {
+                                Err(Canceled)
+                            } else {
+                                Ok(result)
+                            }
+                        }
+                        MainLoopMode::AddIgnore => {
+                            if let Ok(result) =
+                                suppress_all_diagnostics(db, result, &self.cancellation_token)
+                            {
+                                self.write_diagnostics(db, &result.diagnostics)?;
+
+                                let terminal_settings = db.project().settings(db).terminal();
+                                let is_human_readable =
+                                    terminal_settings.output_format.is_human_readable();
+
+                                if is_human_readable {
+                                    writeln!(
+                                        self.printer.stream_for_failure_summary(),
+                                        "Added {} ignore comment{}",
+                                        result.count,
+                                        if result.count > 1 { "s" } else { "" }
+                                    )?;
+                                }
+
+                                Ok(result.diagnostics)
+                            } else {
+                                Err(Canceled)
+                            }
+                        }
+                    };
+
+                    let exit_status = match result.as_deref() {
+                        Ok([]) => ExitStatus::Success,
+                        Ok(diagnostics) => {
+                            let terminal_settings = db.project().settings(db).terminal();
+                            exit_status_from_diagnostics(diagnostics, terminal_settings)
+                        }
+                        Err(Canceled) => ExitStatus::Success,
+                    };
+
+                    if exit_status.is_internal_error() {
+                        tracing::warn!(
+                            "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
+                        );
+                    }
+
+                    if self.watcher.is_some() {
+                        continue;
+                    }
+
+                    return Ok(exit_status);
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
+                    Printer::clear_screen()?;
+
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(changes, Some(&self.project_options_overrides));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
+
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
@@ -404,6 +432,65 @@ impl MainLoop {
 
         Ok(ExitStatus::Success)
     }
+
+    fn write_diagnostics(
+        &self,
+        db: &ProjectDatabase,
+        diagnostics: &[Diagnostic],
+    ) -> anyhow::Result<()> {
+        let terminal_settings = db.project().settings(db).terminal();
+        let is_human_readable = terminal_settings.output_format.is_human_readable();
+
+        match diagnostics {
+            [] => {
+                if is_human_readable {
+                    writeln!(
+                        self.printer.stream_for_success_summary(),
+                        "{}",
+                        "All checks passed!".green().bold()
+                    )?;
+                }
+            }
+            diagnostics => {
+                let diagnostics_count = diagnostics.len();
+
+                let mut stdout = self.printer.stream_for_details().lock();
+
+                // Only render diagnostics if they're going to be displayed, since doing
+                // so is expensive.
+                if stdout.is_enabled() {
+                    let display_config = DisplayDiagnosticConfig::default()
+                        .format(terminal_settings.output_format.into())
+                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
+                        .with_cancellation_token(Some(self.cancellation_token.clone()))
+                        .show_fix_diff(true);
+
+                    write!(
+                        stdout,
+                        "{}",
+                        DisplayDiagnostics::new(db, &display_config, diagnostics)
+                    )?;
+                }
+
+                if !self.cancellation_token.is_cancelled() && is_human_readable {
+                    writeln!(
+                        self.printer.stream_for_failure_summary(),
+                        "Found {} diagnostic{}",
+                        diagnostics_count,
+                        if diagnostics_count > 1 { "s" } else { "" }
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum MainLoopMode {
+    Check,
+    AddIgnore,
 }
 
 fn exit_status_from_diagnostics(
@@ -493,10 +580,12 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 #[derive(Debug)]
 struct MainLoopCancellationToken {
     sender: crossbeam_channel::Sender<MainLoopMessage>,
+    source: CancellationTokenSource,
 }
 
 impl MainLoopCancellationToken {
     fn stop(self) {
+        self.source.cancel();
         self.sender.send(MainLoopMessage::Exit).unwrap();
     }
 }
@@ -536,12 +625,7 @@ fn set_colored_override(color: Option<TerminalColor>) {
 fn setup_rayon() {
     ThreadPoolBuilder::default()
         .num_threads(max_parallelism().get())
-        // Use a reasonably large stack size to avoid running into stack overflows too easily. The
-        // size was chosen in such a way as to still be able to handle large expressions involving
-        // binary operators (x + x + … + x) both during the AST walk in semantic index building as
-        // well as during type checking. Using this stack size, we can handle handle expressions
-        // that are several times larger than the corresponding limits in existing type checkers.
-        .stack_size(16 * 1024 * 1024)
+        .stack_size(STACK_SIZE)
         .build_global()
         .unwrap();
 }

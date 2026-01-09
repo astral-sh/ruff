@@ -36,7 +36,7 @@ class Point:
     x: int
     y: int
 
-reveal_type(Point.__replace__)  # revealed: (self: Point, *, x: int = int, y: int = int) -> Point
+reveal_type(Point.__replace__)  # revealed: (self: Point, *, x: int = ..., y: int = ...) -> Point
 ```
 
 The `__replace__` method can either be called directly or through the `replace` function:
@@ -70,4 +70,39 @@ e = a.__replace__(x="wrong")  # error: [invalid-argument-type]
 
 # TODO: this should ideally also be emit an error
 e = replace(a, x="wrong")
+```
+
+### NamedTuples
+
+NamedTuples also support the `__replace__` protocol:
+
+```py
+from typing import NamedTuple
+from copy import replace
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+reveal_type(Point.__replace__)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
+```
+
+The `__replace__` method can either be called directly or through the `replace` function:
+
+```py
+a = Point(1, 2)
+
+b = a.__replace__(x=3, y=4)
+reveal_type(b)  # revealed: Point
+
+b = replace(a, x=3, y=4)
+# TODO: this should be `Point`, once we support specialization of generic protocols
+reveal_type(b)  # revealed: Unknown
+```
+
+Invalid calls to `__replace__` will raise an error:
+
+```py
+# error: [unknown-argument] "Argument `z` does not match any known parameter"
+a.__replace__(z=42)
 ```

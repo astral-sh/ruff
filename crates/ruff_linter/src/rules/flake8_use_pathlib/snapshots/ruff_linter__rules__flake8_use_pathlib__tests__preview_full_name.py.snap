@@ -1037,5 +1037,142 @@ PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
 138 |
 139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^^^^^^^
+140 |
+141 | # See: https://github.com/astral-sh/ruff/issues/21794
     |
 help: Replace with `Path(...).samefile()`
+
+PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
+   --> full_name.py:144:4
+    |
+142 | import sys
+143 |
+144 | if os.rename("pth1.py", "pth1.py.bak"):
+    |    ^^^^^^^^^
+145 |     print("rename: truthy")
+146 | else:
+    |
+help: Replace with `Path(...).rename(...)`
+140 | 
+141 | # See: https://github.com/astral-sh/ruff/issues/21794
+142 | import sys
+143 + import pathlib
+144 | 
+    - if os.rename("pth1.py", "pth1.py.bak"):
+145 + if pathlib.Path("pth1.py").rename("pth1.py.bak"):
+146 |     print("rename: truthy")
+147 | else:
+148 |     print("rename: falsey")
+note: This is an unsafe fix and may change runtime behavior
+
+PTH105 [*] `os.replace()` should be replaced by `Path.replace()`
+   --> full_name.py:149:4
+    |
+147 |     print("rename: falsey")
+148 |
+149 | if os.replace("pth1.py.bak", "pth1.py"):
+    |    ^^^^^^^^^^
+150 |     print("replace: truthy")
+151 | else:
+    |
+help: Replace with `Path(...).replace(...)`
+140 | 
+141 | # See: https://github.com/astral-sh/ruff/issues/21794
+142 | import sys
+143 + import pathlib
+144 | 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+146 |     print("rename: truthy")
+147 | else:
+148 |     print("rename: falsey")
+149 | 
+    - if os.replace("pth1.py.bak", "pth1.py"):
+150 + if pathlib.Path("pth1.py.bak").replace("pth1.py"):
+151 |     print("replace: truthy")
+152 | else:
+153 |     print("replace: falsey")
+note: This is an unsafe fix and may change runtime behavior
+
+PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:155:14
+    |
+154 | try:
+155 |     for _ in os.getcwd():
+    |              ^^^^^^^^^
+156 |         print("getcwd: iterable")
+157 |         break
+    |
+help: Replace with `Path.cwd()`
+140 | 
+141 | # See: https://github.com/astral-sh/ruff/issues/21794
+142 | import sys
+143 + import pathlib
+144 | 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+146 |     print("rename: truthy")
+--------------------------------------------------------------------------------
+153 |     print("replace: falsey")
+154 | 
+155 | try:
+    -     for _ in os.getcwd():
+156 +     for _ in pathlib.Path.cwd():
+157 |         print("getcwd: iterable")
+158 |         break
+159 | except TypeError as e:
+note: This is an unsafe fix and may change runtime behavior
+
+PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:162:14
+    |
+161 | try:
+162 |     for _ in os.getcwdb():
+    |              ^^^^^^^^^^
+163 |         print("getcwdb: iterable")
+164 |         break
+    |
+help: Replace with `Path.cwd()`
+140 | 
+141 | # See: https://github.com/astral-sh/ruff/issues/21794
+142 | import sys
+143 + import pathlib
+144 | 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+146 |     print("rename: truthy")
+--------------------------------------------------------------------------------
+160 |     print("getcwd: not iterable")
+161 | 
+162 | try:
+    -     for _ in os.getcwdb():
+163 +     for _ in pathlib.Path.cwd():
+164 |         print("getcwdb: iterable")
+165 |         break
+166 | except TypeError as e:
+note: This is an unsafe fix and may change runtime behavior
+
+PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
+   --> full_name.py:169:14
+    |
+168 | try:
+169 |     for _ in os.readlink(sys.executable):
+    |              ^^^^^^^^^^^
+170 |         print("readlink: iterable")
+171 |         break
+    |
+help: Replace with `Path(...).readlink()`
+140 | 
+141 | # See: https://github.com/astral-sh/ruff/issues/21794
+142 | import sys
+143 + import pathlib
+144 | 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+146 |     print("rename: truthy")
+--------------------------------------------------------------------------------
+167 |     print("getcwdb: not iterable")
+168 | 
+169 | try:
+    -     for _ in os.readlink(sys.executable):
+170 +     for _ in pathlib.Path(sys.executable).readlink():
+171 |         print("readlink: iterable")
+172 |         break
+173 | except TypeError as e:
+note: This is an unsafe fix and may change runtime behavior

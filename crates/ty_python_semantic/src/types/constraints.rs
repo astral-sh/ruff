@@ -76,12 +76,14 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
     UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -349,6 +351,18 @@ impl<'db> ConstraintSet<'db> {
         self.node.satisfied_by_all_typevars(db, inferable)
     }
 
+    pub(crate) fn limit_to_valid_specializations(self, db: &'db dyn Db) -> Self {
+        let mut result = self.node;
+        let mut seen = FxHashSet::default();
+        self.node.for_each_constraint(db, &mut |constraint, _| {
+            let bound_typevar = constraint.typevar(db);
+            if seen.insert(bound_typevar) {
+                result = result.and_with_offset(db, bound_typevar.valid_specializations(db));
+            }
+        });
+        Self { node: result }
+    }
+
     /// Updates this constraint set to hold the union of itself and another constraint set.
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
@@ -432,6 +446,10 @@ impl<'db> ConstraintSet<'db> {
         Self { node }
     }
 
+    pub(crate) fn for_each_path(self, db: &'db dyn Db, f: impl FnMut(&PathAssignments<'db>)) {
+        self.node.for_each_path(db, f);
+    }
+
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
@@ -490,9 +508,9 @@ impl IntersectionResult<'_> {
 /// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarInstance<'db>,
-    lower: Type<'db>,
-    upper: Type<'db>,
+    pub(crate) typevar: BoundTypeVarInstance<'db>,
+    pub(crate) lower: Type<'db>,
+    pub(crate) upper: Type<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -602,7 +620,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
-        if !lower.is_assignable_to(db, upper) {
+        if !lower.is_constraint_set_assignable_to(db, upper) {
             return Node::AlwaysFalse;
         }
 
@@ -713,7 +731,11 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// simplifications that we perform that operate on constraints with the same typevar, and this
     /// ensures that we can find all candidate simplifications more easily.
     fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        (self.typevar(db).identity(db), self.as_id())
+        (
+            self.typevar(db).binding_context(db),
+            self.typevar(db).identity(db),
+            self.as_id(),
+        )
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -725,8 +747,12 @@ impl<'db> ConstrainedTypeVar<'db> {
         if !self.typevar(db).is_same_typevar_as(db, other.typevar(db)) {
             return false;
         }
-        other.lower(db).is_assignable_to(db, self.lower(db))
-            && self.upper(db).is_assignable_to(db, other.upper(db))
+        other
+            .lower(db)
+            .is_constraint_set_assignable_to(db, self.lower(db))
+            && self
+                .upper(db)
+                .is_constraint_set_assignable_to(db, other.upper(db))
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -737,7 +763,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
-        if !lower.is_assignable_to(db, upper) {
+        if !lower.is_constraint_set_assignable_to(db, upper) {
             return IntersectionResult::Disjoint;
         }
 
@@ -748,7 +774,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         IntersectionResult::Simplified(Self::new(db, self.typevar(db), lower, upper))
     }
 
-    fn display(self, db: &'db dyn Db) -> impl Display {
+    pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.display_inner(db, false)
     }
 
@@ -973,6 +999,41 @@ impl<'db> Node<'db> {
         }
     }
 
+    fn for_each_path(self, db: &'db dyn Db, mut f: impl FnMut(&PathAssignments<'db>)) {
+        match self {
+            Node::AlwaysTrue => {}
+            Node::AlwaysFalse => {}
+            Node::Interior(interior) => {
+                let map = interior.sequent_map(db);
+                let mut path = PathAssignments::default();
+                self.for_each_path_inner(db, &mut f, map, &mut path);
+            }
+        }
+    }
+
+    fn for_each_path_inner(
+        self,
+        db: &'db dyn Db,
+        f: &mut dyn FnMut(&PathAssignments<'db>),
+        map: &SequentMap<'db>,
+        path: &mut PathAssignments<'db>,
+    ) {
+        match self {
+            Node::AlwaysTrue => f(path),
+            Node::AlwaysFalse => {}
+            Node::Interior(interior) => {
+                let constraint = interior.constraint(db);
+                let source_order = interior.source_order(db);
+                path.walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
+                    interior.if_true(db).for_each_path_inner(db, f, map, path);
+                });
+                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
+                    interior.if_false(db).for_each_path_inner(db, f, map, path);
+                });
+            }
+        }
+    }
+
     /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         match self {
@@ -1000,8 +1061,9 @@ impl<'db> Node<'db> {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
+                let source_order = interior.source_order(db);
                 let true_always_satisfied = path
-                    .walk_edge(db, map, constraint.when_true(), |path, _| {
+                    .walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
                         interior
                             .if_true(db)
                             .is_always_satisfied_inner(db, map, path)
@@ -1012,7 +1074,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(db, map, constraint.when_false(), |path, _| {
+                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
                     interior
                         .if_false(db)
                         .is_always_satisfied_inner(db, map, path)
@@ -1049,8 +1111,9 @@ impl<'db> Node<'db> {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
+                let source_order = interior.source_order(db);
                 let true_never_satisfied = path
-                    .walk_edge(db, map, constraint.when_true(), |path, _| {
+                    .walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
                         interior.if_true(db).is_never_satisfied_inner(db, map, path)
                     })
                     .unwrap_or(true);
@@ -1059,7 +1122,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(db, map, constraint.when_false(), |path, _| {
+                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
                     interior
                         .if_false(db)
                         .is_never_satisfied_inner(db, map, path)
@@ -1408,7 +1471,7 @@ impl<'db> Node<'db> {
                         db,
                         current_bounds.iter().map(|bounds| bounds.upper),
                     );
-                    greatest_lower_bound.is_assignable_to(db, least_upper_bound)
+                    greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound)
                 });
 
                 // We've been tracking the lower and upper bound that the types for this path must
@@ -1946,22 +2009,27 @@ impl<'db> InteriorNode<'db> {
     fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
         let map = self.sequent_map(db);
         let mut path = PathAssignments::default();
+        let mentions_typevar = |ty: Type<'db>| match ty {
+            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+            _ => false,
+        };
         self.abstract_one_inner(
             db,
-            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound of
-            // `bound_typevar`.
+            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
+            // that mentions `bound_typevar`.
+            // TODO: This will currently remove constraints that mention a typevar, but the sequent
+            // map is not yet propagating all derived facts about those constraints. For instance,
+            // removing `T` from `T ≤ int ∧ U ≤ Sequence[T]` should produce `U ≤ Sequence[int]`.
+            // But that requires `T ≤ int ∧ U ≤ Sequence[T] → U ≤ Sequence[int]` to exist in the
+            // sequent map. It doesn't, and so we currently produce `U ≤ Unknown` in this case.
             &mut |constraint| {
                 if constraint.typevar(db).identity(db) == bound_typevar {
                     return true;
                 }
-                if let Type::TypeVar(lower_bound_typevar) = constraint.lower(db)
-                    && lower_bound_typevar.identity(db) == bound_typevar
-                {
+                if any_over_type(db, constraint.lower(db), &mentions_typevar, false) {
                     return true;
                 }
-                if let Type::TypeVar(upper_bound_typevar) = constraint.upper(db)
-                    && upper_bound_typevar.identity(db) == bound_typevar
-                {
+                if any_over_type(db, constraint.upper(db), &mentions_typevar, false) {
                     return true;
                 }
                 false
@@ -1985,9 +2053,7 @@ impl<'db> InteriorNode<'db> {
                 if constraint.typevar(db).identity(db) != bound_typevar {
                     return true;
                 }
-                if matches!(constraint.lower(db), Type::TypeVar(_))
-                    || matches!(constraint.upper(db), Type::TypeVar(_))
-                {
+                if constraint.lower(db).has_typevar(db) || constraint.upper(db).has_typevar(db) {
                     return true;
                 }
                 false
@@ -2005,6 +2071,7 @@ impl<'db> InteriorNode<'db> {
         path: &mut PathAssignments<'db>,
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
+        let self_source_order = self.source_order(db);
         if should_remove(self_constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
             // with the OR of its if_false/if_true edges. That is, the result is true if there's
@@ -2020,59 +2087,83 @@ impl<'db> InteriorNode<'db> {
             // way of tracking source order for derived facts.
             let self_source_order = self.source_order(db);
             let if_true = path
-                .walk_edge(db, map, self_constraint.when_true(), |path, new_range| {
-                    let branch = self
-                        .if_true(db)
-                        .abstract_one_inner(db, should_remove, map, path);
-                    path.assignments[new_range]
-                        .iter()
-                        .filter(|assignment| {
-                            // Don't add back any derived facts if they are ones that we would have
-                            // removed!
-                            !should_remove(assignment.constraint())
-                        })
-                        .fold(branch, |branch, assignment| {
-                            branch.and(
-                                db,
-                                Node::new_satisfied_constraint(db, *assignment, self_source_order),
-                            )
-                        })
-                })
+                .walk_edge(
+                    db,
+                    map,
+                    self_constraint.when_true(),
+                    self_source_order,
+                    |path, new_range| {
+                        let branch =
+                            self.if_true(db)
+                                .abstract_one_inner(db, should_remove, map, path);
+                        path.assignments[new_range]
+                            .iter()
+                            .filter(|(assignment, _)| {
+                                // Don't add back any derived facts if they are ones that we would have
+                                // removed!
+                                !should_remove(assignment.constraint())
+                            })
+                            .fold(branch, |branch, (assignment, source_order)| {
+                                branch.and(
+                                    db,
+                                    Node::new_satisfied_constraint(db, *assignment, *source_order),
+                                )
+                            })
+                    },
+                )
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
-                .walk_edge(db, map, self_constraint.when_false(), |path, new_range| {
-                    let branch = self
-                        .if_false(db)
-                        .abstract_one_inner(db, should_remove, map, path);
-                    path.assignments[new_range]
-                        .iter()
-                        .filter(|assignment| {
-                            // Don't add back any derived facts if they are ones that we would have
-                            // removed!
-                            !should_remove(assignment.constraint())
-                        })
-                        .fold(branch, |branch, assignment| {
-                            branch.and(
-                                db,
-                                Node::new_satisfied_constraint(db, *assignment, self_source_order),
-                            )
-                        })
-                })
+                .walk_edge(
+                    db,
+                    map,
+                    self_constraint.when_false(),
+                    self_source_order,
+                    |path, new_range| {
+                        let branch =
+                            self.if_false(db)
+                                .abstract_one_inner(db, should_remove, map, path);
+                        path.assignments[new_range]
+                            .iter()
+                            .filter(|(assignment, _)| {
+                                // Don't add back any derived facts if they are ones that we would have
+                                // removed!
+                                !should_remove(assignment.constraint())
+                            })
+                            .fold(branch, |branch, (assignment, source_order)| {
+                                branch.and(
+                                    db,
+                                    Node::new_satisfied_constraint(db, *assignment, *source_order),
+                                )
+                            })
+                    },
+                )
                 .unwrap_or(Node::AlwaysFalse);
             if_true.or(db, if_false)
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
             let if_true = path
-                .walk_edge(db, map, self_constraint.when_true(), |path, _| {
-                    self.if_true(db)
-                        .abstract_one_inner(db, should_remove, map, path)
-                })
+                .walk_edge(
+                    db,
+                    map,
+                    self_constraint.when_true(),
+                    self_source_order,
+                    |path, _| {
+                        self.if_true(db)
+                            .abstract_one_inner(db, should_remove, map, path)
+                    },
+                )
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
-                .walk_edge(db, map, self_constraint.when_false(), |path, _| {
-                    self.if_false(db)
-                        .abstract_one_inner(db, should_remove, map, path)
-                })
+                .walk_edge(
+                    db,
+                    map,
+                    self_constraint.when_false(),
+                    self_source_order,
+                    |path, _| {
+                        self.if_false(db)
+                            .abstract_one_inner(db, should_remove, map, path)
+                    },
+                )
                 .unwrap_or(Node::AlwaysFalse);
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
@@ -2126,15 +2217,26 @@ impl<'db> InteriorNode<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn sequent_map(self, db: &'db dyn Db) -> SequentMap<'db> {
-        tracing::debug!(
+        tracing::trace!(
             target: "ty_python_semantic::types::constraints::SequentMap",
             constraints = %Node::Interior(self).display(db),
             "create sequent map",
         );
-        let mut map = SequentMap::default();
-        Node::Interior(self).for_each_constraint(db, &mut |constraint, _| {
-            map.add(db, constraint);
+
+        // Sort the constraints in this BDD by their `source_order`s before adding them to the
+        // sequent map. This ensures that constraints appear in the sequent map in a stable order.
+        // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
+        // unstable sort is fine.
+        let mut constraints = Vec::new();
+        Node::Interior(self).for_each_constraint(db, &mut |constraint, source_order| {
+            constraints.push((constraint, source_order));
         });
+        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
+
+        let mut map = SequentMap::default();
+        for (constraint, _) in constraints {
+            map.add(db, constraint);
+        }
         map
     }
 
@@ -2554,8 +2656,8 @@ fn sequent_map_cycle_initial<'db>(
 
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
 /// must provide an assignment for each variable present in the BDD.)
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum ConstraintAssignment<'db> {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update)]
+pub(crate) enum ConstraintAssignment<'db> {
     Positive(ConstrainedTypeVar<'db>),
     Negative(ConstrainedTypeVar<'db>),
 }
@@ -2690,10 +2792,10 @@ struct SequentMap<'db> {
     /// Sequents of the form `C₁ ∧ C₂ → D`
     pair_implications: FxHashMap<
         (ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>),
-        FxHashSet<ConstrainedTypeVar<'db>>,
+        FxOrderSet<ConstrainedTypeVar<'db>>,
     >,
     /// Sequents of the form `C → D`
-    single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxHashSet<ConstrainedTypeVar<'db>>>,
+    single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxOrderSet<ConstrainedTypeVar<'db>>>,
     /// Constraints that we have already processed
     processed: FxHashSet<ConstrainedTypeVar<'db>>,
     /// Constraints that enqueued to be processed
@@ -2758,7 +2860,7 @@ impl<'db> SequentMap<'db> {
 
     fn add_single_tautology(&mut self, db: &'db dyn Db, ante: ConstrainedTypeVar<'db>) {
         if self.single_tautologies.insert(ante) {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 sequent = %format_args!("¬{} → false", ante.display(db)),
                 "add sequent",
@@ -2776,7 +2878,7 @@ impl<'db> SequentMap<'db> {
             .pair_impossibilities
             .insert(Self::pair_key(db, ante1, ante2))
         {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 sequent = %format_args!("{} ∧ {} → false", ante1.display(db), ante2.display(db)),
                 "add sequent",
@@ -2801,7 +2903,7 @@ impl<'db> SequentMap<'db> {
             .or_default()
             .insert(post)
         {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 sequent = %format_args!(
                     "{} ∧ {} → {}",
@@ -2829,7 +2931,7 @@ impl<'db> SequentMap<'db> {
             .or_default()
             .insert(post)
         {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 sequent = %format_args!(
                     "{} → {}",
@@ -2990,6 +3092,35 @@ impl<'db> SequentMap<'db> {
                 (bound_constraint.lower(db), constrained_upper)
             }
 
+            // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
+            (constrained_lower, constrained_upper)
+                if !constrained_upper.is_never()
+                    && !constrained_upper.is_object()
+                    && constrained_upper
+                        .top_materialization(db)
+                        .is_constraint_set_assignable_to(
+                            db,
+                            bound_constraint.lower(db).bottom_materialization(db),
+                        ) =>
+            {
+                (constrained_lower, Type::TypeVar(bound_typevar))
+            }
+
+            // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
+            (constrained_lower, constrained_upper)
+                if !constrained_lower.is_never()
+                    && !constrained_lower.is_object()
+                    && bound_constraint
+                        .upper(db)
+                        .top_materialization(db)
+                        .is_constraint_set_assignable_to(
+                            db,
+                            constrained_lower.bottom_materialization(db),
+                        ) =>
+            {
+                (Type::TypeVar(bound_typevar), constrained_upper)
+            }
+
             _ => return,
         };
 
@@ -3012,17 +3143,36 @@ impl<'db> SequentMap<'db> {
                 let left_upper = left_constraint.upper(db);
                 let right_lower = right_constraint.lower(db);
                 let right_upper = right_constraint.upper(db);
+                let new_constraint = |bound_typevar: BoundTypeVarInstance<'db>,
+                                      right_lower: Type<'db>,
+                                      right_upper: Type<'db>| {
+                    let right_lower = if let Type::TypeVar(other_bound_typevar) = right_lower
+                        && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
+                    {
+                        Type::Never
+                    } else {
+                        right_lower
+                    };
+                    let right_upper = if let Type::TypeVar(other_bound_typevar) = right_upper
+                        && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
+                    {
+                        Type::object()
+                    } else {
+                        right_upper
+                    };
+                    ConstrainedTypeVar::new(db, bound_typevar, right_lower, right_upper)
+                };
                 let post_constraint = match (left_lower, left_upper) {
                     (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
                         if bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
                     {
-                        ConstrainedTypeVar::new(db, bound_typevar, right_lower, right_upper)
+                        new_constraint(bound_typevar, right_lower, right_upper)
                     }
                     (Type::TypeVar(bound_typevar), _) => {
-                        ConstrainedTypeVar::new(db, bound_typevar, Type::Never, right_upper)
+                        new_constraint(bound_typevar, Type::Never, right_upper)
                     }
                     (_, Type::TypeVar(bound_typevar)) => {
-                        ConstrainedTypeVar::new(db, bound_typevar, right_lower, Type::object())
+                        new_constraint(bound_typevar, right_lower, Type::object())
                     }
                     _ => return,
                 };
@@ -3046,7 +3196,7 @@ impl<'db> SequentMap<'db> {
         // elements. (For instance, when processing `T ≤ τ₁ & τ₂` and `T ≤ τ₂ & τ₁`, these clauses
         // would add sequents for `(T ≤ τ₁ & τ₂) → (T ≤ τ₂ & τ₁)` and vice versa.)
         if left_constraint.implies(db, right_constraint) {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 left = %left_constraint.display(db),
                 right = %right_constraint.display(db),
@@ -3055,7 +3205,7 @@ impl<'db> SequentMap<'db> {
             self.add_single_implication(db, left_constraint, right_constraint);
         }
         if right_constraint.implies(db, left_constraint) {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 left = %left_constraint.display(db),
                 right = %right_constraint.display(db),
@@ -3066,7 +3216,7 @@ impl<'db> SequentMap<'db> {
 
         match left_constraint.intersect(db, right_constraint) {
             IntersectionResult::Simplified(intersection_constraint) => {
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::constraints::SequentMap",
                     left = %left_constraint.display(db),
                     right = %right_constraint.display(db),
@@ -3090,7 +3240,7 @@ impl<'db> SequentMap<'db> {
             IntersectionResult::CannotSimplify => {}
 
             IntersectionResult::Disjoint => {
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::constraints::SequentMap",
                     left = %left_constraint.display(db),
                     right = %right_constraint.display(db),
@@ -3169,8 +3319,8 @@ impl<'db> SequentMap<'db> {
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
 #[derive(Debug, Default)]
-struct PathAssignments<'db> {
-    assignments: FxOrderSet<ConstraintAssignment<'db>>,
+pub(crate) struct PathAssignments<'db> {
+    assignments: FxOrderMap<ConstraintAssignment<'db>, usize>,
 }
 
 impl<'db> PathAssignments<'db> {
@@ -3201,6 +3351,7 @@ impl<'db> PathAssignments<'db> {
         db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
+        source_order: usize,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
         // Record a snapshot of the assignments that we already knew held — both so that we can
@@ -3213,12 +3364,12 @@ impl<'db> PathAssignments<'db> {
             target: "ty_python_semantic::types::constraints::PathAssignment",
             before = %format_args!(
                 "[{}]",
-                self.assignments[..start].iter().map(|assignment| assignment.display(db)).format(", "),
+                self.assignments[..start].iter().map(|(assignment, _)| assignment.display(db)).format(", "),
             ),
             edge = %assignment.display(db),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, map, assignment);
+        let found_conflict = self.add_assignment(db, map, assignment, source_order);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -3233,7 +3384,7 @@ impl<'db> PathAssignments<'db> {
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 new = %format_args!(
                     "[{}]",
-                    self.assignments[start..].iter().map(|assignment| assignment.display(db)).format(", "),
+                    self.assignments[start..].iter().map(|(assignment, _)| assignment.display(db)).format(", "),
                 ),
                 "new assignments",
             );
@@ -3247,8 +3398,19 @@ impl<'db> PathAssignments<'db> {
         result
     }
 
+    pub(crate) fn positive_constraints(
+        &self,
+    ) -> impl Iterator<Item = (ConstrainedTypeVar<'db>, usize)> + '_ {
+        self.assignments
+            .iter()
+            .filter_map(|(assignment, source_order)| match assignment {
+                ConstraintAssignment::Positive(constraint) => Some((*constraint, *source_order)),
+                ConstraintAssignment::Negative(_) => None,
+            })
+    }
+
     fn assignment_holds(&self, assignment: ConstraintAssignment<'db>) -> bool {
-        self.assignments.contains(&assignment)
+        self.assignments.contains_key(&assignment)
     }
 
     /// Adds a new assignment, along with any derived information that we can infer from the new
@@ -3259,26 +3421,34 @@ impl<'db> PathAssignments<'db> {
         db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
+        source_order: usize,
     ) -> Result<(), PathAssignmentConflict> {
         // First add this assignment. If it causes a conflict, return that as an error. If we've
         // already know this assignment holds, just return.
-        if self.assignments.contains(&assignment.negated()) {
+        if self.assignments.contains_key(&assignment.negated()) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 assignment = %assignment.display(db),
                 facts = %format_args!(
                     "[{}]",
-                    self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                    self.assignments.iter().map(|(assignment, _)| assignment.display(db)).format(", "),
                 ),
                 "found contradiction",
             );
             return Err(PathAssignmentConflict);
         }
-        if !self.assignments.insert(assignment) {
+        if self.assignments.insert(assignment, source_order).is_some() {
             return Ok(());
         }
 
-        // Then use our sequents to add additional facts that we know to be true.
+        // Then use our sequents to add additional facts that we know to be true. We currently
+        // reuse the `source_order` of the "real" constraint passed into `walk_edge` when we add
+        // these derived facts.
+        //
+        // TODO: This might not be stable enough, if we add more than one derived fact for this
+        // constraint. If we still see inconsistent test output, we might need a more complex
+        // way of tracking source order for derived facts.
+        //
         // TODO: This is very naive at the moment, partly for expediency, and partly because we
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
@@ -3292,7 +3462,7 @@ impl<'db> PathAssignments<'db> {
                     ante = %ante.display(db),
                     facts = %format_args!(
                         "[{}]",
-                        self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                        self.assignments.iter().map(|(assignment, _)| assignment.display(db)).format(", "),
                     ),
                     "found contradiction",
                 );
@@ -3311,7 +3481,7 @@ impl<'db> PathAssignments<'db> {
                     ante2 = %ante2.display(db),
                     facts = %format_args!(
                         "[{}]",
-                        self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                        self.assignments.iter().map(|(assignment, _)| assignment.display(db)).format(", "),
                     ),
                     "found contradiction",
                 );
@@ -3324,7 +3494,7 @@ impl<'db> PathAssignments<'db> {
                 if self.assignment_holds(ante1.when_true())
                     && self.assignment_holds(ante2.when_true())
                 {
-                    self.add_assignment(db, map, post.when_true())?;
+                    self.add_assignment(db, map, post.when_true(), source_order)?;
                 }
             }
         }
@@ -3332,7 +3502,7 @@ impl<'db> PathAssignments<'db> {
         for (ante, posts) in &map.single_implications {
             for post in posts {
                 if self.assignment_holds(ante.when_true()) {
-                    self.add_assignment(db, map, post.when_true())?;
+                    self.add_assignment(db, map, post.when_true(), source_order)?;
                 }
             }
         }
@@ -3615,10 +3785,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// specifies the required specializations, and the iterator will be empty. For a constrained
     /// typevar, the primary result will include the fully static constraints, and the iterator
     /// will include an entry for each non-fully-static constraint.
-    fn required_specializations(
-        self,
-        db: &'db dyn Db,
-    ) -> (Node<'db>, impl IntoIterator<Item = Node<'db>>) {
+    fn required_specializations(self, db: &'db dyn Db) -> (Node<'db>, Vec<Node<'db>>) {
         // For upper bounds and constraints, we are free to choose any materialization that makes
         // the check succeed. In non-inferable positions, it is most helpful to choose a
         // materialization that is as restrictive as possible, since that minimizes the number of
@@ -3660,7 +3827,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         constraints: ConstraintSet<'db>,
     ) -> Result<Specialization<'db>, ()> {
-        tracing::debug!(
+        tracing::trace!(
             target: "ty_python_semantic::types::constraints::specialize_constrained",
             generic_context = %self.display_full(db),
             constraints = %constraints.node.display(db),
@@ -3687,7 +3854,7 @@ impl<'db> GenericContext<'db> {
                 constraints.and_with_offset(db, bound_typevar.valid_specializations(db))
             })
             .and_with_offset(db, constraints.node);
-        tracing::debug!(
+        tracing::trace!(
             target: "ty_python_semantic::types::constraints::specialize_constrained",
             valid = %abstracted.display(db),
             "limited to valid specializations",
@@ -3731,7 +3898,7 @@ impl<'db> GenericContext<'db> {
                 // The BDD is satisfiable, but the typevar is unconstrained, then we use `None` to tell
                 // specialize_recursive to fall back on the typevar's default.
                 if unconstrained {
-                    tracing::debug!(
+                    tracing::trace!(
                         target: "ty_python_semantic::types::constraints::specialize_constrained",
                         bound_typevar = %identity.display(db),
                         "typevar is unconstrained",
@@ -3743,7 +3910,7 @@ impl<'db> GenericContext<'db> {
                 // for this constraint set.
                 if representatives.is_empty() {
                     // TODO: Construct a useful error here
-                    tracing::debug!(
+                    tracing::trace!(
                         target: "ty_python_semantic::types::constraints::specialize_constrained",
                         bound_typevar = %identity.display(db),
                         "typevar cannot be satisfied",
@@ -3765,8 +3932,8 @@ impl<'db> GenericContext<'db> {
 
                 // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
                 // BDD. That's an ambiguous specialization, as described above.
-                if !greatest_lower_bound.is_assignable_to(db, least_upper_bound) {
-                    tracing::debug!(
+                if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
+                    tracing::trace!(
                         target: "ty_python_semantic::types::constraints::specialize_constrained",
                         bound_typevar = %identity.display(db),
                         greatest_lower_bound = %greatest_lower_bound.display(db),
@@ -3779,7 +3946,7 @@ impl<'db> GenericContext<'db> {
 
                 // Of all of the types that satisfy all of the paths in the BDD, we choose the
                 // "largest" one (i.e., "closest to `object`") as the specialization.
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::constraints::specialize_constrained",
                     bound_typevar = %identity.display(db),
                     specialization = %least_upper_bound.display(db),
@@ -3805,6 +3972,7 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+    use ruff_python_ast::name::Name;
 
     #[test]
     fn test_display_graph_output() {
@@ -3838,8 +4006,10 @@ mod tests {
         .trim_end();
 
         let db = setup_db();
-        let t = BoundTypeVarInstance::synthetic(&db, "T", TypeVarVariance::Invariant);
-        let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
         let t_str = ConstraintSet::range(&db, str_type, t, str_type);

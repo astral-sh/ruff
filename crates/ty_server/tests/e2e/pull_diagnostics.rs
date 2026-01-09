@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use insta::{assert_compact_debug_snapshot, assert_debug_snapshot};
+use insta::{assert_compact_json_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -35,6 +35,153 @@ def foo() -> str:
     let diagnostics = server.document_diagnostic_request(foo, None);
 
     assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_open_diagnostics_off() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Off)),
+        )?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "items": []}"#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_syntax_with_syntax_errors_disabled() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo(
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_show_syntax_errors(false)),
+        )?
+        .with_file(foo, foo_content)?
+        .with_initialization_options(
+            ClientOptions::default()
+                .with_show_syntax_errors(false)
+                .with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
+    assert_compact_json_snapshot!(workspace_diagnostics, @r#"
+    {
+      "items": [
+        {
+          "kind": "full",
+          "uri": "file://<temp_dir>/src/foo.py",
+          "version": null,
+          "resultId": "[RESULT_ID]",
+          "items": []
+        }
+      ]
+    }
+    "#);
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "resultId": "[RESULT_ID]", "items": []}"#);
+
+    Ok(())
+}
+
+/// Regression test for <https://github.com/astral-sh/ty/issues/2310>
+#[test]
+fn stack_size() -> Result<()> {
+    use std::fmt::Write;
+
+    let _filter = filter_result_id();
+
+    let mut content = String::new();
+    writeln!(
+        &mut content,
+        "
+from typing_extensions import reveal_type
+total = 1{plus_one_repeated}
+reveal_type(total)
+        ",
+        plus_one_repeated = " + 1".repeat(2000 - 1)
+    )?;
+
+    let file_path = SystemPath::new("src/foo.py");
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(file_path, &content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(file_path, content, 1);
+    let diagnostics = server.document_diagnostic_request(file_path, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn pull_excluded_file() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let main_path = SystemPath::new("src/foo.py");
+    let main_content = r#"reveal_type("included")"#;
+
+    let excluded_path = SystemPath::new("src/excluded/lib.py");
+    let excluded_content = r#"reveal_type("Excluded")"#;
+
+    let config = r#"
+[src]
+exclude = ["src/excluded/"]
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(main_path, main_content)?
+        .with_file(excluded_path, excluded_content)?
+        .with_file(SystemPath::new("ty.toml"), config)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(main_path, main_content, 1);
+    let main_diagnostics = server.document_diagnostic_request(main_path, None);
+    assert_compact_json_snapshot!("main", main_diagnostics);
+
+    server.open_text_document(excluded_path, excluded_content, 1);
+    let excluded_diagnostics = server.document_diagnostic_request(excluded_path, None);
+    assert_compact_json_snapshot!("excluded", excluded_diagnostics);
 
     Ok(())
 }
@@ -368,13 +515,13 @@ def foo() -> str:
 
     let second_response = shutdown_and_await_workspace_diagnostic(server, &workspace_request_id);
 
-    assert_compact_debug_snapshot!(second_response, @"Report(WorkspaceDiagnosticReport { items: [] })");
+    insta::assert_compact_debug_snapshot!(second_response, @"Report(WorkspaceDiagnosticReport { items: [] })");
 
     Ok(())
 }
 
 // Redact result_id values since they are hash-based and non-deterministic
-fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
+pub(crate) fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(r#""[a-f0-9]{16}""#, r#""[RESULT_ID]""#);
     settings.bind_to_scope()

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: classes.md - Generic classes: PEP 695 syntax - Diagnostics for bad specializations
 mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.md

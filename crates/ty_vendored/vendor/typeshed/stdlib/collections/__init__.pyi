@@ -663,7 +663,7 @@ class OrderedDict(dict[_KT, _VT]):
         """
 
     def copy(self) -> Self:
-        """od.copy() -> a shallow copy of od"""
+        """A shallow copy of ordered dict."""
 
     def __reversed__(self) -> Iterator[_KT]:
         """od.__reversed__() <==> reversed(od)"""
@@ -731,6 +731,8 @@ class defaultdict(dict[_KT, _VT]):
     """
 
     default_factory: Callable[[], _VT] | None
+    """Factory for default value called by __missing__()."""
+
     @overload
     def __init__(self) -> None: ...
     @overload

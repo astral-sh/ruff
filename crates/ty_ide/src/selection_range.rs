@@ -1,9 +1,9 @@
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Db;
-use crate::find_node::covering_node;
 
 /// Returns a list of nested selection ranges, where each range contains the next one.
 /// The first range in the list is the largest range containing the cursor position.
@@ -64,22 +64,30 @@ x = 1 + <CURSOR>2
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | x = 1 + 2
+          | |__________^
+          |
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | x = 1 + 2
           | ^^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:5
           |
         2 | x = 1 + 2
           |     ^^^^^
           |
 
-        info[selection-range]: Selection Range 2
+        info[selection-range]: Selection Range 3
          --> main.py:2:9
           |
         2 | x = 1 + 2
@@ -102,20 +110,28 @@ print(\"he<CURSOR>llo\")
 
         assert_snapshot!(test.selection_range(), @r#"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | print("hello")
+          | |_______________^
+          |
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | print("hello")
           | ^^^^^^^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:6
           |
         2 | print("hello")
           |      ^^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 2
+        info[selection-range]: Selection Range 3
          --> main.py:2:7
           |
         2 | print("hello")
@@ -137,8 +153,17 @@ def my_<CURSOR>function():
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | def my_function():
+        3 | |     return 42
+          | |______________^
+          |
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | / def my_function():
@@ -146,7 +171,7 @@ def my_<CURSOR>function():
           | |_____________^
           |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:5
           |
         2 | def my_function():
@@ -170,8 +195,18 @@ class My<CURSOR>Class:
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | class MyClass:
+        3 | |     def __init__(self):
+        4 | |         self.value = 1
+          | |_______________________^
+          |
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | / class MyClass:
@@ -180,7 +215,7 @@ class My<CURSOR>Class:
           | |______________________^
           |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:7
           |
         2 | class MyClass:
@@ -203,50 +238,58 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
+          | |______________________________________________________________________________^
+          |
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:10
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 2
+        info[selection-range]: Selection Range 3
          --> main.py:2:11
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 3
+        info[selection-range]: Selection Range 4
          --> main.py:2:12
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |            ^^^^^^^^^^^^^^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 4
+        info[selection-range]: Selection Range 5
          --> main.py:2:22
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |                      ^^^^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 5
+        info[selection-range]: Selection Range 6
          --> main.py:2:24
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |                        ^^^^^^^^
           |
 
-        info[selection-range]: Selection Range 6
+        info[selection-range]: Selection Range 7
          --> main.py:2:28
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]

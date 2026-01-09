@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use ruff_db::files::File;
 use ty_combine::Combine;
+use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
 
 use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
@@ -25,6 +26,7 @@ pub struct Settings {
     pub(super) rules: Arc<RuleSelection>,
     pub(super) terminal: TerminalSettings,
     pub(super) src: SrcSettings,
+    pub(super) analysis: AnalysisSettings,
 
     /// Settings for configuration overrides that apply to specific file patterns.
     ///
@@ -53,6 +55,10 @@ impl Settings {
 
     pub fn overrides(&self) -> &[Override] {
         &self.overrides
+    }
+
+    pub fn analysis(&self) -> &AnalysisSettings {
+        &self.analysis
     }
 }
 
@@ -91,7 +97,7 @@ impl Override {
         matches!(
             self.files
                 .is_file_included(path, GlobFilterCheckMode::Adhoc),
-            IncludeResult::Included
+            IncludeResult::Included { .. }
         )
     }
 }

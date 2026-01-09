@@ -8,7 +8,7 @@ use super::{
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
@@ -31,7 +31,7 @@ use crate::types::{
     protocol_class::ProtocolClass,
 };
 use crate::types::{DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance};
-use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
+use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
@@ -44,11 +44,13 @@ use ruff_python_ast::{self as ast, AnyNodeRef, PythonVersion, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
+use ty_module_resolver::{Module, ModuleName};
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
+    registry.register_lint(&CALL_TOP_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
@@ -92,7 +94,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
-    registry.register_lint(&NON_SUBSCRIPTABLE);
+    registry.register_lint(&NOT_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
@@ -118,10 +120,12 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
+    registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
+    registry.register_lint(&INVALID_TOTAL_ORDERING);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -146,6 +150,31 @@ declare_lint! {
     pub(crate) static CALL_NON_CALLABLE = {
         summary: "detects calls to non-callable objects",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to objects typed as `Top[Callable[..., T]]` (the infinite union of all
+    /// callable types with return type `T`).
+    ///
+    /// ## Why is this bad?
+    /// When an object is narrowed to `Top[Callable[..., object]]` (e.g., via `callable(x)` or
+    /// `isinstance(x, Callable)`), we know the object is callable, but we don't know its
+    /// precise signature. This type represents the set of all possible callable types
+    /// (including, e.g., functions that take no arguments and functions that require arguments),
+    /// so no specific set of arguments can be guaranteed to be valid.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def f(x: object):
+    ///     if callable(x):
+    ///         x()  # error: We know `x` is callable, but not what arguments it accepts
+    /// ```
+    pub(crate) static CALL_TOP_CALLABLE = {
+        summary: "detects calls to the top callable type",
+        status: LintStatus::stable("0.0.7"),
         default_level: Level::Error,
     }
 }
@@ -307,6 +336,10 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Dividing by zero raises a `ZeroDivisionError` at runtime.
+    ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
     ///
     /// ## Examples
     /// ```python
@@ -1430,7 +1463,7 @@ declare_lint! {
     /// ```python
     /// 4[1]  # TypeError: 'int' object is not subscriptable
     /// ```
-    pub(crate) static NON_SUBSCRIPTABLE = {
+    pub(crate) static NOT_SUBSCRIPTABLE = {
         summary: "detects subscripting objects that do not support subscripting",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -1580,6 +1613,10 @@ declare_lint! {
     /// Importing a missing module or name will raise a `ModuleNotFoundError`
     /// or `ImportError` at runtime.
     ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
+    ///
     /// ## Examples
     /// ```python
     /// # module.py
@@ -1594,7 +1631,7 @@ declare_lint! {
     pub(crate) static POSSIBLY_MISSING_IMPORT = {
         summary: "detects possibly missing imports",
         status: LintStatus::stable("0.0.1-alpha.22"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 
@@ -1604,6 +1641,10 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Using an undefined variable will raise a `NameError` at runtime.
+    ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
     ///
     /// ## Example
     ///
@@ -2130,6 +2171,31 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Detects statements other than annotated declarations in `TypedDict` class bodies.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` class bodies aren't allowed to contain any other types of statements. For
+    /// example, method definitions and field values aren't allowed. None of these will be
+    /// available on "instances of the `TypedDict`" at runtime (as `dict` is the runtime class of
+    /// all "`TypedDict` instances").
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Foo(TypedDict):
+    ///     def bar(self):  # error: [invalid-typed-dict-statement]
+    ///         pass
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
+        summary: "detects invalid statements in `TypedDict` class bodies",
+        status: LintStatus::stable("0.0.9"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
     ///
     /// The LSP states that an instance of a subtype should be substitutable for an instance of its supertype.
@@ -2264,6 +2330,46 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Checks for classes decorated with `@functools.total_ordering` that don't
+    /// define any ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`).
+    ///
+    /// ## Why is this bad?
+    /// The `@total_ordering` decorator requires the class to define at least one
+    /// ordering method. If none is defined, Python raises a `ValueError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from functools import total_ordering
+    ///
+    /// @total_ordering
+    /// class MyClass:  # Error: no ordering method defined
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```python
+    /// from functools import total_ordering
+    ///
+    /// @total_ordering
+    /// class MyClass:
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    ///
+    ///     def __lt__(self, other: "MyClass") -> bool:
+    ///         return True
+    /// ```
+    pub(crate) static INVALID_TOTAL_ORDERING = {
+        summary: "detects `@total_ordering` classes without an ordering method",
+        status: LintStatus::stable("0.0.10"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -2363,19 +2469,26 @@ pub(super) fn report_index_out_of_bounds(
 }
 
 /// Emit a diagnostic declaring that a type does not support subscripting.
-pub(super) fn report_non_subscriptable(
+pub(super) fn report_not_subscriptable(
     context: &InferContext,
     node: &ast::ExprSubscript,
-    non_subscriptable_ty: Type,
+    not_subscriptable_ty: Type,
     method: &str,
 ) {
-    let Some(builder) = context.report_lint(&NON_SUBSCRIPTABLE, node) else {
+    let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot subscript object of type `{}` with no `{method}` method",
-        non_subscriptable_ty.display(context.db())
-    ));
+    if method == "__delitem__" {
+        builder.into_diagnostic(format_args!(
+            "Cannot delete subscript on object of type `{}` with no `{method}` method",
+            not_subscriptable_ty.display(context.db())
+        ));
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Cannot subscript object of type `{}` with no `{method}` method",
+            not_subscriptable_ty.display(context.db())
+        ));
+    }
 }
 
 pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
@@ -2406,29 +2519,25 @@ fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
     message: std::fmt::Arguments,
 ) -> Option<LintDiagnosticGuard<'db, 'ctx>> {
     let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
+
+    let mut diag = builder.into_diagnostic(message);
+
     match target_ty {
         Type::ClassLiteral(class) => {
-            let mut diag = builder.into_diagnostic(format_args!(
-                "Implicit shadowing of class `{}`",
+            diag.info(format_args!(
+                "Implicit shadowing of class `{}`, add an annotation to make it explicit if this is intentional",
                 class.name(context.db()),
             ));
-            diag.info("Annotate to make it explicit if this is intentional");
-            Some(diag)
         }
         Type::FunctionLiteral(function) => {
-            let mut diag = builder.into_diagnostic(format_args!(
-                "Implicit shadowing of function `{}`",
+            diag.info(format_args!(
+                "Implicit shadowing of function `{}`, add an annotation to make it explicit if this is intentional",
                 function.name(context.db()),
             ));
-            diag.info("Annotate to make it explicit if this is intentional");
-            Some(diag)
         }
-
-        _ => {
-            let diag = builder.into_diagnostic(message);
-            Some(diag)
-        }
+        _ => {}
     }
+    Some(diag)
 }
 
 pub(super) fn report_invalid_assignment<'db>(
@@ -3478,13 +3587,16 @@ fn report_unsupported_base(
     let Some(builder) = context.report_lint(&UNSUPPORTED_BASE, base_node) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Unsupported class base");
+    diagnostic.set_primary_message(format_args!("Has type `{}`", base_type.display(db)));
+    diagnostic.set_concise_message(format_args!(
         "Unsupported class base with type `{}`",
-        base_type.display(context.db())
+        base_type.display(db)
     ));
     diagnostic.info(format_args!(
-        "ty cannot resolve a consistent MRO for class `{}` due to this base",
-        class.name(context.db())
+        "ty cannot resolve a consistent method resolution order (MRO) for class `{}` due to this base",
+        class.name(db)
     ));
     diagnostic.info("Only class objects or `Any` are supported as class bases");
 }
@@ -3700,6 +3812,66 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
     }
 }
 
+/// Enum representing the reason why a key cannot be deleted from a `TypedDict`.
+#[derive(Copy, Clone)]
+pub(crate) enum TypedDictDeleteErrorKind {
+    /// The key exists but is required (not `NotRequired`)
+    RequiredKey,
+    /// The key does not exist in the `TypedDict`
+    UnknownKey,
+}
+
+pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
+    context: &InferContext<'db, '_>,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    field_name: &str,
+    field: Option<&crate::types::typed_dict::TypedDictField<'db>>,
+    error_kind: TypedDictDeleteErrorKind,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) else {
+        return;
+    };
+
+    let typed_dict_name = typed_dict_ty.display(db);
+
+    let mut diagnostic = match error_kind {
+        TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
+            "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+        TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
+            "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+    };
+
+    // Add sub-diagnostic pointing to where the field is defined (if available)
+    if let Some(field) = field
+        && let Some(declaration) = field.first_declaration()
+    {
+        let file = declaration.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field defined here");
+        sub.annotate(
+            Annotation::secondary(
+                Span::from(file).with_range(declaration.full_range(db, &module).range()),
+            )
+            .message(format_args!(
+                "`{field_name}` declared as required here; consider making it `NotRequired`"
+            )),
+        );
+        diagnostic.sub(sub);
+    }
+
+    // Add hint about how to allow deletion
+    if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey) {
+        diagnostic.info(
+            "Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted",
+        );
+    }
+}
+
 pub(crate) fn report_invalid_type_param_order<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
@@ -3886,9 +4058,14 @@ pub(super) fn report_invalid_method_override<'db>(
             .place
     };
 
-    if let Place::Defined(Type::FunctionLiteral(subclass_function), _, _) = class_member(subclass)
-        && let Place::Defined(Type::FunctionLiteral(superclass_function), _, _) =
-            class_member(superclass)
+    if let Place::Defined(DefinedPlace {
+        ty: Type::FunctionLiteral(subclass_function),
+        ..
+    }) = class_member(subclass)
+        && let Place::Defined(DefinedPlace {
+            ty: Type::FunctionLiteral(superclass_function),
+            ..
+        }) = class_member(superclass)
         && let Ok(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)
         && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)
@@ -4240,8 +4417,9 @@ pub(super) fn report_unsupported_comparison<'db>(
             && let Some(TupleSpec::Fixed(rhs_spec)) = right_ty.tuple_instance_spec(db).as_deref()
             && lhs_spec.len() == rhs_spec.len()
             && let Some(position) = lhs_spec
-                .elements()
-                .zip(rhs_spec.elements())
+                .all_elements()
+                .iter()
+                .zip(rhs_spec.all_elements())
                 .position(|tup| tup == (&error.left_ty, &error.right_ty))
         {
             if error.left_ty == error.right_ty {
@@ -4483,6 +4661,27 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
 
         diagnostic.sub(sub);
     }
+}
+
+pub(super) fn report_invalid_total_ordering(
+    context: &InferContext<'_, '_>,
+    class: ClassLiteral<'_>,
+    decorator: &ast::Decorator,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_TOTAL_ORDERING, decorator) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "Class decorated with `@total_ordering` must define at least one ordering method",
+    );
+    diagnostic.set_primary_message(format_args!(
+        "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+        class.name(db)
+    ));
+    diagnostic.info("The decorator will raise `ValueError` at runtime");
 }
 
 /// This function receives an unresolved `from foo import bar` import,

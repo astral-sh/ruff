@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_python_semantic::ProgramSettings;
+use ty_python_semantic::{MisconfigurationMode, ProgramSettings};
 
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
@@ -37,6 +37,9 @@ pub struct ProjectMetadata {
     /// The path ordering doesn't imply precedence.
     #[cfg_attr(test, serde(skip_serializing_if = "Vec::is_empty"))]
     pub(super) extra_configuration_paths: Vec<SystemPathBuf>,
+
+    #[cfg_attr(test, serde(skip))]
+    pub(super) misconfiguration_mode: MisconfigurationMode,
 }
 
 impl ProjectMetadata {
@@ -47,11 +50,13 @@ impl ProjectMetadata {
             root,
             extra_configuration_paths: Vec::default(),
             options: Options::default(),
+            misconfiguration_mode: MisconfigurationMode::Fail,
         }
     }
 
     pub fn from_config_file(
         path: SystemPathBuf,
+        root: &SystemPath,
         system: &dyn System,
     ) -> Result<Self, ProjectMetadataError> {
         tracing::debug!("Using overridden configuration file at '{path}'");
@@ -66,10 +71,11 @@ impl ProjectMetadata {
         let options = config_file.into_options();
 
         Ok(Self {
-            name: Name::new(system.current_directory().file_name().unwrap_or("root")),
-            root: system.current_directory().to_path_buf(),
+            name: Name::new(root.file_name().unwrap_or("root")),
+            root: root.to_path_buf(),
             options,
             extra_configuration_paths: vec![path],
+            misconfiguration_mode: MisconfigurationMode::Fail,
         })
     }
 
@@ -82,6 +88,7 @@ impl ProjectMetadata {
             pyproject.tool.and_then(|tool| tool.ty).unwrap_or_default(),
             root,
             pyproject.project.as_ref(),
+            MisconfigurationMode::Fail,
         )
     }
 
@@ -90,6 +97,7 @@ impl ProjectMetadata {
         mut options: Options,
         root: SystemPathBuf,
         project: Option<&Project>,
+        misconfiguration_mode: MisconfigurationMode,
     ) -> Result<Self, ResolveRequiresPythonError> {
         let name = project
             .and_then(|project| project.name.as_deref())
@@ -117,6 +125,7 @@ impl ProjectMetadata {
             root,
             options,
             extra_configuration_paths: Vec::new(),
+            misconfiguration_mode,
         })
     }
 
@@ -194,6 +203,7 @@ impl ProjectMetadata {
                     pyproject
                         .as_ref()
                         .and_then(|pyproject| pyproject.project.as_ref()),
+                    MisconfigurationMode::Fail,
                 )
                 .map_err(|err| {
                     ProjectMetadataError::InvalidRequiresPythonConstraint {
@@ -273,8 +283,13 @@ impl ProjectMetadata {
         system: &dyn System,
         vendored: &VendoredFileSystem,
     ) -> anyhow::Result<ProgramSettings> {
-        self.options
-            .to_program_settings(self.root(), self.name(), system, vendored)
+        self.options.to_program_settings(
+            self.root(),
+            self.name(),
+            system,
+            vendored,
+            self.misconfiguration_mode,
+        )
     }
 
     pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {

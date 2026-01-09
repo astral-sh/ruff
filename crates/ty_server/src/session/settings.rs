@@ -1,5 +1,4 @@
 use super::options::DiagnosticMode;
-
 use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::metadata::options::ProjectOptionsOverrides;
 
@@ -8,11 +7,16 @@ use ty_project::metadata::options::ProjectOptionsOverrides;
 pub(crate) struct GlobalSettings {
     pub(super) diagnostic_mode: DiagnosticMode,
     pub(super) experimental: ExperimentalSettings,
+    pub(super) show_syntax_errors: bool,
 }
 
 impl GlobalSettings {
     pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
         self.diagnostic_mode
+    }
+
+    pub(crate) fn show_syntax_errors(&self) -> bool {
+        self.show_syntax_errors
     }
 }
 
@@ -23,7 +27,7 @@ pub(crate) struct ExperimentalSettings;
 ///
 /// These settings are meant to be used directly by the server, and are *not* a 1:1 representation
 /// with how the client sends them.
-#[derive(Clone, Default, Debug)]
+#[derive(Default, Debug)]
 pub(crate) struct WorkspaceSettings {
     pub(super) disable_language_services: bool,
     pub(super) inlay_hints: InlayHintSettings,

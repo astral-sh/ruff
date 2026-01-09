@@ -51,7 +51,7 @@ fn default_files() -> Result<()> {
 
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
-        .arg("--check"), @r"
+        .arg("--check"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -71,7 +71,7 @@ fn format_warn_stdin_filename_with_files() -> Result<()> {
     assert_cmd_snapshot!(test.format_command()
         .args(["--isolated", "--stdin-filename", "foo.py"])
         .arg("foo.py")
-        .pass_stdin("foo =     1"), @r"
+        .pass_stdin("foo =     1"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -87,7 +87,7 @@ fn format_warn_stdin_filename_with_files() -> Result<()> {
 fn nonexistent_config_file() -> Result<()> {
     let test = CliTest::new()?;
     assert_cmd_snapshot!(test.format_command()
-        .args(["--config", "foo.toml", "."]), @r"
+        .args(["--config", "foo.toml", "."]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -111,7 +111,7 @@ fn nonexistent_config_file() -> Result<()> {
 fn config_override_rejected_if_invalid_toml() -> Result<()> {
     let test = CliTest::new()?;
     assert_cmd_snapshot!(test.format_command()
-        .args(["--config", "foo = bar", "."]), @r"
+        .args(["--config", "foo = bar", "."]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -145,7 +145,7 @@ fn too_many_config_files() -> Result<()> {
         .arg("ruff.toml")
         .arg("--config")
         .arg("ruff2.toml")
-        .arg("."), @r"
+        .arg("."), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -168,7 +168,7 @@ fn config_file_and_isolated() -> Result<()> {
         .arg("--isolated")
         .arg("--config")
         .arg("ruff.toml")
-        .arg("."), @r"
+        .arg("."), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -390,7 +390,7 @@ fn mixed_line_endings() -> Result<()> {
     assert_cmd_snapshot!(test.format_command()
         .arg("--diff")
         .arg("--isolated")
-        .arg("."), @r"
+        .arg("."), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -446,7 +446,7 @@ OTHER = "OTHER"
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
         .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
-        .arg("."), @r"
+        .arg("."), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -469,7 +469,7 @@ fn deduplicate_directory_and_explicit_file() -> Result<()> {
             .arg("--check")
             .arg(".")
             .arg("main.py"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -495,7 +495,7 @@ from module import =
     assert_cmd_snapshot!(test.format_command()
         .arg("--check")
         .arg("--isolated")
-        .arg("main.py"), @r"
+        .arg("main.py"), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -522,7 +522,7 @@ if __name__ == "__main__":
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
         .arg("--check")
-        .arg("main.py"), @r"
+        .arg("main.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -534,7 +534,7 @@ if __name__ == "__main__":
 
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
-        .arg("main.py"), @r"
+        .arg("main.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -545,7 +545,7 @@ if __name__ == "__main__":
 
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
-        .arg("main.py"), @r"
+        .arg("main.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -614,7 +614,7 @@ fn output_format_notebook() -> Result<()> {
 
     assert_cmd_snapshot!(
         test.format_command().args(["--isolated", "--preview", "--check"]).arg(path),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -672,7 +672,7 @@ if __name__ == "__main__":
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
         .arg("--exit-non-zero-on-format")
-        .arg("main.py"), @r"
+        .arg("main.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -685,7 +685,7 @@ if __name__ == "__main__":
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
         .arg("--exit-non-zero-on-format")
-        .arg("main.py"), @r"
+        .arg("main.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -701,7 +701,7 @@ if __name__ == "__main__":
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
         .arg("--exit-non-zero-on-fix")
-        .arg("main.py"), @r"
+        .arg("main.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -714,7 +714,7 @@ if __name__ == "__main__":
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
         .arg("--exit-non-zero-on-fix")
-        .arg("main.py"), @r"
+        .arg("main.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -771,7 +771,7 @@ OTHER = "OTHER"
         // Explicitly pass test.py, should not be formatted because of --force-exclude
         .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
-        .arg("."), @r"
+        .arg("."), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -931,7 +931,7 @@ tab-size = 2
             .pass_stdin(r"
 if True:
     pass
-    "), @r"
+    "), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1144,7 +1144,7 @@ def say_hy(name: str):
     assert_cmd_snapshot!(test.format_command()
         .arg("--config")
         .arg("ruff.toml")
-        .arg("test.py"), @r"
+        .arg("test.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1184,7 +1184,7 @@ def say_hy(name: str):
     assert_cmd_snapshot!(test.format_command()
         .arg("--config")
         .arg("ruff.toml")
-        .arg("test.py"), @r"
+        .arg("test.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1216,7 +1216,7 @@ def say_hy(name: str):
     assert_cmd_snapshot!(test.format_command()
         .arg("--config")
         .arg("ruff.toml")
-        .arg("test.py"), @r"
+        .arg("test.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1246,7 +1246,7 @@ fn test_diff() -> Result<()> {
 
     assert_cmd_snapshot!(
         test.format_command().args(["--isolated", "--diff"]).args(paths),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1311,7 +1311,7 @@ fn test_diff_no_change() -> Result<()> {
     let paths = [fixtures.join("unformatted.py")];
     assert_cmd_snapshot!(
         test.format_command().args(["--isolated", "--diff"]).args(paths),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1341,7 +1341,7 @@ fn test_diff_stdin_unformatted() -> Result<()> {
         test.format_command()
             .args(["--isolated", "--diff", "-", "--stdin-filename", "unformatted.py"])
             .pass_stdin(unformatted),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1366,7 +1366,7 @@ fn test_diff_stdin_formatted() -> Result<()> {
     let unformatted = fs::read(fixtures.join("formatted.py")).unwrap();
     assert_cmd_snapshot!(
         test.format_command().args(["--isolated", "--diff", "-"]).pass_stdin(unformatted),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1873,7 +1873,7 @@ include = ["*.ipy"]
     assert_cmd_snapshot!(test.format_command()
         .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
-        .arg("."), @r"
+        .arg("."), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1938,7 +1938,7 @@ include = ["*.ipy"]
     assert_cmd_snapshot!(test.format_command()
         .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
-        .arg("."), @r"
+        .arg("."), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2021,7 +2021,7 @@ def file2(arg1, arg2,):
     assert_cmd_snapshot!(test.format_command()
         .args(["--isolated", "--range=1:8-1:15"])
         .arg("file1.py")
-        .arg("file2.py"),  @r"
+        .arg("file2.py"),  @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2068,7 +2068,7 @@ fn range_start_larger_than_end() -> Result<()> {
 def foo(arg1, arg2,):
     print("Shouldn't format this" )
 
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2168,7 +2168,7 @@ fn range_missing_line() -> Result<()> {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2192,7 +2192,7 @@ fn zero_line_number() -> Result<()> {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2217,7 +2217,7 @@ fn column_and_line_zero() -> Result<()> {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2274,7 +2274,7 @@ fn range_formatting_notebook() -> Result<()> {
  "nbformat": 4,
  "nbformat_minor": 5
 }
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2355,7 +2355,7 @@ fn cookiecutter_globbing() -> Result<()> {
     ])?;
 
     assert_cmd_snapshot!(test.format_command()
-            .args(["--isolated", "--diff", "."]), @r"
+            .args(["--isolated", "--diff", "."]), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2374,7 +2374,7 @@ fn stable_output_format_warning() -> Result<()> {
         test.format_command()
             .args(["--output-format=full", "-"])
             .pass_stdin(""),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----

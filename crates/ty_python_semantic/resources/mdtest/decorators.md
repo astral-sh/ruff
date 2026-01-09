@@ -144,11 +144,10 @@ from functools import cache
 def f(x: int) -> int:
     return x**2
 
-# TODO: Should be `_lru_cache_wrapper[int]`
-reveal_type(f)  # revealed: _lru_cache_wrapper[Unknown]
-
-# TODO: Should be `int`
-reveal_type(f(1))  # revealed: Unknown
+# revealed: _lru_cache_wrapper[int]
+reveal_type(f)
+# revealed: int
+reveal_type(f(1))
 ```
 
 ## Lambdas as decorators
@@ -234,4 +233,39 @@ def takes_no_argument() -> str:
 # error: [too-many-positional-arguments] "Too many positional arguments to function `takes_no_argument`: expected 0, got 1"
 @takes_no_argument
 def g(x): ...
+```
+
+## Class decorators
+
+Class decorator calls are validated, emitting diagnostics for invalid arguments:
+
+```py
+def takes_int(x: int) -> int:
+    return x
+
+# error: [invalid-argument-type]
+@takes_int
+class Foo: ...
+```
+
+Using `None` as a decorator is an error:
+
+```py
+# error: [call-non-callable]
+@None
+class Bar: ...
+```
+
+A decorator can enforce type constraints on the class being decorated:
+
+```py
+def decorator(cls: type[int]) -> type[int]:
+    return cls
+
+# error: [invalid-argument-type]
+@decorator
+class Baz: ...
+
+# TODO: the revealed type should ideally be `type[int]` (the decorator's return type)
+reveal_type(Baz)  # revealed: <class 'Baz'>
 ```

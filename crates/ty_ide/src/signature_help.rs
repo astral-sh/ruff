@@ -6,11 +6,12 @@
 //! types, and documentation. It supports multiple signatures for union types
 //! and overloads.
 
+use crate::Db;
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
-use crate::{Db, find_node::covering_node};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -33,8 +34,8 @@ pub struct ParameterDetails<'db> {
     pub name: String,
     /// The parameter label in the signature (e.g., "param1: str")
     pub label: String,
-    /// The annotated type of the parameter, if any
-    pub ty: Option<Type<'db>>,
+    /// The annotated type of the parameter. If no annotation was provided, this is `Unknown`.
+    pub ty: Type<'db>,
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
@@ -124,6 +125,11 @@ fn get_call_expr(
         })?;
 
     // Find the covering node at the given position that is a function call.
+    // Note that we are okay with the range being anywhere within a call
+    // expression, even if it's not in the arguments portion of the call
+    // expression. This is because, e.g., a user can request signature
+    // information at a call site, and this should ideally work anywhere
+    // within the call site, even at the function name.
     let call = covering_node(root_node, token.range())
         .find_first(|node| {
             if !node.is_expr_call() {
@@ -231,7 +237,7 @@ fn create_parameters_from_offsets<'db>(
     docstring: Option<&Docstring>,
     parameter_names: &[String],
     parameter_kinds: &[ParameterKind],
-    parameter_types: &[Option<Type<'db>>],
+    parameter_types: &[Type<'db>],
 ) -> Vec<ParameterDetails<'db>> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(docstring) = docstring {
@@ -258,12 +264,11 @@ fn create_parameters_from_offsets<'db>(
                 parameter_kinds.get(i),
                 Some(ParameterKind::PositionalOnly { .. })
             );
-            let ty = parameter_types.get(i).copied().flatten();
 
             ParameterDetails {
                 name: param_name.to_string(),
                 label,
-                ty,
+                ty: parameter_types[i],
                 documentation: param_docs.get(param_name).cloned(),
                 is_positional_only,
             }
@@ -522,7 +527,8 @@ def ab(a: str): ...
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int) -> Unknown
         ---------------------------------------------
@@ -577,7 +583,8 @@ def ab(a: str):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int) -> Unknown
         ---------------------------------------------
@@ -632,7 +639,8 @@ def ab(a: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, b: int) -> Unknown
         ---------------------------------------------
@@ -685,7 +693,8 @@ def ab(a: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, b: int) -> Unknown
         ---------------------------------------------
@@ -744,7 +753,8 @@ def ab(a: int, *, c: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, *, b: int) -> Unknown
         ---------------------------------------------
@@ -809,7 +819,8 @@ def ab(a: int, *, c: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, *, c: int) -> Unknown
         ---------------------------------------------

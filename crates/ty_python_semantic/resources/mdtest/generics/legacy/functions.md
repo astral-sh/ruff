@@ -80,6 +80,7 @@ class CanIndex(Protocol[T]):
     def __getitem__(self, index: int, /) -> T: ...
 
 class ExplicitlyImplements(CanIndex[T]): ...
+class SubProtocol(CanIndex[T], Protocol): ...
 
 def takes_in_list(x: list[T]) -> list[T]:
     return x
@@ -101,6 +102,18 @@ def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def deep_subprotocol(x: SubProtocol[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deeper_subprotocol(x: SubProtocol[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def itself(x: CanIndex[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deep_itself(x: CanIndex[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def takes_in_type(x: type[T]) -> type[T]:
@@ -555,8 +568,7 @@ def identity(x: T) -> T:
 def head(xs: list[T]) -> T:
     return xs[0]
 
-# TODO: this should be `Literal[1]`
-reveal_type(invoke(identity, 1))  # revealed: Unknown
+reveal_type(invoke(identity, 1))  # revealed: Literal[1]
 
 # TODO: this should be `Unknown | int`
 reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
@@ -739,4 +751,33 @@ reveal_type(x)  # revealed: list[Sub]
 
 y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
+```
+
+## Bounded TypeVar with callable parameter
+
+When a bounded TypeVar appears in a `Callable` parameter's return type, the inferred type should be
+the actual type from the call, not the TypeVar's upper bound.
+
+See: <https://github.com/astral-sh/ty/issues/2292>
+
+```py
+from typing import Callable, TypeVar
+
+class Base:
+    pass
+
+class Derived(Base):
+    attr: int
+
+T = TypeVar("T", bound=Base)
+
+def takes_factory(factory: Callable[[], T]) -> T:
+    return factory()
+
+# Passing a class as a factory: should infer Derived, not Base
+result = takes_factory(Derived)
+reveal_type(result)  # revealed: Derived
+
+# Accessing an attribute that only exists on Derived should work
+print(result.attr)  # No error
 ```

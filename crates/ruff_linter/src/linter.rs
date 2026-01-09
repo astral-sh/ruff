@@ -26,6 +26,7 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
+use crate::preview::is_py315_support_enabled;
 use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
@@ -33,7 +34,7 @@ use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
 use crate::suppression::Suppressions;
-use crate::{Locator, directives, fs};
+use crate::{Locator, directives, fs, warn_user_once};
 
 pub(crate) mod float;
 
@@ -450,6 +451,14 @@ pub fn lint_only(
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
 
+    if matches!(target_version.linter_version(), PythonVersion::PY315)
+        && !is_py315_support_enabled(settings)
+    {
+        warn_user_once!(
+            "Support for Python 3.15 is under development and may be unstable. Enable `preview` to remove this warning."
+        );
+    }
+
     let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
@@ -554,6 +563,14 @@ pub fn lint_fix<'a>(
     let mut has_no_syntax_errors = false;
 
     let target_version = settings.resolve_target_version(path);
+
+    if matches!(target_version.linter_version(), PythonVersion::PY315)
+        && !is_py315_support_enabled(settings)
+    {
+        warn_user_once!(
+            "Support for Python 3.15 is under development and may be unstable. Enable `preview` to remove this warning."
+        );
+    }
 
     // Continuously fix until the source code stabilizes.
     loop {
@@ -1001,6 +1018,7 @@ mod tests {
     #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY310)]
     #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
     #[test_case(Path::new("global_parameter.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("annotated_global.py"), PythonVersion::PY314)]
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
         let snapshot = format!(
             "semantic_syntax_error_{}_{}",

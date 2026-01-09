@@ -20,11 +20,59 @@ Valid severities are:
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.rules]
-possibly-unresolved-reference = "warn"
-division-by-zero = "ignore"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.rules]
+    possibly-unresolved-reference = "warn"
+    division-by-zero = "ignore"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [rules]
+    possibly-unresolved-reference = "warn"
+    division-by-zero = "ignore"
+    ```
+
+---
+
+## `analysis`
+
+### `respect-type-ignore-comments`
+
+Whether ty should respect `type: ignore` comments.
+
+When set to `false`, `type: ignore` comments are treated like any other normal
+comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+
+Setting this option can be useful when using ty alongside other type checkers or when
+you prefer using `ty: ignore` over `type: ignore`.
+
+Defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
 
 ---
 
@@ -47,10 +95,19 @@ configuration setting.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.environment]
-extra-paths = ["./shared/my-search-path"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    extra-paths = ["./shared/my-search-path"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    extra-paths = ["./shared/my-search-path"]
+    ```
 
 ---
 
@@ -78,10 +135,19 @@ This option can be used to point to virtual or system Python environments.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.environment]
-python = "./custom-venv-location/.venv"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    python = "./custom-venv-location/.venv"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    python = "./custom-venv-location/.venv"
+    ```
 
 ---
 
@@ -105,11 +171,21 @@ If no platform is specified, ty will use the current platform:
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.environment]
-# Tailor type stubs and conditionalized type definitions to windows.
-python-platform = "win32"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    # Tailor type stubs and conditionalized type definitions to windows.
+    python-platform = "win32"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    # Tailor type stubs and conditionalized type definitions to windows.
+    python-platform = "win32"
+    ```
 
 ---
 
@@ -139,10 +215,19 @@ to reflect the differing contents of the standard library across Python versions
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.environment]
-python-version = "3.12"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    python-version = "3.12"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    python-version = "3.12"
+    ```
 
 ---
 
@@ -167,11 +252,21 @@ it will also be included in the first party search path.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.environment]
-# Multiple directories (priority order)
-root = ["./src", "./lib", "./vendor"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    # Multiple directories (priority order)
+    root = ["./src", "./lib", "./vendor"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    # Multiple directories (priority order)
+    root = ["./src", "./lib", "./vendor"]
+    ```
 
 ---
 
@@ -187,10 +282,19 @@ bundled as a zip file in the binary
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.environment]
-typeshed = "/path/to/custom/typeshed"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    typeshed = "/path/to/custom/typeshed"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    typeshed = "/path/to/custom/typeshed"
+    ```
 
 ---
 
@@ -200,24 +304,22 @@ Configuration override that applies to specific files based on glob patterns.
 
 An override allows you to apply different rule configurations to specific
 files or directories. Multiple overrides can match the same file, with
-later overrides take precedence.
+later overrides take precedence. Override rules take precedence over global
+rules for matching files.
 
-### Precedence
-
-- Later overrides in the array take precedence over earlier ones
-- Override rules take precedence over global rules for matching files
-
-### Examples
+For example, to relax enforcement of rules in test files:
 
 ```toml
-# Relax rules for test files
 [[tool.ty.overrides]]
 include = ["tests/**", "**/test_*.py"]
 
 [tool.ty.overrides.rules]
 possibly-unresolved-reference = "warn"
+```
 
-# Ignore generated files but still check important ones
+Or, to ignore a rule in generated files but retain enforcement in an important file:
+
+```toml
 [[tool.ty.overrides]]
 include = ["generated/**"]
 exclude = ["generated/important.py"]
@@ -242,15 +344,29 @@ If not specified, defaults to `[]` (excludes no files).
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[[tool.ty.overrides]]
-exclude = [
-    "generated",
-    "*.proto",
-    "tests/fixtures/**",
-    "!tests/fixtures/important.py"  # Include this one file
-]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    exclude = [
+        "generated",
+        "*.proto",
+        "tests/fixtures/**",
+        "!tests/fixtures/important.py"  # Include this one file
+    ]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    exclude = [
+        "generated",
+        "*.proto",
+        "tests/fixtures/**",
+        "!tests/fixtures/important.py"  # Include this one file
+    ]
+    ```
 
 ---
 
@@ -270,13 +386,25 @@ If not specified, defaults to `["**"]` (matches all files).
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[[tool.ty.overrides]]
-include = [
-    "src",
-    "tests",
-]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = [
+        "src",
+        "tests",
+    ]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = [
+        "src",
+        "tests",
+    ]
+    ```
 
 ---
 
@@ -294,13 +422,25 @@ severity levels or disable them entirely.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[[tool.ty.overrides]]
-include = ["src"]
+=== "pyproject.toml"
 
-[tool.ty.overrides.rules]
-possibly-unresolved-reference = "ignore"
-```
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.rules]
+    possibly-unresolved-reference = "ignore"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.rules]
+    possibly-unresolved-reference = "ignore"
+    ```
 
 ---
 
@@ -360,15 +500,29 @@ to re-include `dist` use `exclude = ["!dist"]`
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.src]
-exclude = [
-    "generated",
-    "*.proto",
-    "tests/fixtures/**",
-    "!tests/fixtures/important.py"  # Include this one file
-]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    exclude = [
+        "generated",
+        "*.proto",
+        "tests/fixtures/**",
+        "!tests/fixtures/important.py"  # Include this one file
+    ]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    exclude = [
+        "generated",
+        "*.proto",
+        "tests/fixtures/**",
+        "!tests/fixtures/important.py"  # Include this one file
+    ]
+    ```
 
 ---
 
@@ -401,13 +555,25 @@ matches `<project_root>/src` and not `<project_root>/test/src`).
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.src]
-include = [
-    "src",
-    "tests",
-]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    include = [
+        "src",
+        "tests",
+    ]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    include = [
+        "src",
+        "tests",
+    ]
+    ```
 
 ---
 
@@ -423,10 +589,19 @@ Enabled by default.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.src]
-respect-ignore-files = false
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    respect-ignore-files = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    respect-ignore-files = false
+    ```
 
 ---
 
@@ -452,10 +627,19 @@ it will also be included in the first party search path.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.src]
-root = "./app"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    root = "./app"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    root = "./app"
+    ```
 
 ---
 
@@ -473,11 +657,21 @@ Defaults to `false`.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.terminal]
-# Error if ty emits any warning-level diagnostics.
-error-on-warning = true
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.terminal]
+    # Error if ty emits any warning-level diagnostics.
+    error-on-warning = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [terminal]
+    # Error if ty emits any warning-level diagnostics.
+    error-on-warning = true
+    ```
 
 ---
 
@@ -493,10 +687,19 @@ Defaults to `full`.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.terminal]
-output-format = "concise"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.terminal]
+    output-format = "concise"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [terminal]
+    output-format = "concise"
+    ```
 
 ---
 

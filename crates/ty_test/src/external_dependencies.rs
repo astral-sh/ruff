@@ -1,6 +1,7 @@
 use crate::db::Db;
 
 use anyhow::{Context, Result, anyhow, bail};
+use camino::Utf8Path;
 use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath};
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::{PythonEnvironment, PythonPlatform, SysPrefixPathOrigin};
@@ -13,6 +14,7 @@ pub(crate) fn setup_venv(
     python_version: PythonVersion,
     python_platform: &PythonPlatform,
     dest_venv_path: &SystemPath,
+    lockfile_path: &Utf8Path,
 ) -> Result<()> {
     // Create a temporary directory for the project
     let temp_dir = tempfile::Builder::new()
@@ -70,20 +72,73 @@ dependencies = [
         }
     };
 
+    let upgrade_lockfile = std::env::var("MDTEST_UPGRADE_LOCKFILES").is_ok_and(|v| v == "1");
+    let use_locked = if upgrade_lockfile {
+        // In upgrade mode, we'll generate a new lockfile
+        false
+    } else if lockfile_path.exists() {
+        // Copy existing lockfile to temp directory
+        let temp_lockfile = temp_path.join("uv.lock");
+        std::fs::copy(lockfile_path, temp_lockfile.as_std_path())
+            .with_context(|| format!("Failed to copy lockfile from '{lockfile_path}'"))?;
+        true
+    } else {
+        // No existing lockfile - error in normal mode
+        bail!(
+            "Lockfile not found at '{lockfile_path}'. Run with `MDTEST_UPGRADE_LOCKFILES=1` to generate it.",
+        );
+    };
+
     // Run `uv sync` to install dependencies
-    let uv_sync_output = std::process::Command::new("uv")
+    let mut uv_sync = std::process::Command::new("uv");
+    uv_sync
         .args(["sync", "--python-platform", uv_platform])
-        .current_dir(temp_path.as_std_path())
+        .current_dir(temp_path.as_std_path());
+    if use_locked {
+        uv_sync.arg("--locked");
+    }
+
+    let uv_sync_output = uv_sync
         .output()
         .context("Failed to run `uv sync`. Is `uv` installed?")?;
 
     if !uv_sync_output.status.success() {
         let stderr = String::from_utf8_lossy(&uv_sync_output.stderr);
+
+        if use_locked
+            && stderr.contains("`uv.lock` needs to be updated, but `--locked` was provided.")
+        {
+            bail!(
+                "Lockfile is out of date. Use one of these commands to regenerate it:\n\
+                 \n\
+                 uv run crates/ty_python_semantic/mdtest.py -e external/\n\
+                 \n\
+                 Or using cargo:\n\
+                 \n\
+                 MDTEST_EXTERNAL=1 MDTEST_UPGRADE_LOCKFILES=1 cargo test -p ty_python_semantic --test mdtest mdtest__external"
+            );
+        }
+
         bail!(
             "`uv sync` failed with exit code {:?}:\n{}",
             uv_sync_output.status.code(),
             stderr
         );
+    }
+
+    // In upgrade mode, copy the generated lockfile back to the source location
+    if upgrade_lockfile {
+        let temp_lockfile = temp_path.join("uv.lock");
+        let temp_lockfile = temp_lockfile.as_std_path();
+        if temp_lockfile.exists() {
+            std::fs::copy(temp_lockfile, lockfile_path)
+                .with_context(|| format!("Failed to write lockfile to '{lockfile_path}'"))?;
+        } else {
+            bail!(
+                "Expected uv to create a lockfile at '{}'",
+                temp_lockfile.display()
+            );
+        }
     }
 
     let venv_path = temp_path.join(".venv");

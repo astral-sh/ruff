@@ -369,6 +369,61 @@ fn type_excluded_by_previous_patterns<'db>(
     builder.build()
 }
 
+/// Analyze a pattern predicate to determine its static truthiness.
+///
+/// This is a Salsa tracked function to enable memoization. Without memoization, for a match
+/// statement with N cases where each case references the subject (e.g., `self`), we would
+/// re-analyze each pattern O(N) times (once per reference), leading to O(N²) total work.
+/// With memoization, each pattern is analyzed exactly once.
+#[salsa::tracked(cycle_initial = analyze_pattern_predicate_cycle_initial, heap_size = get_size2::GetSize::get_heap_size)]
+fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
+    let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+
+    let narrowed_subject = IntersectionBuilder::new(db)
+        .add_positive(subject_ty)
+        .add_negative(type_excluded_by_previous_patterns(db, predicate));
+
+    let narrowed_subject_ty = narrowed_subject.clone().build();
+
+    // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
+    // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
+    // subject type is `Self & ~Literal[NO]`. This type is *not* equivalent to `Literal[YES]`,
+    // because `Self` could also specialize to `Literal[NO]` or `Never`, making the intersection
+    // empty. However, if the current pattern matches on `YES`, the *next* narrowed subject type
+    // will be `Self & ~Literal[NO] & ~Literal[YES]`, which *is* always equivalent to `Never`. This
+    // means that subsequent patterns can never match. And we know that if we reach this point,
+    // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
+    // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
+    let next_narrowed_subject_ty = narrowed_subject
+        .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
+        .build();
+    if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
+        return Truthiness::AlwaysTrue;
+    }
+
+    let truthiness = ReachabilityConstraints::analyze_single_pattern_predicate_kind(
+        db,
+        predicate.kind(db),
+        narrowed_subject_ty,
+    );
+
+    if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
+        // Fall back to ambiguous, the guard might change the result.
+        // TODO: actually analyze guard truthiness
+        Truthiness::Ambiguous
+    } else {
+        truthiness
+    }
+}
+
+fn analyze_pattern_predicate_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _predicate: PatternPredicate<'db>,
+) -> Truthiness {
+    Truthiness::Ambiguous
+}
+
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachabilityConstraints {
@@ -801,46 +856,6 @@ impl ReachabilityConstraints {
         }
     }
 
-    fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
-        let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
-
-        let narrowed_subject = IntersectionBuilder::new(db)
-            .add_positive(subject_ty)
-            .add_negative(type_excluded_by_previous_patterns(db, predicate));
-
-        let narrowed_subject_ty = narrowed_subject.clone().build();
-
-        // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
-        // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
-        // subject type is `Self & ~Literal[NO]`. This type is *not* equivalent to `Literal[YES]`,
-        // because `Self` could also specialize to `Literal[NO]` or `Never`, making the intersection
-        // empty. However, if the current pattern matches on `YES`, the *next* narrowed subject type
-        // will be `Self & ~Literal[NO] & ~Literal[YES]`, which *is* always equivalent to `Never`. This
-        // means that subsequent patterns can never match. And we know that if we reach this point,
-        // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
-        // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-        let next_narrowed_subject_ty = narrowed_subject
-            .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
-            .build();
-        if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
-            return Truthiness::AlwaysTrue;
-        }
-
-        let truthiness = Self::analyze_single_pattern_predicate_kind(
-            db,
-            predicate.kind(db),
-            narrowed_subject_ty,
-        );
-
-        if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
-            // Fall back to ambiguous, the guard might change the result.
-            // TODO: actually analyze guard truthiness
-            Truthiness::Ambiguous
-        } else {
-            truthiness
-        }
-    }
-
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -884,9 +899,7 @@ impl ReachabilityConstraints {
                 let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
                     .fold((true, true), |(none, all), overload| {
                         let overload_returns_never =
-                            overload.return_ty.is_some_and(|return_type| {
-                                return_type.is_equivalent_to(db, Type::Never)
-                            });
+                            overload.return_ty.is_equivalent_to(db, Type::Never);
 
                         (
                             none && !overload_returns_never,
@@ -908,7 +921,7 @@ impl ReachabilityConstraints {
                 }
                 .negate_if(!predicate.is_positive)
             }
-            PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
+            PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
                 let place_table = place_table(db, star_import.scope(db));
                 let symbol = place_table.symbol(star_import.symbol_id(db));
@@ -938,16 +951,14 @@ impl ReachabilityConstraints {
                 )
                 .place
                 {
-                    crate::place::Place::Defined(
-                        _,
-                        _,
-                        crate::place::Definedness::AlwaysDefined,
-                    ) => Truthiness::AlwaysTrue,
-                    crate::place::Place::Defined(
-                        _,
-                        _,
-                        crate::place::Definedness::PossiblyUndefined,
-                    ) => Truthiness::Ambiguous,
+                    crate::place::Place::Defined(crate::place::DefinedPlace {
+                        definedness: crate::place::Definedness::AlwaysDefined,
+                        ..
+                    }) => Truthiness::AlwaysTrue,
+                    crate::place::Place::Defined(crate::place::DefinedPlace {
+                        definedness: crate::place::Definedness::PossiblyUndefined,
+                        ..
+                    }) => Truthiness::Ambiguous,
                     crate::place::Place::Undefined => Truthiness::AlwaysFalse,
                 }
             }

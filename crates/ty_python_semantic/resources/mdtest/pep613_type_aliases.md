@@ -113,7 +113,7 @@ MyList: TypeAlias = list[T]
 ListOrSet: TypeAlias = list[T] | set[T]
 
 reveal_type(MyList)  # revealed: <class 'list[T]'>
-reveal_type(ListOrSet)  # revealed: <types.UnionType special form 'list[T] | set[T]'>
+reveal_type(ListOrSet)  # revealed: <types.UnionType special-form 'list[T] | set[T]'>
 
 def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
     reveal_type(list_of_int)  # revealed: list[int]
@@ -293,7 +293,7 @@ def _(rec: RecursiveHomogeneousTuple):
     reveal_type(rec)  # revealed: tuple[Divergent, ...]
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-reveal_type(ClassInfo)  # revealed: <types.UnionType special form 'type | UnionType | tuple[Divergent, ...]'>
+reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     # TODO should be `type | UnionType | tuple[ClassInfo, ...]`

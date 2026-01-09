@@ -502,9 +502,8 @@ mod tests {
     use ruff_db::{Db as _, files::system_path_to_file};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
+    use ty_module_resolver::SearchPathSettings;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
         let mut db = Db::setup();

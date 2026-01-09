@@ -1446,7 +1446,7 @@ class TaggedData(TypedDict, Generic[T]):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData[int]`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 
 class Items(TypedDict, Generic[T]):
@@ -1488,7 +1488,7 @@ class TaggedData[T](TypedDict):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData[int]`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 
 class Items[T](TypedDict):
@@ -1726,5 +1726,587 @@ reveal_type(actual_td)  # revealed: ActualTypedDict
 reveal_type(actual_td["name"])  # revealed: str
 ```
 
+## Disjointness with other `TypedDict`s
+
+Two `TypedDict` types are disjoint if it's impossible to come up with a third (fully-static)
+`TypedDict` that's assignable to both. The simplest way to establish this is if both sides have
+fields with the same name but disjoint types:
+
+```py
+from typing import TypedDict, final
+from typing_extensions import ReadOnly
+from ty_extensions import static_assert, is_disjoint_from
+
+# Two simple disjoint types, to avoid relying on `@disjoint_base` special cases for built-ins like
+# `int` and `str`.
+@final
+class Final1: ...
+
+@final
+class Final2: ...
+
+static_assert(is_disjoint_from(Final1, Final2))
+
+class DisjointTD1(TypedDict):
+    # Make this example `ReadOnly` because that actually ends up checking the field types for
+    # disjointness in practice. Mutable fields are stricter. We'll get to that below.
+    disjoint: ReadOnly[Final1]
+    # While we're here: It doesn't matter how many other compatible fields there are. Just the one
+    # incompatible field above establishes disjointness.
+    common1: object
+    common2: object
+
+class DisjointTD2(TypedDict):
+    disjoint: ReadOnly[Final2]
+    common1: object
+    common2: object
+
+static_assert(is_disjoint_from(DisjointTD1, DisjointTD2))
+```
+
+However, note that most pairs of non-final classes are *not* disjoint from each other, even if
+neither inherits from the other, because we could define a third class that multiply-inherits from
+both. `TypedDict` disjointness takes this into account. For example:
+
+```py
+from ty_extensions import is_assignable_to
+
+class NonFinal1: ...
+class NonFinal2: ...
+class CommonSub(NonFinal1, NonFinal2): ...
+
+static_assert(not is_disjoint_from(NonFinal1, NonFinal2))
+static_assert(not is_assignable_to(NonFinal1, NonFinal2))
+static_assert(is_assignable_to(CommonSub, NonFinal1))
+static_assert(is_assignable_to(CommonSub, NonFinal2))
+
+class NonDisjointTD1(TypedDict):
+    non_disjoint: ReadOnly[NonFinal1]
+    # While we're here: It doesn't matter how many "extra" fields there are, or what order the
+    # fields are in. Only shared field names can establish disjointness.
+    extra1: int
+
+class NonDisjointTD2(TypedDict):
+    extra2: str
+    non_disjoint: ReadOnly[NonFinal2]
+
+class CommonSubTD(TypedDict):
+    extra2: str
+    extra1: int
+    non_disjoint: ReadOnly[CommonSub]
+
+# The first two TDs above are not assignable in either direction...
+static_assert(not is_assignable_to(NonDisjointTD1, NonDisjointTD2))
+static_assert(not is_assignable_to(NonDisjointTD2, NonDisjointTD1))
+# ...but they're still not disjoint...
+static_assert(not is_disjoint_from(NonDisjointTD1, NonDisjointTD2))
+# ...because the third TD above is assignable to both of them.
+static_assert(is_assignable_to(CommonSubTD, NonDisjointTD1))
+static_assert(is_assignable_to(CommonSubTD, NonDisjointTD2))
+static_assert(not is_disjoint_from(CommonSubTD, NonDisjointTD1))
+static_assert(not is_disjoint_from(CommonSubTD, NonDisjointTD2))
+```
+
+We made the important fields `ReadOnly` above, because those only establish disjointness when
+they're disjoint themselves. However, the rules for mutable fields are stricter. Mutable fields in
+common need to have *compatible* types (in the fully-static case, equivalent types):
+
+```py
+from typing import Any, Generic, TypeVar
+
+class IntTD(TypedDict):
+    x: int
+
+class BoolTD(TypedDict):
+    x: bool
+
+# `bool` is assignable to `int`, but `int` is not assignable to `bool`. If `x` was `ReadOnly` (even,
+# as we'll see below, only on the `int` side), then these two TDs would not be disjoint, but in this
+# mutable case they are.
+
+static_assert(is_disjoint_from(IntTD, BoolTD))
+static_assert(is_disjoint_from(BoolTD, IntTD))
+
+# Gradual types: `int` is compatible with `bool | Any`, because that could materialize to
+# `bool | int`, which is just `int`. (And `int | Any` and `bool | Any` are compatible with each
+# other for the same reason.) However, `bool` is *not* compatible with `int | Any`, because there's
+# no materialization that's equivalent to `bool`.
+
+class IntOrAnyTD(TypedDict):
+    x: int | Any
+
+class BoolOrAnyTD(TypedDict):
+    x: bool | Any
+
+static_assert(not is_disjoint_from(IntTD, IntOrAnyTD))
+static_assert(not is_disjoint_from(IntOrAnyTD, IntTD))
+static_assert(not is_disjoint_from(IntTD, BoolOrAnyTD))
+static_assert(not is_disjoint_from(BoolOrAnyTD, IntTD))
+
+static_assert(not is_disjoint_from(IntOrAnyTD, BoolOrAnyTD))
+static_assert(not is_disjoint_from(BoolOrAnyTD, IntOrAnyTD))
+
+static_assert(is_disjoint_from(BoolTD, IntOrAnyTD))
+static_assert(is_disjoint_from(IntOrAnyTD, BoolTD))
+static_assert(not is_disjoint_from(BoolTD, BoolOrAnyTD))
+static_assert(not is_disjoint_from(BoolOrAnyTD, BoolTD))
+
+# `Any` is compatible with everything.
+
+class AnyTD(TypedDict):
+    x: Any
+
+static_assert(not is_disjoint_from(IntTD, AnyTD))
+static_assert(not is_disjoint_from(AnyTD, IntTD))
+static_assert(not is_disjoint_from(BoolTD, AnyTD))
+static_assert(not is_disjoint_from(AnyTD, BoolTD))
+static_assert(not is_disjoint_from(IntOrAnyTD, AnyTD))
+static_assert(not is_disjoint_from(AnyTD, IntOrAnyTD))
+static_assert(not is_disjoint_from(BoolOrAnyTD, AnyTD))
+static_assert(not is_disjoint_from(AnyTD, BoolOrAnyTD))
+static_assert(not is_disjoint_from(AnyTD, AnyTD))
+
+# This works with generic `TypedDict`s too.
+
+class TwoIntsTD(TypedDict):
+    x: int
+    y: int
+
+class TwoBoolsTD(TypedDict):
+    x: bool
+    y: bool
+
+class IntBoolTD(TypedDict):
+    x: int
+    y: bool
+
+T = TypeVar("T")
+
+class TwoGenericTD(TypedDict, Generic[T]):
+    x: T
+    y: T
+
+static_assert(not is_disjoint_from(TwoGenericTD[Any], TwoIntsTD))
+static_assert(not is_disjoint_from(TwoGenericTD[int], TwoIntsTD))
+static_assert(is_disjoint_from(TwoGenericTD[bool], TwoIntsTD))
+static_assert(not is_disjoint_from(TwoGenericTD[Any], TwoBoolsTD))
+static_assert(is_disjoint_from(TwoGenericTD[int], TwoBoolsTD))
+static_assert(not is_disjoint_from(TwoGenericTD[bool], TwoBoolsTD))
+# TODO: T can't be compatible with both `int` and `bool` at the same time, so these types should be
+# disjoint, regardless of the materialization of `T`.
+static_assert(not is_disjoint_from(TwoGenericTD[Any], IntBoolTD))
+```
+
+If one side is mutable but the other is not, then a "third `TypedDict` that's assignable to both"
+would have to have the same type as the mutable side, so we establish disjointness if that type
+isn't assignable to the immutable side:
+
+```py
+class ReadOnlyIntTD(TypedDict):
+    x: ReadOnly[int]
+
+class ReadOnlyBoolTD(TypedDict):
+    x: ReadOnly[bool]
+
+static_assert(not is_disjoint_from(ReadOnlyIntTD, ReadOnlyBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyBoolTD, ReadOnlyIntTD))
+static_assert(not is_disjoint_from(BoolTD, ReadOnlyIntTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, BoolTD))
+static_assert(is_disjoint_from(IntTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(ReadOnlyBoolTD, IntTD))
+```
+
+With mutability above we were able to make the simplifying assumption that the "third `TypedDict`
+that's assignable to both" has only mutable fields, because a mutable field is always assignable to
+its immutable counterpart. However, `Required` vs `NotRequired` are more complicated, because a a
+`Required` field is *not* necessarily assignable to its `NotRequired` counterpart. In particular, if
+a `NotRequired` field is also mutable (intuitively, if we're allowed to `del` it), then no
+`Required` field is ever assignable to it. So, if either side is `NotRequired` and mutable, and the
+other side is `Required` (regardless of mutability), then that's sufficient to establish
+disjointness:
+
+```py
+from typing_extensions import NotRequired
+
+class NotRequiredIntTD(TypedDict):
+    x: NotRequired[int]
+
+class NotRequiredReadOnlyIntTD(TypedDict):
+    x: NotRequired[ReadOnly[int]]
+
+static_assert(is_disjoint_from(NotRequiredIntTD, IntTD))
+static_assert(is_disjoint_from(IntTD, NotRequiredIntTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, ReadOnlyIntTD))
+static_assert(is_disjoint_from(ReadOnlyIntTD, NotRequiredIntTD))
+static_assert(not is_disjoint_from(NotRequiredIntTD, NotRequiredReadOnlyIntTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, NotRequiredIntTD))
+```
+
+All those rules put together give us the "full disjointness table". We've pretty well tested above
+that disjointness is symmetrical, so here we won't worry about asserting both directions for each
+check:
+
+```py
+class NotRequiredBoolTD(TypedDict):
+    x: NotRequired[bool]
+
+class NotRequiredReadOnlyBoolTD(TypedDict):
+    x: NotRequired[ReadOnly[bool]]
+
+static_assert(not is_disjoint_from(IntTD, IntTD))
+static_assert(is_disjoint_from(IntTD, BoolTD))
+static_assert(not is_disjoint_from(IntTD, ReadOnlyIntTD))
+static_assert(is_disjoint_from(IntTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(IntTD, NotRequiredIntTD))
+static_assert(is_disjoint_from(IntTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(IntTD, NotRequiredReadOnlyIntTD))
+static_assert(is_disjoint_from(IntTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, BoolTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, ReadOnlyIntTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(ReadOnlyIntTD, NotRequiredIntTD))
+static_assert(is_disjoint_from(ReadOnlyIntTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, NotRequiredReadOnlyIntTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, NotRequiredReadOnlyBoolTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, BoolTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, ReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredIntTD, NotRequiredIntTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(NotRequiredIntTD, NotRequiredReadOnlyIntTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, BoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, ReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, NotRequiredReadOnlyIntTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(BoolTD, BoolTD))
+static_assert(not is_disjoint_from(BoolTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(BoolTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(BoolTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyBoolTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(ReadOnlyBoolTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyBoolTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredBoolTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(NotRequiredBoolTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnlyBoolTD))
+```
+
+## Disjointness with other types
+
+```py
+from typing import TypedDict, Mapping
+from ty_extensions import static_assert, is_disjoint_from
+
+class TD(TypedDict):
+    x: int
+
+class RegularNonTD: ...
+
+static_assert(not is_disjoint_from(TD, object))
+static_assert(not is_disjoint_from(TD, Mapping[str, object]))
+static_assert(is_disjoint_from(TD, Mapping[int, object]))
+static_assert(is_disjoint_from(TD, RegularNonTD))
+
+# TODO: We approximate disjointness with other types `T` by asking whether `dict[str, Any]` is
+# assignable to `T`. That covers common cases like the ones above, but does it have some false
+# negatives with `dict` types. A `TypedDict` is almost never assignable to a `dict` (or vice versa),
+# even when all of the `TypedDict`'s field types match the `dict`'s value type (and are mutable).
+# The problem is that the `TypedDict` could have been assigned to from *another* `TypedDict` with
+# additional fields, and we don't usually know anything about the types or mutability of those. On
+# the other hand, the assignment to `dict` can be allowed if the `TypedDict` has mutable
+# `extra_items` of a compatible type. See: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-with-dict
+static_assert(is_disjoint_from(TD, dict[str, int]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(TD, dict[str, str]))  # error: [static-assert-error]
+```
+
+## Narrowing tagged unions of `TypedDict`s
+
+In a tagged union of `TypedDict`s, a common field in each member (often `"type"` or `"tag"`) is
+given a distinct `Literal` type/value. We can narrow the union by constraining this field:
+
+```py
+from typing import TypedDict, Literal
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+
+class Bar(TypedDict):
+    tag: Literal[42]
+
+class Baz(TypedDict):
+    tag: Literal[b"baz"]  # `BytesLiteral` is supported.
+
+class Bing(TypedDict):
+    tag: Literal["bing"]
+
+def _(u: Foo | Bar | Baz | Bing):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    elif u["tag"] == 42:
+        reveal_type(u)  # revealed: Bar
+    elif u["tag"] == b"baz":
+        reveal_type(u)  # revealed: Baz
+    else:
+        reveal_type(u)  # revealed: Bing
+```
+
+We can descend into intersections to discover `TypedDict` types that need narrowing:
+
+```py
+from collections.abc import Mapping
+from ty_extensions import Intersection
+
+def _(u: Foo | Intersection[Bar, Mapping[str, int]]):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Bar & Mapping[str, int]
+```
+
+We can also narrow a single `TypedDict` type to `Never`:
+
+```py
+def _(u: Foo):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Never
+```
+
+Narrowing is restricted to `Literal` tags, though, because `x == "foo"` doesn't generally tell us
+anything about the type of `x`. Here's an example where narrowing would be tempting but unsound:
+
+```py
+from ty_extensions import is_assignable_to, static_assert
+
+class NonLiteralTD(TypedDict):
+    tag: int
+
+def _(u: Foo | NonLiteralTD):
+    if u["tag"] == "foo":
+        # We can't narrow the union here...
+        reveal_type(u)  # revealed: Foo | NonLiteralTD
+    else:
+        # ...(even though we can here)...
+        reveal_type(u)  # revealed: NonLiteralTD
+
+# ...because `NonLiteralTD["tag"]` could be assigned to with one of these, which would make the
+# first condition above true at runtime!
+class WackyInt(int):
+    def __eq__(self, other):
+        return True
+
+_: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
+```
+
+We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
+
+```py
+def _(u: Foo | Bar | dict):
+    if u["tag"] == "foo":
+        # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
+        # false negative in `is_disjoint_impl`.
+        reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+
+# The negation(s) will simplify out if we add something to the union that doesn't inherit from
+# `dict`. It just needs to support indexing with a string key.
+class NotADict:
+    def __getitem__(self, key): ...
+
+def _(u: Foo | Bar | NotADict):
+    if u["tag"] == 42:
+        reveal_type(u)  # revealed: Bar | NotADict
+```
+
+It would be nice if we could also narrow `TypedDict` unions by checking whether a key (which only
+shows up in a subset of the union members) is present, but that isn't generally correct, because
+"extra items" are allowed by default. For example, even though `Bar` here doesn't define a `"foo"`
+field, it could be *assigned to* with another `TypedDict` that does:
+
+```py
+from typing_extensions import Literal
+
+class Foo(TypedDict):
+    foo: int
+
+class Bar(TypedDict):
+    bar: int
+
+def disappointment(u: Foo | Bar, v: Literal["foo"]):
+    if "foo" in u:
+        # We can't narrow the union here...
+        reveal_type(u)  # revealed: Foo | Bar
+    else:
+        # ...(even though we *can* narrow it here)...
+        reveal_type(u)  # revealed: Bar
+
+    if v in u:
+        reveal_type(u)  # revealed: Foo | Bar
+    else:
+        reveal_type(u)  # revealed: Bar
+
+# ...because `u` could turn out to be one of these.
+class FooBar(TypedDict):
+    foo: int
+    bar: int
+
+static_assert(is_assignable_to(FooBar, Foo))
+static_assert(is_assignable_to(FooBar, Bar))
+```
+
+`not in` works in the opposite way to `in`: we can narrow in the positive case, but we cannot narrow
+in the negative case. The following snippet also tests our narrowing behaviour for intersections
+that contain `TypedDict`s, and unions that contain intersections that contain `TypedDict`s:
+
+```py
+from typing_extensions import Literal, Any
+from ty_extensions import Intersection, is_assignable_to, static_assert
+
+def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Literal["bar"]):
+    reveal_type(u)  # revealed: Foo | (Bar & Any)
+    reveal_type(v)  # revealed: Bar & Any
+
+    if "bar" not in t:
+        reveal_type(t)  # revealed: Never
+    else:
+        reveal_type(t)  # revealed: Bar
+
+    if "bar" not in u:
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Foo | (Bar & Any)
+
+    if "bar" not in v:
+        reveal_type(v)  # revealed: Never
+    else:
+        reveal_type(v)  # revealed: Bar & Any
+
+    if w not in u:
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Foo | (Bar & Any)
+```
+
+TODO: The narrowing that we didn't do above will become possible when we add support for
+`closed=True`. This is [one of the main use cases][closed] that motivated the `closed` feature.
+
+## Narrowing tagged unions of `TypedDict`s with `match` statements
+
+Just like with `if` statements, we can narrow tagged unions of `TypedDict`s in `match` statements:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from typing import TypedDict, Literal
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+
+class Bar(TypedDict):
+    tag: Literal[42]
+
+class Baz(TypedDict):
+    tag: Literal[b"baz"]
+
+class Bing(TypedDict):
+    tag: Literal["bing"]
+
+def match_statements(u: Foo | Bar | Baz | Bing):
+    match u["tag"]:
+        case "foo":
+            reveal_type(u)  # revealed: Foo
+        case 42:
+            reveal_type(u)  # revealed: Bar
+        case b"baz":
+            reveal_type(u)  # revealed: Baz
+        case _:
+            reveal_type(u)  # revealed: Bing
+```
+
+We can also narrow a single `TypedDict` type to `Never`:
+
+```py
+def match_single(u: Foo):
+    match u["tag"]:
+        case "foo":
+            reveal_type(u)  # revealed: Foo
+        case _:
+            reveal_type(u)  # revealed: Never
+```
+
+Narrowing is restricted to `Literal` tags:
+
+```py
+from ty_extensions import is_assignable_to, static_assert
+
+class NonLiteralTD(TypedDict):
+    tag: int
+
+def match_non_literal(u: Foo | NonLiteralTD):
+    match u["tag"]:
+        case "foo":
+            # We can't narrow the union here...
+            reveal_type(u)  # revealed: Foo | NonLiteralTD
+        case _:
+            # ...(but we *can* narrow here)...
+            reveal_type(u)  # revealed: NonLiteralTD
+```
+
+We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
+
+```py
+def match_with_dict(u: Foo | Bar | dict):
+    match u["tag"]:
+        case "foo":
+            # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
+            # false negative in `is_disjoint_impl`.
+            reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+```
+
+## Only annotated declarations are allowed in the class body
+
+<!-- snapshot-diagnostics -->
+
+`TypedDict` class bodies are very restricted in what kinds of statements they can contain. Besides
+annotated items, the only allowed statements are docstrings and `pass`. Annotated items are are also
+not allowed to have a value.
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    """docstring"""
+
+    annotated_item: int
+    """attribute docstring"""
+
+    pass
+
+    # As a non-standard but common extension, we interpret `...` as equivalent to `pass`.
+    ...
+
+class Bar(TypedDict):
+    a: int
+    # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
+    42
+    # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
+    b: str = "hello"
+    # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
+    def bar(self): ...
+```
+
+These rules are also enforced for `TypedDict` classes that don't directly inherit from `TypedDict`:
+
+```py
+class Baz(Bar):
+    # error: [invalid-typed-dict-statement]
+    def baz(self):
+        pass
+```
+
+[closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly
 [subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

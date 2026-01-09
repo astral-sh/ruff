@@ -1,0 +1,50 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: tuples.md - Comparison: Tuples - Homogeneous - Tuples with Prefixes and Suffixes
+mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(
+ 2 |     prefix_int_var_str: tuple[int, *tuple[str, ...]],
+ 3 |     prefix_str_var_int: tuple[str, *tuple[int, ...]],
+ 4 | ):
+ 5 |     # Prefix `int` vs. prefix `str` are not comparable.
+ 6 |     # error: [unsupported-operator]
+ 7 |     prefix_int_var_str < prefix_str_var_int
+ 8 | def _(
+ 9 |     prefix_int_var_int: tuple[int, *tuple[int, ...]],
+10 |     prefix_int_var_bool: tuple[int, *tuple[bool, ...]],
+11 | ):
+12 |     # Prefix `int` vs. prefix `int`, variable `int` vs. variable `bool` are all comparable.
+13 |     reveal_type(prefix_int_var_int < prefix_int_var_bool)  # revealed: bool
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Unsupported `<` operation
+ --> src/mdtest_snippet.py:7:5
+  |
+5 |     # Prefix `int` vs. prefix `str` are not comparable.
+6 |     # error: [unsupported-operator]
+7 |     prefix_int_var_str < prefix_str_var_int
+  |     ------------------^^^------------------
+  |     |                    |
+  |     |                    Has type `tuple[str, *tuple[int, ...]]`
+  |     Has type `tuple[int, *tuple[str, ...]]`
+8 | def _(
+9 |     prefix_int_var_int: tuple[int, *tuple[int, ...]],
+  |
+info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
+info: rule `unsupported-operator` is enabled by default
+
+```

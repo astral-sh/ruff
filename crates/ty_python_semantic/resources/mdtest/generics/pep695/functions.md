@@ -75,6 +75,7 @@ class CanIndex(Protocol[S]):
     def __getitem__(self, index: int, /) -> S: ...
 
 class ExplicitlyImplements[T](CanIndex[T]): ...
+class SubProtocol[T](CanIndex[T], Protocol): ...
 
 def takes_in_list[T](x: list[T]) -> list[T]:
     return x
@@ -96,6 +97,18 @@ def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def deep_subprotocol(x: SubProtocol[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deeper_subprotocol(x: SubProtocol[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def itself(x: CanIndex[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deep_itself(x: CanIndex[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def takes_in_type[T](x: type[T]) -> type[T]:
@@ -493,8 +506,7 @@ def identity[T](x: T) -> T:
 def head[T](xs: list[T]) -> T:
     return xs[0]
 
-# TODO: this should be `Literal[1]`
-reveal_type(invoke(identity, 1))  # revealed: Unknown
+reveal_type(invoke(identity, 1))  # revealed: Literal[1]
 
 # TODO: this should be `Unknown | int`
 reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
@@ -736,3 +748,230 @@ def f[T](x: T, y: Not[T]) -> T:
     y = x  # error: [invalid-assignment]
     return x
 ```
+
+## `Callable` parameters
+
+### Class constructors
+
+We can recurse into the parameters and return values of `Callable` parameters to infer
+specializations of a generic function.
+
+```py
+from typing import Any, Callable, NoReturn, overload, Self
+from ty_extensions import generic_context, into_callable
+
+def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
+    return callable
+
+def returns_int() -> int:
+    raise NotImplementedError
+
+# revealed: () -> int
+reveal_type(into_callable(returns_int))
+# revealed: () -> int
+reveal_type(accepts_callable(returns_int))
+# revealed: int
+reveal_type(accepts_callable(returns_int)())
+
+class ClassWithoutConstructor: ...
+
+# revealed: () -> ClassWithoutConstructor
+reveal_type(into_callable(ClassWithoutConstructor))
+# revealed: () -> ClassWithoutConstructor
+reveal_type(accepts_callable(ClassWithoutConstructor))
+# revealed: ClassWithoutConstructor
+reveal_type(accepts_callable(ClassWithoutConstructor)())
+
+class ClassWithNew:
+    def __new__(cls, *args, **kwargs) -> Self:
+        raise NotImplementedError
+
+# revealed: (...) -> ClassWithNew
+reveal_type(into_callable(ClassWithNew))
+# revealed: (...) -> ClassWithNew
+reveal_type(accepts_callable(ClassWithNew))
+# revealed: ClassWithNew
+reveal_type(accepts_callable(ClassWithNew)())
+
+class ClassWithInit:
+    def __init__(self) -> None: ...
+
+# revealed: () -> ClassWithInit
+reveal_type(into_callable(ClassWithInit))
+# revealed: () -> ClassWithInit
+reveal_type(accepts_callable(ClassWithInit))
+# revealed: ClassWithInit
+reveal_type(accepts_callable(ClassWithInit)())
+
+class ClassWithNewAndInit:
+    def __new__(cls, *args, **kwargs) -> Self:
+        raise NotImplementedError
+
+    def __init__(self, x: int) -> None: ...
+
+# TODO: We do not currently solve a common behavioral supertype for the two solutions of P.
+# revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
+reveal_type(into_callable(ClassWithNewAndInit))
+# TODO: revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
+# revealed: (...) -> ClassWithNewAndInit
+reveal_type(accepts_callable(ClassWithNewAndInit))
+# revealed: ClassWithNewAndInit
+reveal_type(accepts_callable(ClassWithNewAndInit)())
+
+class Meta(type):
+    def __call__(cls, *args: Any, **kwargs: Any) -> NoReturn:
+        raise NotImplementedError
+
+class ClassWithNoReturnMetatype(metaclass=Meta):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        raise NotImplementedError
+
+# TODO: The return types here are wrong, because we end up creating a constraint (Never ≤ R), which
+# we confuse with "R has no lower bound".
+# revealed: (...) -> Never
+reveal_type(into_callable(ClassWithNoReturnMetatype))
+# TODO: revealed: (...) -> Never
+# revealed: (...) -> Unknown
+reveal_type(accepts_callable(ClassWithNoReturnMetatype))
+# TODO: revealed: Never
+# revealed: Unknown
+reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
+
+class Proxy: ...
+
+class ClassWithIgnoredInit:
+    def __new__(cls) -> Proxy:
+        return Proxy()
+
+    def __init__(self, x: int) -> None: ...
+
+# revealed: () -> Proxy
+reveal_type(into_callable(ClassWithIgnoredInit))
+# revealed: () -> Proxy
+reveal_type(accepts_callable(ClassWithIgnoredInit))
+# revealed: Proxy
+reveal_type(accepts_callable(ClassWithIgnoredInit)())
+
+class ClassWithOverloadedInit[T]:
+    t: T  # invariant
+
+    @overload
+    def __init__(self: "ClassWithOverloadedInit[int]", x: int) -> None: ...
+    @overload
+    def __init__(self: "ClassWithOverloadedInit[str]", x: str) -> None: ...
+    def __init__(self, x: int | str) -> None: ...
+
+# TODO: The old solver cannot handle this overloaded constructor. The ideal solution is that we
+# would solve **P once, and map it to the entire overloaded signature of the constructor. This
+# mapping would have to include the return types, since there are different return types for each
+# overload. We would then also have to determine that R must be equal to the return type of **P's
+# solution.
+
+# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
+reveal_type(into_callable(ClassWithOverloadedInit))
+# TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
+# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], (x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
+reveal_type(accepts_callable(ClassWithOverloadedInit))
+# TODO: revealed: ClassWithOverloadedInit[int]
+# revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
+reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
+# TODO: revealed: ClassWithOverloadedInit[str]
+# revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
+reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
+
+class GenericClass[T]:
+    t: T  # invariant
+
+    def __new__(cls, x: list[T], y: list[T]) -> Self:
+        raise NotImplementedError
+
+def _(x: list[str]):
+    # TODO: This fails because we are not propagating GenericClass's generic context into the
+    # Callable that we create for it.
+    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    reveal_type(into_callable(GenericClass))
+    # revealed: ty_extensions.GenericContext[T@GenericClass]
+    reveal_type(generic_context(into_callable(GenericClass)))
+
+    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    reveal_type(accepts_callable(GenericClass))
+    # TODO: revealed: ty_extensions.GenericContext[T@GenericClass]
+    # revealed: None
+    reveal_type(generic_context(accepts_callable(GenericClass)))
+
+    # TODO: revealed: GenericClass[str]
+    # TODO: no errors
+    # revealed: GenericClass[T@GenericClass]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    reveal_type(accepts_callable(GenericClass)(x, x))
+```
+
+### Don't include identical lower/upper bounds in type mapping multiple times
+
+This is was a performance regression reported in
+[ty#1968](https://github.com/astral-sh/ty/issues/1968). Before fixing this, we would see the
+`U ≤ M1 | ... | M7` upper bound 7 times. Since we intersect upper bounds before recording a single
+type mapping, we would perform 7 intersections. Each intersection would require 7^2 comparisons of
+the `Mx` types. We now have a simple heuristics that avoids processing any identical lower or upper
+bound more than once, since we know the extra copies cannot affect the result.
+
+```py
+from typing import Callable, Generic, TypeVar, Union
+
+class M1: ...
+class M2: ...
+class M3: ...
+class M4: ...
+class M5: ...
+class M6: ...
+class M7: ...
+
+Msg = Union[M1, M2, M3, M4, M5, M6, M7]
+
+T = TypeVar("T")
+U_co = TypeVar("U_co", covariant=True)
+
+class Stream(Generic[T]):
+    def apply(self, func: Callable[["Stream[T]"], "Stream[U_co]"]) -> "Stream[U_co]":
+        return func(self)
+
+TMsg = TypeVar("TMsg", bound=Msg)
+
+class Builder(Generic[TMsg]):
+    def build(self) -> Stream[TMsg]:
+        stream: Stream[TMsg] = Stream()
+        # TODO: no error
+        # error: [invalid-assignment]
+        stream = stream.apply(self._handler)
+        return stream
+
+    def _handler(self, stream: Stream[Msg]) -> Stream[Msg]:
+        return stream
+```
+
+## Regressions
+
+### Only consider fully static types as pivots for transitivity
+
+This is a regression test for [ty#2371]. When working with constraint sets, we track transitive
+relationships between the constraints in the set. For instance, in `S ≤ int ∧ int ≤ T`, we can infer
+that `S ≤ T`. However, we should only consider fully static types when looking for a "pivot" for
+this kind of transitive relationship. The same pattern does not hold for `S ≤ Any ∧ Any ≤ T`;
+because the two `Any`s can materialize to different types, we cannot infer that `S ≤ T`.
+
+We have lower level tests of this in [`type_properties/implies_subtype_of.md`][implies_subtype_of].
+`functools.reduce` has a signature that exercises this behavior, as well, so we also include this
+regression test.
+
+```py
+from functools import reduce
+
+def _(keys: list[str]):
+    # TODO: revealed: int
+    # revealed: Unknown | Literal[0]
+    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+```
+
+[implies_subtype_of]: ../../type_properties/implies_subtype_of.md
+[ty#2371]: https://github.com/astral-sh/ty/issues/2371
