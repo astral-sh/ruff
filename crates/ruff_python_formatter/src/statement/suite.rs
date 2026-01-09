@@ -20,11 +20,9 @@ use crate::prelude::*;
 use crate::preview::{
     is_allow_newline_after_block_open_enabled, is_blank_line_before_decorated_class_in_stub_enabled,
 };
-use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::statement::trailing_semicolon;
 use crate::verbatim::{
-    suppressed_node, write_skipped_statements,
-    write_suppressed_statements_starting_with_leading_comment,
+    write_skipped_statements, write_suppressed_statements_starting_with_leading_comment,
     write_suppressed_statements_starting_with_trailing_comment,
 };
 
@@ -863,61 +861,57 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
         let comments = f.context().comments().clone();
         let node_comments = comments.leading_dangling_trailing(self.docstring);
 
-        if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
-            suppressed_node(self.docstring).fmt(f)
-        } else {
-            // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ExprStringLiteral`.
-            let string_literal = self
-                .docstring
-                .as_expr_stmt()
-                .unwrap()
-                .value
-                .as_string_literal_expr()
-                .unwrap();
+        // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ExprStringLiteral`.
+        let string_literal = self
+            .docstring
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_string_literal_expr()
+            .unwrap();
 
-            // We format the expression, but the statement carries the comments
-            write!(
-                f,
-                [
-                    leading_comments(node_comments.leading),
-                    f.options()
-                        .source_map_generation()
-                        .is_enabled()
-                        .then_some(source_position(self.docstring.start())),
-                    string_literal
-                        .format()
-                        .with_options(StringLiteralKind::Docstring),
-                    f.options()
-                        .source_map_generation()
-                        .is_enabled()
-                        .then_some(source_position(self.docstring.end())),
-                ]
-            )?;
+        // We format the expression, but the statement carries the comments
+        write!(
+            f,
+            [
+                leading_comments(node_comments.leading),
+                f.options()
+                    .source_map_generation()
+                    .is_enabled()
+                    .then_some(source_position(self.docstring.start())),
+                string_literal
+                    .format()
+                    .with_options(StringLiteralKind::Docstring),
+                f.options()
+                    .source_map_generation()
+                    .is_enabled()
+                    .then_some(source_position(self.docstring.end())),
+            ]
+        )?;
 
-            if self.suite_kind == SuiteKind::Class {
-                // Comments after class docstrings need a newline between the docstring and the
-                // comment (https://github.com/astral-sh/ruff/issues/7948).
-                // ```python
-                // class ModuleBrowser:
-                //     """Browse module classes and functions in IDLE."""
-                //     # ^ Insert a newline above here
-                //
-                //     def __init__(self, master, path, *, _htest=False, _utest=False):
-                //         pass
-                // ```
-                if let Some(own_line) = node_comments
-                    .trailing
-                    .iter()
-                    .find(|comment| comment.line_position().is_own_line())
-                {
-                    if lines_before(own_line.start(), f.context().source()) < 2 {
-                        empty_line().fmt(f)?;
-                    }
+        if self.suite_kind == SuiteKind::Class {
+            // Comments after class docstrings need a newline between the docstring and the
+            // comment (https://github.com/astral-sh/ruff/issues/7948).
+            // ```python
+            // class ModuleBrowser:
+            //     """Browse module classes and functions in IDLE."""
+            //     # ^ Insert a newline above here
+            //
+            //     def __init__(self, master, path, *, _htest=False, _utest=False):
+            //         pass
+            // ```
+            if let Some(own_line) = node_comments
+                .trailing
+                .iter()
+                .find(|comment| comment.line_position().is_own_line())
+            {
+                if lines_before(own_line.start(), f.context().source()) < 2 {
+                    empty_line().fmt(f)?;
                 }
             }
-
-            trailing_comments(node_comments.trailing).fmt(f)
         }
+
+        trailing_comments(node_comments.trailing).fmt(f)
     }
 }
 
