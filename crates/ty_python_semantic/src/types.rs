@@ -2546,15 +2546,34 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                let member = match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => Type::object().instance_member(db, name),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.instance_member(db, name)
+                        if bound_typevar.typevar(db).is_self(db) {
+                            if let Type::NominalInstance(instance) = bound {
+                                instance.class(db).instance_member(db, name)
+                            } else {
+                                bound.instance_member(db, name)
+                            }
+                        } else {
+                            bound.instance_member(db, name)
+                        }
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .map_with_boundness_and_qualifiers(db, |constraint| {
                             constraint.instance_member(db, name)
                         }),
+                };
+                if bound_typevar.typevar(db).is_self(db) {
+                    let self_mapping = TypeMapping::BindSelf {
+                        self_type: Type::TypeVar(*bound_typevar),
+                        binding_context: None,
+                    };
+                    member.map_type(|ty| {
+                        ty.apply_type_mapping(db, &self_mapping, TypeContext::default())
+                    })
+                } else {
+                    member
                 }
             }
 
@@ -3303,11 +3322,20 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => {
                 let fallback = self.instance_member(db, name_str);
 
+                // `Self` type variables use `InstanceFallbackShadowsNonDataDescriptor::Yes`
+                // because instance attributes should shadow non-data descriptors on the class.
+                let instance_fallback_shadows = if matches!(self, Type::TypeVar(tv) if tv.typevar(db).is_self(db))
+                {
+                    InstanceFallbackShadowsNonDataDescriptor::Yes
+                } else {
+                    InstanceFallbackShadowsNonDataDescriptor::No
+                };
+
                 let result = self.invoke_descriptor_protocol(
                     db,
                     name_str,
                     fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    instance_fallback_shadows,
                     policy,
                 );
 

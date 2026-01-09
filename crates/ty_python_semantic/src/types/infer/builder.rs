@@ -120,15 +120,15 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
-    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type,
-    definition_expression_type, infer_scope_types, todo_type,
+    CallableTypeKind, ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
+    UnionTypeInstance, binding_type, definition_expression_type, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -4729,6 +4729,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let mut first_tcx = None;
+        let self_mapping = TypeMapping::BindSelf {
+            self_type: object_ty,
+            binding_context: None,
+        };
+        let bind_self =
+            |ty: Type<'db>| ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
 
         // A wrapper over `infer_value_ty` that allows inferring the value type multiple times
         // during attribute resolution.
@@ -5074,6 +5080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }),
                         qualifiers,
                     } => {
+                        let meta_attr_ty = bind_self(meta_attr_ty);
                         if invalid_assignment_to_final(self, qualifiers) {
                             return false;
                         }
@@ -5125,6 +5132,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             } =
                                 object_ty.instance_member(db, attribute)
                             {
+                                let instance_attr_ty = bind_self(instance_attr_ty);
                                 let value_ty =
                                     infer_value_ty(self, TypeContext::new(Some(instance_attr_ty)));
                                 if invalid_assignment_to_final(self, qualifiers) {
@@ -5170,6 +5178,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             qualifiers,
                         } = object_ty.instance_member(db, attribute)
                         {
+                            let instance_attr_ty = bind_self(instance_attr_ty);
                             let value_ty =
                                 infer_value_ty(self, TypeContext::new(Some(instance_attr_ty)));
                             if invalid_assignment_to_final(self, qualifiers) {

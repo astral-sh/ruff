@@ -1814,6 +1814,27 @@ def _(ns: argparse.Namespace):
     reveal_type(ns.whatever)  # revealed: Any
 ```
 
+### `__getattr__` with `Self` type
+
+`__getattr__` should also work when the receiver is typed as `Self`:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Self
+
+class CustomGetAttr:
+    def __getattr__(self, name: str) -> int:
+        return 1
+
+    def method(self) -> Self:
+        reveal_type(self.whatever)  # revealed: int
+        return self
+```
+
 ## Classes with custom `__getattribute__` methods
 
 If a type provides a custom `__getattribute__`, we use its return type as the type for unknown
