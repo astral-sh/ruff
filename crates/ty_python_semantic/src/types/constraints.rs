@@ -227,7 +227,9 @@ impl<'db> ConstraintSet<'db> {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
-        let (node, support) = ConstrainedTypeVar::new_node_with_support(db, typevar, lower, upper);
+        let (mut node, support) =
+            ConstrainedTypeVar::new_node_with_support(db, typevar, lower, upper);
+        node = node.prune_impossible_paths(db, &support);
         Self {
             node,
             support: Support::new(db, support),
@@ -364,10 +366,12 @@ impl<'db> ConstraintSet<'db> {
             ),
             _ => panic!("at least one type should be a typevar"),
         };
-        Self {
-            node: self.node.implies_subtype_of(db, lhs, rhs),
-            support: self.support.union(db, Support::new(db, constraint_support)),
-        }
+        let support = self.support.union(db, Support::new(db, constraint_support));
+        let node = self
+            .node
+            .implies_subtype_of(db, lhs, rhs)
+            .prune_impossible_paths(db, support.constraints(db));
+        Self { node, support }
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -407,15 +411,21 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.or(db, other.node);
         self.support = self.support.union(db, other.support);
+        self.node = self
+            .node
+            .or(db, other.node)
+            .prune_impossible_paths(db, self.support.constraints(db));
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.and(db, other.node);
         self.support = self.support.union(db, other.support);
+        self.node = self
+            .node
+            .and(db, other.node)
+            .prune_impossible_paths(db, self.support.constraints(db));
         *self
     }
 
@@ -454,10 +464,12 @@ impl<'db> ConstraintSet<'db> {
 
     /// Returns a constraint set encoding that this constraint set is equivalent to another.
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
-        ConstraintSet {
-            node: self.node.iff(db, other.node),
-            support: self.support.union(db, other.support),
-        }
+        let support = self.support.union(db, other.support);
+        let node = self
+            .node
+            .iff(db, other.node)
+            .prune_impossible_paths(db, support.constraints(db));
+        ConstraintSet { node, support }
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -1032,6 +1044,45 @@ impl<'db> Node<'db> {
         match self {
             Node::Interior(interior) => Some(interior.constraint(db)),
             _ => None,
+        }
+    }
+
+    fn prune_impossible_paths(
+        self,
+        db: &'db dyn Db,
+        support: &FxOrderSet<ConstrainedTypeVar<'db>>,
+    ) -> Self {
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse => self,
+            Node::Interior(interior) => {
+                let mut path = interior.path_assignments(db, support);
+                Node::Interior(interior).prune_impossible_paths_inner(db, &mut path)
+            }
+        }
+    }
+
+    fn prune_impossible_paths_inner(
+        self,
+        db: &'db dyn Db,
+        path: &mut PathAssignments<'_, 'db>,
+    ) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => {
+                let constraint = interior.constraint(db);
+                let if_true = path
+                    .walk_edge(db, constraint.when_true(), |path, _| {
+                        interior.if_true(db).prune_impossible_paths_inner(db, path)
+                    })
+                    .unwrap_or(Node::AlwaysFalse);
+                let if_false = path
+                    .walk_edge(db, constraint.when_false(), |path, _| {
+                        interior.if_false(db).prune_impossible_paths_inner(db, path)
+                    })
+                    .unwrap_or(Node::AlwaysFalse);
+                Node::new(db, constraint, if_true, if_false)
+            }
         }
     }
 
