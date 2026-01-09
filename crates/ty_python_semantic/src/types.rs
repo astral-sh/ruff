@@ -7057,7 +7057,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     match known_instance {
         KnownInstanceType::SubscriptedProtocol(context)
         | KnownInstanceType::SubscriptedGeneric(context) => {
-            walk_generic_context(db, context, visitor);
+            visitor.visit_generic_context(db, context);
         }
         KnownInstanceType::TypeVar(typevar) => {
             visitor.visit_type_var_type(db, typevar);
@@ -8460,7 +8460,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(db, typevar, BindingContext::Synthetic, None)
     }
 
-    /// Create a new PEP 695 type variable that can be used in signaturesof synthetic generic functions,
+    /// Create a new PEP 695 type variable that can be used in signatures of synthetic generic functions,
     /// with the given upper bound.
     pub(crate) fn synthetic_with_bounds_or_constraints(
         db: &'db dyn Db,

@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
@@ -27,7 +27,7 @@ use crate::types::{
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, declaration_type, walk_type_var_bounds,
+    TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -763,7 +763,8 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     specialization: Specialization<'db>,
     visitor: &V,
 ) {
-    walk_generic_context(db, specialization.generic_context(db), visitor);
+    visitor.visit_generic_context(db, specialization.generic_context(db));
+
     for ty in specialization.types(db) {
         visitor.visit_type(db, *ty);
     }
@@ -1613,11 +1614,6 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
         ty: Type<'db>,
         f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
-        // TODO:
-        // if !bound_typevar.is_inferable(self.db, self.inferable) {
-        //     return;
-        // }
-
         let Some(ty) = f((bound_typevar, ty)) else {
             return;
         };
@@ -2093,17 +2089,17 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
         polarity: TypeVarVariance,
         f: &mut dyn FnMut(TypeVarAssignment<'db>, TypeVarVariance) -> Option<Type<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
-        // The synthetic type variables created will not produce bounds or constraint errors,
-        // so we must ensure the type mappings being created are valid before attempting inference.
+        // Ensure that the type mappings being created are valid, to avoid having to map the
+        // synthesized errors back to their original types.
         let mut builder = SpecializationBuilder::new(self.db, self.inferable);
         builder.infer_map(formal, actual, |_| None)?;
 
         // Synthesize the formal and actual types.
-        let (synthetic_actual, synthetic_actual_specialization) =
-            synthetic_specialization(actual, 0, true, self.db);
-        let (synthetic_formal, synthetic_formal_specialization) = synthetic_specialization(
-            formal,
-            synthetic_actual_specialization.types(self.db).len(),
+        let (synthetic_formal, synthetic_formal_specialization) =
+            synthetic_specialization(formal, 0, true, self.db);
+        let (synthetic_actual, synthetic_actual_specialization) = synthetic_specialization(
+            actual,
+            synthetic_formal_specialization.types(self.db).len(),
             true,
             self.db,
         );
@@ -2119,22 +2115,13 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
         }
 
         let mut synthetic_inferable = FxHashSet::default();
-        for synthetic_typevar in synthetic_formal_specialization
-            .generic_context(self.db)
-            .variables(self.db)
+        for (synthetic_typevar, ty) in synthetic_formal_specialization
+            .types_and_variables(self.db)
+            .chain(synthetic_actual_specialization.types_and_variables(self.db))
         {
-            synthetic_inferable.insert(synthetic_typevar.identity(self.db));
-        }
-        for (synthetic_typevar, ty) in synthetic_actual_specialization
-            .generic_context(self.db)
-            .variables(self.db)
-            .zip(synthetic_actual_specialization.types(self.db))
-        {
-            // There may be inferable type variables in the actual type, in which we case we must mark
-            // the synthetic type variables that replace them as inferable.
-            if let Type::TypeVar(formal_type_var) = ty
-                && formal_type_var.is_inferable(self.db, self.inferable)
-            {
+            // Mark the synthetic type variable as inferable if it is representing an inferable
+            // type variable, or a type containing one.
+            if contains_inferable_type_var(ty, self.inferable, self.db) {
                 synthetic_inferable.insert(synthetic_typevar.identity(self.db));
             }
         }
@@ -2162,39 +2149,40 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
         }
 
         for (identity, synthetic_type) in synthetic_type_mappings {
-            let type_var = assigned_variables
+            let bound_typevar = assigned_variables
                 .get(&identity)
                 .copied()
                 .expect("every type mapping stores its corresponding type variable");
 
-            let (formal_type, actual_type, synthetic_actual) =
-                if let Some(formal_type) = synthetic_actual_specialization.get(self.db, type_var) {
-                    // The type variable may be a synthetic type variable from the actual type that was
-                    // marked as inferable, in which case the inferred type is from the formal type.
-                    let actual_type = synthetic_type.apply_type_mapping(
-                        self.db,
-                        &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
-                            synthetic_formal_specialization,
-                        )),
-                        TypeContext::default(),
-                    );
+            let (formal_type, actual_type, synthetic_actual) = if let Some(formal_type) =
+                synthetic_actual_specialization.get(self.db, bound_typevar)
+            {
+                // The type variable may be a synthetic type variable from the actual type that was
+                // marked as inferable, in which case the inferred type is from the formal type.
+                let actual_type = synthetic_type.apply_type_mapping(
+                    self.db,
+                    &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                        synthetic_formal_specialization,
+                    )),
+                    TypeContext::default(),
+                );
 
-                    (formal_type, actual_type, synthetic_formal)
-                } else {
-                    let formal_type = synthetic_formal_specialization
-                        .get(self.db, type_var)
-                        .unwrap_or(Type::TypeVar(type_var));
+                (formal_type, actual_type, synthetic_formal)
+            } else {
+                let formal_type = synthetic_formal_specialization
+                    .get(self.db, bound_typevar)
+                    .unwrap_or(Type::TypeVar(bound_typevar));
 
-                    let actual_type = synthetic_type.apply_type_mapping(
-                        self.db,
-                        &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
-                            synthetic_actual_specialization,
-                        )),
-                        TypeContext::default(),
-                    );
+                let actual_type = synthetic_type.apply_type_mapping(
+                    self.db,
+                    &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                        synthetic_actual_specialization,
+                    )),
+                    TypeContext::default(),
+                );
 
-                    (formal_type, actual_type, synthetic_actual)
-                };
+                (formal_type, actual_type, synthetic_actual)
+            };
 
             if let Some(synthetic_type_var) = synthetic_type.as_typevar() {
                 // Created a type mapping to a synthetic type variable. Update the variance
@@ -2293,6 +2281,52 @@ impl<'a, 'db> SpecializationBuilder<'a, 'db> {
     }
 }
 
+// Returns `true` if the given type contains an inferable type variable.
+fn contains_inferable_type_var<'db>(
+    ty: Type<'db>,
+    inferable: InferableTypeVars<'_, 'db>,
+    db: &'db dyn Db,
+) -> bool {
+    struct ContainsInferableTypeVar<'a, 'db> {
+        result: Cell<bool>,
+        inferable: InferableTypeVars<'a, 'db>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for ContainsInferableTypeVar<'_, 'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            true
+        }
+
+        fn visit_bound_type_var_type(
+            &self,
+            db: &'db dyn Db,
+            bound_typevar: BoundTypeVarInstance<'db>,
+        ) {
+            if bound_typevar.is_inferable(db, self.inferable) {
+                self.result.set(true);
+            }
+
+            walk_bound_type_var_type(db, bound_typevar, self);
+        }
+
+        fn visit_generic_context(&self, _db: &'db dyn Db, _context: GenericContext<'db>) {}
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let visitor = ContainsInferableTypeVar {
+        inferable,
+        result: Cell::new(false),
+        recursion_guard: TypeCollector::default(),
+    };
+    visitor.visit_type(db, ty);
+
+    visitor.result.get()
+}
+
 // Assign each type variable on the given type to a unique synthetic type variable, returning the
 // synthesized type and its specialization.
 fn synthetic_specialization<'db>(
@@ -2314,8 +2348,7 @@ fn synthetic_specialization<'db>(
 
     let synthetic_specialization = {
         let (type_vars, types): (Vec<_>, Vec<_>) = synthetic_types.iter().unzip();
-        GenericContext::from_typevar_instances(db, type_vars)
-            .specialize(db, types.into_boxed_slice())
+        GenericContext::from_typevar_instances(db, type_vars).specialize(db, &types)
     };
 
     (synthetic_ty, synthetic_specialization)

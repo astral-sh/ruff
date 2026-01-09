@@ -4,16 +4,16 @@ use crate::{
     Db,
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
-        IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-        PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
-        TypeGuardType, TypeIsType, TypeVarInstance, TypedDictType, UnionType,
+        GenericContext, IntersectionType, KnownBoundMethodType, KnownInstanceType,
+        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
+        TypeAliasType, TypeGuardType, TypeIsType, TypeVarInstance, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         newtype::{NewType, walk_newtype_instance_type},
         subclass_of::walk_subclass_of_type,
-        walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
+        walk_bound_method_type, walk_bound_type_var_type, walk_callable_type, walk_generic_context,
         walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
         walk_property_instance_type, walk_type_alias_type, walk_type_var_type,
         walk_typed_dict_type, walk_typeguard_type, walk_typeis_type, walk_union,
@@ -58,6 +58,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_subclass_of_type(&self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
         walk_subclass_of_type(db, subclass_of, self);
+    }
+
+    fn visit_generic_context(&self, db: &'db dyn Db, context: GenericContext<'db>) {
+        walk_generic_context(db, context, self);
     }
 
     fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
