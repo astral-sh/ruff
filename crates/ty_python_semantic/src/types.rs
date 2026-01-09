@@ -6866,8 +6866,12 @@ pub enum TypeMapping<'a, 'db> {
         specialization: RefCell<FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>>,
 
         // Whether or not to constrain a given synthetic type variable to the type
-        // it replaces.
+        // it replaces, unless it is replacing a type that contains an inferable
+        // type variable.
         constrain: bool,
+
+        // The inferable type variables contained in the type being mapped.
+        inferable: InferableTypeVars<'a, 'db>,
     },
 
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
