@@ -628,17 +628,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (class, class_node) in class_definitions {
             // (1) Check that the class does not have a cyclic definition
             if let Some(inheritance_cycle) = class.inheritance_cycle(self.db()) {
-                if inheritance_cycle.is_participant() {
-                    if let Some(builder) = self
+                if inheritance_cycle.is_participant()
+                    && let Some(builder) = self
                         .context
                         .report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Cyclic definition of `{}` (class cannot inherit from itself)",
-                            class.name(self.db())
-                        ));
-                    }
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cyclic definition of `{}` (class cannot inherit from itself)",
+                        class.name(self.db())
+                    ));
                 }
+
                 // If a class is cyclically defined, that's a sufficient error to report; the
                 // following checks (which are all inheritance-based) aren't even relevant.
                 continue;
@@ -1026,15 +1026,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 class.legacy_generic_context(self.db()),
                 class.inherited_legacy_generic_context(self.db()),
             ) {
-                if !inherited.is_subset_of(self.db(), legacy) {
-                    if let Some(builder) =
+                if !inherited.is_subset_of(self.db(), legacy)
+                    && let Some(builder) =
                         self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
-                    {
-                        builder.into_diagnostic(
-                            "`Generic` base class must include all type \
-                            variables used in other base classes",
-                        );
-                    }
+                {
+                    builder.into_diagnostic(
+                        "`Generic` base class must include all type \
+                        variables used in other base classes",
+                    );
                 }
             }
 
@@ -1155,16 +1154,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // Annotated assignments are allowed (that's the whole point), but they're
                         // not allowed to have a value.
                         ast::Stmt::AnnAssign(ann_assign) => {
-                            if let Some(value) = &ann_assign.value {
-                                if let Some(builder) = self
+                            if let Some(value) = &ann_assign.value
+                                && let Some(builder) = self
                                     .context
                                     .report_lint(&INVALID_TYPED_DICT_STATEMENT, &**value)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "TypedDict item cannot have a value"
-                                    ));
-                                }
+                            {
+                                builder.into_diagnostic("TypedDict item cannot have a value");
                             }
+
                             continue;
                         }
                         // Pass statements are allowed.
@@ -1832,17 +1829,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Fall back to implicit module globals for (possibly) unbound names
-        if !place_and_quals.place.is_definitely_bound() {
-            if let PlaceExprRef::Symbol(symbol) = place {
-                let symbol_id = place_id.expect_symbol();
+        if !place_and_quals.place.is_definitely_bound()
+            && let PlaceExprRef::Symbol(symbol) = place
+        {
+            let symbol_id = place_id.expect_symbol();
 
-                if self.skip_non_global_scopes(file_scope_id, symbol_id)
-                    || self.scope.file_scope_id(self.db()).is_global()
-                {
-                    place_and_quals = place_and_quals.or_fall_back_to(self.db(), || {
-                        module_type_implicit_global_declaration(self.db(), symbol.name())
-                    });
-                }
+            if self.skip_non_global_scopes(file_scope_id, symbol_id)
+                || self.scope.file_scope_id(self.db()).is_global()
+            {
+                place_and_quals = place_and_quals.or_fall_back_to(self.db(), || {
+                    module_type_implicit_global_declaration(self.db(), symbol.name())
+                });
             }
         }
 
@@ -2621,25 +2618,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         returns: Option<&ast::Expr>,
         deferred_expression_state: DeferredExpressionState,
     ) {
-        if let Some(returns) = returns {
-            let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
+        let Some(returns) = returns else {
+            return;
+        };
+        let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
 
-            if !annotated.qualifiers.is_empty() {
-                for qualifier in [
-                    TypeQualifiers::FINAL,
-                    TypeQualifiers::CLASS_VAR,
-                    TypeQualifiers::INIT_VAR,
-                ] {
-                    if annotated.qualifiers.contains(qualifier) {
-                        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns)
-                        {
-                            builder.into_diagnostic(format!(
-                                "`{name}` is not allowed in function return type annotations",
-                                name = qualifier.name()
-                            ));
-                        }
-                    }
-                }
+        if annotated.qualifiers.is_empty() {
+            return;
+        }
+        for qualifier in [
+            TypeQualifiers::FINAL,
+            TypeQualifiers::CLASS_VAR,
+            TypeQualifiers::INIT_VAR,
+        ] {
+            if annotated.qualifiers.contains(qualifier)
+                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns)
+            {
+                builder.into_diagnostic(format!(
+                    "`{name}` is not allowed in function return type annotations",
+                    name = qualifier.name()
+                ));
             }
         }
     }
@@ -2679,24 +2677,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.defer_annotations().into(),
         );
 
-        if let Some(qualifiers) = annotated.map(|annotated| annotated.qualifiers) {
-            if !qualifiers.is_empty() {
-                for qualifier in [
-                    TypeQualifiers::FINAL,
-                    TypeQualifiers::CLASS_VAR,
-                    TypeQualifiers::INIT_VAR,
-                ] {
-                    if qualifiers.contains(qualifier) {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, parameter)
-                        {
-                            builder.into_diagnostic(format!(
-                                "`{name}` is not allowed in function parameter annotations",
-                                name = qualifier.name()
-                            ));
-                        }
-                    }
-                }
+        let Some(annotated) = annotated else {
+            return;
+        };
+
+        let qualifiers = annotated.qualifiers;
+
+        if qualifiers.is_empty() {
+            return;
+        }
+
+        for qualifier in [
+            TypeQualifiers::FINAL,
+            TypeQualifiers::CLASS_VAR,
+            TypeQualifiers::INIT_VAR,
+        ] {
+            if qualifiers.contains(qualifier)
+                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter)
+            {
+                builder.into_diagnostic(format!(
+                    "`{name}` is not allowed in function parameter annotations",
+                    name = qualifier.name()
+                ));
             }
         }
     }
@@ -4545,15 +4547,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 // If none are valid, emit a diagnostic for the first failing element
-                if !any_valid {
-                    if let Some(element_ty) = intersection.positive(db).first() {
-                        self.validate_subscript_deletion_impl(
-                            target,
-                            full_object_ty.or(Some(object_ty)),
-                            *element_ty,
-                            slice_ty,
-                        );
-                    }
+                if !any_valid && let Some(element_ty) = intersection.positive(db).first() {
+                    self.validate_subscript_deletion_impl(
+                        target,
+                        full_object_ty.or(Some(object_ty)),
+                        *element_ty,
+                        slice_ty,
+                    );
                 }
             }
 
@@ -4761,13 +4761,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
         let emit_invalid_final = |builder: &Self| {
-            if emit_diagnostics {
-                if let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target) {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to final attribute `{attribute}` on type `{}`",
-                        object_ty.display(db)
-                    ));
-                }
+            if emit_diagnostics
+                && let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target)
+            {
+                builder.into_diagnostic(format_args!(
+                    "Cannot assign to final attribute `{attribute}` on type `{}`",
+                    object_ty.display(db)
+                ));
             }
         };
 
@@ -4811,20 +4811,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let class_scope_id = class_literal.body_scope(db).file_scope_id(db);
                 let place_table = builder.index.place_table(class_scope_id);
 
-                if let Some(symbol) = place_table.symbol_by_name(attribute) {
-                    if symbol.is_bound() {
-                        if emit_diagnostics {
-                            if let Some(diag_builder) =
-                                builder.context.report_lint(&INVALID_ASSIGNMENT, target)
-                            {
-                                diag_builder.into_diagnostic(format_args!(
-                                    "Cannot assign to final attribute `{attribute}` in `__init__` \
-                                                     because it already has a value at class level"
-                                ));
-                            }
-                        }
-                        return true;
+                if let Some(symbol) = place_table.symbol_by_name(attribute)
+                    && symbol.is_bound()
+                {
+                    if emit_diagnostics
+                        && let Some(diag_builder) =
+                            builder.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        diag_builder.into_diagnostic(format_args!(
+                            "Cannot assign to final attribute `{attribute}` in `__init__` \
+                            because it already has a value at class level"
+                        ));
                     }
+
+                    return true;
                 }
             }
 
@@ -4851,16 +4851,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     // TODO: This is not a very helpful error message, as it does not include the underlying reason
                     // why the assignment is invalid. This would be a good use case for sub-diagnostics.
-                    if emit_diagnostics {
-                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Object of type `{}` is not assignable \
+                    if emit_diagnostics
+                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Object of type `{}` is not assignable \
                                  to attribute `{attribute}` on type `{}`",
-                                value_ty.display(self.db()),
-                                object_ty.display(self.db()),
-                            ));
-                        }
+                            value_ty.display(self.db()),
+                            object_ty.display(self.db()),
+                        ));
                     }
 
                     false
@@ -4884,18 +4883,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }) {
                     true
                 } else {
-                    if emit_diagnostics {
-                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                        {
-                            // TODO: same here, see above
-                            builder.into_diagnostic(format_args!(
-                                "Object of type `{}` is not assignable \
+                    if emit_diagnostics
+                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        // TODO: same here, see above
+                        builder.into_diagnostic(format_args!(
+                            "Object of type `{}` is not assignable \
                                  to attribute `{attribute}` on type `{}`",
-                                value_ty.display(self.db()),
-                                object_ty.display(self.db()),
-                            ));
-                        }
+                            value_ty.display(self.db()),
+                            object_ty.display(self.db()),
+                        ));
                     }
+
                     false
                 }
             }
@@ -4912,26 +4911,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
                 infer_value_ty(self, TypeContext::default());
 
-                if emit_diagnostics {
-                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot assign to attribute `{attribute}` on type `{}`",
-                            object_ty.display(self.db()),
-                        ));
-                    }
+                if emit_diagnostics
+                    && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to attribute `{attribute}` on type `{}`",
+                        object_ty.display(self.db()),
+                    ));
                 }
+
                 false
             }
             Type::BoundSuper(_) => {
                 infer_value_ty(self, TypeContext::default());
 
-                if emit_diagnostics {
-                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot assign to attribute `{attribute}` on type `{}`",
-                            object_ty.display(self.db()),
-                        ));
-                    }
+                if emit_diagnostics
+                    && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to attribute `{attribute}` on type `{}`",
+                        object_ty.display(self.db()),
+                    ));
                 }
                 false
             }
@@ -5036,16 +5036,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Only fall back to `__setattr__` when no explicit attribute is found.
                 match object_ty.class_member(db, attribute.into()) {
                     meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
-                        if emit_diagnostics {
-                            if let Some(builder) =
+                        if emit_diagnostics
+                            && let Some(builder) =
                                 self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Cannot assign to ClassVar `{attribute}` \
-                                     from an instance of type `{ty}`",
-                                    ty = object_ty.display(self.db()),
-                                ));
-                            }
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot assign to ClassVar `{attribute}` \
+                                from an instance of type `{ty}`",
+                                ty = object_ty.display(self.db()),
+                            ));
                         }
                         false
                     }
@@ -5075,16 +5074,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
                             );
 
-                            if emit_diagnostics {
-                                if let Err(dunder_set_failure) = dunder_set_result.as_ref() {
-                                    report_bad_dunder_set_call(
-                                        &self.context,
-                                        dunder_set_failure,
-                                        attribute,
-                                        object_ty,
-                                        target,
-                                    );
-                                }
+                            if emit_diagnostics
+                                && let Err(dunder_set_failure) = dunder_set_result.as_ref()
+                            {
+                                report_bad_dunder_set_call(
+                                    &self.context,
+                                    dunder_set_failure,
+                                    attribute,
+                                    object_ty,
+                                    target,
+                                );
                             }
 
                             dunder_set_result.is_ok()
@@ -5177,32 +5176,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // If __setattr__ succeeded, allow the assignment.
                                 Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => true,
                                 Err(CallDunderError::CallError(..)) => {
-                                    if emit_diagnostics {
-                                        if let Some(builder) =
+                                    if emit_diagnostics
+                                        && let Some(builder) =
                                             self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                                        {
-                                            builder.into_diagnostic(format_args!(
-                                                "Cannot assign object of type `{}` to attribute \
-                                                 `{attribute}` on type `{}` with \
-                                                 custom `__setattr__` method.",
-                                                value_ty.display(db),
-                                                object_ty.display(db)
-                                            ));
-                                        }
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Cannot assign object of type `{}` to attribute \
+                                            `{attribute}` on type `{}` with \
+                                            custom `__setattr__` method.",
+                                            value_ty.display(db),
+                                            object_ty.display(db)
+                                        ));
                                     }
                                     false
                                 }
                                 Err(CallDunderError::MethodNotAvailable) => {
-                                    if emit_diagnostics {
-                                        if let Some(builder) =
+                                    if emit_diagnostics
+                                        && let Some(builder) =
                                             self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                                        {
-                                            builder.into_diagnostic(format_args!(
-                                                "Unresolved attribute `{}` on type `{}`.",
-                                                attribute,
-                                                object_ty.display(db)
-                                            ));
-                                        }
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Unresolved attribute `{}` on type `{}`",
+                                            attribute,
+                                            object_ty.display(db)
+                                        ));
                                     }
                                     false
                                 }
@@ -5244,16 +5241,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
                             );
 
-                            if emit_diagnostics {
-                                if let Err(dunder_set_failure) = dunder_set_result.as_ref() {
-                                    report_bad_dunder_set_call(
-                                        &self.context,
-                                        dunder_set_failure,
-                                        attribute,
-                                        object_ty,
-                                        target,
-                                    );
-                                }
+                            if emit_diagnostics
+                                && let Err(dunder_set_failure) = dunder_set_result.as_ref()
+                            {
+                                report_bad_dunder_set_call(
+                                    &self.context,
+                                    dunder_set_failure,
+                                    attribute,
+                                    object_ty,
+                                    target,
+                                );
                             }
 
                             dunder_set_result.is_ok()
@@ -5406,16 +5403,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     infer_value_ty(self, TypeContext::default());
 
-                    if emit_diagnostics {
-                        if let Some(builder) =
+                    if emit_diagnostics
+                        && let Some(builder) =
                             self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Unresolved attribute `{}` on type `{}`.",
-                                attribute,
-                                object_ty.display(db)
-                            ));
-                        }
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Unresolved attribute `{}` on type `{}`.",
+                            attribute,
+                            object_ty.display(db)
+                        ));
                     }
 
                     false
@@ -7192,16 +7188,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if !annotated.qualifiers.is_empty() {
                 for qualifier in [TypeQualifiers::CLASS_VAR, TypeQualifiers::INIT_VAR] {
-                    if annotated.qualifiers.contains(qualifier) {
-                        if let Some(builder) = self
+                    if annotated.qualifiers.contains(qualifier)
+                        && let Some(builder) = self
                             .context
                             .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "`{name}` annotations are not allowed for non-name targets",
-                                name = qualifier.name()
-                            ));
-                        }
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "`{name}` annotations are not allowed for non-name targets",
+                            name = qualifier.name()
+                        ));
                     }
                 }
             }
@@ -7245,15 +7240,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let current_scope = self.index.scope(current_scope_id);
             if current_scope.kind() != ScopeKind::Class {
                 for qualifier in [TypeQualifiers::CLASS_VAR, TypeQualifiers::INIT_VAR] {
-                    if declared.qualifiers.contains(qualifier) {
-                        if let Some(builder) =
+                    if declared.qualifiers.contains(qualifier)
+                        && let Some(builder) =
                             self.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "`{name}` annotations are only allowed in class-body scopes",
-                                name = qualifier.name()
-                            ));
-                        }
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "`{name}` annotations are only allowed in class-body scopes",
+                            name = qualifier.name()
+                        ));
                     }
                 }
             }
@@ -7292,12 +7286,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
         // Handle various singletons.
-        if let Some(name_expr) = target.as_name_expr() {
-            if let Some(special_form) =
+        if let Some(name_expr) = target.as_name_expr()
+            && let Some(special_form) =
                 SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name_expr.id)
-            {
-                declared.inner = Type::SpecialForm(special_form);
-            }
+        {
+            declared.inner = Type::SpecialForm(special_form);
         }
 
         // If the target of an assignment is not one of the place expressions we support,
@@ -9608,10 +9601,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
                     elt_tcx.filter(|_| !elt_tcx_variance[&elt_ty_identity].is_covariant())
+                    && inferred_elt_ty.is_assignable_to(self.db(), elt_tcx)
                 {
-                    if inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
-                        continue;
-                    }
+                    continue;
                 }
 
                 // Convert any element literals to their promoted type form to avoid excessively large
@@ -10227,50 +10219,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
-            if let Type::TypedDict(typed_dict_ty) = value_type {
-                if matches!(attr.id.as_str(), "pop" | "setdefault") && !arguments.args.is_empty() {
-                    // Validate the key argument for `TypedDict` methods
-                    if let Some(first_arg) = arguments.args.first() {
-                        if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                            value: key_literal,
-                            ..
-                        }) = first_arg
-                        {
-                            let key = key_literal.to_str();
-                            let items = typed_dict_ty.items(self.db());
 
-                            // Check if key exists
-                            if let Some((_, field)) = items
-                                .iter()
-                                .find(|(field_name, _)| field_name.as_str() == key)
-                            {
-                                // Key exists - check if it's a `pop()` on a required field
-                                if attr.id.as_str() == "pop" && field.is_required() {
-                                    report_cannot_pop_required_field_on_typed_dict(
-                                        &self.context,
-                                        first_arg.into(),
-                                        Type::TypedDict(typed_dict_ty),
-                                        key,
-                                    );
-                                    return Type::unknown();
-                                }
-                            } else {
-                                // Key not found, report error with suggestion and return early
-                                let key_ty = Type::string_literal(self.db(), key);
-                                report_invalid_key_on_typed_dict(
-                                    &self.context,
-                                    first_arg.into(),
-                                    first_arg.into(),
-                                    Type::TypedDict(typed_dict_ty),
-                                    None,
-                                    key_ty,
-                                    items,
-                                );
-                                // Return `Unknown` to prevent the overload system from generating its own error
-                                return Type::unknown();
-                            }
-                        }
+            if let Type::TypedDict(typed_dict_ty) = value_type
+                && matches!(attr.id.as_str(), "pop" | "setdefault")
+                && !arguments.args.is_empty()
+
+                // Validate the key argument for `TypedDict` methods
+                && let Some(first_arg) = arguments.args.first()
+                    && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+                        value: key_literal,
+                        ..
+                    }) = first_arg
+            {
+                let key = key_literal.to_str();
+                let items = typed_dict_ty.items(self.db());
+
+                // Check if key exists
+                if let Some((_, field)) = items
+                    .iter()
+                    .find(|(field_name, _)| field_name.as_str() == key)
+                {
+                    // Key exists - check if it's a `pop()` on a required field
+                    if attr.id.as_str() == "pop" && field.is_required() {
+                        report_cannot_pop_required_field_on_typed_dict(
+                            &self.context,
+                            first_arg.into(),
+                            Type::TypedDict(typed_dict_ty),
+                            key,
+                        );
+                        return Type::unknown();
                     }
+                } else {
+                    // Key not found, report error with suggestion and return early
+                    let key_ty = Type::string_literal(self.db(), key);
+                    report_invalid_key_on_typed_dict(
+                        &self.context,
+                        first_arg.into(),
+                        first_arg.into(),
+                        Type::TypedDict(typed_dict_ty),
+                        None,
+                        key_ty,
+                        items,
+                    );
+                    // Return `Unknown` to prevent the overload system from generating its own error
+                    return Type::unknown();
                 }
             }
         }
@@ -10447,18 +10439,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Validate `TypedDict` constructor calls after argument type inference
-        if let Some(class_literal) = callable_type.as_class_literal() {
-            if class_literal.is_typed_dict(self.db()) {
-                let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
-                if let Some(typed_dict) = typed_dict_type.as_typed_dict() {
-                    validate_typed_dict_constructor(
-                        &self.context,
-                        typed_dict,
-                        arguments,
-                        func.as_ref().into(),
-                        |expr| self.expression_type(expr),
-                    );
-                }
+        if let Type::ClassLiteral(class_literal) = callable_type
+            && class_literal.is_typed_dict(self.db())
+        {
+            let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
+            if let Some(typed_dict) = typed_dict_type.as_typed_dict() {
+                validate_typed_dict_constructor(
+                    &self.context,
+                    typed_dict,
+                    arguments,
+                    func.as_ref().into(),
+                    |expr| self.expression_type(expr),
+                );
             }
         }
 
@@ -10871,26 +10863,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
             let mut symbol_resolves_locally = false;
-            if let Some(symbol) = place_expr.as_symbol() {
-                if let Some(symbol_id) = place_table.symbol_id(symbol.name()) {
-                    // Footgun: `place_expr` and `symbol` were probably constructed with all-zero
-                    // flags. We need to read the place table to get correct flags.
-                    symbol_resolves_locally = place_table.symbol(symbol_id).is_local();
-                    // If we try to access a variable in a class before it has been defined, the
-                    // lookup will fall back to global. See the comment on `Symbol::is_local`.
-                    let fallback_to_global =
-                        scope.node(db).scope_kind().is_class() && symbol_resolves_locally;
-                    if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
-                        return global_symbol(self.db(), self.file(), symbol.name()).map_type(
-                            |ty| {
-                                self.narrow_place_with_applicable_constraints(
-                                    place_expr,
-                                    ty,
-                                    &constraint_keys,
-                                )
-                            },
-                        );
-                    }
+            if let Some(symbol) = place_expr.as_symbol()
+                && let Some(symbol_id) = place_table.symbol_id(symbol.name())
+            {
+                // Footgun: `place_expr` and `symbol` were probably constructed with all-zero
+                // flags. We need to read the place table to get correct flags.
+                symbol_resolves_locally = place_table.symbol(symbol_id).is_local();
+                // If we try to access a variable in a class before it has been defined, the
+                // lookup will fall back to global. See the comment on `Symbol::is_local`.
+                let fallback_to_global =
+                    scope.node(db).scope_kind().is_class() && symbol_resolves_locally;
+                if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
+                    return global_symbol(self.db(), self.file(), symbol.name()).map_type(|ty| {
+                        self.narrow_place_with_applicable_constraints(
+                            place_expr,
+                            ty,
+                            &constraint_keys,
+                        )
+                    });
                 }
             }
 
@@ -11987,15 +11977,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
                 let ty = if n < 1 {
                     Type::string_literal(self.db(), "")
-                } else if let Ok(n) = usize::try_from(n) {
-                    if n.checked_mul(s.value(self.db()).len())
+                } else if let Ok(n) = usize::try_from(n)
+                    && n.checked_mul(s.value(self.db()).len())
                         .is_some_and(|new_length| new_length <= Self::MAX_STRING_LITERAL_SIZE)
-                    {
-                        let new_literal = s.value(self.db()).repeat(n);
-                        Type::string_literal(self.db(), &new_literal)
-                    } else {
-                        Type::LiteralString
-                    }
+                {
+                    let new_literal = s.value(self.db()).repeat(n);
+                    Type::string_literal(self.db(), &new_literal)
                 } else {
                     Type::LiteralString
                 };
@@ -13430,12 +13417,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )));
             }
             Type::SpecialForm(SpecialFormType::Optional) => {
-                if matches!(**slice, ast::Expr::Tuple(_)) {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "`typing.Optional` requires exactly one argument"
-                        ));
-                    }
+                if matches!(**slice, ast::Expr::Tuple(_))
+                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "`typing.Optional` requires exactly one argument"
+                    ));
                 }
 
                 let ty = self.infer_expression(slice, TypeContext::default());
@@ -13472,14 +13459,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ),
                         ));
 
-                        if is_empty {
-                            if let Some(builder) =
+                        if is_empty
+                            && let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                            {
-                                builder.into_diagnostic(
-                                    "`typing.Union` requires at least one type argument",
-                                );
-                            }
+                        {
+                            builder.into_diagnostic(
+                                "`typing.Union` requires at least one type argument",
+                            );
                         }
 
                         return union_type;
@@ -13597,16 +13583,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ..
                 }) = **slice
                 {
-                    if arguments.len() != 2 {
-                        if let Some(builder) =
+                    if arguments.len() != 2
+                        && let Some(builder) =
                             self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "`typing.{}` requires exactly two arguments, got {}",
-                                special_form.name(),
-                                arguments.len()
-                            ));
-                        }
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "`typing.{}` requires exactly two arguments, got {}",
+                            special_form.name(),
+                            arguments.len()
+                        ));
                     }
 
                     if let [first_expr, second_expr] = &arguments[..] {
