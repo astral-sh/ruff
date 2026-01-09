@@ -69,7 +69,7 @@ use crate::checkers::ast::Checker;
 ///
 /// arr1 = np.sum(np.array([0.1, 0.2]))
 ///
-/// assert np.all(arr1 == 0.3) # AssertionError
+/// assert np.all(arr1 == 0.3)  # AssertionError
 /// ```
 ///
 /// Use instead:
