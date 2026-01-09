@@ -968,8 +968,8 @@ def _(
     reveal_type(callable_and_any())  # revealed: Foo & str
 ```
 
-If one element accepts the call but another rejects it (e.g., due to incompatible arguments),
-the call still succeeds using only the element that accepts:
+If one element accepts the call but another rejects it (e.g., due to incompatible arguments), the
+call still succeeds using only the element that accepts:
 
 ```py
 from ty_extensions import Intersection
