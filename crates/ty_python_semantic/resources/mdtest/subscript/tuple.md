@@ -430,5 +430,38 @@ class Bar: ...
 
 def test4(val: Intersection[tuple[Foo], tuple[Bar]]):
     # TODO: should be `Foo & Bar`
-    reveal_type(val[0])  # revealed: @Todo(Subscript expressions on intersections)
+    reveal_type(val[0])  # revealed: @Todo(Subscript expressions with intersections)
+```
+
+## Intersection slice access
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+def f(
+    x: tuple[A, B],
+    y: tuple[C, D],
+    z: Intersection[tuple[A, B], tuple[C, D]],
+):
+    reveal_type(x[1:])  # revealed: tuple[B]
+    reveal_type(y[1:])  # revealed: tuple[D]
+    # TODO: should be `tuple[B] & tuple[D]`
+    reveal_type(z[1:])  # revealed: @Todo(Subscript expressions with intersections)
+```
+
+```py
+class A: ...
+class B: ...
+class C: ...
+
+def g(x: tuple[A, B]):
+    reveal_type(x[1:])  # revealed: tuple[B]
+    if isinstance(x, C):
+        # TODO: should be `tuple[B]`
+        reveal_type(x[1:])  # revealed: @Todo(Subscript expressions with intersections)
 ```

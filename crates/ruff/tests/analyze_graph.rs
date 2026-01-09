@@ -714,6 +714,121 @@ fn notebook_basic() -> Result<()> {
     Ok(())
 }
 
+/// Test that the `src` configuration option is respected.
+///
+/// This is useful for monorepos where there are multiple source directories that need to be
+/// included in the module resolution search path.
+#[test]
+fn src_option() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // Create a lib directory with a package.
+    root.child("lib")
+        .child("mylib")
+        .child("__init__.py")
+        .write_str("def helper(): pass")?;
+
+    // Create an app directory with a file that imports from mylib.
+    root.child("app").child("__init__.py").write_str("")?;
+    root.child("app")
+        .child("main.py")
+        .write_str("from mylib import helper")?;
+
+    // Without src configured, the import from mylib won't resolve.
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("app").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "app/__init__.py": [],
+          "app/main.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    // With src = ["lib"], the import should resolve.
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        src = ["lib"]
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("app").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "app/__init__.py": [],
+          "app/main.py": [
+            "lib/mylib/__init__.py"
+          ]
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// Test that glob patterns in `src` are expanded.
+#[test]
+fn src_glob_expansion() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // Create multiple lib directories with packages.
+    root.child("libs")
+        .child("lib_a")
+        .child("pkg_a")
+        .child("__init__.py")
+        .write_str("def func_a(): pass")?;
+    root.child("libs")
+        .child("lib_b")
+        .child("pkg_b")
+        .child("__init__.py")
+        .write_str("def func_b(): pass")?;
+
+    // Create an app that imports from both packages.
+    root.child("app").child("__init__.py").write_str("")?;
+    root.child("app")
+        .child("main.py")
+        .write_str("from pkg_a import func_a\nfrom pkg_b import func_b")?;
+
+    // Use a glob pattern to include all lib directories.
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        src = ["libs/*"]
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("app").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "app/__init__.py": [],
+          "app/main.py": [
+            "libs/lib_a/pkg_a/__init__.py",
+            "libs/lib_b/pkg_b/__init__.py"
+          ]
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
 #[test]
 fn notebook_with_magic() -> Result<()> {
     let tempdir = TempDir::new()?;

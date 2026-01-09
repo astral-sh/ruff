@@ -121,6 +121,31 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["a", "c"] | int
 ```
 
+## No narrowing for the right-hand side (currently)
+
+No narrowing is done for the right-hand side currently, even if the right-hand side is a valid
+"target" (name/attribute/subscript) that could potentially be narrowed. We may change this in the
+future:
+
+```py
+from typing import Literal
+
+def f(x: Literal["abc", "def"]):
+    if "a" in x:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+
+    if "a" not in x:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+```
+
 ## bool
 
 ```py

@@ -8,13 +8,14 @@
 //! reasonably ask us to type-check code assuming that the code runs
 //! on Linux.)
 
+mod version;
+
 use std::io;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::{fmt, sync::Arc};
 
-use crate::{PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource};
 use camino::Utf8Component;
 use indexmap::IndexSet;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
@@ -25,6 +26,7 @@ use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange};
 use strum::IntoEnumIterator;
 use ty_static::EnvVars;
+pub use version::{PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource};
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 type StdlibDiscoveryResult<T> = Result<T, StdlibDiscoveryError>;

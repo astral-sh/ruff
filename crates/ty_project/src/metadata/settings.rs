@@ -171,18 +171,26 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
         merged.combine_with((*option).clone());
     }
 
-    merged
-        .rules
-        .combine_with(db.project().metadata(db).options().rules.clone());
+    let global_options = db.project().metadata(db).options();
 
-    let Some(rules) = merged.rules else {
+    merged.rules.combine_with(global_options.rules.clone());
+    merged
+        .analysis
+        .combine_with(global_options.analysis.clone());
+
+    if merged.rules.is_none() && merged.analysis.is_none() {
         return FileSettings::Global;
-    };
+    }
+
+    let rules = merged.rules.unwrap_or_default();
+    let analysis = merged.analysis.unwrap_or_default();
 
     // It's okay to ignore the errors here because the rules are eagerly validated
     // during `overrides.to_settings()`.
     let rules = rules.to_rule_selection(db, &mut Vec::new());
-    FileSettings::File(Arc::new(OverrideSettings { rules }))
+    let analysis = analysis.to_settings();
+
+    FileSettings::File(Arc::new(OverrideSettings { rules, analysis }))
 }
 
 /// The resolved settings for a file.
@@ -202,9 +210,17 @@ impl FileSettings {
             FileSettings::File(override_settings) => &override_settings.rules,
         }
     }
+
+    pub fn analysis<'a>(&'a self, db: &'a dyn Db) -> &'a AnalysisSettings {
+        match self {
+            FileSettings::Global => db.project().settings(db).analysis(),
+            FileSettings::File(override_settings) => &override_settings.analysis,
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, get_size2::GetSize)]
 pub struct OverrideSettings {
     pub(super) rules: RuleSelection,
+    pub(super) analysis: AnalysisSettings,
 }

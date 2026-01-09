@@ -155,6 +155,52 @@ def invalid_binary_operators(
     reveal_type(l)  # revealed: Unknown
 ```
 
+## Invalid AST nodes in string annotations
+
+Invalid AST nodes should also be rejected when they appear in string annotations:
+
+```py
+def bar() -> None:
+    return None
+
+async def baz(): ...
+async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
+    def _(
+        a: "1",  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+        b: "2.3",  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
+        c: "4j",  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
+        d: "True",  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
+        e: "1 and 2",  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
+        f: "1 or 2",  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
+        g: "(foo := 1)",  # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
+        h: "not 1",  # error: [invalid-type-form] "Unary operations are not allowed in type expressions"
+        i: "lambda: 1",  # error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
+        j: "1 if True else 2",  # error: [invalid-type-form] "`if` expressions are not allowed in type expressions"
+        k: "await baz()",  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
+        l: "(yield 1)",  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
+        m: "1 < 2",  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
+        n: "bar()",  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
+        # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        # error: [invalid-type-form] "Invalid subscript"
+        o: "[1, 2, 3][1:2]",
+    ):
+        reveal_type(a)  # revealed: Unknown
+        reveal_type(b)  # revealed: Unknown
+        reveal_type(c)  # revealed: Unknown
+        reveal_type(d)  # revealed: Unknown
+        reveal_type(e)  # revealed: Unknown
+        reveal_type(f)  # revealed: Unknown
+        reveal_type(g)  # revealed: Unknown
+        reveal_type(h)  # revealed: Unknown
+        reveal_type(i)  # revealed: Unknown
+        reveal_type(j)  # revealed: Unknown
+        reveal_type(k)  # revealed: Unknown
+        reveal_type(l)  # revealed: Unknown
+        reveal_type(m)  # revealed: Unknown
+        reveal_type(n)  # revealed: Unknown
+        reveal_type(o)  # revealed: Unknown
+```
+
 ## Invalid Collection based AST nodes
 
 ```toml

@@ -71,10 +71,11 @@ use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::Range;
 
+use indexmap::map::Entry;
 use itertools::Itertools;
-use ordermap::map::Entry;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
+use smallvec::SmallVec;
 
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::visitor::{
@@ -84,7 +85,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
     UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxOrderMap, FxOrderSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -147,13 +148,8 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::never();
-        for child in self {
-            if result.union(db, f(child)).is_always_satisfied(db) {
-                return result;
-            }
-        }
-        result
+        let node = Node::distributed_or(db, self.map(|element| f(element).node));
+        ConstraintSet { node }
     }
 
     fn when_all<'db>(
@@ -161,13 +157,8 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always();
-        for child in self {
-            if result.intersect(db, f(child)).is_never_satisfied(db) {
-                return result;
-            }
-        }
-        result
+        let node = Node::distributed_and(db, self.map(|element| f(element).node));
+        ConstraintSet { node }
     }
 }
 
@@ -727,16 +718,23 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// and working with BDDs. We don't do that, but we have tried to make some simple choices that
     /// have clear wins.
     ///
-    /// In particular, we compare the _typevars_ of each constraint first, so that all constraints
-    /// for a single typevar are guaranteed to be adjacent in the BDD structure. There are several
-    /// simplifications that we perform that operate on constraints with the same typevar, and this
-    /// ensures that we can find all candidate simplifications more easily.
-    fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        (
-            self.typevar(db).binding_context(db),
-            self.typevar(db).identity(db),
-            self.as_id(),
-        )
+    /// In particular, we use the IDs that salsa assigns to each constraint as it is created. This
+    /// tends to ensure that constraints that are close to each other in the source are also close
+    /// to each other in the BDD structure.
+    ///
+    /// As an optimization, we also _reverse_ this ordering, so that constraints that appear
+    /// earlier in the source appear "lower" (closer to the terminal nodes) in the BDD. Since we
+    /// build up BDDs by combining smaller BDDs (which will have been constructed from expressions
+    /// earlier in the source), this tends to minimize the amount of "node shuffling" that we have
+    /// to do when combining BDDs.
+    ///
+    /// Previously, we tried to be more clever — for instance, by comparing the typevars of each
+    /// constraint first, in an attempt to keep all of the constraints for a single typevar
+    /// adjacent in the BDD structure. However, this proved to be counterproductive; we've found
+    /// empirically that we get smaller BDDs with an ordering that is more aligned with source
+    /// order.
+    fn ordering(self, _db: &'db dyn Db) -> impl Ord {
+        std::cmp::Reverse(self.as_id())
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -1023,9 +1021,8 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => {}
             Node::AlwaysFalse => {}
             Node::Interior(interior) => {
-                let map = interior.sequent_map(db);
-                let mut path = PathAssignments::default();
-                self.for_each_path_inner(db, &mut f, map, &mut path);
+                let mut path = interior.path_assignments(db);
+                self.for_each_path_inner(db, &mut f, &mut path);
             }
         }
     }
@@ -1034,7 +1031,6 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         f: &mut dyn FnMut(&PathAssignments<'db>),
-        map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) {
         match self {
@@ -1043,11 +1039,11 @@ impl<'db> Node<'db> {
             Node::Interior(interior) => {
                 let constraint = interior.constraint(db);
                 let source_order = interior.source_order(db);
-                path.walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
-                    interior.if_true(db).for_each_path_inner(db, f, map, path);
+                path.walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                    interior.if_true(db).for_each_path_inner(db, f, path);
                 });
-                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
-                    interior.if_false(db).for_each_path_inner(db, f, map, path);
+                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                    interior.if_false(db).for_each_path_inner(db, f, path);
                 });
             }
         }
@@ -1059,19 +1055,13 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                let map = interior.sequent_map(db);
-                let mut path = PathAssignments::default();
-                self.is_always_satisfied_inner(db, map, &mut path)
+                let mut path = interior.path_assignments(db);
+                self.is_always_satisfied_inner(db, &mut path)
             }
         }
     }
 
-    fn is_always_satisfied_inner(
-        self,
-        db: &'db dyn Db,
-        map: &SequentMap<'db>,
-        path: &mut PathAssignments<'db>,
-    ) -> bool {
+    fn is_always_satisfied_inner(self, db: &'db dyn Db, path: &mut PathAssignments<'db>) -> bool {
         match self {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
@@ -1082,10 +1072,8 @@ impl<'db> Node<'db> {
                 let constraint = interior.constraint(db);
                 let source_order = interior.source_order(db);
                 let true_always_satisfied = path
-                    .walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
-                        interior
-                            .if_true(db)
-                            .is_always_satisfied_inner(db, map, path)
+                    .walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                        interior.if_true(db).is_always_satisfied_inner(db, path)
                     })
                     .unwrap_or(true);
                 if !true_always_satisfied {
@@ -1093,10 +1081,8 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
-                    interior
-                        .if_false(db)
-                        .is_always_satisfied_inner(db, map, path)
+                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                    interior.if_false(db).is_always_satisfied_inner(db, path)
                 })
                 .unwrap_or(true)
             }
@@ -1109,19 +1095,13 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
-                let map = interior.sequent_map(db);
-                let mut path = PathAssignments::default();
-                self.is_never_satisfied_inner(db, map, &mut path)
+                let mut path = interior.path_assignments(db);
+                self.is_never_satisfied_inner(db, &mut path)
             }
         }
     }
 
-    fn is_never_satisfied_inner(
-        self,
-        db: &'db dyn Db,
-        map: &SequentMap<'db>,
-        path: &mut PathAssignments<'db>,
-    ) -> bool {
+    fn is_never_satisfied_inner(self, db: &'db dyn Db, path: &mut PathAssignments<'db>) -> bool {
         match self {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
@@ -1132,8 +1112,8 @@ impl<'db> Node<'db> {
                 let constraint = interior.constraint(db);
                 let source_order = interior.source_order(db);
                 let true_never_satisfied = path
-                    .walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
-                        interior.if_true(db).is_never_satisfied_inner(db, map, path)
+                    .walk_edge(db, constraint.when_true(), source_order, |path, _| {
+                        interior.if_true(db).is_never_satisfied_inner(db, path)
                     })
                     .unwrap_or(true);
                 if !true_never_satisfied {
@@ -1141,10 +1121,8 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
-                    interior
-                        .if_false(db)
-                        .is_never_satisfied_inner(db, map, path)
+                path.walk_edge(db, constraint.when_false(), source_order, |path, _| {
+                    interior.if_false(db).is_never_satisfied_inner(db, path)
                 })
                 .unwrap_or(true)
             }
@@ -1203,6 +1181,104 @@ impl<'db> Node<'db> {
                 self_interior.or(db, other_interior, other_offset)
             }
         }
+    }
+
+    /// Combine an iterator of nodes into a single node using an associative operator.
+    ///
+    /// Because the operator is associative, we don't have to combine the nodes left to right; we
+    /// can instead combine them in a "tree-like" way:
+    ///
+    /// ```text
+    /// linear:  (((((a ∨ b) ∨ c) ∨ d) ∨ e) ∨ f) ∨ g
+    /// tree:    ((a ∨ b) ∨ (c ∨ d)) ∨ ((e ∨ f) ∨ g)
+    /// ```
+    ///
+    /// We have to invoke the operator the same number of times. But BDD operators are often much
+    /// cheaper when the operands are small, and with the tree shape, many more of the invocations
+    /// are performed on small BDDs.
+    ///
+    /// You must also provide the "zero" and "one" units of the operator. The "zero" is the value
+    /// that has no effect (`0 ∨ a = a`). It is returned if the iterator is empty. The "one" is the
+    /// value that saturates (`1 ∨ a = 1`). We use this to short-circuit; if any element BDD or any
+    /// intermediate result evaluates to "one", we can return early.
+    fn tree_fold(
+        db: &'db dyn Db,
+        nodes: impl Iterator<Item = Self>,
+        zero: Self,
+        one: Self,
+        mut combine: impl FnMut(Self, &'db dyn Db, Self) -> Self,
+    ) -> Self {
+        // To implement the "linear" shape described above, we could collect the iterator elements
+        // into a vector, and then use the fold at the bottom of this method to combine the
+        // elements using the operator.
+        //
+        // To implement the "tree" shape, we also maintain a "depth" for each element of the
+        // vector, which indicates how many times the operator has been applied to the element.
+        // As we collect elements into the vector, we keep it capped at a length `O(log n)` of the
+        // number of elements seen so far. To do that, whenever the last two elements of the vector
+        // have the same depth, we apply the operator once to combine those two elements, adding
+        // the result back to the vector with an incremented depth. (That might let us combine the
+        // result with the _next_ intermediate result in the vector, and so on.)
+        //
+        // Walking through the example above, our vector ends up looking like:
+        //
+        //                                a/0
+        //                     a/0 b/0 => ab/1
+        //                                ab/1 c/0
+        //   ab/1 c/0 d/0 => ab/1 cd/1 => abcd/2
+        //                                abcd/2 e/0
+        //              abcd/2 e/0 f/0 => abcd/2 ef/1
+        //                                abcd/2 ef/1 g/0
+        //
+        // We use a SmallVec for the accumulator so that we don't have to spill over to the heap
+        // until the iterator passes 256 elements.
+        let mut accumulator: SmallVec<[(Node<'db>, u8); 8]> = SmallVec::default();
+        for node in nodes {
+            if node == one {
+                return one;
+            }
+
+            let (mut node, mut depth) = (node, 0);
+            while accumulator
+                .last()
+                .is_some_and(|(_, existing)| *existing == depth)
+            {
+                let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
+                node = combine(existing, db, node);
+                if node == one {
+                    return one;
+                }
+                depth += 1;
+            }
+            accumulator.push((node, depth));
+        }
+
+        // At this point, we've consumed all of the iterator. The length of the accumulator will be
+        // the same as the number of 1 bits in the length of the iterator. We do a final fold to
+        // produce the overall result.
+        accumulator
+            .into_iter()
+            .fold(zero, |result, (node, _)| combine(result, db, node))
+    }
+
+    fn distributed_or(db: &'db dyn Db, nodes: impl Iterator<Item = Node<'db>>) -> Self {
+        Self::tree_fold(
+            db,
+            nodes,
+            Node::AlwaysFalse,
+            Node::AlwaysTrue,
+            Self::or_with_offset,
+        )
+    }
+
+    fn distributed_and(db: &'db dyn Db, nodes: impl Iterator<Item = Node<'db>>) -> Self {
+        Self::tree_fold(
+            db,
+            nodes,
+            Node::AlwaysTrue,
+            Node::AlwaysFalse,
+            Self::and_with_offset,
+        )
     }
 
     /// Returns the `and` or intersection of two BDDs.
@@ -1430,13 +1506,12 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
-        map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
-            Node::Interior(interior) => interior.abstract_one_inner(db, should_remove, map, path),
+            Node::Interior(interior) => interior.abstract_one_inner(db, should_remove, path),
         }
     }
 
@@ -1817,56 +1892,66 @@ impl<'db> Node<'db> {
             db: &'db dyn Db,
             node: Node<'db>,
             prefix: &'a dyn Display,
+            seen: RefCell<FxIndexSet<InteriorNode<'db>>>,
         }
 
-        impl<'a, 'db> DisplayNode<'a, 'db> {
-            fn new(db: &'db dyn Db, node: Node<'db>, prefix: &'a dyn Display) -> Self {
-                Self { db, node, prefix }
+        fn format_node<'db>(
+            db: &'db dyn Db,
+            node: Node<'db>,
+            prefix: &dyn Display,
+            seen: &RefCell<FxIndexSet<InteriorNode<'db>>>,
+            f: &mut std::fmt::Formatter<'_>,
+        ) -> std::fmt::Result {
+            match node {
+                Node::AlwaysTrue => write!(f, "always"),
+                Node::AlwaysFalse => write!(f, "never"),
+                Node::Interior(interior) => {
+                    let (index, is_new) = seen.borrow_mut().insert_full(interior);
+                    if !is_new {
+                        return write!(f, "<{index}> SHARED");
+                    }
+                    write!(
+                        f,
+                        "<{index}> {} {}/{}",
+                        interior.constraint(db).display(db),
+                        interior.source_order(db),
+                        interior.max_source_order(db),
+                    )?;
+                    // Calling display_graph recursively here causes rustc to claim that the
+                    // expect(unused) up above is unfulfilled!
+                    write!(f, "\n{prefix}┡━₁ ",)?;
+                    format_node(
+                        db,
+                        interior.if_true(db),
+                        &format_args!("{prefix}│   ",),
+                        seen,
+                        f,
+                    )?;
+                    write!(f, "\n{prefix}└─₀ ",)?;
+                    format_node(
+                        db,
+                        interior.if_false(db),
+                        &format_args!("{prefix}    ",),
+                        seen,
+                        f,
+                    )?;
+                    Ok(())
+                }
             }
         }
 
         impl Display for DisplayNode<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.node {
-                    Node::AlwaysTrue => write!(f, "always"),
-                    Node::AlwaysFalse => write!(f, "never"),
-                    Node::Interior(interior) => {
-                        write!(
-                            f,
-                            "{} {}/{}",
-                            interior.constraint(self.db).display(self.db),
-                            interior.source_order(self.db),
-                            interior.max_source_order(self.db),
-                        )?;
-                        // Calling display_graph recursively here causes rustc to claim that the
-                        // expect(unused) up above is unfulfilled!
-                        write!(
-                            f,
-                            "\n{}┡━₁ {}",
-                            self.prefix,
-                            DisplayNode::new(
-                                self.db,
-                                interior.if_true(self.db),
-                                &format_args!("{}│   ", self.prefix)
-                            ),
-                        )?;
-                        write!(
-                            f,
-                            "\n{}└─₀ {}",
-                            self.prefix,
-                            DisplayNode::new(
-                                self.db,
-                                interior.if_false(self.db),
-                                &format_args!("{}    ", self.prefix)
-                            ),
-                        )?;
-                        Ok(())
-                    }
-                }
+                format_node(self.db, self.node, self.prefix, &self.seen, f)
             }
         }
 
-        DisplayNode::new(db, self, prefix)
+        DisplayNode {
+            db,
+            node: self,
+            prefix,
+            seen: RefCell::default(),
+        }
     }
 }
 
@@ -2026,8 +2111,7 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
-        let map = self.sequent_map(db);
-        let mut path = PathAssignments::default();
+        let mut path = self.path_assignments(db);
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
             _ => false,
@@ -2053,15 +2137,13 @@ impl<'db> InteriorNode<'db> {
                 }
                 false
             },
-            map,
             &mut path,
         )
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
-        let map = self.sequent_map(db);
-        let mut path = PathAssignments::default();
+        let mut path = self.path_assignments(db);
         self.abstract_one_inner(
             db,
             // Remove any node that constrains some other typevar than `bound_typevar`, and any
@@ -2077,7 +2159,6 @@ impl<'db> InteriorNode<'db> {
                 }
                 false
             },
-            map,
             &mut path,
         )
     }
@@ -2086,7 +2167,6 @@ impl<'db> InteriorNode<'db> {
         self,
         db: &'db dyn Db,
         should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
-        map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
@@ -2108,13 +2188,10 @@ impl<'db> InteriorNode<'db> {
             let if_true = path
                 .walk_edge(
                     db,
-                    map,
                     self_constraint.when_true(),
                     self_source_order,
                     |path, new_range| {
-                        let branch =
-                            self.if_true(db)
-                                .abstract_one_inner(db, should_remove, map, path);
+                        let branch = self.if_true(db).abstract_one_inner(db, should_remove, path);
                         path.assignments[new_range]
                             .iter()
                             .filter(|(assignment, _)| {
@@ -2134,13 +2211,12 @@ impl<'db> InteriorNode<'db> {
             let if_false = path
                 .walk_edge(
                     db,
-                    map,
                     self_constraint.when_false(),
                     self_source_order,
                     |path, new_range| {
-                        let branch =
-                            self.if_false(db)
-                                .abstract_one_inner(db, should_remove, map, path);
+                        let branch = self
+                            .if_false(db)
+                            .abstract_one_inner(db, should_remove, path);
                         path.assignments[new_range]
                             .iter()
                             .filter(|(assignment, _)| {
@@ -2163,24 +2239,19 @@ impl<'db> InteriorNode<'db> {
             let if_true = path
                 .walk_edge(
                     db,
-                    map,
                     self_constraint.when_true(),
                     self_source_order,
-                    |path, _| {
-                        self.if_true(db)
-                            .abstract_one_inner(db, should_remove, map, path)
-                    },
+                    |path, _| self.if_true(db).abstract_one_inner(db, should_remove, path),
                 )
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
                 .walk_edge(
                     db,
-                    map,
                     self_constraint.when_false(),
                     self_source_order,
                     |path, _| {
                         self.if_false(db)
-                            .abstract_one_inner(db, should_remove, map, path)
+                            .abstract_one_inner(db, should_remove, path)
                     },
                 )
                 .unwrap_or(Node::AlwaysFalse);
@@ -2228,35 +2299,18 @@ impl<'db> InteriorNode<'db> {
         }
     }
 
-    /// Returns a sequent map for this BDD, which records the relationships between the constraints
-    /// that appear in the BDD.
-    #[salsa::tracked(
-        returns(ref),
-        cycle_initial=sequent_map_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
-    fn sequent_map(self, db: &'db dyn Db) -> SequentMap<'db> {
-        tracing::trace!(
-            target: "ty_python_semantic::types::constraints::SequentMap",
-            constraints = %Node::Interior(self).display(db),
-            "create sequent map",
-        );
-
+    fn path_assignments(self, db: &'db dyn Db) -> PathAssignments<'db> {
         // Sort the constraints in this BDD by their `source_order`s before adding them to the
         // sequent map. This ensures that constraints appear in the sequent map in a stable order.
         // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
         // unstable sort is fine.
-        let mut constraints = Vec::new();
+        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
         Node::Interior(self).for_each_constraint(db, &mut |constraint, source_order| {
             constraints.push((constraint, source_order));
         });
         constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
 
-        let mut map = SequentMap::default();
-        for (constraint, _) in constraints {
-            map.add(db, constraint);
-        }
-        map
+        PathAssignments::new(constraints.into_iter().map(|(constraint, _)| constraint))
     }
 
     /// Returns a simplified version of a BDD.
@@ -2665,14 +2719,6 @@ impl<'db> InteriorNode<'db> {
     }
 }
 
-fn sequent_map_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: InteriorNode<'db>,
-) -> SequentMap<'db> {
-    SequentMap::default()
-}
-
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
 /// must provide an assignment for each variable present in the BDD.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update)]
@@ -2802,7 +2848,19 @@ impl<'db> ConstraintAssignment<'db> {
 ///
 /// - `C → D`: This indicates that `C` on its own is enough to imply `D`. Any path that assumes `C`
 ///   holds but `D` does _not_ is impossible and can be pruned.
-#[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+///
+/// Sequent maps are primarily used when walking a BDD path with a [`PathAssignments`]. The
+/// `PathAssignments` will hold a sequent map containing all of the constraints that are
+/// encountered during the walk. It builds up its sequent map lazily, so that it only has to
+/// include sequents for the constraints that are actually encountered. However, we also don't want
+/// to perform duplicate work if we perform multiple BDD walks on the same constraint set. The
+/// [`for_constraint`][Self::for_constraint] and [`for_constraint_pair`][Self::for_constraint_pair]
+/// methods are salsa-tracked, to ensure that we only perform them once for any particular
+/// constraint or pair of constraints. `PathAssignments` invokes these methods when it encounters a
+/// new constraint, and then merges those cached sequents into its own sequent map. (That means we
+/// also share the work of calculating the sequent map across `PathAssignments` for _different_
+/// constraint sets.)
+#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 struct SequentMap<'db> {
     /// Sequents of the form `¬C₁ → false`
     single_tautologies: FxHashSet<ConstrainedTypeVar<'db>>,
@@ -2815,54 +2873,79 @@ struct SequentMap<'db> {
     >,
     /// Sequents of the form `C → D`
     single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxOrderSet<ConstrainedTypeVar<'db>>>,
-    /// Constraints that we have already processed
-    processed: FxHashSet<ConstrainedTypeVar<'db>>,
-    /// Constraints that enqueued to be processed
-    enqueued: Vec<ConstrainedTypeVar<'db>>,
 }
 
 impl<'db> SequentMap<'db> {
-    fn add(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
-        self.enqueue_constraint(constraint);
-
-        while let Some(constraint) = self.enqueued.pop() {
-            // If we've already processed this constraint, we can skip it.
-            if !self.processed.insert(constraint) {
-                continue;
-            }
-
-            // First see if we can create any sequents from the constraint on its own.
+    /// Returns a sequent map containing the sequents that we can infer from a single constraint in
+    /// isolation. This method is salsa-tracked so that we only perform this work once per
+    /// constraint.
+    fn for_constraint(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> &'db Self {
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn for_constraint_inner<'db>(
+            db: &'db dyn Db,
+            constraint: ConstrainedTypeVar<'db>,
+        ) -> SequentMap<'db> {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 constraint = %constraint.display(db),
                 "add sequents for constraint",
             );
-            self.add_sequents_for_single(db, constraint);
-
-            // Then check this constraint against all of the other ones we've seen so far, seeing
-            // if they're related to each other.
-            let processed = std::mem::take(&mut self.processed);
-            for other in &processed {
-                if constraint != *other {
-                    tracing::trace!(
-                        target: "ty_python_semantic::types::constraints::SequentMap",
-                        left = %constraint.display(db),
-                        right = %other.display(db),
-                        "add sequents for constraint pair",
-                    );
-                    self.add_sequents_for_pair(db, constraint, *other);
-                }
-            }
-            self.processed = processed;
+            let mut map = SequentMap::default();
+            map.add_sequents_for_single(db, constraint);
+            map
         }
+
+        for_constraint_inner(db, constraint)
     }
 
-    fn enqueue_constraint(&mut self, constraint: ConstrainedTypeVar<'db>) {
-        // If we've already processed this constraint, we can skip it.
-        if self.processed.contains(&constraint) {
-            return;
+    /// Returns a sequent map containing the sequents that we can infer from a pair of constraints.
+    /// This method is salsa-tracked so that we only perform this work once per constraint pair.
+    ///
+    /// (Note that this method is _not_ commutative; you should provide `left` and `right` in the
+    /// order that they appear in the source code, so that we can construct derived constraints
+    /// that retain that ordering.)
+    fn for_constraint_pair(
+        db: &'db dyn Db,
+        left: ConstrainedTypeVar<'db>,
+        right: ConstrainedTypeVar<'db>,
+    ) -> &'db Self {
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn for_constraint_pair_inner<'db>(
+            db: &'db dyn Db,
+            left: ConstrainedTypeVar<'db>,
+            right: ConstrainedTypeVar<'db>,
+        ) -> SequentMap<'db> {
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                left = %left.display(db),
+                right = %right.display(db),
+                "add sequents for constraint pair",
+            );
+            let mut map = SequentMap::default();
+            map.add_sequents_for_pair(db, left, right);
+            map
         }
-        self.enqueued.push(constraint);
+
+        for_constraint_pair_inner(db, left, right)
+    }
+
+    /// Merges the sequents from another sequent map into this one.
+    fn merge(&mut self, db: &'db dyn Db, other: &Self) {
+        self.single_tautologies.extend(&other.single_tautologies);
+        self.pair_impossibilities
+            .extend(&other.pair_impossibilities);
+        for ((ante1, ante2), post) in &other.pair_implications {
+            self.pair_implications
+                .entry(Self::pair_key(db, *ante1, *ante2))
+                .or_default()
+                .extend(post);
+        }
+        for (ante, post) in &other.single_implications {
+            self.single_implications
+                .entry(*ante)
+                .or_default()
+                .extend(post);
+        }
     }
 
     fn pair_key(
@@ -3006,7 +3089,6 @@ impl<'db> SequentMap<'db> {
         };
 
         self.add_single_implication(db, constraint, post_constraint);
-        self.enqueue_constraint(post_constraint);
     }
 
     fn add_sequents_for_pair(
@@ -3146,7 +3228,6 @@ impl<'db> SequentMap<'db> {
         let post_constraint =
             ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
         self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
-        self.enqueue_constraint(post_constraint);
     }
 
     fn add_mutual_sequents_for_same_typevars(
@@ -3196,7 +3277,6 @@ impl<'db> SequentMap<'db> {
                     _ => return,
                 };
                 self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
-                self.enqueue_constraint(post_constraint);
             };
 
         try_one_direction(left_constraint, right_constraint);
@@ -3250,7 +3330,6 @@ impl<'db> SequentMap<'db> {
                 );
                 self.add_single_implication(db, intersection_constraint, left_constraint);
                 self.add_single_implication(db, intersection_constraint, right_constraint);
-                self.enqueue_constraint(intersection_constraint);
             }
 
             // The sequent map only needs to include constraints that might appear in a BDD. If the
@@ -3337,12 +3416,29 @@ impl<'db> SequentMap<'db> {
 
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct PathAssignments<'db> {
-    assignments: FxOrderMap<ConstraintAssignment<'db>, usize>,
+    map: SequentMap<'db>,
+    assignments: FxIndexMap<ConstraintAssignment<'db>, usize>,
+    /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
+    /// ensures a stable order for all of the derived constraints that we create, while still
+    /// letting us create them lazily.)
+    discovered: FxIndexMap<ConstrainedTypeVar<'db>, bool>,
 }
 
 impl<'db> PathAssignments<'db> {
+    fn new(constraints: impl IntoIterator<Item = ConstrainedTypeVar<'db>>) -> Self {
+        let discovered = constraints
+            .into_iter()
+            .map(|constraint| (constraint, false))
+            .collect();
+        Self {
+            map: SequentMap::default(),
+            assignments: FxIndexMap::default(),
+            discovered,
+        }
+    }
+
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
     /// constraint that the BDD node checks, and whether we are following the `if_true` or
     /// `if_false` edge.
@@ -3368,7 +3464,6 @@ impl<'db> PathAssignments<'db> {
     fn walk_edge<R>(
         &mut self,
         db: &'db dyn Db,
-        map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
         source_order: usize,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
@@ -3388,7 +3483,7 @@ impl<'db> PathAssignments<'db> {
             edge = %assignment.display(db),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, map, assignment, source_order);
+        let found_conflict = self.add_assignment(db, assignment, source_order);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -3432,13 +3527,34 @@ impl<'db> PathAssignments<'db> {
         self.assignments.contains_key(&assignment)
     }
 
+    /// Update our sequent map to ensure that it holds all of the sequents that involve the given
+    /// constraint. We do not calculate the new sequents directly. Instead, we call
+    /// [`SequentMap::for_constraint`] and [`for_constraint_pair`][SequentMap::for_constraint_pair]
+    /// to calculate _and cache_ the constraints, so that if we walk another constraint set
+    /// containing this constraint, we reuse the work to calculate its sequents.
+    fn discover_constraint(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
+        // If we've already processed this constraint, we can skip it.
+        let existing = self.discovered.insert(constraint, true);
+        let already_processed = existing.is_some_and(|existing| existing);
+        if already_processed {
+            return;
+        }
+
+        let single_map = SequentMap::for_constraint(db, constraint);
+        self.map.merge(db, single_map);
+
+        for existing in self.discovered.keys().dropping_back(1) {
+            let pair_map = SequentMap::for_constraint_pair(db, *existing, constraint);
+            self.map.merge(db, pair_map);
+        }
+    }
+
     /// Adds a new assignment, along with any derived information that we can infer from the new
     /// assignment combined with the assignments we've already seen. If any of this causes the path
     /// to become invalid, due to a contradiction, returns a [`PathAssignmentConflict`] error.
     fn add_assignment(
         &mut self,
         db: &'db dyn Db,
-        map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
         source_order: usize,
     ) -> Result<(), PathAssignmentConflict> {
@@ -3474,7 +3590,9 @@ impl<'db> PathAssignments<'db> {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
-        for ante in &map.single_tautologies {
+        self.discover_constraint(db, assignment.constraint());
+
+        for ante in &self.map.single_tautologies {
             if self.assignment_holds(ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
                 // it's false.
@@ -3491,7 +3609,7 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for (ante1, ante2) in &map.pair_impossibilities {
+        for (ante1, ante2) in &self.map.pair_impossibilities {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
@@ -3510,22 +3628,27 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for ((ante1, ante2), posts) in &map.pair_implications {
+        let mut new_constraints = Vec::new();
+        for ((ante1, ante2), posts) in &self.map.pair_implications {
             for post in posts {
                 if self.assignment_holds(ante1.when_true())
                     && self.assignment_holds(ante2.when_true())
                 {
-                    self.add_assignment(db, map, post.when_true(), source_order)?;
+                    new_constraints.push(*post);
                 }
             }
         }
 
-        for (ante, posts) in &map.single_implications {
+        for (ante, posts) in &self.map.single_implications {
             for post in posts {
                 if self.assignment_holds(ante.when_true()) {
-                    self.add_assignment(db, map, post.when_true(), source_order)?;
+                    new_constraints.push(*post);
                 }
             }
+        }
+
+        for new_constraint in new_constraints {
+            self.add_assignment(db, new_constraint.when_true(), source_order)?;
         }
 
         Ok(())
@@ -4003,30 +4126,18 @@ mod tests {
     #[test]
     fn test_display_graph_output() {
         let expected = indoc! {r#"
-            (T = str) 3/4
-            ┡━₁ (T = bool) 4/4
-            │   ┡━₁ (U = str) 1/2
-            │   │   ┡━₁ (U = bool) 2/2
+            <0> (U = bool) 2/4
+            ┡━₁ <1> (U = str) 1/4
+            │   ┡━₁ <2> (T = bool) 4/4
+            │   │   ┡━₁ <3> (T = str) 3/3
             │   │   │   ┡━₁ always
             │   │   │   └─₀ always
-            │   │   └─₀ (U = bool) 2/2
+            │   │   └─₀ <4> (T = str) 3/3
             │   │       ┡━₁ always
             │   │       └─₀ never
-            │   └─₀ (U = str) 1/2
-            │       ┡━₁ (U = bool) 2/2
-            │       │   ┡━₁ always
-            │       │   └─₀ always
-            │       └─₀ (U = bool) 2/2
-            │           ┡━₁ always
-            │           └─₀ never
-            └─₀ (T = bool) 4/4
-                ┡━₁ (U = str) 1/2
-                │   ┡━₁ (U = bool) 2/2
-                │   │   ┡━₁ always
-                │   │   └─₀ always
-                │   └─₀ (U = bool) 2/2
-                │       ┡━₁ always
-                │       └─₀ never
+            │   └─₀ <2> SHARED
+            └─₀ <5> (U = str) 1/4
+                ┡━₁ <2> SHARED
                 └─₀ never
         "#}
         .trim_end();

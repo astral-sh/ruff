@@ -20,14 +20,15 @@ use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, sema
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
-use crate::types::infer::{infer_deferred_types, infer_scope_types};
+use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, todo_type,
+    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, infer_complete_scope_types,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -54,7 +55,7 @@ fn function_signature_expression_type<'db>(
         infer_deferred_types(db, definition).expression_type(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
-        infer_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(expression)
     }
 }
 
@@ -188,9 +189,13 @@ impl<'db> CallableSignature<'db> {
                 {
                     Some(CallableSignature::from_overloads(
                         callable.signatures(db).iter().map(|signature| Signature {
-                            generic_context: self_signature.generic_context.map(|context| {
-                                type_mapping.update_signature_generic_context(db, context)
-                            }),
+                            generic_context: GenericContext::merge_optional(
+                                db,
+                                signature.generic_context,
+                                self_signature.generic_context.map(|context| {
+                                    type_mapping.update_signature_generic_context(db, context)
+                                }),
+                            ),
                             definition: signature.definition,
                             parameters: if signature.parameters().is_top() {
                                 signature.parameters().clone()
@@ -414,7 +419,11 @@ impl<'db> CallableSignature<'db> {
                         db,
                         CallableSignature::from_overloads(other_signatures.iter().map(
                             |signature| {
-                                Signature::new(signature.parameters().clone(), Type::unknown())
+                                Signature::new_generic(
+                                    signature.generic_context,
+                                    signature.parameters().clone(),
+                                    Type::unknown(),
+                                )
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -446,7 +455,11 @@ impl<'db> CallableSignature<'db> {
                         db,
                         CallableSignature::from_overloads(self_signatures.iter().map(
                             |signature| {
-                                Signature::new(signature.parameters().clone(), Type::unknown())
+                                Signature::new_generic(
+                                    signature.generic_context,
+                                    signature.parameters().clone(),
+                                    Type::unknown(),
+                                )
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -699,7 +712,7 @@ impl<'db> Signature<'db> {
 
     pub(super) fn wrap_coroutine_return_type(self, db: &'db dyn Db) -> Self {
         let return_ty = KnownClass::CoroutineType
-            .to_specialized_instance(db, [Type::any(), Type::any(), self.return_ty]);
+            .to_specialized_instance(db, &[Type::any(), Type::any(), self.return_ty]);
         Self { return_ty, ..self }
     }
 
@@ -711,6 +724,19 @@ impl<'db> Signature<'db> {
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom() -> Self {
         Self::new(Parameters::bottom(), Type::Never)
+    }
+
+    /// Returns `true` if `Self` should be hidden from the generic context display.
+    ///
+    /// `Self` is hidden if it does not appear in:
+    /// 1. The return type
+    /// 2. Any explicitly annotated parameter (not inferred)
+    pub(crate) fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
+        !self.return_ty.contains_self(db)
+            && !self
+                .parameters()
+                .iter()
+                .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db))
     }
 
     pub(crate) fn with_inherited_generic_context(
@@ -1083,7 +1109,11 @@ impl<'db> Signature<'db> {
             let upper = Type::Callable(CallableType::new(
                 db,
                 CallableSignature::from_overloads(other.overloads.iter().map(|signature| {
-                    Signature::new(signature.parameters().clone(), Type::unknown())
+                    Signature::new_generic(
+                        signature.generic_context,
+                        signature.parameters().clone(),
+                        Type::unknown(),
+                    )
                 })),
                 CallableTypeKind::ParamSpecValue,
             ));
@@ -1339,7 +1369,8 @@ impl<'db> Signature<'db> {
                 (Some(self_bound_typevar), None) => {
                     let upper = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new(
+                        CallableSignature::single(Signature::new_generic(
+                            other.generic_context,
                             other.parameters.clone(),
                             Type::unknown(),
                         )),
@@ -1358,7 +1389,8 @@ impl<'db> Signature<'db> {
                 (None, Some(other_bound_typevar)) => {
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new(
+                        CallableSignature::single(Signature::new_generic(
+                            self.generic_context,
                             self.parameters.clone(),
                             Type::unknown(),
                         )),
@@ -2191,6 +2223,15 @@ pub(crate) struct Parameter<'db> {
     /// type semantics of the parameter.
     pub(crate) inferred_annotation: bool,
 
+    /// Variadic parameters can have starred annotations, e.g.
+    /// - `*args: *Ts`
+    /// - `*args: *tuple[int, ...]`
+    /// - `*args: *tuple[int, *tuple[str, ...], bytes]`
+    ///
+    /// The `*` prior to the type gives the annotation a different meaning,
+    /// so this must be propagated upwards.
+    has_starred_annotation: bool,
+
     kind: ParameterKind<'db>,
     pub(crate) form: ParameterForm,
 }
@@ -2200,6 +2241,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
+            has_starred_annotation: false,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -2212,6 +2254,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
+            has_starred_annotation: false,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -2224,6 +2267,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
+            has_starred_annotation: false,
             kind: ParameterKind::Variadic { name },
             form: ParameterForm::Value,
         }
@@ -2233,6 +2277,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
+            has_starred_annotation: false,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -2245,6 +2290,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: Type::unknown(),
             inferred_annotation: true,
+            has_starred_annotation: false,
             kind: ParameterKind::KeywordVariadic { name },
             form: ParameterForm::Value,
         }
@@ -2270,6 +2316,14 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    pub(crate) fn with_optional_default_type(self, default: Option<Type<'db>>) -> Self {
+        if let Some(default) = default {
+            self.with_default_type(default)
+        } else {
+            self
+        }
+    }
+
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
@@ -2293,6 +2347,7 @@ impl<'db> Parameter<'db> {
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
+            has_starred_annotation: self.has_starred_annotation,
             form: self.form,
         }
     }
@@ -2310,7 +2365,8 @@ impl<'db> Parameter<'db> {
             annotated_type,
             kind,
             form,
-            ..
+            has_starred_annotation,
+            inferred_annotation: _,
         } = self;
 
         // Ensure unions and intersections are ordered in the annotated type.
@@ -2351,6 +2407,7 @@ impl<'db> Parameter<'db> {
             // Normalize `inferred_annotation` to `false` since it's a display-only field
             // that doesn't affect type semantics.
             inferred_annotation: false,
+            has_starred_annotation: *has_starred_annotation,
             kind,
             form: *form,
         }
@@ -2364,6 +2421,7 @@ impl<'db> Parameter<'db> {
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
+            has_starred_annotation,
             inferred_annotation,
             kind,
             form,
@@ -2424,6 +2482,7 @@ impl<'db> Parameter<'db> {
         Some(Self {
             annotated_type,
             inferred_annotation: *inferred_annotation,
+            has_starred_annotation: *has_starred_annotation,
             kind,
             form: *form,
         })
@@ -2435,18 +2494,20 @@ impl<'db> Parameter<'db> {
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
-        let (annotated_type, inferred_annotation) = if let Some(annotation) = parameter.annotation()
-        {
-            (
-                function_signature_expression_type(db, definition, annotation),
-                false,
-            )
-        } else {
-            (Type::unknown(), true)
-        };
+        let (annotated_type, inferred_annotation, has_starred_annotation) =
+            if let Some(annotation) = parameter.annotation() {
+                (
+                    function_signature_expression_type(db, definition, annotation),
+                    false,
+                    annotation.is_starred_expr(),
+                )
+            } else {
+                (Type::unknown(), true, false)
+            };
         Self {
             annotated_type,
             kind,
+            has_starred_annotation,
             form: ParameterForm::Value,
             inferred_annotation,
         }
@@ -2496,6 +2557,12 @@ impl<'db> Parameter<'db> {
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     pub(crate) fn annotated_type(&self) -> Type<'db> {
         self.annotated_type
+    }
+
+    /// Return `true` if this parameter has a starred annotation,
+    /// e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...], bytes]`
+    pub(crate) fn has_starred_annotation(&self) -> bool {
+        self.has_starred_annotation
     }
 
     /// Kind of the parameter.

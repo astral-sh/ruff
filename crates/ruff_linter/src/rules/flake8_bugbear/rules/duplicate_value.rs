@@ -1,15 +1,15 @@
-use anyhow::{Context, Result};
+use ruff_diagnostics::{Applicability, Fix};
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
 use ruff_python_ast::comparable::HashableExpr;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::fix::edits;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for set literals that contain duplicate items.
@@ -27,6 +27,20 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Use instead:
 /// ```python
 /// {1, 2, 3}
+/// ```
+///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the
+/// original expression, potentially losing important context or documentation.
+///
+/// For example:
+/// ```python
+/// {
+///     1,
+///     2,
+///     # Comment
+///     1,
+/// }
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.271")]
@@ -68,51 +82,20 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
                     },
                     value.range(),
                 );
-
                 diagnostic.try_set_fix(|| {
-                    remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
+                    edits::remove_member(&set.elts, index, checker.locator().contents()).map(
+                        |edit| {
+                            let applicability = if checker.comment_ranges().intersects(edit.range())
+                            {
+                                Applicability::Unsafe
+                            } else {
+                                Applicability::Safe
+                            };
+                            Fix::applicable_edit(edit, applicability)
+                        },
+                    )
                 });
             }
         }
-    }
-}
-
-/// Remove the member at the given index from the [`ast::ExprSet`].
-fn remove_member(set: &ast::ExprSet, index: usize, source: &str) -> Result<Edit> {
-    if index < set.len() - 1 {
-        // Case 1: the expression is _not_ the last node, so delete from the start of the
-        // expression to the end of the subsequent comma.
-        // Ex) Delete `"a"` in `{"a", "b", "c"}`.
-        let mut tokenizer = SimpleTokenizer::starts_at(set.elts[index].end(), source);
-
-        // Find the trailing comma.
-        tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Comma)
-            .context("Unable to find trailing comma")?;
-
-        // Find the next non-whitespace token.
-        let next = tokenizer
-            .find(|token| {
-                token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
-            })
-            .context("Unable to find next token")?;
-
-        Ok(Edit::deletion(set.elts[index].start(), next.start()))
-    } else if index > 0 {
-        // Case 2: the expression is the last node, but not the _only_ node, so delete from the
-        // start of the previous comma to the end of the expression.
-        // Ex) Delete `"c"` in `{"a", "b", "c"}`.
-        let mut tokenizer = SimpleTokenizer::starts_at(set.elts[index - 1].end(), source);
-
-        // Find the trailing comma.
-        let comma = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Comma)
-            .context("Unable to find trailing comma")?;
-
-        Ok(Edit::deletion(comma.start(), set.elts[index].end()))
-    } else {
-        // Case 3: expression is the only node, so delete it.
-        // Ex) Delete `"a"` in `{"a"}`.
-        Ok(Edit::range_deletion(set.elts[index].range()))
     }
 }

@@ -228,9 +228,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypeAlias(_), _) => Ordering::Less,
         (_, Type::TypeAlias(_)) => Ordering::Greater,
 
-        (Type::TypedDict(left), Type::TypedDict(right)) => {
-            left.defining_class().cmp(&right.defining_class())
-        }
+        (Type::TypedDict(left), Type::TypedDict(right)) => left.cmp(right),
         (Type::TypedDict(_), _) => Ordering::Less,
         (_, Type::TypedDict(_)) => Ordering::Greater,
 

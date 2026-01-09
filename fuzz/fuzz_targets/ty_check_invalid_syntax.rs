@@ -100,7 +100,7 @@ impl SemanticDb for TestDb {
         &self.rule_selection
     }
 
-    fn analysis_settings(&self) -> &AnalysisSettings {
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
     }
 

@@ -69,6 +69,30 @@ def call_with_args(y: object, a: int, b: str) -> object:
     return None
 ```
 
+## Narrowing with named expressions (walrus operator)
+
+When `callable()` is used with a named expression, the target of the named expression should be
+narrowed.
+
+```py
+from typing import Any
+
+class Foo:
+    func: Any | None
+
+def f(foo: Foo):
+    first = getattr(foo, "func", None)
+    if callable(first):
+        reveal_type(first)  # revealed: Any & Top[(...) -> object]
+    else:
+        reveal_type(first)  # revealed: (Any & ~Top[(...) -> object]) | None
+
+    if callable(second := getattr(foo, "func", None)):
+        reveal_type(second)  # revealed: Any & Top[(...) -> object]
+    else:
+        reveal_type(second)  # revealed: (Any & ~Top[(...) -> object]) | None
+```
+
 ## Assignability of narrowed callables
 
 A narrowed callable `Top[Callable[..., object]]` should be assignable to `Callable[..., Any]`. This

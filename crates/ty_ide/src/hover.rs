@@ -242,7 +242,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         def my_func(
             a,
             b
@@ -297,7 +297,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         def my_func(
             a,
             b
@@ -366,7 +366,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -428,7 +428,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -603,7 +603,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -668,7 +668,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         bound method MyClass.my_method(
             a,
             b
@@ -1694,7 +1694,7 @@ def ab(a: int, *, c: int):
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -2248,7 +2248,7 @@ def function():
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -2642,13 +2642,13 @@ def function():
 
             Wow these are good docs!
             """
-        
+
         x = Foo()
         x.a<CURSOR>
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -2737,7 +2737,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
+        assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -3102,7 +3102,7 @@ def function():
         let test = cursor_test(
             r#"
         def a<CURSOR>b():
-            """wow cool docs""" 
+            """wow cool docs"""
             # and a comment that shouldn't be included
             """and docs"""
             return
@@ -3129,7 +3129,7 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-        3 |     """wow cool docs""" 
+        3 |     """wow cool docs"""
         4 |     # and a comment that shouldn't be included
           |
         "#);
@@ -3141,7 +3141,7 @@ def function():
             r#"
         def a<CURSOR>b():
             (
-                """wow cool docs""" 
+                """wow cool docs"""
                 """and docs"""
             )
             return
@@ -3169,7 +3169,7 @@ def function():
           |     |Cursor offset
           |     source
         3 |     (
-        4 |         """wow cool docs""" 
+        4 |         """wow cool docs"""
           |
         "#);
     }
@@ -3180,7 +3180,7 @@ def function():
             r#"
         def a<CURSOR>b():
             (
-                """wow cool docs""" 
+                """wow cool docs"""
                 # and a comment that shouldn't be included
                 """and docs"""
             )
@@ -3209,7 +3209,7 @@ def function():
           |     |Cursor offset
           |     source
         3 |     (
-        4 |         """wow cool docs""" 
+        4 |         """wow cool docs"""
           |
         "#);
     }
@@ -3831,6 +3831,55 @@ def function():
     }
 
     #[test]
+    fn hover_comprehension_type_context() {
+        let test = cursor_test(
+            r#"
+            a = [[n]<CURSOR> for n in [1, 2, 3]]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        list[Unknown | int]
+        ---------------------------------------------
+        ```python
+        list[Unknown | int]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:6
+          |
+        2 | a = [[n] for n in [1, 2, 3]]
+          |      ^^^- Cursor offset
+          |      |
+          |      source
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+            a: list[list[int | str]] = [[n]<CURSOR> for n in [1, 2, 3]]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        list[int | str]
+        ---------------------------------------------
+        ```python
+        list[int | str]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:29
+          |
+        2 | a: list[list[int | str]] = [[n] for n in [1, 2, 3]]
+          |                             ^^^- Cursor offset
+          |                             |
+          |                             source
+          |
+        ");
+    }
+
+    #[test]
     fn hover_submodule_import_from_use() {
         let test = CursorTest::builder()
             .source(
@@ -4162,6 +4211,34 @@ def function():
           |    |
           |    source
         3 |     pass
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_dunder_file() {
+        let test = cursor_test(
+            r#"
+        __fil<CURSOR>e__
+        "#,
+        );
+
+        // __file__ should be `str` when accessed within a module, not `str | None`
+        assert_snapshot!(test.hover(), @"
+        str
+        ---------------------------------------------
+        ```python
+        str
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:1
+          |
+        2 | __file__
+          | ^^^^^-^^
+          | |    |
+          | |    Cursor offset
+          | source
           |
         ");
     }

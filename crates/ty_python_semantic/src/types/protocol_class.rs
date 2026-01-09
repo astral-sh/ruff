@@ -16,9 +16,9 @@ use crate::{
     },
     semantic_index::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map},
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-        ClassType, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
-        KnownFunction, MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
+        FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
+        MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, StaticClassLiteral,
         Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
@@ -29,11 +29,11 @@ use crate::{
     },
 };
 
-impl<'db> ClassLiteral<'db> {
+impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
     pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
         self.is_protocol(db)
-            .then_some(ProtocolClass(ClassType::NonGeneric(self)))
+            .then_some(ProtocolClass(ClassType::NonGeneric(self.into())))
     }
 }
 
@@ -76,10 +76,12 @@ impl<'db> ProtocolClass<'db> {
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db)
-            .0
-            .known_function_decorators(db)
-            .contains(&KnownFunction::RuntimeCheckable)
+        self.static_class_literal(db)
+            .is_some_and(|(class_literal, _)| {
+                class_literal
+                    .known_function_decorators(db)
+                    .contains(&KnownFunction::RuntimeCheckable)
+            })
     }
 
     /// Iterate through the body of the protocol class. Check that all definitions
@@ -88,7 +90,10 @@ impl<'db> ProtocolClass<'db> {
     pub(super) fn validate_members(self, context: &InferContext) {
         let db = context.db();
         let interface = self.interface(db);
-        let body_scope = self.class_literal(db).0.body_scope(db);
+        let Some((class_literal, _)) = self.static_class_literal(db) else {
+            return;
+        };
+        let body_scope = class_literal.body_scope(db);
         let class_place_table = place_table(db, body_scope);
 
         for (symbol_id, mut bindings_iterator) in
@@ -104,7 +109,11 @@ impl<'db> ProtocolClass<'db> {
                 self.iter_mro(db)
                     .filter_map(ClassBase::into_class)
                     .any(|superclass| {
-                        let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+                        let Some((superclass_literal, _)) = superclass.static_class_literal(db)
+                        else {
+                            return false;
+                        };
+                        let superclass_scope = superclass_literal.body_scope(db);
                         let Some(scoped_symbol_id) =
                             place_table(db, superclass_scope).symbol_id(symbol_name)
                         else {
@@ -879,7 +888,7 @@ impl BoundOnClass {
     }
 }
 
-/// Inner Salsa query for [`ProtocolClassLiteral::interface`].
+/// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(cycle_initial=proto_interface_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
@@ -887,15 +896,16 @@ fn cached_protocol_interface<'db>(
 ) -> ProtocolInterface<'db> {
     let mut members = BTreeMap::default();
 
-    for (parent_protocol, specialization) in class
+    for (parent_scope, specialization) in class
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
         .filter_map(|class| {
-            let (class, specialization) = class.class_literal(db);
-            Some((class.into_protocol_class(db)?, specialization))
+            let (class_literal, specialization) = class.static_class_literal(db)?;
+            let protocol_class = class_literal.into_protocol_class(db)?;
+            let parent_scope = protocol_class.static_class_literal(db)?.0.body_scope(db);
+            Some((parent_scope, specialization))
         })
     {
-        let parent_scope = parent_protocol.class_literal(db).0.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
         let place_table = place_table(db, parent_scope);
         let mut direct_members = FxHashMap::default();

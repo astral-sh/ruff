@@ -606,3 +606,424 @@ class Bar(Foo):
     @overload
     def method2(self, x: str) -> str: ...
 ```
+
+## A `@final` class must implement all abstract methods
+
+A class decorated with `@final` cannot be subclassed. Therefore, if such a class has abstract
+methods, those methods must be implemented in the final class itself - there's no other way to
+provide implementations.
+
+At runtime, instantiation of classes with unimplemented abstract methods is only prevented for
+classes that have `ABCMeta` (or a subclass of it) as their metaclass. However, type checkers also
+enforce this for classes that do not use `ABCMeta`, since the intent for the class to be abstract is
+clear from the use of `@abstractmethod`.
+
+### Basic case with ABC
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int:
+        raise NotImplementedError
+
+@final
+class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
+    pass
+```
+
+### Multiple abstract methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+    @abstractmethod
+    def bar(self) -> str: ...
+    @abstractmethod
+    def baz(self) -> None: ...
+
+@final
+class MissingAll(Base):  # error: [abstract-method-in-final-class]
+    pass
+
+@final
+class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
+    def foo(self) -> int:
+        return 42
+
+    def bar(self) -> str:
+        return "hello"
+```
+
+### Protocol with abstract methods
+
+```py
+from abc import abstractmethod
+from typing import Protocol, final
+
+class MyProtocol(Protocol):
+    @abstractmethod
+    def method(self) -> int: ...
+
+@final
+class Implementer(MyProtocol):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Fully implemented final class is fine
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+    @abstractmethod
+    def bar(self) -> str: ...
+
+@final
+class FullyImplemented(Base):
+    def foo(self) -> int:
+        return 42
+
+    def bar(self) -> str:
+        return "hello"
+```
+
+### Abstract method in grandparent class
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class GrandParent(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+class Parent(GrandParent):
+    pass
+
+@final
+class Child(Parent):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Abstract method re-abstracted after concrete implementation
+
+An abstract method can be overridden as concrete in a middle class, then re-declared as abstract in
+a subclass. A `@final` class inheriting from that subclass must implement it.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class GreatGrandparent(ABC):
+    @abstractmethod
+    def f(self): ...
+
+class Grandparent(GreatGrandparent):
+    def f(self): ...
+
+class Parent(Grandparent):
+    @abstractmethod
+    def f(self): ...
+
+@final
+class Child(Parent):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Abstract method implemented via dynamic class
+
+A dynamic class created with `type()` can provide concrete implementations of abstract methods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+
+DynamicMiddle = type("DynamicMiddle", (Base,), {"foo": lambda self: 42})
+
+@final
+class Final(DynamicMiddle):  # No error; `foo` is implemented by `DynamicMiddle`
+    pass
+```
+
+### Non-final class with unimplemented abstract methods is fine
+
+Non-final classes are allowed to have unimplemented abstract methods, as they can be implemented by
+subclasses.
+
+```py
+from abc import ABC, abstractmethod
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+
+class Derived(Base):  # No error - not final, can be subclassed
+    pass
+```
+
+### Enum classes are implicitly final
+
+Enum classes cannot be subclassed if they have any members, so they are treated as final.
+
+```py
+from abc import abstractmethod
+from enum import Enum
+
+class Stringable:
+    @abstractmethod
+    def stringify(self) -> str: ...
+
+class MyEnum(Stringable, Enum):  # error: [abstract-method-in-final-class]
+    A = 1
+    B = 2
+```
+
+### A `@final` class that directly defines an abstract method
+
+A `@final` class that directly defines an `@abstractmethod` is equally invalid, since the method can
+never be implemented by a subclass.
+
+```py
+from abc import abstractmethod
+from typing import final
+
+@final
+class Broken:  # error: [abstract-method-in-final-class]
+    @abstractmethod
+    def foo(self) -> int: ...
+```
+
+### Abstract property
+
+A `@final` class must also implement abstract properties.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def value(self) -> int: ...
+
+@final
+class Good(Base):
+    @property
+    def value(self) -> int:
+        return 42
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+A property with an abstract setter (but concrete getter) is also abstract:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    def value(self) -> int:
+        return 42
+
+    @value.setter
+    @abstractmethod
+    def value(self, v: int) -> None: ...
+
+@final
+class Good(Base):
+    @Base.value.setter
+    def value(self, v: int) -> None:
+        pass
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+Similarly, a property with an abstract deleter is also abstract. However, we don't yet support
+property deleters, so this is a TODO test:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    def value(self) -> int:
+        return 42
+
+    @value.setter
+    def value(self, v: int) -> None:
+        pass
+
+    @value.deleter
+    @abstractmethod
+    def value(self) -> None: ...
+
+@final
+# TODO: should emit [abstract-method-in-final-class]
+class Bad(Base):
+    pass
+```
+
+### Binding overrides abstract property
+
+A binding like `f = 42` does override an abstract property, because the class attribute provides a
+concrete value that will be returned when accessing the property. An annotated assignment with a
+value (`f: int = 42`) also overrides the abstract property.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def f(self) -> int: ...
+
+@final
+class Child1(Base):
+    f = 42  # OK: binding overrides the abstract property
+
+@final
+class Child2(Base):
+    f: int = 42  # OK: annotated assignment with value also overrides
+```
+
+### Annotation doesn't override abstract method
+
+A simple annotation like `method: int` shadows the name but doesn't actually implement the abstract
+method. Attempting to instantiate the class will still fail at runtime.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    method: int
+```
+
+The same applies to abstract properties:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def f(self) -> int: ...
+
+@final
+class BadChild(Base):  # error: [abstract-method-in-final-class]
+    f: int
+```
+
+### Abstract classmethod
+
+A `@final` class must also implement abstract classmethods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @classmethod
+    @abstractmethod
+    def make(cls) -> "Base": ...
+
+@final
+class Good(Base):
+    @classmethod
+    def make(cls) -> "Good":
+        return cls()
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Abstract staticmethod
+
+A `@final` class must also implement abstract staticmethods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @staticmethod
+    @abstractmethod
+    def create() -> int: ...
+
+@final
+class Good(Base):
+    @staticmethod
+    def create() -> int:
+        return 42
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Deprecated abstract decorators
+
+The `abc.abstractproperty`, `abc.abstractclassmethod`, and `abc.abstractstaticmethod` decorators are
+deprecated since Python 3.3 and not currently detected in `@final` classes.
+
+```py
+from abc import (
+    ABC,
+    abstractproperty,  # error: [deprecated]
+    abstractclassmethod,  # error: [deprecated]
+    abstractstaticmethod,  # error: [deprecated]
+)
+from typing import final
+
+class Base(ABC):
+    @abstractproperty  # error: [deprecated]
+    def value(self) -> int:
+        return 0
+
+    @abstractclassmethod  # error: [deprecated]
+    def make(cls) -> "Base":
+        raise NotImplementedError
+
+    @abstractstaticmethod  # error: [deprecated]
+    def create() -> int:
+        return 0
+
+@final
+# TODO: should emit [abstract-method-in-final-class] for `value`, `make`, and `create`
+class Bad(Base):
+    pass
+```

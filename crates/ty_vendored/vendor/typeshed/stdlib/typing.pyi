@@ -1999,7 +1999,7 @@ if sys.version_info >= (3, 14):
         localns: Mapping[str, Any] | None = None,
         include_extras: bool = False,
         *,
-        format: Format | None = None,
+        format: Format | None = None,  # Default: Format.VALUE
     ) -> dict[str, Any]:  # AnnotationForm
         """Return type hints for an object.
 

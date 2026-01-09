@@ -1313,6 +1313,14 @@ pub enum Tuple<T> {
 }
 
 impl<T> Tuple<T> {
+    /// Returns the inner fixed-length tuple if this is a `Tuple::Fixed` variant.
+    pub(crate) fn as_fixed_length(&self) -> Option<&FixedLengthTuple<T>> {
+        match self {
+            Tuple::Fixed(tuple) => Some(tuple),
+            Tuple::Variable(_) => None,
+        }
+    }
+
     pub(crate) const fn homogeneous(element: T) -> Self {
         Self::Variable(VariableLengthTuple::homogeneous(element))
     }
@@ -1898,7 +1906,7 @@ impl<'db> TupleUnpacker<'db> {
             .into_all_elements_with_kind()
             .map(|builder| match builder {
                 TupleElement::Variable(builder) => builder.try_build().unwrap_or_else(|| {
-                    KnownClass::List.to_specialized_instance(self.db, [Type::unknown()])
+                    KnownClass::List.to_specialized_instance(self.db, &[Type::unknown()])
                 }),
                 TupleElement::Fixed(builder)
                 | TupleElement::Prefix(builder)
@@ -1927,7 +1935,7 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
             target.add_in_place(value);
         }
         self.variable_element_mut()
-            .add_in_place(KnownClass::List.to_specialized_instance(db, [values.variable()]));
+            .add_in_place(KnownClass::List.to_specialized_instance(db, &[values.variable()]));
         for (target, value) in
             (self.suffix_elements_mut().iter_mut()).zip(values.iter_suffix_elements())
         {

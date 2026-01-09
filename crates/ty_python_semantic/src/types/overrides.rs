@@ -16,7 +16,7 @@ use crate::{
         symbol::ScopedSymbolId, use_def_map,
     },
     types::{
-        ClassBase, ClassLiteral, ClassType, KnownClass, Type,
+        ClassBase, ClassType, KnownClass, StaticClassLiteral, Type,
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
@@ -45,7 +45,10 @@ const PROHIBITED_NAMEDTUPLE_ATTRS: &[&str] = &[
     "_source",
 ];
 
-pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
+// TODO: Support dynamic class literals. If we allow dynamic classes to define attributes in their
+// namespace dictionary, we should also check whether those attributes are valid overrides of
+// attributes in their superclasses.
+pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticClassLiteral<'db>) {
     let db = context.db();
     let configuration = OverrideRulesConfig::from(context);
     if configuration.no_rules_enabled() {
@@ -118,8 +121,10 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    let (literal, specialization) = class.class_literal(db);
-    let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
+    let Some((literal, specialization)) = class.static_class_literal(db) else {
+        return;
+    };
+    let class_kind = CodeGeneratorKind::from_class(db, literal.into(), specialization);
 
     // Check for prohibited `NamedTuple` attribute overrides.
     //
@@ -152,6 +157,11 @@ fn check_class_declaration<'db>(
     let mut liskov_diagnostic_emitted = false;
     let mut overridden_final_method = None;
 
+    // Track the first superclass that defines this method (the "immediate parent" for this method).
+    // We need this to check if parent itself already has an LSP violation with an ancestor.
+    // If so, we shouldn't report the same violation for the child class.
+    let mut immediate_parent_method: Option<(ClassType<'db>, Type<'db>)> = None;
+
     for class_base in class.iter_mro(db).skip(1) {
         let superclass = match class_base {
             ClassBase::Protocol | ClassBase::Generic => continue,
@@ -166,7 +176,11 @@ fn check_class_declaration<'db>(
             ClassBase::Class(class) => class,
         };
 
-        let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
+        let Some((superclass_literal, superclass_specialization)) =
+            superclass.static_class_literal(db)
+        else {
+            continue;
+        };
         let superclass_scope = superclass_literal.body_scope(db);
         let superclass_symbol_table = place_table(db, superclass_scope);
         let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
@@ -186,10 +200,13 @@ fn check_class_declaration<'db>(
             {
                 continue;
             }
-            method_kind =
-                CodeGeneratorKind::from_class(db, superclass_literal, superclass_specialization)
-                    .map(MethodKind::Synthesized)
-                    .unwrap_or_default();
+            method_kind = CodeGeneratorKind::from_class(
+                db,
+                superclass_literal.into(),
+                superclass_specialization,
+            )
+            .map(MethodKind::Synthesized)
+            .unwrap_or_default();
         }
 
         let Place::Defined(DefinedPlace {
@@ -204,6 +221,11 @@ fn check_class_declaration<'db>(
         };
 
         subclass_overrides_superclass_declaration = true;
+
+        // Record the first superclass that defines this method as the "immediate parent method"
+        if immediate_parent_method.is_none() {
+            immediate_parent_method = Some((superclass, superclass_type));
+        }
 
         if configuration.check_final_method_overridden() {
             overridden_final_method = overridden_final_method.or_else(|| {
@@ -271,9 +293,28 @@ fn check_class_declaration<'db>(
             continue;
         };
 
-        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_callable.into_type(db))
-        {
+        let superclass_type_as_type = superclass_type_as_callable.into_type(db);
+
+        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
             continue;
+        }
+
+        // If this superclass is not the immediate parent for this method,
+        // check if the immediate parent itself already has an LSP violation with this ancestor.
+        // If so, don't report the same violation for the child class -- it would be a false positive
+        // since the child cannot fix the violation without contradicting its immediate parent's contract.
+        // See: https://github.com/astral-sh/ty/issues/2000
+        if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
+            if immediate_parent != superclass {
+                // The immediate parent already defines this method and is different from the
+                // current ancestor we're checking. Check if the immediate parent's method
+                // is also incompatible with this ancestor.
+                if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
+                    // The immediate parent already has an LSP violation with this ancestor.
+                    // Don't report the same violation for the child.
+                    continue;
+                }
+            }
         }
 
         report_invalid_method_override(

@@ -8,7 +8,8 @@ use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::{ParameterKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, KnownUnion, Type, TypeContext, UnionType,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownUnion, Type,
+    TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasType, SemanticModel};
 use ruff_db::files::FileRange;
@@ -168,9 +169,9 @@ pub fn definitions_for_name<'db>(
                 // instead of `int` (hover only shows the docstring of the first definition).
                 .rev()
                 .filter_map(|ty| ty.as_nominal_instance())
-                .map(|instance| {
-                    let definition = instance.class_literal(db).definition(db);
-                    ResolvedDefinition::Definition(definition)
+                .filter_map(|instance| {
+                    let definition = instance.class_literal(db).definition(db)?;
+                    Some(ResolvedDefinition::Definition(definition))
                 })
                 .collect();
         }
@@ -266,7 +267,10 @@ pub fn definitions_for_attribute<'db>(
         let class_literal = match meta_type {
             Type::ClassLiteral(class_literal) => class_literal,
             Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
-                Some(cls) => cls.class_literal(db).0,
+                Some(cls) => match cls.static_class_literal(db) {
+                    Some((lit, _)) => ClassLiteral::Static(lit),
+                    None => continue,
+                },
                 None => continue,
             },
             _ => continue,
@@ -274,9 +278,9 @@ pub fn definitions_for_attribute<'db>(
 
         // Walk the MRO: include class and its ancestors, but stop when we find a match
         'scopes: for ancestor in class_literal
-            .iter_mro(db, None)
+            .iter_mro(db)
             .filter_map(ClassBase::into_class)
-            .map(|cls| cls.class_literal(db).0)
+            .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
         {
             let class_scope = ancestor.body_scope(db);
             let class_place_table = crate::semantic_index::place_table(db, class_scope);

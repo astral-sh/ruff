@@ -405,7 +405,8 @@ pub fn add_noqa_to_path(
     );
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+    let suppressions =
+        Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let diagnostics = check_path(
@@ -479,7 +480,8 @@ pub fn lint_only(
     );
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+    let suppressions =
+        Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
 
     // Generate diagnostics.
     let diagnostics = check_path(
@@ -596,7 +598,8 @@ pub fn lint_fix<'a>(
         );
 
         // Parse range suppression comments
-        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+        let suppressions =
+            Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
 
         // Generate diagnostics.
         let diagnostics = check_path(
@@ -978,7 +981,8 @@ mod tests {
             &locator,
             &indexer,
         );
-        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+        let suppressions =
+            Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
         let mut diagnostics = check_path(
             path,
             None,
