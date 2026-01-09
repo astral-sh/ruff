@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
@@ -500,13 +501,17 @@ impl<'db> GenericContext<'db> {
 
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = self.variables(db).map(Type::TypeVar).collect();
+        let types: Vec<Type> = self.variables(db).map(Type::TypeVar).collect();
         self.specialize(db, types)
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = vec![Type::unknown(); self.len(db)];
-        self.specialize(db, types.into())
+        match self.len(db) {
+            0 => self.specialize(db, &[]),
+            1 => self.specialize(db, &[Type::unknown(); 1]),
+            2 => self.specialize(db, &[Type::unknown(); 2]),
+            len => self.specialize(db, vec![Type::unknown(); len]),
+        }
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
@@ -545,11 +550,13 @@ impl<'db> GenericContext<'db> {
     /// otherwise, you will be left with a partial specialization. (Use
     /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
     /// in this generic context.)
-    pub(crate) fn specialize(
-        self,
-        db: &'db dyn Db,
-        types: Box<[Type<'db>]>,
-    ) -> Specialization<'db> {
+    pub(crate) fn specialize<'t, T>(self, db: &'db dyn Db, types: T) -> Specialization<'db>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
+        let types = types.into();
+
         assert_eq!(self.len(db), types.len());
         Specialization::new(db, self, types, None, None)
     }

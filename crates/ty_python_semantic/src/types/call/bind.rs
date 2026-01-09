@@ -888,7 +888,7 @@ impl<'db> Bindings<'db> {
                             {
                                 overload.set_return_type(
                                     KnownClass::Iterator
-                                        .to_specialized_instance(db, [enum_instance]),
+                                        .to_specialized_instance(db, &[enum_instance]),
                                 );
                             }
                         }
@@ -1232,7 +1232,7 @@ impl<'db> Bindings<'db> {
                                             UnionType::from_elements(db, member_names);
                                         overload.set_return_type(
                                             KnownClass::FrozenSet
-                                                .to_specialized_instance(db, [specialization]),
+                                                .to_specialized_instance(db, &[specialization]),
                                         );
                                     }
                                 }

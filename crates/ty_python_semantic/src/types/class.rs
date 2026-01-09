@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt::Write;
 use std::sync::{LazyLock, Mutex};
@@ -1091,7 +1092,7 @@ impl<'db> ClassType<'db> {
                             let mut tuple_elements = tuple.iter_all_elements();
                             iterable_parameter = iterable_parameter.with_annotated_type(
                                 KnownClass::Iterable
-                                    .to_specialized_instance(db, [tuple_elements.next().unwrap()]),
+                                    .to_specialized_instance(db, &[tuple_elements.next().unwrap()]),
                             );
                             assert_eq!(
                                 tuple_elements.next(),
@@ -2061,7 +2062,7 @@ impl<'db> ClassLiteral<'db> {
             let name = Type::string_literal(db, self.name(db));
             let bases = Type::heterogeneous_tuple(db, self.explicit_bases(db));
             let namespace = KnownClass::Dict
-                .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
 
             // TODO: Other keyword arguments?
             let arguments = CallArguments::positional([name, bases, namespace]);
@@ -2308,9 +2309,9 @@ impl<'db> ClassLiteral<'db> {
                 return Member {
                     inner: Place::declared(KnownClass::Dict.to_specialized_instance(
                         db,
-                        [
+                        &[
                             KnownClass::Str.to_instance(db),
-                            KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                            KnownClass::Field.to_specialized_instance(db, &[Type::any()]),
                         ],
                     ))
                     .with_qualifiers(TypeQualifiers::CLASS_VAR),
@@ -5197,18 +5198,26 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_specialized_class_type<'db>(
+    pub(crate) fn to_specialized_class_type<'t, 'db, T>(
         self,
         db: &'db dyn Db,
-        specialization: impl IntoIterator<Item = Type<'db>>,
-    ) -> Option<ClassType<'db>> {
-        fn to_specialized_class_type_impl<'db>(
+        specialization: T,
+    ) -> Option<ClassType<'db>>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
+        fn inner<'db>(
             db: &'db dyn Db,
             class: KnownClass,
-            class_literal: ClassLiteral<'db>,
-            specialization: Box<[Type<'db>]>,
-            generic_context: GenericContext<'db>,
-        ) -> ClassType<'db> {
+            specialization: Cow<[Type<'db>]>,
+        ) -> Option<ClassType<'db>> {
+            let Type::ClassLiteral(class_literal) = class.to_class_literal(db) else {
+                return None;
+            };
+
+            let generic_context = class_literal.generic_context(db)?;
+
             if specialization.len() != generic_context.len(db) {
                 // a cache of the `KnownClass`es that we have already seen mismatched-arity
                 // specializations for (and therefore that we've already logged a warning for)
@@ -5217,31 +5226,21 @@ impl KnownClass {
                 if MESSAGES.lock().unwrap().insert(class) {
                     tracing::info!(
                         "Wrong number of types when specializing {}. \
-                     Falling back to default specialization for the symbol instead.",
+                 Falling back to default specialization for the symbol instead.",
                         class.display(db)
                     );
                 }
-                return class_literal.default_specialization(db);
+                return Some(class_literal.default_specialization(db));
             }
 
-            class_literal
-                .apply_specialization(db, |_| generic_context.specialize(db, specialization))
+            Some(
+                class_literal
+                    .apply_specialization(db, |_| generic_context.specialize(db, specialization)),
+            )
         }
 
-        let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
-            return None;
-        };
-
-        let generic_context = class_literal.generic_context(db)?;
-        let types = specialization.into_iter().collect::<Box<[_]>>();
-
-        Some(to_specialized_class_type_impl(
-            db,
-            self,
-            class_literal,
-            types,
-            generic_context,
-        ))
+        let specialization = specialization.into();
+        inner(db, self, specialization)
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
@@ -5250,11 +5249,15 @@ impl KnownClass {
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
     #[track_caller]
-    pub(crate) fn to_specialized_instance<'db>(
+    pub(crate) fn to_specialized_instance<'t, 'db, T>(
         self,
         db: &'db dyn Db,
-        specialization: impl IntoIterator<Item = Type<'db>>,
-    ) -> Type<'db> {
+        specialization: T,
+    ) -> Type<'db>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
         debug_assert_ne!(
             self,
             KnownClass::Tuple,

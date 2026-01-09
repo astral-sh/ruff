@@ -429,7 +429,7 @@ impl Workspace {
             .into_iter()
             .map(|comp| {
                 let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
-                let kind = comp.kind(&self.db).map(CompletionKind::from);
+                let kind = comp.kind.map(CompletionKind::from);
                 let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
                     let range = Range::from_text_range(

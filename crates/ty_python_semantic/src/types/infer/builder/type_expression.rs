@@ -793,7 +793,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         todo_type!("specialized recursive generic type alias"),
                         generic_context.len(db),
                     )
-                    .collect(),
+                    .collect::<Vec<_>>(),
                 ),
             );
             return if in_type_expression {
@@ -1131,7 +1131,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         let ty = class.to_specialized_instance(
             self.db(),
-            args.iter().map(|node| self.infer_type_expression(node)),
+            args.iter()
+                .map(|node| self.infer_type_expression(node))
+                .collect::<Vec<_>>(),
         );
         if arguments.is_tuple_expr() {
             self.store_expression_type(arguments, ty);
