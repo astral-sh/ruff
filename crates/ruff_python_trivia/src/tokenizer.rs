@@ -93,8 +93,8 @@ pub fn lines_after(offset: TextSize, code: &str) -> u32 {
 /// own-line comments, and any intermediary newlines.
 pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> u32 {
     let mut newlines = 0u32;
-    for token in SimpleTokenizer::starts_at(offset, code) {
-        match token.kind() {
+    for token in SimpleTokenizer::starts_at(offset, code).kinds() {
+        match token {
             SimpleTokenKind::Newline => {
                 newlines += 1;
             }
@@ -118,11 +118,12 @@ pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> u32 {
 pub fn lines_after_ignoring_end_of_line_trivia(offset: TextSize, code: &str) -> u32 {
     // SAFETY: We don't support files greater than 4GB, so casting to u32 is safe.
     SimpleTokenizer::starts_at(offset, code)
-        .skip_while(|token| token.kind != SimpleTokenKind::Newline && token.kind.is_trivia())
-        .take_while(|token| {
-            token.kind == SimpleTokenKind::Newline || token.kind == SimpleTokenKind::Whitespace
+        .kinds()
+        .skip_while(|&token| token != SimpleTokenKind::Newline && token.is_trivia())
+        .take_while(|&token| {
+            token == SimpleTokenKind::Newline || token == SimpleTokenKind::Whitespace
         })
-        .filter(|token| token.kind == SimpleTokenKind::Newline)
+        .filter(|&token| token == SimpleTokenKind::Newline)
         .count() as u32
 }
 

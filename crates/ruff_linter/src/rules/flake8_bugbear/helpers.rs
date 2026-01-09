@@ -25,7 +25,8 @@ pub(super) fn at_last_top_level_expression_in_cell(
                 locator.contents(),
                 TextRange::new(current_statement_end, cell_range.end()),
             )
-            .all(|token| token.kind() == SimpleTokenKind::Semi || token.kind().is_trivia())
+            .kinds()
+            .all(|token| token == SimpleTokenKind::Semi || token.is_trivia())
         })
 }
 

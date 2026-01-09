@@ -1,5 +1,5 @@
 use ruff_formatter::FormatContext;
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
 use crate::MagicTrailingComma;
@@ -17,15 +17,10 @@ pub(crate) fn has_magic_trailing_comma(range: TextRange, context: &PyFormatConte
 /// Returns `true` if the range ends with a trailing comma.
 pub(crate) fn has_trailing_comma(range: TextRange, context: &PyFormatContext) -> bool {
     let first_token = SimpleTokenizer::new(context.source(), range)
+        .kinds()
         .skip_trivia()
         // Skip over any closing parentheses belonging to the expression
-        .find(|token| token.kind() != SimpleTokenKind::RParen);
+        .find(|&token| token != SimpleTokenKind::RParen);
 
-    matches!(
-        first_token,
-        Some(SimpleToken {
-            kind: SimpleTokenKind::Comma,
-            ..
-        })
-    )
+    first_token == Some(SimpleTokenKind::Comma)
 }

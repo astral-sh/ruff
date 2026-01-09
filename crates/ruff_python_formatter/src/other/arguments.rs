@@ -117,10 +117,11 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source: &str) -> bool {
     let mut has_seen_r_paren = false;
 
-    for token in
-        SimpleTokenizer::new(source, TextRange::new(argument.end(), call_end)).skip_trivia()
+    for token in SimpleTokenizer::new(source, TextRange::new(argument.end(), call_end))
+        .kinds()
+        .skip_trivia()
     {
-        match token.kind() {
+        match token {
             SimpleTokenKind::RParen => {
                 if has_seen_r_paren {
                     return true;
