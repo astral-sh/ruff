@@ -2537,7 +2537,7 @@ impl<'db> ClassLiteral<'db> {
                         // the `__set__` method can be called. We build a union of all possible options
                         // to account for possible overloads.
                         let mut value_types = UnionBuilder::new(db);
-                        for binding in &dunder_set.bindings(db) {
+                        for binding in dunder_set.bindings(db).iter() {
                             for overload in binding {
                                 if let Some(value_param) =
                                     overload.signature.parameters().get_positional(2)
