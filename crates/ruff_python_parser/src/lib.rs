@@ -525,7 +525,7 @@ pub trait AsMode {
 impl AsMode for PySourceType {
     fn as_mode(&self) -> Mode {
         match self {
-            PySourceType::Python | PySourceType::Stub => Mode::Module,
+            PySourceType::Python | PySourceType::Stub | PySourceType::Markdown => Mode::Module,
             PySourceType::Ipynb => Mode::Ipython,
         }
     }

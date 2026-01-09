@@ -89,6 +89,8 @@ pub enum PySourceType {
     Stub,
     /// The source is a Jupyter notebook (`.ipynb`).
     Ipynb,
+    /// The source is a Markdown file (`.md`).
+    Markdown,
 }
 
 impl PySourceType {
@@ -106,6 +108,7 @@ impl PySourceType {
             "pyi" => Self::Stub,
             "pyw" => Self::Python,
             "ipynb" => Self::Ipynb,
+            "md" => Self::Markdown,
             _ => return None,
         };
 
@@ -133,6 +136,10 @@ impl PySourceType {
 
     pub const fn is_ipynb(self) -> bool {
         matches!(self, Self::Ipynb)
+    }
+
+    pub const fn is_markdown(self) -> bool {
+        matches!(self, Self::Markdown)
     }
 }
 
