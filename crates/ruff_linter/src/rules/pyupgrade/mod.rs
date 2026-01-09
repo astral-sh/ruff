@@ -452,4 +452,17 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn up045_future_annotations_py39() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP045_py39.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY39.into(),
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationOptional)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }
