@@ -454,6 +454,35 @@ rule detect imports at the top of a file, but for notebooks it detects imports a
 **cell**. For a given rule, the rule's documentation will always specify if it has different
 behavior when applied to Jupyter Notebook files.
 
+## External AST linters
+
+Ruff can load additional AST-based linters from TOML definition files via the
+`[lint.ext-lint.<name>]` table. In addition to providing the `path` to the
+definition file and the optional `enabled` flag, each external linter may expose
+arbitrary configuration to its Python rules with a nested
+`[lint.ext-lint.<name>.config]` table. The values you set in this table are
+surfaced to your Python callbacks via the `ctx.config` mapping on the `Context`
+object:
+
+```toml title="pyproject.toml"
+[tool.ruff.lint.ext-lint.custom]
+path = "lint/custom.toml"
+
+[tool.ruff.lint.ext-lint.custom.config]
+enabled = true
+message = "Hello from Ruff!"
+```
+
+```python title="lint/custom_rules.py"
+def check_stmt(node, ctx):
+    if ctx.config.get("enabled"):
+        ctx.report(ctx.config["message"])
+```
+
+Only the configuration file that defines a given external linter (and configuration
+files in its subdirectories) may provide configuration for that linter. Attempting to
+configure a linter from a parent directory results in an error.
+
 ## Command-line interface
 
 Some configuration options can be provided or overridden via dedicated flags on the command line.
@@ -679,6 +708,22 @@ Miscellaneous:
       --exit-non-zero-on-fix
           Exit with a non-zero status code if any files were modified via fix,
           even if no lint violations remain
+
+External linter options:
+      --list-external-linters
+          List configured external AST linters and exit
+      --select-external <LINTER>
+          Restrict linting to the given external linter IDs
+      --extend-select-external <LINTER>
+          Enable additional external linter IDs or rule codes without replacing
+          existing selections
+      --ignore-external <LINTER>
+          Disable the given external linter IDs or rule codes
+      --extend-ignore-external <LINTER>
+          Disable additional external linter IDs or rule codes without
+          replacing existing ignores
+      --verify-external-linters
+          Validate external linter definitions without running lint checks
 
 Log levels:
   -v, --verbose  Enable verbose logging
