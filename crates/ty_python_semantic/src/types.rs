@@ -4761,13 +4761,62 @@ impl<'db> Type<'db> {
                     // the resulting element types. Negative elements don't affect iteration.
                     // We only fail if all elements fail to iterate; as long as at least one
                     // element can be iterated over, we can produce a result.
+                    //
+                    // For TypeVars, we replace them with their upper bound for iteration
+                    // purposes. Once we are iterating, the fact that it's a TypeVar no
+                    // longer matters: all that matters is the upper bound.
+                    //
+                    // For unions in an intersection context, if some elements are not
+                    // iterable, we iterate only the iterable parts. This is sound because
+                    // the intersection constrains the type to the iterable parts.
+                    // For example, for `T & tuple[object, ...]` where `T: tuple[int, ...] | int`,
+                    // iterating should give `int` (from the `tuple[int, ...]` part of T's bound),
+                    // not `object` (from ignoring T entirely).
+                    let try_iterate_element =
+                        |element: Type<'db>| -> Option<Cow<'db, TupleSpec<'db>>> {
+                            // Replace TypeVar with its upper bound for iteration purposes.
+                            let element = if let Type::TypeVar(tvar) = element {
+                                match tvar.typevar(db).bound_or_constraints(db) {
+                                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
+                                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                        constraints.as_type(db)
+                                    }
+                                    None => return None,
+                                }
+                            } else {
+                                element
+                            };
+
+                            // Try normal iteration.
+                            if let Ok(spec) =
+                                element.try_iterate_with_mode(db, EvaluationMode::Sync)
+                            {
+                                return Some(spec);
+                            }
+
+                            // For unions, try iterating only the iterable parts.
+                            if let Type::Union(union) = element {
+                                let mut iterable_specs = union.elements(db).iter().filter_map(
+                                    |elem| {
+                                        elem.try_iterate_with_mode(db, EvaluationMode::Sync).ok()
+                                    },
+                                );
+
+                                if let Some(first) = iterable_specs.next() {
+                                    let mut builder = TupleSpecBuilder::from(&*first);
+                                    for spec in iterable_specs {
+                                        builder = builder.union(db, &spec);
+                                    }
+                                    return Some(Cow::Owned(builder.build()));
+                                }
+                            }
+
+                            None
+                        };
+
                     let mut specs_iter = intersection
                         .positive_elements_or_object(db)
-                        .filter_map(|element| {
-                            element
-                                .try_iterate_with_mode(db, EvaluationMode::Sync)
-                                .ok()
-                        });
+                        .filter_map(try_iterate_element);
                     let first_spec = specs_iter.next()?;
                     let mut builder = TupleSpecBuilder::from(&*first_spec);
                     for spec in specs_iter {
