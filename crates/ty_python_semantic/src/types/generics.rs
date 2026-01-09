@@ -66,12 +66,26 @@ pub(crate) fn bind_typevar<'db>(
 ) -> Option<BoundTypeVarInstance<'db>> {
     // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It is always bound to the outermost method in the containing class.
     if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
-        for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
-            if outer.kind().is_class() {
-                if let NodeWithScopeKind::Function(function) = inner.node() {
-                    let definition = index.expect_single_definition(function);
+        let binding_function =
+            typevar_binding_context.filter(|definition| definition.kind(db).is_function_def());
+        let mut function_in_class = None;
+        for (_, scope) in index.ancestor_scopes(containing_scope) {
+            match scope.node() {
+                NodeWithScopeKind::Function(function) => {
+                    function_in_class = Some(function);
+                }
+                NodeWithScopeKind::Class(class) => {
+                    if let Some(function) = function_in_class {
+                        let definition = index.expect_single_definition(function);
+                        return Some(typevar.with_binding_context(db, definition));
+                    }
+                    if let Some(binding_context) = binding_function {
+                        return Some(typevar.with_binding_context(db, binding_context));
+                    }
+                    let definition = index.expect_single_definition(class);
                     return Some(typevar.with_binding_context(db, definition));
                 }
+                _ => {}
             }
         }
     }
