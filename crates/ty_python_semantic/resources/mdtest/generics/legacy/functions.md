@@ -202,8 +202,9 @@ def f(x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type]
-reveal_type(f("string"))  # revealed: Unknown
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int & Unknown`, found `Literal["string"]`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`"
+reveal_type(f("string"))  # revealed: int & Unknown
 ```
 
 ## Inferring a constrained typevar
@@ -359,12 +360,13 @@ def accepts_t_or_int(x: T_str | int) -> T_str:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_int("a"))  # revealed: Literal["a"]
-reveal_type(accepts_t_or_int(1))  # revealed: Unknown
+reveal_type(accepts_t_or_int(1))  # revealed: str & Unknown
 
 class Unrelated: ...
 
 # error: [invalid-argument-type] "Argument type `Unrelated` does not satisfy upper bound `str` of type variable `T_str`"
-reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
+# error: [invalid-argument-type] "Argument to function `accepts_t_or_int` is incorrect: Expected `(str & Unknown) | int`, found `Unrelated`"
+reveal_type(accepts_t_or_int(Unrelated()))  # revealed: str & Unknown
 ```
 
 ```py
@@ -374,15 +376,17 @@ def accepts_t_or_list_of_t(x: T_str | list[T_str]) -> T_str:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
+# error: [invalid-argument-type] "Argument to function `accepts_t_or_list_of_t` is incorrect: Expected `(str & Unknown) | list[str & Unknown]`, found `Literal[1]`"
 # error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str`"
-reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
+reveal_type(accepts_t_or_list_of_t(1))  # revealed: str & Unknown
 
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
 
     # TODO: the error message here could be improved by referring to the second union element
+    # error: [invalid-argument-type] "Argument to function `accepts_t_or_list_of_t` is incorrect: Expected `(str & Unknown) | list[str & Unknown]`, found `list[int]`"
     # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str`"
-    reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+    reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: str & Unknown
 ```
 
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
@@ -519,15 +523,16 @@ class P(Generic[T]):
 def f(t: P[I_int] | P[S_str]) -> tuple[I_int, S_str]:
     raise NotImplementedError
 
-reveal_type(f(P[int]()))  # revealed: tuple[int, Unknown]
-reveal_type(f(P[str]()))  # revealed: tuple[Unknown, str]
+reveal_type(f(P[int]()))  # revealed: tuple[int, str & Unknown]
+reveal_type(f(P[str]()))  # revealed: tuple[int & Unknown, str]
 ```
 
 However, if we pass something that does not match _any_ union element, we do emit an error:
 
 ```py
 # error: [invalid-argument-type]
-reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
+# error: [invalid-argument-type]
+reveal_type(f(P[bytes]()))  # revealed: tuple[int & Unknown, str & Unknown]
 ```
 
 ## Inferring nested generic function calls

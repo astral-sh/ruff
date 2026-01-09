@@ -23,8 +23,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
+    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     UnionType, declaration_type, walk_type_var_bounds,
 };
@@ -648,24 +648,31 @@ impl<'db> GenericContext<'db> {
                 continue;
             }
 
-            let Some(default) = typevar.default_type(db) else {
-                continue;
-            };
+            if let Some(default) = typevar.default_type(db) {
+                // Typevars are only allowed to refer to _earlier_ typevars in their defaults.
+                // (This is statically enforced for PEP-695 contexts, and is explicitly called out
+                // as a requirement for legacy contexts.)
+                let specialization = ApplySpecialization::Partial {
+                    generic_context: self,
+                    types: &expanded[0..idx],
+                    skip: None,
+                };
+                let default = default.apply_type_mapping(
+                    db,
+                    &TypeMapping::ApplySpecialization(specialization),
+                    TypeContext::default(),
+                );
+                expanded[idx] = default;
+            }
 
-            // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
-            // statically enforced for PEP-695 contexts, and is explicitly called out as a
-            // requirement for legacy contexts.)
-            let specialization = ApplySpecialization::Partial {
-                generic_context: self,
-                types: &expanded[0..idx],
-                skip: None,
-            };
-            let default = default.apply_type_mapping(
-                db,
-                &TypeMapping::ApplySpecialization(specialization),
-                TypeContext::default(),
-            );
-            expanded[idx] = default;
+            if let Some(upper_bound) = typevar.typevar(db).upper_bound(db) {
+                let ty = IntersectionBuilder::new(db)
+                    .add_positive(upper_bound)
+                    .add_positive(Type::unknown())
+                    .build();
+                expanded[idx] = ty;
+                continue;
+            }
         }
 
         expanded.into_boxed_slice()
