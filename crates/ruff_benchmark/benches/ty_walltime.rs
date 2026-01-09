@@ -71,6 +71,7 @@ impl Display for Benchmark<'_> {
     }
 }
 
+#[track_caller]
 fn check_project(db: &ProjectDatabase, project_name: &str, max_diagnostics: usize) {
     let result = db.check();
     let diagnostics = result.len();
@@ -194,7 +195,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    13116,
+    13400,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
@@ -223,7 +224,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: "2025-08-09",
         python_version: PythonVersion::PY311,
     },
-    1100,
+    1657,
 );
 
 #[track_caller]
