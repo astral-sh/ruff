@@ -453,3 +453,17 @@ def _(y: Y):
     if isinstance(y, dict):
         reveal_type(y)  # revealed: dict[str, X] | dict[str, Y]
 ```
+
+### Recursive alias with tuple - stack overflow test (issue 2470)
+
+This test case used to cause a stack overflow. The returned type `list[int]` is not assignable to
+`RecursiveT = int | tuple[RecursiveT, ...]`, so we get an error.
+
+```py
+type RecursiveT = int | tuple[RecursiveT, ...]
+
+def foo(a: int, b: int) -> RecursiveT:
+    some_intermediate_var = (a, b)
+    # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
+    return list(some_intermediate_var)
+```

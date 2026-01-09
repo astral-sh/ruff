@@ -3,7 +3,7 @@
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
 use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
-use crate::session::{InitializationOptions, Session, warn_about_unknown_options};
+use crate::session::{ClientName, InitializationOptions, Session, warn_about_unknown_options};
 use anyhow::Context;
 use lsp_server::Connection;
 use lsp_types::{ClientCapabilities, InitializeParams, MessageType, Url};
@@ -47,6 +47,7 @@ impl Server {
             initialization_options,
             capabilities: client_capabilities,
             workspace_folders,
+            client_info,
             ..
         } = serde_json::from_value(init_value)
             .context("Failed to deserialize initialization parameters")?;
@@ -65,6 +66,7 @@ impl Server {
             tracing::error!("Failed to deserialize initialization options: {error}");
         }
 
+        tracing::debug!("Client info: {client_info:#?}");
         tracing::debug!("Initialization options: {initialization_options:#?}");
 
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
@@ -155,6 +157,7 @@ impl Server {
                 workspace_urls,
                 initialization_options,
                 native_system,
+                ClientName::from(client_info),
                 in_test,
             )?,
         })

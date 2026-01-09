@@ -1,0 +1,58 @@
+# Build ruff_wasm for npm.
+#
+# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a local
+# artifacts job within `cargo-dist`.
+name: "Build wasm"
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - .github/workflows/build-wasm.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  build:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [web, bundler, nodejs]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
+        with:
+          version: v0.13.1
+      - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
+      - name: "Run wasm-pack build"
+        run: wasm-pack build --target ${{ matrix.target }} crates/ruff_wasm
+      - name: "Rename generated package"
+        run: | # Replace the package name w/ jq
+          jq '.name="@astral-sh/ruff-wasm-${{ matrix.target }}"' crates/ruff_wasm/pkg/package.json > /tmp/package.json
+          mv /tmp/package.json crates/ruff_wasm/pkg
+      - run: cp LICENSE crates/ruff_wasm/pkg # wasm-pack does not put the LICENSE file in the pkg
+      - name: "Upload wasm artifact"
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: artifacts-wasm-${{ matrix.target }}
+          path: crates/ruff_wasm/pkg

@@ -710,7 +710,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             match class_literal.generic_context(self.db()) {
                                 Some(generic_context) => {
                                     let db = self.db();
-                                    let specialize = |types: &[Option<Type<'db>>]| {
+                                    let specialize = &|types: &[Option<Type<'db>>]| {
                                         SubclassOfType::from(
                                             db,
                                             class_literal.apply_specialization(db, |_| {
@@ -793,7 +793,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         todo_type!("specialized recursive generic type alias"),
                         generic_context.len(db),
                     )
-                    .collect(),
+                    .collect::<Vec<_>>(),
                 ),
             );
             return if in_type_expression {
@@ -805,7 +805,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
         }
 
-        let specialize = |types: &[Option<Type<'db>>]| {
+        let specialize = &|types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(
                 db,
                 generic_context.specialize_partial(db, types.iter().copied()),
@@ -1045,12 +1045,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 value_ty
             }
             Type::ClassLiteral(class) => {
-                match class.generic_context(self.db()) {
-                    Some(generic_context) => {
+                match (class.generic_context(self.db()), class.as_static()) {
+                    (Some(generic_context), Some(static_class)) => {
                         let specialized_class = self.infer_explicit_class_specialization(
                             subscript,
                             value_ty,
-                            class,
+                            static_class,
                             generic_context,
                         );
 
@@ -1062,7 +1062,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                             .unwrap_or(Type::unknown())
                     }
-                    None => {
+                    _ => {
                         // TODO: emit a diagnostic if you try to specialize a non-generic class.
                         self.infer_type_expression(slice);
                         todo_type!("specialized non-generic class")
@@ -1131,7 +1131,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         let ty = class.to_specialized_instance(
             self.db(),
-            args.iter().map(|node| self.infer_type_expression(node)),
+            args.iter()
+                .map(|node| self.infer_type_expression(node))
+                .collect::<Vec<_>>(),
         );
         if arguments.is_tuple_expr() {
             self.store_expression_type(arguments, ty);

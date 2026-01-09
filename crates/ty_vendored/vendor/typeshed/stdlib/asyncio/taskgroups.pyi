@@ -38,10 +38,24 @@ class TaskGroup:
 
     async def __aenter__(self) -> Self: ...
     async def __aexit__(self, et: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
-    def create_task(self, coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None) -> Task[_T]:
-        """Create a new task in this group and return it.
+    if sys.version_info >= (3, 14):
+        def create_task(
+            self,
+            coro: _CoroutineLike[_T],
+            *,
+            name: str | None = None,
+            context: Context | None = None,
+            eager_start: bool | None = None,
+        ) -> Task[_T]:
+            """Create a new task in this group and return it.
 
-        Similar to `asyncio.create_task`.
-        """
+            Similar to `asyncio.create_task`.
+            """
+    else:
+        def create_task(self, coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None) -> Task[_T]:
+            """Create a new task in this group and return it.
+
+            Similar to `asyncio.create_task`.
+            """
 
     def _on_task_done(self, task: Task[object]) -> None: ...

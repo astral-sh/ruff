@@ -29,6 +29,10 @@ use crate::{FixAvailability, Violation};
 ///         return f"{self.first_name} {self.last_name}"
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.property-decorators`
+///
 /// ## References
 /// - [Python documentation: The property class](https://docs.python.org/3/library/functions.html#property)
 #[derive(ViolationMetadata)]
@@ -62,7 +66,8 @@ pub(crate) fn property_without_return(checker: &Checker, function_def: &StmtFunc
         ..
     } = function_def;
 
-    if !visibility::is_property(decorator_list, [], semantic)
+    let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
+    if !visibility::is_property(decorator_list, extra_property_decorators, semantic)
         || visibility::is_overload(decorator_list, semantic)
         || function_type::is_stub(function_def, semantic)
     {

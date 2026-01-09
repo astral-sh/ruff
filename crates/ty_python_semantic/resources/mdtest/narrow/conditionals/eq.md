@@ -12,6 +12,30 @@ def _(flag: bool):
         reveal_type(x)  # revealed: None
 ```
 
+## `None != x` (reversed operands)
+
+```py
+def _(flag: bool):
+    x = None if flag else 1
+
+    if None != x:
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: None
+```
+
+This also works for `==` with reversed operands:
+
+```py
+def _(flag: bool):
+    x = None if flag else 1
+
+    if None == x:
+        reveal_type(x)  # revealed: None
+    else:
+        reveal_type(x)  # revealed: Literal[1]
+```
+
 ## `!=` for other singleton types
 
 ### Bool

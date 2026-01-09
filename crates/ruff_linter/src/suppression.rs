@@ -3,13 +3,13 @@ use core::fmt;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::whitespace::indentation;
+use ruff_python_index::Indexer;
 use rustc_hash::FxHashSet;
 use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
-use ruff_python_trivia::Cursor;
+use ruff_python_trivia::{Cursor, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
@@ -153,10 +153,15 @@ pub struct Suppressions {
 }
 
 impl Suppressions {
-    pub fn from_tokens(settings: &LinterSettings, source: &str, tokens: &Tokens) -> Suppressions {
+    pub fn from_tokens(
+        settings: &LinterSettings,
+        source: &str,
+        tokens: &Tokens,
+        indexer: &Indexer,
+    ) -> Suppressions {
         if is_range_suppressions_enabled(settings) {
             let builder = SuppressionsBuilder::new(source);
-            builder.load_from_tokens(tokens)
+            builder.load_from_tokens(tokens, indexer)
         } else {
             Suppressions::default()
         }
@@ -355,7 +360,6 @@ pub(crate) struct SuppressionsBuilder<'a> {
 
     valid: Vec<Suppression>,
     invalid: Vec<InvalidSuppression>,
-    errors: Vec<ParseError>,
 
     pending: Vec<PendingSuppressionComment<'a>>,
 }
@@ -368,74 +372,109 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    pub(crate) fn load_from_tokens(mut self, tokens: &Tokens) -> Suppressions {
-        let default_indent = "";
+    pub(crate) fn load_from_tokens(mut self, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
         let mut indents: Vec<&str> = vec![];
+        let mut errors = Vec::new();
 
-        // Iterate through tokens, tracking indentation, filtering trailing comments, and then
-        // looking for matching comments from the previous block when reaching a dedent token.
-        for (token_index, token) in tokens.iter().enumerate() {
-            match token.kind() {
-                TokenKind::Indent => {
-                    indents.push(self.source.slice(token));
-                }
-                TokenKind::Dedent => {
-                    self.match_comments(indents.last().copied().unwrap_or_default(), token.range());
-                    indents.pop();
-                }
-                TokenKind::Comment => {
-                    let mut parser = SuppressionParser::new(self.source, token.range());
-                    match parser.parse_comment() {
-                        Ok(comment) => {
-                            let indent = indentation(self.source, &comment.range);
-
-                            let Some(indent) = indent else {
-                                // trailing suppressions are not supported
-                                self.invalid.push(InvalidSuppression {
-                                    kind: InvalidSuppressionKind::Trailing,
-                                    comment,
-                                });
-                                continue;
-                            };
-
-                            // comment matches current block's indentation, or precedes an indent/dedent token
-                            if indent == indents.last().copied().unwrap_or_default()
-                                || tokens[token_index..]
-                                    .iter()
-                                    .find(|t| !t.kind().is_trivia())
-                                    .is_some_and(|t| {
-                                        matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
-                                    })
-                            {
-                                self.pending
-                                    .push(PendingSuppressionComment { indent, comment });
-                            } else {
-                                // weirdly indented? ¯\_(ツ)_/¯
-                                self.invalid.push(InvalidSuppression {
-                                    kind: InvalidSuppressionKind::Indentation,
-                                    comment,
-                                });
-                            }
-                        }
-                        Err(ParseError {
-                            kind: ParseErrorKind::NotASuppression,
-                            ..
-                        }) => {}
-                        Err(error) => {
-                            self.errors.push(error);
-                        }
+        let mut suppressions = indexer
+            .comment_ranges()
+            .iter()
+            .copied()
+            .filter_map(|comment_range| {
+                let mut parser = SuppressionParser::new(self.source, comment_range);
+                match parser.parse_comment() {
+                    Ok(comment) => Some(comment),
+                    Err(ParseError {
+                        kind: ParseErrorKind::NotASuppression,
+                        ..
+                    }) => None,
+                    Err(error) => {
+                        errors.push(error);
+                        None
                     }
                 }
-                _ => {}
+            })
+            .peekable();
+
+        'comments: while let Some(suppression) = suppressions.peek() {
+            indents.clear();
+
+            let (before, after) = tokens.split_at(suppression.range.start());
+            let last_indent = before
+                .iter()
+                .rfind(|token| token.kind() == TokenKind::Indent)
+                .map(|token| self.source.slice(token))
+                .unwrap_or_default();
+
+            indents.push(last_indent);
+
+            // Iterate through tokens, tracking indentation, filtering trailing comments, and then
+            // looking for matching comments from the previous block when reaching a dedent token.
+            for (token_index, token) in after.iter().enumerate() {
+                let current_indent = indents.last().copied().unwrap_or_default();
+                match token.kind() {
+                    TokenKind::Indent => {
+                        indents.push(self.source.slice(token));
+                    }
+                    TokenKind::Dedent => {
+                        self.match_comments(current_indent, token.range());
+
+                        indents.pop();
+
+                        if indents.is_empty() || self.pending.is_empty() {
+                            continue 'comments;
+                        }
+                    }
+                    TokenKind::Comment => {
+                        let Some(suppression) =
+                            suppressions.next_if(|suppression| suppression.range == token.range())
+                        else {
+                            continue;
+                        };
+
+                        let Some(indent) =
+                            indentation_at_offset(suppression.range.start(), self.source)
+                        else {
+                            // trailing suppressions are not supported
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::Trailing,
+                                comment: suppression,
+                            });
+                            continue;
+                        };
+
+                        // comment matches current block's indentation, or precedes an indent/dedent token
+                        if indent == current_indent
+                            || after[token_index..]
+                                .iter()
+                                .find(|t| !t.kind().is_trivia())
+                                .is_some_and(|t| {
+                                    matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
+                                })
+                        {
+                            self.pending.push(PendingSuppressionComment {
+                                indent,
+                                comment: suppression,
+                            });
+                        } else {
+                            // weirdly indented? ¯\_(ツ)_/¯
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::Indentation,
+                                comment: suppression,
+                            });
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
 
-        self.match_comments(default_indent, TextRange::up_to(self.source.text_len()));
+        self.match_comments("", TextRange::up_to(self.source.text_len()));
 
         Suppressions {
             valid: self.valid,
             invalid: self.invalid,
-            errors: self.errors,
+            errors,
         }
     }
 
@@ -691,6 +730,7 @@ mod tests {
 
     use insta::assert_debug_snapshot;
     use itertools::Itertools;
+    use ruff_python_index::Indexer;
     use ruff_python_parser::{Mode, ParseOptions, parse};
     use ruff_text_size::{TextLen, TextRange, TextSize};
     use similar::DiffableStr;
@@ -1585,10 +1625,12 @@ def bar():
         /// Parse all suppressions and errors in a module for testing
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
             let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
+            let indexer = Indexer::from_tokens(parsed.tokens(), source);
             let suppressions = Suppressions::from_tokens(
                 &LinterSettings::default().with_preview_mode(),
                 source,
                 parsed.tokens(),
+                &indexer,
             );
             DebugSuppressions {
                 source,

@@ -15,7 +15,7 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
-use ty_project::metadata::options::{EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
@@ -67,6 +67,7 @@ fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
 }
 
+#[expect(clippy::needless_update)]
 fn setup_tomllib_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
@@ -84,6 +85,10 @@ fn setup_tomllib_case() -> Case {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
+        }),
+        analysis: Some(AnalysisOptions {
+            respect_type_ignore_comments: Some(false),
+            ..AnalysisOptions::default()
         }),
         ..Options::default()
     });
@@ -755,7 +760,7 @@ fn datetype(criterion: &mut Criterion) {
             max_dep_date: "2025-07-04",
             python_version: PythonVersion::PY313,
         },
-        2,
+        4,
     );
 
     bench_project(&benchmark, criterion);

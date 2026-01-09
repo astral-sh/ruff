@@ -24,6 +24,7 @@ has another way to reference private data (besides global variables).
 """
 
 import sys
+import time
 from collections.abc import Callable
 from typing import Any, ClassVar, NamedTuple, type_check_only
 from typing_extensions import TypeAlias
@@ -59,7 +60,7 @@ class scheduler:
     timefunc: Callable[[], float]
     delayfunc: Callable[[float], object]
 
-    def __init__(self, timefunc: Callable[[], float] = ..., delayfunc: Callable[[float], object] = ...) -> None:
+    def __init__(self, timefunc: Callable[[], float] = time.monotonic, delayfunc: Callable[[float], object] = time.sleep) -> None:
         """Initialize a new instance, passing the time and delay
         functions
         """

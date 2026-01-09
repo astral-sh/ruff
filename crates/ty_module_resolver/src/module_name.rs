@@ -83,6 +83,24 @@ impl ModuleName {
         self.0.split('.')
     }
 
+    /// Returns the first component in this module name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().first_component(), "foo");
+    /// ```
+    #[must_use]
+    pub fn first_component(&self) -> &str {
+        // OK because `Self::is_valid_name` guarantees that there is at least
+        // one component in the module name.
+        self.components()
+            .next()
+            .expect("at least one module component")
+    }
+
     /// The name of this module's immediate parent, if it has a parent.
     ///
     /// # Examples

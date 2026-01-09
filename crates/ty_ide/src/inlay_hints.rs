@@ -2466,13 +2466,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:974:11
+           --> stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           ^^^^^^^^
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         info: Source
          --> main2.py:5:20
@@ -5675,13 +5675,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:974:11
+           --> stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           ^^^^^^^^
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         info: Source
           --> main2.py:13:37
@@ -6504,13 +6504,13 @@ mod tests {
         a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:690:7
+           --> stdlib/types.pyi:685:7
             |
-        689 | @final
-        690 | class WrapperDescriptorType:
+        684 | @final
+        685 | class WrapperDescriptorType:
             |       ^^^^^^^^^^^^^^^^^^^^^
-        691 |     @property
-        692 |     def __name__(self) -> str: ...
+        686 |     @property
+        687 |     def __name__(self) -> str: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6557,13 +6557,13 @@ mod tests {
         a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:704:7
+           --> stdlib/types.pyi:699:7
             |
-        703 | @final
-        704 | class MethodWrapperType:
+        698 | @final
+        699 | class MethodWrapperType:
             |       ^^^^^^^^^^^^^^^^^
-        705 |     @property
-        706 |     def __self__(self) -> object: ...
+        700 |     @property
+        701 |     def __self__(self) -> object: ...
             |
         info: Source
          --> main2.py:4:6

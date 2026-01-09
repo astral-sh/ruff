@@ -75,7 +75,7 @@ impl std::fmt::Display for IncludeExcludeFilter {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) enum GlobFilterCheckMode {
     /// The paths are checked top-to-bottom and inclusion is determined
     /// for each path during the traversal.

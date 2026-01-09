@@ -34,12 +34,12 @@ cargo install cargo-insta
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
-You can optionally install pre-commit hooks to automatically run the validation checks
+You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install pre-commit
-pre-commit install
+uv tool install prek
+prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run ty's test suite (via `cargo nextest run`),
@@ -66,7 +66,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 cargo test  # Rust testing
-uvx pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally

@@ -90,16 +90,7 @@ def parsedate_tz(data: None) -> None:
 
 @overload
 def parsedate_tz(data: str) -> _PDTZ | None: ...
-
-if sys.version_info >= (3, 10):
-    @overload
-    def parsedate_to_datetime(data: None) -> None: ...
-    @overload
-    def parsedate_to_datetime(data: str) -> datetime.datetime: ...
-
-else:
-    def parsedate_to_datetime(data: str) -> datetime.datetime: ...
-
+def parsedate_to_datetime(data: str) -> datetime.datetime: ...
 def mktime_tz(data: _PDTZ) -> int:
     """Turn a 10-tuple as returned by parsedate_tz() into a POSIX timestamp."""
 

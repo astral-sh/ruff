@@ -945,7 +945,7 @@ impl ReachabilityConstraints {
 
                 match imported_symbol(
                     db,
-                    referenced_file,
+                    Some(referenced_file),
                     symbol.name(),
                     requires_explicit_reexport,
                 )

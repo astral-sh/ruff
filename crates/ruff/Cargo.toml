@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.14.10"
+version = "0.14.13"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
@@ -48,6 +48,7 @@ colored = { workspace = true }
 filetime = { workspace = true }
 globwalk = { workspace = true }
 ignore = { workspace = true }
+indexmap = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 jiff = { workspace = true }

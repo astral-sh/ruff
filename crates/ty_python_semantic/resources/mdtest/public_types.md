@@ -339,7 +339,7 @@ class A: ...
 
 def f(x: A):
     # TODO: no error
-    # error: [invalid-assignment] "Object of type `mdtest_snippet.A @ src/mdtest_snippet.py:12 | mdtest_snippet.A @ src/mdtest_snippet.py:13` is not assignable to `mdtest_snippet.A @ src/mdtest_snippet.py:13`"
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.A @ src/mdtest_snippet.py:12:7 | mdtest_snippet.A @ src/mdtest_snippet.py:13:7` is not assignable to `mdtest_snippet.A @ src/mdtest_snippet.py:13:7`"
     x = A()
 ```
 

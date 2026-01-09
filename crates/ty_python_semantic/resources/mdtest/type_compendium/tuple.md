@@ -534,4 +534,34 @@ x: list[Literal[1, 2, 3]] = list((1, 2, 3))
 reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
 ```
 
+## Tuples with starred elements
+
+```py
+from typing import Literal, Sequence
+
+x = (1, *range(3), 3)
+reveal_type(x)  # revealed: tuple[Literal[1], *tuple[int, ...], Literal[3]]
+
+y = 1, 2
+
+reveal_type(("foo", *y))  # revealed: tuple[Literal["foo"], Literal[1], Literal[2]]
+
+aa: tuple[list[int], ...] = ([42], *{[56], [78]}, [100])
+reveal_type(aa)  # revealed: tuple[list[int], list[int], list[int], list[int]]
+
+bb: tuple[list[Literal[42, 56]], ...] = ([42], *{[56, 42], [42]}, [42, 42, 56])
+reveal_type(bb)  # revealed: tuple[list[Literal[42, 56]], list[Literal[42, 56]], list[Literal[42, 56]], list[Literal[42, 56]]]
+
+reveal_type((*[],))  # revealed: tuple[()]
+reveal_type((42, *[], 56, *[]))  # revealed: tuple[Literal[42], Literal[56]]
+
+tup: Sequence[str] = (*{"foo": 42, "bar": 56},)
+
+# TODO: `tuple[str, str]` would be better, given the type annotation
+reveal_type(tup)  # revealed: tuple[Unknown | str, Unknown | str]
+
+def f(x: list[int]):
+    reveal_type((42, 56, *x, 97))  # revealed: tuple[Literal[42], Literal[56], *tuple[int, ...], Literal[97]]
+```
+
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

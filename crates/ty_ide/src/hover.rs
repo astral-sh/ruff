@@ -4166,6 +4166,34 @@ def function():
         ");
     }
 
+    #[test]
+    fn hover_dunder_file() {
+        let test = cursor_test(
+            r#"
+        __fil<CURSOR>e__
+        "#,
+        );
+
+        // __file__ should be `str` when accessed within a module, not `str | None`
+        assert_snapshot!(test.hover(), @"
+        str
+        ---------------------------------------------
+        ```python
+        str
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:1
+          |
+        2 | __file__
+          | ^^^^^-^^
+          | |    |
+          | |    Cursor offset
+          | source
+          |
+        ");
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;

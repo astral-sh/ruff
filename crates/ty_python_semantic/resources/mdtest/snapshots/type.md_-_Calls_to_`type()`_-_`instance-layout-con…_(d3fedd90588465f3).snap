@@ -1,0 +1,74 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: type.md - Calls to `type()` - `instance-layout-conflict` diagnostic snapshots
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A:
+ 2 |     __slots__ = ("x",)
+ 3 | 
+ 4 | class B:
+ 5 |     __slots__ = ("y",)
+ 6 | 
+ 7 | # error: [instance-layout-conflict]
+ 8 | X = type("X", (A, B), {})
+ 9 | class C:
+10 |     __slots__ = ("x",)
+11 | 
+12 | class D:
+13 |     __slots__ = ("y",)
+14 | 
+15 | bases: tuple[type[C], type[D]] = (C, D)
+16 | # error: [instance-layout-conflict]
+17 | Y = type("Y", bases, {})
+```
+
+# Diagnostics
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:8:5
+   |
+ 7 | # error: [instance-layout-conflict]
+ 8 | X = type("X", (A, B), {})
+   |     ^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+ 9 | class C:
+10 |     __slots__ = ("x",)
+   |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:8:16
+   |
+ 7 | # error: [instance-layout-conflict]
+ 8 | X = type("X", (A, B), {})
+   |                -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+   |                |
+   |                `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
+ 9 | class C:
+10 |     __slots__ = ("x",)
+   |
+info: rule `instance-layout-conflict` is enabled by default
+
+```
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:17:5
+   |
+15 | bases: tuple[type[C], type[D]] = (C, D)
+16 | # error: [instance-layout-conflict]
+17 | Y = type("Y", bases, {})
+   |     ^^^^^^^^^^^^^^^^^^^^ Bases `C` and `D` cannot be combined in multiple inheritance
+   |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+info: rule `instance-layout-conflict` is enabled by default
+
+```

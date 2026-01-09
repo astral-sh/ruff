@@ -1,4 +1,4 @@
-# Configuration for the actionlint tool, which we run via pre-commit
+# Configuration for the actionlint tool, which we run via prek
 # to verify the correctness of the syntax in our GitHub Actions workflows.
 
 self-hosted-runner:
@@ -17,4 +17,4 @@ self-hosted-runner:
 paths:
   ".github/workflows/mypy_primer.yaml":
     ignore:
-      - 'condition "false" is always evaluated to false. remove the if: section'
+      - 'constant expression "false" in condition. remove the if: section'

@@ -938,6 +938,18 @@ impl DefinitionKind<'_> {
             | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
         }
     }
+
+    /// Returns the value expression for assignment-based definitions.
+    ///
+    /// Returns `Some` for `Assignment` and `AnnotatedAssignment` (if it has a value),
+    /// `None` for all other definition kinds.
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        match self {
+            DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Hash, get_size2::GetSize)]

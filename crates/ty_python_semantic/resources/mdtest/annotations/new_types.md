@@ -235,8 +235,8 @@ Foo(3.14)
 Foo(42)
 Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected `int | float`, found `Literal["hello"]`"
 
-reveal_type(Foo(3.14).__class__)  # revealed: type[int] | type[float]
-reveal_type(Foo(42).__class__)  # revealed: type[int] | type[float]
+reveal_type(Foo(3.14).__class__)  # revealed: type[int | float]
+reveal_type(Foo(42).__class__)  # revealed: type[int | float]
 static_assert(is_assignable_to(Foo, float))
 static_assert(is_assignable_to(Foo, int | float))
 static_assert(is_assignable_to(Foo, int | float | None))
@@ -253,9 +253,9 @@ Bar(3.14)
 Bar(42)
 Bar("goodbye")  # error: [invalid-argument-type]
 
-reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int] | type[float] | type[complex]
-reveal_type(Bar(3.14).__class__)  # revealed: type[int] | type[float] | type[complex]
-reveal_type(Bar(42).__class__)  # revealed: type[int] | type[float] | type[complex]
+reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int | float | complex]
+reveal_type(Bar(3.14).__class__)  # revealed: type[int | float | complex]
+reveal_type(Bar(42).__class__)  # revealed: type[int | float | complex]
 static_assert(is_assignable_to(Bar, complex))
 static_assert(is_assignable_to(Bar, int | float | complex))
 static_assert(is_assignable_to(Bar, int | float | complex | None))

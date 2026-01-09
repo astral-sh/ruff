@@ -1,5 +1,115 @@
 # Changelog
 
+## 0.14.13
+
+Released on 2026-01-15.
+
+This is a follow-up release to 0.14.12. Because of an issue publishing the WASM packages, there is no GitHub release or Git tag for 0.14.12, although the package was published to PyPI. The contents of the 0.14.13 release are identical to 0.14.12.
+
+## 0.14.12
+
+Released on 2026-01-15.
+
+### Preview features
+
+- \[`flake8-blind-except`\] Allow more logging methods (`BLE001`) ([#22057](https://github.com/astral-sh/ruff/pull/22057))
+- \[`ruff`\] Respect `lint.pydocstyle.property-decorators` in `RUF066` ([#22515](https://github.com/astral-sh/ruff/pull/22515))
+
+### Bug fixes
+
+- Fix configuration path in `--show-settings` ([#22478](https://github.com/astral-sh/ruff/pull/22478))
+- Respect `fmt: skip` for multiple statements on the same logical line ([#22119](https://github.com/astral-sh/ruff/pull/22119))
+
+### Rule changes
+
+- \[`pydocstyle`\] Update Rust crate imperative to v1.0.7 (`D401`) ([#22519](https://github.com/astral-sh/ruff/pull/22519))
+- \[`isort`\] Insert imports in alphabetical order (`I002`) ([#22493](https://github.com/astral-sh/ruff/pull/22493))
+
+### Documentation
+
+- Add llms.txt support for documentation ([#22463](https://github.com/astral-sh/ruff/pull/22463))
+- Use prek in documentation and CI ([#22505](https://github.com/astral-sh/ruff/pull/22505))
+- \[`flake8-pytest-style`\] Add `check` parameter example to `PT017` docs ([#22546](https://github.com/astral-sh/ruff/pull/22546))
+- \[`ruff`\] Make example error out-of-the-box (`RUF103`) ([#22558](https://github.com/astral-sh/ruff/pull/22558))
+- \[`ruff`\] document `RUF100` trailing comment fix behavior ([#22479](https://github.com/astral-sh/ruff/pull/22479))
+
+### Other changes
+
+- wasm: Require explicit logging initialization ([#22587](https://github.com/astral-sh/ruff/pull/22587))
+
+### Contributors
+
+- [@terror](https://github.com/terror)
+- [@harupy](https://github.com/harupy)
+- [@Jkhall81](https://github.com/Jkhall81)
+- [@dhruvmanila](https://github.com/dhruvmanila)
+- [@lubaskinc0de](https://github.com/lubaskinc0de)
+- [@zanieb](https://github.com/zanieb)
+- [@MeGaGiGaGon](https://github.com/MeGaGiGaGon)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@renovate](https://github.com/renovate)
+- [@dylwil3](https://github.com/dylwil3)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@11happy](https://github.com/11happy)
+
+## 0.14.11
+
+Released on 2026-01-08.
+
+### Preview features
+
+- Consolidate diagnostics for matched disable/enable suppression comments ([#22099](https://github.com/astral-sh/ruff/pull/22099))
+- Report diagnostics for invalid/unmatched range suppression comments ([#21908](https://github.com/astral-sh/ruff/pull/21908))
+- \[`airflow`\] Passing positional argument into `airflow.lineage.hook.HookLineageCollector.create_asset` is not allowed (`AIR303`) ([#22046](https://github.com/astral-sh/ruff/pull/22046))
+- \[`refurb`\] Mark `FURB192` fix as always unsafe ([#22210](https://github.com/astral-sh/ruff/pull/22210))
+- \[`ruff`\] Add `non-empty-init-module` (`RUF067`) ([#22143](https://github.com/astral-sh/ruff/pull/22143))
+
+### Bug fixes
+
+- Fix GitHub format for multi-line diagnostics ([#22108](https://github.com/astral-sh/ruff/pull/22108))
+- \[`flake8-unused-arguments`\] Mark `**kwargs` in `TypeVar` as used (`ARG001`) ([#22214](https://github.com/astral-sh/ruff/pull/22214))
+
+### Rule changes
+
+- Add `help:` subdiagnostics for several Ruff rules that can sometimes appear to disagree with `ty` ([#22331](https://github.com/astral-sh/ruff/pull/22331))
+- \[`pylint`\] Demote `PLW1510` fix to display-only ([#22318](https://github.com/astral-sh/ruff/pull/22318))
+- \[`pylint`\] Ignore identical members (`PLR1714`) ([#22220](https://github.com/astral-sh/ruff/pull/22220))
+- \[`pylint`\] Improve diagnostic range for `PLC0206` ([#22312](https://github.com/astral-sh/ruff/pull/22312))
+- \[`ruff`\] Improve fix title for `RUF102` invalid rule code ([#22100](https://github.com/astral-sh/ruff/pull/22100))
+- \[`flake8-simplify`\]: Avoid unnecessary builtins import for `SIM105` ([#22358](https://github.com/astral-sh/ruff/pull/22358))
+
+### Configuration
+
+- Allow Python 3.15 as valid `target-version` value in preview ([#22419](https://github.com/astral-sh/ruff/pull/22419))
+- Check `required-version` before parsing rules ([#22410](https://github.com/astral-sh/ruff/pull/22410))
+- Include configured `src` directories when resolving graphs ([#22451](https://github.com/astral-sh/ruff/pull/22451))
+
+### Documentation
+
+- Update `T201` suggestion to not use root logger to satisfy `LOG015` ([#22059](https://github.com/astral-sh/ruff/pull/22059))
+- Fix `iter` example in unsafe fixes doc ([#22118](https://github.com/astral-sh/ruff/pull/22118))
+- \[`flake8_print`\] better suggestion for `basicConfig` in `T201` docs ([#22101](https://github.com/astral-sh/ruff/pull/22101))
+- \[`pylint`\] Restore the fix safety docs for `PLW0133` ([#22211](https://github.com/astral-sh/ruff/pull/22211))
+- Fix Jupyter notebook discovery info for editors ([#22447](https://github.com/astral-sh/ruff/pull/22447))
+
+### Contributors
+
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@cenviity](https://github.com/cenviity)
+- [@njhearp](https://github.com/njhearp)
+- [@cbachhuber](https://github.com/cbachhuber)
+- [@jelle-openai](https://github.com/jelle-openai)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@ValdonVitija](https://github.com/ValdonVitija)
+- [@BurntSushi](https://github.com/BurntSushi)
+- [@Jkhall81](https://github.com/Jkhall81)
+- [@PeterJCLaw](https://github.com/PeterJCLaw)
+- [@harupy](https://github.com/harupy)
+- [@amyreese](https://github.com/amyreese)
+- [@sjyangkevin](https://github.com/sjyangkevin)
+- [@woodruffw](https://github.com/woodruffw)
+
 ## 0.14.10
 
 Released on 2025-12-18.
