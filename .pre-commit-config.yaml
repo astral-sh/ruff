@@ -125,6 +125,7 @@ repos:
         args:
           - "-ignore=SC2129" # ignorable stylistic lint from shellcheck
           - "-ignore=SC2016" # another shellcheck lint: seems to have false positives?
+        language: golang # means renovate will also update `additional_dependencies`
         additional_dependencies:
           # actionlint has a shellcheck integration which extracts shell scripts in `run:` steps from GitHub Actions
           # and checks these with shellcheck. This is arguably its most useful feature,
