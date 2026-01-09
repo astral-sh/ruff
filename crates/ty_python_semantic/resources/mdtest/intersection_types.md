@@ -946,6 +946,60 @@ def mixed(
     reveal_type(i4)  # revealed: Any
 ```
 
+## Calling intersection types
+
+When calling an intersection type, we try to call each positive element with the given arguments.
+Elements where the call fails (wrong arguments, not callable, etc.) are discarded. The return type
+is the intersection of return types from the elements where the call succeeded.
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class Foo:
+    pass
+
+def _(
+    callable_and_any: Intersection[type[Foo], Callable[[], str]],
+) -> None:
+    # Both `type[Foo]` and `Callable[[], str]` are callable with no arguments.
+    # `type[Foo]()` returns `Foo`, `Callable[[], str]()` returns `str`.
+    # The return type is the intersection of `Foo` and `str`.
+    reveal_type(callable_and_any())  # revealed: Foo & str
+```
+
+If one element accepts the call but another rejects it (e.g., due to incompatible arguments),
+the call still succeeds using only the element that accepts:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class Bar:
+    pass
+
+def _(
+    x: Intersection[type[Bar], Callable[[int], str]],
+) -> None:
+    # `type[Bar]()` accepts no arguments and returns `Bar`.
+    # `Callable[[int], str]` requires an int argument, so it fails for this call.
+    # We discard the failing element and use only `type[Bar]`.
+    reveal_type(x())  # revealed: Bar
+```
+
+If no positive element is callable, the intersection is not callable:
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+def _(x: Intersection[A, B]) -> None:
+    # error: [call-non-callable] "Object of type `A & B` is not callable"
+    x()
+```
+
 ## Invalid
 
 ```py

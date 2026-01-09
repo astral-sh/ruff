@@ -4513,8 +4513,21 @@ impl<'db> Type<'db> {
                     .map(|element| element.bindings(db)),
             ),
 
-            Type::Intersection(_) => {
-                Binding::single(self, Signature::todo("Type::Intersection.call")).into()
+            Type::Intersection(intersection) => {
+                // For intersections, we try to call each positive element.
+                // Elements where the call fails are discarded.
+                // The return type is the intersection of return types from successful calls.
+                //
+                // We don't filter by "is callable" upfront because an element might be
+                // callable but reject the specific arguments. The actual filtering happens
+                // during check_types() when we know the arguments.
+                Bindings::from_intersection(
+                    db,
+                    self,
+                    intersection
+                        .positive_elements_or_object(db)
+                        .map(|element| element.bindings(db)),
+                )
             }
 
             Type::DataclassDecorator(_) => {

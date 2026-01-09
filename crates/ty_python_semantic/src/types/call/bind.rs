@@ -44,10 +44,10 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members, todo_type,
+    FieldInstance, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -55,10 +55,24 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSe
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 use ty_module_resolver::KnownModule;
 
-/// Binding information for a possible union of callables. At a call site, the arguments must be
-/// compatible with _all_ of the types in the union for the call to be valid.
+/// Indicates how return types from multiple callable elements should be combined.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum ReturnTypeAggregation {
+    /// Return types are combined using union (for union types).
+    #[default]
+    Union,
+    /// Return types are combined using intersection (for intersection types).
+    Intersection,
+}
+
+/// Binding information for a possible union or intersection of callables.
 ///
-/// It's guaranteed that the wrapped bindings have no errors.
+/// For unions: At a call site, the arguments must be compatible with _all_ of the types
+/// in the union for the call to be valid. Return types are combined using union.
+///
+/// For intersections: At a call site, we try each element and discard elements where the
+/// call fails. If at least one element succeeds, the call is valid. Return types are
+/// combined using intersection.
 #[derive(Debug, Clone)]
 pub(crate) struct Bindings<'db> {
     /// The type that is (hopefully) callable.
@@ -67,17 +81,20 @@ pub(crate) struct Bindings<'db> {
     /// The type of the instance being constructed, if this signature is for a constructor.
     constructor_instance_type: Option<Type<'db>>,
 
-    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
-    /// type.
+    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a single
+    /// callable type (not a union or intersection).
     elements: SmallVec<[CallableBinding<'db>; 1]>,
 
     /// Whether each argument will be used as a value and/or a type form in this call.
     argument_forms: ArgumentForms,
+
+    /// How return types from multiple elements should be combined.
+    return_type_aggregation: ReturnTypeAggregation,
 }
 
 impl<'db> Bindings<'db> {
-    /// Creates a new `Bindings` from an iterator of [`Bindings`]s. Panics if the iterator is
-    /// empty.
+    /// Creates a new `Bindings` from an iterator of [`Bindings`]s for a union type.
+    /// Panics if the iterator is empty.
     pub(crate) fn from_union<I>(callable_type: Type<'db>, elements: I) -> Self
     where
         I: IntoIterator<Item = Bindings<'db>>,
@@ -92,6 +109,31 @@ impl<'db> Bindings<'db> {
             elements,
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
+            return_type_aggregation: ReturnTypeAggregation::Union,
+        }
+    }
+
+    /// Creates a new `Bindings` from an iterator of [`Bindings`]s for an intersection type.
+    /// Panics if the iterator is empty.
+    pub(crate) fn from_intersection<I>(
+        _db: &'db dyn Db,
+        callable_type: Type<'db>,
+        elements: I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = Bindings<'db>>,
+    {
+        let elements: SmallVec<_> = elements
+            .into_iter()
+            .flat_map(|s| s.elements.into_iter())
+            .collect();
+        assert!(!elements.is_empty());
+        Self {
+            callable_type,
+            elements,
+            argument_forms: ArgumentForms::new(0),
+            constructor_instance_type: None,
+            return_type_aggregation: ReturnTypeAggregation::Intersection,
         }
     }
 
@@ -140,6 +182,7 @@ impl<'db> Bindings<'db> {
             argument_forms: self.argument_forms,
             constructor_instance_type: self.constructor_instance_type,
             elements: self.elements.into_iter().map(f).collect(),
+            return_type_aggregation: self.return_type_aggregation,
         }
     }
 
@@ -216,6 +259,21 @@ impl<'db> Bindings<'db> {
 
         self.evaluate_known_cases(db, argument_types, dataclass_field_specifiers);
 
+        // For intersection types, we filter out elements where the call fails.
+        // Only if ALL elements fail do we report an error.
+        if self.return_type_aggregation == ReturnTypeAggregation::Intersection {
+            // Keep only elements where the call succeeded
+            self.elements.retain(|binding| binding.as_result().is_ok());
+
+            if self.elements.is_empty() {
+                // All elements failed; report not callable
+                return Err(CallErrorKind::NotCallable);
+            }
+            // At least one element succeeded
+            return Ok(());
+        }
+
+        // For union types:
         // In order of precedence:
         //
         // - If every union element is Ok, then the union is too.
@@ -283,7 +341,15 @@ impl<'db> Bindings<'db> {
         if let [binding] = self.elements.as_slice() {
             return binding.return_type();
         }
-        UnionType::from_elements(db, self.into_iter().map(CallableBinding::return_type))
+        match self.return_type_aggregation {
+            ReturnTypeAggregation::Union => {
+                UnionType::from_elements(db, self.into_iter().map(CallableBinding::return_type))
+            }
+            ReturnTypeAggregation::Intersection => IntersectionType::from_elements(
+                db,
+                self.into_iter().map(CallableBinding::return_type),
+            ),
+        }
     }
 
     /// Report diagnostics for all of the errors that occurred when trying to match actual
@@ -1458,6 +1524,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             elements: smallvec_inline![from],
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
+            return_type_aggregation: ReturnTypeAggregation::default(),
         }
     }
 }
@@ -1481,6 +1548,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             elements: smallvec_inline![callable_binding],
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
+            return_type_aggregation: ReturnTypeAggregation::default(),
         }
     }
 }
@@ -2182,7 +2250,7 @@ impl<'db> CallableBinding<'db> {
         Ok(())
     }
 
-    fn is_callable(&self) -> bool {
+    pub(crate) fn is_callable(&self) -> bool {
         !self.overloads.is_empty()
     }
 
