@@ -40,6 +40,10 @@ declare_lint! {
     /// ```py
     /// a = 20 / 2
     /// ```
+    ///
+    /// ## Options
+    /// Set [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
+    /// to `false` to prevent this rule from reporting unused `type: ignore` comments.
     pub static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `ty: ignore` and `type: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),

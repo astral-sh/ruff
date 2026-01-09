@@ -1172,7 +1172,7 @@
         },
         "unused-ignore-comment": {
           "title": "detects unused `ty: ignore` and `type: ignore` comments",
-          "description": "## What it does\nChecks for `ty: ignore` or `type: ignore` directives that are no longer applicable.\n\n## Why is this bad?\nA `ty: ignore` directive that no longer matches any diagnostic violations is likely\nincluded by mistake, and should be removed to avoid confusion.\n\n## Examples\n```py\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```",
+          "description": "## What it does\nChecks for `ty: ignore` or `type: ignore` directives that are no longer applicable.\n\n## Why is this bad?\nA `ty: ignore` directive that no longer matches any diagnostic violations is likely\nincluded by mistake, and should be removed to avoid confusion.\n\n## Examples\n```py\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\nSet [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nto `false` to prevent this rule from reporting unused `type: ignore` comments.",
           "default": "warn",
           "oneOf": [
             {
