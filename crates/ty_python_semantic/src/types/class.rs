@@ -3479,7 +3479,7 @@ impl<'db> ClassLiteral<'db> {
         }
 
         if union.is_empty() {
-            Place::Undefined.with_qualifiers(TypeQualifiers::empty())
+            PlaceAndQualifiers::default()
         } else {
             let boundness = if is_definitely_bound {
                 Definedness::AlwaysDefined

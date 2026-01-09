@@ -1800,12 +1800,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .index
                     .place_table(scope)
                     .place(declaration.place(self.db()));
-                if let PlaceExprRef::Symbol(symbol) = &place {
-                    if scope.is_global() {
-                        module_type_implicit_global_symbol(self.db(), symbol.name())
-                    } else {
-                        Place::Undefined.into()
-                    }
+
+                if let PlaceExprRef::Symbol(symbol) = &place
+                    && scope.is_global()
+                {
+                    module_type_implicit_global_symbol(self.db(), symbol.name())
                 } else {
                     Place::Undefined.into()
                 }
@@ -9704,7 +9703,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            PlaceAndQualifiers::from(Place::Undefined)
+            PlaceAndQualifiers::default()
                 // If we're in a class body, check for implicit class body symbols first.
                 // These take precedence over globals.
                 .or_fall_back_to(db, || {
