@@ -67,6 +67,7 @@ fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
 }
 
+#[expect(clippy::needless_update)]
 fn setup_tomllib_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
