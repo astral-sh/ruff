@@ -48,11 +48,13 @@ use crate::checkers::ast::Checker;
 /// `Decimal` class from the `decimal` module instead of floating-point numbers.
 ///
 /// ## Example
+///
 /// ```python
 /// assert 0.1 + 0.2 == 0.3  # AssertionError
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import math
 ///
@@ -61,6 +63,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Ecosystem-specific alternatives
+///
 /// ```python
 /// import numpy as np
 ///
@@ -70,6 +73,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import numpy as np
 ///
