@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 /// floating-point comparison, often with different default tolerances optimized
 /// for their specific use cases:
 ///
-/// - For NumPy arrays: use `numpy.isclose()` or `numpy.allclose()`
-/// - For PyTorch tensors: use `torch.isclose()`
+/// - For `NumPy` arrays: use `numpy.isclose()` or `numpy.allclose()`
+/// - For `PyTorch` tensors: use `torch.isclose()`
 /// - Check your framework's / library's documentation for equivalent functions
 ///
 /// For scenarios requiring exact decimal arithmetic, consider using the
