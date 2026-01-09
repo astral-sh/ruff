@@ -928,65 +928,6 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
     }
 }
 
-/// Disables formatting for `node` and instead uses the same formatting as the node has in source.
-///
-/// The `node` gets indented as any formatted node to avoid syntax errors when the indentation string changes (e.g. from 2 spaces to 4).
-/// The `node`s leading and trailing comments are formatted as usual, except if they fall into the suppressed node's range.
-#[cold]
-pub(crate) fn suppressed_node<'a, N>(node: N) -> FormatSuppressedNode<'a>
-where
-    N: Into<AnyNodeRef<'a>>,
-{
-    FormatSuppressedNode { node: node.into() }
-}
-
-pub(crate) struct FormatSuppressedNode<'a> {
-    node: AnyNodeRef<'a>,
-}
-
-impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
-        let node_comments = comments.leading_dangling_trailing(self.node);
-
-        // Mark all comments as formatted that fall into the node range
-        for comment in node_comments.leading {
-            if comment.start() > self.node.start() {
-                comment.mark_formatted();
-            }
-        }
-
-        for comment in node_comments.trailing {
-            if comment.start() < self.node.end() {
-                comment.mark_formatted();
-            }
-        }
-
-        // Some statements may end with a semicolon. Preserve the semicolon
-        let semicolon_range = self
-            .node
-            .is_statement()
-            .then(|| trailing_semicolon(self.node, f.context().source()))
-            .flatten();
-        let verbatim_range = semicolon_range.map_or(self.node.range(), |semicolon| {
-            TextRange::new(self.node.start(), semicolon.end())
-        });
-        comments.mark_verbatim_node_comments_formatted(self.node);
-
-        // Write the outer comments and format the node as verbatim
-        write!(
-            f,
-            [
-                leading_comments(node_comments.leading),
-                source_position(verbatim_range.start()),
-                verbatim_text(verbatim_range),
-                source_position(verbatim_range.end()),
-                trailing_comments(node_comments.trailing)
-            ]
-        )
-    }
-}
-
 #[cold]
 pub(crate) fn write_suppressed_clause_header(
     header: ClauseHeader,
