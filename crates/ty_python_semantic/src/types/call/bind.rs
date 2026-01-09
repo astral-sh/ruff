@@ -65,6 +65,18 @@ enum ReturnTypeAggregation {
     Intersection,
 }
 
+/// Priority levels for call errors in intersection types.
+/// Higher values indicate more specific errors that should take precedence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum CallErrorPriority {
+    /// Object is not callable at all (no `__call__` method).
+    NotCallable = 0,
+    /// Object is a top callable (e.g., `Top[Callable[..., object]]`) with unknown signature.
+    TopCallable = 1,
+    /// Specific binding error (invalid argument type, missing argument, etc.).
+    BindingError = 2,
+}
+
 /// Binding information for a possible union or intersection of callables.
 ///
 /// For unions: At a call site, the arguments must be compatible with _all_ of the types
@@ -394,15 +406,29 @@ impl<'db> Bindings<'db> {
             return;
         }
 
-        // For intersection types where all elements failed, report each element's error
-        // with intersection context.
+        // For intersection types where all elements failed, use priority hierarchy
+        // to determine which errors to show.
         if self.return_type_aggregation == ReturnTypeAggregation::Intersection {
+            // Find the highest priority error among all elements
+            let max_priority = self
+                .into_iter()
+                .map(CallableBinding::error_priority)
+                .max()
+                .unwrap_or(CallErrorPriority::NotCallable);
+
+            // For NotCallable priority, we already handle this at the top of the function
+            // by emitting a single "not callable" error for the whole intersection.
+            // This case shouldn't be reached if all elements are not callable.
+
+            // Only report errors from elements with the highest priority
             for binding in self {
-                let intersection_diag = IntersectionDiagnostic {
-                    callable_type: self.callable_type(),
-                    binding,
-                };
-                binding.report_diagnostics(context, node, Some(&intersection_diag));
+                if binding.error_priority() == max_priority {
+                    let intersection_diag = IntersectionDiagnostic {
+                        callable_type: self.callable_type(),
+                        binding,
+                    };
+                    binding.report_diagnostics(context, node, Some(&intersection_diag));
+                }
             }
             return;
         }
@@ -2268,6 +2294,26 @@ impl<'db> CallableBinding<'db> {
 
     pub(crate) fn is_callable(&self) -> bool {
         !self.overloads.is_empty()
+    }
+
+    /// Returns the error priority for this binding, used to determine which errors
+    /// to show when all intersection elements fail.
+    fn error_priority(&self) -> CallErrorPriority {
+        if !self.is_callable() {
+            return CallErrorPriority::NotCallable;
+        }
+
+        // Check if this is a top-callable error
+        for overload in &self.overloads {
+            for error in &overload.errors {
+                if matches!(error, BindingError::CalledTopCallable(_)) {
+                    return CallErrorPriority::TopCallable;
+                }
+            }
+        }
+
+        // Any other binding error
+        CallErrorPriority::BindingError
     }
 
     /// Returns whether there were any errors binding this call site. If the callable has multiple

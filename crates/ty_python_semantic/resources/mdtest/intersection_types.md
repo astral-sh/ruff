@@ -1005,6 +1005,62 @@ def _(
     x(1.0)
 ```
 
+When intersection elements fail with different error types, we use a priority hierarchy to determine
+which errors to show. More specific errors (like `invalid-argument-type`) take precedence over less
+specific ones (like `call-top-callable` or `call-non-callable`).
+
+A specific argument error takes priority over a top-callable error:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+def _(
+    x: Intersection[Callable[[int], str], Top[Callable[..., object]]],
+) -> None:
+    # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
+    # `Top[Callable[..., object]]` would fail with call-top-callable
+    # We only show the more specific invalid-argument-type error
+    # error: [invalid-argument-type]
+    x("hello")
+```
+
+A specific argument error takes priority over a not-callable error:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class NotCallable: ...
+
+def _(
+    x: Intersection[Callable[[int], str], NotCallable],
+) -> None:
+    # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
+    # `NotCallable` would fail with call-non-callable
+    # We only show the more specific invalid-argument-type error
+    # error: [invalid-argument-type]
+    x("hello")
+```
+
+A top-callable error takes priority over a not-callable error:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+class NotCallable: ...
+
+def _(
+    x: Intersection[Top[Callable[..., object]], NotCallable],
+) -> None:
+    # `Top[Callable[..., object]]` fails with call-top-callable
+    # `NotCallable` would fail with call-non-callable
+    # We only show the call-top-callable error (it's more specific)
+    # error: [call-top-callable]
+    x()
+```
+
 If no positive element is callable, the intersection is not callable:
 
 ```py
