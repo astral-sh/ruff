@@ -603,7 +603,7 @@ impl<'db> BoundSuperType<'db> {
                 }
                 return delegate_to(
                     KnownClass::Dict
-                        .to_specialized_instance(db, [key_builder.build(), value_builder.build()]),
+                        .to_specialized_instance(db, &[key_builder.build(), value_builder.build()]),
                 );
             }
             Type::NewTypeInstance(newtype) => {

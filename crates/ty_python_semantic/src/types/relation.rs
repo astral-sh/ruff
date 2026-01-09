@@ -1015,7 +1015,7 @@ impl<'db> Type<'db> {
             // key types are a supertype of the extra items type?)
             (Type::TypedDict(_), _) => relation_visitor.visit((self, target, relation), || {
                 KnownClass::Mapping
-                    .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::object()])
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::object()])
                     .has_relation_to_impl(
                         db,
                         target,
@@ -2384,7 +2384,7 @@ impl<'db> Type<'db> {
             // `dict` *itself* is almost always disjoint from `TypedDict` -- but it's a good
             // approximation, and some false negatives are acceptable.
             (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => KnownClass::Dict
-                .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()])
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
                 .has_relation_to_impl(
                     db,
                     other,

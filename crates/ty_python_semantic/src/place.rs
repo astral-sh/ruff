@@ -1671,7 +1671,7 @@ mod implicit_globals {
                 Place::Defined(
                     DefinedPlace::new(KnownClass::Dict.to_specialized_instance(
                         db,
-                        [Type::any(), KnownClass::Int.to_instance(db)],
+                        &[Type::any(), KnownClass::Int.to_instance(db)],
                     ))
                     .with_definedness(Definedness::PossiblyUndefined),
                 )
@@ -1689,7 +1689,7 @@ mod implicit_globals {
                     ),
                     KnownClass::Dict.to_specialized_instance(
                         db,
-                        [KnownClass::Str.to_instance(db), Type::any()],
+                        &[KnownClass::Str.to_instance(db), Type::any()],
                     ),
                 );
                 Place::Defined(
