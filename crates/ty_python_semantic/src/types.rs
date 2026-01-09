@@ -2811,20 +2811,23 @@ impl<'db> Type<'db> {
         self.is_data_descriptor_impl(d, false)
     }
 
-    /// Returns whether this type may be a data descriptor.
+    /// Returns whether this type is static and may be a data descriptor.
     /// If this type is a union, returns true if _any_ element is a data descriptor.
-    pub(crate) fn may_be_data_descriptor(self, d: &'db dyn Db) -> bool {
+    /// This is used to determine whether an attribute assignment is valid for narrowing.
+    /// In theory, dynamic types are data descriptor types, so it is unsafe to use attribute assignment for narrowing if the inferred type of an attribute contains a dynamic type.
+    /// However, strictly applying this rule would disable narrowing for most implicit attributes.
+    /// Therefore, for practical convenience, we will relax the rule and disable narrowing only if the attribute type is static and a data descriptor.
+    pub(crate) fn is_static_and_may_be_data_descriptor(self, d: &'db dyn Db) -> bool {
         self.is_data_descriptor_impl(d, true)
     }
 
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
-            Type::Dynamic(_) | Type::Never | Type::PropertyInstance(_) => true,
+            Type::Dynamic(_) => !any_of_union,
+            Type::Never | Type::PropertyInstance(_) => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)
                 .iter()
-                // Types of instance attributes that are not explicitly typed are unioned with `Unknown`, it should be excluded when checking.
-                .filter(|ty| !ty.is_unknown())
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
             Type::Union(union) => union
                 .elements(db)
