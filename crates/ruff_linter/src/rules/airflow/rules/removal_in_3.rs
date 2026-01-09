@@ -820,6 +820,63 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 "TriggerRule",
                 "DUMMY" | "NONE_FAILED_OR_SKIPPED",
             ] => Replacement::None,
+
+            // airflow.utils.setup_teardown
+            ["setup_teardown", "BaseSetupTeardownContext"] => Replacement::Rename {
+                module: "airflow.sdk.definitions._internal.setup_teardown",
+                name: "BaseSetupTeardownContext",
+            },
+            ["setup_teardown", "SetupTeardownContext"] => Replacement::Rename {
+                module: "airflow.sdk.definitions._internal.setup_teardown",
+                name: "SetupTeardownContext",
+            },
+
+            // airflow.utils.xcom
+            ["xcom", "XCOM_RETURN_KEY"] => Replacement::Rename {
+                module: "airflow.models.xcom",
+                name: "XCOM_RETURN_KEY",
+            },
+
+            // airflow.utils.task_group
+            ["task_group", "TaskGroup"] => Replacement::Rename {
+                module: "airflow.sdk",
+                name: "TaskGroup",
+            },
+
+            // airflow.utils.timeout
+            ["timeout", "timeout"] => Replacement::Rename {
+                module: "airflow.sdk.execution_time.timeout",
+                name: "timeout",
+            },
+
+            // airflow.utils.weight_rule
+            ["weight_rule", "WeightRule"] => Replacement::Rename {
+                module: "airflow.task.weight_rule",
+                name: "WeightRule",
+            },
+            ["weight_rule", "DB_SAFE_MINIMUM"] => Replacement::Rename {
+                module: "airflow.sdk.bases.operator",
+                name: "DB_SAFE_MINIMUM",
+            },
+            ["weight_rule", "DB_SAFE_MAXIMUM"] => Replacement::Rename {
+                module: "airflow.sdk.bases.operator",
+                name: "DB_SAFE_MAXIMUM",
+            },
+            ["weight_rule", "db_safe_priority"] => Replacement::Rename {
+                module: "airflow.sdk.bases.operator",
+                name: "db_safe_priority",
+            },
+
+            // airflow.utils.decorators (additional)
+            ["decorators", "remove_task_decorator"] => Replacement::Rename {
+                module: "airflow.sdk.definitions._internal.decorators",
+                name: "remove_task_decorator",
+            },
+            ["decorators", "fixup_decorator_warning_stack"] => Replacement::Rename {
+                module: "airflow.sdk.definitions._internal.decorators",
+                name: "fixup_decorator_warning_stack",
+            },
+
             _ => return,
         },
 

@@ -745,6 +745,8 @@ AIR301 [*] `airflow.utils.log.secrets_masker` is removed in Airflow 3.0
 113 | #  airflow.utils.log
 114 | secrets_masker
     | ^^^^^^^^^^^^^^
+115 |
+116 | # airflow.utils.setup_teardown
     |
 help: Use `secrets_masker` from `airflow.sdk.execution_time` instead.
 108 | 
@@ -755,4 +757,241 @@ help: Use `secrets_masker` from `airflow.sdk.execution_time` instead.
 112 | 
 113 | #  airflow.utils.log
 114 | secrets_masker
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.setup_teardown.BaseSetupTeardownContext` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:119:1
+    |
+117 | from airflow.utils.setup_teardown import BaseSetupTeardownContext, SetupTeardownContext
+118 |
+119 | BaseSetupTeardownContext
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+120 | SetupTeardownContext
+    |
+help: Use `BaseSetupTeardownContext` from `airflow.sdk.definitions._internal.setup_teardown` instead.
+114 | secrets_masker
+115 | 
+116 | # airflow.utils.setup_teardown
+    - from airflow.utils.setup_teardown import BaseSetupTeardownContext, SetupTeardownContext
+117 + from airflow.utils.setup_teardown import SetupTeardownContext
+118 + from airflow.sdk.definitions._internal.setup_teardown import BaseSetupTeardownContext
+119 | 
+120 | BaseSetupTeardownContext
+121 | SetupTeardownContext
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.setup_teardown.SetupTeardownContext` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:120:1
+    |
+119 | BaseSetupTeardownContext
+120 | SetupTeardownContext
+    | ^^^^^^^^^^^^^^^^^^^^
+121 |
+122 | # airflow.utils.xcom
+    |
+help: Use `SetupTeardownContext` from `airflow.sdk.definitions._internal.setup_teardown` instead.
+114 | secrets_masker
+115 | 
+116 | # airflow.utils.setup_teardown
+    - from airflow.utils.setup_teardown import BaseSetupTeardownContext, SetupTeardownContext
+117 + from airflow.utils.setup_teardown import BaseSetupTeardownContext
+118 + from airflow.sdk.definitions._internal.setup_teardown import SetupTeardownContext
+119 | 
+120 | BaseSetupTeardownContext
+121 | SetupTeardownContext
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.xcom.XCOM_RETURN_KEY` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:125:1
+    |
+123 | from airflow.utils.xcom import XCOM_RETURN_KEY
+124 |
+125 | XCOM_RETURN_KEY
+    | ^^^^^^^^^^^^^^^
+126 |
+127 | # airflow.utils.task_group
+    |
+help: Use `XCOM_RETURN_KEY` from `airflow.models.xcom` instead.
+120 | SetupTeardownContext
+121 | 
+122 | # airflow.utils.xcom
+    - from airflow.utils.xcom import XCOM_RETURN_KEY
+123 + from airflow.models.xcom import XCOM_RETURN_KEY
+124 | 
+125 | XCOM_RETURN_KEY
+126 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.task_group.TaskGroup` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:130:1
+    |
+128 | from airflow.utils.task_group import TaskGroup
+129 |
+130 | TaskGroup
+    | ^^^^^^^^^
+131 |
+132 | # airflow.utils.timeout
+    |
+help: Use `TaskGroup` from `airflow.sdk` instead.
+125 | XCOM_RETURN_KEY
+126 | 
+127 | # airflow.utils.task_group
+    - from airflow.utils.task_group import TaskGroup
+128 + from airflow.sdk import TaskGroup
+129 | 
+130 | TaskGroup
+131 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.timeout.timeout` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:135:1
+    |
+133 | from airflow.utils.timeout import timeout
+134 |
+135 | timeout
+    | ^^^^^^^
+136 |
+137 | # airflow.utils.weight_rule
+    |
+help: Use `timeout` from `airflow.sdk.execution_time.timeout` instead.
+130 | TaskGroup
+131 | 
+132 | # airflow.utils.timeout
+    - from airflow.utils.timeout import timeout
+133 + from airflow.sdk.execution_time.timeout import timeout
+134 | 
+135 | timeout
+136 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.weight_rule.WeightRule` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:145:1
+    |
+143 | )
+144 |
+145 | WeightRule
+    | ^^^^^^^^^^
+146 | DB_SAFE_MINIMUM
+147 | DB_SAFE_MAXIMUM
+    |
+help: Use `WeightRule` from `airflow.task.weight_rule` instead.
+138 | from airflow.utils.weight_rule import (
+139 |     DB_SAFE_MAXIMUM,
+140 |     DB_SAFE_MINIMUM,
+    -     WeightRule,
+141 |     db_safe_priority,
+142 | )
+143 + from airflow.task.weight_rule import WeightRule
+144 | 
+145 | WeightRule
+146 | DB_SAFE_MINIMUM
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.weight_rule.DB_SAFE_MINIMUM` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:146:1
+    |
+145 | WeightRule
+146 | DB_SAFE_MINIMUM
+    | ^^^^^^^^^^^^^^^
+147 | DB_SAFE_MAXIMUM
+148 | db_safe_priority
+    |
+help: Use `DB_SAFE_MINIMUM` from `airflow.sdk.bases.operator` instead.
+137 | # airflow.utils.weight_rule
+138 | from airflow.utils.weight_rule import (
+139 |     DB_SAFE_MAXIMUM,
+    -     DB_SAFE_MINIMUM,
+140 |     WeightRule,
+141 |     db_safe_priority,
+142 | )
+143 + from airflow.sdk.bases.operator import DB_SAFE_MINIMUM
+144 | 
+145 | WeightRule
+146 | DB_SAFE_MINIMUM
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.weight_rule.DB_SAFE_MAXIMUM` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:147:1
+    |
+145 | WeightRule
+146 | DB_SAFE_MINIMUM
+147 | DB_SAFE_MAXIMUM
+    | ^^^^^^^^^^^^^^^
+148 | db_safe_priority
+    |
+help: Use `DB_SAFE_MAXIMUM` from `airflow.sdk.bases.operator` instead.
+136 | 
+137 | # airflow.utils.weight_rule
+138 | from airflow.utils.weight_rule import (
+    -     DB_SAFE_MAXIMUM,
+139 |     DB_SAFE_MINIMUM,
+140 |     WeightRule,
+141 |     db_safe_priority,
+142 | )
+143 + from airflow.sdk.bases.operator import DB_SAFE_MAXIMUM
+144 | 
+145 | WeightRule
+146 | DB_SAFE_MINIMUM
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.weight_rule.db_safe_priority` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:148:1
+    |
+146 | DB_SAFE_MINIMUM
+147 | DB_SAFE_MAXIMUM
+148 | db_safe_priority
+    | ^^^^^^^^^^^^^^^^
+149 |
+150 | # airflow.utils.decorators (additional)
+    |
+help: Use `db_safe_priority` from `airflow.sdk.bases.operator` instead.
+139 |     DB_SAFE_MAXIMUM,
+140 |     DB_SAFE_MINIMUM,
+141 |     WeightRule,
+    -     db_safe_priority,
+142 | )
+143 + from airflow.sdk.bases.operator import db_safe_priority
+144 | 
+145 | WeightRule
+146 | DB_SAFE_MINIMUM
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.decorators.fixup_decorator_warning_stack` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:153:1
+    |
+151 | from airflow.utils.decorators import fixup_decorator_warning_stack, remove_task_decorator
+152 |
+153 | fixup_decorator_warning_stack
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+154 | remove_task_decorator
+    |
+help: Use `fixup_decorator_warning_stack` from `airflow.sdk.definitions._internal.decorators` instead.
+148 | db_safe_priority
+149 | 
+150 | # airflow.utils.decorators (additional)
+    - from airflow.utils.decorators import fixup_decorator_warning_stack, remove_task_decorator
+151 + from airflow.utils.decorators import remove_task_decorator
+152 + from airflow.sdk.definitions._internal.decorators import fixup_decorator_warning_stack
+153 | 
+154 | fixup_decorator_warning_stack
+155 | remove_task_decorator
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.decorators.remove_task_decorator` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:154:1
+    |
+153 | fixup_decorator_warning_stack
+154 | remove_task_decorator
+    | ^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use `remove_task_decorator` from `airflow.sdk.definitions._internal.decorators` instead.
+148 | db_safe_priority
+149 | 
+150 | # airflow.utils.decorators (additional)
+    - from airflow.utils.decorators import fixup_decorator_warning_stack, remove_task_decorator
+151 + from airflow.utils.decorators import fixup_decorator_warning_stack
+152 + from airflow.sdk.definitions._internal.decorators import remove_task_decorator
+153 | 
+154 | fixup_decorator_warning_stack
+155 | remove_task_decorator
 note: This is an unsafe fix and may change runtime behavior

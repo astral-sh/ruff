@@ -112,3 +112,43 @@ from airflow.utils.log import secrets_masker
 
 #  airflow.utils.log
 secrets_masker
+
+# airflow.utils.setup_teardown
+from airflow.utils.setup_teardown import BaseSetupTeardownContext, SetupTeardownContext
+
+BaseSetupTeardownContext
+SetupTeardownContext
+
+# airflow.utils.xcom
+from airflow.utils.xcom import XCOM_RETURN_KEY
+
+XCOM_RETURN_KEY
+
+# airflow.utils.task_group
+from airflow.utils.task_group import TaskGroup
+
+TaskGroup
+
+# airflow.utils.timeout
+from airflow.utils.timeout import timeout
+
+timeout
+
+# airflow.utils.weight_rule
+from airflow.utils.weight_rule import (
+    DB_SAFE_MAXIMUM,
+    DB_SAFE_MINIMUM,
+    WeightRule,
+    db_safe_priority,
+)
+
+WeightRule
+DB_SAFE_MINIMUM
+DB_SAFE_MAXIMUM
+db_safe_priority
+
+# airflow.utils.decorators (additional)
+from airflow.utils.decorators import fixup_decorator_warning_stack, remove_task_decorator
+
+fixup_decorator_warning_stack
+remove_task_decorator
