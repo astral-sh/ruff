@@ -4663,11 +4663,7 @@ impl<'db> Type<'db> {
                 return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
             }
 
-            return Ok(Bindings::from_intersection(
-                db,
-                self,
-                successful_bindings,
-            ));
+            return Ok(Bindings::from_intersection(db, self, successful_bindings));
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
