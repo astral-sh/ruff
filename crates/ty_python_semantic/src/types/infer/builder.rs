@@ -6053,15 +6053,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer the argument types.
         let name_type = self.infer_expression(name_arg, TypeContext::default());
         let bases_type = self.infer_expression(bases_arg, TypeContext::default());
-        let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
 
-        if !namespace_type.is_assignable_to(
-            db,
-            KnownClass::Dict
-                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
-        ) && let Some(builder) = self
-            .context
-            .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
+        // Extract members from the namespace dict (third argument).
+        // Infer the whole dict first to avoid double-inferring individual values.
+        let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
+        let (members, has_dynamic_namespace): (Box<[(ast::name::Name, Type<'db>)]>, bool) =
+            if let ast::Expr::Dict(dict) = namespace_arg {
+                // Check if all keys are string literal types. If any key is not a string literal
+                // type or is missing (spread), the namespace is considered dynamic.
+                let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                    item.key
+                        .as_ref()
+                        .is_some_and(|k| matches!(self.expression_type(k), Type::StringLiteral(_)))
+                });
+                let members = dict
+                    .items
+                    .iter()
+                    .filter_map(|item| {
+                        // Only extract items with string literal keys.
+                        let key_expr = item.key.as_ref()?;
+                        let key_name = match self.expression_type(key_expr) {
+                            Type::StringLiteral(s) => ast::name::Name::new(s.value(db)),
+                            _ => return None,
+                        };
+                        // Get the already-inferred type from when we inferred the dict above.
+                        let value_ty = self.expression_type(&item.value);
+                        Some((key_name, value_ty))
+                    })
+                    .collect();
+                (members, !all_keys_are_string_literals)
+            } else if let Type::TypedDict(typed_dict) = namespace_type {
+                // Namespace is a TypedDict instance. Extract known keys as members.
+                // TypedDicts are "open" (can have additional string keys), so this
+                // is still a dynamic namespace for unknown attributes.
+                let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| (name.clone(), field.declared_ty))
+                    .collect();
+                (members, true)
+            } else {
+                // Namespace is not a dict literal, so it's dynamic.
+                (Box::new([]), true)
+            };
+
+        if !matches!(namespace_type, Type::TypedDict(_))
+            && !namespace_type.is_assignable_to(
+                db,
+                KnownClass::Dict
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
+            )
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
         {
             let mut diagnostic = builder
                 .into_diagnostic("Invalid argument to parameter 3 (`namespace`) of `type()`");
@@ -6094,7 +6138,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let file_scope = self.scope().file_scope_id(db);
         let node_index = call_expr.node_index().load();
         let dynamic_class = DynamicClassLiteral::new(
-            db, name, bases, file, file_scope, node_index, definition, None,
+            db,
+            name,
+            bases,
+            members,
+            file,
+            file_scope,
+            node_index,
+            definition,
+            has_dynamic_namespace,
+            None,
         );
 
         // Check for MRO errors.

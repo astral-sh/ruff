@@ -643,13 +643,17 @@ impl<'db> ClassLiteral<'db> {
     /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
     /// `__ge__`) in its own body (not inherited). Used by `@total_ordering` to determine if
     /// synthesis is valid.
-    // TODO: A dynamic class could provide ordering methods in the namespace dictionary:
-    // ```python
-    // >>> X = type("X", (), {"__lt__": lambda self, other: True})
-    // ```
+    ///
+    /// For dynamic classes, this checks if any ordering methods are provided in the namespace
+    /// dictionary:
+    /// ```python
+    /// X = type("X", (), {"__lt__": lambda self, other: True})
+    /// ```
     pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
-        self.as_static()
-            .is_some_and(|class| class.has_own_ordering_method(db))
+        match self {
+            Self::Static(class) => class.has_own_ordering_method(db),
+            Self::Dynamic(class) => class.has_own_ordering_method(db),
+        }
     }
 
     /// Returns the static class definition if this is one.
@@ -704,20 +708,27 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns whether this class is a disjoint base.
-    // TODO: A dynamic class could provide __slots__ in the namespace dictionary, which would make
-    // it a disjoint base:
-    // ```python
-    // >>> X = type("X", (), {"__slots__": ("a",)})
-    // >>> class Foo(int, X): ...
-    // ...
-    // Traceback (most recent call last):
-    //   File "<python-input-4>", line 1, in <module>
-    //     class Foo(int, X): ...
-    // TypeError: multiple bases have instance lay-out conflict
-    // ```
+    ///
+    /// A class is considered a disjoint base if:
+    /// - It has the `@disjoint_base` decorator (static classes only), or
+    /// - It defines non-empty `__slots__`
+    ///
+    /// For dynamic classes created via `type()`, we check if `__slots__` is provided
+    /// in the namespace dictionary:
+    /// ```python
+    /// >>> X = type("X", (), {"__slots__": ("a",)})
+    /// >>> class Foo(int, X): ...
+    /// ...
+    /// Traceback (most recent call last):
+    ///   File "<python-input-4>", line 1, in <module>
+    ///     class Foo(int, X): ...
+    /// TypeError: multiple bases have instance lay-out conflict
+    /// ```
     pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
-        self.as_static()
-            .and_then(|class| class.as_disjoint_base(db))
+        match self {
+            Self::Static(class) => class.as_disjoint_base(db),
+            Self::Dynamic(class) => class.as_disjoint_base(db),
+        }
     }
 
     /// Returns a non-generic instance of this class.
@@ -1323,8 +1334,12 @@ impl<'db> ClassType<'db> {
             Signature::new(parameters, return_annotation)
         }
 
-        let Some((class_literal, specialization)) = self.static_class_literal(db) else {
-            return Member::unbound();
+        let (class_literal, specialization) = match self {
+            Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
+                return dynamic.own_class_member(db, name);
+            }
+            Self::NonGeneric(ClassLiteral::Static(class)) => (class, None),
+            Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
         };
 
         let fallback_member_lookup = || {
@@ -1637,12 +1652,21 @@ impl<'db> ClassType<'db> {
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let Some((class_literal, specialization)) = self.static_class_literal(db) else {
-            return Member::unbound();
-        };
-        class_literal
-            .own_instance_member(db, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        match self {
+            Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
+                dynamic.own_instance_member(db, name)
+            }
+            Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
+                class_literal.own_instance_member(db, name)
+            }
+            Self::Generic(generic) => {
+                let specialization = generic.specialization(db);
+                generic
+                    .origin(db)
+                    .own_instance_member(db, name)
+                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+            }
+        }
     }
 
     /// Return a callable type (or union of callable types) that represents the callable
@@ -2111,16 +2135,27 @@ impl<'db> StaticClassLiteral<'db> {
                 let Some(base_class) = base.into_class() else {
                     continue;
                 };
-                let Some((base_literal, base_specialization)) = base_class.static_class_literal(db)
-                else {
-                    continue;
-                };
-                if base_literal.is_known(db, KnownClass::Object) {
-                    continue;
-                }
-                let member = class_member(db, base_literal.body_scope(db), name);
-                if let Some(ty) = member.ignore_possibly_undefined() {
-                    return Some(ty.apply_optional_specialization(db, base_specialization));
+                match base_class.class_literal(db) {
+                    ClassLiteral::Static(base_literal) => {
+                        if base_literal.is_known(db, KnownClass::Object) {
+                            continue;
+                        }
+                        let member = class_member(db, base_literal.body_scope(db), name);
+                        if let Some(ty) = member.ignore_possibly_undefined() {
+                            let base_specialization = base_class
+                                .static_class_literal(db)
+                                .and_then(|(_, spec)| spec);
+                            return Some(ty.apply_optional_specialization(db, base_specialization));
+                        }
+                    }
+                    ClassLiteral::Dynamic(dynamic) => {
+                        // Dynamic classes (created with `type()`) can also define ordering methods
+                        // in their namespace dict.
+                        let member = dynamic.own_class_member(db, name);
+                        if let Some(ty) = member.ignore_possibly_undefined() {
+                            return Some(ty);
+                        }
+                    }
                 }
             }
         }
@@ -2376,7 +2411,9 @@ impl<'db> StaticClassLiteral<'db> {
         {
             Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
-            Some(DisjointBase::due_to_dunder_slots(self))
+            Some(DisjointBase::due_to_dunder_slots(ClassLiteral::Static(
+                self,
+            )))
         } else {
             None
         }
@@ -4665,18 +4702,9 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// - name: "Foo"
 /// - bases: [Base]
 ///
-/// # Limitations
-///
-/// TODO: Attributes from the namespace dict (third argument to `type()`) are not tracked.
-/// This matches Pyright's behavior. For example:
-///
-/// ```python
-/// Foo = type("Foo", (), {"attr": 42})
-/// Foo().attr  # Error: no attribute 'attr'
-/// ```
-///
-/// Supporting namespace dict attributes would require parsing dict literals and tracking
-/// the attribute types, similar to how TypedDict handles its fields.
+/// This is called "functional" because it mirrors the terminology used for `NamedTuple`
+/// and `TypedDict`, where the "functional form" means creating via a function call
+/// rather than a class statement.
 ///
 /// # Salsa interning
 ///
@@ -4701,6 +4729,11 @@ pub struct DynamicClassLiteral<'db> {
     #[returns(deref)]
     pub bases: Box<[ClassBase<'db>]>,
 
+    /// The class members from the namespace dict (third argument to `type()`).
+    /// Each entry is a (name, type) pair extracted from the dict literal.
+    #[returns(deref)]
+    pub members: Box<[(Name, Type<'db>)]>,
+
     /// The file containing the `type()` call.
     pub file: File,
 
@@ -4716,6 +4749,11 @@ pub struct DynamicClassLiteral<'db> {
     /// This is `Some` when the `type()` call is part of an assignment,
     /// allowing go-to-definition to navigate to the creation site.
     pub definition: Option<Definition<'db>>,
+
+    /// Whether the namespace dict (third argument) is dynamic (not a literal dict,
+    /// or contains non-string-literal keys). When true, attribute lookups on this
+    /// class and its instances return `Unknown` instead of failing.
+    pub has_dynamic_namespace: bool,
 
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
     /// or passed to `dataclass()` as a function.
@@ -4892,6 +4930,33 @@ impl<'db> DynamicClassLiteral<'db> {
         }
     }
 
+    /// Look up a class member defined directly on this class (not inherited).
+    ///
+    /// Returns [`Member::unbound`] if the member is not found in the namespace dict,
+    /// unless the namespace is dynamic, in which case returns `Unknown`.
+    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        for (member_name, member_type) in self.members(db) {
+            if member_name.as_str() == name {
+                return Member::definitely_declared(*member_type);
+            }
+        }
+        // If the namespace is dynamic (not a literal dict), return Unknown
+        // since we can't know what attributes might be defined.
+        if self.has_dynamic_namespace(db) {
+            Member::definitely_declared(Type::unknown())
+        } else {
+            Member::unbound()
+        }
+    }
+
+    /// Look up an instance member defined directly on this class (not inherited).
+    ///
+    /// For dynamic classes, instance members are the same as class members
+    /// since they come from the namespace dict.
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        self.own_class_member(db, name)
+    }
+
     /// Try to compute the MRO for this dynamic class.
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
@@ -4899,6 +4964,48 @@ impl<'db> DynamicClassLiteral<'db> {
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic_class(db, self)
+    }
+
+    /// Return `Some()` if this dynamic class is known to be a [`DisjointBase`].
+    ///
+    /// A dynamic class is a disjoint base if `__slots__` is defined in the namespace
+    /// dictionary and is non-empty. Example:
+    /// ```python
+    /// X = type("X", (), {"__slots__": ("a",)})
+    /// ```
+    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+        // Check if __slots__ is in the members
+        for (name, ty) in self.members(db) {
+            if name.as_str() == "__slots__" {
+                // Check if the slots are non-empty
+                let is_non_empty = match ty {
+                    // __slots__ = ("a", "b")
+                    Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|spec| {
+                        spec.len().into_fixed_length().is_some_and(|len| len > 0)
+                    }),
+                    // __slots__ = "abc"  # Same as ("abc",)
+                    Type::StringLiteral(_) => true,
+                    // Other types are considered dynamic/unknown
+                    _ => false,
+                };
+                if is_non_empty {
+                    return Some(DisjointBase::due_to_dunder_slots(ClassLiteral::Dynamic(
+                        self,
+                    )));
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns `true` if this dynamic class defines any ordering method (`__lt__`, `__le__`,
+    /// `__gt__`, `__ge__`) in its namespace dictionary. Used by `@total_ordering` to determine
+    /// if synthesis is valid.
+    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+        const ORDERING_METHODS: &[&str] = &["__lt__", "__le__", "__gt__", "__ge__"];
+        self.members(db)
+            .iter()
+            .any(|(name, _)| ORDERING_METHODS.contains(&name.as_str()))
     }
 
     /// Returns a new [`DynamicClassLiteral`] with the given dataclass params, preserving all other fields.
@@ -4911,10 +5018,12 @@ impl<'db> DynamicClassLiteral<'db> {
             db,
             self.name(db).clone(),
             self.bases(db),
+            self.members(db),
             self.file(db),
             self.file_scope(db),
             self.node_index(db),
             self.definition(db),
+            self.has_dynamic_namespace(db),
             dataclass_params,
         )
     }
@@ -5291,7 +5400,7 @@ impl InheritanceCycle {
 /// [PEP 800]: https://peps.python.org/pep-0800/
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub(super) struct DisjointBase<'db> {
-    pub(super) class: StaticClassLiteral<'db>,
+    pub(super) class: ClassLiteral<'db>,
     pub(super) kind: DisjointBaseKind,
 }
 
@@ -5300,14 +5409,14 @@ impl<'db> DisjointBase<'db> {
     /// because it has the `@disjoint_base` decorator on its definition
     fn due_to_decorator(class: StaticClassLiteral<'db>) -> Self {
         Self {
-            class,
+            class: ClassLiteral::Static(class),
             kind: DisjointBaseKind::DisjointBaseDecorator,
         }
     }
 
     /// Creates a [`DisjointBase`] instance where we know the class is a disjoint base
     /// because of its `__slots__` definition.
-    fn due_to_dunder_slots(class: StaticClassLiteral<'db>) -> Self {
+    fn due_to_dunder_slots(class: ClassLiteral<'db>) -> Self {
         Self {
             class,
             kind: DisjointBaseKind::DefinesSlots,
@@ -5319,10 +5428,12 @@ impl<'db> DisjointBase<'db> {
         self == other
             || self
                 .class
-                .is_subclass_of(db, None, other.class.default_specialization(db))
+                .default_specialization(db)
+                .is_subclass_of(db, other.class.default_specialization(db))
             || other
                 .class
-                .is_subclass_of(db, None, self.class.default_specialization(db))
+                .default_specialization(db)
+                .is_subclass_of(db, self.class.default_specialization(db))
     }
 }
 
