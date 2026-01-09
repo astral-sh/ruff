@@ -960,12 +960,12 @@ class Foo:
     pass
 
 def _(
-    callable_and_any: Intersection[type[Foo], Callable[[], str]],
+    x: Intersection[type[Foo], Callable[[], str]],
 ) -> None:
     # Both `type[Foo]` and `Callable[[], str]` are callable with no arguments.
     # `type[Foo]()` returns `Foo`, `Callable[[], str]()` returns `str`.
     # The return type is the intersection of `Foo` and `str`.
-    reveal_type(callable_and_any())  # revealed: Foo & str
+    reveal_type(x())  # revealed: Foo & str
 ```
 
 If one element accepts the call but another rejects it (e.g., due to incompatible arguments), the

@@ -4517,10 +4517,6 @@ impl<'db> Type<'db> {
                 // For intersections, we try to call each positive element.
                 // Elements where the call fails are discarded.
                 // The return type is the intersection of return types from successful calls.
-                //
-                // We don't filter by "is callable" upfront because an element might be
-                // callable but reject the specific arguments. The actual filtering happens
-                // during check_types() when we know the arguments.
                 Bindings::from_intersection(
                     db,
                     self,
@@ -4641,7 +4637,8 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         // For intersection types, call the dunder on each element separately and combine
         // the results. This avoids intersecting bound methods (which often collapses to Never)
-        // and instead intersects the return types.
+        // and instead intersects the return types. TODO we might be able to remove this after
+        // fixing https://github.com/astral-sh/ty/issues/2428.
         if let Type::Intersection(intersection) = self {
             let mut successful_bindings = Vec::new();
             let mut last_error = None;
@@ -4660,6 +4657,8 @@ impl<'db> Type<'db> {
             }
 
             if successful_bindings.is_empty() {
+                // TODO we are only showing one of the errors here; should we aggregate them
+                // somehow or show all of them?
                 return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
             }
 
