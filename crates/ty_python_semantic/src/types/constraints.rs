@@ -504,7 +504,7 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
-    pub(crate) fn for_each_path(self, db: &'db dyn Db, f: impl FnMut(&PathAssignments<'db>)) {
+    pub(crate) fn for_each_path(self, db: &'db dyn Db, f: impl FnMut(&PathAssignments<'_, 'db>)) {
         self.node.for_each_path(db, self.support.constraints(db), f);
     }
 
@@ -1039,7 +1039,7 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         support: &FxOrderSet<ConstrainedTypeVar<'db>>,
-        mut f: impl FnMut(&PathAssignments<'db>),
+        mut f: impl FnMut(&PathAssignments<'_, 'db>),
     ) {
         let mut path = match self {
             Node::Interior(interior) => interior.path_assignments(db, support),
@@ -1057,8 +1057,8 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         missing: &Slice<ConstrainedTypeVar<'db>>,
-        f: &mut dyn FnMut(&PathAssignments<'db>),
-        path: &mut PathAssignments<'db>,
+        f: &mut dyn FnMut(&PathAssignments<'_, 'db>),
+        path: &mut PathAssignments<'_, 'db>,
     ) {
         if let Some((constraint, rest)) = missing.split_first() {
             path.walk_edge(db, constraint.when_true(), |path, _| {
@@ -1075,8 +1075,8 @@ impl<'db> Node<'db> {
     fn for_each_path_inner(
         self,
         db: &'db dyn Db,
-        f: &mut dyn FnMut(&PathAssignments<'db>),
-        path: &mut PathAssignments<'db>,
+        f: &mut dyn FnMut(&PathAssignments<'_, 'db>),
+        path: &mut PathAssignments<'_, 'db>,
     ) {
         match self {
             Node::AlwaysTrue => f(path),
@@ -1109,7 +1109,11 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn is_always_satisfied_inner(self, db: &'db dyn Db, path: &mut PathAssignments<'db>) -> bool {
+    fn is_always_satisfied_inner(
+        self,
+        db: &'db dyn Db,
+        path: &mut PathAssignments<'_, 'db>,
+    ) -> bool {
         match self {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
@@ -1152,7 +1156,11 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn is_never_satisfied_inner(self, db: &'db dyn Db, path: &mut PathAssignments<'db>) -> bool {
+    fn is_never_satisfied_inner(
+        self,
+        db: &'db dyn Db,
+        path: &mut PathAssignments<'_, 'db>,
+    ) -> bool {
         match self {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
@@ -1404,7 +1412,7 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
-        path: &mut PathAssignments<'db>,
+        path: &mut PathAssignments<'_, 'db>,
     ) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysTrue,
@@ -1975,7 +1983,7 @@ impl<'db> InteriorNode<'db> {
         self,
         db: &'db dyn Db,
         should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
-        path: &mut PathAssignments<'db>,
+        path: &mut PathAssignments<'_, 'db>,
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
         if should_remove(self_constraint) {
@@ -2082,16 +2090,15 @@ impl<'db> InteriorNode<'db> {
         map
     }
 
-    fn path_assignments(
+    fn path_assignments<'a>(
         self,
         db: &'db dyn Db,
-        support: &FxOrderSet<ConstrainedTypeVar<'db>>,
-    ) -> PathAssignments<'db> {
-        let support_order = support.clone();
+        support: &'a FxOrderSet<ConstrainedTypeVar<'db>>,
+    ) -> PathAssignments<'a, 'db> {
         PathAssignments {
             map: self.sequent_map_with_support(db, support),
             assignments: FxOrderMap::default(),
-            support_order,
+            support,
         }
     }
 
@@ -3088,18 +3095,21 @@ impl<'db> SequentMap<'db> {
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
 #[derive(Debug)]
-pub(crate) struct PathAssignments<'db> {
+pub(crate) struct PathAssignments<'a, 'db> {
     map: SequentMap<'db>,
     assignments: FxOrderMap<ConstraintAssignment<'db>, usize>,
-    support_order: FxOrderSet<ConstrainedTypeVar<'db>>,
+    support: &'a FxOrderSet<ConstrainedTypeVar<'db>>,
 }
 
-impl<'db> PathAssignments<'db> {
-    fn new_with_support(_db: &'db dyn Db, support: &FxOrderSet<ConstrainedTypeVar<'db>>) -> Self {
+impl<'a, 'db> PathAssignments<'a, 'db> {
+    fn new_with_support(
+        _db: &'db dyn Db,
+        support: &'a FxOrderSet<ConstrainedTypeVar<'db>>,
+    ) -> Self {
         Self {
             map: SequentMap::new(support.iter().copied()),
             assignments: FxOrderMap::default(),
-            support_order: support.clone(),
+            support,
         }
     }
 
@@ -3147,7 +3157,7 @@ impl<'db> PathAssignments<'db> {
             "walk edge",
         );
         let source_order = self
-            .support_order
+            .support
             .get_index_of(&assignment.constraint())
             .unwrap_or(0);
         let found_conflict = self.add_assignment(db, assignment, source_order);
