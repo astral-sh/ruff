@@ -235,6 +235,78 @@ def takes_no_argument() -> str:
 def g(x): ...
 ```
 
+### Class decorator with wrong signature
+
+When a class is used as a decorator, its constructor (`__init__` or `__new__`) must accept the
+decorated function as an argument. If the class's constructor doesn't accept the right arguments, we
+emit an error:
+
+```py
+class NoInit: ...
+
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+@NoInit
+def foo(): ...
+
+reveal_type(foo)  # revealed: NoInit
+
+# error: [invalid-argument-type]
+@int
+def bar(): ...
+
+reveal_type(bar)  # revealed: int
+```
+
+### Class decorator with correct signature
+
+When a class's constructor accepts the decorated function, no error is emitted:
+
+```py
+from typing import Callable
+
+class Wrapper:
+    def __init__(self, func: Callable[..., object]) -> None:
+        self.func = func
+
+@Wrapper
+def my_func() -> int:
+    return 42
+
+reveal_type(my_func)  # revealed: Wrapper
+```
+
+### Generic class decorator
+
+Generic class decorators are validated through constructor calls:
+
+```py
+from typing import Generic, TypeVar, Callable
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+# error: [invalid-argument-type]
+@Box[int]
+def returns_str() -> str:
+    return "hello"
+```
+
+### `type[SomeClass]` decorator
+
+Using `type[SomeClass]` as a decorator validates against the class's constructor:
+
+```py
+class Base: ...
+
+def apply_decorator(cls: type[Base]) -> None:
+    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+    @cls
+    def inner() -> None: ...
+```
+
 ## Class decorators
 
 Class decorator calls are validated, emitting diagnostics for invalid arguments:
