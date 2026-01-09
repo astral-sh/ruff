@@ -194,10 +194,14 @@ promotion:
 from typing import Iterable
 
 class X[T]:
+    x: T
+
     def __init__(self, x: Iterable[T]): ...
 
 def _(x: list[Literal[1]]):
     reveal_type(X(x))  # revealed: X[Literal[1]]
+    reveal_type(list(x))  # revealed: list[Literal[1]]
+    reveal_type(set(x))  # revealed: set[Literal[1]]
 ```
 
 ## Literals are promoted recursively
