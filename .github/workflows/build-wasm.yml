@@ -56,4 +56,3 @@ jobs:
         with:
           name: artifacts-wasm-${{ matrix.target }}
           path: crates/ruff_wasm/pkg
-
