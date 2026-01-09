@@ -101,14 +101,21 @@ impl SourceKind {
     /// Read the [`SourceKind`] from the given path. Returns `None` if the source is not a Python
     /// source file.
     pub fn from_path(path: &Path, source_type: PySourceType) -> Result<Option<Self>, SourceError> {
-        if source_type.is_ipynb() {
-            let notebook = Notebook::from_path(path)?;
-            Ok(notebook
-                .is_python_notebook()
-                .then_some(Self::IpyNotebook(Box::new(notebook))))
-        } else {
-            let contents = std::fs::read_to_string(path)?;
-            Ok(Some(Self::Python(contents)))
+        match source_type {
+            PySourceType::Ipynb => {
+                let notebook = Notebook::from_path(path)?;
+                Ok(notebook
+                    .is_python_notebook()
+                    .then_some(Self::IpyNotebook(Box::new(notebook))))
+            }
+            PySourceType::Markdown => {
+                let contents = std::fs::read_to_string(path)?;
+                Ok(Some(Self::Markdown(contents)))
+            }
+            PySourceType::Python | PySourceType::Stub => {
+                let contents = std::fs::read_to_string(path)?;
+                Ok(Some(Self::Python(contents)))
+            }
         }
     }
 
