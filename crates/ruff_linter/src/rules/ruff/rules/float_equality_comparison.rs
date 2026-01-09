@@ -14,25 +14,44 @@ use crate::checkers::ast::Checker;
 /// Checks for comparisons between floating-point values using `==` or `!=`.
 ///
 /// ## Why is this bad?
-/// Directly comparing floats can produce unreliable results due to the
-/// inherent imprecision of floating-point arithmetic.
+/// Directly comparing floating-point numbers for exact equality or inequality
+/// can lead to incorrect and non-deterministic outcomes. This is because
+/// floating-point values are finite binary approximations of real numbers.
+/// Many decimal values, such as `0.1`, cannot be represented exactly in binary,
+/// leading to small rounding errors. Furthermore, the results of arithmetic
+/// operations are subject to rounding at each step, and the order of operations
+/// can influence the final result. Consequently, two mathematically equivalent
+/// computations may yield binary floating-point values that differ by a tiny
+/// margin. Relying on exact comparison treats these semantically equal values
+/// as different, breaking logical correctness.
 ///
-/// ## When to use `math.isclose()` vs `numpy.isclose()`
+/// ## How to fix
+/// For general Python code, use tolerance-based comparison functions from the
+/// standard library:
 ///
-/// **Use `math.isclose()` for scalar values:**
-/// - Comparing individual float numbers
-/// - Working with regular Python variables (not arrays)
-/// - When you need a single `True`/`False` result
+/// - Use `math.isclose()` for scalar comparisons
+/// - Use `unittest.assertAlmostEqual()` in tests with `unittest`
 ///
-/// **Use `numpy.isclose()` for array-like objects:**
-/// - Comparing `pandas` Series, `numpy` arrays, or other vectorized objects
-/// - When you need element-wise comparison of arrays
-/// - Working in data science contexts with vectorized operations
+/// Note that `math.isclose()` has a default absolute tolerance of zero, so
+/// when comparing values near zero, you must explicitly specify an `abs_tol`
+/// parameter.
+///
+/// Many frameworks and libraries provide their own specialized functions for
+/// floating-point comparison, often with different default tolerances optimized
+/// for their specific use cases:
+///
+/// - For NumPy arrays: use `numpy.isclose()` or `numpy.allclose()`
+/// - For PyTorch tensors: use `torch.isclose()`
+/// - Check your framework's / library's documentation for equivalent functions
+///
+/// For scenarios requiring exact decimal arithmetic, consider using the
+/// `Decimal` class from the `decimal` module instead of floating-point numbers.
 ///
 /// ## Example
 /// ```python
 /// assert 0.1 + 0.2 == 0.3  # AssertionError
 /// ```
+///
 /// Use instead:
 /// ```python
 /// import math
@@ -40,11 +59,37 @@ use crate::checkers::ast::Checker;
 /// # Scalar comparison
 /// assert math.isclose(0.1 + 0.2, 0.3, abs_tol=1e-9)
 /// ```
+///
+/// ## Ecosystem-specific alternatives
+/// ```python
+/// import numpy as np
+///
+/// arr1 = np.sum(np.array([0.1, 0.2]))
+///
+/// assert np.all(arr1 == 0.3) # AssertionError
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import numpy as np
+///
+/// arr1 = np.sum(np.array([0.1, 0.2]))
+///
+/// assert np.all(np.isclose(arr1, 0.3, rtol=1e-9, atol=1e-9))
+/// # or
+/// assert np.allclose(arr1, 0.3, rtol=1e-9, atol=1e-9)
+/// ```
+///
 /// ## References
+/// - [Python documentation: Floating Point Arithmetic: Issues and Limitations](https://docs.python.org/3/tutorial/floatingpoint.html#floating-point-arithmetic-issues-and-limitations)
+/// - [Decimal fixed point and floating point arithmetic](https://docs.python.org/3/library/decimal.html#module-decimal)
 /// - [Python documentation: `math.isclose`](https://docs.python.org/3/library/math.html#math.isclose)
+/// - [Python documentation: `unittest.assertAlmostEqual`](https://docs.python.org/3/library/unittest.html#unittest.TestCase.assertAlmostEqual)
 /// - [NumPy documentation: `numpy.isclose`](https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose)
+/// - [NumPy documentation: `numpy.allclose`](https://numpy.org/doc/stable/reference/generated/numpy.allclose.html#numpy-allclose)
+/// - [PyTorch documentation: `torch.isclose`](https://docs.pytorch.org/docs/stable/generated/torch.isclose.html#torch-isclose)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(preview_since = "0.14.12")]
 pub(crate) struct FloatEqualityComparison<'a> {
     pub left: &'a str,
     pub right: &'a str,
@@ -59,9 +104,7 @@ impl Violation for FloatEqualityComparison<'_> {
             right,
             operand,
         } = self;
-        format!(
-            "Comparison `{left} {operand} {right}` should be replaced by `math.isclose()` or `numpy.isclose()`"
-        )
+        format!("Unreliable floating point equality comparison `{left} {operand} {right}`")
     }
 }
 
