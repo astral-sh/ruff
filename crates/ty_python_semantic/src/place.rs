@@ -1098,6 +1098,18 @@ fn symbol_impl<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
+    let place = place_table(db, scope)
+        .symbol_id(name)
+        .map(|symbol| {
+            place_by_id(
+                db,
+                scope,
+                symbol.into(),
+                requires_explicit_reexport,
+                considered_definitions,
+            )
+        })
+        .unwrap_or_default();
 
     if name == "platform"
         && file_to_module(db, scope.file(db))
@@ -1111,20 +1123,43 @@ fn symbol_impl<'db>(
                 // Fall through to the looked up type
             }
         }
+    } else if name == "__file__" {
+        // We special-case `__file__` here because we know that for a successfully imported
+        // Python module, that hasn't been explicitly overridden it is always a string,
+        // even though typeshed says `str | None`.
+        // This is not assumed to be the case for stubs though, where we will stick with typeshed
+        if let Some(module) = file_to_module(db, scope.file(db)) {
+            if let Some(f) = module.file(db) {
+                if !f.is_stub(db) {
+                    let implicit_type = KnownClass::Str.to_instance(db);
+
+                    match place.place {
+                        // If explicitly Undefined we assume str
+                        Place::Undefined => {
+                            return Place::bound(implicit_type).into();
+                        }
+                        // If possibly undefined, union with the implicit type
+                        Place::Defined(ty, origin, Definedness::PossiblyUndefined, widening) => {
+                            let new_type = UnionType::from_elements(db, [ty, implicit_type]);
+                            return Place::Defined(
+                                new_type,
+                                origin,
+                                Definedness::AlwaysDefined,
+                                widening,
+                            )
+                            .with_qualifiers(place.qualifiers);
+                        }
+                        // If explicitly defined, respect the definition
+                        Place::Defined(_, _, Definedness::AlwaysDefined, _) => {
+                            return place;
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    place_table(db, scope)
-        .symbol_id(name)
-        .map(|symbol| {
-            place_by_id(
-                db,
-                scope,
-                symbol.into(),
-                requires_explicit_reexport,
-                considered_definitions,
-            )
-        })
-        .unwrap_or_default()
+    place
 }
 
 fn place_impl<'db>(
