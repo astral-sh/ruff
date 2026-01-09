@@ -22,6 +22,8 @@ pub enum SourceKind {
     Python(String),
     /// The source contains a Jupyter notebook.
     IpyNotebook(Box<Notebook>),
+    /// The source contains Markdown text.
+    Markdown(String),
 }
 
 impl SourceKind {
@@ -33,6 +35,7 @@ impl SourceKind {
         match self {
             SourceKind::IpyNotebook(notebook) => Some(notebook),
             SourceKind::Python(_) => None,
+            SourceKind::Markdown(_) => None,
         }
     }
 
@@ -40,20 +43,36 @@ impl SourceKind {
         match self {
             SourceKind::Python(code) => Some(code),
             SourceKind::IpyNotebook(_) => None,
+            SourceKind::Markdown(_) => None,
+        }
+    }
+
+    pub fn as_markdown(&self) -> Option<&str> {
+        match self {
+            SourceKind::Markdown(code) => Some(code),
+            SourceKind::Python(_) => None,
+            SourceKind::IpyNotebook(_) => None,
         }
     }
 
     pub fn expect_python(self) -> String {
         match self {
             SourceKind::Python(code) => code,
-            SourceKind::IpyNotebook(_) => panic!("expected python code"),
+            _ => panic!("expected python code"),
         }
     }
 
     pub fn expect_ipy_notebook(self) -> Notebook {
         match self {
             SourceKind::IpyNotebook(notebook) => *notebook,
-            SourceKind::Python(_) => panic!("expected ipy notebook"),
+            _ => panic!("expected ipy notebook"),
+        }
+    }
+
+    pub fn expect_markdown(self) -> String {
+        match self {
+            SourceKind::Markdown(code) => code,
+            _ => panic!("expected markdown text"),
         }
     }
 
@@ -66,6 +85,7 @@ impl SourceKind {
                 SourceKind::IpyNotebook(cloned)
             }
             SourceKind::Python(_) => SourceKind::Python(new_source),
+            SourceKind::Markdown(_) => SourceKind::Markdown(new_source),
         }
     }
 
@@ -74,6 +94,7 @@ impl SourceKind {
         match self {
             SourceKind::Python(source) => source,
             SourceKind::IpyNotebook(notebook) => notebook.source_code(),
+            SourceKind::Markdown(source) => source,
         }
     }
 
@@ -120,6 +141,10 @@ impl SourceKind {
                 notebook.write(writer)?;
                 Ok(())
             }
+            SourceKind::Markdown(source) => {
+                writer.write_all(source.as_bytes())?;
+                Ok(())
+            }
         }
     }
 
@@ -138,6 +163,10 @@ impl SourceKind {
             }),
             (SourceKind::IpyNotebook(src), SourceKind::IpyNotebook(dst)) => Some(SourceKindDiff {
                 kind: DiffKind::IpyNotebook(src, dst),
+                path,
+            }),
+            (SourceKind::Markdown(src), SourceKind::Markdown(dst)) => Some(SourceKindDiff {
+                kind: DiffKind::Markdown(src, dst),
                 path,
             }),
             _ => None,
@@ -212,6 +241,17 @@ impl std::fmt::Display for SourceKindDiff<'_> {
 
                 writeln!(f)?;
             }
+            DiffKind::Markdown(original, modified) => {
+                let mut diff = CodeDiff::new(original, modified);
+
+                let relative_path = self.path.map(fs::relativize_path);
+
+                if let Some(relative_path) = &relative_path {
+                    diff.header(relative_path, relative_path);
+                }
+
+                writeln!(f, "{diff}")?;
+            }
         }
 
         Ok(())
@@ -222,6 +262,7 @@ impl std::fmt::Display for SourceKindDiff<'_> {
 enum DiffKind<'a> {
     Python(&'a str, &'a str),
     IpyNotebook(&'a Notebook, &'a Notebook),
+    Markdown(&'a str, &'a str),
 }
 
 struct CodeDiff<'a> {
