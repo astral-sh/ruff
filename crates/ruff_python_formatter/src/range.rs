@@ -271,7 +271,7 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
                 && verbatim_range.intersect(self.range).is_some()
             {
                 return;
-            };
+            }
             self.visit_stmt(stmt);
         }
         self.suppressed = Suppressed::No;
