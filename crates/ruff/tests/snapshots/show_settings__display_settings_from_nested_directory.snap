@@ -1,28 +1,23 @@
 ---
-source: crates/ruff/tests/cli/lint.rs
+source: crates/ruff/tests/show_settings.rs
 info:
   program: ruff
   args:
     - check
-    - "--no-cache"
-    - "--output-format"
-    - concise
     - "--show-settings"
-    - "--select"
-    - UP007
-    - foo/test.py
+    - subdir/test.py
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-Resolved settings for: "[TMP]/foo/test.py"
-Settings path: "[TMP]/foo/pyproject.toml"
+Resolved settings for: "<temp_dir>/subdir/test.py"
+Settings path: "<temp_dir>/subdir/pyproject.toml"
 
 # General Settings
-cache_dir = "[TMP]/foo/.ruff_cache"
+cache_dir = "<temp_dir>/subdir/.ruff_cache"
 fix = false
 fix_only = false
-output_format = concise
+output_format = full
 show_fixes = false
 unsafe_fixes = hint
 
@@ -64,21 +59,145 @@ file_resolver.include = [
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
-file_resolver.project_root = "[TMP]/foo"
+file_resolver.project_root = "<temp_dir>/subdir"
 
 # Linter Settings
 linter.exclude = []
-linter.project_root = "[TMP]/foo"
+linter.project_root = "<temp_dir>/subdir"
 linter.rules.enabled = [
-	non-pep604-annotation-union (UP007),
+	unsorted-imports (I001),
+	missing-required-import (I002),
+	mixed-spaces-and-tabs (E101),
+	multiple-imports-on-one-line (E401),
+	module-import-not-at-top-of-file (E402),
+	line-too-long (E501),
+	multiple-statements-on-one-line-colon (E701),
+	multiple-statements-on-one-line-semicolon (E702),
+	useless-semicolon (E703),
+	none-comparison (E711),
+	true-false-comparison (E712),
+	not-in-test (E713),
+	not-is-test (E714),
+	type-comparison (E721),
+	bare-except (E722),
+	lambda-assignment (E731),
+	ambiguous-variable-name (E741),
+	ambiguous-class-name (E742),
+	ambiguous-function-name (E743),
+	io-error (E902),
+	unused-import (F401),
+	import-shadowed-by-loop-var (F402),
+	undefined-local-with-import-star (F403),
+	late-future-import (F404),
+	undefined-local-with-import-star-usage (F405),
+	undefined-local-with-nested-import-star-usage (F406),
+	future-feature-not-defined (F407),
+	percent-format-invalid-format (F501),
+	percent-format-expected-mapping (F502),
+	percent-format-expected-sequence (F503),
+	percent-format-extra-named-arguments (F504),
+	percent-format-missing-argument (F505),
+	percent-format-mixed-positional-and-named (F506),
+	percent-format-positional-count-mismatch (F507),
+	percent-format-star-requires-sequence (F508),
+	percent-format-unsupported-format-character (F509),
+	string-dot-format-invalid-format (F521),
+	string-dot-format-extra-named-arguments (F522),
+	string-dot-format-extra-positional-arguments (F523),
+	string-dot-format-missing-arguments (F524),
+	string-dot-format-mixing-automatic (F525),
+	f-string-missing-placeholders (F541),
+	multi-value-repeated-key-literal (F601),
+	multi-value-repeated-key-variable (F602),
+	expressions-in-star-assignment (F621),
+	multiple-starred-expressions (F622),
+	assert-tuple (F631),
+	is-literal (F632),
+	invalid-print-syntax (F633),
+	if-tuple (F634),
+	break-outside-loop (F701),
+	continue-outside-loop (F702),
+	yield-outside-function (F704),
+	return-outside-function (F706),
+	default-except-not-last (F707),
+	forward-annotation-syntax-error (F722),
+	redefined-while-unused (F811),
+	undefined-name (F821),
+	undefined-export (F822),
+	undefined-local (F823),
+	unused-variable (F841),
+	unused-annotation (F842),
+	raise-not-implemented (F901),
 ]
 linter.rules.should_fix = [
-	non-pep604-annotation-union (UP007),
+	unsorted-imports (I001),
+	missing-required-import (I002),
+	mixed-spaces-and-tabs (E101),
+	multiple-imports-on-one-line (E401),
+	module-import-not-at-top-of-file (E402),
+	line-too-long (E501),
+	multiple-statements-on-one-line-colon (E701),
+	multiple-statements-on-one-line-semicolon (E702),
+	useless-semicolon (E703),
+	none-comparison (E711),
+	true-false-comparison (E712),
+	not-in-test (E713),
+	not-is-test (E714),
+	type-comparison (E721),
+	bare-except (E722),
+	lambda-assignment (E731),
+	ambiguous-variable-name (E741),
+	ambiguous-class-name (E742),
+	ambiguous-function-name (E743),
+	io-error (E902),
+	unused-import (F401),
+	import-shadowed-by-loop-var (F402),
+	undefined-local-with-import-star (F403),
+	late-future-import (F404),
+	undefined-local-with-import-star-usage (F405),
+	undefined-local-with-nested-import-star-usage (F406),
+	future-feature-not-defined (F407),
+	percent-format-invalid-format (F501),
+	percent-format-expected-mapping (F502),
+	percent-format-expected-sequence (F503),
+	percent-format-extra-named-arguments (F504),
+	percent-format-missing-argument (F505),
+	percent-format-mixed-positional-and-named (F506),
+	percent-format-positional-count-mismatch (F507),
+	percent-format-star-requires-sequence (F508),
+	percent-format-unsupported-format-character (F509),
+	string-dot-format-invalid-format (F521),
+	string-dot-format-extra-named-arguments (F522),
+	string-dot-format-extra-positional-arguments (F523),
+	string-dot-format-missing-arguments (F524),
+	string-dot-format-mixing-automatic (F525),
+	f-string-missing-placeholders (F541),
+	multi-value-repeated-key-literal (F601),
+	multi-value-repeated-key-variable (F602),
+	expressions-in-star-assignment (F621),
+	multiple-starred-expressions (F622),
+	assert-tuple (F631),
+	is-literal (F632),
+	invalid-print-syntax (F633),
+	if-tuple (F634),
+	break-outside-loop (F701),
+	continue-outside-loop (F702),
+	yield-outside-function (F704),
+	return-outside-function (F706),
+	default-except-not-last (F707),
+	forward-annotation-syntax-error (F722),
+	redefined-while-unused (F811),
+	undefined-name (F821),
+	undefined-export (F822),
+	undefined-local (F823),
+	unused-variable (F841),
+	unused-annotation (F842),
+	raise-not-implemented (F901),
 ]
 linter.per_file_ignores = {}
 linter.safety_table.forced_safe = []
 linter.safety_table.forced_unsafe = []
-linter.unresolved_target_version = 3.10
+linter.unresolved_target_version = none
 linter.per_file_target_version = {}
 linter.preview = disabled
 linter.explicit_preview_rules = false
@@ -91,11 +210,11 @@ linter.ignore_init_module_imports = true
 linter.logger_objects = []
 linter.namespace_packages = []
 linter.src = [
-	"[TMP]/foo",
-	"[TMP]/foo/src",
+	"<temp_dir>/subdir",
+	"<temp_dir>/subdir/src",
 ]
 linter.tab_size = 4
-linter.line_length = 88
+linter.line_length = 120
 linter.task_tags = [
 	TODO,
 	FIXME,
@@ -242,7 +361,7 @@ linter.pep8_naming.ignore_names = [
 ]
 linter.pep8_naming.classmethod_decorators = []
 linter.pep8_naming.staticmethod_decorators = []
-linter.pycodestyle.max_line_length = 88
+linter.pycodestyle.max_line_length = 120
 linter.pycodestyle.max_doc_length = none
 linter.pycodestyle.ignore_overlong_task_comments = false
 linter.pyflakes.extend_generics = []
@@ -270,7 +389,7 @@ formatter.exclude = []
 formatter.unresolved_target_version = 3.10
 formatter.per_file_target_version = {}
 formatter.preview = disabled
-formatter.line_width = 88
+formatter.line_width = 120
 formatter.line_ending = auto
 formatter.indent_style = space
 formatter.indent_width = 4
