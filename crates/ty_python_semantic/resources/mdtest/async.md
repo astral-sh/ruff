@@ -130,7 +130,12 @@ async def f():
 reveal_type(f())  # revealed: CoroutineType[Any, Any, Unknown]
 ```
 
-## Awaiting intersection types
+## Awaiting intersection types (3.13+)
+
+```toml
+[environment]
+python-version = "3.13"
+```
 
 Intersection types can be awaited when their elements are awaitable. This is important for patterns
 like `inspect.isawaitable()` which narrow types to intersections with `Awaitable`.
@@ -151,11 +156,6 @@ async def test():
 
 The return type of awaiting an intersection is the intersection of the return types of awaiting each
 element:
-
-```toml
-[environment]
-python-version = "3.13"
-```
 
 ```py
 from typing import Coroutine
@@ -198,4 +198,27 @@ class NotAwaitable2:
 async def test(x: Intersection[NotAwaitable1, NotAwaitable2]):
     # error: [invalid-await]
     await x
+```
+
+## Awaiting intersection types (Python 3.12 or lower)
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The return type of awaiting an intersection is the intersection of the return types of awaiting each
+element:
+
+```py
+from typing import Coroutine
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, object, B]]):
+    y = await x
+    # TODO: should be `A & B`, but suffers from https://github.com/astral-sh/ty/issues/2426
+    reveal_type(y)  # revealed: A
 ```
