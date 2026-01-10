@@ -1833,7 +1833,7 @@ impl<'db> Type<'db> {
     ///
     /// This method may have false negatives, but it should not have false positives. It should be
     /// a cheap shallow check, not an exhaustive recursive check.
-    fn subtyping_is_always_reflexive(self) -> bool {
+    const fn subtyping_is_always_reflexive(self) -> bool {
         match self {
             Type::Never
             | Type::FunctionLiteral(..)
@@ -1854,6 +1854,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::PropertyInstance(_)
+            | Type::TypeVar(_)
             // might inherit `Any`, but subtyping is still reflexive
             | Type::ClassLiteral(_)
              => true,
@@ -1865,7 +1866,6 @@ impl<'db> Type<'db> {
             | Type::Union(_)
             | Type::Intersection(_)
             | Type::Callable(_)
-            | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
