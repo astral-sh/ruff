@@ -36,6 +36,7 @@ com2ann
 comtypes
 core
 cpython
+cryptography
 cwltool
 dacite
 dd-trace-py
@@ -79,6 +80,7 @@ mypy-protobuf
 mypy_primer
 nionutils
 nox
+numpy-stl
 openlibrary
 operator
 optuna
