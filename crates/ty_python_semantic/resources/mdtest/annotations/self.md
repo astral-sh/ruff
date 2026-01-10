@@ -445,6 +445,28 @@ def _(c: MyClass):
     c.field = c
 ```
 
+Accessing base class attributes through `Self` should work correctly. This is a common pattern in
+ORMs like Django where a base `Model` class defines methods that access `self` attributes, and those
+methods are inherited by subclasses:
+
+```py
+from typing import Self
+
+class Model:
+    id: int
+    name: str
+
+    def get_id(self: Self) -> int:
+        # Self is bounded by Model here, but should still find id
+        reveal_type(self.id)  # revealed: int
+        return self.id
+
+class User(Model):
+    email: str
+
+reveal_type(User().get_id())  # revealed: int
+```
+
 Attributes can also refer to a generic parameter:
 
 ```py
@@ -727,4 +749,75 @@ class C:
 
 def _(c: CallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None
+```
+
+## Bound methods from internal data structures stored as instance attributes
+
+This tests the pattern where a class stores bound methods from internal data structures (like
+`deque` or `dict`) as instance attributes for performance. When these bound methods are later
+accessed and called through `self`, the `Self` type binding should not interfere with their
+signatures.
+
+This is a regression test for false positives found in ecosystem projects like jinja's `LRUCache`
+and beartype's `CacheUnboundedStrong`.
+
+```py
+from collections import deque
+from typing import Any
+
+class LRUCache:
+    """A simple LRU cache that stores bound methods from an internal deque."""
+
+    def __init__(self, capacity: int) -> None:
+        self.capacity = capacity
+        self._mapping: dict[Any, Any] = {}
+        self._queue: deque[Any] = deque()
+        self._postinit()
+
+    def _postinit(self) -> None:
+        # Store bound methods from the internal deque for faster attribute lookup
+        self._popleft = self._queue.popleft
+        self._pop = self._queue.pop
+        self._remove = self._queue.remove
+        self._append = self._queue.append
+
+    def __getitem__(self, key: Any) -> Any:
+        # These should not produce errors - the bound methods have signatures
+        # from deque, not involving Self
+        self._remove(key)
+        self._append(key)
+        return self._mapping[key]
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._remove(key)
+        if len(self._queue) >= self.capacity:
+            self._popleft()
+        self._append(key)
+        self._mapping[key] = value
+
+    def __delitem__(self, key: Any) -> None:
+        self._remove(key)
+        del self._mapping[key]
+```
+
+Similarly for dict-based patterns:
+
+```py
+from typing import Hashable
+
+class CacheMap:
+    """A cache that stores bound methods from an internal dict."""
+
+    def __init__(self) -> None:
+        self._key_to_value: dict[Hashable, object] = {}
+        self._key_to_value_get = self._key_to_value.get
+        self._key_to_value_set = self._key_to_value.__setitem__
+
+    def cache_or_get_cached_value(self, key: Hashable, value: object) -> object:
+        # This should not produce errors - we're using dict's get/setitem methods
+        cached_value = self._key_to_value_get(key)
+        if cached_value is not None:
+            return cached_value
+        self._key_to_value_set(key, value)
+        return value
 ```
