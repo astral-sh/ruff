@@ -19,7 +19,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
-    Completion as SemanticCompletion, HasType, NameKind, SemanticModel,
+    Completion as SemanticCompletion, NameKind, SemanticModel,
     types::{CycleDetector, KnownClass, StringLiteralType, Type},
 };
 
@@ -305,6 +305,7 @@ impl<'db> Completion<'db> {
     }
 }
 
+impl<'db> Completion<'db> {
     /// Returns the "kind" of this completion.
     ///
     /// This is meant to be a very general classification of this completion.
@@ -372,6 +373,7 @@ impl<'db> Completion<'db> {
                 .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
         })
     }
+}
 /// A builder for construction a `Completion`.
 #[derive(Debug)]
 struct CompletionBuilder<'db> {
@@ -838,11 +840,11 @@ impl<'m> ContextCursor<'m> {
     /// Determine whether we're in a syntactic place where literal suggestions make sense.
     fn string_literal_site(&self) -> Option<StringLiteralSite<'m>> {
         let range = TextRange::empty(self.offset);
-        let covering = self.covering_node(TextRange::empty(self.offset));
+        let covering = self.covering_node(range);
 
         // Call argument site
         if self
-            .covering_node(TextRange::empty(self.offset))
+            .covering_node(range)
             .ancestors()
             .take_while(|node| !node.is_statement())
             .any(|node| node.is_arguments())
@@ -862,7 +864,6 @@ impl<'m> ContextCursor<'m> {
         }
 
         // Annotated assignment RHS: `x: T = "..."`
-        let range = TextRange::empty(self.offset);
         let covering = self.covering_node(range);
         let ann = covering.ancestors().find_map(|node| match node {
             AnyNodeRef::StmtAnnAssign(ann_assign) => {
@@ -1475,19 +1476,12 @@ fn add_string_literal_completions<'db>(
             Cow::Owned(s) => s.into_boxed_str(),
         };
 
-        completions.add(Completion {
-            name: Name::new(value),
-            qualified: None,
-            insert: Some(insert),
-            ty: Some(Type::StringLiteral(literal_ty)),
-            kind: Some(CompletionKind::Value),
-            module_name: None,
-            import: None,
-            builtin: false,
-            is_type_check_only: false,
-            is_definitively_raisable: false,
-            documentation: None,
-        });
+        completions.add(
+            CompletionBuilder::new(Name::new(value))
+                .insert(Name::new(insert))
+                .ty(Type::StringLiteral(literal_ty))
+                .kind(CompletionKind::Value),
+        );
     }
 }
 
@@ -1526,11 +1520,8 @@ fn collect_from_signature<'db>(
     let Some(parameter) = signature.parameters.get(active_parameter) else {
         return;
     };
-    let Some(ty) = parameter.ty else {
-        return;
-    };
 
-    collect_string_literals_from_type(db, ty, seen_types, out);
+    collect_string_literals_from_type(db, parameter.ty, seen_types, out);
 }
 
 fn collect_annotation_site_literals<'db>(
@@ -8475,6 +8466,7 @@ TypedDi<CURSOR>
     left :: Literal["left"]
     right :: Literal["right"]
     "#);
+    }
     /// Tests that `xs = ["..."]; xs[0].<CURSOR>` gets completions
     /// appropriate for `str`.
     #[test]
