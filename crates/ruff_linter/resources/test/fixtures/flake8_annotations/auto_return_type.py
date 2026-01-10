@@ -302,3 +302,26 @@ def func(x: int):
             return 1
         case y:
             return "foo"
+
+
+# Test cases for NotImplementedError - should not get NoReturn auto-fix
+def func():
+    raise NotImplementedError
+
+
+class Class:
+    @staticmethod
+    def func():
+        raise NotImplementedError
+
+    @classmethod
+    def method(cls):
+        raise NotImplementedError
+
+    def instance_method(self):
+        raise NotImplementedError
+
+
+# Test case: function that raises other exceptions should still get NoReturn
+def func():
+    raise ValueError
