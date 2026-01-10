@@ -246,6 +246,41 @@ reveal_type(c1 > c2)  # revealed: bool
 reveal_type(c1 >= c2)  # revealed: bool
 ```
 
+## Method precedence with inheritance
+
+The decorator always prefers `__lt__` > `__le__` > `__gt__` > `__ge__`, regardless of whether the
+method is defined locally or inherited. In this example, the inherited `__lt__` takes precedence
+over the locally-defined `__gt__`:
+
+```py
+from functools import total_ordering
+from typing import Literal
+
+class Base:
+    def __lt__(self, other: "Base") -> Literal[True]:
+        return True
+
+@total_ordering
+class Child(Base):
+    # __gt__ is defined locally, but __lt__ (inherited) takes precedence
+    def __gt__(self, other: "Child") -> Literal[False]:
+        return False
+
+c1 = Child()
+c2 = Child()
+
+# __lt__ is inherited from Base
+reveal_type(c1 < c2)  # revealed: Literal[True]
+
+# __gt__ is defined locally on Child
+reveal_type(c1 > c2)  # revealed: Literal[False]
+
+# __le__ and __ge__ are synthesized from __lt__ (the highest-priority method),
+# even though __gt__ is defined locally on the class itself
+reveal_type(c1 <= c2)  # revealed: bool
+reveal_type(c1 >= c2)  # revealed: bool
+```
+
 ## Explicitly-defined methods are not overridden
 
 When a class explicitly defines multiple comparison methods, the decorator does not override them.
@@ -362,6 +397,79 @@ reveal_type(n1 > n2)  # revealed: bool
 # These comparison operators are not available.
 n1 <= n2  # error: [unsupported-operator]
 n1 >= n2  # error: [unsupported-operator]
+```
+
+## Non-bool return type
+
+When the root ordering method returns a non-bool type (like `int`), the synthesized methods return a
+union of that type and `bool`. This is because `@total_ordering` generates methods like:
+
+```python
+def __le__(self, other):
+    return self < other or self == other
+```
+
+If `__lt__` returns `int`, then the synthesized `__le__` could return either `int` (from
+`self < other`) or `bool` (from `self == other`). Since `bool` is a subtype of `int`, the union
+simplifies to `int`:
+
+```py
+from functools import total_ordering
+
+@total_ordering
+class IntReturn:
+    def __init__(self, value: int):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, IntReturn):
+            return NotImplemented
+        return self.value == other.value
+
+    def __lt__(self, other: "IntReturn") -> int:
+        return self.value - other.value
+
+a = IntReturn(10)
+b = IntReturn(20)
+
+# User-defined __lt__ returns int.
+reveal_type(a < b)  # revealed: int
+
+# Synthesized methods return int (the union int | bool simplifies to int
+# because bool is a subtype of int in Python).
+reveal_type(a <= b)  # revealed: int
+reveal_type(a > b)  # revealed: int
+reveal_type(a >= b)  # revealed: int
+```
+
+When the root method returns a type that is not a supertype of `bool`, the union is preserved:
+
+```py
+from functools import total_ordering
+
+@total_ordering
+class StrReturn:
+    def __init__(self, value: str):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, StrReturn):
+            return NotImplemented
+        return self.value == other.value
+
+    def __lt__(self, other: "StrReturn") -> str:
+        return self.value
+
+a = StrReturn("a")
+b = StrReturn("b")
+
+# User-defined __lt__ returns str.
+reveal_type(a < b)  # revealed: str
+
+# Synthesized methods return str | bool.
+reveal_type(a <= b)  # revealed: str | bool
+reveal_type(a > b)  # revealed: str | bool
+reveal_type(a >= b)  # revealed: str | bool
 ```
 
 ## Function call form

@@ -1598,8 +1598,8 @@ impl<'db> ClassLiteral<'db> {
 
     /// Returns the type of the ordering method used by `@total_ordering`, if any.
     ///
-    /// We prefer methods defined on the class itself, following `functools.total_ordering`
-    /// precedence, and fall back to inherited methods if none are defined locally.
+    /// Following `functools.total_ordering` precedence, we prefer `__lt__` > `__le__` > `__gt__` >
+    /// `__ge__`, regardless of whether the method is defined locally or inherited.
     pub(super) fn total_ordering_root_method(
         self,
         db: &'db dyn Db,
@@ -1607,17 +1607,8 @@ impl<'db> ClassLiteral<'db> {
     ) -> Option<Type<'db>> {
         const ORDERING_METHODS: [&str; 4] = ["__lt__", "__le__", "__gt__", "__ge__"];
 
-        let body_scope = self.body_scope(db);
-
         for name in ORDERING_METHODS {
-            let member = class_member(db, body_scope, name);
-            if let Some(ty) = member.ignore_possibly_undefined() {
-                return Some(ty.apply_optional_specialization(db, specialization));
-            }
-        }
-
-        for name in ORDERING_METHODS {
-            for base in self.iter_mro(db, specialization).skip(1) {
+            for base in self.iter_mro(db, specialization) {
                 let Some(base_class) = base.into_class() else {
                     continue;
                 };
@@ -2484,8 +2475,19 @@ impl<'db> ClassLiteral<'db> {
         // ordering method. The decorator requires at least one of __lt__,
         // __le__, __gt__, or __ge__ to be defined (either in this class or
         // inherited from a superclass, excluding `object`).
+        //
+        // Only synthesize methods that are not already defined in the MRO.
         if self.total_ordering(db)
             && matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
+            && !self
+                .iter_mro(db, specialization)
+                .filter_map(ClassBase::into_class)
+                .filter(|class| !class.class_literal(db).0.is_known(db, KnownClass::Object))
+                .any(|class| {
+                    class_member(db, class.class_literal(db).0.body_scope(db), name)
+                        .ignore_possibly_undefined()
+                        .is_some()
+                })
             && self.has_ordering_method_in_mro(db, specialization)
             && let Some(root_method_ty) = self.total_ordering_root_method(db, specialization)
             && let Some(callables) = root_method_ty.try_upcast_to_callable(db)
@@ -2494,10 +2496,16 @@ impl<'db> ClassLiteral<'db> {
             let synthesized_callables = callables.map(|callable| {
                 let signatures = CallableSignature::from_overloads(
                     callable.signatures(db).iter().map(|signature| {
+                        // The generated methods return a union of the root method's return type
+                        // and `bool`. This is because `@total_ordering` synthesizes methods like:
+                        //     def __gt__(self, other): return not (self == other or self < other)
+                        // If `__lt__` returns `int`, then `__gt__` could return `int | bool`.
+                        let return_ty =
+                            UnionType::from_elements(db, [signature.return_ty, bool_ty]);
                         Signature::new_generic(
                             signature.generic_context,
                             signature.parameters().clone(),
-                            bool_ty,
+                            return_ty,
                         )
                     }),
                 );
