@@ -30,8 +30,7 @@ mypy_primer \
     --project-selector '/black$'
 ```
 
-This will show the diagnostics diff for the `black` project between the `main` branch and your `my/feature` branch. To run the
-diff for all projects we currently enable in CI, use `--project-selector "/($(paste -s -d'|' crates/ty_python_semantic/resources/primer/good.txt))\$"`.
+This will show the diagnostics diff for the `black` project between the `main` branch and your `my/feature` branch.
 
 You can also take a look at the [full list of ecosystem projects]. Note that some of them might still need a `ty_paths` configuration
 option to work correctly.

@@ -62,7 +62,6 @@ jobs:
             --repository ruff \
             analyze \
             --profile=profiling \
-            --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
           mkdir dist

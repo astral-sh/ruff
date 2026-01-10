@@ -62,13 +62,11 @@ jobs:
           echo "new commit"
           git checkout -b new_commit "$GITHUB_SHA"
           git rev-list --format=%s --max-count=1 new_commit
-          cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
 
           echo "old commit (merge base)"
           MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
           git checkout -b old_commit "$MERGE_BASE"
           git rev-list --format=%s --max-count=1 old_commit
-          cp crates/ty_python_semantic/resources/primer/good.txt projects_old.txt
 
           cd ..
 
@@ -78,8 +76,6 @@ jobs:
             --repository ruff \
             diff \
             --profile=profiling \
-            --projects-old ruff/projects_old.txt \
-            --projects-new ruff/projects_new.txt \
             --old old_commit \
             --new new_commit \
             --output-old diagnostics-old.json \
