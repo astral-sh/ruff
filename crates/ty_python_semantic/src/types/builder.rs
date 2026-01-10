@@ -36,6 +36,8 @@
 //! shares exactly the same possible super-types, and none of them are subtypes of each other
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
+use std::hash::BuildHasherDefault;
+
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
@@ -706,7 +708,10 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        let mut types = vec![];
+        let mut types: FxOrderSet<Type<'db>> = FxOrderSet::with_capacity_and_hasher(
+            self.elements.len(),
+            BuildHasherDefault::default(),
+        );
         for element in self.elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
@@ -721,7 +726,9 @@ impl<'db> UnionBuilder<'db> {
                 UnionElement::EnumLiterals { literals, .. } => {
                     types.extend(literals.into_iter().map(Type::EnumLiteral));
                 }
-                UnionElement::Type(ty) => types.push(ty),
+                UnionElement::Type(ty) => {
+                    types.insert(ty);
+                }
             }
         }
         if self.order_elements {
@@ -730,11 +737,14 @@ impl<'db> UnionBuilder<'db> {
         match types.len() {
             0 => None,
             1 => Some(types[0]),
-            _ => Some(Type::Union(UnionType::new(
-                self.db,
-                types.into_boxed_slice(),
-                self.recursively_defined,
-            ))),
+            _ => {
+                types.shrink_to_fit();
+                Some(Type::Union(UnionType::new(
+                    self.db,
+                    types,
+                    self.recursively_defined,
+                )))
+            }
         }
     }
 }
@@ -847,7 +857,7 @@ impl<'db> IntersectionBuilder<'db> {
                             db,
                             enum_member_literals(db, instance.class_literal(db), None)
                                 .expect("Calling `enum_member_literals` on an enum class")
-                                .collect::<Box<[_]>>(),
+                                .collect::<FxOrderSet<_>>(),
                             RecursivelyDefined::No,
                         )),
                         seen_aliases,
@@ -1412,6 +1422,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{IntersectionBuilder, Type, UnionBuilder, UnionType};
 
+    use crate::FxOrderSet;
     use crate::db::tests::setup_db;
     use crate::place::known_module_symbol;
     use crate::types::enums::enum_member_literals;
@@ -1445,7 +1456,7 @@ mod tests {
         let t1 = Type::IntLiteral(1);
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
-        assert_eq!(union.elements(&db), &[t0, t1]);
+        assert_eq!(union.elements(&db), &FxOrderSet::from_iter([t0, t1]));
     }
 
     #[test]

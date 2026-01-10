@@ -7268,15 +7268,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|overload| overload.signature.generic_context.is_some());
 
         // If the type context is a union, attempt to narrow to a specific element.
-        let narrow_targets: &[_] = match call_expression_tcx.annotation {
+        let narrow_targets = match call_expression_tcx.annotation {
             // TODO: We could theoretically attempt to narrow to every element of
             // the power set of this union. However, this leads to an exponential
             // explosion of inference attempts, and is rarely needed in practice.
             //
             // We only need to attempt narrowing on generic calls, otherwise the type
             // context has no effect.
-            Some(Type::Union(union)) if has_generic_context => union.elements(db),
-            _ => &[],
+            Some(Type::Union(union)) if has_generic_context => {
+                Either::Left(union.elements(db).iter().copied())
+            }
+            _ => Either::Right(std::iter::empty()),
         };
 
         // We silence diagnostics until we successfully narrow to a specific type.
@@ -7346,10 +7348,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Prefer the declared type of generic classes.
         for narrowed_ty in narrow_targets
-            .iter()
+            .clone()
             .filter(|ty| ty.class_specialization(db).is_some())
         {
-            if let Some(result) = try_narrow(*narrowed_ty) {
+            if let Some(result) = try_narrow(narrowed_ty) {
                 return result;
             }
         }
@@ -7358,11 +7360,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // TODO: We could also attempt an inference without type context, but this
         // leads to similar performance issues.
-        for narrowed_ty in narrow_targets
-            .iter()
-            .filter(|ty| ty.class_specialization(db).is_none())
-        {
-            if let Some(result) = try_narrow(*narrowed_ty) {
+        for narrowed_ty in narrow_targets.filter(|ty| ty.class_specialization(db).is_none()) {
+            if let Some(result) = try_narrow(narrowed_ty) {
                 return result;
             }
         }
