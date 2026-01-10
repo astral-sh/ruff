@@ -12614,16 +12614,67 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value_node = subscript.value.as_ref();
 
         let inferred = match (value_ty, slice_ty) {
+            (Type::Dynamic(_) | Type::Never, _) => Some(value_ty),
+
+            (Type::TypeAlias(alias), _) => Some(self.infer_subscript_expression_types(
+                subscript,
+                alias.value_type(self.db()),
+                slice_ty,
+                expr_context,
+            )),
+
+            (_, Type::TypeAlias(alias)) => Some(self.infer_subscript_expression_types(
+                subscript,
+                value_ty,
+                alias.value_type(self.db()),
+                expr_context,
+            )),
+
+            (Type::TypeVar(var), _) => {
+                let recurse_into_bounds = match slice_ty {
+                    Type::IntLiteral(_) | Type::BooleanLiteral(_) => true,
+                    Type::NominalInstance(nominal) => nominal.slice_literal(db).is_some(),
+                    _ => false,
+                };
+                if recurse_into_bounds {
+                    match var.typevar(db).bound_or_constraints(db) {
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            Some(self.infer_subscript_expression_types(
+                                subscript,
+                                bound,
+                                slice_ty,
+                                expr_context,
+                            ))
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            Some(self.infer_subscript_expression_types(
+                                subscript,
+                                constraints.as_type(db),
+                                slice_ty,
+                                expr_context,
+                            ))
+                        }
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+
             (Type::Union(union), _) => Some(union.map(db, |element| {
                 self.infer_subscript_expression_types(subscript, *element, slice_ty, expr_context)
+            })),
+
+            (_, Type::Union(union)) => Some(union.map(db, |element| {
+                self.infer_subscript_expression_types(subscript, value_ty, *element, expr_context)
             })),
 
             // TODO: we can map over the intersection and fold the results back into an intersection,
             // but we need to make sure we avoid emitting a diagnostic if one positive element has a `__getitem__`
             // method but another does not. This means `infer_subscript_expression_types`
             // needs to return a `Result` rather than eagerly emitting diagnostics.
-            (Type::Intersection(_), _) => {
-                Some(todo_type!("Subscript expressions on intersections"))
+            (Type::Intersection(_), _) | (_, Type::Intersection(_)) => {
+                Some(todo_type!("Subscript expressions with intersections"))
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
@@ -12702,6 +12753,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::unknown()
                     }
                 }),
+
+            (Type::LiteralString, Type::IntLiteral(_) | Type::BooleanLiteral(_)) => {
+                Some(Type::LiteralString)
+            }
+
+            (Type::LiteralString, Type::NominalInstance(nominal))
+                if nominal.slice_literal(db).is_some() =>
+            {
+                Some(Type::LiteralString)
+            }
 
             // Ex) Given `b"value"[1]`, return `97` (i.e., `ord(b"a")`)
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(i64_int)) => {
@@ -12834,7 +12895,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(todo_type!("Inference of subscript on special form"))
             }
 
-            _ => None,
+            (
+                Type::FunctionLiteral(_)
+                | Type::WrapperDescriptor(_)
+                | Type::BoundMethod(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::AlwaysFalsy
+                | Type::AlwaysTruthy
+                | Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::ProtocolInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::EnumLiteral(_)
+                | Type::BoundSuper(_)
+                | Type::TypeIs(_)
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_)
+                | Type::NominalInstance(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::StringLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::LiteralString
+                | Type::KnownBoundMethod(_),
+                _,
+            ) => None,
         };
 
         if let Some(inferred) = inferred {
