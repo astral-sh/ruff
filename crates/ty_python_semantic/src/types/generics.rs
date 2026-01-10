@@ -1878,9 +1878,16 @@ impl<'db> SpecializationBuilder<'db> {
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if !ty
-                            .when_assignable_to(self.db, bound, self.inferable)
-                            .is_always_satisfied(self.db)
+                        // In a contravariant position, the formal type variable is a subtype of
+                        // the actual type (`T <: ty`). Since we also have the upper bound
+                        // constraint `T <: bound`, we just need to ensure that the intersection
+                        // of `ty` and `bound` is non-empty. Since `Never` is always a valid
+                        // intersection if the types are disjoint, we don't need to perform any
+                        // check here.
+                        if !polarity.is_contravariant()
+                            && !ty
+                                .when_assignable_to(self.db, bound, self.inferable)
+                                .is_always_satisfied(self.db)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -1899,10 +1906,16 @@ impl<'db> SpecializationBuilder<'db> {
                         }
 
                         for constraint in constraints.elements(self.db) {
-                            if ty
-                                .when_assignable_to(self.db, *constraint, self.inferable)
-                                .is_always_satisfied(self.db)
-                            {
+                            let is_satisfied = if polarity.is_contravariant() {
+                                constraint
+                                    .when_assignable_to(self.db, ty, self.inferable)
+                                    .is_always_satisfied(self.db)
+                            } else {
+                                ty.when_assignable_to(self.db, *constraint, self.inferable)
+                                    .is_always_satisfied(self.db)
+                            };
+
+                            if is_satisfied {
                                 self.add_type_mapping(bound_typevar, *constraint, polarity, f);
                                 return Ok(());
                             }

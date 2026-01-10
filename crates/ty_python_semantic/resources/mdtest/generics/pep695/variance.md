@@ -172,6 +172,24 @@ static_assert(not is_equivalent_to(D[Any], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
+## Bounded typevars in contravariant positions
+
+When a bounded typevar appears in a contravariant position, the actual type doesn't need to satisfy
+the bound directly. The typevar can be solved to the intersection of the actual type and the bound
+(e.g., `Never` when disjoint).
+
+```py
+class Contra[T]:
+    def append(self, x: T): ...
+
+def f[T: int](x: Contra[T]):
+    ...
+
+def _(x: Contra[str]):
+    # This is valid: T can be solved to `int & str = Never`
+    f(x)
+```
+
 ## Invariance
 
 With an invariant typevar, only equivalent specializations of the generic class are subtypes of or
