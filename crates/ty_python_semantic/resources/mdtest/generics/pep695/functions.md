@@ -43,6 +43,17 @@ def absurd[T]() -> T:
     raise ValueError("absurd")
 ```
 
+If a typevar is used only once, we still attempt to make use of its upper bound:
+
+```py
+def bounded_typevar[T: int]() -> T:
+    raise NotImplementedError
+
+reveal_type(bounded_typevar())  # revealed: int & Unknown
+reveal_type(bounded_typevar().numerator)  # revealed: int & Unknown
+reveal_type(bounded_typevar().bit_length())  # revealed: @Todo(Type::Intersection.call)
+```
+
 ## Inferring generic function parameter types
 
 If the type of a generic function parameter is a typevar, then we can infer what type that typevar
@@ -186,8 +197,9 @@ def f[T: int](x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type]
-reveal_type(f("string"))  # revealed: Unknown
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int & Unknown`, found `Literal["string"]`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`"
+reveal_type(f("string"))  # revealed: int & Unknown
 ```
 
 ## Inferring a constrained typevar
@@ -322,26 +334,29 @@ def accepts_t_or_int[T_str: str](x: T_str | int) -> T_str:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_int("a"))  # revealed: Literal["a"]
-reveal_type(accepts_t_or_int(1))  # revealed: Unknown
+reveal_type(accepts_t_or_int(1))  # revealed: str & Unknown
 
 class Unrelated: ...
 
-# error: [invalid-argument-type] "Argument type `Unrelated` does not satisfy upper bound `str` of type variable `T_str`"
-reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
+# error: [invalid-argument-type] "Argument to function `accepts_t_or_int` is incorrect: Expected `(str & Unknown) | int`, found `Unrelated`"
+# error: [invalid-argument-type] "Argument to function `accepts_t_or_int` is incorrect: Argument type `Unrelated` does not satisfy upper bound `str` of type variable `T_str`"
+reveal_type(accepts_t_or_int(Unrelated()))  # revealed: str & Unknown
 
 def accepts_t_or_list_of_t[T: str](x: T | list[T]) -> T:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
-# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T`"
-reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
+# error: [invalid-argument-type] "Argument to function `accepts_t_or_list_of_t` is incorrect: Expected `(str & Unknown) | list[str & Unknown]`, found `Literal[1]`"
+# error: [invalid-argument-type] "Argument to function `accepts_t_or_list_of_t` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T`"
+reveal_type(accepts_t_or_list_of_t(1))  # revealed: str & Unknown
 
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
 
     # TODO: the error message here could be improved by referring to the second union element
-    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T`"
-    reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+    # error: [invalid-argument-type] "Argument to function `accepts_t_or_list_of_t` is incorrect: Expected `(str & Unknown) | list[str & Unknown]`, found `list[int]`"
+    # error: [invalid-argument-type] "Argument to function `accepts_t_or_list_of_t` is incorrect: Argument type `list[int]` does not satisfy upper bound `str` of type variable `T`"
+    reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: str & Unknown
 ```
 
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
@@ -465,15 +480,16 @@ class P[T]:
 def f[I: int, S: str](t: P[I] | P[S]) -> tuple[I, S]:
     raise NotImplementedError
 
-reveal_type(f(P[int]()))  # revealed: tuple[int, Unknown]
-reveal_type(f(P[str]()))  # revealed: tuple[Unknown, str]
+reveal_type(f(P[int]()))  # revealed: tuple[int, str & Unknown]
+reveal_type(f(P[str]()))  # revealed: tuple[int & Unknown, str]
 ```
 
 However, if we pass something that does not match _any_ union element, we do emit an error:
 
 ```py
-# error: [invalid-argument-type]
-reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `P[int & Unknown] | P[str & Unknown]`, found `P[bytes]`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `bytes` does not satisfy upper bound `int` of type variable `I`"
+reveal_type(f(P[bytes]()))  # revealed: tuple[int & Unknown, str & Unknown]
 ```
 
 ## Inferring nested generic function calls
@@ -562,9 +578,11 @@ def f(
     reveal_type(close_and_return(e))  # revealed: ClosableNonFullyStaticNominal
 
     # error: [invalid-argument-type] "does not satisfy upper bound"
-    reveal_type(close_and_return(f))  # revealed: Unknown
+    # error: [invalid-argument-type] "Argument to function `close_and_return` is incorrect: Expected `SupportsClose & Unknown`, found `NotClosableProtocol`"
+    reveal_type(close_and_return(f))  # revealed: SupportsClose & Unknown
     # error: [invalid-argument-type] "does not satisfy upper bound"
-    reveal_type(close_and_return(g))  # revealed: Unknown
+    # error: [invalid-argument-type] "Argument to function `close_and_return` is incorrect: Expected `SupportsClose & Unknown`, found `NotClosableNominal`"
+    reveal_type(close_and_return(g))  # revealed: SupportsClose & Unknown
 ```
 
 ## Opaque decorators don't affect typevar binding
@@ -607,6 +625,29 @@ def f[T: A](c: T | None):
 
 def g[T: A](b: B[T]):
     return f(b.x)  # Fine
+```
+
+## Avoid solving to Unknown when TypeVar with upper bound takes on default value
+
+```py
+from typing import *
+
+class Base: ...
+
+BaseT = TypeVar("BaseT", bound=Base)
+
+def f(x: Callable[[], BaseT]) -> BaseT:
+    return x()
+
+class Unrelated: ...
+
+def make_unrelated() -> Unrelated:
+    return Unrelated()
+
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `() -> Base & Unknown`, found `<class 'Unrelated'>`"
+f(Unrelated)
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `() -> Base & Unknown`, found `def make_unrelated() -> Unrelated`"
+f(make_unrelated)
 ```
 
 ## Typevars in a union

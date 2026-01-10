@@ -114,6 +114,7 @@ Calling an instance method explicitly verifies the first argument:
 ```py
 A.implicit_self(a)
 
+# error: [invalid-argument-type] "Argument to function `implicit_self` is incorrect: Expected `A & Unknown`, found `Literal[1]`"
 # error: [invalid-argument-type] "Argument to function `implicit_self` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `A` of type variable `Self`"
 A.implicit_self(1)
 ```
