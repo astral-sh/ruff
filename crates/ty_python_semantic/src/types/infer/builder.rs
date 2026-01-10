@@ -11886,10 +11886,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::TypedDict(typed_dict) => add_typed_dict_keys(typed_dict),
             Type::Union(union) => {
                 for ty in union.elements(db) {
-                    let Type::TypedDict(typed_dict) = *ty else {
-                        return None;
-                    };
-                    add_typed_dict_keys(typed_dict);
+                    if let Some(typed_dict) = ty.as_typed_dict() {
+                        add_typed_dict_keys(typed_dict);
+                    }
                 }
             }
             _ => return None,
