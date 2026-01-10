@@ -2020,19 +2020,7 @@ impl KnownFunction {
                     _ => return,
                 };
 
-                // Check if any class in the MRO (except object) defines an ordering method.
-                let has_ordering_method = class
-                    .iter_mro(db)
-                    .filter_map(ClassBase::into_class)
-                    .filter(|base_class| {
-                        !base_class
-                            .class_literal(db)
-                            .0
-                            .is_known(db, KnownClass::Object)
-                    })
-                    .any(|base_class| base_class.class_literal(db).0.has_own_ordering_method(db));
-
-                if !has_ordering_method {
+                if !class.has_ordering_method_in_mro(db) {
                     report_invalid_total_ordering_call(
                         context,
                         class.class_literal(db).0,

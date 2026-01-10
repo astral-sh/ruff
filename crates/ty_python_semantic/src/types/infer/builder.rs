@@ -854,34 +854,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // (5) Check that @total_ordering has a valid ordering method in the MRO
-            if class.total_ordering(self.db()) {
-                let has_ordering_method = class
-                    .iter_mro(self.db(), None)
-                    .filter_map(ClassBase::into_class)
-                    .filter(|base_class| {
-                        !base_class
-                            .class_literal(self.db())
-                            .0
-                            .is_known(self.db(), KnownClass::Object)
-                    })
-                    .any(|base_class| {
-                        base_class
-                            .class_literal(self.db())
-                            .0
-                            .has_own_ordering_method(self.db())
-                    });
-
-                if !has_ordering_method {
-                    // Find the @total_ordering decorator to report the diagnostic at its location
-                    if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
-                        self.expression_type(&decorator.expression)
-                            .as_function_literal()
-                            .is_some_and(|function| {
-                                function.is_known(self.db(), KnownFunction::TotalOrdering)
-                            })
-                    }) {
-                        report_invalid_total_ordering(&self.context, class, decorator);
-                    }
+            if class.total_ordering(self.db()) && !class.has_ordering_method_in_mro(self.db(), None)
+            {
+                // Find the @total_ordering decorator to report the diagnostic at its location
+                if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
+                    self.expression_type(&decorator.expression)
+                        .as_function_literal()
+                        .is_some_and(|function| {
+                            function.is_known(self.db(), KnownFunction::TotalOrdering)
+                        })
+                }) {
+                    report_invalid_total_ordering(&self.context, class, decorator);
                 }
             }
 

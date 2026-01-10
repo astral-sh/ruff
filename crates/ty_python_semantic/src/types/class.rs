@@ -604,6 +604,13 @@ impl<'db> ClassType<'db> {
         class_literal.is_final(db)
     }
 
+    /// Returns `true` if any class in this class's MRO (excluding `object`) defines an ordering
+    /// method (`__lt__`, `__le__`, `__gt__`, `__ge__`). Used by `@total_ordering` validation.
+    pub(super) fn has_ordering_method_in_mro(self, db: &'db dyn Db) -> bool {
+        let (class_literal, specialization) = self.class_literal(db);
+        class_literal.has_ordering_method_in_mro(db, specialization)
+    }
+
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         self.when_subclass_of(db, other, InferableTypeVars::None)
@@ -1559,6 +1566,20 @@ impl<'db> ClassLiteral<'db> {
             .any(|method| !class_member(db, body_scope, method).is_undefined())
     }
 
+    /// Returns `true` if any class in this class's MRO (excluding `object`) defines an ordering
+    /// method (`__lt__`, `__le__`, `__gt__`, `__ge__`). Used by `@total_ordering` validation and
+    /// for synthesizing comparison methods.
+    pub(super) fn has_ordering_method_in_mro(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> bool {
+        self.iter_mro(db, specialization)
+            .filter_map(ClassBase::into_class)
+            .filter(|class| !class.class_literal(db).0.is_known(db, KnownClass::Object))
+            .any(|class| class.class_literal(db).0.has_own_ordering_method(db))
+    }
+
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
         // the knowledge that this class is not generic.
@@ -2409,15 +2430,7 @@ impl<'db> ClassLiteral<'db> {
         // __le__, __gt__, or __ge__ to be defined (either in this class or
         // inherited from a superclass, excluding `object`).
         if self.total_ordering(db) && matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
-            // Check if any class in the MRO (excluding object) defines at least one
-            // ordering method in its own body (not synthesized).
-            let has_ordering_method = self
-                .iter_mro(db, specialization)
-                .filter_map(super::class_base::ClassBase::into_class)
-                .filter(|class| !class.class_literal(db).0.is_known(db, KnownClass::Object))
-                .any(|class| class.class_literal(db).0.has_own_ordering_method(db));
-
-            if has_ordering_method {
+            if self.has_ordering_method_in_mro(db, specialization) {
                 let instance_ty =
                     Type::instance(db, self.apply_optional_specialization(db, specialization));
 
