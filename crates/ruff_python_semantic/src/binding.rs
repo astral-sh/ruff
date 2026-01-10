@@ -458,6 +458,10 @@ pub struct BindingId;
 pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Bindings(IndexVec::with_capacity(capacity))
+    }
     /// Pushes a new [`Binding`] and returns its [`BindingId`].
     pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)
