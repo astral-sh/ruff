@@ -43,11 +43,11 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, GenericAlias, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members, todo_type,
+    CallableTypeKind, DATACLASS_FLAGS, DataclassFlags, DataclassParams, FieldInstance,
+    GenericAlias, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
+    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
+    enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -611,6 +611,25 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Type::DataclassDecorator(params) => match overload.parameter_types() {
+                        [Some(Type::ClassLiteral(class_literal))] => {
+                            overload.set_return_type(Type::from(
+                                class_literal.with_dataclass_params(db, Some(params)),
+                            ));
+                        }
+                        [Some(Type::GenericAlias(generic_alias))] => {
+                            let new_origin = generic_alias
+                                .origin(db)
+                                .with_dataclass_params(db, Some(params));
+                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
+                                db,
+                                new_origin,
+                                generic_alias.specialization(db),
+                            )));
+                        }
+                        _ => {}
+                    },
+
                     Type::BoundMethod(bound_method)
                         if bound_method.self_instance(db).is_property_instance() =>
                     {
@@ -1119,17 +1138,9 @@ impl<'db> Bindings<'db> {
                                 overload.parameter_types()
                             {
                                 let params = DataclassParams::default_params(db);
-                                overload.set_return_type(Type::from(ClassLiteral::new(
-                                    db,
-                                    class_literal.name(db),
-                                    class_literal.body_scope(db),
-                                    class_literal.known(db),
-                                    class_literal.deprecated(db),
-                                    class_literal.type_check_only(db),
-                                    Some(params),
-                                    class_literal.dataclass_transformer_params(db),
-                                    class_literal.total_ordering(db),
-                                )));
+                                overload.set_return_type(Type::from(
+                                    class_literal.with_dataclass_params(db, Some(params)),
+                                ));
                             }
                         }
 
@@ -1215,47 +1226,55 @@ impl<'db> Bindings<'db> {
                                     dataclass_params.field_specifiers(db),
                                 );
 
-                                // If the return type is class-like and the first argument is a
-                                // class, return it with dataclass params applied. Otherwise,
-                                // return a `DataclassDecorator` for application to a class later.
-                                let declared_return_type = overload.return_type();
-                                let returns_class = matches!(
-                                    declared_return_type,
-                                    Type::ClassLiteral(_)
-                                        | Type::GenericAlias(_)
-                                        | Type::SubclassOf(_)
-                                );
+                                // The dataclass_transform spec doesn't clarify how to tell whether
+                                // a decorated function is a decorator or a decorator factory. We
+                                // use heuristics based on the number and type of positional arguments:
+                                //
+                                // - Zero positional arguments: assume it's a decorator factory.
+                                // - More than one positional argument: assume it's a decorator factory.
+                                // - Exactly one positional argument that's a class: ambiguous, so check
+                                //   the return type to disambiguate (class-like means decorate directly).
+                                let mut positional_args = overload
+                                    .signature
+                                    .parameters()
+                                    .iter()
+                                    .zip(overload.parameter_types())
+                                    .filter(|(param, ty)| ty.is_some() && !param.is_keyword_only())
+                                    .map(|(_, ty)| ty);
 
-                                if returns_class {
-                                    match overload.parameter_types().first() {
-                                        Some(Some(Type::ClassLiteral(class_literal))) => {
+                                let first_positional = positional_args.next();
+                                let has_more = positional_args.next().is_some();
+
+                                // Only attempt direct decoration if exactly one positional argument.
+                                if !has_more {
+                                    // Helper to check if return type is class-like.
+                                    let returns_class = || {
+                                        matches!(
+                                            overload.return_type(),
+                                            Type::ClassLiteral(_)
+                                                | Type::GenericAlias(_)
+                                                | Type::SubclassOf(_)
+                                        )
+                                    };
+
+                                    match first_positional {
+                                        Some(Some(Type::ClassLiteral(class_literal)))
+                                            if returns_class() =>
+                                        {
                                             overload.set_return_type(Type::from(
-                                                ClassLiteral::new(
+                                                class_literal.with_dataclass_params(
                                                     db,
-                                                    class_literal.name(db),
-                                                    class_literal.body_scope(db),
-                                                    class_literal.known(db),
-                                                    class_literal.deprecated(db),
-                                                    class_literal.type_check_only(db),
                                                     Some(dataclass_params),
-                                                    class_literal.dataclass_transformer_params(db),
-                                                    class_literal.total_ordering(db),
                                                 ),
                                             ));
+                                            continue;
                                         }
-                                        Some(Some(Type::GenericAlias(generic_alias))) => {
-                                            let class_literal = generic_alias.origin(db);
-                                            let new_origin = ClassLiteral::new(
-                                                db,
-                                                class_literal.name(db),
-                                                class_literal.body_scope(db),
-                                                class_literal.known(db),
-                                                class_literal.deprecated(db),
-                                                class_literal.type_check_only(db),
-                                                Some(dataclass_params),
-                                                class_literal.dataclass_transformer_params(db),
-                                                class_literal.total_ordering(db),
-                                            );
+                                        Some(Some(Type::GenericAlias(generic_alias)))
+                                            if returns_class() =>
+                                        {
+                                            let new_origin = generic_alias
+                                                .origin(db)
+                                                .with_dataclass_params(db, Some(dataclass_params));
                                             overload.set_return_type(Type::GenericAlias(
                                                 GenericAlias::new(
                                                     db,
@@ -1263,14 +1282,16 @@ impl<'db> Bindings<'db> {
                                                     generic_alias.specialization(db),
                                                 ),
                                             ));
+                                            continue;
                                         }
                                         _ => {}
                                     }
-                                } else {
-                                    overload.set_return_type(Type::DataclassDecorator(
-                                        dataclass_params,
-                                    ));
                                 }
+
+                                // Zero or more than one positional argument, or the argument is
+                                // not a class: assume it's a decorator factory.
+                                overload
+                                    .set_return_type(Type::DataclassDecorator(dataclass_params));
                             }
                         }
                     },
