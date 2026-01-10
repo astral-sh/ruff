@@ -2941,6 +2941,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // params of the last seen usage of `@dataclass_transform`
                 let transformer_params = f
                     .iter_overloads_and_implementation(self.db())
+                    .rev()
                     .find_map(|overload| overload.dataclass_transformer_params(self.db()));
                 if let Some(transformer_params) = transformer_params {
                     dataclass_params = Some(DataclassParams::from_transformer_params(

@@ -748,9 +748,9 @@ impl<'db> FunctionLiteral<'db> {
     fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
-        let (implementation, overloads) = self.overloads_and_implementation(db);
-        overloads.into_iter().chain(implementation.iter().copied())
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
+        let (overloads, implementation) = self.overloads_and_implementation(db);
+        overloads.iter().copied().chain(implementation)
     }
 
     /// Typed externally-visible signature for this function.
@@ -1034,7 +1034,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
         self.literal(db).iter_overloads_and_implementation(db)
     }
 

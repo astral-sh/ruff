@@ -1555,6 +1555,25 @@ impl<'db> ClassLiteral<'db> {
         self.is_known(db, KnownClass::Tuple)
     }
 
+    /// Returns a new `ClassLiteral` with the given dataclass params, preserving all other fields.
+    pub(crate) fn with_dataclass_params(
+        self,
+        db: &'db dyn Db,
+        dataclass_params: Option<DataclassParams<'db>>,
+    ) -> Self {
+        ClassLiteral::new(
+            db,
+            self.name(db).clone(),
+            self.body_scope(db),
+            self.known(db),
+            self.deprecated(db),
+            self.type_check_only(db),
+            dataclass_params,
+            self.dataclass_transformer_params(db),
+            self.total_ordering(db),
+        )
+    }
+
     /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
     /// `__ge__`) in its own body (not inherited). Used by `@total_ordering` to determine if
     /// synthesis is valid.
