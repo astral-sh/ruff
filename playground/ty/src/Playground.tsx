@@ -81,11 +81,9 @@ export default function Playground() {
       content,
     });
 
-    const handle = files.handles[files.selected];
-
-    if (handle != null) {
-      updateFile(workspace, handle, content, setError);
-    } else if (fileName === SETTINGS_FILE_NAME) {
+    // Updates to user files are handled by the editor,
+    // only the settings file is managed here
+    if (fileName === SETTINGS_FILE_NAME) {
       updateOptions(workspace, content, setError);
     }
   };
@@ -192,6 +190,7 @@ export default function Playground() {
           onChangeFile={handleFileChanged}
           onSelectVendoredFile={handleVendoredFileSelected}
           onClearVendoredFile={handleVendoredFileCleared}
+          onError={setError}
         />
       </Suspense>
       {error ? (
@@ -534,20 +533,6 @@ function updateOptions(
     setError(null);
   } catch (error) {
     setError(`Failed to update 'ty.json' options: ${formatError(error)}`);
-  }
-}
-
-function updateFile(
-  workspace: Workspace,
-  handle: FileHandle,
-  content: string,
-  setError: (error: string | null) => void,
-) {
-  try {
-    workspace.updateFile(handle, content);
-    setError(null);
-  } catch (error) {
-    setError(`Failed to update file: ${formatError(error)}`);
   }
 }
 
