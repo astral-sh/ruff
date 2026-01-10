@@ -157,6 +157,9 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notifications::DidCloseNotebookHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseNotebookHandler>(notif)
         }
+        notifications::DidSaveTextDocumentHandler::METHOD => {
+            sync_notification_task::<notifications::DidSaveTextDocumentHandler>(notif)
+        }
         notifications::DidChangeWatchedFiles::METHOD => {
             sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
         }
