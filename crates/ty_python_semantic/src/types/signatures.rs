@@ -19,7 +19,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, semantic_index};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
+use crate::types::generics::{GenericContext, InferableTypeVars};
 use crate::types::infer::{infer_deferred_types, infer_scope_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
@@ -607,7 +607,7 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     if let Some(generic_context) = &signature.generic_context {
-        walk_generic_context(db, *generic_context, visitor);
+        visitor.visit_generic_context(db, *generic_context);
     }
     // By default we usually don't visit the type of the default value,
     // as it isn't relevant to most things
