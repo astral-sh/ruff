@@ -1313,6 +1313,14 @@ pub enum Tuple<T> {
 }
 
 impl<T> Tuple<T> {
+    /// Returns the inner fixed-length tuple if this is a `Tuple::Fixed` variant.
+    pub(crate) fn as_fixed_length(&self) -> Option<&FixedLengthTuple<T>> {
+        match self {
+            Tuple::Fixed(tuple) => Some(tuple),
+            Tuple::Variable(_) => None,
+        }
+    }
+
     pub(crate) const fn homogeneous(element: T) -> Self {
         Self::Variable(VariableLengthTuple::homogeneous(element))
     }

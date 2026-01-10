@@ -16,7 +16,7 @@ use crate::{
         symbol::ScopedSymbolId, use_def_map,
     },
     types::{
-        ClassBase, ClassLiteral, ClassType, KnownClass, Type,
+        ClassBase, ClassType, KnownClass, StaticClassLiteral, Type,
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
@@ -45,7 +45,10 @@ const PROHIBITED_NAMEDTUPLE_ATTRS: &[&str] = &[
     "_source",
 ];
 
-pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
+// TODO: Support dynamic class literals. If we allow dynamic classes to define attributes in their
+// namespace dictionary, we should also check whether those attributes are valid overrides of
+// attributes in their superclasses.
+pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticClassLiteral<'db>) {
     let db = context.db();
     let configuration = OverrideRulesConfig::from(context);
     if configuration.no_rules_enabled() {
@@ -118,8 +121,10 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    let (literal, specialization) = class.class_literal(db);
-    let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
+    let Some((literal, specialization)) = class.static_class_literal(db) else {
+        return;
+    };
+    let class_kind = CodeGeneratorKind::from_class(db, literal.into(), specialization);
 
     // Check for prohibited `NamedTuple` attribute overrides.
     //
@@ -171,7 +176,11 @@ fn check_class_declaration<'db>(
             ClassBase::Class(class) => class,
         };
 
-        let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
+        let Some((superclass_literal, superclass_specialization)) =
+            superclass.static_class_literal(db)
+        else {
+            continue;
+        };
         let superclass_scope = superclass_literal.body_scope(db);
         let superclass_symbol_table = place_table(db, superclass_scope);
         let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
@@ -191,10 +200,13 @@ fn check_class_declaration<'db>(
             {
                 continue;
             }
-            method_kind =
-                CodeGeneratorKind::from_class(db, superclass_literal, superclass_specialization)
-                    .map(MethodKind::Synthesized)
-                    .unwrap_or_default();
+            method_kind = CodeGeneratorKind::from_class(
+                db,
+                superclass_literal.into(),
+                superclass_specialization,
+            )
+            .map(MethodKind::Synthesized)
+            .unwrap_or_default();
         }
 
         let Place::Defined(DefinedPlace {

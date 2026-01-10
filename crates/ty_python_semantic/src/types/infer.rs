@@ -53,7 +53,8 @@ use crate::types::function::FunctionType;
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers, declaration_type,
+    ClassLiteral, KnownClass, StaticClassLiteral, Truthiness, Type, TypeAndQualifiers,
+    declaration_type,
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
@@ -465,7 +466,7 @@ pub(crate) fn nearest_enclosing_class<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
-) -> Option<ClassLiteral<'db>> {
+) -> Option<StaticClassLiteral<'db>> {
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
@@ -474,6 +475,7 @@ pub(crate) fn nearest_enclosing_class<'db>(
             declaration_type(db, definition)
                 .inner_type()
                 .as_class_literal()
+                .and_then(ClassLiteral::as_static)
         })
 }
 

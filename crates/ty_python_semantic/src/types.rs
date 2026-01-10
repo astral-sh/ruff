@@ -24,6 +24,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::class::DynamicClassLiteral;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
@@ -76,7 +77,7 @@ use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias};
+pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
@@ -782,7 +783,7 @@ pub enum Type<'db> {
     Callable(CallableType<'db>),
     /// A specific module object
     ModuleLiteral(ModuleLiteralType<'db>),
-    /// A specific class object
+    /// A specific class object (either from a `class` statement or `type()` call)
     ClassLiteral(ClassLiteral<'db>),
     /// A specialization of a generic class
     GenericAlias(GenericAlias<'db>),
@@ -976,9 +977,9 @@ impl<'db> Type<'db> {
     }
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance()
-            .and_then(|instance| crate::types::enums::enum_metadata(db, instance.class_literal(db)))
-            .is_some()
+        self.as_nominal_instance().is_some_and(|instance| {
+            crate::types::enums::enum_metadata(db, instance.class_literal(db)).is_some()
+        })
     }
 
     fn is_typealias_special_form(&self) -> bool {
@@ -1097,25 +1098,21 @@ impl<'db> Type<'db> {
     pub(crate) fn specialization_of(
         self,
         db: &'db dyn Db,
-        expected_class: ClassLiteral<'_>,
+        expected_class: StaticClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        self.class_and_specialization_of_optional(db, Some(expected_class))
-            .map(|(_, specialization)| specialization)
+        self.specialization_of_optional(db, Some(expected_class))
     }
 
-    /// If this type is a class instance, returns its class literal and specialization.
-    pub(crate) fn class_specialization(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
-        self.class_and_specialization_of_optional(db, None)
+    /// If this type is a class instance, returns its specialization.
+    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        self.specialization_of_optional(db, None)
     }
 
-    fn class_and_specialization_of_optional(
+    fn specialization_of_optional(
         self,
         db: &'db dyn Db,
-        expected_class: Option<ClassLiteral<'_>>,
-    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
+        expected_class: Option<StaticClassLiteral<'_>>,
+    ) -> Option<Specialization<'db>> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
             Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
@@ -1124,12 +1121,12 @@ impl<'db> Type<'db> {
         }
         .class(db);
 
-        let (class_literal, specialization) = class_type.class_literal(db);
+        let (class_literal, specialization) = class_type.static_class_literal(db)?;
         if expected_class.is_some_and(|expected_class| expected_class != class_literal) {
             return None;
         }
 
-        Some((class_literal, specialization?))
+        specialization
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
@@ -2048,7 +2045,10 @@ impl<'db> Type<'db> {
 
             return;
         };
-        let (class_literal, Some(specialization)) = instance.class(db).class_literal(db) else {
+
+        let Some((class_literal, Some(specialization))) =
+            instance.class(db).static_class_literal(db)
+        else {
             return;
         };
         let generic_context = specialization.generic_context(db);
@@ -3248,11 +3248,14 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance)
                 if matches!(name_str, "value" | "_value_")
-                    && is_single_member_enum(db, instance.class(db).class_literal(db).0) =>
+                    && is_single_member_enum(db, instance.class_literal(db)) =>
             {
-                enum_metadata(db, instance.class(db).class_literal(db).0)
-                    .and_then(|metadata| metadata.members.get_index(0).map(|(_, v)| *v))
-                    .map_or(Place::Undefined, Place::bound)
+                enum_metadata(db, instance.class_literal(db))
+                    .and_then(|metadata| {
+                        let (_, ty) = metadata.members.get_index(0)?;
+                        Some(Place::bound(*ty))
+                    })
+                    .unwrap_or_default()
                     .into()
             }
 
@@ -3298,7 +3301,7 @@ impl<'db> Type<'db> {
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
-                    .unwrap_or(Place::Undefined)
+                    .unwrap_or_default()
                     .into()
                 };
 
@@ -3319,7 +3322,7 @@ impl<'db> Type<'db> {
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
-                    .unwrap_or(Place::Undefined)
+                    .unwrap_or_default()
                     .into()
                 };
 
@@ -3356,14 +3359,15 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                if let Some(enum_class) = match self {
+                let enum_class = match self {
                     Type::ClassLiteral(literal) => Some(literal),
                     Type::SubclassOf(subclass_of) => subclass_of
                         .subclass_of()
                         .into_class(db)
-                        .map(|class| class.class_literal(db).0),
+                        .map(|class| class.class_literal(db)),
                     _ => None,
-                } {
+                };
+                if let Some(enum_class) = enum_class {
                     if let Some(metadata) = enum_metadata(db, enum_class) {
                         if let Some(resolved_name) = metadata.resolve_member(&name) {
                             return Place::bound(Type::EnumLiteral(EnumLiteralType::new(
@@ -5096,7 +5100,9 @@ impl<'db> Type<'db> {
         let from_class_base = |base: ClassBase<'db>| {
             let class = base.into_class()?;
             if class.is_known(db, KnownClass::Generator) {
-                if let Some(specialization) = class.class_literal_specialized(db, None).1 {
+                if let Some((_, Some(specialization))) =
+                    class.static_class_literal_specialized(db, None)
+                {
                     if let [_, _, return_ty] = specialization.types(db) {
                         return Some(*return_ty);
                     }
@@ -5623,9 +5629,11 @@ impl<'db> Type<'db> {
                         });
                     };
 
-                    Ok(typing_self(db, scope_id, typevar_binding_context, class)
-                        .map(Type::TypeVar)
-                        .unwrap_or(*self))
+                    Ok(
+                        typing_self(db, scope_id, typevar_binding_context, class.into())
+                            .map(Type::TypeVar)
+                            .unwrap_or(*self),
+                    )
                 }
                 // We ensure that `typing.TypeAlias` used in the expected position (annotating an
                 // annotated assignment statement) doesn't reach here. Using it in any other type
@@ -6521,13 +6529,9 @@ impl<'db> Type<'db> {
                 Some(TypeDefinition::Function(function.definition(db)))
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
-            Self::ClassLiteral(class_literal) => {
-                Some(TypeDefinition::Class(class_literal.definition(db)))
-            }
-            Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
-            Self::NominalInstance(instance) => {
-                Some(TypeDefinition::Class(instance.class(db).definition(db)))
-            }
+            Self::ClassLiteral(class_literal) => class_literal.type_definition(db),
+            Self::GenericAlias(alias) => Some(TypeDefinition::StaticClass(alias.definition(db))),
+            Self::NominalInstance(instance) => instance.class(db).type_definition(db),
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
                     Some(TypeDefinition::TypeVar(var.definition(db)?))
@@ -6540,9 +6544,11 @@ impl<'db> Type<'db> {
             },
 
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Class(class) => Some(TypeDefinition::Class(class.definition(db))),
                 SubclassOfInner::Dynamic(_) => None,
-                SubclassOfInner::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
+                SubclassOfInner::Class(class) => class.type_definition(db),
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?))
+                }
             },
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db),
@@ -6569,13 +6575,11 @@ impl<'db> Type<'db> {
             Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
+                Protocol::FromClass(class) => class.type_definition(db),
                 Protocol::Synthesized(_) => None,
             },
 
-            Self::TypedDict(typed_dict) => {
-                typed_dict.definition(db).map(TypeDefinition::Class)
-            }
+            Self::TypedDict(typed_dict) => typed_dict.type_definition(db),
 
             Self::Union(_) | Self::Intersection(_) => None,
 
@@ -6656,7 +6660,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+    pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<StaticClassLiteral<'db>> {
         match self {
             Type::GenericAlias(generic) => Some(generic.origin(db)),
             Type::NominalInstance(instance) => {
@@ -8985,7 +8989,12 @@ impl<'db> UnionTypeInstance<'db> {
     ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
         let to_class_literal = |ty: Type<'db>| {
             ty.as_nominal_instance()
-                .map(|instance| Type::ClassLiteral(instance.class(db).class_literal(db).0))
+                .and_then(|instance| {
+                    instance
+                        .class(db)
+                        .static_class_literal(db)
+                        .map(|(lit, _)| Type::ClassLiteral(lit.into()))
+                })
                 .unwrap_or_else(Type::unknown)
         };
 
@@ -11718,7 +11727,7 @@ impl<'db> TypeAliasType<'db> {
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: ClassType<'db>,
-    explicit_metaclass_of: ClassLiteral<'db>,
+    explicit_metaclass_of: StaticClassLiteral<'db>,
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -12925,7 +12934,7 @@ impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
 /// being added to the given class.
 pub(super) fn determine_upper_bound<'db>(
     db: &'db dyn Db,
-    class_literal: ClassLiteral<'db>,
+    class_literal: StaticClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
     is_known_base: impl Fn(ClassBase<'db>) -> bool,
 ) -> Type<'db> {
