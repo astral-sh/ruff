@@ -5,8 +5,6 @@ echo "Enabling mypy primer specific configuration overloads (see .github/mypy-pr
 mkdir -p ~/.config/ty
 cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
 
-PRIMER_SELECTOR="$(paste -s -d'|' "${PRIMER_SELECTOR}")"
-
 echo "new commit"
 git rev-list --format=%s --max-count=1 "${GITHUB_SHA}"
 
@@ -19,7 +17,6 @@ git rev-list --format=%s --max-count=1 base_commit
 
 cd ..
 
-echo "Project selector: ${PRIMER_SELECTOR}"
 # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
 uvx \
   --from="git+https://github.com/hauntsaninja/mypy_primer@ea7c45364a129b9a556b08a6285f8df0e5aedf0a" \
@@ -29,7 +26,6 @@ uvx \
   --cargo-profile profiling \
   --old base_commit \
   --new "${GITHUB_SHA}" \
-  --project-selector "/($PRIMER_SELECTOR)\$" \
   --output concise \
   --debug > "${DIFF_FILE}" || [ $? -eq 1 ]
 
