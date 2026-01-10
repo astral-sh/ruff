@@ -80,3 +80,14 @@ def f():
     import sklearn
 
     mlflow
+
+
+# Submodule import of the same root module should NOT trigger F823
+# https://github.com/astral-sh/ruff/issues/22467
+import pwndbg
+
+
+def myfunc() -> None:
+    if pwndbg.dbg.is_gdblib_available():
+        import pwndbg.gdblib.functions
+        _ = pwndbg.gdblib.functions.functions

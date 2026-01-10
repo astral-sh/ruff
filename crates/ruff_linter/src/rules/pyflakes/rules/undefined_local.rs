@@ -1,7 +1,7 @@
 use std::string::ToString;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{Scope, ScopeId};
+use ruff_python_semantic::{BindingKind, Imported, Scope, ScopeId};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -53,6 +53,20 @@ pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scop
             // If the variable shadows a binding in a parent scope...
             if let Some(shadowed_id) = checker.semantic().shadowed_binding(binding_id) {
                 let shadowed = checker.semantic().binding(shadowed_id);
+                let binding = checker.semantic().binding(binding_id);
+
+                // If this is a submodule import (e.g., `import foo.bar`), it's common to refer to
+                // the module (`foo`) before the import statement. Technically, this is an
+                // `UnboundLocalError` in Python, but Pyflakes (and Ruff) exempts it if the
+                // shadowed binding is an import of the same module.
+                if let BindingKind::SubmoduleImport(submodule_import) = &binding.kind {
+                    if let Some(any_import) = shadowed.as_any_import() {
+                        if any_import.module_name() == submodule_import.module_name() {
+                            continue;
+                        }
+                    }
+                }
+
                 // And that binding was referenced in the current scope...
                 if let Some(range) = shadowed.references().find_map(|reference_id| {
                     let reference = checker.semantic().reference(reference_id);
