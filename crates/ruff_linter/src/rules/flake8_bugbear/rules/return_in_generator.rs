@@ -5,6 +5,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_pytest_style::is_pytest_hookimpl_wrapper;
 
 /// ## What it does
 /// Checks for `return {value}` statements in functions that also contain `yield`
@@ -97,6 +98,14 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
 
     // Async functions are flagged by the `ReturnInGenerator` semantic syntax error.
     if function_def.is_async {
+        return;
+    }
+
+    if function_def
+        .decorator_list
+        .iter()
+        .any(|decorator| is_pytest_hookimpl_wrapper(decorator, checker.semantic()))
+    {
         return;
     }
 

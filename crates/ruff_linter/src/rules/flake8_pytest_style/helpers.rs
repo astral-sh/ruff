@@ -50,6 +50,36 @@ pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -
         })
 }
 
+/// Returns `true` if the decorator is `@pytest.hookimpl(wrapper=True)` or `@hookimpl(wrapper=True)`.
+///
+/// These hook wrappers intentionally use `return` in generator functions as part of the
+/// pytest hook wrapper protocol.
+///
+/// See: <https://docs.pytest.org/en/stable/how-to/writing_hook_functions.html#hook-wrappers-executing-around-other-hooks>
+pub(crate) fn is_pytest_hookimpl_wrapper(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    let Expr::Call(call) = &decorator.expression else {
+        return false;
+    };
+
+    // Check if it's pytest.hookimpl
+    let is_hookimpl = semantic
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|name| matches!(name.segments(), ["pytest", "hookimpl"]));
+
+    if !is_hookimpl {
+        return false;
+    }
+
+    // Check for wrapper=True keyword argument
+    call.arguments.keywords.iter().any(|keyword| {
+        keyword.arg.as_ref().is_some_and(|arg| arg == "wrapper")
+            && matches!(
+                &keyword.value,
+                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })
+            )
+    })
+}
+
 /// Whether the currently checked `func` is likely to be a Pytest test.
 ///
 /// A normal Pytest test function is one whose name starts with `test` and is either:
