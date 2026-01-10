@@ -1,0 +1,38 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: unsupported_base_dynamic_type.md - Unsupported base for dynamic `type()` classes - `Generic` base
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_base_dynamic_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import Generic, TypeVar
+2 | 
+3 | T = TypeVar("T")
+4 | 
+5 | X = type("X", (Generic[T],), {})  # error: [unsupported-base]
+```
+
+# Diagnostics
+
+```
+warning[unsupported-base]: Invalid base for class created via `type()`
+ --> src/mdtest_snippet.py:5:16
+  |
+3 | T = TypeVar("T")
+4 |
+5 | X = type("X", (Generic[T],), {})  # error: [unsupported-base]
+  |                ^^^^^^^^^^ Has type `<special-form 'typing.Generic[T]'>`
+  |
+info: Classes created via `type()` cannot be generic
+info: Consider using `class X(Generic[...]): ...` instead
+info: rule `unsupported-base` is enabled by default
+
+```

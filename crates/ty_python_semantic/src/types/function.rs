@@ -2036,6 +2036,18 @@ impl KnownFunction {
                 }
             }
 
+            KnownFunction::Final => {
+                // Support `@final` on dynamic classes by creating a final version.
+                let [Some(Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)))] =
+                    parameter_types
+                else {
+                    return;
+                };
+
+                let final_class = dynamic_class.with_final(db);
+                overload.set_return_type(Type::ClassLiteral(ClassLiteral::Dynamic(final_class)));
+            }
+
             _ => {}
         }
     }

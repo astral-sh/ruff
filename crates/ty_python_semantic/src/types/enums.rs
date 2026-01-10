@@ -67,7 +67,6 @@ pub(crate) fn enum_metadata<'db>(
             //
             // MyEnum = type("MyEnum", (BaseEnum,), {"A": 1, "B": 2})
             // ```
-            // TODO: Add a diagnostic for including an enum in a `type(...)` call.
             return None;
         }
     };

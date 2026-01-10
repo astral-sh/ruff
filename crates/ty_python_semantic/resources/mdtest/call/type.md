@@ -908,12 +908,34 @@ Bad: type[Unrelated] = type("Bad", (Base,), {})
 ## Special base classes
 
 Some special base classes work with dynamic class creation, but special semantics may not be fully
-synthesized:
+synthesized.
+
+### Invalid special bases
+
+Dynamic classes cannot directly inherit from `Generic`, `Protocol`, or `TypedDict`. These special
+forms require class syntax for their semantics to be properly applied:
+
+```py
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+# error: [unsupported-base] "Invalid base for class created via `type()`"
+GenericClass = type("GenericClass", (Generic[T],), {})
+
+# error: [unsupported-dynamic-base] "Invalid base for class created via `type()`"
+ProtocolClass = type("ProtocolClass", (Protocol,), {})
+
+# error: [unsupported-base] "Invalid base for class created via `type()`"
+TypedDictClass = type("TypedDictClass", (TypedDict,), {})
+```
 
 ### Protocol bases
 
+Inheriting from a class that is itself a protocol is valid:
+
 ```py
-# Protocol bases work - the class is created as a subclass of the protocol
 from typing import Protocol
 from ty_extensions import reveal_mro
 
@@ -930,8 +952,9 @@ reveal_type(instance)  # revealed: ProtoImpl
 
 ### TypedDict bases
 
+Inheriting from a class that is itself a TypedDict is valid:
+
 ```py
-# TypedDict bases work but TypedDict semantics aren't applied to dynamic subclasses
 from typing_extensions import TypedDict
 from ty_extensions import reveal_mro
 
@@ -964,26 +987,26 @@ reveal_mro(Point3D)  # revealed: (<class 'Point3D'>, <class 'Point'>, <class 'tu
 
 ### Enum bases
 
+Creating a class via `type()` that inherits from any Enum class fails at runtime because `EnumMeta`
+expects special attributes in the class dict that `type()` doesn't provide:
+
 ```py
-# Enum subclassing via type() is not supported - EnumMeta requires special dict handling
-# that type() cannot provide. This applies even to empty enums.
 from enum import Enum
 
 class Color(Enum):
     RED = 1
     GREEN = 2
 
+# Enums with members are final and cannot be subclassed
+# error: [subclass-of-final-class]
+ExtendedColor = type("ExtendedColor", (Color,), {})
+
 class EmptyEnum(Enum):
     pass
 
-# TODO: We should emit a diagnostic here - type() cannot create Enum subclasses
-ExtendedColor = type("ExtendedColor", (Color,), {})
-reveal_type(ExtendedColor)  # revealed: <class 'ExtendedColor'>
-
-# Even empty enums fail - EnumMeta requires special dict handling
-# TODO: We should emit a diagnostic here too
-ValidExtension = type("ValidExtension", (EmptyEnum,), {})
-reveal_type(ValidExtension)  # revealed: <class 'ValidExtension'>
+# Empty enums fail because EnumMeta requires special dict handling
+# error: [unsupported-base] "Invalid base for class created via `type()`"
+InvalidExtension = type("InvalidExtension", (EmptyEnum,), {})
 ```
 
 ## `__init_subclass__` keyword arguments
@@ -1045,4 +1068,25 @@ reveal_type(Dynamic)  # revealed: <class 'Dynamic'>
 
 # Metaclass attributes are accessible on the class
 reveal_type(Dynamic.custom_attr)  # revealed: str
+```
+
+## `@final` on dynamic classes
+
+Dynamic classes can be marked as `@final` using `final(type(...))`:
+
+```py
+from typing import final
+
+FinalClass = final(type("FinalClass", (), {}))
+reveal_type(FinalClass)  # revealed: <class 'FinalClass'>
+
+# Cannot subclass a final dynamic class
+class Child(FinalClass): ...  # error: [subclass-of-final-class]
+
+# Also works with base classes
+class Base: ...
+
+FinalDerived = final(type("FinalDerived", (Base,), {}))
+
+class Child2(FinalDerived): ...  # error: [subclass-of-final-class]
 ```
