@@ -6059,7 +6059,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer the argument types.
         let _name_type = self.infer_expression(&arguments.args[0], TypeContext::default());
         let bases_type = self.infer_expression(&arguments.args[1], TypeContext::default());
-        let _namespace_type = self.infer_expression(&arguments.args[2], TypeContext::default());
+
+        // Extract members from the namespace dict (third argument).
+        // Infer the whole dict first to avoid double-inferring individual values.
+        let namespace_arg = &arguments.args[2];
+        let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
+        let (members, has_dynamic_namespace): (Box<[(ast::name::Name, Type<'db>)]>, bool) =
+            if let ast::Expr::Dict(dict) = namespace_arg {
+                // Check if all keys are string literals. If any key is not a string literal
+                // or is missing (spread), the namespace is considered dynamic.
+                let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                    item.key
+                        .as_ref()
+                        .is_some_and(|k| matches!(k, ast::Expr::StringLiteral(_)))
+                });
+                let members = dict
+                    .items
+                    .iter()
+                    .filter_map(|item| {
+                        // Only extract items with string literal keys.
+                        let key_expr = item.key.as_ref()?;
+                        let key_name = match key_expr {
+                            ast::Expr::StringLiteral(string_lit) => {
+                                ast::name::Name::new(string_lit.value.to_str())
+                            }
+                            _ => return None,
+                        };
+                        // Get the already-inferred type from when we inferred the dict above.
+                        let value_ty = self.expression_type(&item.value);
+                        Some((key_name, value_ty))
+                    })
+                    .collect();
+                (members, !all_keys_are_string_literals)
+            } else if let Type::TypedDict(typed_dict) = namespace_type {
+                // Namespace is a TypedDict instance. Extract known keys as members.
+                // TypedDicts are "open" (can have additional string keys), so this
+                // is still a dynamic namespace for unknown attributes.
+                let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| (name.clone(), field.declared_ty))
+                    .collect();
+                (members, true)
+            } else {
+                // Namespace is not a dict literal, so it's dynamic.
+                (Box::new([]), true)
+            };
 
         // Extract base classes from the bases tuple.
         // For unsupported bases (like `type[Base]`), we emit a diagnostic and use `Unknown`
@@ -6133,10 +6178,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 name,
                 bases,
+                members,
                 file,
                 file_scope,
                 node_index,
                 Some(definition),
+                has_dynamic_namespace,
             );
 
             // Check for MRO errors.
@@ -6240,7 +6287,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer all arguments.
         let _name_type = self.infer_expression(&arguments.args[0], TypeContext::default());
         let bases_type = self.infer_expression(&arguments.args[1], TypeContext::default());
-        let namespace_type = self.infer_expression(&arguments.args[2], TypeContext::default());
+
+        // Extract members from the namespace dict (third argument).
+        // Infer the whole dict first to avoid double-inferring individual values.
+        let namespace_arg = &arguments.args[2];
+        let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
+        let (members, has_dynamic_namespace): (Box<[(ast::name::Name, Type<'db>)]>, bool) =
+            if let ast::Expr::Dict(dict) = namespace_arg {
+                // Check if all keys are string literals. If any key is not a string literal
+                // or is missing (spread), the namespace is considered dynamic.
+                let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                    item.key
+                        .as_ref()
+                        .is_some_and(|k| matches!(k, ast::Expr::StringLiteral(_)))
+                });
+                let members = dict
+                    .items
+                    .iter()
+                    .filter_map(|item| {
+                        let key_expr = item.key.as_ref()?;
+                        let key_name = match key_expr {
+                            ast::Expr::StringLiteral(string_lit) => {
+                                ast::name::Name::new(string_lit.value.to_str())
+                            }
+                            _ => return None,
+                        };
+                        // Get the already-inferred type from when we inferred the dict above.
+                        let value_ty = self.expression_type(&item.value);
+                        Some((key_name, value_ty))
+                    })
+                    .collect();
+                (members, !all_keys_are_string_literals)
+            } else if let Type::TypedDict(typed_dict) = namespace_type {
+                // Namespace is a TypedDict instance. Extract known keys as members.
+                // TypedDicts are "open" (can have additional string keys), so this
+                // is still a dynamic namespace for unknown attributes.
+                let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| (name.clone(), field.declared_ty))
+                    .collect();
+                (members, true)
+            } else {
+                // Namespace is not a dict literal, so it's dynamic.
+                (Box::new([]), true)
+            };
 
         // Validate the namespace dict type. If the dict has non-string keys, fall through
         // to regular call binding so that it emits the appropriate error.
@@ -6322,8 +6413,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let file = self.file();
         let file_scope = self.scope().file_scope_id(db);
         let node_index = call_expr.node_index().load();
-        let dynamic_class =
-            DynamicClassLiteral::new(db, name, bases, file, file_scope, node_index, None);
+        let dynamic_class = DynamicClassLiteral::new(
+            db,
+            name,
+            bases,
+            members,
+            file,
+            file_scope,
+            node_index,
+            None,
+            has_dynamic_namespace,
+        );
 
         Some(Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)))
     }
