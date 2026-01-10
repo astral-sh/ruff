@@ -25,10 +25,10 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
-    SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeGuardLike, TypedDictType,
-    UnionType, WrapperDescriptorKind, visitor,
+    BindingContext, BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, MaterializationKind, Protocol,
+    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeGuardLike,
+    TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -44,6 +44,10 @@ pub struct DisplaySettings<'db> {
     /// Disallow Signature printing to introduce a name
     /// (presumably because we rendered one already)
     pub disallow_signature_name: bool,
+    /// Scopes that are currently active in the display context (e.g. function scopes
+    /// whose type parameters are currently being displayed).
+    /// Used to suppress redundant `@{scope}` suffixes for type variables.
+    pub active_scopes: Rc<FxHashSet<crate::semantic_index::definition::Definition<'db>>>,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -83,6 +87,19 @@ impl<'db> DisplaySettings<'db> {
     pub fn disallow_signature_name(&self) -> Self {
         Self {
             disallow_signature_name: true,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn with_active_scopes(
+        &self,
+        scopes: impl IntoIterator<Item = crate::semantic_index::definition::Definition<'db>>,
+    ) -> Self {
+        let mut active_scopes = (*self.active_scopes).clone();
+        active_scopes.extend(scopes);
+        Self {
+            active_scopes: Rc::new(active_scopes),
             ..self.clone()
         }
     }
@@ -746,7 +763,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(
                         f.with_type(Type::TypeVar(bound_typevar)),
                         "{}",
-                        bound_typevar.identity(self.db).display(self.db)
+                        bound_typevar
+                            .identity(self.db)
+                            .display_with(self.db, self.settings.clone())
                     )?;
                     f.write_char(']')
                 }
@@ -771,10 +790,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
 
                 match function.signature(self.db).overloads.as_slice() {
                     [signature] => {
+                        let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
+                        let hide_unused_self =
+                            bound_signature.should_hide_self_from_display(self.db);
                         let type_parameters = DisplayOptionalGenericContext {
-                            generic_context: signature.generic_context.as_ref(),
+                            generic_context: bound_signature.generic_context.as_ref(),
                             db: self.db,
                             settings: self.settings.clone(),
+                            hide_unused_self,
                         };
                         f.set_invalid_type_annotation();
                         f.write_str("bound method ")?;
@@ -784,8 +807,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         f.write_char('.')?;
                         f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;
-                        signature
-                            .bind_self(self.db, Some(typing_self_ty))
+                        bound_signature
                             .display_with(self.db, self.settings.disallow_signature_name())
                             .fmt_detailed(f)
                     }
@@ -977,7 +999,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             }
             Type::TypeVar(bound_typevar) => {
                 f.set_invalid_type_annotation();
-                write!(f, "{}", bound_typevar.identity(self.db).display(self.db))
+                write!(
+                    f,
+                    "{}",
+                    bound_typevar
+                        .identity(self.db)
+                        .display_with(self.db, self.settings.clone())
+                )
             }
             Type::AlwaysTruthy => f.with_type(self.ty).write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.with_type(self.ty).write_str("AlwaysFalsy"),
@@ -1042,6 +1070,19 @@ impl<'db> BoundTypeVarIdentity<'db> {
         DisplayBoundTypeVarIdentity {
             bound_typevar_identity: self,
             db,
+            settings: DisplaySettings::default(),
+        }
+    }
+
+    pub(crate) fn display_with(
+        self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> impl Display {
+        DisplayBoundTypeVarIdentity {
+            bound_typevar_identity: self,
+            db,
+            settings,
         }
     }
 }
@@ -1049,13 +1090,26 @@ impl<'db> BoundTypeVarIdentity<'db> {
 struct DisplayBoundTypeVarIdentity<'db> {
     bound_typevar_identity: BoundTypeVarIdentity<'db>,
     db: &'db dyn Db,
+    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
-        if let Some(binding_context) = self.bound_typevar_identity.binding_context.name(self.db) {
-            write!(f, "@{binding_context}")?;
+        if let Some(binding_context_name) =
+            self.bound_typevar_identity.binding_context.name(self.db)
+        {
+            let mut suppressed = false;
+            if let BindingContext::Definition(definition) =
+                self.bound_typevar_identity.binding_context
+            {
+                if self.settings.active_scopes.contains(&definition) {
+                    suppressed = true;
+                }
+            }
+            if !suppressed {
+                write!(f, "@{binding_context_name}")?;
+            }
         }
         if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
             write!(f, ".{paramspec_attr}")?;
@@ -1186,10 +1240,12 @@ pub(crate) struct DisplayOverloadLiteral<'db> {
 impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let signature = self.literal.signature(self.db);
+        let hide_unused_self = signature.should_hide_self_from_display(self.db);
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
             db: self.db,
             settings: self.settings.clone(),
+            hide_unused_self,
         };
 
         f.set_invalid_type_annotation();
@@ -1234,10 +1290,13 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
 
         match signature.overloads.as_slice() {
             [signature] => {
+                let hide_unused_self = signature.should_hide_self_from_display(self.db);
+
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
                     settings: self.settings.clone(),
+                    hide_unused_self,
                 };
                 f.set_invalid_type_annotation();
                 f.write_str("def ")?;
@@ -1354,6 +1413,7 @@ impl<'db> GenericContext<'db> {
             db,
             settings: DisplaySettings::default(),
             full: true,
+            hide_unused_self: false,
         }
     }
 
@@ -1367,6 +1427,7 @@ impl<'db> GenericContext<'db> {
             db,
             settings,
             full: false,
+            hide_unused_self: false,
         }
     }
 }
@@ -1375,14 +1436,22 @@ struct DisplayOptionalGenericContext<'a, 'db> {
     generic_context: Option<&'a GenericContext<'db>>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
+    /// If true, hide `Self` type variables from the generic context prefix
+    /// when they are not displayed in the signature body.
+    hide_unused_self: bool,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayOptionalGenericContext<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(generic_context) = self.generic_context {
-            generic_context
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f)
+            DisplayGenericContext {
+                generic_context,
+                db: self.db,
+                settings: self.settings.clone(),
+                full: false,
+                hide_unused_self: self.hide_unused_self,
+            }
+            .fmt_detailed(f)
         } else {
             Ok(())
         }
@@ -1401,22 +1470,30 @@ pub struct DisplayGenericContext<'a, 'db> {
     #[expect(dead_code)]
     settings: DisplaySettings<'db>,
     full: bool,
+    /// If true, hide `Self` type variables from the generic context prefix.
+    hide_unused_self: bool,
 }
 
 impl<'db> DisplayGenericContext<'_, 'db> {
     fn fmt_normal(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let variables = self.generic_context.variables(self.db);
+        let mut variables = self
+            .generic_context
+            .variables(self.db)
+            .filter(|bound_typevar| {
+                // If hide_unused_self is true and this is a Self typevar, skip it
+                if self.hide_unused_self && bound_typevar.typevar(self.db).is_self(self.db) {
+                    return false;
+                }
+                true
+            })
+            .peekable();
 
-        let non_implicit_variables: Vec<_> = variables
-            .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_self(self.db))
-            .collect();
-
-        if non_implicit_variables.is_empty() {
+        if variables.peek().is_none() {
             return Ok(());
         }
 
         f.write_char('[')?;
-        for (idx, bound_typevar) in non_implicit_variables.iter().enumerate() {
+        for (idx, bound_typevar) in variables.enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
@@ -1426,12 +1503,14 @@ impl<'db> DisplayGenericContext<'_, 'db> {
                 f.write_str("**")?;
             }
             write!(
-                f.with_type(Type::TypeVar(*bound_typevar)),
+                f.with_type(Type::TypeVar(bound_typevar)),
                 "{}",
                 typevar.name(self.db)
             )?;
         }
-        f.write_char(']')
+        f.write_char(']')?;
+
+        Ok(())
     }
 
     fn fmt_full(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
@@ -1671,6 +1750,7 @@ impl<'db> Signature<'db> {
     ) -> DisplaySignature<'a, 'db> {
         DisplaySignature {
             definition: self.definition(),
+            generic_context: self.generic_context.as_ref(),
             parameters: self.parameters(),
             return_ty: self.return_ty,
             db,
@@ -1681,13 +1761,14 @@ impl<'db> Signature<'db> {
 
 pub(crate) struct DisplaySignature<'a, 'db> {
     definition: Option<Definition<'db>>,
+    generic_context: Option<&'a GenericContext<'db>>,
     parameters: &'a Parameters<'db>,
     return_ty: Type<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
 
-impl DisplaySignature<'_, '_> {
+impl<'db> DisplaySignature<'_, 'db> {
     /// Get detailed display information including component ranges
     pub(crate) fn to_string_parts(&self) -> SignatureDisplayDetails {
         let mut f = TypeWriter::Details(TypeDetailsWriter::new());
@@ -1697,6 +1778,15 @@ impl DisplaySignature<'_, '_> {
             TypeWriter::Details(details) => details.finish_signature_details(),
             TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
         }
+    }
+
+    pub(crate) fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
+        let return_contains_self = self.return_ty.contains_self(db);
+        let param_contains_self = self
+            .parameters
+            .iter()
+            .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db));
+        !return_contains_self && !param_contains_self
     }
 }
 
@@ -1723,15 +1813,41 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             f.write_str(&name)?;
         }
 
+        let settings = if let Some(generic_context) = self.generic_context {
+            self.settings
+                .with_active_scopes(generic_context.variables(self.db).filter_map(|bound| {
+                    match bound.binding_context(self.db) {
+                        BindingContext::Definition(def) => Some(def),
+                        BindingContext::Synthetic => None,
+                    }
+                }))
+        } else {
+            self.settings.clone()
+        };
+
+        // Display type parameters if present, but only when the caller hasn't
+        // already displayed them (indicated by disallow_signature_name being false)
+        if !self.settings.disallow_signature_name {
+            let hide_unused_self = self.should_hide_self_from_display(self.db);
+
+            DisplayOptionalGenericContext {
+                generic_context: self.generic_context,
+                db: self.db,
+                settings: settings.clone(),
+                hide_unused_self,
+            }
+            .fmt_detailed(&mut f)?;
+        }
+
         // Parameters
         self.parameters
-            .display_with(self.db, self.settings.clone())
+            .display_with(self.db, settings.clone())
             .fmt_detailed(&mut f)?;
 
         // Return type
         f.write_str(" -> ")?;
         self.return_ty
-            .display_with(self.db, self.settings.singleline())
+            .display_with(self.db, settings.singleline())
             .fmt_detailed(&mut f)?;
 
         if self.parameters.is_top() {
