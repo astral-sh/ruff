@@ -113,6 +113,29 @@ static_assert(not is_assignable_to(str, Literal["foo"]))
 static_assert(not is_assignable_to(str, LiteralString))
 ```
 
+### String literals and Sequence
+
+String literals are assignable to `Sequence[Literal[chars...]]` because strings are sequences of
+their characters.
+
+```py
+from typing import Literal, Sequence, Iterable, Collection, Reversible
+from ty_extensions import is_assignable_to, static_assert
+
+static_assert(is_assignable_to(Literal["abba"], Sequence[Literal["a", "b"]]))
+static_assert(is_assignable_to(Literal["abb"], Iterable[Literal["a", "b"]]))
+static_assert(is_assignable_to(Literal["abb"], Collection[Literal["a", "b"]]))
+static_assert(is_assignable_to(Literal["abb"], Reversible[Literal["a", "b"]]))
+static_assert(is_assignable_to(Literal["aaa"], Sequence[Literal["a"]]))
+static_assert(is_assignable_to(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
+static_assert(is_assignable_to(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  # subset of allowed chars
+
+# String literals are NOT assignable when they contain chars outside the allowed set
+static_assert(not is_assignable_to(Literal["abc"], Sequence[Literal["a", "b"]]))  # 'c' not allowed
+static_assert(not is_assignable_to(Literal["x"], Sequence[Literal["a", "b"]]))  # 'x' not allowed
+static_assert(not is_assignable_to(Literal["aa"], Sequence[Literal[""]]))
+```
+
 ### Byte literals
 
 ```py
