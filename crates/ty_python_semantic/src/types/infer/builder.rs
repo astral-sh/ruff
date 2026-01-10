@@ -4532,7 +4532,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut first_tcx = None;
         let self_mapping = TypeMapping::BindSelf {
             self_type: object_ty,
-            binding_context: None,
+            self_typevar_identity: None,
         };
         let bind_self =
             |ty: Type<'db>| ty.apply_type_mapping(db, &self_mapping, TypeContext::default());

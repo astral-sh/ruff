@@ -2551,7 +2551,7 @@ impl<'db> Type<'db> {
                 if bound_typevar.typevar(db).is_self(db) {
                     let self_mapping = TypeMapping::BindSelf {
                         self_type: Type::TypeVar(*bound_typevar),
-                        binding_context: None,
+                        self_typevar_identity: Some(bound_typevar.typevar(db).identity(db)),
                     };
                     member.map_type(|ty| {
                         ty.apply_type_mapping(db, &self_mapping, TypeContext::default())
@@ -6895,7 +6895,8 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf {
         self_type: Type<'db>,
-        binding_context: Option<BindingContext<'db>>,
+        /// If `Some`, only bind `Self` typevars that have this identity (i.e., from the same class).
+        self_typevar_identity: Option<TypeVarIdentity<'db>>,
     },
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
@@ -6925,8 +6926,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion => context,
             TypeMapping::BindSelf {
-                binding_context, ..
-            } => context.remove_self(db, *binding_context),
+                self_typevar_identity,
+                ..
+            } => context.remove_self(db, *self_typevar_identity),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
                 context.variables(db).map(|typevar| {
@@ -8561,10 +8563,11 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::BindSelf {
                 self_type,
-                binding_context,
+                self_typevar_identity,
             } => {
                 if self.typevar(db).is_self(db)
-                    && binding_context.is_none_or(|context| self.binding_context(db) == context)
+                    && self_typevar_identity
+                        .is_none_or(|identity| self.typevar(db).identity(db) == identity)
                 {
                     *self_type
                 } else {
