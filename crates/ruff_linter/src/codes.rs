@@ -1062,6 +1062,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "066") => rules::ruff::rules::PropertyWithoutReturn,
         (Ruff, "067") => rules::ruff::rules::NonEmptyInitModule,
 
+        (Ruff, "070") => rules::ruff::rules::FloatEqualityComparison,
+
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
         (Ruff, "102") => rules::ruff::rules::InvalidRuleCode,
