@@ -499,3 +499,24 @@ def _(x: object):
     if f(x) and (g(x) or h(x)):
         reveal_type(x)  # revealed: B | (A & C)
 ```
+
+## Narrowing with named expressions (walrus operator)
+
+When a type guard is used with a named expression, the target of the named expression should be
+narrowed.
+
+```py
+from typing_extensions import TypeIs
+
+def is_str(x: object) -> TypeIs[str]:
+    return isinstance(x, str)
+
+def get_value() -> int | str:
+    return 1
+
+def f():
+    if is_str(x := get_value()):
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: int
+```

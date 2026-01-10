@@ -347,3 +347,19 @@ def _(x: LiteralString):
     else:
         reveal_type(x)  # revealed: LiteralString & ~Literal[""]
 ```
+
+## Narrowing with named expressions (walrus operator)
+
+When a truthiness check is used with a named expression, the target of the named expression should
+be narrowed.
+
+```py
+def get_value() -> str | None:
+    return "hello"
+
+def f():
+    if x := get_value():
+        reveal_type(x)  # revealed: str & ~AlwaysFalsy
+    else:
+        reveal_type(x)  # revealed: (str & ~AlwaysTruthy) | None
+```
