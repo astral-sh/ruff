@@ -79,7 +79,9 @@ impl<'a> ProjectFilesFilter<'a> {
         match self.match_included_paths(path, mode) {
             None => IncludeResult::NotIncluded,
             Some(CheckPathMatch::Partial) => self.src_filter.is_file_included(path, mode),
-            Some(CheckPathMatch::Full) => IncludeResult::Included,
+            Some(CheckPathMatch::Full) => IncludeResult::Included {
+                literal_match: Some(true),
+            },
         }
     }
 
@@ -93,7 +95,9 @@ impl<'a> ProjectFilesFilter<'a> {
             Some(CheckPathMatch::Partial) => {
                 self.src_filter.is_directory_maybe_included(path, mode)
             }
-            Some(CheckPathMatch::Full) => IncludeResult::Included,
+            Some(CheckPathMatch::Full) => IncludeResult::Included {
+                literal_match: Some(true),
+            },
         }
     }
 }
@@ -189,60 +193,59 @@ impl<'a> ProjectFilesWalker<'a> {
                                 let directory_included = filter
                                     .is_directory_included(entry.path(), GlobFilterCheckMode::TopDown);
                                 return match directory_included {
-                                    IncludeResult::Included => WalkState::Continue,
+                                    IncludeResult::Included { .. } => WalkState::Continue,
                                     IncludeResult::Excluded => {
                                         tracing::debug!(
                                             "Skipping directory '{path}' because it is excluded by a default or `src.exclude` pattern",
                                             path=entry.path()
                                         );
                                         WalkState::Skip
-                                    },
+                                    }
                                     IncludeResult::NotIncluded => {
                                         tracing::debug!(
                                             "Skipping directory `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI",
                                             path=entry.path()
                                         );
                                         WalkState::Skip
-                                    },
+                                    }
                                 };
                             }
                         } else {
-                            // Ignore any non python files to avoid creating too many entries in `Files`.
-                            // Unless the file is explicitly passed, we then always assume it's a python file.
-                            let source_type = entry.path().extension().and_then(PySourceType::try_from_extension).or_else(|| {
-                                if entry.depth() == 0 {
-                                    Some(PySourceType::Python)
-                                } else {
-                                    db.system().source_type(entry.path())
-                                }
-                            });
-
-                            if source_type.is_none()
-                            {
-                                return WalkState::Continue;
-                            }
-
                             // For all files, except the ones that were explicitly passed to the walker (CLI),
                             // check if they're included in the project.
                             if entry.depth() > 0 || self.force_exclude {
                                 match filter
                                     .is_file_included(entry.path(), GlobFilterCheckMode::TopDown)
                                 {
-                                    IncludeResult::Included => {},
+                                    IncludeResult::Included { literal_match } => {
+                                        // Ignore any non python files to avoid creating too many entries in `Files`.
+                                        // Unless the file is explicitly passed on the CLI or a literal match in the `include`, we then always assume it's a file ty can analyze
+                                        let source_type = if literal_match == Some(true) || entry.depth() == 0 {
+                                            Some(PySourceType::Python)
+                                        } else {
+                                            entry.path().extension().and_then(PySourceType::try_from_extension).or_else(|| db.system().source_type(entry.path()))
+                                        };
+
+
+                                        if source_type.is_none()
+                                        {
+                                            return WalkState::Continue;
+                                        }
+                                    }
                                     IncludeResult::Excluded => {
                                         tracing::debug!(
                                             "Ignoring file `{path}` because it is excluded by a default or `src.exclude` pattern.",
                                             path=entry.path()
                                         );
                                         return WalkState::Continue;
-                                    },
+                                    }
                                     IncludeResult::NotIncluded => {
                                         tracing::debug!(
                                             "Ignoring file `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI.",
                                             path=entry.path()
                                         );
                                         return WalkState::Continue;
-                                    },
+                                    }
                                 }
                             }
 

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: single_matching_overload.md - Single matching overload - Limited number of overloads
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/single_matching_overload.md

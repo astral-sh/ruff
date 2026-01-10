@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: overloads.md - Overloads - Argument type expansion - Optimization: Limit expansion size
 mdtest path: crates/ty_python_semantic/resources/mdtest/call/overloads.md

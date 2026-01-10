@@ -899,9 +899,7 @@ impl ReachabilityConstraints {
                 let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
                     .fold((true, true), |(none, all), overload| {
                         let overload_returns_never =
-                            overload.return_ty.is_some_and(|return_type| {
-                                return_type.is_equivalent_to(db, Type::Never)
-                            });
+                            overload.return_ty.is_equivalent_to(db, Type::Never);
 
                         (
                             none && !overload_returns_never,
@@ -953,18 +951,14 @@ impl ReachabilityConstraints {
                 )
                 .place
                 {
-                    crate::place::Place::Defined(
-                        _,
-                        _,
-                        crate::place::Definedness::AlwaysDefined,
-                        _,
-                    ) => Truthiness::AlwaysTrue,
-                    crate::place::Place::Defined(
-                        _,
-                        _,
-                        crate::place::Definedness::PossiblyUndefined,
-                        _,
-                    ) => Truthiness::Ambiguous,
+                    crate::place::Place::Defined(crate::place::DefinedPlace {
+                        definedness: crate::place::Definedness::AlwaysDefined,
+                        ..
+                    }) => Truthiness::AlwaysTrue,
+                    crate::place::Place::Defined(crate::place::DefinedPlace {
+                        definedness: crate::place::Definedness::PossiblyUndefined,
+                        ..
+                    }) => Truthiness::Ambiguous,
                     crate::place::Place::Undefined => Truthiness::AlwaysFalse,
                 }
             }

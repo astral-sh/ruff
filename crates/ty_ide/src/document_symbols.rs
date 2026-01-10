@@ -31,7 +31,7 @@ class World:
 <CURSOR>",
         );
 
-        assert_snapshot!(test.document_symbols(), @r"
+        assert_snapshot!(test.document_symbols(), @"
         info[document-symbols]: SymbolInfo
          --> main.py:2:5
           |
@@ -97,7 +97,7 @@ def standalone_function():
 <CURSOR>",
         );
 
-        assert_snapshot!(test.document_symbols(), @r"
+        assert_snapshot!(test.document_symbols(), @"
         info[document-symbols]: SymbolInfo
          --> main.py:5:1
           |
@@ -253,7 +253,7 @@ class OuterClass:
 <CURSOR>",
         );
 
-        assert_snapshot!(test.document_symbols(), @r"
+        assert_snapshot!(test.document_symbols(), @"
         info[document-symbols]: SymbolInfo
          --> main.py:2:7
           |

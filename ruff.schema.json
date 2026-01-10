@@ -1880,6 +1880,38 @@
             "object",
             "null"
           ],
+          "properties": {
+            "first-party": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "future": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "local-folder": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "standard-library": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "third-party": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
           "additionalProperties": {
             "type": "array",
             "items": {
@@ -2852,7 +2884,8 @@
         "py311",
         "py312",
         "py313",
-        "py314"
+        "py314",
+        "py315"
       ]
     },
     "Quote": {

@@ -98,7 +98,7 @@ API_BASE_URL = 'https://api.example.com'
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("ufunc"), @r"
+        assert_snapshot!(test.workspace_symbols("ufunc"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:2:5
           |
@@ -110,7 +110,7 @@ API_BASE_URL = 'https://api.example.com'
         info: Function utility_function
         ");
 
-        assert_snapshot!(test.workspace_symbols("data"), @r"
+        assert_snapshot!(test.workspace_symbols("data"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> models.py:2:7
           |
@@ -122,7 +122,7 @@ API_BASE_URL = 'https://api.example.com'
         info: Class DataModel
         ");
 
-        assert_snapshot!(test.workspace_symbols("apibase"), @r"
+        assert_snapshot!(test.workspace_symbols("apibase"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> constants.py:2:1
           |
@@ -145,7 +145,7 @@ class Test:
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("from"), @r"
+        assert_snapshot!(test.workspace_symbols("from"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:3:9
           |
@@ -170,7 +170,7 @@ class Test:
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("from"), @r"
+        assert_snapshot!(test.workspace_symbols("from"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:4:9
           |
@@ -197,7 +197,7 @@ foo = 1
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("foo"), @r"
+        assert_snapshot!(test.workspace_symbols("foo"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:5:1
           |

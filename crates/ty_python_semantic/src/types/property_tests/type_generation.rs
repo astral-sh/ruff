@@ -59,7 +59,7 @@ pub(crate) enum Ty {
     },
     Callable {
         params: CallableParams,
-        returns: Option<Box<Ty>>,
+        returns: Box<Ty>,
     },
     /// `unittest.mock.Mock` is interesting because it is a nominal instance type
     /// where the class has `Any` in its MRO
@@ -91,9 +91,7 @@ impl CallableParams {
                             Parameter::keyword_variadic(param.name.unwrap())
                         }
                     };
-                    if let Some(annotated_ty) = param.annotated_ty {
-                        parameter = parameter.with_annotated_type(annotated_ty.into_type(db));
-                    }
+                    parameter = parameter.with_annotated_type(param.annotated_ty.into_type(db));
                     if let Some(default_ty) = param.default_ty {
                         parameter = parameter.with_default_type(default_ty.into_type(db));
                     }
@@ -108,7 +106,7 @@ impl CallableParams {
 pub(crate) struct Param {
     kind: ParamKind,
     name: Option<Name>,
-    annotated_ty: Option<Ty>,
+    annotated_ty: Ty,
     default_ty: Option<Ty>,
 }
 
@@ -237,10 +235,7 @@ impl Ty {
             }
             Ty::Callable { params, returns } => Type::single_callable(
                 db,
-                Signature::new(
-                    params.into_parameters(db),
-                    returns.map(|ty| ty.into_type(db)),
-                ),
+                Signature::new(params.into_parameters(db), returns.into_type(db)),
             ),
         }
     }
@@ -374,7 +369,7 @@ fn arbitrary_type(g: &mut Gen, size: u32, fully_static: bool) -> Ty {
                     0 if !fully_static => CallableParams::GradualForm,
                     _ => CallableParams::List(arbitrary_parameter_list(g, size, fully_static)),
                 },
-                returns: arbitrary_annotation(g, size - 1, fully_static).map(Box::new),
+                returns: Box::new(arbitrary_type(g, size - 1, fully_static)),
             },
             _ => unreachable!(),
         }
@@ -433,7 +428,7 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<P
         params.push(Param {
             kind: next_kind,
             name,
-            annotated_ty: arbitrary_annotation(g, size, fully_static),
+            annotated_ty: arbitrary_type(g, size, fully_static),
             default_ty: if matches!(next_kind, ParamKind::Variadic | ParamKind::KeywordVariadic) {
                 None
             } else {
@@ -443,15 +438,6 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<P
     }
 
     params
-}
-
-/// An arbitrary optional type, always `Some` if fully static.
-fn arbitrary_annotation(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {
-    if fully_static {
-        Some(arbitrary_type(g, size, true))
-    } else {
-        arbitrary_optional_type(g, size, false)
-    }
 }
 
 fn arbitrary_optional_type(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {

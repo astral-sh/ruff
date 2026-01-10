@@ -23,7 +23,7 @@ use smallvec::{SmallVec, smallvec, smallvec_inline};
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{Definedness, Place, known_module_symbol};
+use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
@@ -662,7 +662,7 @@ impl<'db> Bindings<'db> {
                         if let Some(enum_instance) = bound_method.self_instance(db).to_instance(db)
                         {
                             overload.set_return_type(
-                                KnownClass::Iterator.to_specialized_instance(db, [enum_instance]),
+                                KnownClass::Iterator.to_specialized_instance(db, &[enum_instance]),
                             );
                         }
                     }
@@ -993,7 +993,7 @@ impl<'db> Bindings<'db> {
                                     let specialization = UnionType::from_elements(db, member_names);
                                     overload.set_return_type(
                                         KnownClass::FrozenSet
-                                            .to_specialized_instance(db, [specialization]),
+                                            .to_specialized_instance(db, &[specialization]),
                                     );
                                 }
                             }
@@ -1022,7 +1022,11 @@ impl<'db> Bindings<'db> {
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
                                 match instance_ty.static_member(db, attr_name.value(db)) {
-                                    Place::Defined(ty, _, Definedness::AlwaysDefined, _) => {
+                                    Place::Defined(DefinedPlace {
+                                        ty,
+                                        definedness: Definedness::AlwaysDefined,
+                                        ..
+                                    }) => {
                                         if ty.is_dynamic() {
                                             // Here, we attempt to model the fact that an attribute lookup on
                                             // a dynamic type could fail
@@ -1032,9 +1036,11 @@ impl<'db> Bindings<'db> {
                                             ty
                                         }
                                     }
-                                    Place::Defined(ty, _, Definedness::PossiblyUndefined, _) => {
-                                        union_with_default(ty)
-                                    }
+                                    Place::Defined(DefinedPlace {
+                                        ty,
+                                        definedness: Definedness::PossiblyUndefined,
+                                        ..
+                                    }) => union_with_default(ty),
                                     Place::Undefined => default,
                                 },
                             );
@@ -1122,6 +1128,7 @@ impl<'db> Bindings<'db> {
                                     class_literal.type_check_only(db),
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
+                                    class_literal.total_ordering(db),
                                 )));
                             }
                         }
@@ -1740,9 +1747,8 @@ impl<'db> CallableBinding<'db> {
             let mut is_argument_assignable_to_any_overload = false;
             'overload: for overload in &self.overloads {
                 for parameter_index in &overload.argument_matches[argument_index].parameters {
-                    let parameter_type = overload.signature.parameters()[*parameter_index]
-                        .annotated_type()
-                        .unwrap_or(Type::unknown());
+                    let parameter_type =
+                        overload.signature.parameters()[*parameter_index].annotated_type();
                     if argument_type
                         .when_assignable_to(db, parameter_type, overload.inferable_typevars)
                         .is_always_satisfied(db)
@@ -1989,9 +1995,8 @@ impl<'db> CallableBinding<'db> {
                 for &parameter_index in &overload.argument_matches[argument_index].parameters {
                     // TODO: For an unannotated `self` / `cls` parameter, the type should be
                     // `typing.Self` / `type[typing.Self]`
-                    let current_parameter_type = overload.signature.parameters()[parameter_index]
-                        .annotated_type()
-                        .unwrap_or(Type::unknown());
+                    let current_parameter_type =
+                        overload.signature.parameters()[parameter_index].annotated_type();
                     let first_parameter_type = &mut first_parameter_types[parameter_index];
                     if let Some(first_parameter_type) = first_parameter_type {
                         if !first_parameter_type
@@ -2102,9 +2107,8 @@ impl<'db> CallableBinding<'db> {
                         }
                         // TODO: For an unannotated `self` / `cls` parameter, the type should be
                         // `typing.Self` / `type[typing.Self]`
-                        let mut parameter_type = overload.signature.parameters()[*parameter_index]
-                            .annotated_type()
-                            .unwrap_or(Type::unknown());
+                        let mut parameter_type =
+                            overload.signature.parameters()[*parameter_index].annotated_type();
                         if let Some(specialization) = overload.specialization {
                             parameter_type =
                                 parameter_type.apply_specialization(db, specialization);
@@ -2828,7 +2832,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 )
                 .place
             {
-                Place::Defined(getitem_method, _, Definedness::AlwaysDefined, _) => getitem_method
+                Place::Defined(DefinedPlace {
+                    ty: getitem_method,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) => getitem_method
                     .try_call(db, &CallArguments::positional([Type::unknown()]))
                     .ok()
                     .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
@@ -3000,7 +3008,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let return_with_tcx = self
             .constructor_instance_type
-            .or(self.signature.return_ty)
+            .or(Some(self.signature.return_ty))
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
@@ -3040,13 +3048,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
-                let parameter = &parameters[parameter_index];
-                let Some(expected_type) = parameter.annotated_type() else {
-                    continue;
-                };
-
                 let specialization_result = builder.infer_map(
-                    expected_type,
+                    parameters[parameter_index].annotated_type(),
                     variadic_argument_type.unwrap_or(argument_type),
                     |(identity, variance, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
@@ -3081,10 +3084,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Attempt to promote any literal types assigned to the specialization.
         let maybe_promote = |identity, typevar, ty: Type<'db>| {
-            let Some(return_ty) = self.constructor_instance_type.or(self.signature.return_ty)
-            else {
-                return ty;
-            };
+            let return_ty = self
+                .constructor_instance_type
+                .unwrap_or(self.signature.return_ty);
 
             let mut combined_tcx = TypeContext::default();
             let mut variance_in_return = TypeVarVariance::Bivariant;
@@ -3177,30 +3179,29 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
-        if let Some(mut expected_ty) = parameter.annotated_type() {
-            if let Some(specialization) = self.specialization {
-                argument_type = argument_type.apply_specialization(self.db, specialization);
-                expected_ty = expected_ty.apply_specialization(self.db, specialization);
-            }
-            // This is one of the few places where we want to check if there's _any_ specialization
-            // where assignability holds; normally we want to check that assignability holds for
-            // _all_ specializations.
-            // TODO: Soon we will go further, and build the actual specializations from the
-            // constraint set that we get from this assignability check, instead of inferring and
-            // building them in an earlier separate step.
-            if argument_type
-                .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
-                .is_never_satisfied(self.db)
-            {
-                let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
-                    && !parameter.is_variadic();
-                self.errors.push(BindingError::InvalidArgumentType {
-                    parameter: ParameterContext::new(parameter, parameter_index, positional),
-                    argument_index: adjusted_argument_index,
-                    expected_ty,
-                    provided_ty: argument_type,
-                });
-            }
+        let mut expected_ty = parameter.annotated_type();
+        if let Some(specialization) = self.specialization {
+            argument_type = argument_type.apply_specialization(self.db, specialization);
+            expected_ty = expected_ty.apply_specialization(self.db, specialization);
+        }
+        // This is one of the few places where we want to check if there's _any_ specialization
+        // where assignability holds; normally we want to check that assignability holds for
+        // _all_ specializations.
+        // TODO: Soon we will go further, and build the actual specializations from the
+        // constraint set that we get from this assignability check, instead of inferring and
+        // building them in an earlier separate step.
+        if argument_type
+            .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
+            .is_never_satisfied(self.db)
+        {
+            let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
+                && !parameter.is_variadic();
+            self.errors.push(BindingError::InvalidArgumentType {
+                parameter: ParameterContext::new(parameter, parameter_index, positional),
+                argument_index: adjusted_argument_index,
+                expected_ty,
+                provided_ty: argument_type,
+            });
         }
         // We still update the actual type of the parameter in this binding to match the
         // argument, even if the argument type is not assignable to the expected parameter
@@ -3317,10 +3318,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         };
 
-        if !self.signature.parameters()[*parameter_index]
-            .annotated_type()
-            .is_some_and(|ty| matches!(ty, Type::TypeVar(typevar) if typevar.is_paramspec(self.db)))
-        {
+        let Type::TypeVar(typevar) = self.signature.parameters()[*parameter_index].annotated_type()
+        else {
+            return false;
+        };
+        if !typevar.is_paramspec(self.db) {
             return false;
         }
 
@@ -3435,7 +3437,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     )
                     .place
                 {
-                    Place::Defined(keys_method, _, Definedness::AlwaysDefined, _) => keys_method
+                    Place::Defined(DefinedPlace {
+                        ty: keys_method,
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }) => keys_method
                         .try_call(self.db, &CallArguments::none())
                         .ok()
                         .and_then(|bindings| {
@@ -3481,14 +3487,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         )
                         .place
                     {
-                        Place::Defined(keys_method, _, Definedness::AlwaysDefined, _) => {
-                            keys_method
-                                .try_call(self.db, &CallArguments::positional([Type::unknown()]))
-                                .ok()
-                                .map_or_else(Type::unknown, |bindings| {
-                                    bindings.return_type(self.db)
-                                })
-                        }
+                        Place::Defined(DefinedPlace {
+                            ty: getitem_method,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        }) => getitem_method
+                            .try_call(self.db, &CallArguments::positional([Type::unknown()]))
+                            .ok()
+                            .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
                         _ => Type::unknown(),
                     },
                 )
@@ -3677,7 +3683,7 @@ impl<'db> Binding<'db> {
         for (keywords_index, keywords_type) in keywords_arguments {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
-        self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
+        self.return_ty = self.signature.return_ty;
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
@@ -4708,9 +4714,9 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         .exactly_one()
         .ok()?;
     let signature = &binding.signature;
-    let return_ty = signature.return_ty?;
 
-    let yield_ty = return_ty
+    let yield_ty = signature
+        .return_ty
         .try_iterate_with_mode(db, EvaluationMode::Async)
         .ok()?
         .homogeneous_element_type(db);
@@ -4726,7 +4732,7 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
     });
 
     let new_return_ty = Type::from(context_manager).to_instance(db)?;
-    let new_signature = Signature::new(signature.parameters().clone(), Some(new_return_ty));
+    let new_signature = Signature::new(signature.parameters().clone(), new_return_ty);
 
     Some(Type::Callable(CallableType::new(
         db,

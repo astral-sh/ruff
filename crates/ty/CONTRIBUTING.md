@@ -25,6 +25,12 @@ that are ready for contributions.
 ty is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
+You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
+
+```shell
+cargo install cargo-insta
+```
+
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
@@ -67,6 +73,13 @@ These checks will run on GitHub Actions when you open your pull request, but run
 will save you time and expedite the merge process.
 
 If you're using VS Code, you can also install the recommended [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) extension to get these checks while editing.
+
+Note that many code changes also require updating the snapshot tests, which is done interactively
+after running `cargo test` like so:
+
+```shell
+cargo insta review
+```
 
 Include the text `[ty]` at the beginning of your pull request title, to distinguish ty pull requests
 from Ruff ones.

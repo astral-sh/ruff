@@ -13,7 +13,8 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db, NameKind,
     place::{
-        Place, PlaceWithDefinition, imported_symbol, place_from_bindings, place_from_declarations,
+        DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
+        place_from_declarations,
     },
     semantic_index::{
         attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
@@ -162,14 +163,33 @@ impl<'db> AllMembers<'db> {
 
     fn extend_with_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
-            Type::Union(union) => self.members.extend(
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|ty| AllMembers::of(db, *ty).members)
-                    .reduce(|acc, members| acc.intersection(&members).cloned().collect())
-                    .unwrap_or_default(),
-            ),
+            Type::Union(union) => {
+                fn is_dynamic(db: &dyn Db, ty: Type<'_>) -> bool {
+                    // We don't need to use recursion here because
+                    // `Type` guarantees that unions/intersections
+                    // are kept in DNF (i.e., they are flattened).
+                    ty.is_dynamic()
+                        || match ty {
+                            Type::Intersection(intersection) => {
+                                intersection.positive(db).iter().any(Type::is_dynamic)
+                            }
+                            _ => false,
+                        }
+                }
+
+                let union = match union.filter(db, |&ty| !is_dynamic(db, ty)) {
+                    Type::Union(union) => union,
+                    ty => return self.extend_with_type(db, ty),
+                };
+                self.members.extend(
+                    union
+                        .elements(db)
+                        .iter()
+                        .map(|ty| AllMembers::of(db, *ty).members)
+                        .reduce(|acc, members| acc.intersection(&members).cloned().collect())
+                        .unwrap_or_default(),
+                );
+            }
 
             Type::Intersection(intersection) => self.members.extend(
                 intersection
@@ -325,7 +345,7 @@ impl<'db> AllMembers<'db> {
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
-                    let Place::Defined(ty, _, _, _) =
+                    let Place::Defined(DefinedPlace { ty, .. }) =
                         imported_symbol(db, file, symbol_name, None).place
                     else {
                         continue;
@@ -494,7 +514,11 @@ impl<'db> AllMembers<'db> {
             Some(CodeGeneratorKind::TypedDict) => {}
             Some(CodeGeneratorKind::DataclassLike(_)) => {
                 for attr in SYNTHETIC_DATACLASS_ATTRIBUTES {
-                    if let Place::Defined(synthetic_member, _, _, _) = ty.member(db, attr).place {
+                    if let Place::Defined(DefinedPlace {
+                        ty: synthetic_member,
+                        ..
+                    }) = ty.member(db, attr).place
+                    {
                         self.members.insert(Member {
                             name: Name::from(*attr),
                             ty: synthetic_member,
