@@ -46,6 +46,7 @@ type Props = {
   theme: Theme;
   workspace: Workspace;
   onChange(content: string): void;
+  onError(error: string | null): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
   onOpenFile(file: FileId): void;
   onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
@@ -62,6 +63,7 @@ export default function Editor({
   diagnostics,
   workspace,
   onChange,
+  onError,
   onMount,
   onOpenFile,
   onVendoredFileChange,
@@ -78,6 +80,7 @@ export default function Editor({
         onOpenFile,
         onVendoredFileChange,
         onBackToUserFile,
+        onError,
       },
       isViewingVendoredFile,
     );
@@ -87,6 +90,7 @@ export default function Editor({
     onOpenFile,
     onVendoredFileChange,
     onBackToUserFile,
+    onError,
     isViewingVendoredFile,
   ]);
 
@@ -127,6 +131,7 @@ export default function Editor({
         onOpenFile,
         onVendoredFileChange,
         onBackToUserFile,
+        onError,
       });
 
       server.updateDiagnostics(diagnostics);
@@ -143,6 +148,7 @@ export default function Editor({
       diagnostics,
       onVendoredFileChange,
       onBackToUserFile,
+      onError,
     ],
   );
 
@@ -176,6 +182,7 @@ interface PlaygroundServerProps {
   onOpenFile: (file: FileId) => void;
   onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
   onBackToUserFile: () => void;
+  onError: (error: string | null) => void;
 }
 
 class PlaygroundServer
@@ -206,6 +213,7 @@ class PlaygroundServer
   private inlayHintsDisposable: IDisposable;
   private formatDisposable: IDisposable;
   private completionDisposable: IDisposable;
+  private modelContentChangeDisposable: IDisposable;
   private semanticTokensDisposable: IDisposable;
   private rangeSemanticTokensDisposable: IDisposable;
   private signatureHelpDisposable: IDisposable;
@@ -246,6 +254,27 @@ class PlaygroundServer
       "python",
       this,
     );
+    this.modelContentChangeDisposable = editor.onDidChangeModelContent(() => {
+      const model = editor.getModel();
+      if (!model) {
+        return;
+      }
+
+      const fileHandle = this.getFileHandleForModel(model);
+      if (fileHandle == null) {
+        return;
+      }
+
+      const modelValue = model.getValue();
+      if (this.props.workspace.sourceText(fileHandle) !== modelValue) {
+        try {
+          this.props.workspace.updateFile(fileHandle, modelValue);
+          this.props.onError(null);
+        } catch (error) {
+          this.props.onError(`Failed to update file: ${formatError(error)}`);
+        }
+      }
+    });
     this.semanticTokensDisposable =
       monaco.languages.registerDocumentSemanticTokensProvider("python", this);
     this.rangeSemanticTokensDisposable =
@@ -926,6 +955,7 @@ class PlaygroundServer
     this.rangeSemanticTokensDisposable.dispose();
     this.semanticTokensDisposable.dispose();
     this.completionDisposable.dispose();
+    this.modelContentChangeDisposable.dispose();
     this.signatureHelpDisposable.dispose();
     this.documentHighlightDisposable.dispose();
     this.codeActionDisposable.dispose();
@@ -1049,4 +1079,11 @@ function mapDocumentHighlightKind(
     default:
       return languages.DocumentHighlightKind.Text;
   }
+}
+
+function formatError(error: unknown): string {
+  const message = error instanceof Error ? error.message : `${error}`;
+  return message.startsWith("Error: ")
+    ? message.slice("Error: ".length)
+    : message;
 }

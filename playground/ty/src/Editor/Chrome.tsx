@@ -58,6 +58,8 @@ export interface Props {
   onSelectVendoredFile(handle: FileHandle): void;
 
   onClearVendoredFile(): void;
+
+  onError(error: string | null): void;
 }
 
 export default function Chrome({
@@ -72,6 +74,7 @@ export default function Chrome({
   onChangeFile,
   onSelectVendoredFile,
   onClearVendoredFile,
+  onError,
 }: Props) {
   const workspace = use(workspacePromise);
 
@@ -222,6 +225,7 @@ export default function Chrome({
                     workspace={workspace}
                     onMount={handleEditorMount}
                     onChange={(content) => onChangeFile(workspace, content)}
+                    onError={onError}
                     onOpenFile={onSelectFile}
                     onVendoredFileChange={onSelectVendoredFile}
                     onBackToUserFile={handleBackToUserFile}
