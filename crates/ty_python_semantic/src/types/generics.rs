@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
@@ -1538,6 +1538,42 @@ pub(crate) struct SpecializationBuilder<'db> {
 pub(crate) type TypeVarAssignment<'db> = (BoundTypeVarIdentity<'db>, TypeVarVariance, Type<'db>);
 
 impl<'db> SpecializationBuilder<'db> {
+    fn contains_negated_type(&self, ty: Type<'db>) -> bool {
+        struct Visitor<'db> {
+            found: Cell<bool>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for Visitor<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if self.found.get() {
+                    return;
+                }
+                if let Type::Intersection(intersection) = ty {
+                    let has_non_truthiness_negation = intersection.negative(db).iter().any(|neg| {
+                        !matches!(neg, Type::AlwaysFalsy | Type::AlwaysTruthy) && !neg.is_none(db)
+                    });
+                    if has_non_truthiness_negation {
+                        self.found.set(true);
+                        return;
+                    }
+                }
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let visitor = Visitor {
+            found: Cell::new(false),
+            recursion_guard: TypeCollector::default(),
+        };
+        visitor.visit_type(self.db, ty);
+        visitor.found.get()
+    }
+
     pub(crate) fn new(db: &'db dyn Db, inferable: InferableTypeVars<'db, 'db>) -> Self {
         Self {
             db,
@@ -1878,10 +1914,14 @@ impl<'db> SpecializationBuilder<'db> {
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if !ty
-                            .when_assignable_to(self.db, bound, self.inferable)
-                            .is_always_satisfied(self.db)
+                        let constraints = if self.contains_negated_type(ty)
+                            || self.contains_negated_type(bound)
                         {
+                            ty.when_constraint_set_assignable_to(self.db, bound, self.inferable)
+                        } else {
+                            ty.when_assignable_to(self.db, bound, self.inferable)
+                        };
+                        if !constraints.satisfied_by_all_typevars(self.db, self.inferable) {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
                                 argument: ty,
