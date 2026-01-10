@@ -1527,6 +1527,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
 
 /// Performs type inference between parameter annotations and argument types, producing a
 /// specialization of a generic function.
+#[derive(Clone)]
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
     inferable: InferableTypeVars<'db, 'db>,
