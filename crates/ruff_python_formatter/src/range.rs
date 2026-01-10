@@ -270,7 +270,7 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
             if let Some(verbatim_range) = skip_range(stmt, iter.as_slice(), self.context)
                 && verbatim_range.intersect(self.range).is_some()
             {
-                return;
+                break;
             }
             self.visit_stmt(stmt);
         }
