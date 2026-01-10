@@ -1683,8 +1683,8 @@ class Foo: ...
 
 ordered_foo = dataclass(order=True)(Foo)
 reveal_type(ordered_foo)  # revealed: type[Foo] & Any
-# TODO: should be `Foo & Any`
-reveal_type(ordered_foo())  # revealed: @Todo(Type::Intersection.call)
-# TODO: should be `Any`
-reveal_type(ordered_foo() < ordered_foo())  # revealed: @Todo(Type::Intersection.call)
+reveal_type(ordered_foo())  # revealed: Foo & Any
+# The result is `bool & Any` because the comparison operators on `type[Foo]` return `bool`
+# and `Any`'s comparison operators return `Any`, and the return types are intersected.
+reveal_type(ordered_foo() < ordered_foo())  # revealed: bool & Any
 ```

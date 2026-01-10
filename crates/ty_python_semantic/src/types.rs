@@ -4513,8 +4513,21 @@ impl<'db> Type<'db> {
                     .map(|element| element.bindings(db)),
             ),
 
-            Type::Intersection(_) => {
-                Binding::single(self, Signature::todo("Type::Intersection.call")).into()
+            Type::Intersection(intersection) => {
+                // For intersections, we try to call each positive element.
+                // Elements where the call fails are discarded.
+                // The return type is the intersection of return types from successful calls.
+                //
+                // We don't filter by "is callable" upfront because an element might be
+                // callable but reject the specific arguments. The actual filtering happens
+                // during check_types() when we know the arguments.
+                Bindings::from_intersection(
+                    db,
+                    self,
+                    intersection
+                        .positive_elements_or_object(db)
+                        .map(|element| element.bindings(db)),
+                )
             }
 
             Type::DataclassDecorator(_) => {
@@ -4626,6 +4639,37 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // For intersection types, call the dunder on each element separately and combine
+        // the results. This avoids intersecting bound methods (which often collapses to Never)
+        // and instead intersects the return types.
+        if let Type::Intersection(intersection) = self {
+            let mut successful_bindings = Vec::new();
+            let mut last_error = None;
+
+            for element in intersection.positive(db) {
+                match element.try_call_dunder_with_policy(
+                    db,
+                    name,
+                    &mut argument_types.clone(),
+                    tcx,
+                    policy,
+                ) {
+                    Ok(bindings) => successful_bindings.push(bindings),
+                    Err(err) => last_error = Some(err),
+                }
+            }
+
+            if successful_bindings.is_empty() {
+                return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
+            }
+
+            return Ok(Bindings::from_intersection(
+                db,
+                self,
+                successful_bindings,
+            ));
+        }
+
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies:
         match self
@@ -5117,6 +5161,17 @@ impl<'db> Type<'db> {
                 }
             }
             Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                let mut any_success = false;
+                for ty in intersection.positive(db) {
+                    if let Some(return_ty) = ty.generator_return_type(db) {
+                        builder = builder.add_positive(return_ty);
+                        any_success = true;
+                    }
+                }
+                any_success.then(|| builder.build())
+            }
             ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
             _ => None,
         }
