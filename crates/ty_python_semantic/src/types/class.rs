@@ -27,7 +27,7 @@ use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
+    GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
@@ -369,9 +369,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         std::iter::once(origin.variance_of(db, typevar))
             .chain(
                 specialization
-                    .generic_context(db)
-                    .variables(db)
-                    .zip(specialization.types(db))
+                    .types_and_variables(db)
                     .map(|(generic_typevar, ty)| {
                         if let Some(explicit_variance) =
                             generic_typevar.typevar(db).explicit_variance(db)
@@ -1697,7 +1695,7 @@ impl<'db> ClassLiteral<'db> {
 
         let visitor = CollectTypeVars::default();
         if let Some(generic_context) = self.generic_context(db) {
-            walk_generic_context(db, generic_context, &visitor);
+            visitor.visit_generic_context(db, generic_context);
         }
         for base in self.explicit_bases(db) {
             visitor.visit_type(db, *base);
