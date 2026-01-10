@@ -12,10 +12,10 @@ pub struct FormatDecorator;
 
 impl FormatNodeRule<Decorator> for FormatDecorator {
     fn fmt_fields(&self, item: &Decorator, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
-        let node_comments = comments.leading_dangling_trailing(item);
+        let comments = f.context().comments();
+        let trailing = comments.trailing(item);
 
-        if has_skip_comment(node_comments.trailing, f.context().source()) {
+        if has_skip_comment(trailing, f.context().source()) {
             comments.mark_verbatim_node_comments_formatted(item.into());
 
             verbatim_text(item.range()).fmt(f)
