@@ -229,6 +229,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 
+    /// Map from loop-header definitions to their constituent definitions.
+    loop_header_definitions: FxHashMap<Definition<'db>, Vec<Definition<'db>>>,
+
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
@@ -317,6 +320,15 @@ impl<'db> SemanticIndex<'db> {
 
     pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId<'db>> + '_ {
         self.scope_ids_by_scope.iter().copied()
+    }
+
+    pub(crate) fn loop_header_definitions(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&[Definition<'db>]> {
+        self.loop_header_definitions
+            .get(&definition)
+            .map(|defs| defs.as_slice())
     }
 
     pub(crate) fn symbol_is_global_in_scope(

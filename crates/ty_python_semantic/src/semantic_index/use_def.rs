@@ -261,8 +261,9 @@ use crate::semantic_index::reachability_constraints::{
 };
 use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
+pub(crate) use crate::semantic_index::use_def::place_state::Bindings;
 use crate::semantic_index::use_def::place_state::{
-    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
+    Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
     LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
@@ -362,6 +363,13 @@ impl<'db> UseDefMap<'db> {
             &self.bindings_by_use[use_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
+    }
+
+    pub(crate) fn bindings_from_snapshot<'a>(
+        &'a self,
+        bindings: &'a Bindings,
+    ) -> BindingWithConstraintsIterator<'a, 'db> {
+        self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
     pub(crate) fn applicable_constraints(
@@ -825,6 +833,52 @@ pub(super) struct FlowSnapshot {
     reachability: ScopedReachabilityConstraintId,
 }
 
+impl FlowSnapshot {
+    pub(super) fn has_new_bindings_for_place(
+        &self,
+        other: &FlowSnapshot,
+        place: ScopedPlaceId,
+    ) -> bool {
+        let (self_ids, other_ids) = match place {
+            ScopedPlaceId::Symbol(symbol) => (
+                self.symbol_states[symbol].bindings().binding_ids(),
+                other.symbol_states[symbol].bindings().binding_ids(),
+            ),
+            ScopedPlaceId::Member(member) => (
+                self.member_states[member].bindings().binding_ids(),
+                other.member_states[member].bindings().binding_ids(),
+            ),
+        };
+        other_ids.iter().any(|id| !self_ids.contains(id))
+    }
+
+    pub(super) fn bindings_for_place(&self, place: ScopedPlaceId) -> Bindings {
+        match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings().clone(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings().clone(),
+        }
+    }
+
+    pub(super) fn binding_ids_for_place_excluding_unbound(
+        &self,
+        place: ScopedPlaceId,
+    ) -> Vec<ScopedDefinitionId> {
+        let mut ids = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings().binding_ids(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings().binding_ids(),
+        };
+        ids.retain(|id| *id != ScopedDefinitionId::UNBOUND);
+        ids
+    }
+
+    pub(super) fn declarations_for_place(&self, place: ScopedPlaceId) -> Declarations {
+        match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].declarations().clone(),
+            ScopedPlaceId::Member(member) => self.member_states[member].declarations().clone(),
+        }
+    }
+}
+
 /// A snapshot of the state of a single symbol (e.g. `obj`) and all of its associated members
 /// (e.g. `obj.attr`, `obj["key"]`).
 pub(super) struct SingleSymbolSnapshot {
@@ -1246,6 +1300,107 @@ impl<'db> UseDefMapBuilder<'db> {
         // Track reachability of all uses of places to silence `unresolved-reference`
         // diagnostics in unreachable code.
         self.record_node_reachability(node_key);
+    }
+
+    pub(super) fn merge_use_with_snapshot(
+        &mut self,
+        use_id: ScopedUseId,
+        snapshot: &FlowSnapshot,
+        place: ScopedPlaceId,
+        predicate: Option<ScopedPredicateId>,
+    ) {
+        let mut bindings = self.bindings_by_use[use_id].clone();
+        let mut backedge_bindings = snapshot.bindings_for_place(place);
+        if let Some(predicate) = predicate {
+            if predicate != ScopedPredicateId::ALWAYS_TRUE
+                && predicate != ScopedPredicateId::ALWAYS_FALSE
+            {
+                backedge_bindings
+                    .record_narrowing_constraint(&mut self.narrowing_constraints, predicate.into());
+            }
+        }
+        bindings.merge(
+            backedge_bindings,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
+        self.bindings_by_use[use_id] = bindings;
+    }
+
+    pub(super) fn register_definition(
+        &mut self,
+        definition: Definition<'db>,
+    ) -> ScopedDefinitionId {
+        self.all_definitions
+            .push(DefinitionState::Defined(definition))
+    }
+
+    pub(super) fn register_definition_with_bindings(
+        &mut self,
+        definition: Definition<'db>,
+        bindings: Bindings,
+        declarations: Declarations,
+    ) -> ScopedDefinitionId {
+        let def_id = self
+            .all_definitions
+            .push(DefinitionState::Defined(definition));
+        self.bindings_by_definition.insert(definition, bindings);
+        self.declarations_by_binding
+            .insert(definition, declarations);
+        def_id
+    }
+
+    pub(super) fn replace_use_with_definition(
+        &mut self,
+        use_id: ScopedUseId,
+        definition_id: ScopedDefinitionId,
+    ) {
+        self.bindings_by_use[use_id].replace_definition(definition_id);
+    }
+
+    pub(super) fn replace_use_bindings(
+        &mut self,
+        use_id: ScopedUseId,
+        from: &[ScopedDefinitionId],
+        definition_id: ScopedDefinitionId,
+    ) {
+        self.bindings_by_use[use_id].replace_definitions(
+            from,
+            definition_id,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
+    }
+
+    pub(super) fn merge_bindings(&mut self, mut bindings: Bindings, other: Bindings) -> Bindings {
+        bindings.merge(
+            other,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
+        bindings
+    }
+
+    pub(super) fn definitions_for_place_in_snapshot(
+        &self,
+        snapshot: &FlowSnapshot,
+        place: ScopedPlaceId,
+    ) -> Vec<Definition<'db>> {
+        let binding_ids = match place {
+            ScopedPlaceId::Symbol(symbol) => {
+                snapshot.symbol_states[symbol].bindings().binding_ids()
+            }
+            ScopedPlaceId::Member(member) => {
+                snapshot.member_states[member].bindings().binding_ids()
+            }
+        };
+        binding_ids
+            .into_iter()
+            .filter_map(|binding_id| match self.all_definitions[binding_id] {
+                DefinitionState::Defined(definition) => Some(definition),
+                DefinitionState::Undefined | DefinitionState::Deleted => None,
+            })
+            .collect()
     }
 
     pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {

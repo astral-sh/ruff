@@ -56,7 +56,7 @@ use crate::semantic_index::reachability_constraints::{
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
-pub(super) struct ScopedDefinitionId;
+pub(crate) struct ScopedDefinitionId;
 
 impl ScopedDefinitionId {
     /// A special ID that is used to describe an implicit start-of-scope state. When
@@ -74,7 +74,7 @@ impl ScopedDefinitionId {
 /// Live declarations for a single place at some point in control flow, with their
 /// corresponding reachability constraints.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(super) struct Declarations {
+pub(crate) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
     live_declarations: SmallVec<[LiveDeclaration; 2]>,
 }
@@ -206,7 +206,7 @@ impl EnclosingSnapshot {
 /// Live bindings for a single place at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a reachability constraint.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(super) struct Bindings {
+pub(crate) struct Bindings {
     /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
     /// when it's not visible. This happens in class scopes, where local name bindings are not visible
     /// to nested scopes, but we still need to know what narrowing constraints were applied to the
@@ -222,11 +222,108 @@ impl Bindings {
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
     }
 
+    pub(super) fn has_defined_bindings(&self) -> bool {
+        self.live_bindings
+            .iter()
+            .any(|binding| !binding.binding.is_unbound())
+    }
+
+    pub(super) fn from_single(
+        binding: ScopedDefinitionId,
+        narrowing_constraint: ScopedNarrowingConstraint,
+        reachability_constraint: ScopedReachabilityConstraintId,
+    ) -> Self {
+        Self {
+            unbound_narrowing_constraint: None,
+            live_bindings: smallvec![LiveBinding {
+                binding,
+                narrowing_constraint,
+                reachability_constraint,
+            }],
+        }
+    }
+
+    pub(super) fn representative_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
+        self.live_bindings
+            .first()
+            .map(|binding| binding.narrowing_constraint)
+            .unwrap_or_else(ScopedNarrowingConstraint::empty)
+    }
+
+    pub(super) fn retain_bindings(
+        &mut self,
+        mut predicate: impl FnMut(ScopedDefinitionId) -> bool,
+    ) {
+        self.live_bindings
+            .retain(|binding| predicate(binding.binding));
+    }
+
+    pub(super) fn binding_ids(&self) -> Vec<ScopedDefinitionId> {
+        self.live_bindings
+            .iter()
+            .map(|binding| binding.binding)
+            .collect()
+    }
+
     pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
         self.live_bindings.shrink_to_fit();
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint);
         }
+    }
+
+    pub(super) fn replace_definition(&mut self, binding: ScopedDefinitionId) {
+        for live_binding in &mut self.live_bindings {
+            live_binding.binding = binding;
+        }
+        self.live_bindings
+            .sort_by(|left, right| left.binding.cmp(&right.binding));
+    }
+
+    pub(super) fn replace_definitions(
+        &mut self,
+        from: &[ScopedDefinitionId],
+        replacement: ScopedDefinitionId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        if from.is_empty() {
+            return;
+        }
+
+        let mut changed = false;
+        for live_binding in &mut self.live_bindings {
+            if from.contains(&live_binding.binding) {
+                live_binding.binding = replacement;
+                changed = true;
+            }
+        }
+
+        if !changed {
+            return;
+        }
+
+        self.live_bindings
+            .sort_by(|left, right| left.binding.cmp(&right.binding));
+
+        let mut merged: SmallVec<[LiveBinding; 2]> = SmallVec::new();
+        for binding in std::mem::take(&mut self.live_bindings) {
+            match merged.last_mut() {
+                Some(last) if last.binding == binding.binding => {
+                    last.narrowing_constraint = narrowing_constraints.intersect_constraints(
+                        last.narrowing_constraint,
+                        binding.narrowing_constraint,
+                    );
+                    last.reachability_constraint = reachability_constraints.add_or_constraint(
+                        last.reachability_constraint,
+                        binding.reachability_constraint,
+                    );
+                }
+                _ => merged.push(binding),
+            }
+        }
+
+        self.live_bindings = merged;
     }
 }
 
@@ -289,6 +386,26 @@ impl Bindings {
             binding.narrowing_constraint = narrowing_constraints
                 .add_predicate_to_constraint(binding.narrowing_constraint, predicate);
         }
+    }
+
+    pub(super) fn add_narrowing_constraint_from(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        constraint: ScopedNarrowingConstraint,
+    ) {
+        let predicates: Vec<_> = narrowing_constraints.iter_predicates(constraint).collect();
+        let mut unbound_constraint = self.unbound_narrowing_constraint;
+        for predicate in predicates {
+            if let Some(existing) = unbound_constraint {
+                unbound_constraint =
+                    Some(narrowing_constraints.add_predicate_to_constraint(existing, predicate));
+            }
+            for binding in &mut self.live_bindings {
+                binding.narrowing_constraint = narrowing_constraints
+                    .add_predicate_to_constraint(binding.narrowing_constraint, predicate);
+            }
+        }
+        self.unbound_narrowing_constraint = unbound_constraint;
     }
 
     /// Add given reachability constraint to all live bindings.

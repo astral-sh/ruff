@@ -127,3 +127,64 @@ class NotBoolable:
 while NotBoolable():
     ...
 ```
+
+## Backwards control flow
+
+```py
+i = 0
+reveal_type(i)  # revealed: Literal[0]
+while i < 1_000_000:
+    reveal_type(i)  # revealed: int
+    i += 1
+    reveal_type(i)  # revealed: int
+reveal_type(i)  # revealed: int
+
+# TODO: None of these should need to be raised to `int`. Loop control flow analysis should take the
+# loop condition into account.
+i = 0
+reveal_type(i)  # revealed: Literal[0]
+while i < 2:
+    # TODO: Should be Literal[0, 1].
+    reveal_type(i)  # revealed: int
+    i += 1
+    # TODO: Should be Literal[1, 2].
+    reveal_type(i)  # revealed: int
+# TODO: Should be Literal[2].
+reveal_type(i)  # revealed: int
+```
+
+```py
+def random() -> bool:
+    raise NotImplementedError
+
+i = 0
+while True:
+    reveal_type(i)  # revealed: Literal[0, 1, 2]
+    if random():
+        i = 1
+    else:
+        i = "break"
+        break
+    # To get here we must take the `i = 1` branch above.
+    reveal_type(i)  # revealed: Literal[1]
+    if random():
+        i = 2
+    reveal_type(i)  # revealed: Literal[1, 2]
+reveal_type(i)  # revealed: Literal["break"]
+
+i = 0
+while random():
+    if random():
+        reveal_type(i)  # revealed: Literal[0, 1, 2, 3]
+        i = 1
+        reveal_type(i)  # revealed: Literal[1]
+    while random():
+        if random():
+            reveal_type(i)  # revealed: Literal[1, 0, 2, 3]
+            i = 2
+            reveal_type(i)  # revealed: Literal[2]
+    if random():
+        reveal_type(i)  # revealed: Literal[1, 2, 0, 3]
+        i = 3
+        reveal_type(i)  # revealed: Literal[3]
+```

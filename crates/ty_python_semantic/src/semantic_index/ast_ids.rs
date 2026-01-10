@@ -141,4 +141,10 @@ pub(crate) mod node_key {
             Self(NodeKey::from_node(value))
         }
     }
+
+    impl From<ExpressionNodeKey> for NodeKey {
+        fn from(value: ExpressionNodeKey) -> Self {
+            value.0
+        }
+    }
 }

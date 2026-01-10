@@ -39,7 +39,7 @@ use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
-    ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
+    ForStmtDefinitionKind, LoopHeaderDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
@@ -121,7 +121,7 @@ use crate::types::{
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
-    todo_type,
+    todo_type, with_loop_header_override,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -1501,6 +1501,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::TypeVarTuple(node) => {
                 self.infer_typevartuple_definition(node.node(self.module()), definition);
             }
+            DefinitionKind::LoopHeader(loop_header) => {
+                self.infer_loop_header_definition(&loop_header, definition);
+            }
         }
     }
 
@@ -1530,6 +1533,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_deferred(assignment.value(self.module()));
             }
+            DefinitionKind::LoopHeader(_) => {}
             _ => {}
         }
     }
@@ -5382,6 +5386,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
         add.insert(self, target_ty);
+    }
+
+    fn infer_loop_header_definition(
+        &mut self,
+        loop_header: &LoopHeaderDefinitionKind<'db>,
+        definition: Definition<'db>,
+    ) {
+        const MAX_LOOP_HEADER_ITERATIONS: usize = 8;
+        let max_iterations = MAX_LOOP_HEADER_ITERATIONS;
+        let should_widen = true;
+
+        let add = self.add_binding(loop_header.node(self.module()).into(), definition);
+        let mut seed_union = UnionBuilder::new(self.db());
+        for seed_definition in loop_header.seed_definitions() {
+            seed_union = seed_union.add(binding_type(self.db(), *seed_definition));
+        }
+        let mut current = if seed_union.is_empty() {
+            Type::unknown()
+        } else {
+            seed_union.build()
+        };
+
+        let mut changed = false;
+        for _ in 0..max_iterations {
+            let previous_multi = self.multi_inference_state;
+            self.multi_inference_state = MultiInferenceState::Overwrite;
+            let next = with_loop_header_override(definition, current, || {
+                let mut union = UnionBuilder::new(self.db());
+                for definition in loop_header.definitions() {
+                    let inferred = match definition.kind(self.db()) {
+                        DefinitionKind::Assignment(assignment) => self
+                            .infer_assignment_definition_impl(
+                                &assignment,
+                                *definition,
+                                TypeContext::default(),
+                            ),
+                        DefinitionKind::AugmentedAssignment(augmented_assignment) => {
+                            self.infer_augment_assignment(augmented_assignment.node(self.module()))
+                        }
+                        _ => binding_type(self.db(), *definition),
+                    };
+                    union = union.add(inferred);
+                }
+                union.build()
+            });
+            self.multi_inference_state = previous_multi;
+
+            if next == current {
+                changed = false;
+                break;
+            }
+            changed = true;
+            current = next;
+        }
+
+        if should_widen && changed {
+            current = KnownClass::Int.to_instance(self.db());
+        }
+
+        add.insert(self, current);
     }
 
     fn infer_assignment_definition_impl(

@@ -111,6 +111,13 @@ impl NarrowingConstraintsBuilder {
     ) -> ScopedNarrowingConstraint {
         self.lists.intersect(a, b)
     }
+
+    pub(crate) fn iter_predicates(
+        &self,
+        set: ScopedNarrowingConstraint,
+    ) -> NarrowingConstraintsIterator<'_> {
+        self.lists.iter_set_reverse(set).copied()
+    }
 }
 
 // Iteration
@@ -142,12 +149,5 @@ mod tests {
         }
     }
 
-    impl NarrowingConstraintsBuilder {
-        pub(crate) fn iter_predicates(
-            &self,
-            set: ScopedNarrowingConstraint,
-        ) -> NarrowingConstraintsIterator<'_> {
-            self.lists.iter_set_reverse(set).copied()
-        }
-    }
+    // Test-only impl removed; use the main impl above.
 }

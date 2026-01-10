@@ -18,6 +18,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashMap;
+use salsa::plumbing::{AsId, Id};
 use smallvec::{SmallVec, smallvec};
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
@@ -158,8 +160,59 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     diagnostics
 }
 
+thread_local! {
+    static LOOP_HEADER_OVERRIDE: RefCell<FxHashMap<Id, Type<'static>>> =
+        RefCell::new(FxHashMap::default());
+}
+
+fn loop_header_override<'db>(definition: Definition<'db>) -> Option<Type<'db>> {
+    let id = definition.as_id();
+    LOOP_HEADER_OVERRIDE.with(|cell| cell.borrow().get(&id).copied().map(restore_type_lifetime))
+}
+
+pub(crate) fn with_loop_header_override<'db, R>(
+    definition: Definition<'db>,
+    ty: Type<'db>,
+    f: impl FnOnce() -> R,
+) -> R {
+    let id = definition.as_id();
+    LOOP_HEADER_OVERRIDE.with(|cell| {
+        let mut overrides = cell.borrow_mut();
+        let previous = overrides.insert(id, erase_type_lifetime(ty));
+        drop(overrides);
+
+        let result = f();
+
+        let mut overrides = cell.borrow_mut();
+        match previous {
+            Some(previous) => {
+                overrides.insert(id, previous);
+            }
+            None => {
+                overrides.remove(&id);
+            }
+        }
+        result
+    })
+}
+
+fn erase_type_lifetime<'db>(ty: Type<'db>) -> Type<'static> {
+    // SAFETY: `Type` is a copyable, db-backed handle; we only use this within
+    // a single thread to provide a temporary loop-header override.
+    unsafe { std::mem::transmute::<Type<'db>, Type<'static>>(ty) }
+}
+
+fn restore_type_lifetime<'db>(ty: Type<'static>) -> Type<'db> {
+    // SAFETY: This is the inverse of `erase_type_lifetime` and is only used
+    // within the dynamic scope of a loop-header override.
+    unsafe { std::mem::transmute::<Type<'static>, Type<'db>>(ty) }
+}
+
 /// Infer the type of a binding.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+    if let Some(override_type) = loop_header_override(definition) {
+        return override_type;
+    }
     let inference = infer_definition_types(db, definition);
     inference.binding_type(definition)
 }
@@ -11792,7 +11845,9 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(
-                UnionBuilder::new(db).cycle_recovery(true),
+                UnionBuilder::new(db)
+                    .cycle_recovery(true)
+                    .recursively_defined(RecursivelyDefined::Yes),
                 |builder, element| builder.add(element.into()),
             )
             .build()

@@ -19,14 +19,15 @@ use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
+use crate::semantic_index::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
-    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
-    DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
+    DefinitionNodeKey, DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, LoopHeaderDefinitionKind, MatchPatternDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
@@ -43,6 +44,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
+use crate::semantic_index::use_def::Bindings;
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
@@ -53,15 +55,27 @@ use crate::{Db, Program};
 
 mod except_handlers;
 
+#[derive(Clone, Debug)]
+struct LoopUse {
+    place: ScopedPlaceId,
+    use_id: ScopedUseId,
+}
+
 #[derive(Clone, Debug, Default)]
 struct Loop {
     /// Flow states at each `break` in the current loop.
     break_states: Vec<FlowSnapshot>,
+    uses: Vec<LoopUse>,
+    defined_places: FxHashSet<ScopedPlaceId>,
 }
 
 impl Loop {
     fn push_break(&mut self, state: FlowSnapshot) {
         self.break_states.push(state);
+    }
+
+    fn record_definition(&mut self, place: ScopedPlaceId) {
+        self.defined_places.insert(place);
     }
 }
 
@@ -69,6 +83,7 @@ struct ScopeInfo {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
+    condition_place_uses: Option<FxHashSet<ScopedPlaceId>>,
 }
 
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
@@ -109,6 +124,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    loop_header_definitions: FxHashMap<Definition<'db>, Vec<Definition<'db>>>,
     imported_modules: FxHashSet<ModuleName>,
     seen_submodule_imports: FxHashSet<String>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
@@ -147,6 +163,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            loop_header_definitions: FxHashMap::default(),
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
@@ -256,8 +273,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Pop a loop, replacing with the previous saved outer loop, if any.
     fn pop_loop(&mut self, outer_loop: Option<Loop>) -> Loop {
-        std::mem::replace(&mut self.current_scope_info_mut().current_loop, outer_loop)
-            .expect("pop_loop() should not be called without a prior push_loop()")
+        let inner_loop = std::mem::take(&mut self.current_scope_info_mut().current_loop)
+            .expect("pop_loop() should not be called without a prior push_loop()");
+        let merged_outer = outer_loop.map(|mut outer| {
+            outer.uses.extend(inner_loop.uses.iter().cloned());
+            outer
+                .defined_places
+                .extend(inner_loop.defined_places.iter().copied());
+            outer
+        });
+        self.current_scope_info_mut().current_loop = merged_outer;
+        inner_loop
     }
 
     fn current_loop_mut(&mut self) -> Option<&mut Loop> {
@@ -308,6 +334,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
             current_loop: None,
+            condition_place_uses: None,
         });
     }
 
@@ -656,6 +683,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place: ScopedPlaceId,
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
+        if let Some(current_loop) = self.current_loop_mut() {
+            current_loop.record_definition(place);
+        }
         let (definition, num_definitions) = self.push_additional_definition(place, definition_node);
         debug_assert_eq!(
             num_definitions, 1,
@@ -753,6 +783,40 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.try_node_context_stack_manager = try_node_stack_manager;
 
         (definition, num_definitions)
+    }
+
+    fn add_loop_header_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        loop_node: &'ast ast::StmtWhile,
+        definitions: Vec<Definition<'db>>,
+        seed_definitions: Vec<Definition<'db>>,
+        bindings: Bindings,
+        seed_bindings: Bindings,
+    ) -> Definition<'db> {
+        let kind = DefinitionKind::LoopHeader(LoopHeaderDefinitionKind::new(
+            AstNodeRef::new(self.module, loop_node),
+            definitions,
+            seed_definitions,
+            bindings,
+            seed_bindings,
+        ));
+        let is_reexported = kind.is_reexported();
+        let definition = Definition::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            place,
+            kind,
+            is_reexported,
+        );
+
+        self.add_entry_for_definition_key(DefinitionNodeKey::from_node_key(NodeKey::from_node(
+            loop_node,
+        )))
+        .push(definition);
+
+        definition
     }
 
     fn record_expression_narrowing_constraint(
@@ -1318,6 +1382,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes: self.scopes,
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
+            loop_header_definitions: self.loop_header_definitions,
             scope_ids_by_scope: self.scope_ids_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
@@ -1340,6 +1405,96 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn source_text(&self) -> &SourceText {
         self.source_text
             .get_or_init(|| source_text(self.db, self.file))
+    }
+
+    fn record_use(&mut self, place_id: ScopedPlaceId, expr_node_key: ExpressionNodeKey) {
+        if let ScopedPlaceId::Symbol(symbol_id) = place_id {
+            self.mark_symbol_used(symbol_id);
+        }
+        let use_id = self.current_ast_ids().record_use(expr_node_key);
+        self.current_use_def_map_mut()
+            .record_use(place_id, use_id, expr_node_key.into());
+        if let Some(condition_place_uses) = &mut self.current_scope_info_mut().condition_place_uses
+        {
+            condition_place_uses.insert(place_id);
+        }
+        if let Some(current_loop) = self.current_loop_mut() {
+            current_loop.uses.push(LoopUse {
+                place: place_id,
+                use_id,
+            });
+        }
+    }
+
+    fn create_loop_header_definitions(
+        &mut self,
+        loop_node: &'ast ast::StmtWhile,
+        loop_state: &Loop,
+        pre_loop: &FlowSnapshot,
+        post_body: &FlowSnapshot,
+    ) {
+        let mut used_places = FxHashSet::default();
+        for loop_use in &loop_state.uses {
+            used_places.insert(loop_use.place);
+        }
+
+        let scope_id = self.current_scope();
+        for place in loop_state.defined_places.iter() {
+            if !used_places.contains(place) {
+                continue;
+            }
+
+            let pre_loop_binding_ids = pre_loop.binding_ids_for_place_excluding_unbound(*place);
+            let seed_bindings = pre_loop.bindings_for_place(*place);
+            let loop_bindings = self
+                .current_use_def_map_mut()
+                .merge_bindings(seed_bindings.clone(), post_body.bindings_for_place(*place));
+            let mut seed_definitions = self
+                .current_use_def_map()
+                .definitions_for_place_in_snapshot(pre_loop, *place);
+            let mut definitions = seed_definitions.clone();
+            definitions.extend(
+                self.current_use_def_map()
+                    .definitions_for_place_in_snapshot(post_body, *place),
+            );
+            definitions.sort();
+            definitions.dedup();
+            seed_definitions.sort();
+            seed_definitions.dedup();
+
+            if definitions.is_empty() {
+                continue;
+            }
+
+            let header_definition = self.add_loop_header_definition(
+                *place,
+                loop_node,
+                definitions.clone(),
+                seed_definitions,
+                loop_bindings,
+                seed_bindings,
+            );
+            let header_definition_id = self.use_def_maps[scope_id]
+                .register_definition_with_bindings(
+                    header_definition,
+                    pre_loop.bindings_for_place(*place),
+                    pre_loop.declarations_for_place(*place),
+                );
+            self.loop_header_definitions
+                .insert(header_definition, definitions);
+
+            if pre_loop_binding_ids.is_empty() {
+                continue;
+            }
+
+            for loop_use in loop_state.uses.iter().filter(|use_| use_.place == *place) {
+                self.current_use_def_map_mut().replace_use_bindings(
+                    loop_use.use_id,
+                    &pre_loop_binding_ids,
+                    header_definition_id,
+                );
+            }
+        }
     }
 }
 
@@ -1924,41 +2079,66 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
             }
-            ast::Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::While(stmt_while) => {
+                let ast::StmtWhile {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                    node_index: _,
+                } = stmt_while;
+                self.current_scope_info_mut()
+                    .condition_place_uses
+                    .replace(FxHashSet::default());
+                let outer_loop = self.push_loop();
+                let has_outer_loop = outer_loop.is_some();
                 self.visit_expr(test);
+                let condition_place_uses = self
+                    .current_scope_info_mut()
+                    .condition_place_uses
+                    .take()
+                    .unwrap();
 
                 let pre_loop = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
-                self.record_reachability_constraint(predicate);
+                let predicate = self.build_predicate(test);
+                let predicate_id = self.add_predicate(predicate);
+                self.record_narrowing_constraint_id(predicate_id);
+                self.record_reachability_constraint_id(predicate_id);
 
-                let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
+                let post_body = self.flow_snapshot();
+                if !has_outer_loop {
+                    self.create_loop_header_definitions(
+                        stmt_while, &this_loop, &pre_loop, &post_body,
+                    );
+                }
 
                 // We execute the `else` branch once the condition evaluates to false. This could
                 // happen without ever executing the body, if the condition is false the first time
                 // it's tested. Or it could happen if a _later_ evaluation of the condition yields
                 // false. So we merge in the pre-loop state here into the post-body state:
 
-                self.flow_merge(pre_loop);
+                self.flow_merge(pre_loop.clone());
 
                 // The `else` branch can only be reached if the loop condition *can* be false. To
                 // model this correctly, we need a second copy of the while condition constraint,
                 // since the first and later evaluations might produce different results. We would
                 // otherwise simplify `predicate AND ~predicate` to `False`.
-                let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-                let later_reachability_constraint = self
-                    .current_reachability_constraints_mut()
-                    .add_atom(later_predicate_id);
-                self.record_negated_reachability_constraint(later_reachability_constraint);
-
-                self.record_negated_narrowing_constraint(predicate);
+                let condition_depends_on_loop = condition_place_uses
+                    .iter()
+                    .any(|place| pre_loop.has_new_bindings_for_place(&post_body, *place));
+                if condition_depends_on_loop {
+                    self.record_ambiguous_reachability();
+                } else {
+                    let later_predicate_id =
+                        self.current_use_def_map_mut().add_predicate(predicate);
+                    let later_reachability_constraint = self
+                        .current_reachability_constraints_mut()
+                        .add_atom(later_predicate_id);
+                    self.record_negated_reachability_constraint(later_reachability_constraint);
+                    self.record_negated_narrowing_constraint(predicate);
+                }
 
                 self.visit_body(orelse);
 
@@ -2469,12 +2649,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let place_id = self.add_place(place_expr);
 
                     if is_use {
-                        if let ScopedPlaceId::Symbol(symbol_id) = place_id {
-                            self.mark_symbol_used(symbol_id);
-                        }
-                        let use_id = self.current_ast_ids().record_use(expr);
-                        self.current_use_def_map_mut()
-                            .record_use(place_id, use_id, node_key);
+                        self.record_use(place_id, expr.into());
                     }
 
                     if is_definition {

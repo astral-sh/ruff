@@ -13,6 +13,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::{FileScopeId, ScopeId};
 use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::semantic_index::use_def::Bindings;
 use crate::unpack::{Unpack, UnpackPosition};
 
 /// A definition of a place.
@@ -753,6 +754,7 @@ pub enum DefinitionKind<'db> {
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
+    LoopHeader(LoopHeaderDefinitionKind<'db>),
 }
 
 impl DefinitionKind<'_> {
@@ -835,6 +837,7 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeVarTuple(type_var_tuple) => {
                 type_var_tuple.node(module).name.range()
             }
+            DefinitionKind::LoopHeader(loop_header) => loop_header.node(module).range(),
         }
     }
 
@@ -880,6 +883,7 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeVar(type_var) => type_var.node(module).range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
+            DefinitionKind::LoopHeader(loop_header) => loop_header.node(module).range(),
         }
     }
 
@@ -935,7 +939,8 @@ impl DefinitionKind<'_> {
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
-            | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
+            | DefinitionKind::ExceptHandler(_)
+            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
         }
     }
 }
@@ -1211,8 +1216,61 @@ impl ExceptHandlerDefinitionKind {
     }
 }
 
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct LoopHeaderDefinitionKind<'db> {
+    node: AstNodeRef<ast::StmtWhile>,
+    definitions: Vec<Definition<'db>>,
+    seed_definitions: Vec<Definition<'db>>,
+    bindings: Bindings,
+    seed_bindings: Bindings,
+}
+
+impl<'db> LoopHeaderDefinitionKind<'db> {
+    pub(crate) fn new(
+        node: AstNodeRef<ast::StmtWhile>,
+        definitions: Vec<Definition<'db>>,
+        seed_definitions: Vec<Definition<'db>>,
+        bindings: Bindings,
+        seed_bindings: Bindings,
+    ) -> Self {
+        Self {
+            node,
+            definitions,
+            seed_definitions,
+            bindings,
+            seed_bindings,
+        }
+    }
+
+    pub(crate) fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtWhile {
+        self.node.node(module)
+    }
+
+    pub(crate) fn definitions(&self) -> &[Definition<'db>] {
+        &self.definitions
+    }
+
+    pub(crate) fn seed_definitions(&self) -> &[Definition<'db>] {
+        &self.seed_definitions
+    }
+
+    pub(crate) fn bindings(&self) -> &Bindings {
+        &self.bindings
+    }
+
+    pub(crate) fn seed_bindings(&self) -> &Bindings {
+        &self.seed_bindings
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionNodeKey(NodeKey);
+
+impl DefinitionNodeKey {
+    pub(crate) fn from_node_key(node_key: NodeKey) -> Self {
+        Self(node_key)
+    }
+}
 
 impl From<&ast::Alias> for DefinitionNodeKey {
     fn from(node: &ast::Alias) -> Self {
@@ -1276,6 +1334,12 @@ impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
 
 impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
     fn from(node: &ast::StmtAugAssign) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtWhile> for DefinitionNodeKey {
+    fn from(node: &ast::StmtWhile) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
