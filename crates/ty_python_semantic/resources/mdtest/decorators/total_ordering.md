@@ -38,6 +38,125 @@ reveal_type(s1 > s2)  # revealed: bool
 reveal_type(s1 >= s2)  # revealed: bool
 ```
 
+## Signature derived from source ordering method
+
+When the source ordering method accepts a broader type (like `object`) for its `other` parameter,
+the synthesized comparison methods should use the same signature. This allows comparisons with types
+other than the class itself:
+
+```py
+from functools import total_ordering
+
+@total_ordering
+class Comparable:
+    def __init__(self, value: int):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Comparable):
+            return self.value == other.value
+        if isinstance(other, int):
+            return self.value == other
+        return NotImplemented
+
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, Comparable):
+            return self.value < other.value
+        if isinstance(other, int):
+            return self.value < other
+        return NotImplemented
+
+a = Comparable(10)
+b = Comparable(20)
+
+# Comparisons with the same type work.
+reveal_type(a <= b)  # revealed: bool
+reveal_type(a >= b)  # revealed: bool
+
+# Comparisons with `int` also work because `__lt__` accepts `object`.
+reveal_type(a <= 15)  # revealed: bool
+reveal_type(a >= 5)  # revealed: bool
+```
+
+## Multiple ordering methods with different signatures
+
+When multiple ordering methods are defined with different signatures, the decorator selects a "root"
+method using the priority order: `__lt__` > `__le__` > `__gt__` > `__ge__`. Synthesized methods use
+the signature from the highest-priority method. Methods that are explicitly defined are not
+overridden.
+
+```py
+from functools import total_ordering
+
+@total_ordering
+class MultiSig:
+    def __init__(self, value: int):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        return True
+    # __lt__ accepts `object` (highest priority, used as root)
+    def __lt__(self, other: object) -> bool:
+        return True
+    # __gt__ only accepts `MultiSig` (not overridden by decorator)
+    def __gt__(self, other: "MultiSig") -> bool:
+        return True
+
+a = MultiSig(10)
+b = MultiSig(20)
+
+# __le__ and __ge__ are synthesized with __lt__'s signature (accepts `object`)
+reveal_type(a <= b)  # revealed: bool
+reveal_type(a <= 15)  # revealed: bool
+reveal_type(a >= b)  # revealed: bool
+reveal_type(a >= 15)  # revealed: bool
+
+# __gt__ keeps its original signature (only accepts MultiSig)
+reveal_type(a > b)  # revealed: bool
+a > 15  # error: [unsupported-operator]
+```
+
+## Overloaded ordering method
+
+When the source ordering method is overloaded, the synthesized comparison methods should preserve
+all overloads:
+
+```py
+from functools import total_ordering
+from typing import overload
+
+@total_ordering
+class Flexible:
+    def __init__(self, value: int):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    @overload
+    def __lt__(self, other: "Flexible") -> bool: ...
+    @overload
+    def __lt__(self, other: int) -> bool: ...
+    def __lt__(self, other: "Flexible | int") -> bool:
+        if isinstance(other, Flexible):
+            return self.value < other.value
+        return self.value < other
+
+a = Flexible(10)
+b = Flexible(20)
+
+# Synthesized __le__ preserves overloads from __lt__
+reveal_type(a <= b)  # revealed: bool
+reveal_type(a <= 15)  # revealed: bool
+
+# Synthesized __ge__ also preserves overloads
+reveal_type(a >= b)  # revealed: bool
+reveal_type(a >= 15)  # revealed: bool
+
+# But comparison with an unsupported type should still error
+a <= "string"  # error: [unsupported-operator]
+```
+
 ## Using `__gt__` as the root comparison method
 
 When a class defines `__eq__` and `__gt__`, the decorator synthesizes `__lt__`, `__le__`, and
