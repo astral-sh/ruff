@@ -227,6 +227,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    /// The expected types for expressions in this region.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
@@ -342,6 +344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             multi_inference_state: MultiInferenceState::Panic,
             inner_expression_inference_state: InnerExpressionInferenceState::Infer,
             expressions: FxHashMap::default(),
+            expected_types: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
@@ -390,6 +393,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.context.extend(&extra.diagnostics);
             self.deferred
                 .extend(extra.deferred.iter().copied(), self.multi_inference_state);
+            for (key, ty) in &extra.expected_types {
+                self.merge_expected_type(*key, *ty);
+            }
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
         }
@@ -408,6 +414,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
+            for (key, ty) in &extra.expected_types {
+                self.merge_expected_type(*key, *ty);
+            }
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
 
@@ -7739,6 +7748,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
+        if let Some(expected_ty) = tcx.annotation {
+            self.merge_expected_type(expression.into(), expected_ty);
+        }
 
         match self.multi_inference_state {
             MultiInferenceState::Ignore => {}
@@ -7766,6 +7778,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     })
                     .or_insert(ty);
+            }
+        }
+    }
+
+    fn merge_expected_type(&mut self, key: ExpressionNodeKey, expected_ty: Type<'db>) {
+        let db = self.db();
+
+        match self.multi_inference_state {
+            MultiInferenceState::Ignore => {}
+            MultiInferenceState::Panic => {
+                self.expected_types.entry(key).or_insert(expected_ty);
+            }
+            MultiInferenceState::Overwrite => {
+                self.expected_types.insert(key, expected_ty);
+            }
+            MultiInferenceState::Intersect => {
+                self.expected_types
+                    .entry(key)
+                    .and_modify(|current| {
+                        // NOTE: Skipping intersections that are not assignable in either direction,
+                        // but this may be a performance hit serving a rare edge case... consider just
+                        // intersecting unconditionally.
+                        if expected_ty.is_assignable_to(db, *current)
+                            || current.is_assignable_to(db, expected_ty)
+                        {
+                            *current = IntersectionType::from_elements(db, [*current, expected_ty]);
+                        }
+                    })
+                    .or_insert(expected_ty);
             }
         }
     }
@@ -11830,6 +11871,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn expected_subscript_slice_type(&self, value_ty: Type<'db>) -> Option<Type<'db>> {
+        let db = self.db();
+        let mut elements = Vec::new();
+
+        let mut add_typed_dict_keys = |typed_dict: TypedDictType<'db>| {
+            // TODO: For large TypeDicts, we might want to cap the number of keys we add here
+            for (name, _) in typed_dict.items(db) {
+                elements.push(Type::string_literal(db, name.as_str()));
+            }
+        };
+
+        match value_ty {
+            Type::TypedDict(typed_dict) => add_typed_dict_keys(typed_dict),
+            Type::Union(union) => {
+                for ty in union.elements(db) {
+                    if let Some(typed_dict) = ty.as_typed_dict() {
+                        add_typed_dict_keys(typed_dict);
+                    }
+                }
+            }
+            _ => return None,
+        }
+
+        if elements.is_empty() {
+            return None;
+        }
+
+        Some(UnionType::from_elements(db, elements))
+    }
+
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
         let ast::ExprSubscript {
             value,
@@ -11843,19 +11914,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Load => self.infer_subscript_load(subscript),
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_tcx = TypeContext::new(self.expected_subscript_slice_type(value_ty));
+                let slice_ty = self.infer_expression(slice, slice_tcx);
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_tcx = TypeContext::new(self.expected_subscript_slice_type(value_ty));
+                let slice_ty = self.infer_expression(slice, slice_tcx);
                 self.validate_subscript_deletion(subscript, value_ty, slice_ty);
                 Type::Never
             }
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_tcx = TypeContext::new(self.expected_subscript_slice_type(value_ty));
+                let slice_ty = self.infer_expression(slice, slice_tcx);
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::unknown()
             }
@@ -11888,6 +11962,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx,
         } = subscript;
 
+        let slice_tcx = TypeContext::new(self.expected_subscript_slice_type(value_ty));
         let mut constraint_keys = vec![];
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
@@ -11906,7 +11981,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
+                    let slice_ty = self.infer_expression(slice, slice_tcx);
                     self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                     return ty;
                 }
@@ -11947,7 +12022,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
                 _,
             ))) => {
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty = self.infer_expression(slice, slice_tcx);
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     self.db(),
@@ -12250,7 +12325,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
             }
             Type::Dynamic(DynamicType::Unknown) => {
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty = self.infer_expression(slice, slice_tcx);
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     self.db(),
@@ -12263,7 +12338,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {}
         }
 
-        let slice_ty = self.infer_expression(slice, TypeContext::default());
+        let slice_ty = self.infer_expression(slice, slice_tcx);
         let result_ty = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
@@ -13126,6 +13201,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             mut expressions,
+            mut expected_types,
             string_annotations,
             scope,
             bindings,
@@ -13162,7 +13238,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let extra =
-            (!string_annotations.is_empty() || cycle_recovery.is_some() || !bindings.is_empty() || !diagnostics.is_empty() || !all_definitely_bound).then(|| {
+            (!string_annotations.is_empty()
+                || !expected_types.is_empty()
+                || cycle_recovery.is_some()
+                || !bindings.is_empty()
+                || !diagnostics.is_empty()
+                || !all_definitely_bound)
+            .then(|| {
                 if bindings.len() > 20 {
                     tracing::debug!(
                         "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
@@ -13171,7 +13253,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
 
+                expected_types.shrink_to_fit();
                 Box::new(ExpressionInferenceExtra {
+                    expected_types,
                     string_annotations,
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
@@ -13196,6 +13280,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             mut expressions,
+            mut expected_types,
             string_annotations,
             scope,
             bindings,
@@ -13221,11 +13306,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
+            || !expected_types.is_empty()
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
             || !deferred.is_empty())
         .then(|| {
+            expected_types.shrink_to_fit();
             Box::new(DefinitionInferenceExtra {
+                expected_types,
                 string_annotations,
                 cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
@@ -13269,6 +13357,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             string_annotations,
             mut expressions,
+            mut expected_types,
             scope,
             cycle_recovery,
 
@@ -13296,15 +13385,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra =
-            (!string_annotations.is_empty() || !diagnostics.is_empty() || cycle_recovery.is_some())
-                .then(|| {
-                    Box::new(ScopeInferenceExtra {
-                        string_annotations,
-                        cycle_recovery,
-                        diagnostics,
-                    })
-                });
+        let extra = (!string_annotations.is_empty()
+            || !expected_types.is_empty()
+            || !diagnostics.is_empty()
+            || cycle_recovery.is_some())
+        .then(|| {
+            expected_types.shrink_to_fit();
+            Box::new(ScopeInferenceExtra {
+                expected_types,
+                string_annotations,
+                cycle_recovery,
+                diagnostics,
+            })
+        });
 
         expressions.shrink_to_fit();
 
