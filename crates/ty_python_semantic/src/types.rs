@@ -2546,34 +2546,15 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                let member = match bound_typevar.typevar(db).bound_or_constraints(db) {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => Type::object().instance_member(db, name),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if bound_typevar.typevar(db).is_self(db) {
-                            if let Type::NominalInstance(instance) = bound {
-                                instance.class(db).instance_member(db, name)
-                            } else {
-                                bound.instance_member(db, name)
-                            }
-                        } else {
-                            bound.instance_member(db, name)
-                        }
+                        bound.instance_member(db, name)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .map_with_boundness_and_qualifiers(db, |constraint| {
                             constraint.instance_member(db, name)
                         }),
-                };
-                if bound_typevar.typevar(db).is_self(db) {
-                    let self_mapping = TypeMapping::BindSelf {
-                        self_type: Type::TypeVar(*bound_typevar),
-                        binding_context: None,
-                    };
-                    member.map_type(|ty| {
-                        ty.apply_type_mapping(db, &self_mapping, TypeContext::default())
-                    })
-                } else {
-                    member
                 }
             }
 
@@ -6880,7 +6861,8 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf {
         self_type: Type<'db>,
-        binding_context: Option<BindingContext<'db>>,
+        /// If `Some`, only bind `Self` typevars that have this identity (i.e., from the same class).
+        self_typevar_identity: Option<TypeVarIdentity<'db>>,
     },
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
@@ -6928,8 +6910,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion => context,
             TypeMapping::BindSelf {
-                binding_context, ..
-            } => context.remove_self(db, *binding_context),
+                self_typevar_identity,
+                ..
+            } => context.remove_self(db, *self_typevar_identity),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
                 context.variables(db).map(|typevar| {
@@ -8354,10 +8337,10 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
-    /// Get the identity of this bound typevar.
+    /// Get a unique key for this bound typevar that includes binding context.
     ///
-    /// This is used for comparing whether two bound typevars represent the same logical typevar,
-    /// regardless of e.g. differences in their bounds or constraints due to materialization.
+    /// This is used as a key in maps/sets where we need to distinguish the same logical
+    /// typevar bound in different contexts (e.g., `T@foo` vs `T@bar`).
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         BoundTypeVarIdentity {
             identity: self.typevar(db).identity(db),
@@ -8440,9 +8423,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 
     /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
-    /// differences in their bounds or constraints due to materialization.
+    /// differences in their bounds or constraints due to materialization, or different binding
+    /// contexts.
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
-        self.identity(db) == other.identity(db)
+        self.typevar(db).identity(db) == other.typevar(db).identity(db)
+            && self.paramspec_attr(db) == other.paramspec_attr(db)
     }
 
     /// Create a new PEP 695 type variable that can be used in signatures
@@ -8559,10 +8544,11 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::BindSelf {
                 self_type,
-                binding_context,
+                self_typevar_identity,
             } => {
                 if self.typevar(db).is_self(db)
-                    && binding_context.is_none_or(|context| self.binding_context(db) == context)
+                    && self_typevar_identity
+                        .is_none_or(|identity| self.typevar(db).identity(db) == identity)
                 {
                     *self_type
                 } else {
