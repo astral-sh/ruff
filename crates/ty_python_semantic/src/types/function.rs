@@ -70,6 +70,7 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
+    report_invalid_total_ordering_call,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::display::DisplaySettings;
@@ -2005,6 +2006,29 @@ impl KnownFunction {
 
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
+
+            KnownFunction::TotalOrdering => {
+                // When `total_ordering(cls)` is called as a function (not as a decorator),
+                // check that the class defines at least one ordering method.
+                let [Some(class_type)] = parameter_types else {
+                    return;
+                };
+
+                let class = match class_type {
+                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
+                    Type::GenericAlias(generic) => ClassType::Generic(*generic),
+                    _ => return,
+                };
+
+                if !class.has_ordering_method_in_mro(db) {
+                    report_invalid_total_ordering_call(
+                        context,
+                        class.class_literal(db).0,
+                        call_expression,
+                    );
+                }
+            }
+
             _ => {}
         }
     }

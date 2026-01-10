@@ -4684,6 +4684,29 @@ pub(super) fn report_invalid_total_ordering(
     diagnostic.info("The decorator will raise `ValueError` at runtime");
 }
 
+/// Reports an invalid `total_ordering(cls)` function call where the class
+/// does not define any ordering method.
+pub(super) fn report_invalid_total_ordering_call(
+    context: &InferContext<'_, '_>,
+    class: ClassLiteral<'_>,
+    call_expression: &ast::ExprCall,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_TOTAL_ORDERING, call_expression) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "`@functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined",
+    );
+    diagnostic.set_primary_message(format_args!(
+        "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+        class.name(db)
+    ));
+    diagnostic.info("The function will raise `ValueError` at runtime");
+}
+
 /// This function receives an unresolved `from foo import bar` import,
 /// where `foo` can be resolved to a module but that module does not
 /// have a `bar` member or submodule.
