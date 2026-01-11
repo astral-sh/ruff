@@ -483,10 +483,20 @@ class Base:
 
 class Child(Base): ...
 
+reveal_type(Base.create())  # revealed: _GeneratorContextManager[Base, None, None]
 with Base.create() as base:
     reveal_type(base)  # revealed: Base
 
+reveal_type(Base().create())  # revealed: _GeneratorContextManager[Base, None, None]
+with Base().create() as base:
+    reveal_type(base)  # revealed: Base
+
+reveal_type(Child.create())  # revealed: _GeneratorContextManager[Child, None, None]
 with Child.create() as child:
+    reveal_type(child)  # revealed: Child
+
+reveal_type(Child().create())  # revealed: _GeneratorContextManager[Child, None, None]
+with Child().create() as child:
     reveal_type(child)  # revealed: Child
 ```
 
