@@ -659,6 +659,8 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
 }
 
 /// Error for dynamic class MRO computation with fallback MRO.
+///
+/// Separate from [`MroError`] because dynamic classes can only have a subset of MRO errors.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct DynamicMroError<'db> {
     kind: DynamicMroErrorKind<'db>,
@@ -679,7 +681,7 @@ impl<'db> DynamicMroError<'db> {
 
 /// Error kinds for dynamic class MRO computation.
 ///
-/// These mirror the relevant variants from `MroErrorKind` for regular classes.
+/// These mirror the relevant variants from `MroErrorKind` for static classes.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum DynamicMroErrorKind<'db> {
     /// The class has duplicate bases in its bases tuple.

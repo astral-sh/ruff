@@ -596,12 +596,11 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns the metaclass instance type for this class.
+    /// Return a type representing "the set of all instances of the metaclass of this class".
     pub(crate) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Self::Static(class) => class.metaclass_instance_type(db),
-            Self::Dynamic(class) => class.metaclass(db),
-        }
+        self.metaclass(db)
+            .to_instance(db)
+            .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
     /// Returns whether this class is type-check only.
@@ -635,6 +634,8 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns whether this class is final.
+    // TODO: Support `@final` on dynamic classes, e.g. `X = final(type("X", (), {}))`.
+    // We should either recognize and track this, or emit a diagnostic if unsupported.
     pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
         self.as_static().is_some_and(|class| class.is_final(db))
     }
@@ -2583,14 +2584,6 @@ impl<'db> StaticClassLiteral<'db> {
         self.try_metaclass(db)
             .map(|(ty, _)| ty)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
-    }
-
-    /// Return a type representing "the set of all instances of the metaclass of this class".
-    pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
-        self
-            .metaclass(db)
-            .to_instance(db)
-            .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.

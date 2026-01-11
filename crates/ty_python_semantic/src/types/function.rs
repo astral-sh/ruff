@@ -1737,9 +1737,7 @@ impl KnownFunction {
                 if class.is_protocol(db) {
                     return;
                 }
-                if let Some(class) = class.as_static() {
-                    report_bad_argument_to_get_protocol_members(context, call_expression, class);
-                }
+                report_bad_argument_to_get_protocol_members(context, call_expression, *class);
             }
 
             KnownFunction::RevealProtocolInterface => {

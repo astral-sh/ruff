@@ -926,9 +926,9 @@ from ty_extensions import has_member, static_assert
 
 DynamicWithDict = type("DynamicWithDict", (), {"custom_attr": 42})
 
-# Namespace dict attributes are not available for autocomplete
-static_assert(not has_member(DynamicWithDict, "custom_attr"))
-static_assert(not has_member(DynamicWithDict(), "custom_attr"))
+# TODO: these should pass -- namespace dict attributes are not yet available for autocomplete
+static_assert(has_member(DynamicWithDict, "custom_attr"))  # error: [static-assert-error]
+static_assert(has_member(DynamicWithDict(), "custom_attr"))  # error: [static-assert-error]
 ```
 
 Dynamic classes inheriting from classes with custom metaclasses get metaclass members:
@@ -960,10 +960,10 @@ class Base:
 DynamicSingle = type("DynamicSingle", (Base,), {})
 instance = DynamicSingle()
 
-# TODO: Instance members should be available but currently are not
-static_assert(not has_member(instance, "base_attr"))
-static_assert(not has_member(instance, "__repr__"))
-static_assert(not has_member(instance, "__hash__"))
+# TODO: these should pass; instance members should be available
+static_assert(has_member(instance, "base_attr"))  # error: [static-assert-error]
+static_assert(has_member(instance, "__repr__"))  # error: [static-assert-error]
+static_assert(has_member(instance, "__hash__"))  # error: [static-assert-error]
 ```
 
 ### Attributes not available at runtime
