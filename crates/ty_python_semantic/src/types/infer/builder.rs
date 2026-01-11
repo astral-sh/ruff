@@ -69,11 +69,11 @@ use crate::types::diagnostic::{
     INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC,
     INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases,
-    NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -5450,7 +5450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // signalling that we must fall back to normal call inference.
                             self.infer_dynamic_type_expression(call_expr, Some(definition))
                                 .unwrap_or_else(|| {
-                                    self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                                    self.infer_type_call_fallback(call_expr, callable_type, tcx)
                                 })
                         }
                         Some(_) | None => {
@@ -6054,6 +6054,67 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diag.info("The base of a `NewType` must be a class type or another `NewType`.");
             }
         }
+    }
+
+    /// Fallback for `type()` calls when `infer_dynamic_type_expression` returns `None`.
+    ///
+    /// This handles ambiguous `type()` calls that have variadic arguments (`*args`, `**kwargs`)
+    /// or invalid keyword arguments. In these cases, we return `type[Unknown]` instead of
+    /// going through normal overload resolution, which could give misleading results
+    /// (e.g., matching the single-argument overload when there might be more arguments).
+    fn infer_type_call_fallback(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        callable_type: Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        self.try_type_call_fallback(call_expr)
+            .unwrap_or_else(|| self.infer_call_expression_impl(call_expr, callable_type, tcx))
+    }
+
+    /// Try to handle an ambiguous `type()` call with variadic arguments or invalid kwargs.
+    ///
+    /// Returns `Some(type[Unknown])` if this is an ambiguous `type()` call that should
+    /// not go through normal overload resolution. Returns `None` if normal call
+    /// inference should proceed.
+    fn try_type_call_fallback(&mut self, call_expr: &ast::ExprCall) -> Option<Type<'db>> {
+        let arguments = &call_expr.arguments;
+
+        // Check for variadic arguments that make the overload ambiguous.
+        let has_starred_args = arguments.args.iter().any(ast::Expr::is_starred_expr);
+        let has_kwargs_unpack = arguments.keywords.iter().any(|kw| kw.arg.is_none());
+
+        // If we have variadic arguments, we can't determine which overload of `type()`
+        // is being called. Return type[Unknown].
+        if has_starred_args || has_kwargs_unpack {
+            for arg in &arguments.args {
+                self.infer_expression(arg, TypeContext::default());
+            }
+            for kw in &arguments.keywords {
+                self.infer_expression(&kw.value, TypeContext::default());
+            }
+            return Some(SubclassOfType::subclass_of_unknown());
+        }
+
+        // If we have explicit keyword arguments (not **kwargs unpack), this is an invalid
+        // type() call. Return type[Unknown] instead of Unknown to reduce false positives.
+        if !arguments.keywords.is_empty() && !has_kwargs_unpack && arguments.args.len() == 3 {
+            // Infer all argument types to ensure they're stored.
+            for arg in &arguments.args {
+                self.infer_expression(arg, TypeContext::default());
+            }
+            for kw in &arguments.keywords {
+                self.infer_expression(&kw.value, TypeContext::default());
+            }
+
+            if let Some(builder) = self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr) {
+                builder.into_diagnostic("No overload of class `type` matches arguments");
+            }
+
+            return Some(SubclassOfType::subclass_of_unknown());
+        }
+
+        None
     }
 
     /// Try to infer a 3-argument `type(name, bases, dict)` call expression, capturing the definition.
@@ -9316,9 +9377,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Handle 3-argument `type(name, bases, dict)`.
         if let Type::ClassLiteral(class) = callable_type
             && class.is_known(self.db(), KnownClass::Type)
-            && let Some(dynamic_type) = self.infer_dynamic_type_expression(call_expression, None)
         {
-            return dynamic_type;
+            if let Some(dynamic_type) = self.infer_dynamic_type_expression(call_expression, None) {
+                return dynamic_type;
+            }
+
+            // Fallback for ambiguous `type()` calls (with `*args`, `**kwargs`, or invalid kwargs).
+            let result = self.try_type_call_fallback(call_expression);
+            if let Some(ty) = result {
+                return ty;
+            }
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the

@@ -498,17 +498,16 @@ Other numbers of arguments are invalid:
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
 reveal_type(type("Foo", ()))  # revealed: Unknown
 
-# TODO: the keyword arguments for `Foo`/`Bar`/`Baz` here are invalid
+# The keyword arguments for `Foo`/`Bar`/`Baz` here are invalid
 # (you cannot pass `metaclass=` to `type()`, and none of them have
-# base classes with `__init_subclass__` methods),
-# but `type[Unknown]` would be better than `Unknown` here
-#
+# base classes with `__init_subclass__` methods).
+# We return `type[Unknown]` to reduce false positives from attribute access.
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: Unknown
+reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: type[Unknown]
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: Unknown
+reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: type[Unknown]
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: Unknown
+reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: type[Unknown]
 ```
 
 The following calls are also invalid, due to incorrect argument types:
@@ -859,28 +858,29 @@ def f(*args, **kwargs):
     A = type(*args, **kwargs)
     reveal_type(A)  # revealed: type[Unknown]
 
-    # Has a string first arg, but unknown additional args from *args
+    # Has a string first arg, but unknown additional args from *args.
+    # We return type[Unknown] since the overload is ambiguous.
     B = type("B", *args, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(B)  # revealed: <class 'str'>
+    reveal_type(B)  # revealed: type[Unknown]
 
-    # Has string and tuple, but unknown additional args
+    # Has string and tuple, but unknown additional args from *args.
     C = type("C", (), *args, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(C)  # revealed: type
+    reveal_type(C)  # revealed: type[Unknown]
 
-    # All three positional args provided, only **kwargs unknown
+    # All three positional args provided, only **kwargs unknown.
     D = type("D", (), {}, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(D)  # revealed: type
+    reveal_type(D)  # revealed: type[Unknown]
 
     # Three starred expressions - we can't know how they expand
     a = ("E",)
     b = ((),)
     c = ({},)
     E = type(*a, *b, *c)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(E)  # revealed: type
+    reveal_type(E)  # revealed: type[Unknown]
+
+    # Non-string first argument with **kwargs - still ambiguous, return type[Unknown]
+    F = type(123, **kwargs)
+    reveal_type(F)  # revealed: type[Unknown]
 ```
 
 ## Explicit type annotations
