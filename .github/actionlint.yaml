@@ -1,4 +1,4 @@
-# Configuration for the actionlint tool, which we run via pre-commit
+# Configuration for the actionlint tool, which we run via prek
 # to verify the correctness of the syntax in our GitHub Actions workflows.
 
 self-hosted-runner:
