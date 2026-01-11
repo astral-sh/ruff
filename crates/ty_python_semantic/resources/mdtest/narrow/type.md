@@ -160,15 +160,19 @@ def _(x: A | B):
 
 ## No narrowing for multiple arguments
 
-No narrowing should occur if `type` is used to dynamically create a class:
+Narrowing does not occur in the same way if `type` is used to dynamically create a class:
 
 ```py
 def _(x: str | int):
     # The following diagnostic is valid, since the three-argument form of `type`
     # can only be called with `str` as the first argument.
-    # error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `str | int`"
+    #
+    # error: [invalid-argument-type] "Invalid argument to parameter 1 (`name`) of `type()`: Expected `str`, found `str | int`"
     if type(x, (), {}) is str:
-        reveal_type(x)  # revealed: str | int
+        # But we synthesize a new class object as the result of a three-argument call to `type`,
+        # and we know that this synthesized class object is not the same object as the `str` class object,
+        # so here the type is narrowed to `Never`!
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: str | int
 ```
