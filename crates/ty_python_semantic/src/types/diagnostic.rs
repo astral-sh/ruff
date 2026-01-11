@@ -3205,7 +3205,7 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
 pub(crate) fn report_bad_argument_to_get_protocol_members(
     context: &InferContext,
     call: &ast::ExprCall,
-    class: StaticClassLiteral,
+    class: ClassLiteral,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
         return;

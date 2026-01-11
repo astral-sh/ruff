@@ -208,7 +208,7 @@ static_assert(not is_disjoint_from(type[Foo], type[Bar]))
 
 ## Using dynamic classes with `super()`
 
-Dynamic classes can be used as pivot in `super()`:
+Dynamic classes can be used as the pivot class in `super()` calls:
 
 ```py
 class Base:
@@ -256,10 +256,10 @@ child = ChildCls()
 reveal_type(child)  # revealed: ChildCls
 reveal_type(child.base_attr)  # revealed: int
 
-# Child instances are subtypes of Parent instances.
+# Child instances are subtypes of `Parent` instances.
 def takes_parent(x: Parent) -> None: ...
 
-takes_parent(child)  # No error - ChildCls is a subtype of Parent
+takes_parent(child)  # No error - `ChildCls` is a subtype of `Parent`
 ```
 
 ## Dataclass transform inheritance
@@ -397,11 +397,19 @@ Other numbers of arguments are invalid:
 
 ```py
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-type("Foo", ())
+reveal_type(type("Foo", ()))  # revealed: Unknown
 
-# TODO: keyword arguments should be supported for `__init_subclass__` calls
+# TODO: the keyword arguments for `Foo`/`Bar`/`Baz` here are invalid
+# (you cannot pass `metaclass=` to `type()`, and none of them have
+# base classes with `__init_subclass__` methods),
+# but `type[Unknown]` would be better than `Unknown` here
+#
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-type("Foo", (), {}, weird_other_arg=42)
+reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: Unknown
+# error: [no-matching-overload] "No overload of class `type` matches arguments"
+reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: Unknown
+# error: [no-matching-overload] "No overload of class `type` matches arguments"
+reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: Unknown
 ```
 
 The following calls are also invalid, due to incorrect argument types:
@@ -521,6 +529,15 @@ def make_class(name: str):
     cls = type(name, (), {})
     reveal_type(cls)  # revealed: <class '<unknown>'>
     return cls
+
+def make_classes(name1: str, name2: str):
+    cls1 = type(name1, (), {})
+    cls2 = type(name2, (), {})
+
+    def inner(x: cls1): ...
+
+    # error: [invalid-argument-type] "Argument to function `inner` is incorrect: Expected `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:8`, found `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:9`"
+    inner(cls2())
 ```
 
 When the name comes from a union of string literals, we also use a placeholder name:
@@ -563,7 +580,7 @@ def make_class(bases: tuple[type, ...]):
     return cls
 ```
 
-When bases is a module-level variable holding a tuple of class literals, we can extract the base
+When `bases` is a module-level variable holding a tuple of class literals, we can extract the base
 classes:
 
 ```py
@@ -594,6 +611,31 @@ reveal_type(Cls1)  # revealed: <class 'Cls1'>
 namespace = {"attr": 1}
 Cls2 = type("Cls2", (Base,), {**namespace})
 reveal_type(Cls2)  # revealed: <class 'Cls2'>
+```
+
+When `*args` or `**kwargs` fill an unknown number of parameters, we cannot determine which overload
+of `type()` is being called:
+
+```py
+def f(*args, **kwargs):
+    # Completely dynamic: could be 1-arg or 3-arg form
+    A = type(*args, **kwargs)
+    reveal_type(A)  # revealed: type[Unknown]
+
+    # Has a string first arg, but unknown additional args from *args
+    B = type("B", *args, **kwargs)
+    # TODO: `type[Unknown]` would cause fewer false positives
+    reveal_type(B)  # revealed: <class 'str'>
+
+    # Has string and tuple, but unknown additional args
+    C = type("C", (), *args, **kwargs)
+    # TODO: `type[Unknown]` would cause fewer false positives
+    reveal_type(C)  # revealed: type
+
+    # All three positional args provided, only **kwargs unknown
+    D = type("D", (), {}, **kwargs)
+    # TODO: `type[Unknown]` would cause fewer false positives
+    reveal_type(D)  # revealed: type
 ```
 
 ## Explicit type annotations
@@ -693,12 +735,12 @@ reveal_type(ValidExtension)  # revealed: <class 'ValidExtension'>
 
 ## `__init_subclass__` keyword arguments
 
-When a base class defines `__init_subclass__` with required keyword arguments, those should be
-passed to `type()`. This is not yet supported:
+When a base class defines `__init_subclass__` with required arguments, those should be passed to
+`type()`. This is not yet supported:
 
 ```py
 class Base:
-    def __init_subclass__(cls, *, required_arg: str, **kwargs):
+    def __init_subclass__(cls, required_arg: str, **kwargs):
         super().__init_subclass__(**kwargs)
         cls.config = required_arg
 
