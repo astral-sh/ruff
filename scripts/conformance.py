@@ -31,7 +31,29 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, Self
 
-CONFORMANCE_ERROR_PATTERN = re.compile(r"#\s*E(?:\s*(?::\s*(.+)|\[(.+)\]))?\s*")
+# The conformance tests include 4 types of errors:
+# 1. Required errors (E): The type checker must raise an error on this line
+# 2. Optional errors (E?): The type checker may raise an error on this line
+# 3. Tagged errors ([tag]): The type checker must raise at most one error on any of the lines in a file with matching tags
+# 4. Tagged multi-errors ([tag]+): The type checker should raise one or more errors on any of the tagged lines
+# # This regex pattern parses the error lines in the conformance tests, but the following
+# # implementation treats all errors as required errors.
+CONFORMANCE_ERROR_PATTERN = re.compile(
+    r"""
+    \#\s*E                  # "# E" begins each error
+    (?P<optional>\?)?       # Optional '?' (E?) indicates that an error is optional
+    (?:                     # An optional tag for errors that may appear on multiple lines at most once
+        \[
+            (?P<tag>[^+\]]+)    # identifier
+            (?P<multi>\+)?      # '+' indicates that an error may occur more than once on tagged lines
+        \]
+    )?
+    (?:
+        \s*:\s*(?P<description>.*) # optional description
+    )?
+    """,
+    re.VERBOSE,
+)
 
 
 class Source(Flag):
@@ -195,7 +217,9 @@ def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
                 diagnostics.append(
                     Diagnostic(
                         check_name="conformance",
-                        description=error.group(1) or "Missing",
+                        description=error.group("description")
+                        or error.group("tag")
+                        or "Missing",
                         severity="major",
                         fingerprint=None,
                         location=Location(
