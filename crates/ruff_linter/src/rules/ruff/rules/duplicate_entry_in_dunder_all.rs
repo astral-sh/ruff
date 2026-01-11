@@ -10,32 +10,45 @@ use crate::fix::edits;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Detects duplicate elements in `__all__` definitions.
+/// Detects and removes duplicate elements in `__all__` definitions.
 ///
 /// ## Why is this bad?
-/// Duplicate elements are usually mistakes.
+/// Duplicate elements in `__all__` serve no purpose and can indicate copy-paste errors or
+/// incomplete refactoring.
 ///
 /// ## Example
 /// ```python
-/// import sys
-///
 /// __all__ = [
-///     "a",
-///     "a",
-///     "b",
+///     "DatabaseConnection",
+///     "Product",
+///     "User",
+///     "DatabaseConnection",  # Duplicate
 /// ]
+/// ```
 ///
 /// Use instead:
 /// ```python
-/// import sys
-///
 /// __all__ = [
-///     "a",
-///     "b",
+///     "DatabaseConnection",
+///     "Product",
+///     "User",
+/// ]
+/// ```
+///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the
+/// original expression, potentially losing important context or documentation.
+///
+/// For example:
+/// ```python
+/// __all__ = [
+///     "PublicAPI",
+///     # TODO: Remove this in v2.0
+///     "PublicAPI",  # Deprecated alias
 /// ]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(preview_since = "0.14.12")]
 pub(crate) struct DuplicateEntryInDunderAll;
 
 impl Violation for DuplicateEntryInDunderAll {
