@@ -1196,6 +1196,33 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         constraints.insert(place, NarrowingConstraint::regular(ty));
                     }
                 }
+                // If left is not a narrowable target and not a Call expression try to narrow the
+                // right operand instead. For symmetric operators (==, !=, is, is not), we can swap
+                // the operands.
+                //
+                // E.g., `None != x` should narrow `x` the same way as `x != None`.
+                _ if !matches!(left, ast::Expr::Call(_))
+                    && matches!(
+                        op,
+                        ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot
+                    )
+                    && matches!(
+                        right,
+                        ast::Expr::Name(_)
+                            | ast::Expr::Attribute(_)
+                            | ast::Expr::Subscript(_)
+                            | ast::Expr::Named(_)
+                    ) =>
+                {
+                    if let Some(right_place) = place_expr(right)
+                        // Swap lhs_ty and rhs_ty since we're narrowing the right operand
+                        && let Some(ty) =
+                            self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
+                    {
+                        let place = self.expect_place(&right_place);
+                        constraints.insert(place, NarrowingConstraint::regular(ty));
+                    }
+                }
                 ast::Expr::Call(ast::ExprCall {
                     range: _,
                     node_index: _,
