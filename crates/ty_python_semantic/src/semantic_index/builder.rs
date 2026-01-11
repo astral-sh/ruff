@@ -15,10 +15,9 @@ use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use ruff_text_size::TextRange;
+use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::module_name::ModuleName;
-use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -758,9 +757,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn record_expression_narrowing_constraint(
         &mut self,
-        precide_node: &ast::Expr,
+        predicate_node: &ast::Expr,
     ) -> PredicateOrLiteral<'db> {
-        let predicate = self.build_predicate(precide_node);
+        let predicate = self.build_predicate(predicate_node);
         self.record_narrowing_constraint(predicate);
         predicate
     }

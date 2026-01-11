@@ -1043,7 +1043,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             ]) && flake8_gettext::is_gettext_func_call(
                 checker,
                 func,
-                &checker.settings().flake8_gettext.functions_names,
+                &checker.settings().flake8_gettext.function_names,
             ) {
                 if checker.is_rule_enabled(Rule::FStringInGetTextFuncCall) {
                     flake8_gettext::rules::f_string_in_gettext_func_call(checker, args);
@@ -1280,6 +1280,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
                 airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::Airflow3IncompatibleFunctionSignature) {
+                airflow::rules::airflow_3_incompatible_function_signature(checker, expr);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);

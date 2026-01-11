@@ -54,6 +54,10 @@ pub(crate) struct CheckCommand {
     )]
     pub paths: Vec<SystemPathBuf>,
 
+    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    #[arg(long)]
+    pub(crate) add_ignore: bool,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
@@ -142,7 +146,7 @@ pub(crate) struct CheckCommand {
     pub(crate) watch: bool,
 
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
-    /// Use `--no-respect-gitignore` to disable.
+    /// Use `--no-respect-ignore-files` to disable.
     #[arg(
         long,
         overrides_with("no_respect_ignore_files"),
@@ -190,7 +194,7 @@ pub(crate) struct CheckCommand {
 
 impl CheckCommand {
     pub(crate) fn force_exclude(&self) -> bool {
-        resolve_bool_arg(self.force_exclude, self.no_progress).unwrap_or_default()
+        resolve_bool_arg(self.force_exclude, self.no_force_exclude).unwrap_or_default()
     }
 
     pub(crate) fn into_options(self) -> Options {

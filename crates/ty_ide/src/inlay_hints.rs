@@ -711,6 +711,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
 
@@ -723,13 +724,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
          --> main2.py:6:5
@@ -801,13 +802,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:10:6
@@ -869,6 +870,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         def s(x: str, /) -> str:
@@ -881,13 +883,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:6
@@ -919,13 +921,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:24
@@ -1049,6 +1051,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         def s(x: str, /) -> str:
@@ -1061,13 +1064,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:6
@@ -1099,13 +1102,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:24
@@ -1229,6 +1232,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         def s(x: str, /) -> str:
@@ -1259,13 +1263,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:11
@@ -1297,13 +1301,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:23
@@ -1475,6 +1479,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         def s(x: str, /) -> str:
@@ -1486,13 +1491,13 @@ mod tests {
         x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:6
@@ -1524,13 +1529,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:25
@@ -1562,13 +1567,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:47
@@ -1726,6 +1731,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
 
@@ -1735,13 +1741,13 @@ mod tests {
         w[: int] = z
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
          --> main2.py:6:5
@@ -1815,6 +1821,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def i(x: int, /) -> int:
             return x
         x[: int] = i(1)
@@ -1864,7 +1871,8 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class A:
             def __init__(self, y):
                 self.x = int(1)
@@ -1875,13 +1883,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:5:18
@@ -1939,6 +1947,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def my_func(command: str):
             match command.split():
                 case ["get", ab]:
@@ -1958,6 +1967,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def my_func(command: str):
             match command.split():
                 case ["get", *ab]:
@@ -1977,6 +1987,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def my_func(command: str):
             match command.split():
                 case ["get", ("a" | "b") as ab]:
@@ -2002,6 +2013,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class Click:
             __match_args__ = ("position", "button")
             def __init__(self, pos, btn):
@@ -2023,7 +2035,10 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @"type Alias1[AB: int = bool] = tuple[AB, list[AB]]");
+        assert_snapshot!(test.inlay_hints(), @"
+
+        type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+        ");
     }
 
     #[test]
@@ -2035,7 +2050,8 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import Callable
         type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
         ");
@@ -2049,7 +2065,10 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @"type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]");
+        assert_snapshot!(test.inlay_hints(), @"
+
+        type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+        ");
     }
 
     #[test]
@@ -2071,6 +2090,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a = 1
         b = 1.0
         c = True
@@ -2104,6 +2124,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a = (1, 2)
         b = (1.0, 2.0)
         c = (True, False)
@@ -2137,6 +2158,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a1, a2 = (1, 2)
         b1, b2 = (1.0, 2.0)
         c1, c2 = (True, False)
@@ -2170,6 +2192,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a1, a2 = 1, 2
         b1, b2 = 1.0, 2.0
         c1, c2 = True, False
@@ -2203,8 +2226,9 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a[: list[Unknown | int]] = [1, 2]
-        b[: list[Unknown | float]] = [1.0, 2.0]
+        b[: list[Unknown | int | float]] = [1.0, 2.0]
         c[: list[Unknown | bool]] = [True, False]
         d[: list[Unknown | None]] = [None, None]
         e[: list[Unknown | str]] = ["hel", "lo"]
@@ -2229,25 +2253,25 @@ mod tests {
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |     ^^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:2:10
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |          ^^^^^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
@@ -2265,7 +2289,7 @@ mod tests {
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |                    ^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
@@ -2281,27 +2305,46 @@ mod tests {
          --> main2.py:3:5
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
           |     ^^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:10
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
           |          ^^^^^^^
+        4 | c[: list[Unknown | bool]] = [True, False]
+        5 | d[: list[Unknown | None]] = [None, None]
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:20
+          |
+        2 | a[: list[Unknown | int]] = [1, 2]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
+          |                    ^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |
@@ -2315,11 +2358,11 @@ mod tests {
         662 |     """Convert a string or number to a floating-point number, if possible."""
             |
         info: Source
-         --> main2.py:3:20
+         --> main2.py:3:26
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
-          |                    ^^^^^
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
+          |                          ^^^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |
@@ -2336,7 +2379,7 @@ mod tests {
          --> main2.py:4:5
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |     ^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2344,19 +2387,19 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:10
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |          ^^^^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2376,7 +2419,7 @@ mod tests {
          --> main2.py:4:20
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |                    ^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2394,7 +2437,7 @@ mod tests {
         info: Source
          --> main2.py:5:5
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |     ^^^^
@@ -2403,18 +2446,18 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:5:10
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |          ^^^^^^^
@@ -2423,18 +2466,18 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:950:11
+           --> stdlib/types.pyi:974:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        972 | if sys.version_info >= (3, 10):
+        973 |     @final
+        974 |     class NoneType:
             |           ^^^^^^^^
-        951 |         """The type of the None singleton."""
+        975 |         """The type of the None singleton."""
             |
         info: Source
          --> main2.py:5:20
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |                    ^^^^
@@ -2462,13 +2505,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:6:10
@@ -2521,13 +2564,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:7:10
@@ -2580,13 +2623,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:10
@@ -2639,13 +2682,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:10
@@ -2697,13 +2740,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:10
@@ -2755,13 +2798,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:11:10
@@ -2828,13 +2871,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:12:10
@@ -2885,7 +2928,7 @@ mod tests {
         info: Source
 
         a: list[Unknown | int] = [1, 2]
-        b: list[Unknown | float] = [1.0, 2.0]
+        b: list[Unknown | int | float] = [1.0, 2.0]
         c: list[Unknown | bool] = [True, False]
         d: list[Unknown | None] = [None, None]
         e: list[Unknown | str] = ["hel", "lo"]
@@ -2914,6 +2957,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class MyClass:
             def __init__(self):
                 self.x: int = 1
@@ -3080,6 +3124,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
                 self.x[: list[T@MyClass]] = x
@@ -3148,13 +3193,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:7:13
@@ -3284,13 +3329,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:19
@@ -3359,13 +3404,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:48
@@ -3510,13 +3555,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:13
@@ -3585,13 +3630,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:47
@@ -3735,13 +3780,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:13
@@ -3806,13 +3851,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:47
@@ -3963,7 +4008,8 @@ mod tests {
                 variable_types: false,
                 ..Default::default()
             }),
-            @r"
+            @"
+
         def i(x: int, /) -> int:
             return x
 
@@ -3980,7 +4026,8 @@ mod tests {
             foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         foo([x=]1)
         ---------------------------------------------
@@ -4012,7 +4059,8 @@ mod tests {
             foo(y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         x = 1
         y = 2
@@ -4053,7 +4101,8 @@ mod tests {
             foo(val.y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         class MyClass:
             def __init__(self):
@@ -4098,7 +4147,8 @@ mod tests {
             foo(x.y)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         class MyClass:
             def __init__(self):
@@ -4144,7 +4194,8 @@ mod tests {
             foo(val.y())",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         class MyClass:
             def __init__(self):
@@ -4194,7 +4245,8 @@ mod tests {
             foo(val.y()[1])",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import List
 
         def foo(x: int): pass
@@ -4242,6 +4294,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def foo(x: int): pass
         x[: list[Unknown | int]] = [1]
         y[: list[Unknown | int]] = [2]
@@ -4267,13 +4320,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:10
@@ -4322,13 +4375,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:10
@@ -4398,7 +4451,8 @@ mod tests {
             foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, /): pass
         foo(1)
         ");
@@ -4412,7 +4466,8 @@ mod tests {
             foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(*args: int): pass
         foo(1)
         ");
@@ -4426,7 +4481,8 @@ mod tests {
             foo(x=1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(**kwargs: int): pass
         foo(x=1)
         ");
@@ -4440,9 +4496,116 @@ mod tests {
             foo(x=1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(*, x: int): pass
         foo(x=1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_unpacked_tuple_argument() {
+        // When an unpacked tuple fills multiple parameters, no hint should be shown
+        // for that argument because showing a single parameter name would be misleading.
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: str, b: int, c: int, d: str): ...
+            t: tuple[int, int] = (23, 42)
+            foo('foo', *t, d='bar')",
+        );
+
+        // `*t` fills both `b` and `c`, so no hint is shown for it
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(a: str, b: int, c: int, d: str): ...
+        t: tuple[int, int] = (23, 42)
+        foo([a=]'foo', *t, d='bar')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: str, b: int, c: int, d: str): ...
+          |         ^
+        3 | t: tuple[int, int] = (23, 42)
+        4 | foo('foo', *t, d='bar')
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | def foo(a: str, b: int, c: int, d: str): ...
+        3 | t: tuple[int, int] = (23, 42)
+        4 | foo([a=]'foo', *t, d='bar')
+          |      ^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_unpacked_tuple_argument_single_element() {
+        // When an unpacked tuple fills only one parameter, a hint should be shown.
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: str, b: int, c: str): ...
+            t: tuple[int] = (42,)
+            foo('foo', *t, 'bar')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def foo(a: str, b: int, c: str): ...
+        t: tuple[int] = (42,)
+        foo([a=]'foo', [b=]*t, [c=]'bar')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |         ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |      ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |                 ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:17
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |                 ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:25
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |                         ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:25
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |                         ^
+          |
         ");
     }
 
@@ -4454,7 +4617,8 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, /, y: int): pass
         foo(1, [y=]2)
         ---------------------------------------------
@@ -4483,7 +4647,8 @@ mod tests {
             foo(1, 2, 3)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, /, *args: int): pass
         foo(1, 2, 3)
         ");
@@ -4497,7 +4662,8 @@ mod tests {
             foo(1, x=2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, /, **kwargs: int): pass
         foo(1, x=2)
         ");
@@ -4513,7 +4679,8 @@ mod tests {
             f = Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             def __init__(self, x: int): pass
         Foo([x=]1)
@@ -4568,7 +4735,8 @@ mod tests {
             f = Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             def __new__(cls, x: int): pass
         Foo([x=]1)
@@ -4624,7 +4792,8 @@ mod tests {
             Foo(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class MetaFoo:
             def __call__(self, x: int): pass
         class Foo(metaclass=MetaFoo):
@@ -4660,7 +4829,8 @@ mod tests {
                 x(1)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import Callable
         def foo(x: Callable[[int], int]):
             x(1)
@@ -4676,7 +4846,8 @@ mod tests {
             Foo().bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             def bar(self, y: int): pass
         Foo().bar([y=]2)
@@ -4710,7 +4881,8 @@ mod tests {
             Foo.bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             @classmethod
             def bar(cls, y: int): pass
@@ -4746,7 +4918,8 @@ mod tests {
             Foo.bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class Foo:
             @staticmethod
             def bar(y: int): pass
@@ -4781,7 +4954,8 @@ mod tests {
             foo('abc')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int | str): pass
         foo([x=]1)
         foo([x=]'abc')
@@ -4830,7 +5004,8 @@ mod tests {
             foo(1, 'hello', True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, y: str, z: bool): pass
         foo([x=]1, [y=]'hello', [z=]True)
         ---------------------------------------------
@@ -4889,7 +5064,8 @@ mod tests {
             foo(1, z=True, y='hello')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, y: str, z: bool): pass
         foo([x=]1, z=True, y='hello')
         ---------------------------------------------
@@ -4920,7 +5096,8 @@ mod tests {
             foo(1, 'custom', True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int, y: str = 'default', z: bool = False): pass
         foo([x=]1)
         foo([x=]1, [y=]'custom')
@@ -5048,7 +5225,8 @@ mod tests {
             baz(foo(5), bar(bar('test')), True)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int) -> int:
             return x * 2
 
@@ -5183,7 +5361,8 @@ mod tests {
             A().foo(42).bar('test').baz()",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class A:
             def foo(self, value: int) -> 'A':
                 return self
@@ -5232,7 +5411,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nexted_keyword_function_calls() {
+    fn test_nested_keyword_function_calls() {
         let mut test = inlay_hint_test(
             "
             def foo(x: str) -> str:
@@ -5242,7 +5421,8 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: str) -> str:
             return x
         def bar(y: int): pass
@@ -5278,20 +5458,21 @@ mod tests {
             bar(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         foo[: (x) -> Unknown] = lambda x: x * 2
         bar[: (a, b) -> Unknown] = lambda a, b: a + b
         foo([x=]5)
         bar([a=]1, [b=]2)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:2:14
@@ -5303,13 +5484,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:17
@@ -5334,6 +5515,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import LiteralString
         def my_func(x: LiteralString):
             y[: LiteralString] = x
@@ -5388,6 +5570,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def branch(cond: int):
             if cond < 10:
                 x = 1
@@ -5402,13 +5585,13 @@ mod tests {
             y[: Literal[1, 2, 3, "hello"] | None] = x
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:13:9
@@ -5492,13 +5675,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:950:11
+           --> stdlib/types.pyi:974:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        972 | if sys.version_info >= (3, 10):
+        973 |     @final
+        974 |     class NoneType:
             |           ^^^^^^^^
-        951 |         """The type of the None singleton."""
+        975 |         """The type of the None singleton."""
             |
         info: Source
           --> main2.py:13:37
@@ -5538,6 +5721,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class Foo[T]: ...
 
         a[: <class 'Foo[int]'>] = Foo[int]
@@ -5588,6 +5772,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f(x: list[str]):
             y[: type[list[str]]] = type(x)
         ---------------------------------------------
@@ -5661,7 +5846,8 @@ mod tests {
             ab = F.whatever",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         class F:
             @property
             def whatever(self): ...
@@ -5708,7 +5894,8 @@ mod tests {
             foo(1, 'pos', 3.14, e=42, f='custom')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
         foo(1, 'pos', [c=]3.14, [d=]False, e=42)
         foo(1, 'pos', [c=]3.14, e=42, f='custom')
@@ -5782,7 +5969,8 @@ mod tests {
             pass",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from foo import bar
 
         bar([x=]1)
@@ -5822,7 +6010,8 @@ mod tests {
             foo('hello')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import overload
 
         @overload
@@ -5884,7 +6073,8 @@ mod tests {
         assert_snapshot!(test.inlay_hints_with_settings(&InlayHintSettings {
             call_argument_names: false,
             ..Default::default()
-        }), @r"
+        }), @"
+
         def foo(x: int): pass
         foo(1)
         ");
@@ -5900,7 +6090,8 @@ mod tests {
             bar(2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(x: int): pass
         def bar(y: int): pass
         foo([x=]1)
@@ -5934,7 +6125,8 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(_x: int, y: int): pass
         foo(1, [y=]2)
         ---------------------------------------------
@@ -5967,7 +6159,8 @@ mod tests {
             foo(1, 2)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         def foo(
             x: int,
             y: int
@@ -6023,6 +6216,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def foo(x: int, *y: bool, z: str | int | list[str]): ...
 
         a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
@@ -6135,13 +6329,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:63
@@ -6166,17 +6360,18 @@ mod tests {
         test.with_extra_file("foo.py", "'''Foo module'''");
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         import foo
 
         a[: <module 'foo'>] = foo
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:423:7
+           --> stdlib/types.pyi:431:7
             |
-        422 | @disjoint_base
-        423 | class ModuleType:
+        430 | @disjoint_base
+        431 | class ModuleType:
             |       ^^^^^^^^^^
-        424 |     """Create a module object.
+        432 |     """Create a module object.
             |
         info: Source
          --> main2.py:4:6
@@ -6214,18 +6409,19 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import Literal
 
         a[: <special-form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
          --> main2.py:4:20
@@ -6302,18 +6498,19 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from types import FunctionType
 
         a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:670:7
+           --> stdlib/types.pyi:690:7
             |
-        669 | @final
-        670 | class WrapperDescriptorType:
+        689 | @final
+        690 | class WrapperDescriptorType:
             |       ^^^^^^^^^^^^^^^^^^^^^
-        671 |     @property
-        672 |     def __name__(self) -> str: ...
+        691 |     @property
+        692 |     def __name__(self) -> str: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6354,18 +6551,19 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f(): ...
 
         a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:684:7
+           --> stdlib/types.pyi:704:7
             |
-        683 | @final
-        684 | class MethodWrapperType:
+        703 | @final
+        704 | class MethodWrapperType:
             |       ^^^^^^^^^^^^^^^^^
-        685 |     @property
-        686 |     def __self__(self) -> object: ...
+        705 |     @property
+        706 |     def __self__(self) -> object: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6377,13 +6575,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:134:9
+           --> stdlib/types.pyi:139:9
             |
-        132 |         ) -> Self: ...
-        133 |
-        134 |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        137 |         ) -> Self: ...
+        138 |
+        139 |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
             |         ^^^^^^^^
-        135 |         """Call self as a function."""
+        140 |         """Call self as a function."""
             |
         info: Source
          --> main2.py:4:22
@@ -6443,6 +6641,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import NewType
 
         N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
@@ -6450,14 +6649,14 @@ mod tests {
         Y[: <NewType pseudo-class 'N'>] = N
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:615:11
-            |
-        613 |     TypeGuard: _SpecialForm
-        614 |
-        615 |     class NewType:
-            |           ^^^^^^^
-        616 |         """NewType creates simple unique types with almost zero runtime overhead.
-            |
+            --> stdlib/typing.pyi:1040:11
+             |
+        1038 |     """
+        1039 |
+        1040 |     class NewType:
+             |           ^^^^^^^
+        1041 |         """NewType creates simple unique types with almost zero runtime overhead.
+             |
         info: Source
          --> main2.py:4:6
           |
@@ -6491,15 +6690,15 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:637:28
-            |
-        635 |         """
-        636 |
-        637 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
-            |                            ^^^^
-        638 |         if sys.version_info >= (3, 11):
-        639 |             @staticmethod
-            |
+            --> stdlib/typing.pyi:1062:28
+             |
+        1060 |         """
+        1061 |
+        1062 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
+             |                            ^^^^
+        1063 |         if sys.version_info >= (3, 11):
+        1064 |             @staticmethod
+             |
         info: Source
          --> main2.py:4:44
           |
@@ -6512,15 +6711,15 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:637:39
-            |
-        635 |         """
-        636 |
-        637 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
-            |                                       ^^
-        638 |         if sys.version_info >= (3, 11):
-        639 |             @staticmethod
-            |
+            --> stdlib/typing.pyi:1062:39
+             |
+        1060 |         """
+        1061 |
+        1062 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
+             |                                       ^^
+        1063 |         if sys.version_info >= (3, 11):
+        1064 |             @staticmethod
+             |
         info: Source
          --> main2.py:4:56
           |
@@ -6533,14 +6732,14 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:615:11
-            |
-        613 |     TypeGuard: _SpecialForm
-        614 |
-        615 |     class NewType:
-            |           ^^^^^^^
-        616 |         """NewType creates simple unique types with almost zero runtime overhead.
-            |
+            --> stdlib/typing.pyi:1040:11
+             |
+        1038 |     """
+        1039 |
+        1040 |     class NewType:
+             |           ^^^^^^^
+        1041 |         """NewType creates simple unique types with almost zero runtime overhead.
+             |
         info: Source
          --> main2.py:6:6
           |
@@ -6580,6 +6779,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f[T](x: type[T]):
             y[: type[T@f]] = x
         ---------------------------------------------
@@ -6614,13 +6814,6 @@ mod tests {
         3 |     y[: type[T@f]] = x
           |              ^^^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        def f[T](x: type[T]):
-            y: type[T@f] = x
         "#);
     }
 
@@ -6633,7 +6826,8 @@ mod tests {
         Strange = Protocol[T]",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import Protocol, TypeVar
         T = TypeVar([name=]'T')
         Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
@@ -6658,13 +6852,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:341:1
+           --> stdlib/typing.pyi:346:1
             |
-        340 | Union: _SpecialForm
-        341 | Protocol: _SpecialForm
+        344 | """
+        345 |
+        346 | Protocol: _SpecialForm
             | ^^^^^^^^
-        342 | Callable: _SpecialForm
-        343 | Type: _SpecialForm
+        347 | """Base class for protocol classes.
             |
         info: Source
          --> main2.py:4:26
@@ -6691,7 +6885,7 @@ mod tests {
         4 | Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
           |                                          ^
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -6702,19 +6896,20 @@ mod tests {
         P = ParamSpec('P')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import ParamSpec
         P = ParamSpec([name=]'P')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:552:17
+           --> stdlib/typing.pyi:901:17
             |
-        550 |             def __new__(
-        551 |                 cls,
-        552 |                 name: str,
+        899 |             def __new__(
+        900 |                 cls,
+        901 |                 name: str,
             |                 ^^^^
-        553 |                 *,
-        554 |                 bound: Any | None = None,  # AnnotationForm
+        902 |                 *,
+        903 |                 bound: Any | None = None,  # AnnotationForm
             |
         info: Source
          --> main2.py:3:16
@@ -6735,18 +6930,19 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing_extensions import TypeAliasType
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2037:26
+            --> stdlib/typing.pyi:2546:26
              |
-        2035 |         """
-        2036 |
-        2037 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2544 |         """
+        2545 |
+        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                          ^^^^
-        2038 |         @property
-        2039 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2547 |         @property
+        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:20
@@ -6757,14 +6953,14 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2037:37
+            --> stdlib/typing.pyi:2546:37
              |
-        2035 |         """
-        2036 |
-        2037 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2544 |         """
+        2545 |
+        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                                     ^^^^^
-        2038 |         @property
-        2039 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2547 |         @property
+        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:32
@@ -6784,19 +6980,20 @@ mod tests {
         Ts = TypeVarTuple('Ts')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing_extensions import TypeVarTuple
         Ts = TypeVarTuple([name=]'Ts')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:412:30
+           --> stdlib/typing.pyi:761:30
             |
-        410 |             def has_default(self) -> bool: ...
-        411 |         if sys.version_info >= (3, 13):
-        412 |             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
+        759 |             def has_default(self) -> bool: ...
+        760 |         if sys.version_info >= (3, 13):
+        761 |             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
             |                              ^^^^
-        413 |         elif sys.version_info >= (3, 12):
-        414 |             def __new__(cls, name: str) -> Self: ...
+        762 |         elif sys.version_info >= (3, 12):
+        763 |             def __new__(cls, name: str) -> Self: ...
             |
         info: Source
          --> main2.py:3:20
@@ -6806,6 +7003,87 @@ mod tests {
           |                    ^^^^
           |
         ");
+    }
+
+    #[test]
+    fn hover_narrowed_type_with_top_materialization() {
+        let mut test = inlay_hint_test(
+            r#"
+                def f(xyxy: object):
+                    if isinstance(xyxy, list):
+                        x = xyxy
+                "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def f(xyxy: object):
+            if isinstance(xyxy, list):
+                x[: Top[list[Unknown]]] = xyxy
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:24:1
+           |
+        22 | CallableTypeOf: _SpecialForm
+        23 |
+        24 | Top: _SpecialForm
+           | ^^^
+        25 | """
+        26 | `Top[T]` represents the "top materialization" of `T`.
+           |
+        info: Source
+         --> main2.py:4:13
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |             ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:17
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |                 ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | ^^^^^^^
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main2.py:4:22
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |                      ^^^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def f(xyxy: object):
+            if isinstance(xyxy, list):
+                x: Top[list[Unknown]] = xyxy
+        "#);
     }
 
     struct InlayHintLocationDiagnostic {

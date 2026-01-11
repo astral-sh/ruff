@@ -70,8 +70,8 @@ export default function Editor({
 }: Props) {
   const serverRef = useRef<PlaygroundServer | null>(null);
 
-  if (serverRef.current != null) {
-    serverRef.current.update(
+  useEffect(() => {
+    serverRef.current?.update(
       {
         files,
         workspace,
@@ -81,7 +81,14 @@ export default function Editor({
       },
       isViewingVendoredFile,
     );
-  }
+  }, [
+    files,
+    workspace,
+    onOpenFile,
+    onVendoredFileChange,
+    onBackToUserFile,
+    isViewingVendoredFile,
+  ]);
 
   // Update the diagnostics in the editor.
   useEffect(() => {
@@ -106,11 +113,7 @@ export default function Editor({
 
   useEffect(() => {
     return () => {
-      const server = serverRef.current;
-
-      if (server != null) {
-        server.dispose();
-      }
+      serverRef.current?.dispose();
     };
   }, []);
 
@@ -334,6 +337,7 @@ class PlaygroundServer
     const digitsLength = String(completions.length - 1).length;
 
     return {
+      incomplete: true,
       suggestions: completions.map((completion, i) => ({
         label: {
           label: completion.name,
@@ -454,10 +458,22 @@ class PlaygroundServer
     return {
       dispose: () => {},
       hints: inlayHints.map((hint) => ({
-        label: hint.label.map((part) => ({
-          label: part.label,
-          // As of 2025-09-23, location isn't supported by Monaco which is why we don't set it
-        })),
+        label: hint.label.map((part) => {
+          const locationLink = part.location
+            ? this.mapNavigationTarget(part.location)
+            : undefined;
+
+          return {
+            label: part.label,
+            // Range cannot be `undefined`.
+            location: locationLink?.targetSelectionRange
+              ? {
+                  uri: locationLink.uri,
+                  range: locationLink.targetSelectionRange,
+                }
+              : undefined,
+          };
+        }),
         position: {
           lineNumber: hint.position.line,
           column: hint.position.column,

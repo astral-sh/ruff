@@ -28,11 +28,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
+use ty_module_resolver::{SearchPathSettings, SearchPathSettingsError, SearchPaths};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
-    SearchPathValidationError, SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
+    AnalysisSettings, MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
+    SysPrefixPathOrigin,
 };
 use ty_static::EnvVars;
 
@@ -85,6 +86,10 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub terminal: Option<TerminalOptions>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
+    pub analysis: Option<AnalysisOptions>,
 
     /// Override configurations for specific file patterns.
     ///
@@ -258,7 +263,7 @@ impl Options {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         misconfiguration_mode: MisconfigurationMode,
-    ) -> Result<SearchPaths, SearchPathValidationError> {
+    ) -> Result<SearchPaths, SearchPathSettingsError> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
 
@@ -434,6 +439,8 @@ impl Options {
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             })?;
 
+        let analysis = self.analysis.or_default().to_settings();
+
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)
             .map_err(|err| ToSettingsError {
@@ -446,6 +453,7 @@ impl Options {
             rules: Arc::new(rules),
             terminal,
             src,
+            analysis,
             overrides,
         };
 
@@ -842,7 +850,6 @@ impl SrcOptions {
 )]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
-    #[get_size(ignore)] // TODO: Add `GetSize` support for `OrderMap`.
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
@@ -875,10 +882,7 @@ impl Rules {
                     let lint_source = match source {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
-
-                        ValueSource::Editor => {
-                            unreachable!("Can't configure rules from the user's editor")
-                        }
+                        ValueSource::Editor => LintSource::Editor,
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(lint, severity, lint_source);
@@ -1014,7 +1018,12 @@ fn build_include_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::Editor => unreachable!("Can't configure includes from the user's editor"),
+                        ValueSource::Editor => {
+                            diagnostic.sub(SubDiagnostic::new(
+                                SubDiagnosticSeverity::Info,
+                                "The pattern was specified in the editor settings.",
+                            ))
+                        }
                     }
                 })?;
         }
@@ -1097,9 +1106,10 @@ fn build_exclude_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::Editor => unreachable!(
-                            "Can't configure excludes from the user's editor"
-                        )
+                        ValueSource::Editor => diagnostic.sub(SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            "The pattern was specified in the editor settings",
+                        ))
                     }
                 })?;
         }
@@ -1248,6 +1258,55 @@ pub struct TerminalOptions {
         "#
     )]
     pub error_on_warning: Option<bool>,
+}
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct AnalysisOptions {
+    /// Whether ty should respect `type: ignore` comments.
+    ///
+    /// When set to `false`, `type: ignore` comments are treated like any other normal
+    /// comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+    ///
+    /// Setting this option can be useful when using ty alongside other type checkers or when
+    /// you prefer using `ty: ignore` over `type: ignore`.
+    ///
+    /// Defaults to `true`.
+    #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = r#"
+        # Disable support for `type: ignore` comments
+        respect-type-ignore-comments = false
+        "#
+    )]
+    pub respect_type_ignore_comments: Option<bool>,
+}
+
+impl AnalysisOptions {
+    fn to_settings(&self) -> AnalysisSettings {
+        let AnalysisSettings {
+            respect_type_ignore_comments: respect_type_ignore_default,
+        } = AnalysisSettings::default();
+
+        AnalysisSettings {
+            respect_type_ignore_comments: self
+                .respect_type_ignore_comments
+                .unwrap_or(respect_type_ignore_default),
+        }
+    }
 }
 
 /// Configuration override that applies to specific files based on glob patterns.

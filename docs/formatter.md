@@ -265,26 +265,29 @@ Instead, apply the `# fmt: off` comment to the entire statement:
 Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
 comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
 
-`# fmt: skip` comments suppress formatting for a preceding statement, case header, decorator,
-function definition, or class definition:
+`# fmt: skip` comments suppress formatting for a case header, decorator,
+function definition, class definition, or the preceding statements
+on the same logical line. The formatter leaves the following unchanged:
 
 ```python
 if True:
     pass
-elif False: # fmt: skip
+elif     False: # fmt: skip
     pass
 
 @Test
-@Test2 # fmt: skip
+@Test2(a,b) # fmt: skip
 def test(): ...
 
-a = [1, 2, 3, 4, 5] # fmt: skip
+a = [1,2,3,4,5] # fmt: skip
 
-def test(a, b, c, d, e, f) -> int: # fmt: skip
+def test(a,b,c,d,e,f) -> int: # fmt: skip
     pass
+
+x=1;x=2;x=3 # fmt: skip
 ```
 
-As such, adding an `# fmt: skip` comment at the end of an expression will have no effect. In
+Adding a `# fmt: skip` comment at the end of an expression will have no effect. In
 the following example, the list entry `'1'` will be formatted, despite the `# fmt: skip`:
 
 ```python
@@ -501,7 +504,7 @@ If you want Ruff to split an f-string across multiple lines, ensure there's a li
 [self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
 [configured quote style]: settings.md/#format_quote-style
 
-#### Fluent layout for method chains
+### Fluent layout for method chains
 
 At times, when developers write long chains of methods on an object, such as
 

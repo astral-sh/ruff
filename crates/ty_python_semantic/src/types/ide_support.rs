@@ -73,7 +73,7 @@ pub fn definitions_for_name<'db>(
         let is_global = place_expr.is_global();
         let is_nonlocal = place_expr.is_nonlocal();
 
-        // TODO: The current algorithm doesn't return definintions or bindings
+        // TODO: The current algorithm doesn't return definitions or bindings
         // for other scopes that are outside of this scope hierarchy that target
         // this name using a nonlocal or global binding. The semantic analyzer
         // doesn't appear to track these in a way that we can easily access
@@ -456,8 +456,8 @@ pub struct CallSignatureDetails<'db> {
     /// Parameter kinds, useful to determine correct autocomplete suggestions.
     pub parameter_kinds: Vec<ParameterKind<'db>>,
 
-    /// Parameter kinds, useful to determine correct autocomplete suggestions.
-    pub parameter_types: Vec<Option<Type<'db>>>,
+    /// Annotated types of parameters. If no annotation was provided, this is `Unknown`.
+    pub parameter_types: Vec<Type<'db>>,
 
     /// The definition where this callable was originally defined (useful for
     /// extracting docstrings).
@@ -514,19 +514,18 @@ pub fn call_signature_details<'db>(
         // Extract signature details from all callable bindings
         bindings
             .into_iter()
-            .flat_map(std::iter::IntoIterator::into_iter)
+            .flatten()
             .map(|binding| {
                 let argument_to_parameter_mapping = binding.argument_matches().to_vec();
                 let signature = binding.signature;
                 let display_details = signature.display(model.db()).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
-                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Option<Type>>) =
-                    signature
-                        .parameters()
-                        .iter()
-                        .map(|param| (param.kind().clone(), param.annotated_type()))
-                        .unzip();
+                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
+                    .parameters()
+                    .iter()
+                    .map(|param| (param.kind().clone(), param.annotated_type()))
+                    .unzip();
 
                 CallSignatureDetails {
                     definition: signature.definition(),
@@ -623,7 +622,7 @@ pub fn definitions_for_bin_op<'db>(
 
     let definitions: Vec<_> = bindings
         .into_iter()
-        .flat_map(std::iter::IntoIterator::into_iter)
+        .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
                 binding.signature.definition?,
@@ -681,7 +680,7 @@ pub fn definitions_for_unary_op<'db>(
 
     let definitions = bindings
         .into_iter()
-        .flat_map(std::iter::IntoIterator::into_iter)
+        .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
                 binding.signature.definition?,
@@ -788,6 +787,12 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         }
 
+        // Skip if this argument maps to multiple parameters (e.g., unpacked tuple filling
+        // multiple slots). Showing a single parameter name would be misleading.
+        if arg_mapping.parameters.len() > 1 {
+            continue;
+        }
+
         let Some(param_index) = arg_mapping.parameters.first() else {
             continue;
         };
@@ -846,12 +851,12 @@ mod resolve_definition {
     use ruff_python_stdlib::sys::is_builtin_module;
     use rustc_hash::FxHashSet;
     use tracing::trace;
+    use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
-    use crate::module_resolver::file_to_module;
+    use crate::Db;
     use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
     use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
-    use crate::{Db, ModuleName, resolve_module, resolve_real_module};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.

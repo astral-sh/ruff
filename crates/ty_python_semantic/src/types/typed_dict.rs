@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
@@ -21,12 +22,10 @@ use crate::semantic_index::definition::Definition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
-use crate::types::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeRelation,
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
-
-use ordermap::OrderSet;
+use crate::types::{NormalizedVisitor, TypeContext};
 
 bitflags! {
     /// Used for `TypedDict` class parameters.
@@ -556,7 +555,7 @@ impl TypedDictAssignmentKind {
 /// Validates assignment of a value to a specific key on a `TypedDict`.
 ///
 /// Returns true if the assignment is valid, or false otherwise.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
@@ -612,7 +611,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
         };
 
     let add_item_definition_subdiagnostic = |diagnostic: &mut Diagnostic, message| {
-        if let Some(declaration) = item.first_declaration {
+        if let Some(declaration) = item.first_declaration() {
             let file = declaration.file(db);
             let module = parsed_module(db, file).load(db);
 
@@ -879,7 +878,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     }
 }
 
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct SynthesizedTypedDictType<'db> {
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,
@@ -970,6 +969,10 @@ impl<'db> TypedDictField<'db> {
 
     pub(crate) const fn is_read_only(&self) -> bool {
         self.flags.contains(TypedDictFieldFlags::READ_ONLY)
+    }
+
+    pub(crate) const fn first_declaration(&self) -> Option<Definition<'db>> {
+        self.first_declaration
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(

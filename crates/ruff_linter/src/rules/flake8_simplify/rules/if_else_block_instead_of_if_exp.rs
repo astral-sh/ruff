@@ -55,6 +55,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Ternary operators can also make it harder to measure [code coverage]
 /// with tools that use line profiling.
 ///
+/// ## Options
+///
+/// - `lint.pycodestyle.max-line-length`
+/// - `indent-width`
+///
 /// ## References
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
 ///

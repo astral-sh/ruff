@@ -16,7 +16,7 @@ const VERSION_FILTER: [(&str, &str); 1] = [(
 fn version_basics() {
     insta::with_settings!({filters => VERSION_FILTER.to_vec()}, {
         assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME)).arg("version"), @r"
+            Command::new(get_cargo_bin(BIN_NAME)).arg("version"), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -42,7 +42,7 @@ fn config_option_allowed_but_ignored() -> Result<()> {
                 .arg("version")
                 .arg("--config")
                 .arg(&ruff_dot_toml)
-                .args(["--config", "lint.isort.extra-standard-library = ['foo', 'bar']"]), @r"
+                .args(["--config", "lint.isort.extra-standard-library = ['foo', 'bar']"]), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -60,7 +60,7 @@ fn config_option_ignored_but_validated() {
         assert_cmd_snapshot!(
             Command::new(get_cargo_bin(BIN_NAME))
                 .arg("version")
-                .args(["--config", "foo = bar"]), @r"
+                .args(["--config", "foo = bar"]), @"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -91,7 +91,7 @@ fn config_option_ignored_but_validated() {
 fn isolated_option_allowed() {
     insta::with_settings!({filters => VERSION_FILTER.to_vec()}, {
         assert_cmd_snapshot!(
-            Command::new(get_cargo_bin(BIN_NAME)).arg("version").arg("--isolated"), @r"
+            Command::new(get_cargo_bin(BIN_NAME)).arg("version").arg("--isolated"), @"
         success: true
         exit_code: 0
         ----- stdout -----

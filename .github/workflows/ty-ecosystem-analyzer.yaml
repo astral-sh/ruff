@@ -4,7 +4,13 @@ permissions: {}
 
 on:
   pull_request:
-    types: [labeled]
+    # The default for `pull_request` is to trigger on `synchronize`, `opened` and `reopened`.
+    # We also add `labeled` here so that the workflow triggers when a label is initially added.
+    types:
+      - labeled
+      - synchronize
+      - opened
+      - reopened
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -17,30 +23,29 @@ env:
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
   REF_NAME: ${{ github.ref_name }}
-  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
 
 jobs:
   ty-ecosystem-analyzer:
     name: Compute diagnostic diff
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
-    if: contains(github.event.label.name, 'ecosystem-analyzer')
+    if: contains( github.event.pull_request.labels.*.name, 'ecosystem-analyzer')
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
         with:
-          enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
+          enable-cache: true
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
-          lookup-only: false # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
+          lookup-only: false
 
       - name: Install Rust toolchain
         run: rustup show
@@ -112,27 +117,10 @@ jobs:
 
           cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: "Deploy to Cloudflare Pages"
-        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        id: deploy
-        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
-
-      - name: "Append deployment URL"
-        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
-        run: |
-          echo >> comment.md
-          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)** ([timing results]($DEPLOYMENT_URL/timing))" >> comment.md
-
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: full-report
           path: dist/
@@ -140,19 +128,19 @@ jobs:
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: comment.md
           path: comment.md
 
       - name: Upload diagnostics diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: diff.html
           path: dist/diff.html
 
       - name: Upload timing diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: timing.html
           path: dist/timing.html

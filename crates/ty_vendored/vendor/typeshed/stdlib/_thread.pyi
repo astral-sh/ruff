@@ -53,6 +53,8 @@ class RLock:
         to be available for other threads.
         """
     __enter__ = acquire
+    """Lock the lock."""
+
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None:
         """Release the lock."""
     if sys.version_info >= (3, 14):
@@ -350,6 +352,7 @@ class _ExceptHookArgs(structseq[Any], tuple[type[BaseException], BaseException |
         """Thread"""
 
 _excepthook: Callable[[_ExceptHookArgs], Any]
+"""Handle uncaught Thread.run() exception."""
 
 if sys.version_info >= (3, 12):
     def daemon_threads_allowed() -> bool:

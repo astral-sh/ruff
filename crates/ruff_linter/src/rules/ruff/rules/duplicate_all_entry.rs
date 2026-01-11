@@ -82,12 +82,7 @@ pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     let ([value_passed], []) = (&**args, &**keywords) else {
         return;
     };
-    let ast::Expr::Attribute(ast::ExprAttribute {
-        ref value,
-        ref attr,
-        ..
-    }) = **func
-    else {
+    let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &**func else {
         return;
     };
     if attr == "extend" {

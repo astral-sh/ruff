@@ -132,29 +132,29 @@ fn dependents() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().arg("--direction").arg("dependents").current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [],
-              "ruff/b.py": [
-                "ruff/a.py"
-              ],
-              "ruff/c.py": [
-                "ruff/b.py"
-              ],
-              "ruff/d.py": [
-                "ruff/c.py"
-              ],
-              "ruff/e.py": [
-                "ruff/d.py"
-              ]
-            }
+        assert_cmd_snapshot!(command().arg("--direction").arg("dependents").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [],
+          "ruff/b.py": [
+            "ruff/a.py"
+          ],
+          "ruff/c.py": [
+            "ruff/b.py"
+          ],
+          "ruff/d.py": [
+            "ruff/c.py"
+          ],
+          "ruff/e.py": [
+            "ruff/d.py"
+          ]
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
     });
 
     Ok(())
@@ -184,21 +184,21 @@ fn string_detection() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [
-                "ruff/b.py"
-              ],
-              "ruff/b.py": [],
-              "ruff/c.py": []
-            }
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
     });
 
     insta::with_settings!({
@@ -319,7 +319,7 @@ fn globs() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -340,7 +340,7 @@ fn globs() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
@@ -368,7 +368,7 @@ fn exclude() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -381,7 +381,7 @@ fn exclude() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
@@ -421,7 +421,7 @@ fn wildcard() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -443,7 +443,7 @@ fn wildcard() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
@@ -639,7 +639,7 @@ fn venv() -> Result<()> {
     }, {
         assert_cmd_snapshot!(
             command().args(["--python", "none"]).arg("packages/albatross").current_dir(&root),
-            @r"
+            @"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -695,7 +695,7 @@ fn notebook_basic() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -708,7 +708,122 @@ fn notebook_basic() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
+    });
+
+    Ok(())
+}
+
+/// Test that the `src` configuration option is respected.
+///
+/// This is useful for monorepos where there are multiple source directories that need to be
+/// included in the module resolution search path.
+#[test]
+fn src_option() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // Create a lib directory with a package.
+    root.child("lib")
+        .child("mylib")
+        .child("__init__.py")
+        .write_str("def helper(): pass")?;
+
+    // Create an app directory with a file that imports from mylib.
+    root.child("app").child("__init__.py").write_str("")?;
+    root.child("app")
+        .child("main.py")
+        .write_str("from mylib import helper")?;
+
+    // Without src configured, the import from mylib won't resolve.
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("app").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "app/__init__.py": [],
+          "app/main.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    // With src = ["lib"], the import should resolve.
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        src = ["lib"]
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("app").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "app/__init__.py": [],
+          "app/main.py": [
+            "lib/mylib/__init__.py"
+          ]
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+/// Test that glob patterns in `src` are expanded.
+#[test]
+fn src_glob_expansion() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // Create multiple lib directories with packages.
+    root.child("libs")
+        .child("lib_a")
+        .child("pkg_a")
+        .child("__init__.py")
+        .write_str("def func_a(): pass")?;
+    root.child("libs")
+        .child("lib_b")
+        .child("pkg_b")
+        .child("__init__.py")
+        .write_str("def func_b(): pass")?;
+
+    // Create an app that imports from both packages.
+    root.child("app").child("__init__.py").write_str("")?;
+    root.child("app")
+        .child("main.py")
+        .write_str("from pkg_a import func_a\nfrom pkg_b import func_b")?;
+
+    // Use a glob pattern to include all lib directories.
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        src = ["libs/*"]
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("app").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "app/__init__.py": [],
+          "app/main.py": [
+            "libs/lib_a/pkg_a/__init__.py",
+            "libs/lib_b/pkg_b/__init__.py"
+          ]
+        }
+
+        ----- stderr -----
+        "#);
     });
 
     Ok(())
@@ -765,7 +880,7 @@ fn notebook_with_magic() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -778,7 +893,7 @@ fn notebook_with_magic() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())

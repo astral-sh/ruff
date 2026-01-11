@@ -43,6 +43,12 @@ use crate::{AlwaysFixableViolation, Fix};
 /// str(1)  # `"1"` with the import, `1` without
 /// ```
 ///
+/// ## Options
+///
+/// This rule will not trigger on imports required by the `isort` configuration.
+///
+/// - `lint.isort.required-imports`
+///
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[derive(ViolationMetadata)]

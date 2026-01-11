@@ -75,6 +75,7 @@ class CanIndex(Protocol[S]):
     def __getitem__(self, index: int, /) -> S: ...
 
 class ExplicitlyImplements[T](CanIndex[T]): ...
+class SubProtocol[T](CanIndex[T], Protocol): ...
 
 def takes_in_list[T](x: list[T]) -> list[T]:
     return x
@@ -96,6 +97,18 @@ def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def deep_subprotocol(x: SubProtocol[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deeper_subprotocol(x: SubProtocol[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def itself(x: CanIndex[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deep_itself(x: CanIndex[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def takes_in_type[T](x: type[T]) -> type[T]:
@@ -936,3 +949,29 @@ class Builder(Generic[TMsg]):
     def _handler(self, stream: Stream[Msg]) -> Stream[Msg]:
         return stream
 ```
+
+## Regressions
+
+### Only consider fully static types as pivots for transitivity
+
+This is a regression test for [ty#2371]. When working with constraint sets, we track transitive
+relationships between the constraints in the set. For instance, in `S ≤ int ∧ int ≤ T`, we can infer
+that `S ≤ T`. However, we should only consider fully static types when looking for a "pivot" for
+this kind of transitive relationship. The same pattern does not hold for `S ≤ Any ∧ Any ≤ T`;
+because the two `Any`s can materialize to different types, we cannot infer that `S ≤ T`.
+
+We have lower level tests of this in [`type_properties/implies_subtype_of.md`][implies_subtype_of].
+`functools.reduce` has a signature that exercises this behavior, as well, so we also include this
+regression test.
+
+```py
+from functools import reduce
+
+def _(keys: list[str]):
+    # TODO: revealed: int
+    # revealed: Unknown | Literal[0]
+    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+```
+
+[implies_subtype_of]: ../../type_properties/implies_subtype_of.md
+[ty#2371]: https://github.com/astral-sh/ty/issues/2371

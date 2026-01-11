@@ -1,6 +1,6 @@
 [package]
 name = "ruff_wasm"
-version = "0.14.10"
+version = "0.14.11"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -15,14 +15,11 @@ description = "WebAssembly bindings for Ruff"
 crate-type = ["cdylib", "rlib"]
 doctest = false
 
-[features]
-default = ["console_error_panic_hook"]
-
 [dependencies]
+ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_codegen = { workspace = true }
-ruff_formatter = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_index = { workspace = true }
 ruff_python_parser = { workspace = true }
@@ -33,19 +30,22 @@ ruff_workspace = { workspace = true }
 
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true }
-js-sys = { workspace = true }
-log = { workspace = true }
 # Not a direct dependency but required to enable the `wasm_js` feature.
 # See https://docs.rs/getrandom/latest/getrandom/#webassembly-support
 getrandom = { workspace = true, features = ["wasm_js"] }
+js-sys = { workspace = true }
+log = { workspace = true }
 serde = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
-wasm-bindgen = { workspace = true }
 # Not a direct dependency but required to compile for Wasm.
 uuid = { workspace = true, features = ["js"] }
+wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }
+
+[features]
+default = ["console_error_panic_hook"]
 
 [lints]
 workspace = true

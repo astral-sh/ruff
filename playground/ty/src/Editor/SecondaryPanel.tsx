@@ -75,7 +75,7 @@ function Content({
         }
 
         return (
-          <div className="flex-grow">
+          <div className="flex grow">
             <MonacoEditor
               options={{
                 readOnly: true,
@@ -93,7 +93,7 @@ function Content({
         );
       case "error":
         return (
-          <div className="flex-grow">
+          <div className="flex grow">
             <code className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
               {result.error}
             </code>

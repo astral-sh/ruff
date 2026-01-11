@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: dataclasses.md - Dataclasses - `dataclasses.KW_ONLY`
 mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses/dataclasses.md

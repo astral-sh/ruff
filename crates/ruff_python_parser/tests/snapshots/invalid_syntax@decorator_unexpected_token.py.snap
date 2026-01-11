@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/decorator_unexpected_token.py
 ---
 ## AST
 
@@ -10,6 +9,44 @@ Module(
         node_index: NodeIndex(None),
         range: 0..34,
         body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 0..4,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 0..4,
+                            node_index: NodeIndex(None),
+                            expression: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 1..4,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name(""),
+                        range: 4..4,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 4..4,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [],
+                },
+            ),
             With(
                 StmtWith {
                     node_index: NodeIndex(None),
@@ -44,6 +81,44 @@ Module(
                             },
                         ),
                     ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 23..27,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 23..27,
+                            node_index: NodeIndex(None),
+                            expression: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 24..27,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name(""),
+                        range: 27..27,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 27..27,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [],
                 },
             ),
             Assign(

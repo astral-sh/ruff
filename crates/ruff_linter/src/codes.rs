@@ -1060,6 +1060,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "064") => rules::ruff::rules::NonOctalPermissions,
         (Ruff, "065") => rules::ruff::rules::LoggingEagerConversion,
         (Ruff, "066") => rules::ruff::rules::PropertyWithoutReturn,
+        (Ruff, "067") => rules::ruff::rules::NonEmptyInitModule,
         (Ruff, "069") => rules::ruff::rules::DuplicateEntryInDunderAll,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
@@ -1124,6 +1125,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "002") => rules::airflow::rules::AirflowDagNoScheduleArgument,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
+        (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,
         (Airflow, "311") => rules::airflow::rules::Airflow3SuggestedUpdate,
         (Airflow, "312") => rules::airflow::rules::Airflow3SuggestedToMoveToProvider,
 

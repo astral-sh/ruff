@@ -471,9 +471,13 @@ class SSLSocket(socket.socket):
     """
 
     context: SSLContext
+    """The SSLContext that is currently in use."""
+
     server_side: bool
     server_hostname: str | None
     session: SSLSession | None
+    """The SSLSession for client socket."""
+
     @property
     def session_reused(self) -> bool | None:
         """Was the client session reused during handshake"""
@@ -637,6 +641,8 @@ class SSLContext(_SSLContext):
     post_handshake_auth: bool
     if sys.version_info >= (3, 10):
         security_level: int
+        """The current security level."""
+
     if sys.version_info >= (3, 10):
         @overload
         def __new__(cls, protocol: int, *args: Any, **kwargs: Any) -> Self: ...
@@ -774,6 +780,8 @@ class SSLObject:
     """
 
     context: SSLContext
+    """The SSLContext that is currently in use."""
+
     @property
     def server_side(self) -> bool:
         """Whether this is a server-side socket."""
@@ -784,6 +792,8 @@ class SSLObject:
         server hostname is set.
         """
     session: SSLSession | None
+    """The SSLSession for client socket."""
+
     @property
     def session_reused(self) -> bool:
         """Was the client session reused during handshake"""

@@ -14,8 +14,9 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
+use ty_module_resolver::SearchPaths;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{Db as SemanticDb, Program};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program};
 
 mod changes;
 
@@ -447,6 +448,13 @@ impl SalsaMemoryDump {
 }
 
 #[salsa::db]
+impl ty_module_resolver::Db for ProjectDatabase {
+    fn search_paths(&self) -> &SearchPaths {
+        Program::get(self).search_paths(self)
+    }
+}
+
+#[salsa::db]
 impl SemanticDb for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
         self.project
@@ -460,6 +468,10 @@ impl SemanticDb for ProjectDatabase {
 
     fn lint_registry(&self) -> &LintRegistry {
         ty_python_semantic::default_lint_registry()
+    }
+
+    fn analysis_settings(&self) -> &AnalysisSettings {
+        self.project().settings(self).analysis()
     }
 
     fn verbose(&self) -> bool {
@@ -523,9 +535,10 @@ pub(crate) mod tests {
     use ruff_db::files::{FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
+    use ty_module_resolver::SearchPathSettings;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+        AnalysisSettings, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
     };
 
     use crate::db::Db;
@@ -628,6 +641,13 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
+    impl ty_module_resolver::Db for TestDb {
+        fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
+            Program::get(self).search_paths(self)
+        }
+    }
+
+    #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
         fn should_check_file(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
@@ -639,6 +659,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             ty_python_semantic::default_lint_registry()
+        }
+
+        fn analysis_settings(&self) -> &AnalysisSettings {
+            self.project().settings(self).analysis()
         }
 
         fn verbose(&self) -> bool {

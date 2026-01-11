@@ -137,9 +137,17 @@ _OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
 @disjoint_base
 class Element(Generic[_Tag]):
     tag: _Tag
+    """A string identifying what kind of data this element represents"""
+
     attrib: dict[str, str]
+    """A dictionary containing the element's attributes"""
+
     text: str | None
+    """A string of text directly after the start tag, or None"""
+
     tail: str | None
+    """A string of text directly after the end tag, or None"""
+
     def __init__(self, tag: _Tag, attrib: dict[str, str] = {}, **extra: str) -> None: ...
     def append(self, subelement: Element[Any], /) -> None: ...
     def clear(self) -> None: ...

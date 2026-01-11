@@ -1639,4 +1639,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         }
         _ => {}
     }
+    if checker.is_rule_enabled(Rule::NonEmptyInitModule) {
+        ruff::rules::non_empty_init_module(checker, stmt);
+    }
 }

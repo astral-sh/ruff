@@ -68,7 +68,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .into_iter()
             .enumerate()
             .map(|(i, comp)| {
-                let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
+                let kind = comp.kind.map(ty_kind_to_lsp_kind);
                 let type_display = comp.ty.map(|ty| ty.display(db).to_string());
                 let import_edit = comp.import.as_ref().and_then(|edit| {
                     let range = edit
@@ -100,6 +100,23 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .unwrap_or_else(|| name);
                     (label, None)
                 };
+
+                let documentation = comp.documentation.map(|docstring| {
+                    let (kind, value) = if snapshot
+                        .resolved_client_capabilities()
+                        .prefers_markdown_in_completion()
+                    {
+                        (lsp_types::MarkupKind::Markdown, docstring.render_markdown())
+                    } else {
+                        (
+                            lsp_types::MarkupKind::PlainText,
+                            docstring.render_plaintext(),
+                        )
+                    };
+
+                    Documentation::MarkupContent(lsp_types::MarkupContent { kind, value })
+                });
+
                 CompletionItem {
                     label,
                     kind,
@@ -108,9 +125,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     label_details,
                     insert_text: comp.insert.map(String::from),
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
-                    documentation: comp
-                        .documentation
-                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
+                    documentation,
                     ..Default::default()
                 }
             })

@@ -10,6 +10,9 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         return Vec::new();
     }
 
+    let workspace_symbols_span = tracing::debug_span!("workspace_symbols");
+    let _span = workspace_symbols_span.enter();
+
     let project = db.project();
 
     let query = QueryPattern::fuzzy(query);
@@ -20,12 +23,16 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         let files = &files;
         let results = &results;
         let query = &query;
+        let workspace_symbols_span = &workspace_symbols_span;
 
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
             for file in files.iter() {
                 let db = db.dyn_clone();
                 s.spawn(move |_| {
+                    let symbols_for_file_span = tracing::debug_span!(parent: workspace_symbols_span, "symbols_for_file", ?file);
+                    let _entered = symbols_for_file_span.entered();
+
                     for (_, symbol) in symbols_for_file(&*db, *file).search(query) {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,
@@ -91,7 +98,7 @@ API_BASE_URL = 'https://api.example.com'
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("ufunc"), @r"
+        assert_snapshot!(test.workspace_symbols("ufunc"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:2:5
           |
@@ -103,7 +110,7 @@ API_BASE_URL = 'https://api.example.com'
         info: Function utility_function
         ");
 
-        assert_snapshot!(test.workspace_symbols("data"), @r"
+        assert_snapshot!(test.workspace_symbols("data"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> models.py:2:7
           |
@@ -115,7 +122,7 @@ API_BASE_URL = 'https://api.example.com'
         info: Class DataModel
         ");
 
-        assert_snapshot!(test.workspace_symbols("apibase"), @r"
+        assert_snapshot!(test.workspace_symbols("apibase"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> constants.py:2:1
           |
@@ -138,7 +145,7 @@ class Test:
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("from"), @r"
+        assert_snapshot!(test.workspace_symbols("from"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:3:9
           |
@@ -163,7 +170,7 @@ class Test:
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("from"), @r"
+        assert_snapshot!(test.workspace_symbols("from"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:4:9
           |
@@ -190,7 +197,7 @@ foo = 1
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("foo"), @r"
+        assert_snapshot!(test.workspace_symbols("foo"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:5:1
           |

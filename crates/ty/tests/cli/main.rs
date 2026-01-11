@@ -1,6 +1,8 @@
+mod analysis_options;
 mod config_option;
 mod exit_code;
 mod file_selection;
+mod fixes;
 mod python_environment;
 mod rule_selection;
 
@@ -20,17 +22,17 @@ fn test_quiet_output() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "x: int = 1")?;
 
     // By default, we emit an "all checks passed" message
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     // With `quiet`, the message is not displayed
-    assert_cmd_snapshot!(case.command().arg("--quiet"), @r"
+    assert_cmd_snapshot!(case.command().arg("--quiet"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -61,7 +63,7 @@ fn test_quiet_output() -> anyhow::Result<()> {
     "#);
 
     // With `quiet`, the diagnostic is not displayed, just the summary message
-    assert_cmd_snapshot!(case.command().arg("--quiet"), @r"
+    assert_cmd_snapshot!(case.command().arg("--quiet"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -71,7 +73,7 @@ fn test_quiet_output() -> anyhow::Result<()> {
     ");
 
     // We allow `-q`
-    assert_cmd_snapshot!(case.command().arg("-q"), @r"
+    assert_cmd_snapshot!(case.command().arg("-q"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -81,7 +83,7 @@ fn test_quiet_output() -> anyhow::Result<()> {
     ");
 
     // And repeated `-qq`
-    assert_cmd_snapshot!(case.command().arg("-qq"), @r"
+    assert_cmd_snapshot!(case.command().arg("-qq"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -95,7 +97,7 @@ fn test_quiet_output() -> anyhow::Result<()> {
 #[test]
 fn test_run_in_sub_directory() -> anyhow::Result<()> {
     let case = CliTest::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @r"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -116,7 +118,7 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
 #[test]
 fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
     let case = CliTest::with_files([(".test.py", "~")])?;
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -138,7 +140,7 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
 fn test_respect_ignore_files() -> anyhow::Result<()> {
     // First test that the default option works correctly (the file is skipped)
     let case = CliTest::with_files([(".ignore", "test.py"), ("test.py", "~")])?;
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -146,10 +148,10 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
 
     ----- stderr -----
     WARN No python files found under the given path(s)
-    "###);
+    ");
 
     // Test that we can set to false via CLI
-    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
+    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -167,7 +169,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
 
     // Test that we can set to false via config file
     case.write_file("ty.toml", "src.respect-ignore-files = false")?;
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -185,7 +187,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
 
     // Ensure CLI takes precedence
     case.write_file("ty.toml", "src.respect-ignore-files = true")?;
-    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
+    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -246,7 +248,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     ])?;
 
     // Make sure that the CLI fails when the `libs` directory is not in the search path.
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -267,16 +269,16 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -322,14 +324,14 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -366,7 +368,7 @@ fn user_configuration() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -393,7 +395,7 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     // The user-level configuration sets the severity for `unresolved-reference` to warn.
@@ -410,7 +412,7 @@ fn user_configuration() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
-        @r###"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -437,7 +439,7 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -470,7 +472,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command(),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -503,14 +505,14 @@ fn check_specific_paths() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     // Now check only the `tests` and `other.py` files.
     // We should no longer see any diagnostics related to `main.py`.
     assert_cmd_snapshot!(
         case.command().arg("project/tests").arg("project/other.py"),
-        @r###"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -543,7 +545,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -562,7 +564,7 @@ fn check_non_existing_path() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().arg("project/main.py").arg("project/tests"),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -586,7 +588,7 @@ fn check_file_without_extension() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().arg("main"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -613,7 +615,7 @@ fn check_file_without_extension_in_subfolder() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().arg("src"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -633,20 +635,20 @@ fn concise_diagnostics() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--output-format=concise").arg("--warn").arg("unresolved-reference"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise").arg("--warn").arg("unresolved-reference"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     test.py:2:7: warning[unresolved-reference] Name `x` used when not defined
-    test.py:3:7: error[non-subscriptable] Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    test.py:3:7: error[not-subscriptable] Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -657,7 +659,9 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
         "#,
     )?;
 
@@ -691,8 +695,8 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
         }
       },
       {
-        "check_name": "non-subscriptable",
-        "description": "non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method",
+        "check_name": "not-subscriptable",
+        "description": "not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method",
         "severity": "major",
         "fingerprint": "[FINGERPRINT]",
         "location": {
@@ -705,6 +709,25 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
             "end": {
               "line": 3,
               "column": 11
+            }
+          }
+        }
+      },
+      {
+        "check_name": "revealed-type",
+        "description": "revealed-type: Revealed type: `LiteralString`",
+        "severity": "info",
+        "fingerprint": "[FINGERPRINT]",
+        "location": {
+          "path": "test.py",
+          "positions": {
+            "begin": {
+              "line": 5,
+              "column": 13
+            },
+            "end": {
+              "line": 5,
+              "column": 26
             }
           }
         }
@@ -722,16 +745,19 @@ fn github_diagnostics() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--output-format=github").arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--output-format=github").arg("--warn").arg("unresolved-reference"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
-    ::error title=ty (non-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
     ----- stderr -----
     ");
@@ -759,7 +785,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -767,7 +793,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -787,7 +813,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
 
     let case = CliTest::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -803,7 +829,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }

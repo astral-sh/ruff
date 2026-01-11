@@ -22,23 +22,25 @@ export default function Playground() {
   const [theme, setTheme] = useTheme();
   const [version, setVersion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-
-  let workspacePromise = workspacePromiseRef.current;
-  if (workspacePromise == null) {
-    workspacePromiseRef.current = workspacePromise = startPlayground().then(
-      (fetched) => {
-        setVersion(fetched.version);
-        const workspace = new Workspace("/", PositionEncoding.Utf16, {});
-        restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
-        setWorkspace(workspace);
-        return workspace;
-      },
-    );
-  }
-
   const [files, dispatchFiles] = useReducer(filesReducer, INIT_FILES_STATE);
+
+  const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
+  if (workspacePromiseRef.current == null) {
+    workspacePromiseRef.current = startPlayground().then((fetched) => {
+      setVersion(fetched.version);
+      const workspace = new Workspace("/", PositionEncoding.Utf16, {});
+      restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
+      setWorkspace(workspace);
+      return workspace;
+    });
+  }
+  // This is safe as this is only called once on startup.
+  // We need useRef to avoid duplicate initialization when
+  // running locally due to react rendering
+  // everything twice in strict mode in debug builds.
+  // eslint-disable-next-line react-hooks/refs
+  const workspacePromise = workspacePromiseRef.current;
 
   const fileName = useMemo(() => {
     return (

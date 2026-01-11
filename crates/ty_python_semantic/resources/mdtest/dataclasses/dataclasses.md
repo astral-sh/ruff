@@ -583,7 +583,7 @@ from module import NotFrozenBase
 
 @final
 @dataclass(frozen=True)
-@total_ordering
+@total_ordering  # error: [invalid-total-ordering]
 class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
     y: str
 ```
@@ -1682,9 +1682,7 @@ def sequence4(cls: type) -> type:
 class Foo: ...
 
 ordered_foo = dataclass(order=True)(Foo)
-reveal_type(ordered_foo)  # revealed: type[Foo] & Any
-# TODO: should be `Foo & Any`
-reveal_type(ordered_foo())  # revealed: @Todo(Type::Intersection.call)
-# TODO: should be `Any`
-reveal_type(ordered_foo() < ordered_foo())  # revealed: @Todo(Type::Intersection.call)
+reveal_type(ordered_foo)  # revealed: <class 'Foo'>
+reveal_type(ordered_foo())  # revealed: Foo
+reveal_type(ordered_foo() < ordered_foo())  # revealed: bool
 ```

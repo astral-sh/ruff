@@ -5,20 +5,11 @@
 use std::hash::BuildHasherDefault;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
-use crate::suppression::{
-    IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_IGNORE_COMMENT,
-};
+use crate::suppression::{IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT};
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
-pub use module_name::{ModuleName, ModuleNameResolutionError};
-pub use module_resolver::{
-    KnownModule, Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules,
-    list_modules, resolve_module, resolve_module_confident, resolve_real_module,
-    resolve_real_module_confident, resolve_real_shadowable_module, system_module_search_paths,
-};
 pub use program::{
-    MisconfigurationMode, Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings,
+    Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
 };
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;
@@ -26,7 +17,8 @@ pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
-pub use suppression::create_suppression_fix;
+pub use suppression::{UNUSED_IGNORE_COMMENT, suppress_all, suppress_single};
+pub use ty_module_resolver::MisconfigurationMode;
 pub use types::DisplaySettings;
 pub use types::ide_support::{
     ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,
@@ -39,8 +31,6 @@ mod db;
 mod dunder_all;
 pub mod lint;
 pub(crate) mod list;
-mod module_name;
-mod module_resolver;
 mod node_key;
 pub(crate) mod place;
 mod program;
@@ -80,4 +70,24 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+pub struct AnalysisSettings {
+    /// Whether errors can be suppressed with `type: ignore` comments.
+    ///
+    /// If set to false, ty won't:
+    ///
+    /// * allow suppressing errors with `type: ignore` comments
+    /// * report unused `type: ignore` comments
+    /// * report invalid `type: ignore` comments
+    pub respect_type_ignore_comments: bool,
+}
+
+impl Default for AnalysisSettings {
+    fn default() -> Self {
+        Self {
+            respect_type_ignore_comments: true,
+        }
+    }
 }

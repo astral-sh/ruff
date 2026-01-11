@@ -15,7 +15,7 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
-use ty_project::metadata::options::{EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
@@ -67,6 +67,7 @@ fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
 }
 
+#[expect(clippy::needless_update)]
 fn setup_tomllib_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
@@ -84,6 +85,10 @@ fn setup_tomllib_case() -> Case {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
+        }),
+        analysis: Some(AnalysisOptions {
+            respect_type_ignore_comments: Some(false),
+            ..AnalysisOptions::default()
         }),
         ..Options::default()
     });
@@ -221,7 +226,7 @@ fn setup_micro_case(code: &str) -> Case {
     let file_path = "src/test.py";
     fs.write_file_all(
         SystemPathBuf::from(file_path),
-        ruff_python_trivia::textwrap::dedent(code),
+        &*ruff_python_trivia::textwrap::dedent(code),
     )
     .unwrap();
 
@@ -557,6 +562,60 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 48;
+
+    setup_rayon();
+
+    let mut code = "\
+from enum import Enum
+from typing_extensions import assert_never
+
+class E(Enum):
+"
+    .to_string();
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    m{i} = {i}").ok();
+    }
+
+    code.push_str(
+        "
+    def method(self):
+        match self:",
+    );
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        write!(
+            &mut code,
+            "
+            case E.m{i}:
+                pass"
+        )
+        .ok();
+    }
+
+    write!(
+        &mut code,
+        "
+            case _:
+                assert_never(self)"
+    )
+    .ok();
+
+    criterion.bench_function("ty_micro[many_enum_members_2]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -701,7 +760,7 @@ fn datetype(criterion: &mut Criterion) {
             max_dep_date: "2025-07-04",
             python_version: PythonVersion::PY313,
         },
-        2,
+        4,
     );
 
     bench_project(&benchmark, criterion);
@@ -717,6 +776,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
+    benchmark_many_enum_members_2,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

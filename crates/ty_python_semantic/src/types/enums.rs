@@ -3,11 +3,13 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     Db, FxIndexMap,
-    place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
+    place::{
+        DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
+    },
     semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
-        StringLiteralType, Type, TypeQualifiers,
+        Type, TypeQualifiers,
     },
 };
 
@@ -76,9 +78,10 @@ pub(crate) fn enum_metadata<'db>(
         let ignore_place = place_from_bindings(db, ignore_bindings).place;
 
         match ignore_place {
-            Place::Defined(Type::StringLiteral(ignored_names), _, _) => {
-                Some(ignored_names.value(db).split_ascii_whitespace().collect())
-            }
+            Place::Defined(DefinedPlace {
+                ty: Type::StringLiteral(ignored_names),
+                ..
+            }) => Some(ignored_names.value(db).split_ascii_whitespace().collect()),
             // TODO: support the list-variant of `_ignore_`.
             _ => None,
         }
@@ -113,7 +116,7 @@ pub(crate) fn enum_metadata<'db>(
                 Place::Undefined => {
                     return None;
                 }
-                Place::Defined(ty, _, _) => {
+                Place::Defined(DefinedPlace { ty, .. }) => {
                     let special_case = match ty {
                         Type::Callable(_) | Type::FunctionLiteral(_) => {
                             // Some types are specifically disallowed for enum members.
@@ -139,10 +142,7 @@ pub(crate) fn enum_metadata<'db>(
                                 let auto_value_ty = if Type::ClassLiteral(class)
                                     .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
                                 {
-                                    Type::StringLiteral(StringLiteralType::new(
-                                        db,
-                                        name.to_lowercase().as_str(),
-                                    ))
+                                    Type::string_literal(db, &name.to_lowercase())
                                 } else {
                                     let custom_mixins: smallvec::SmallVec<[Option<KnownClass>; 1]> =
                                         class
@@ -196,9 +196,13 @@ pub(crate) fn enum_metadata<'db>(
                             .place;
 
                         match dunder_get {
-                            Place::Undefined | Place::Defined(Type::Dynamic(_), _, _) => ty,
+                            Place::Undefined
+                            | Place::Defined(DefinedPlace {
+                                ty: Type::Dynamic(_),
+                                ..
+                            }) => ty,
 
-                            Place::Defined(_, _, _) => {
+                            Place::Defined(_) => {
                                 // Descriptors are not considered members.
                                 return None;
                             }
@@ -233,7 +237,11 @@ pub(crate) fn enum_metadata<'db>(
 
             match declared {
                 PlaceAndQualifiers {
-                    place: Place::Defined(Type::Dynamic(DynamicType::Unknown), _, _),
+                    place:
+                        Place::Defined(DefinedPlace {
+                            ty: Type::Dynamic(DynamicType::Unknown),
+                            ..
+                        }),
                     qualifiers,
                 } if qualifiers.contains(TypeQualifiers::FINAL) => {}
                 PlaceAndQualifiers {
@@ -243,7 +251,11 @@ pub(crate) fn enum_metadata<'db>(
                     // Undeclared attributes are considered members
                 }
                 PlaceAndQualifiers {
-                    place: Place::Defined(Type::NominalInstance(instance), _, _),
+                    place:
+                        Place::Defined(DefinedPlace {
+                            ty: Type::NominalInstance(instance),
+                            ..
+                        }),
                     ..
                 } if instance.has_known_class(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
@@ -318,34 +330,6 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
                     .ignore_possibly_undefined()
                     .unwrap_or(Type::unknown()),
             )
-        }
-        Type::Union(union) => {
-            // TODO: This is a hack. The proper fix is to avoid unioning Unknown from
-            // declarations into Place when we have concrete bindings.
-            //
-            // For now, we filter out Unknown and expect exactly one nonmember type
-            // to remain. If there are other non-Unknown types mixed in, we bail out.
-            let mut non_unknown = union.elements(db).iter().filter(|elem| !elem.is_unknown());
-
-            let first = non_unknown.next()?;
-
-            // Ensure there's exactly one non-Unknown element.
-            if non_unknown.next().is_some() {
-                return None;
-            }
-
-            if let Type::NominalInstance(instance) = first {
-                if instance.has_known_class(db, KnownClass::Nonmember) {
-                    return Some(
-                        first
-                            .member(db, "value")
-                            .place
-                            .ignore_possibly_undefined()
-                            .unwrap_or(Type::unknown()),
-                    );
-                }
-            }
-            None
         }
         _ => None,
     }

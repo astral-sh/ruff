@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: overloads.md - Overloads - Invalid - Inconsistent decorators - `@final`
 mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
