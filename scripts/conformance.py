@@ -1,7 +1,23 @@
+"""
+Run typing conformance tests and compare results between two ty versions.
+
+Examples:
+    # Compare two specific ty versions
+    %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
+
+    # Use local ty builds
+    %(prog)s --old-ty ./target/debug/ty-old --new-ty ./target/debug/ty-new
+
+    # Custom test directory
+    %(prog)s --target-path custom/tests --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
+
+    # Show all diagnostics (not just changed ones)
+    %(prog)s --all --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
+"""
+
 from __future__ import annotations
 
 import argparse
-import itertools as it
 import json
 import re
 import subprocess
@@ -9,6 +25,7 @@ import sys
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
 from functools import reduce
+from itertools import groupby
 from operator import attrgetter, or_
 from pathlib import Path
 from textwrap import dedent
@@ -30,25 +47,25 @@ class Classification(StrEnum):
     FALSE_NEGATIVE = auto()
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class Position:
     line: int
     column: int
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class Positions:
     begin: Position
     end: Position
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class Location:
     path: str
     positions: Positions
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class Diagnostic:
     check_name: str
     description: str
@@ -56,6 +73,13 @@ class Diagnostic:
     fingerprint: str | None
     location: Location
     source: Source
+
+    def __str__(self) -> str:
+        return (
+            f"{self.location.path}:{self.location.positions.begin.line}:"
+            f"{self.location.positions.begin.column}: "
+            f"{self.severity_for_display}[{self.check_name}] {self.description}"
+        )
 
     @classmethod
     def from_gitlab_output(
@@ -85,7 +109,7 @@ class Diagnostic:
         )
 
     @property
-    def key(self):
+    def key(self) -> str:
         """Key to group diagnostics by path and beginning line."""
         return f"{self.location.path}:{self.location.positions.begin.line}"
 
@@ -96,15 +120,8 @@ class Diagnostic:
             "minor": "warning",
         }.get(self.severity, "unknown")
 
-    def to_concise(self) -> str:
-        return (
-            f"{self.location.path}:{self.location.positions.begin.line}:"
-            f"{self.location.positions.begin.column}: "
-            f"{self.severity_for_display}[{self.check_name}] {self.description}"
-        )
 
-
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class GroupedDiagnostics:
     key: str
     sources: Source
@@ -133,41 +150,41 @@ class GroupedDiagnostics:
         match self.classification:
             case Classification.TRUE_POSITIVE | Classification.FALSE_POSITIVE:
                 assert self.new is not None
-                return f"+ {self.new.to_concise()}"
+                return f"+ {self.new}"
 
             case Classification.FALSE_NEGATIVE | Classification.TRUE_NEGATIVE:
                 if self.old is not None:
-                    return f"- {self.old.to_concise()}"
+                    return f"- {self.old}"
                 elif self.expected is not None:
-                    return f"- {self.expected.to_concise()}"
+                    return f"- {self.expected}"
                 else:
                     return ""
             case _:
                 raise ValueError(f"Unexpected classification: {self.classification}")
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class Statistics:
-    tp: int = 0
-    fp: int = 0
-    fn: int = 0
+    true_positives: int = 0
+    false_positives: int = 0
+    false_negatives: int = 0
 
     @property
     def precision(self) -> float:
-        if self.tp + self.fp > 0:
-            return self.tp / (self.tp + self.fp)
+        if self.true_positives + self.false_positives > 0:
+            return self.true_positives / (self.true_positives + self.false_positives)
         return 0.0
 
     @property
     def recall(self) -> float:
-        if self.tp + self.fn > 0:
-            return self.tp / (self.tp + self.fn)
+        if self.true_positives + self.false_negatives > 0:
+            return self.true_positives / (self.true_positives + self.false_negatives)
         else:
             return 0.0
 
     @property
     def total(self) -> int:
-        return self.tp + self.fp
+        return self.true_positives + self.false_positives
 
 
 def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
@@ -244,7 +261,7 @@ def group_diagnostics_by_key(
     sorted_diagnostics = sorted(diagnostics, key=attrgetter("key"))
 
     grouped = []
-    for key, group in it.groupby(sorted_diagnostics, key=attrgetter("key")):
+    for key, group in groupby(sorted_diagnostics, key=attrgetter("key")):
         group = list(group)
         sources: Source = reduce(or_, (diag.source for diag in group))
         grouped.append(
@@ -266,18 +283,22 @@ def compute_stats(
     grouped_diagnostics: list[GroupedDiagnostics], source: Source
 ) -> Statistics:
     if source == source.EXPECTED:
-        num_errors = len(
-            [g for g in grouped_diagnostics if source.EXPECTED in g.sources]  # ty:ignore[unsupported-operator]
+        # ty currently raises a false positive here due to incomplete enum.Flag support
+        # see https://github.com/astral-sh/ty/issues/876
+        num_errors = sum(
+            [1 for g in grouped_diagnostics if source.EXPECTED in g.sources]  # ty:ignore[unsupported-operator]
         )
-        return Statistics(tp=num_errors, fp=0, fn=0)
+        return Statistics(
+            true_positives=num_errors, false_positives=0, false_negatives=0
+        )
 
     def increment(statistics: Statistics, grouped: GroupedDiagnostics) -> Statistics:
         if (source in grouped.sources) and (Source.EXPECTED in grouped.sources):
-            statistics.tp += 1
+            statistics.true_positives += 1
         elif source in grouped.sources:
-            statistics.fp += 1
+            statistics.false_positives += 1
         else:
-            statistics.fn += 1
+            statistics.false_negatives += 1
         return statistics
 
     return reduce(increment, grouped_diagnostics, Statistics())
@@ -295,7 +316,7 @@ def render_grouped_diagnostics(
     )
 
     lines = []
-    for classification, group in it.groupby(
+    for classification, group in groupby(
         sorted_by_class, key=attrgetter("classification")
     ):
         group = list(group)
@@ -335,9 +356,9 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
         | Metric     | Old | New | Δ |
         |------------|-----|-----|---|
-        | True Positives | {old.tp} | {new.tp} | {old.tp - new.tp} |
-        | False Positives | {old.fp} | {new.fp} | {new.fp - old.fp} |
-        | False Negatives | {old.fn} | {new.fn} | {new.fn - old.fn} |
+        | True Positives | {old.true_positives} | {new.true_positives} | {old.true_positives - new.true_positives} |
+        | False Positives | {old.false_positives} | {new.false_positives} | {new.false_positives - old.false_positives} |
+        | False Negatives | {old.false_negatives} | {new.false_negatives} | {new.false_negatives - old.false_negatives} |
         | Precision  | {old.precision:.2} | {new.precision:.2} | {pct(precision_delta)} |
         | Recall     | {old.recall:.2} | {new.recall:.2} | {pct(recall_delta)} |
         | Total      | {old.total} | {new.total} | {new.total - old.total} |
@@ -347,7 +368,7 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
     summary = (
         f"Compared to the current merge base, this PR {trend(precision_delta)} precision "
-        f"and {trend(recall_delta)} recall (TP: {new.tp - old.tp}, FP: {new.fp - old.fp}, FN: {new.fn - old.fn}))."
+        f"and {trend(recall_delta)} recall (TP: {new.true_positives - old.true_positives}, FP: {new.false_positives - old.false_positives}, FN: {new.false_negatives - old.false_negatives}))."
     )
 
     return "\n".join([table, summary])
@@ -355,22 +376,8 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Run typing conformance tests and compare results between two ty versions",
+        description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=dedent("""
-            Examples:
-              # Compare two specific ty versions
-              %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
-
-              # Use local ty builds
-              %(prog)s --old-ty ./target/debug/ty-old --new-ty ./target/debug/ty-new
-
-              # Custom test directory
-              %(prog)s --target-path custom/tests --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
-
-              # Show all diagnostics (not just changed ones)
-              %(prog)s --all --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
-        """),
     )
 
     parser.add_argument(
