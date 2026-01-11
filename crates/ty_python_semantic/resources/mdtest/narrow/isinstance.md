@@ -556,3 +556,27 @@ def _(x: type[object], y: type[object], z: type[object]):
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
 ```
+
+## Narrowing with TypedDict unions
+
+Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
+during type ordering of normalized intersection types. Regression test for
+<https://github.com/astral-sh/ty/issues/2451>.
+
+```py
+from typing import Any, TypedDict, cast
+
+class A(TypedDict):
+    x: str
+
+class B(TypedDict):
+    y: str
+
+T = int | A | B
+
+def test(a: Any, items: list[T]) -> None:
+    combined = a or items
+    v = combined[0]
+    if isinstance(v, dict):
+        cast(T, v)  # no panic
+```
