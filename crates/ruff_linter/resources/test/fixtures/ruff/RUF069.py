@@ -18,7 +18,6 @@ __all__.extend(["A", "B"])
 # Bad
 __all__: list[str] = ["A", "B", "A"]
 __all__: typing.Any = ("A", "B", "B")
-__all__ = ["A", "A", "B"]
 __all__ = ["A", "B", "A"]
 __all__ = ["A", "A", "B", "B"]
 __all__ += ["B", "B"]

@@ -1,11 +1,12 @@
+use ruff_diagnostics::{Applicability, Fix};
+use ruff_text_size::Ranged;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -132,33 +133,28 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
     let mut deduplicated_elts = FxHashSet::with_capacity_and_hasher(elts.len(), FxBuildHasher);
     let source = checker.locator().contents();
 
-    for expr in elts {
+    for (index, expr) in elts.iter().enumerate() {
         let Some(string_value) = expr.as_string_literal_expr() else {
-            // If any elt we encounter is not an ExprStringLiteral AST value, that indicates at least
-            // one item in the sequence is not a string literal, which means the sequence is out of
-            // scope for RUF069.
-            return;
+            // In the example below we're ignoring `foo`:
+            // __all__ = [foo, "bar", "bar"]
+            continue;
         };
 
         if !deduplicated_elts.insert(string_value.value.to_str()) {
             let range = expr.range();
             let mut diagnostic = checker.report_diagnostic(DuplicateEntryInDunderAll, range);
 
-            let leading_len: TextSize = source[..range.start().to_usize()]
-                .chars()
-                .rev()
-                .take_while(|c| c.is_whitespace() || *c == ',')
-                .map(TextLen::text_len)
-                .sum();
+            match edits::remove_member(elts, index, source) {
+                Ok(edit) => {
+                    let applicability = if checker.comment_ranges().intersects(edit.range()) {
+                        Applicability::Unsafe
+                    } else {
+                        Applicability::Safe
+                    };
 
-            let fix_range = TextRange::new(range.start() - leading_len, range.end());
-
-            let edit = Edit::range_deletion(fix_range);
-
-            if checker.comment_ranges().intersects(fix_range) {
-                diagnostic.set_fix(Fix::unsafe_edit(edit));
-            } else {
-                diagnostic.set_fix(Fix::safe_edit(edit));
+                    diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
+                }
+                Err(err) => log::debug!("Failed to create fix for {}: {}", diagnostic.name(), err),
             }
         }
     }
