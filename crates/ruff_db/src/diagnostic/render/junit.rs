@@ -49,7 +49,6 @@ impl<'a> JunitRenderer<'a> {
                     .extra
                     .insert(XmlString::new("package"), XmlString::new("org.ruff"));
 
-                let indent = " ".repeat(4 * 4);
                 for diagnostic in diagnostics {
                     let DiagnosticWithLocation {
                         diagnostic,
@@ -67,27 +66,25 @@ impl<'a> JunitRenderer<'a> {
                     let msg = diagnostic.concise_message().to_str();
                     case.status.set_message(msg.clone());
 
-                    let mut diagnostic_loc = String::new();
-                    if let Some(location) = location {
-                        case.extra.insert(
-                            XmlString::new("line"),
-                            XmlString::new(location.line.to_string()),
-                        );
-                        case.extra.insert(
-                            XmlString::new("column"),
-                            XmlString::new(location.column.to_string()),
-                        );
-                        diagnostic_loc = format!(
-                            "line {row}, col {col}, ",
-                            row = location.line,
-                            col = location.column,
-                        );
-                    }
+                    let loc = location
+                        .and_then(|location| {
+                            case.extra.insert(
+                                XmlString::new("line"),
+                                XmlString::new(location.line.to_string()),
+                            );
+                            case.extra.insert(
+                                XmlString::new("column"),
+                                XmlString::new(location.column.to_string()),
+                            );
+                            Some(format!(
+                                "line {row}, col {col}, ",
+                                row = location.line,
+                                col = location.column,
+                            ))
+                        })
+                        .unwrap_or_default();
 
-                    case.status.set_description(format!(
-                        "\n{indent}{diagnostic_loc}{msg}\n{after_indent}",
-                        after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
-                    ));
+                    case.status.set_description(format!("{loc}{msg}"));
                     test_suite.add_test_case(case);
                 }
                 report.add_test_suite(test_suite);
