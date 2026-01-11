@@ -8059,6 +8059,17 @@ def f(x: Intersection[int, Any] | str):
         );
     }
 
+    #[test]
+    fn dunder_file_completion() {
+        let builder = completion_test_builder("__fil<CURSOR>");
+
+        // __file__ should be `str` when accessed within a module, not `str | None`
+        assert_snapshot!(
+            builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
+            @"__file__ :: str",
+        );
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///
