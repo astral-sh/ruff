@@ -678,6 +678,10 @@ fn check_tuple_subclass_member<'db>(
     if member.name.as_str() == "__bool__" {
         let return_type = subclass_function.last_definition_signature(db).return_ty;
 
+        if return_type.is_unknown() {
+            return;
+        }
+
         let return_type_truthiness = return_type.bool(db);
 
         match (tuple.truthiness(), return_type_truthiness) {
