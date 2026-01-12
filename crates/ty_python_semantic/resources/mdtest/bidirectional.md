@@ -324,6 +324,30 @@ def _(x: X | dict[Bar, Bar]):
     x[{"baz": 1}] = {"baz": 2}
 ```
 
+Similarly, the value type for augmented assignment dunder calls is inferred with type context:
+
+```py
+from typing import TypedDict
+
+class Bar(TypedDict):
+    bar: int
+
+def _(bar: Bar):
+    bar |= reveal_type({"bar": 1})  # revealed: Bar
+
+class Bar2(TypedDict):
+    bar: int
+
+class X:
+    def __ior__(self, other: Bar2): ...
+
+def _(x: X):
+    x |= reveal_type({"bar": 1})  # revealed: Bar2
+
+def _(x: X | Bar):
+    x |= {"bar": 1}
+```
+
 ## Multi-inference diagnostics
 
 ```toml
@@ -336,6 +360,8 @@ Diagnostics unrelated to the type-context are only reported once:
 `call.py`:
 
 ```py
+from typing import TypedDict
+
 def f[T](x: T) -> list[T]:
     return [x]
 
@@ -357,6 +383,22 @@ def _(x: int):
 
     # error: [possibly-unresolved-reference] "Name `z` used when possibly not defined"
     y(f(True), [z])
+
+class Bar(TypedDict):
+    bar: int
+
+class Bar2(TypedDict):
+    bar: int
+
+class Bar3(TypedDict):
+    bar: int
+
+def _(flag: bool, bar: Bar | Bar2 | Bar3):
+    if flag:
+        y = 1
+
+    # error: [possibly-unresolved-reference]
+    bar |= {"bar": y}
 ```
 
 `call_standalone_expression.py`:

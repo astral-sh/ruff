@@ -6563,7 +6563,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         assignment: &ast::StmtAugAssign,
         target_type: Type<'db>,
-        value_type: Type<'db>,
+        value_expr: &ast::Expr,
+        infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> Type<'db> {
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
@@ -6571,43 +6572,86 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         // Fall back to non-augmented binary operator inference.
-        let mut binary_return_ty = || {
-            self.infer_binary_expression_type(assignment.into(), false, target_type, value_type, op)
+        let binary_return_ty = |builder: &mut Self, value_ty| {
+            builder
+                .infer_binary_expression_type(assignment.into(), false, target_type, value_ty, op)
                 .unwrap_or_else(|| {
                     report_unsupported_augmented_assignment(
-                        &self.context,
+                        &builder.context,
                         assignment,
                         target_type,
-                        value_type,
+                        value_ty,
                     );
                     Type::unknown()
                 })
         };
 
         match target_type {
-            Type::Union(union) => union.map(db, |&elem_type| {
-                self.infer_augmented_op(assignment, elem_type, value_type)
-            }),
+            Type::Union(union) => {
+                // The first time we infer an argument during multi-inference must be without type context,
+                // to avoid leaking diagnostics for bidirectional inference attempts.
+                let old_multi_inference_state =
+                    self.set_multi_inference_state(MultiInferenceState::Ignore);
+                infer_value_ty(self, TypeContext::default());
+                self.set_multi_inference_state(old_multi_inference_state);
+
+                let infer_value_ty = &mut |builder: &mut Self, tcx| {
+                    // Disable diagnostics for subsequent multi-inference attempts.
+                    let was_in_multi_inference = builder.context.set_multi_inference(true);
+
+                    // We may infer the value multiple times with distinct type context, and so take
+                    // the intersection of every inferred type.
+                    let old_multi_inference_state =
+                        builder.set_multi_inference_state(MultiInferenceState::Intersect);
+
+                    let inferred_ty = infer_value_ty(builder, tcx);
+
+                    // Restore the multi-inference state.
+                    builder.context.set_multi_inference(was_in_multi_inference);
+                    builder.set_multi_inference_state(old_multi_inference_state);
+
+                    inferred_ty
+                };
+
+                union.map(db, |&elem_type| {
+                    self.infer_augmented_op(assignment, elem_type, value_expr, infer_value_ty)
+                })
+            }
+
             _ => {
-                let call = target_type.try_call_dunder(
+                let ast_arguments = [ArgOrKeyword::Arg(value_expr)];
+                let mut call_arguments = CallArguments::positional([Type::unknown()]);
+
+                let call = self.infer_and_try_call_dunder(
                     db,
+                    target_type,
                     op.in_place_dunder(),
-                    CallArguments::positional([value_type]),
+                    ArgumentsIter::synthesized(&ast_arguments),
+                    &mut call_arguments,
+                    &mut |builder, (_, _, tcx)| infer_value_ty(builder, tcx),
                     TypeContext::default(),
                 );
 
+                let [Some(value_ty)] = call_arguments.types() else {
+                    unreachable!();
+                };
+
                 match call {
                     Ok(outcome) => outcome.return_type(db),
-                    Err(CallDunderError::MethodNotAvailable) => binary_return_ty(),
-                    Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                        UnionType::from_elements(db, [outcome.return_type(db), binary_return_ty()])
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        let value_ty = infer_value_ty(self, TypeContext::default());
+                        binary_return_ty(self, value_ty)
                     }
+                    Err(CallDunderError::PossiblyUnbound(outcome)) => UnionType::from_elements(
+                        db,
+                        [outcome.return_type(db), binary_return_ty(self, *value_ty)],
+                    ),
                     Err(CallDunderError::CallError(_, bindings)) => {
                         report_unsupported_augmented_assignment(
                             &self.context,
                             assignment,
                             target_type,
-                            value_type,
+                            *value_ty,
                         );
                         bindings.return_type(db)
                     }
@@ -6654,9 +6698,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => self.infer_expression(target, TypeContext::default()),
         };
-        let value_type = self.infer_expression(value, TypeContext::default());
 
-        self.infer_augmented_op(assignment, target_type, value_type)
+        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+            builder.infer_expression(value, tcx)
+        })
     }
 
     fn infer_type_alias_statement(&mut self, node: &ast::StmtTypeAlias) {
@@ -7823,6 +7868,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let specialization = builder.build(generic_context);
 
                     parameter_type = parameter_type.apply_specialization(db, specialization);
+                }
+
+                // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
+                // use the upper bound as type context.
+                if let Type::TypeVar(typevar) = parameter_type
+                    && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                        typevar.typevar(db).bound_or_constraints(db)
+                {
+                    return Some(bound);
                 }
 
                 // TODO: For now, skip any parameter annotations that still mention any typevars. There
