@@ -2,13 +2,13 @@ use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArguments, CallDunderError, ClassBase, ClassLiteral, KnownClass,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, KnownClass, StaticClassLiteral,
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
@@ -113,6 +113,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_BASE);
+    registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
@@ -120,10 +121,12 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
+    registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
+    registry.register_lint(&INVALID_TOTAL_ORDERING);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -836,6 +839,40 @@ declare_lint! {
         summary: "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
         status: LintStatus::stable("0.0.1-alpha.7"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for dynamic class definitions (using `type()`) that have bases
+    /// which are unsupported by ty.
+    ///
+    /// This is equivalent to [`unsupported-base`] but applies to classes created
+    /// via `type()` rather than `class` statements.
+    ///
+    /// ## Why is this bad?
+    /// If a dynamically created class has a base that is an unsupported type
+    /// such as `type[T]`, ty will not be able to resolve the
+    /// [method resolution order] (MRO) for the class. This may lead to an inferior
+    /// understanding of your codebase and unpredictable type-checking behavior.
+    ///
+    /// ## Default level
+    /// This rule is disabled by default because it will not cause a runtime error,
+    /// and may be noisy on codebases that use `type()` in highly dynamic ways.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def factory(base: type[Base]) -> type:
+    ///     # `base` has type `type[Base]`, not `type[Base]` itself
+    ///     return type("Dynamic", (base,), {})  # error: [unsupported-dynamic-base]
+    /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    /// [`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base
+    pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
+        summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -2169,6 +2206,31 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Detects statements other than annotated declarations in `TypedDict` class bodies.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` class bodies aren't allowed to contain any other types of statements. For
+    /// example, method definitions and field values aren't allowed. None of these will be
+    /// available on "instances of the `TypedDict`" at runtime (as `dict` is the runtime class of
+    /// all "`TypedDict` instances").
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Foo(TypedDict):
+    ///     def bar(self):  # error: [invalid-typed-dict-statement]
+    ///         pass
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
+        summary: "detects invalid statements in `TypedDict` class bodies",
+        status: LintStatus::stable("0.0.9"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
     ///
     /// The LSP states that an instance of a subtype should be substitutable for an instance of its supertype.
@@ -2299,6 +2361,46 @@ declare_lint! {
     pub(crate) static INVALID_FROZEN_DATACLASS_SUBCLASS = {
         summary: "detects dataclasses with invalid frozen/non-frozen subclassing",
         status: LintStatus::stable("0.0.1-alpha.35"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for classes decorated with `@functools.total_ordering` that don't
+    /// define any ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`).
+    ///
+    /// ## Why is this bad?
+    /// The `@total_ordering` decorator requires the class to define at least one
+    /// ordering method. If none is defined, Python raises a `ValueError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from functools import total_ordering
+    ///
+    /// @total_ordering
+    /// class MyClass:  # Error: no ordering method defined
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```python
+    /// from functools import total_ordering
+    ///
+    /// @total_ordering
+    /// class MyClass:
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    ///
+    ///     def __lt__(self, other: "MyClass") -> bool:
+    ///         return True
+    /// ```
+    pub(crate) static INVALID_TOTAL_ORDERING = {
+        summary: "detects `@total_ordering` classes without an ordering method",
+        status: LintStatus::stable("0.0.10"),
         default_level: Level::Error,
     }
 }
@@ -2733,12 +2835,12 @@ pub(super) fn report_implicit_return_type(
             "Only classes that directly inherit from `typing.Protocol` \
             or `typing_extensions.Protocol` are considered protocol classes",
         );
-        sub_diagnostic.annotate(
-            Annotation::primary(class.header_span(db)).message(format_args!(
+        sub_diagnostic.annotate(Annotation::primary(class.definition_span(db)).message(
+            format_args!(
                 "`Protocol` not present in `{class}`'s immediate bases",
                 class = class.name(db)
-            )),
-        );
+            ),
+        ));
         diagnostic.sub(sub_diagnostic);
 
         diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
@@ -2907,7 +3009,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
 
 pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
-    class: ClassLiteral,
+    class: StaticClassLiteral,
     node: &ast::StmtClassDef,
     disjoint_bases: &IncompatibleBases,
 ) {
@@ -2942,7 +3044,7 @@ pub(crate) fn report_instance_layout_conflict(
 
         let span = context.span(&node.bases()[*node_index]);
         let mut annotation = Annotation::secondary(span.clone());
-        if disjoint_base.class == *originating_base {
+        if originating_base.as_static() == Some(disjoint_base.class) {
             match disjoint_base.kind {
                 DisjointBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
@@ -2991,6 +3093,32 @@ pub(crate) fn report_instance_layout_conflict(
     }
 
     diagnostic.sub(subdiagnostic);
+}
+
+/// Emit a diagnostic for a metaclass conflict where both conflicting metaclasses
+/// are inherited from base classes.
+pub(super) fn report_conflicting_metaclass_from_bases(
+    context: &InferContext,
+    node: AnyNodeRef,
+    class_name: &str,
+    metaclass1: ClassType,
+    base1: impl std::fmt::Display,
+    metaclass2: ClassType,
+    base2: impl std::fmt::Display,
+) {
+    let Some(builder) = context.report_lint(&CONFLICTING_METACLASS, node) else {
+        return;
+    };
+    let db = context.db();
+    builder.into_diagnostic(format_args!(
+        "The metaclass of a derived class (`{class_name}`) \
+            must be a subclass of the metaclasses of all its bases, \
+            but `{metaclass1}` (metaclass of base class `{base1}`) \
+            and `{metaclass2}` (metaclass of base class `{base2}`) \
+            have no subclass relationship",
+        metaclass1 = metaclass1.name(db),
+        metaclass2 = metaclass2.name(db),
+    ));
 }
 
 /// Information regarding the conflicting disjoint bases a class is inferred to have in its MRO.
@@ -3165,9 +3293,9 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
                 class.name(db)
             ),
         );
-        class_def_diagnostic.annotate(Annotation::primary(
-            class.class_literal(db).0.header_span(db),
-        ));
+        if let Some((class_literal, _)) = class.static_class_literal(db) {
+            class_def_diagnostic.annotate(Annotation::primary(class_literal.header_span(db)));
+        }
         diagnostic.sub(class_def_diagnostic);
     }
 
@@ -3226,7 +3354,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
         ),
     );
     class_def_diagnostic.annotate(
-        Annotation::primary(protocol.header_span(db))
+        Annotation::primary(protocol.definition_span(db))
             .message(format_args!("`{class_name}` declared here")),
     );
     diagnostic.sub(class_def_diagnostic);
@@ -3257,7 +3385,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
         format_args!("Protocol classes cannot be instantiated"),
     );
     class_def_diagnostic.annotate(
-        Annotation::primary(protocol.header_span(db))
+        Annotation::primary(protocol.definition_span(db))
             .message(format_args!("`{class_name}` declared as a protocol here")),
     );
     diagnostic.sub(class_def_diagnostic);
@@ -3345,7 +3473,7 @@ pub(crate) fn report_undeclared_protocol_member(
     leads to an ambiguous interface",
     );
     class_def_diagnostic.annotate(
-        Annotation::primary(protocol_class.header_span(db))
+        Annotation::primary(protocol_class.definition_span(db))
             .message(format_args!("`{class_name}` declared as a protocol here",)),
     );
     diagnostic.sub(class_def_diagnostic);
@@ -3358,7 +3486,7 @@ pub(crate) fn report_undeclared_protocol_member(
 
 pub(crate) fn report_duplicate_bases(
     context: &InferContext,
-    class: ClassLiteral,
+    class: StaticClassLiteral,
     duplicate_base_error: &DuplicateBaseError,
     bases_list: &[ast::Expr],
 ) {
@@ -3405,7 +3533,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
     context: &InferContext,
     base_node: &ast::Expr,
     base_type: Type,
-    class: ClassLiteral,
+    class: StaticClassLiteral,
 ) {
     let db = context.db();
     let instance_of_type = KnownClass::Type.to_instance(db);
@@ -3515,7 +3643,7 @@ fn report_unsupported_base(
     context: &InferContext,
     base_node: &ast::Expr,
     base_type: Type,
-    class: ClassLiteral,
+    class: StaticClassLiteral,
 ) {
     let Some(builder) = context.report_lint(&UNSUPPORTED_BASE, base_node) else {
         return;
@@ -3538,7 +3666,7 @@ fn report_invalid_base<'ctx, 'db>(
     context: &'ctx InferContext<'db, '_>,
     base_node: &ast::Expr,
     base_type: Type<'db>,
-    class: ClassLiteral<'db>,
+    class: StaticClassLiteral<'db>,
 ) -> Option<LintDiagnosticGuard<'ctx, 'db>> {
     let builder = context.report_lint(&INVALID_BASE, base_node)?;
     let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -3634,7 +3762,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
 pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
     context: &InferContext<'db, '_>,
-    class: ClassLiteral<'db>,
+    class: StaticClassLiteral<'db>,
     (field, field_def): (&str, Option<Definition<'db>>),
     (field_with_default, field_with_default_def): &(Name, Option<Definition<'db>>),
 ) {
@@ -3683,7 +3811,7 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
 
 pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
     context: &InferContext<'db, '_>,
-    class: ClassLiteral<'db>,
+    class: StaticClassLiteral<'db>,
     field_name: &str,
     field_definition: Option<Definition<'db>>,
 ) {
@@ -3807,7 +3935,7 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
 
 pub(crate) fn report_invalid_type_param_order<'db>(
     context: &InferContext<'db, '_>,
-    class: ClassLiteral<'db>,
+    class: StaticClassLiteral<'db>,
     node: &ast::StmtClassDef,
     typevar_with_default: TypeVarInstance<'db>,
     invalid_later_typevars: &[TypeVarInstance<'db>],
@@ -3892,7 +4020,7 @@ pub(crate) fn report_invalid_type_param_order<'db>(
 pub(crate) fn report_rebound_typevar<'db>(
     context: &InferContext<'db, '_>,
     typevar_name: &ast::name::Name,
-    class: ClassLiteral<'db>,
+    class: StaticClassLiteral<'db>,
     class_node: &ast::StmtClassDef,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
@@ -3967,10 +4095,8 @@ pub(super) fn report_invalid_method_override<'db>(
     let superclass_name = superclass.name(db);
 
     let overridden_method = if class_name == superclass_name {
-        format!(
-            "{superclass}.{member}",
-            superclass = superclass.qualified_name(db),
-        )
+        let qualified_name = superclass.qualified_name(db);
+        format!("{qualified_name}.{member}")
     } else {
         format!("{superclass_name}.{member}")
     };
@@ -3991,10 +4117,14 @@ pub(super) fn report_invalid_method_override<'db>(
             .place
     };
 
-    if let Place::Defined(Type::FunctionLiteral(subclass_function), _, _, _) =
-        class_member(subclass)
-        && let Place::Defined(Type::FunctionLiteral(superclass_function), _, _, _) =
-            class_member(superclass)
+    if let Place::Defined(DefinedPlace {
+        ty: Type::FunctionLiteral(subclass_function),
+        ..
+    }) = class_member(subclass)
+        && let Place::Defined(DefinedPlace {
+            ty: Type::FunctionLiteral(superclass_function),
+            ..
+        }) = class_member(superclass)
         && let Ok(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)
         && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)
@@ -4019,7 +4149,10 @@ pub(super) fn report_invalid_method_override<'db>(
         );
     }
 
-    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+    let Some((superclass_literal, _)) = superclass.static_class_literal(db) else {
+        return;
+    };
+    let superclass_scope = superclass_literal.body_scope(db);
 
     match superclass_method_kind {
         MethodKind::NotSynthesized => {
@@ -4086,7 +4219,7 @@ pub(super) fn report_invalid_method_override<'db>(
             };
 
             sub.annotate(
-                Annotation::primary(superclass.header_span(db))
+                Annotation::primary(superclass.definition_span(db))
                     .message(format_args!("Definition of `{superclass_name}`")),
             );
             diagnostic.sub(sub);
@@ -4206,9 +4339,10 @@ pub(super) fn report_overridden_final_method<'db>(
     // but you'd want to delete the `@my_property.deleter` as well as the getter and the deleter,
     // and we don't model property deleters at all right now.
     if let Type::FunctionLiteral(function) = subclass_type {
-        let class_node = subclass
-            .class_literal(db)
-            .0
+        let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {
+            return;
+        };
+        let class_node = subclass_literal
             .body_scope(db)
             .node(db)
             .expect_class()
@@ -4506,9 +4640,9 @@ fn report_unsupported_binary_operation_impl<'a>(
 
 pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     context: &InferContext<'db, '_>,
-    class: ClassLiteral<'db>,
+    class: StaticClassLiteral<'db>,
     class_node: &ast::StmtClassDef,
-    base_class: ClassLiteral<'db>,
+    base_class: StaticClassLiteral<'db>,
     base_class_node: &ast::Expr,
     base_class_params: DataclassFlags,
 ) {
@@ -4590,6 +4724,50 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
 
         diagnostic.sub(sub);
     }
+}
+
+pub(super) fn report_invalid_total_ordering(
+    context: &InferContext<'_, '_>,
+    class: ClassLiteral<'_>,
+    decorator: &ast::Decorator,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_TOTAL_ORDERING, decorator) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "Class decorated with `@total_ordering` must define at least one ordering method",
+    );
+    diagnostic.set_primary_message(format_args!(
+        "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+        class.name(db)
+    ));
+    diagnostic.info("The decorator will raise `ValueError` at runtime");
+}
+
+/// Reports an invalid `total_ordering(cls)` function call where the class
+/// does not define any ordering method.
+pub(super) fn report_invalid_total_ordering_call(
+    context: &InferContext<'_, '_>,
+    class: ClassLiteral<'_>,
+    call_expression: &ast::ExprCall,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_TOTAL_ORDERING, call_expression) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "`@functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined",
+    );
+    diagnostic.set_primary_message(format_args!(
+        "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+        class.name(db)
+    ));
+    diagnostic.info("The function will raise `ValueError` at runtime");
 }
 
 /// This function receives an unresolved `from foo import bar` import,

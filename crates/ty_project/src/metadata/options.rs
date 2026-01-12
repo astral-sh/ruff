@@ -850,7 +850,6 @@ impl SrcOptions {
 )]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
-    #[get_size(ignore)] // TODO: Add `GetSize` support for `OrderMap`.
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
@@ -1293,7 +1292,7 @@ pub struct AnalysisOptions {
         respect-type-ignore-comments = false
         "#
     )]
-    respect_type_ignore_comments: Option<bool>,
+    pub respect_type_ignore_comments: Option<bool>,
 }
 
 impl AnalysisOptions {

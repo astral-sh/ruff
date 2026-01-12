@@ -3094,18 +3094,29 @@ impl<'db> SequentMap<'db> {
 
             // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
             (constrained_lower, constrained_upper)
-                if constrained_upper == bound_constraint.lower(db)
-                    && !constrained_upper.is_never()
-                    && !constrained_upper.is_object() =>
+                if !constrained_upper.is_never()
+                    && !constrained_upper.is_object()
+                    && constrained_upper
+                        .top_materialization(db)
+                        .is_constraint_set_assignable_to(
+                            db,
+                            bound_constraint.lower(db).bottom_materialization(db),
+                        ) =>
             {
                 (constrained_lower, Type::TypeVar(bound_typevar))
             }
 
             // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
             (constrained_lower, constrained_upper)
-                if constrained_lower == bound_constraint.upper(db)
-                    && !constrained_lower.is_never()
-                    && !constrained_lower.is_object() =>
+                if !constrained_lower.is_never()
+                    && !constrained_lower.is_object()
+                    && bound_constraint
+                        .upper(db)
+                        .top_materialization(db)
+                        .is_constraint_set_assignable_to(
+                            db,
+                            constrained_lower.bottom_materialization(db),
+                        ) =>
             {
                 (Type::TypeVar(bound_typevar), constrained_upper)
             }
@@ -3961,6 +3972,7 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+    use ruff_python_ast::name::Name;
 
     #[test]
     fn test_display_graph_output() {
@@ -3994,8 +4006,10 @@ mod tests {
         .trim_end();
 
         let db = setup_db();
-        let t = BoundTypeVarInstance::synthetic(&db, "T", TypeVarVariance::Invariant);
-        let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
         let t_str = ConstraintSet::range(&db, str_type, t, str_type);

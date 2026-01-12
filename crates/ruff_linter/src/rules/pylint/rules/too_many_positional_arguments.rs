@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, identifier::Identifier};
+use ruff_python_semantic::analyze::function_type::is_subject_to_liskov_substitution_principle;
 use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::Violation;
@@ -125,11 +126,24 @@ pub(crate) fn too_many_positional_arguments(
         return;
     }
 
-    checker.report_diagnostic(
+    let mut diagnostic = checker.report_diagnostic(
         TooManyPositionalArguments {
             c_pos: num_positional_args,
             max_pos: checker.settings().pylint.max_positional_args,
         },
         function_def.identifier(),
     );
+    if is_subject_to_liskov_substitution_principle(
+        &function_def.name,
+        &function_def.decorator_list,
+        semantic.current_scope(),
+        semantic,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
+    ) {
+        diagnostic.help(
+            "Consider adding `@typing.override` if changing the function signature \
+            would violate the Liskov Substitution Principle",
+        );
+    }
 }

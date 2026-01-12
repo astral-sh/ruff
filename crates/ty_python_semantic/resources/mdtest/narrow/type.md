@@ -134,12 +134,17 @@ class IsEqualToEverything(type):
 class A(metaclass=IsEqualToEverything): ...
 class B(metaclass=IsEqualToEverything): ...
 
-def _(x: A | B):
+def _(x: A | B, y: object):
     if type(x) == A:
         reveal_type(x)  # revealed: A | B
 
     if type(x) != A:
         reveal_type(x)  # revealed: A | B
+
+    if type(y) == bool:
+        reveal_type(y)  # revealed: object
+    else:
+        reveal_type(y)  # revealed: object
 ```
 
 ## No narrowing for custom `type` callable
@@ -160,13 +165,14 @@ def _(x: A | B):
 
 ## No narrowing for multiple arguments
 
-No narrowing should occur if `type` is used to dynamically create a class:
+Narrowing does not occur in the same way if `type` is used to dynamically create a class:
 
 ```py
 def _(x: str | int):
-    # The following diagnostic is valid, since the three-argument form of `type`
-    # can only be called with `str` as the first argument.
-    # error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `str | int`"
+    # Inline type() calls fall back to regular type overload matching.
+    # TODO: Once inline type() calls synthesize class types, this should narrow x to Never.
+    #
+    # error: 13 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `str | int`"
     if type(x, (), {}) is str:
         reveal_type(x)  # revealed: str | int
     else:

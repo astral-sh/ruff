@@ -386,7 +386,7 @@ mod tests {
                 ])
             },
         );
-        assert_diagnostics!(diagnostics, @r"
+        assert_diagnostics!(diagnostics, @"
         UP035 [*] Import from `shlex` instead: `quote`
          --> <filename>:1:1
           |

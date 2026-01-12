@@ -14,6 +14,7 @@ use crate::diagnostic::{Span, UnifiedFile};
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
+use crate::source::SourceText;
 use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap, vendored};
@@ -323,6 +324,17 @@ pub struct File {
     /// the file has been deleted is to change the status to `Deleted`.
     #[default]
     status: FileStatus,
+
+    /// Overrides the result of [`source_text`](crate::source::source_text).
+    ///
+    /// This is useful when running queries after modifying a file's content but
+    /// before the content is written to disk. For example, to verify that the applied fixes
+    /// didn't introduce any new errors.
+    ///
+    /// The override gets automatically removed the next time the file changes.
+    #[default]
+    #[returns(ref)]
+    pub source_text_override: Option<SourceText>,
 }
 
 // The Salsa heap is tracked separately.
@@ -444,19 +456,27 @@ impl File {
             _ => (FileStatus::NotFound, FileRevision::zero(), None),
         };
 
+        let mut clear_override = false;
+
         if file.status(db) != status {
             tracing::debug!("Updating the status of `{}`", file.path(db));
             file.set_status(db).to(status);
+            clear_override = true;
         }
 
         if file.revision(db) != revision {
             tracing::debug!("Updating the revision of `{}`", file.path(db));
             file.set_revision(db).to(revision);
+            clear_override = true;
         }
 
         if file.permissions(db) != permission {
             tracing::debug!("Updating the permissions of `{}`", file.path(db));
             file.set_permissions(db).to(permission);
+        }
+
+        if clear_override && file.source_text_override(db).is_some() {
+            file.set_source_text_override(db).to(None);
         }
     }
 
@@ -526,7 +546,7 @@ impl VirtualFile {
     }
 
     /// Increments the revision of the underlying [`File`].
-    fn sync(&self, db: &mut dyn Db) {
+    pub fn sync(&self, db: &mut dyn Db) {
         let file = self.0;
         tracing::debug!("Updating the revision of `{}`", file.path(db));
         let current_revision = file.revision(db);

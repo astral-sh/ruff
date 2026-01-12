@@ -583,7 +583,7 @@ from module import NotFrozenBase
 
 @final
 @dataclass(frozen=True)
-@total_ordering
+@total_ordering  # error: [invalid-total-ordering]
 class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
     y: str
 ```
@@ -1682,9 +1682,42 @@ def sequence4(cls: type) -> type:
 class Foo: ...
 
 ordered_foo = dataclass(order=True)(Foo)
-reveal_type(ordered_foo)  # revealed: type[Foo] & Any
-# TODO: should be `Foo & Any`
-reveal_type(ordered_foo())  # revealed: @Todo(Type::Intersection.call)
-# TODO: should be `Any`
-reveal_type(ordered_foo() < ordered_foo())  # revealed: @Todo(Type::Intersection.call)
+reveal_type(ordered_foo)  # revealed: <class 'Foo'>
+reveal_type(ordered_foo())  # revealed: Foo
+reveal_type(ordered_foo() < ordered_foo())  # revealed: bool
+```
+
+## Dynamic class literals
+
+Dynamic classes created with `type()` can be wrapped with `dataclass()` as a function:
+
+```py
+from dataclasses import dataclass
+
+# Basic dynamic class wrapped with dataclass
+DynamicFoo = type("DynamicFoo", (), {})
+DynamicFoo = dataclass(DynamicFoo)
+
+# The class is recognized as a dataclass
+reveal_type(DynamicFoo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+# Can create instances
+instance = DynamicFoo()
+reveal_type(instance)  # revealed: DynamicFoo
+```
+
+Dynamic classes that inherit from a dataclass base also work:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Base:
+    x: int
+
+# Dynamic class inheriting from a dataclass
+DynamicChild = type("DynamicChild", (Base,), {})
+DynamicChild = dataclass(DynamicChild)
+
+reveal_type(DynamicChild.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 ```

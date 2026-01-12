@@ -23,8 +23,18 @@ class ResourceTracker:
 
 _resource_tracker: ResourceTracker
 ensure_running = _resource_tracker.ensure_running
+"""Make sure that resource tracker process is running.
+
+This can be run from any process.  Usually a child process will use
+the resource created by its parent.
+"""
+
 register = _resource_tracker.register
+"""Register name of resource with resource tracker."""
+
 unregister = _resource_tracker.unregister
+"""Unregister name of resource with resource tracker."""
+
 getfd = _resource_tracker.getfd
 
 def main(fd: FileDescriptorOrPath) -> None:

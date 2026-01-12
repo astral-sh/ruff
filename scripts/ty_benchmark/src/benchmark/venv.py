@@ -3,14 +3,14 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 
+@dataclass(frozen=True, kw_only=True, slots=True)
 class Venv:
+    project_name: str
     project_path: Path
-
-    def __init__(self, path: Path):
-        self.project_path = path
 
     @property
     def path(self) -> Path:
@@ -36,7 +36,7 @@ class Venv:
         return self.bin / f"{name}{extension}"
 
     @staticmethod
-    def create(parent: Path, python_version: str) -> Venv:
+    def create(*, project: str, parent: Path, python_version: str) -> Venv:
         """Creates a new, empty virtual environment."""
 
         command = [
@@ -53,9 +53,10 @@ class Venv:
                 command, cwd=parent, check=True, capture_output=True, text=True
             )
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to create venv: {e.stderr}")
+            msg = f"Failed to create venv for {project}:\n\n{e.stderr}"
+            raise RuntimeError(msg) from e
 
-        return Venv(parent)
+        return Venv(project_name=project, project_path=parent)
 
     def install(self, pip_install_args: list[str]) -> None:
         """Installs the dependencies required to type check the project."""
@@ -87,4 +88,7 @@ class Venv:
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to install dependencies: {e.stderr}")
+            msg = (
+                f"Failed to install dependencies for {self.project_name}:\n\n{e.stderr}"
+            )
+            raise RuntimeError(msg) from e

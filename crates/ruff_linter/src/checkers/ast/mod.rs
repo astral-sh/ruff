@@ -1878,6 +1878,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 } else {
                                     self.visit_non_type_definition(value);
                                 }
+                            } else {
+                                // Ex: typing.TypeVar(**kwargs)
+                                self.visit_non_type_definition(value);
                             }
                         }
                     }

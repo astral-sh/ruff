@@ -1,5 +1,7 @@
+use rustc_hash::FxHashSet;
+
 use crate::{
-    Db, FxIndexSet,
+    Db,
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
         IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
@@ -277,7 +279,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct TypeCollector<'db>(RefCell<FxIndexSet<Type<'db>>>);
+pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
 
 impl<'db> TypeCollector<'db> {
     pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {

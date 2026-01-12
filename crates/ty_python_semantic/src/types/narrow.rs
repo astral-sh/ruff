@@ -12,12 +12,12 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::typed_dict::{
-    SynthesizedTypedDictType, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
+    SynthesizedTypedDictType, TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
-    CallableType, ClassLiteral, ClassType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -155,7 +155,7 @@ impl ClassInfoConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
-        let constraint_fn = |class: ClassLiteral<'db>| match self {
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
                 Type::instance(db, class.top_materialization(db))
             }
@@ -166,9 +166,11 @@ impl ClassInfoConstraintFunction {
 
         match classinfo {
             Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
-            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal)),
+            Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
+                SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
+                    Some(constraint_from_class_literal(class_literal))
+                }
                 // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
                 // e.g. `isinstance(x, list[int])` fails at runtime.
                 SubclassOfInner::Class(ClassType::Generic(_)) => None,
@@ -343,18 +345,12 @@ impl<'db> NarrowingConstraint<'db> {
         };
 
         let new_regular_disjunct = self.regular_disjunct.map(|regular_disjunct| {
-            IntersectionBuilder::new(db)
-                .add_positive(regular_disjunct)
-                .add_positive(other_regular_disjunct)
-                .build()
+            IntersectionType::from_elements(db, [regular_disjunct, other_regular_disjunct])
         });
 
         let additional_typeguard_disjuncts =
             self.typeguard_disjuncts.iter().map(|typeguard_disjunct| {
-                IntersectionBuilder::new(db)
-                    .add_positive(*typeguard_disjunct)
-                    .add_positive(other_regular_disjunct)
-                    .build()
+                IntersectionType::from_elements(db, [*typeguard_disjunct, other_regular_disjunct])
             });
 
         let mut new_typeguard_disjuncts = other.typeguard_disjuncts;
@@ -635,13 +631,24 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     /// Check if a type is directly narrowable by `len()` (without considering unions or intersections).
     ///
-    /// These are types where we know `__bool__` and `__len__` are consistent and the type
-    /// cannot be subclassed with a `__bool__` that disagrees.
+    /// In order for this to return `true`, we must know that the truthiness of the object returned by
+    /// `len(obj)` will always be consistent with the truthiness of `obj` for all `obj`s of type `ty`.
+    ///
+    /// We know that this is true for:
+    /// - Certain `Literal` types where we know that `__len__` is always well-behaved, and where we
+    ///   know that the type cannot be subclassed (because it's a `Literal` type).
+    /// - Tuple types (we generally assume that tuples have well-behaved `__len__` methods,
+    ///   and much of our special-casing for tuples elsewhere depends on this assumption).
+    /// - Arbitrary user types that return `Literal` types from both `__len__` and `__bool__`,
+    ///   where the returned `Literal` types are mutually consistent in their truthiness.
     fn is_base_type_narrowable_by_len(db: &'db dyn Db, ty: Type<'db>) -> bool {
         match ty {
             Type::StringLiteral(_) | Type::LiteralString | Type::BytesLiteral(_) => true,
-            Type::NominalInstance(instance) => instance.tuple_spec(db).is_some(),
-            _ => false,
+            Type::NominalInstance(instance) if instance.tuple_spec(db).is_some() => true,
+            _ => ty.len(db).is_some_and(|len_ty| {
+                let len_ty_bool = len_ty.bool(db);
+                len_ty_bool != Truthiness::Ambiguous && len_ty_bool == ty.bool(db)
+            }),
         }
     }
 
@@ -932,10 +939,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .build();
 
             // Keep order: first literal complement, then broader arms.
-            let result = UnionBuilder::new(self.db)
-                .add(narrowed_single)
-                .add(rest_union)
-                .build();
+            let result = UnionType::from_elements(self.db, [narrowed_single, rest_union]);
             Some(result)
         } else {
             None
@@ -954,10 +958,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match op {
             ast::CmpOp::IsNot => {
                 if rhs_ty.is_singleton(self.db) {
-                    let ty = IntersectionBuilder::new(self.db)
-                        .add_negative(rhs_ty)
-                        .build();
-                    Some(ty)
+                    Some(rhs_ty.negate(self.db))
                 } else {
                     // Non-singletons cannot be safely narrowed using `is not`
                     None
@@ -1091,6 +1092,90 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ) {
                 constraints.insert(place, constraint);
             }
+
+            // Narrow tagged unions of tuples with `Literal` elements, for example:
+            //
+            //     def _(t: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
+            //         if t[0] == "a":
+            //             reveal_type(t)  # tuple[Literal["a"], A]
+            if let Some((place, constraint)) = self.narrow_tuple_subscript(
+                inference.expression_type(&*subscript.value),
+                &subscript.value,
+                inference.expression_type(&*subscript.slice),
+                inference.expression_type(&comparators[0]),
+                constrain_with_equality,
+            ) {
+                constraints.insert(place, constraint);
+            }
+        }
+
+        // Narrow unions and intersections of `TypedDict` in cases where required keys are
+        // excluded:
+        //
+        // class Foo(TypedDict):
+        //     foo: int
+        // class Bar(TypedDict):
+        //     bar: int
+        //
+        // def _(u: Foo | Bar):
+        //     if "foo" not in u:
+        //         reveal_type(u)  # revealed: Bar
+        if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
+            && let Type::StringLiteral(key) = inference.expression_type(&**left)
+            && let Some(rhs_place_expr) = place_expr(&comparators[0])
+            && let rhs_type = inference.expression_type(&comparators[0])
+            && is_typeddict_or_union_with_typeddicts(self.db, rhs_type)
+        {
+            let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
+            if is_negative_check {
+                let requires_key = |td: TypedDictType<'db>| -> bool {
+                    td.items(self.db)
+                        .get(key.value(self.db))
+                        .is_some_and(TypedDictField::is_required)
+                };
+
+                let narrowed = match rhs_type {
+                    Type::TypedDict(td) => {
+                        if requires_key(td) {
+                            Type::Never
+                        } else {
+                            rhs_type
+                        }
+                    }
+                    Type::Intersection(intersection) => {
+                        if intersection
+                            .positive(self.db)
+                            .iter()
+                            .copied()
+                            .filter_map(Type::as_typed_dict)
+                            .any(requires_key)
+                        {
+                            Type::Never
+                        } else {
+                            rhs_type
+                        }
+                    }
+                    Type::Union(union) => {
+                        // remove all members of the union that would require the key
+                        union.filter(self.db, |ty| match ty {
+                            Type::TypedDict(td) => !requires_key(*td),
+                            Type::Intersection(intersection) => !intersection
+                                .positive(self.db)
+                                .iter()
+                                .copied()
+                                .filter_map(Type::as_typed_dict)
+                                .any(requires_key),
+                            _ => true,
+                        })
+                    }
+                    _ => rhs_type,
+                };
+
+                if narrowed != rhs_type {
+                    let place = self.expect_place(&rhs_place_expr);
+                    constraints.insert(place, NarrowingConstraint::typeguard(narrowed));
+                }
+            }
         }
 
         let mut last_rhs_ty: Option<Type> = None;
@@ -1137,10 +1222,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         _ => continue,
                     };
 
-                    let is_positive = if is_positive {
-                        op == &ast::CmpOp::Is
-                    } else {
-                        op == &ast::CmpOp::IsNot
+                    let is_positive = match op {
+                        ast::CmpOp::Is => is_positive,
+                        ast::CmpOp::IsNot => !is_positive,
+                        _ => continue,
                     };
 
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
@@ -1416,6 +1501,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ) {
                 constraints.insert(place, constraint);
             }
+            // Narrow tagged unions of tuples with `Literal` elements, just like `if` statements.
+            else if let Some((place, constraint)) = self.narrow_tuple_subscript(
+                inference.expression_type(&*subscript.value),
+                &subscript.value,
+                inference.expression_type(&*subscript.slice),
+                value_ty,
+                is_positive,
+            ) {
+                constraints.insert(place, constraint);
+            }
         }
 
         Some(constraints)
@@ -1524,7 +1619,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let Type::StringLiteral(key_literal) = subscript_key_type else {
             return None;
         };
-        if !is_supported_typeddict_tag_literal(rhs_type) {
+        if !is_supported_tag_literal(rhs_type) {
             return None;
         }
 
@@ -1567,6 +1662,93 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let place = self.expect_place(&subscript_place_expr);
         Some((place, NarrowingConstraint::regular(intersection)))
     }
+
+    /// Narrow tagged unions of tuples with `Literal` elements.
+    ///
+    /// Given a subscript expression like `t[0]` where `t` is a union of tuple types, and a
+    /// comparison value like `"foo"`, this method creates a constraint on `t` that narrows it
+    /// based on the element value at that index.
+    ///
+    /// For example:
+    /// ```python
+    /// def _(t: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
+    ///     if t[0] == "a":
+    ///         reveal_type(t)  # tuple[Literal["a"], A]
+    /// ```
+    ///
+    /// Returns `Some((place, constraint))` if narrowing is possible, `None` otherwise.
+    fn narrow_tuple_subscript(
+        &self,
+        subscript_value_type: Type<'db>,
+        subscript_value_expr: &ast::Expr,
+        subscript_index_type: Type<'db>,
+        rhs_type: Type<'db>,
+        constrain_with_equality: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        // We need a union type for narrowing to be useful.
+        let Type::Union(union) = subscript_value_type else {
+            return None;
+        };
+
+        // The subscript index must be an integer literal.
+        let Type::IntLiteral(index) = subscript_index_type else {
+            return None;
+        };
+        let index = i32::try_from(index).ok()?;
+
+        // The comparison value must be a supported literal type.
+        if !is_supported_tag_literal(rhs_type) {
+            return None;
+        }
+
+        let subscript_place_expr = place_expr(subscript_value_expr)?;
+
+        // Skip narrowing if any tuple in the union has an out-of-bounds index.
+        // A diagnostic will be emitted elsewhere for the out-of-bounds access.
+        if any_tuple_has_out_of_bounds_index(self.db, union, index) {
+            return None;
+        }
+
+        // For equality constraints, all matching elements must have literal types to safely narrow.
+        // For inequality constraints, we can narrow even with non-literal element types.
+        if constrain_with_equality
+            && !all_matching_tuple_elements_have_literal_types(self.db, union, index)
+        {
+            return None;
+        }
+
+        // Filter the union based on whether each tuple element at the index could match the rhs.
+        let filtered: Vec<_> = union
+            .elements(self.db)
+            .iter()
+            .filter(|elem| {
+                elem.as_nominal_instance()
+                    .and_then(|inst| inst.tuple_spec(self.db))
+                    .and_then(|spec| spec.py_index(self.db, index).ok())
+                    .is_none_or(|el_ty| {
+                        if constrain_with_equality {
+                            // Keep tuples where element could be equal to rhs.
+                            !el_ty.is_disjoint_from(self.db, rhs_type)
+                        } else {
+                            // Keep tuples where element is not always equal to rhs.
+                            !el_ty.is_subtype_of(self.db, rhs_type)
+                        }
+                    })
+            })
+            .copied()
+            .collect();
+
+        // Only create a constraint if we actually narrowed something.
+        if filtered.len() < union.elements(self.db).len() {
+            let place = self.expect_place(&subscript_place_expr);
+            Some((
+                place,
+                NarrowingConstraint::regular(UnionType::from_elements(self.db, filtered)),
+            ))
+        } else {
+            None
+        }
+    }
 }
 
 // Return true if the given type is a `TypedDict`, or if it's a union that includes at least one
@@ -1574,23 +1756,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::TypedDict(_) => true,
-        Type::Union(union) => {
-            union
-                .elements(db)
-                .iter()
-                .any(|union_member_ty| match union_member_ty {
-                    Type::TypedDict(_) => true,
-                    Type::Intersection(intersection) => {
-                        intersection.positive(db).iter().any(Type::is_typed_dict)
-                    }
-                    _ => false,
-                })
+        Type::Intersection(intersection) => {
+            intersection.positive(db).iter().any(Type::is_typed_dict)
         }
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|union_member_ty| is_typeddict_or_union_with_typeddicts(db, *union_member_ty)),
         _ => false,
     }
 }
 
-fn is_supported_typeddict_tag_literal(ty: Type) -> bool {
+fn is_supported_tag_literal(ty: Type) -> bool {
     matches!(
         ty,
         // TODO: We'd like to support `EnumLiteral` also, but we have to be careful with types like
@@ -1610,7 +1787,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         typeddict
             .items(db)
             .get(field_name)
-            .is_none_or(|field| is_supported_typeddict_tag_literal(field.declared_ty))
+            .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
     };
 
     match ty {
@@ -1635,4 +1812,39 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         }
         _ => true,
     }
+}
+
+/// Check if any tuple in the union has an out-of-bounds index.
+///
+/// If the index is out of bounds for any tuple, we should skip narrowing entirely
+/// since a diagnostic will be emitted elsewhere for the out-of-bounds access.
+fn any_tuple_has_out_of_bounds_index<'db>(
+    db: &'db dyn Db,
+    union: UnionType<'db>,
+    index: i32,
+) -> bool {
+    union.elements(db).iter().any(|elem| {
+        elem.as_nominal_instance()
+            .and_then(|inst| inst.tuple_spec(db))
+            .is_some_and(|spec| spec.py_index(db, index).is_err())
+    })
+}
+
+/// Check that all tuple elements at the given index have literal types.
+///
+/// For equality narrowing to be safe, we need to ensure that the element types
+/// at the discriminating index are literals (which have well-defined equality).
+/// Non-literal types (like `str` or `int`) could have subclasses that override
+/// `__eq__` in unexpected ways.
+fn all_matching_tuple_elements_have_literal_types<'db>(
+    db: &'db dyn Db,
+    union: UnionType<'db>,
+    index: i32,
+) -> bool {
+    union.elements(db).iter().all(|elem| {
+        elem.as_nominal_instance()
+            .and_then(|inst| inst.tuple_spec(db))
+            .and_then(|spec| spec.py_index(db, index).ok())
+            .is_none_or(is_supported_tag_literal)
+    })
 }

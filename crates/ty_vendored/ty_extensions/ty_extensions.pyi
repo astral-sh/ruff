@@ -192,33 +192,43 @@ def is_singleton(ty: Any) -> bool:
 def is_single_valued(ty: Any) -> bool:
     """Returns `True` if `ty` is non-empty and all inhabitants compare equal to each other."""
 
-# Returns the generic context of a type as a tuple of typevars, or `None` if the
-# type is not generic.
-def generic_context(ty: Any) -> GenericContext | None: ...
+def generic_context(ty: Any) -> GenericContext | None:
+    """Returns the generic context of a type as a tuple of typevars.
 
-# Converts a value into a `Callable`, if possible. This is the value equivalent
-# of `CallableTypeOf`, which operates on types.
-def into_callable(ty: Any) -> Any: ...
+    Returns `None` if the type is not generic.
+    """
 
-# Returns the `__all__` names of a module as a tuple of sorted strings, or `None` if
-# either the module does not have `__all__` or it has invalid elements.
-def dunder_all_names(module: Any) -> Any: ...
+def into_callable(ty: Any) -> Any:
+    """Converts a value into a `Callable`, if possible.
 
-# List all members of an enum.
-def enum_members[E: type[Enum]](enum: E) -> tuple[str, ...]: ...
+    This is the value equivalent of `CallableTypeOf`, which operates on types.
+    """
 
-# Returns a tuple of all members of the given object, similar to `dir(obj)` and
-# `inspect.getmembers(obj)`, with at least the following differences:
-#
-# * `dir` and `inspect.getmembers` may use runtime mutable state to construct
-# the list of attributes returned. In contrast, this routine is limited to
-# static information only.
-# * `dir` will respect an object's `__dir__` implementation, if present, but
-# this method (currently) does not.
-def all_members(obj: Any) -> tuple[str, ...]: ...
+def dunder_all_names(module: Any) -> tuple[LiteralString, ...] | None:
+    """Returns the `__all__` names of a module as a tuple of sorted strings.
 
-# Returns `True` if the given object has a member with the given name.
-def has_member(obj: Any, name: str) -> bool: ...
+    Returns `None` if either the module does not have `__all__` or it has invalid elements.
+    """
+
+def enum_members[E: type[Enum]](enum: E) -> tuple[LiteralString, ...]:
+    """List all members of an enum."""
+
+def all_members(obj: Any) -> tuple[LiteralString, ...]:
+    """Returns a tuple of all members of the given object.
+
+    This nearly emulates `dir(obj)` and `inspect.getmembers(obj)` in Python's
+    standard library, but has at least the following differences:
+
+    * `dir` and `inspect.getmembers` may use runtime mutable state to construct
+      the list of attributes returned. In contrast, this routine is limited to
+      static information only.
+    * `dir` will respect an object's `__dir__` implementation, if present, but
+      this method (currently) does not.
+    """
+
+def has_member(obj: Any, name: LiteralString) -> bool:
+    """Returns `True` if the given object has a member with the given name."""
+
 def reveal_protocol_interface(protocol: type) -> None:
     """
     Passing a protocol type to this function will cause ty to emit an info-level
@@ -230,9 +240,12 @@ def reveal_protocol_interface(protocol: type) -> None:
 def reveal_mro(cls: type | types.GenericAlias) -> None:
     """Reveal the MRO that ty infers for the given class or generic alias."""
 
-# A protocol describing an interface that should be satisfied by all named tuples
-# created using `typing.NamedTuple` or `collections.namedtuple`.
 class NamedTupleLike(Protocol):
+    """
+    A protocol describing an interface that should be satisfied by all named tuples
+    created using `typing.NamedTuple` or `collections.namedtuple`.
+    """
+
     # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
     # that instances of actual `NamedTuple` classes with more precise `_fields`
     # types are considered assignable to this protocol (protocol attribute members

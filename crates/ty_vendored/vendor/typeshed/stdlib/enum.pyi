@@ -510,6 +510,7 @@ class Flag(Enum):
 
     _name_: str | None  # type: ignore[assignment]
     _value_: int
+    _numeric_repr_: Callable[[int], str]
     @_magic_enum_attr
     def name(self) -> str | None:  # type: ignore[override]
         """The name of the Enum member."""
@@ -695,6 +696,8 @@ class auto:
     def __and__(self, other: int | Self) -> Self: ...
     def __xor__(self, other: int | Self) -> Self: ...
     __ror__ = __or__
+    """Return value|self."""
+
     __rand__ = __and__
     __rxor__ = __xor__
 

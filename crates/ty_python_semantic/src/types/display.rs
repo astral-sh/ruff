@@ -14,7 +14,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
@@ -432,8 +432,12 @@ impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
-            Type::EnumLiteral(literal) => self.record_class(db, literal.enum_class(db)),
-            Type::GenericAlias(alias) => self.record_class(db, alias.origin(db)),
+            Type::EnumLiteral(literal) => {
+                self.record_class(db, literal.enum_class(db));
+            }
+            Type::GenericAlias(alias) => {
+                self.record_class(db, ClassLiteral::Static(alias.origin(db)));
+            }
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -558,13 +562,15 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
 
         let ty = Type::ClassLiteral(self.class);
         if qualification_level.is_some() {
-            write!(f.with_type(ty), "{}", self.class.qualified_name(self.db))?;
+            let qualified_name = self.class.qualified_name(self.db);
+            write!(f.with_type(ty), "{qualified_name}")?;
         } else {
             write!(f.with_type(ty), "{}", self.class.name(self.db))?;
         }
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
             let file = self.class.file(self.db);
+            let class_offset = self.class.header_range(self.db).start();
             let path = file.path(self.db);
             let path = match path {
                 FilePath::System(path) => Cow::Owned(FilePath::System(
@@ -575,7 +581,6 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
                 FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
             };
             let line_index = line_index(self.db, file);
-            let class_offset = self.class.header_range(self.db).start();
             let line_number = line_index.line_index(class_offset);
             f.set_invalid_type_annotation();
             write!(f, " @ {path}:{line_number}")?;
@@ -887,7 +892,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db))
                     .write_str("method-wrapper")?;
                 f.write_str(" '")?;
-                if let Place::Defined(member_ty, _, _, _) =
+                if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
                     class_ty.member(self.db, member_name).place
                 {
                     f.with_type(member_ty).write_str(member_name)?;
@@ -988,7 +993,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ")?;
-                Type::from(bound_super.owner(self.db))
+                bound_super
+                    .owner(self.db)
+                    .owner_type(self.db)
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")
@@ -1285,7 +1292,7 @@ impl<'db> GenericAlias<'db> {
         settings: DisplaySettings<'db>,
     ) -> DisplayGenericAlias<'db> {
         DisplayGenericAlias {
-            origin: self.origin(db),
+            origin: ClassLiteral::Static(self.origin(db)),
             specialization: self.specialization(db),
             db,
             settings,
@@ -1680,7 +1687,7 @@ impl<'db> Signature<'db> {
 pub(crate) struct DisplaySignature<'a, 'db> {
     definition: Option<Definition<'db>>,
     parameters: &'a Parameters<'db>,
-    return_ty: Option<Type<'db>>,
+    return_ty: Type<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
@@ -1727,9 +1734,8 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .fmt_detailed(&mut f)?;
 
         // Return type
-        let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
         f.write_str(" -> ")?;
-        return_ty
+        self.return_ty
             .display_with(self.db, self.settings.singleline())
             .fmt_detailed(&mut f)?;
 
@@ -1897,17 +1903,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
-            if let Some(annotated_type) = self.param.annotated_type() {
-                if self.param.should_annotation_be_displayed() {
-                    f.write_str(": ")?;
-                    annotated_type
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                }
+            if self.param.should_annotation_be_displayed() {
+                let annotated_type = self.param.annotated_type();
+                f.write_str(": ")?;
+                annotated_type
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_type) = self.param.default_type() {
-                if self.param.annotated_type().is_some() {
+                if self.param.should_annotation_be_displayed() {
                     f.write_str(" = ")?;
                 } else {
                     f.write_str("=")?;
@@ -1940,10 +1945,13 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     _ => f.write_str("...")?,
                 }
             }
-        } else if let Some(ty) = self.param.annotated_type() {
+        } else {
             // This case is specifically for the `Callable` signature where name and default value
-            // cannot be provided.
-            ty.display_with(self.db, self.settings.clone())
+            // cannot be provided. For unnamed parameters we always display the type, to ensure we
+            // have something visible in the parameter slot.
+            self.param
+                .annotated_type()
+                .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         Ok(())
@@ -2646,9 +2654,12 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(db, parameters), return_ty)
-            .display(db)
-            .to_string()
+        Signature::new(
+            Parameters::new(db, parameters),
+            return_ty.unwrap_or(Type::unknown()),
+        )
+        .display(db)
+        .to_string()
     }
 
     fn display_signature_multiline<'db>(
@@ -2656,9 +2667,12 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(db, parameters), return_ty)
-            .display_with(db, super::DisplaySettings::default().multiline())
-            .to_string()
+        Signature::new(
+            Parameters::new(db, parameters),
+            return_ty.unwrap_or(Type::unknown()),
+        )
+        .display_with(db, super::DisplaySettings::default().multiline())
+        .to_string()
     }
 
     #[test]
