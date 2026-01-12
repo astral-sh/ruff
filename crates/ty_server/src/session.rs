@@ -542,8 +542,8 @@ impl Session {
                     );
 
                     client.show_error_message(format!(
-                        "Failed to load project for workspace {url}. \
-                        Please refer to the logs for more details.",
+                        "Failed to load project for workspace {url}. {}",
+                        log_guidance(self.client_name()),
                     ));
 
                     let db_with_default_settings = ProjectMetadata::from_options(
