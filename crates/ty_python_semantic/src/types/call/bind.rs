@@ -90,13 +90,15 @@ impl<'db> BindingsElement<'db> {
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
-        let mut result = None;
+        let mut result = ArgumentForms::default();
+        let mut any_forms = false;
         for binding in &mut self.bindings {
             if let Some(forms) = binding.check_types(db, argument_types, call_expression_tcx) {
-                result = Some(forms);
+                result.merge(&forms);
+                any_forms = true;
             }
         }
-        result
+        any_forms.then_some(result)
     }
 
     /// Returns the result of calling this element.
@@ -355,15 +357,15 @@ impl<'db> Bindings<'db> {
     ) -> Result<(), CallErrorKind> {
         // Check types for each element (union variant)
         for element in &mut self.elements {
-            if let Some(mut updated_argument_forms) =
+            if let Some(updated_argument_forms) =
                 element.check_types(db, argument_types, call_expression_tcx)
             {
                 // If this element returned a new set of argument forms (indicating successful
-                // argument type expansion), update the `Bindings` with these forms.
-                updated_argument_forms.shrink_to_fit();
-                self.argument_forms = updated_argument_forms;
+                // argument type expansion), merge them into the existing forms.
+                self.argument_forms.merge(&updated_argument_forms);
             }
         }
+        self.argument_forms.shrink_to_fit();
 
         self.evaluate_known_cases(db, argument_types, dataclass_field_specifiers);
 
