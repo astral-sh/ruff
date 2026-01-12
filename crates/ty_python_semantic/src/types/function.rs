@@ -70,6 +70,7 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
+    report_invalid_total_ordering_call,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::display::DisplaySettings;
@@ -563,10 +564,11 @@ impl<'db> OverloadLiteral<'db> {
                 let index = semantic_index(db, scope_id.file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class).expect(
-                    "We should always find the surrounding class \
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
+                    .expect(
+                        "We should always find the surrounding class \
                      for an implicit self: Self annotation",
-                );
+                    );
 
                 if self.is_classmethod(db) {
                     Some(SubclassOfType::from(
@@ -747,9 +749,9 @@ impl<'db> FunctionLiteral<'db> {
     fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
-        let (implementation, overloads) = self.overloads_and_implementation(db);
-        overloads.into_iter().chain(implementation.iter().copied())
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
+        let (overloads, implementation) = self.overloads_and_implementation(db);
+        overloads.iter().copied().chain(implementation)
     }
 
     /// Typed externally-visible signature for this function.
@@ -1033,7 +1035,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
         self.literal(db).iter_overloads_and_implementation(db)
     }
 
@@ -1226,10 +1228,7 @@ fn is_instance_truthiness<'db>(
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
-                .any(|c| match c {
-                    ClassType::Generic(c) => c.origin(db) == class,
-                    ClassType::NonGeneric(c) => c == class,
-                })
+                .any(|c| c.class_literal(db) == class)
         {
             return true;
         }
@@ -2005,6 +2004,29 @@ impl KnownFunction {
 
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
+
+            KnownFunction::TotalOrdering => {
+                // When `total_ordering(cls)` is called as a function (not as a decorator),
+                // check that the class defines at least one ordering method.
+                let [Some(class_type)] = parameter_types else {
+                    return;
+                };
+
+                let class = match class_type {
+                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
+                    Type::GenericAlias(generic) => ClassType::Generic(*generic),
+                    _ => return,
+                };
+
+                if !class.has_ordering_method_in_mro(db) {
+                    report_invalid_total_ordering_call(
+                        context,
+                        class.class_literal(db),
+                        call_expression,
+                    );
+                }
+            }
+
             _ => {}
         }
     }

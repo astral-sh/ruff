@@ -44,10 +44,10 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members, todo_type,
+    FieldInstance, GenericAlias, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -867,6 +867,25 @@ impl<'db> Bindings<'db> {
                                 ));
                             }
                         }
+
+                        Type::DataclassDecorator(params) => match overload.parameter_types() {
+                            [Some(Type::ClassLiteral(class_literal))] => {
+                                overload.set_return_type(Type::from(
+                                    class_literal.with_dataclass_params(db, Some(params)),
+                                ));
+                            }
+                            [Some(Type::GenericAlias(generic_alias))] => {
+                                let new_origin = generic_alias
+                                    .origin(db)
+                                    .with_dataclass_params(db, Some(params));
+                                overload.set_return_type(Type::GenericAlias(GenericAlias::new(
+                                    db,
+                                    new_origin,
+                                    generic_alias.specialization(db),
+                                )));
+                            }
+                            _ => {}
+                        },
 
                         Type::BoundMethod(bound_method)
                             if bound_method.self_instance(db).is_property_instance() =>

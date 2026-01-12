@@ -352,7 +352,7 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                         .any(|element| is_expandable_type(db, element)),
                     Tuple::Variable(_) => false,
                 })
-                || enum_metadata(db, class.class_literal(db).0).is_some()
+                || enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
         _ => false,
@@ -403,7 +403,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db).0, None) {
+            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None) {
                 return Some(enum_members.collect());
             }
 
