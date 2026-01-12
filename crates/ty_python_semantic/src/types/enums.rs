@@ -69,6 +69,7 @@ pub(crate) fn enum_metadata<'db>(
             // ```
             return None;
         }
+        ClassLiteral::DynamicNamedTuple(..) => return None,
     };
 
     // This is a fast path to avoid traversing the MRO of known classes

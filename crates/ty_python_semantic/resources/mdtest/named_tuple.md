@@ -84,17 +84,438 @@ alice.id = 42
 bob.age = None
 ```
 
-Alternative functional syntax:
+Alternative functional syntax with a list literal:
 
 ```py
 Person2 = NamedTuple("Person", [("id", int), ("name", str)])
 alice2 = Person2(1, "Alice")
 
-# TODO: should be an error
+# error: [missing-argument]
 Person2(1)
 
-reveal_type(alice2.id)  # revealed: @Todo(functional `NamedTuple` syntax)
-reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
+reveal_type(alice2.id)  # revealed: int
+reveal_type(alice2.name)  # revealed: str
+```
+
+Functional syntax with a tuple literal:
+
+```py
+Person3 = NamedTuple("Person", (("id", int), ("name", str)))
+alice3 = Person3(1, "Alice")
+
+reveal_type(alice3.id)  # revealed: int
+reveal_type(alice3.name)  # revealed: str
+```
+
+### Functional syntax with variable name
+
+When the typename is passed via a variable, we can extract it from the inferred literal string type:
+
+```py
+from typing import NamedTuple
+
+name = "Person"
+Person = NamedTuple(name, [("id", int), ("name", str)])
+
+p = Person(1, "Alice")
+reveal_type(p.id)  # revealed: int
+reveal_type(p.name)  # revealed: str
+```
+
+### Functional syntax with tuple variable fields
+
+When fields are passed via a tuple variable, we can extract the literal field names and types from
+the inferred tuple type:
+
+```py
+from typing import NamedTuple
+from ty_extensions import static_assert, is_subtype_of, reveal_mro
+
+fields = (("host", str), ("port", int))
+Url = NamedTuple("Url", fields)
+
+url = Url("localhost", 8080)
+reveal_type(url.host)  # revealed: str
+reveal_type(url.port)  # revealed: int
+
+# Generic types are also correctly converted to instance types.
+generic_fields = (("items", list[int]), ("mapping", dict[str, bool]))
+Container = NamedTuple("Container", generic_fields)
+container = Container([1, 2, 3], {"a": True})
+reveal_type(container.items)  # revealed: list[int]
+reveal_type(container.mapping)  # revealed: dict[str, bool]
+
+# MRO includes the properly specialized tuple type.
+# revealed: (<class 'Url'>, <class 'tuple[str, int]'>, <class 'object'>)
+reveal_mro(Url)
+
+static_assert(is_subtype_of(Url, tuple[str, int]))
+
+# Invalid type expressions in fields produce a diagnostic.
+invalid_fields = (("x", 42),)  # 42 is not a valid type
+# error: [invalid-type-form] "Invalid type `Literal[42]` in `NamedTuple` field type"
+InvalidNT = NamedTuple("InvalidNT", invalid_fields)
+reveal_type(InvalidNT)  # revealed: <class 'InvalidNT'>
+
+# Unpacking works correctly with the field types.
+host, port = url
+reveal_type(host)  # revealed: str
+reveal_type(port)  # revealed: int
+
+# error: [invalid-assignment] "Too many values to unpack: Expected 1"
+(only_one,) = url
+
+# error: [invalid-assignment] "Not enough values to unpack: Expected 3"
+a, b, c = url
+
+# Indexing works correctly.
+reveal_type(url[0])  # revealed: str
+reveal_type(url[1])  # revealed: int
+
+# error: [index-out-of-bounds]
+url[2]
+```
+
+### Functional syntax with variadic tuple fields
+
+When fields are passed as a variadic tuple (e.g., `tuple[..., *tuple[T, ...]]`), we cannot determine
+the exact field count statically. In this case, we fall back to unknown fields:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import NamedTuple
+from ty_extensions import reveal_mro
+
+# Variadic tuple - we can't determine the exact fields statically.
+def get_fields() -> tuple[tuple[str, type[int]], *tuple[tuple[str, type[str]], ...]]:
+    return (("x", int), ("y", str))
+
+fields = get_fields()
+NT = NamedTuple("NT", fields)
+
+# Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
+reveal_type(NT)  # revealed: <class 'NT'>
+reveal_mro(NT)  # revealed: (<class 'NT'>, <class 'tuple[Unknown, ...]'>, <class 'object'>)
+reveal_type(NT(1, "a").x)  # revealed: Any
+```
+
+Similarly for `collections.namedtuple`:
+
+```py
+import collections
+from ty_extensions import reveal_mro
+
+def get_field_names() -> tuple[str, *tuple[str, ...]]:
+    return ("x", "y")
+
+field_names = get_field_names()
+NT = collections.namedtuple("NT", field_names)
+
+# Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
+reveal_type(NT)  # revealed: <class 'NT'>
+reveal_mro(NT)  # revealed: (<class 'NT'>, <class 'tuple[Unknown, ...]'>, <class 'object'>)
+reveal_type(NT(1, 2).x)  # revealed: Any
+```
+
+### Class inheriting from functional NamedTuple
+
+Classes can inherit from functional namedtuples. The constructor parameters and field types are
+properly inherited:
+
+```py
+from typing import NamedTuple
+from ty_extensions import reveal_mro
+
+class Url(NamedTuple("Url", [("host", str), ("path", str)])):
+    pass
+
+reveal_type(Url)  # revealed: <class 'Url'>
+# revealed: (<class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:7'>, <class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:11'>, <class 'tuple[str, str]'>, <class 'object'>)
+reveal_mro(Url)
+reveal_type(Url.__new__)  # revealed: (cls: type, host: str, path: str) -> Url
+
+# Constructor works with the inherited fields.
+url = Url("example.com", "/path")
+reveal_type(url)  # revealed: Url
+reveal_type(url.host)  # revealed: str
+reveal_type(url.path)  # revealed: str
+
+# Error handling works correctly.
+# error: [missing-argument]
+Url("example.com")
+
+# error: [too-many-positional-arguments]
+Url("example.com", "/path", "extra")
+```
+
+Subclasses can add methods that use inherited fields:
+
+```py
+from typing import NamedTuple
+from typing_extensions import Self
+
+class Url(NamedTuple("Url", [("host", str), ("port", int)])):
+    def with_port(self, port: int) -> Self:
+        reveal_type(self.host)  # revealed: str
+        reveal_type(self.port)  # revealed: int
+        return self._replace(port=port)
+
+url = Url("localhost", 8080)
+reveal_type(url.with_port(9000))  # revealed: Url
+```
+
+For `class Foo(namedtuple("Foo", ...)): ...`, the inner call creates a namedtuple class, but the
+outer class is just a regular class inheriting from it. This is equivalent to:
+
+```py
+class _Foo(NamedTuple): ...
+
+class Foo(_Foo):  # Regular class, not a namedtuple
+    ...
+```
+
+Because the outer class is not itself a namedtuple, it can use `super()` and override `__new__`:
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+class ExtType(namedtuple("ExtType", "code data")):
+    """Override __new__ to add validation."""
+
+    def __new__(cls, code, data):
+        if not isinstance(code, int):
+            raise TypeError("code must be int")
+        return super().__new__(cls, code, data)
+
+class Url(NamedTuple("Url", [("host", str), ("path", str)])):
+    """Override __new__ to normalize the path."""
+
+    def __new__(cls, host, path):
+        if path and not path.startswith("/"):
+            path = "/" + path
+        return super().__new__(cls, host, path)
+
+# Both work correctly.
+ext = ExtType(42, b"hello")
+reveal_type(ext)  # revealed: ExtType
+
+url = Url("example.com", "path")
+reveal_type(url)  # revealed: Url
+```
+
+### Functional syntax with list variable fields
+
+When fields are passed via a list variable (not a literal), the field names cannot be determined
+statically. Attribute access returns `Any` and the constructor accepts any arguments:
+
+```py
+from typing import NamedTuple
+from typing_extensions import Self
+
+fields = [("host", str), ("port", int)]
+
+class Url(NamedTuple("Url", fields)):
+    def with_port(self, port: int) -> Self:
+        # Fields are unknown, so attribute access returns Any.
+        reveal_type(self.host)  # revealed: Any
+        reveal_type(self.port)  # revealed: Any
+        reveal_type(self.unknown)  # revealed: Any
+        return self._replace(port=port)
+```
+
+When constructing a namedtuple directly with dynamically-defined fields, keyword arguments are
+accepted because the constructor uses a gradual signature:
+
+```py
+import collections
+from ty_extensions import reveal_mro
+
+CheckerConfig = ["duration", "video_fps", "audio_sample_rate"]
+GroundTruth = collections.namedtuple("GroundTruth", " ".join(CheckerConfig))
+
+# No error - fields are unknown, so any keyword arguments are accepted
+config = GroundTruth(duration=0, video_fps=30, audio_sample_rate=44100)
+reveal_type(config)  # revealed: GroundTruth
+reveal_type(config.duration)  # revealed: Any
+
+# Namedtuples with unknown fields inherit from tuple[Unknown, ...] to avoid false positives.
+# revealed: (<class 'GroundTruth'>, <class 'tuple[Unknown, ...]'>, <class 'object'>)
+reveal_mro(GroundTruth)
+
+# No index-out-of-bounds error since the tuple length is unknown.
+reveal_type(config[0])  # revealed: Unknown
+reveal_type(config[100])  # revealed: Unknown
+```
+
+### Functional syntax signature validation
+
+The `collections.namedtuple` function accepts `str | Iterable[str]` for `field_names`:
+
+```py
+import collections
+from ty_extensions import reveal_mro
+
+# String field names (space-separated)
+Point1 = collections.namedtuple("Point", "x y")
+reveal_type(Point1)  # revealed: <class 'Point'>
+reveal_mro(Point1)  # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+# String field names with multiple spaces
+Point1a = collections.namedtuple("Point", "x       y")
+reveal_type(Point1a)  # revealed: <class 'Point'>
+reveal_mro(Point1a)  # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+# String field names (comma-separated also works at runtime)
+Point2 = collections.namedtuple("Point", "x, y")
+reveal_type(Point2)  # revealed: <class 'Point'>
+reveal_mro(Point2)  # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+# List of strings
+Point3 = collections.namedtuple("Point", ["x", "y"])
+reveal_type(Point3)  # revealed: <class 'Point'>
+reveal_mro(Point3)  # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+# Tuple of strings
+Point4 = collections.namedtuple("Point", ("x", "y"))
+reveal_type(Point4)  # revealed: <class 'Point'>
+reveal_mro(Point4)  # revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+# Invalid: integer is not a valid typename
+# error: [invalid-argument-type]
+Invalid = collections.namedtuple(123, ["x", "y"])
+reveal_type(Invalid)  # revealed: <class '<unknown>'>
+reveal_mro(Invalid)  # revealed: (<class '<unknown>'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+# Invalid: too many positional arguments
+# error: [too-many-positional-arguments] "Too many positional arguments to function `namedtuple`: expected 2, got 4"
+TooMany = collections.namedtuple("TooMany", "x", "y", "z")
+reveal_type(TooMany)  # revealed: <class 'TooMany'>
+```
+
+The `typing.NamedTuple` function accepts `Iterable[tuple[str, Any]]` for `fields`:
+
+```py
+from typing import NamedTuple
+
+# List of tuples
+Person1 = NamedTuple("Person", [("name", str), ("age", int)])
+reveal_type(Person1)  # revealed: <class 'Person'>
+
+# Tuple of tuples
+Person2 = NamedTuple("Person", (("name", str), ("age", int)))
+reveal_type(Person2)  # revealed: <class 'Person'>
+
+# Invalid: integer is not a valid typename
+# error: [invalid-argument-type]
+NamedTuple(123, [("name", str)])
+
+# Invalid: too many positional arguments
+# error: [too-many-positional-arguments] "Too many positional arguments to function `NamedTuple`: expected 2, got 4"
+TooMany = NamedTuple("TooMany", [("x", int)], "extra", "args")
+reveal_type(TooMany)  # revealed: <class 'TooMany'>
+```
+
+### Keyword arguments for `collections.namedtuple`
+
+The `collections.namedtuple` function accepts `rename`, `defaults`, and `module` keyword arguments:
+
+```py
+import collections
+from ty_extensions import reveal_mro
+
+# `rename=True` replaces invalid identifiers with positional names
+Point = collections.namedtuple("Point", ["x", "class", "_y", "z", "z"], rename=True)
+reveal_type(Point)  # revealed: <class 'Point'>
+reveal_type(Point.__new__)  # revealed: (cls: type, x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Point
+reveal_mro(Point)  # revealed: (<class 'Point'>, <class 'tuple[Any, Any, Any, Any, Any]'>, <class 'object'>)
+p = Point(1, 2, 3, 4, 5)
+reveal_type(p.x)  # revealed: Any
+reveal_type(p._1)  # revealed: Any
+reveal_type(p._2)  # revealed: Any
+reveal_type(p.z)  # revealed: Any
+reveal_type(p._4)  # revealed: Any
+
+# `defaults` provides default values for the rightmost fields
+Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
+reveal_type(Person)  # revealed: <class 'Person'>
+reveal_type(Person.__new__)  # revealed: (cls: type, name: Any, age: Any, city: Any = ...) -> Person
+reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'tuple[Any, Any, Any]'>, <class 'object'>)
+# Can create with all fields
+person1 = Person("Alice", 30, "NYC")
+# Can omit the field with default
+person2 = Person("Bob", 25)
+reveal_type(person1.city)  # revealed: Any
+reveal_type(person2.city)  # revealed: Any
+
+# `module` is valid but doesn't affect type checking
+Config = collections.namedtuple("Config", ["host", "port"], module="myapp")
+reveal_type(Config)  # revealed: <class 'Config'>
+
+# Unknown keyword arguments produce an error
+# error: [unknown-argument]
+Bad1 = collections.namedtuple("Bad1", ["x", "y"], foobarbaz=42)
+reveal_type(Bad1)  # revealed: <class 'Bad1'>
+reveal_mro(Bad1)  # revealed: (<class 'Bad1'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+# Multiple unknown keyword arguments
+# error: [unknown-argument]
+# error: [unknown-argument]
+Bad2 = collections.namedtuple("Bad2", ["x"], invalid1=True, invalid2=False)
+reveal_type(Bad2)  # revealed: <class 'Bad2'>
+reveal_mro(Bad2)  # revealed: (<class 'Bad2'>, <class 'tuple[Any]'>, <class 'object'>)
+```
+
+### Keyword arguments for `typing.NamedTuple`
+
+The `typing.NamedTuple` function does not accept any keyword arguments:
+
+```py
+from typing import NamedTuple
+
+# error: [unknown-argument]
+Bad3 = NamedTuple("Bad3", [("x", int)], rename=True)
+
+# error: [unknown-argument]
+Bad4 = NamedTuple("Bad4", [("x", int)], defaults=[0])
+
+# error: [unknown-argument]
+Bad5 = NamedTuple("Bad5", [("x", int)], foobarbaz=42)
+```
+
+### Starred and double-starred arguments
+
+When starred (`*args`) or double-starred (`**kwargs`) arguments are used, we fall back to normal
+call binding since we can't statically determine the arguments. This results in `NamedTupleFallback`
+being returned:
+
+```py
+import collections
+from typing import NamedTuple
+
+args = ("Point", ["x", "y"])
+kwargs = {"rename": True}
+
+# Starred positional arguments - falls back to NamedTupleFallback
+Point1 = collections.namedtuple(*args)
+reveal_type(Point1)  # revealed: type[NamedTupleFallback]
+
+# error: [invalid-argument-type]
+Point2 = NamedTuple(*args)
+reveal_type(Point2)  # revealed: type[NamedTupleFallback]
+
+# Double-starred keyword arguments - falls back to NamedTupleFallback
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+Point3 = collections.namedtuple("Point", ["x", "y"], **kwargs)
+reveal_type(Point3)  # revealed: type[NamedTupleFallback]
+
+Point4 = NamedTuple("Point", [("x", int), ("y", int)], **kwargs)
+reveal_type(Point4)  # revealed: type[NamedTupleFallback]
 ```
 
 ### Definition
@@ -152,6 +573,62 @@ class D(
 
 # error: [invalid-named-tuple]
 class E(NamedTuple, Protocol): ...
+```
+
+However, as explained above, for `class Foo(namedtuple("Foo", ...)): ...` the outer class is not
+itself a namedtuple—it just inherits from one. So it can use multiple inheritance freely:
+
+```py
+from abc import ABC
+from collections import namedtuple
+from typing import NamedTuple
+
+class Point(namedtuple("Point", ["x", "y"]), ABC):
+    """No error - functional namedtuple inheritance allows multiple inheritance."""
+
+class Url(NamedTuple("Url", [("host", str), ("port", int)]), ABC):
+    """No error - typing.NamedTuple functional syntax also allows multiple inheritance."""
+
+p = Point(1, 2)
+reveal_type(p.x)  # revealed: Any
+reveal_type(p.y)  # revealed: Any
+
+u = Url("localhost", 8080)
+reveal_type(u.host)  # revealed: str
+reveal_type(u.port)  # revealed: int
+```
+
+### Ordering methods inherited from tuple
+
+Namedtuples inherit comparison methods (`__lt__`, `__le__`, `__gt__`, `__ge__`) from their tuple
+base class. This means `@total_ordering` should not emit a diagnostic, since the required `__lt__`
+method is already present:
+
+```py
+from collections import namedtuple
+from functools import total_ordering
+from typing import NamedTuple
+
+# No error - __lt__ is inherited from the tuple base class
+@total_ordering
+class Point(namedtuple("Point", "x y")): ...
+
+p1 = Point(1, 2)
+p2 = Point(3, 4)
+# TODO: should be `bool`, not `Any | Literal[False]`
+reveal_type(p1 < p2)  # revealed: Any | Literal[False]
+reveal_type(p1 <= p2)  # revealed: Any | Literal[True]
+
+# Same for typing.NamedTuple - no error
+@total_ordering
+class Person(NamedTuple):
+    name: str
+    age: int
+
+alice = Person("Alice", 30)
+bob = Person("Bob", 25)
+reveal_type(alice < bob)  # revealed: bool
+reveal_type(alice >= bob)  # revealed: bool
 ```
 
 ### Inheriting from a `NamedTuple`
@@ -254,6 +731,34 @@ reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
 ```
 
+Generic namedtuples can also be defined using the functional syntax with type variables in the field
+types. We don't currently support this, but mypy does:
+
+```py
+from typing import NamedTuple, TypeVar
+
+T = TypeVar("T")
+
+# TODO: ideally this would create a generic namedtuple class
+Pair = NamedTuple("Pair", [("first", T), ("second", T)])
+
+# For now, the TypeVar is not specialized, so the field types remain as `T@Pair` and argument type
+# errors are emitted when calling the constructor.
+reveal_type(Pair)  # revealed: <class 'Pair'>
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(Pair(1, 2))  # revealed: Pair
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(Pair(1, 2).first)  # revealed: T@Pair
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(Pair(1, 2).second)  # revealed: T@Pair
+```
+
 ## Attributes on `NamedTuple`
 
 The following attributes are available on `NamedTuple` classes / instances:
@@ -309,6 +814,73 @@ Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
 
 alice = Person(1, "Alice", 42)
 bob = Person(2, "Bob")
+```
+
+## `collections.namedtuple` with tuple variable field names
+
+When field names are passed via a tuple variable, we can extract the literal field names from the
+inferred tuple type. The class is properly synthesized (not a fallback), but field types are `Any`
+since `collections.namedtuple` doesn't include type annotations:
+
+```py
+from collections import namedtuple
+
+field_names = ("name", "age")
+Person = namedtuple("Person", field_names)
+
+reveal_type(Person)  # revealed: <class 'Person'>
+
+alice = Person("Alice", 42)
+reveal_type(alice)  # revealed: Person
+reveal_type(alice.name)  # revealed: Any
+reveal_type(alice.age)  # revealed: Any
+```
+
+## `collections.namedtuple` with list variable field names
+
+When field names are passed via a list variable (not a literal), we fall back to
+`NamedTupleFallback` which allows any attribute access. This is a regression test for accessing
+`Self` attributes in methods of classes that inherit from namedtuples with dynamic fields:
+
+```py
+from collections import namedtuple
+from typing_extensions import Self
+
+field_names = ["host", "port"]
+
+class Url(namedtuple("Url", field_names)):
+    def with_port(self, port: int) -> Self:
+        # Fields are unknown, so attribute access returns `Any`.
+        reveal_type(self.host)  # revealed: Any
+        reveal_type(self.port)  # revealed: Any
+        reveal_type(self.unknown)  # revealed: Any
+        return self._replace(port=port)
+```
+
+## `collections.namedtuple` attributes
+
+Functional namedtuples have synthesized attributes similar to class-based namedtuples:
+
+```py
+from collections import namedtuple
+
+Person = namedtuple("Person", ["name", "age"])
+
+reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
+reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Person._replace)  # revealed: (self: Self, *, name: Any = ..., age: Any = ...) -> Self
+
+# _make creates instances from an iterable.
+reveal_type(Person._make(["Alice", 30]))  # revealed: Person
+
+# _asdict converts to a dictionary.
+person = Person("Alice", 30)
+reveal_type(person._asdict())  # revealed: dict[str, Any]
+
+# _replace creates a copy with replaced fields.
+reveal_type(person._replace(name="Bob"))  # revealed: Person
 ```
 
 ## The symbol `NamedTuple` itself
