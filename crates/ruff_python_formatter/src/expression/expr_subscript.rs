@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatRuleWithOptions, write};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{AnyNodeRef, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExprTString};
 use ruff_python_ast::{Expr, ExprSubscript};
 
 use crate::expression::CallChainLayout;
@@ -8,6 +8,7 @@ use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized, parenthesized,
 };
 use crate::prelude::*;
+use crate::preview::is_never_break_literal_subscripts_enabled;
 
 #[derive(Default)]
 pub struct FormatExprSubscript {
@@ -69,9 +70,16 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
                 }
             });
 
-            parenthesized("[", &format_slice, "]")
-                .with_dangling_comments(dangling_comments)
-                .fmt(f)
+            if is_never_break_literal_subscripts_enabled(f.context())
+                && dangling_comments.is_empty()
+                && is_single_literal(slice.as_ref())
+            {
+                write!(f, [token("["), &format_slice, token("]")])
+            } else {
+                parenthesized("[", &format_slice, "]")
+                    .with_dangling_comments(dangling_comments)
+                    .fmt(f)
+            }
         });
 
         let is_call_chain_root =
@@ -133,5 +141,16 @@ impl NeedsParentheses for ExprSubscript {
                 }
             }
         }
+    }
+}
+
+fn is_single_literal(node: &Expr) -> bool {
+    match node {
+        Expr::NumberLiteral(_) | Expr::Name(_) => true,
+        Expr::StringLiteral(ExprStringLiteral { value, .. }) => !value.is_implicit_concatenated(),
+        Expr::BytesLiteral(ExprBytesLiteral { value, .. }) => !value.is_implicit_concatenated(),
+        Expr::FString(ExprFString { value, .. }) => !value.is_implicit_concatenated(),
+        Expr::TString(ExprTString { value, .. }) => !value.is_implicit_concatenated(),
+        _ => false,
     }
 }
