@@ -35,7 +35,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.40.0
+    rev: v1.41.0
     hooks:
       - id: typos
         priority: 0
@@ -84,7 +84,7 @@ repos:
       - id: mdformat
         language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
-          - mdformat-mkdocs==5.0.0
+          - mdformat-mkdocs==5.1.1
           - mdformat-footnote==0.1.2
         exclude: |
           (?x)^(
@@ -135,7 +135,7 @@ repos:
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
   # Some additional configuration for `actionlint` can be found in `.github/actionlint.yaml`.
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.9
+    rev: v1.7.10
     hooks:
       - id: actionlint
         stages:
