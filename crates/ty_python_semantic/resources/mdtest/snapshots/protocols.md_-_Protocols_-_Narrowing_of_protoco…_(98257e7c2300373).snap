@@ -53,6 +53,26 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 38 |         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]
 39 |     else:
 40 |         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
+41 | @runtime_checkable
+42 | class RuntimeCheckableBase(Protocol):
+43 |     x: int
+44 | 
+45 | class RuntimeCheckableChild(RuntimeCheckableBase, Protocol):
+46 |     y: str
+47 | 
+48 | def g(arg: object):
+49 |     if isinstance(arg, RuntimeCheckableChild):  # no error!
+50 |         reveal_type(arg)  # revealed: RuntimeCheckableChild
+51 |     else:
+52 |         reveal_type(arg)  # revealed: ~RuntimeCheckableChild
+53 | class RuntimeCheckableGrandchild(RuntimeCheckableChild, Protocol):
+54 |     z: float
+55 | 
+56 | def h(arg: object):
+57 |     if isinstance(arg, RuntimeCheckableGrandchild):  # no error!
+58 |         reveal_type(arg)  # revealed: RuntimeCheckableGrandchild
+59 |     else:
+60 |         reveal_type(arg)  # revealed: ~RuntimeCheckableGrandchild
 ```
 
 # Diagnostics

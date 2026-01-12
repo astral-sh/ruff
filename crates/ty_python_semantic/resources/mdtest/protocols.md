@@ -2479,6 +2479,37 @@ def f(arg1: type, arg2: type):
         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
 ```
 
+Per PEP 544, `@runtime_checkable` propagates to subclasses. A protocol that inherits from a
+`@runtime_checkable` protocol is itself runtime-checkable, even without the decorator:
+
+```py
+@runtime_checkable
+class RuntimeCheckableBase(Protocol):
+    x: int
+
+class RuntimeCheckableChild(RuntimeCheckableBase, Protocol):
+    y: str
+
+def g(arg: object):
+    if isinstance(arg, RuntimeCheckableChild):  # no error!
+        reveal_type(arg)  # revealed: RuntimeCheckableChild
+    else:
+        reveal_type(arg)  # revealed: ~RuntimeCheckableChild
+```
+
+This also applies to deeper inheritance hierarchies:
+
+```py
+class RuntimeCheckableGrandchild(RuntimeCheckableChild, Protocol):
+    z: float
+
+def h(arg: object):
+    if isinstance(arg, RuntimeCheckableGrandchild):  # no error!
+        reveal_type(arg)  # revealed: RuntimeCheckableGrandchild
+    else:
+        reveal_type(arg)  # revealed: ~RuntimeCheckableGrandchild
+```
+
 ## Truthiness of protocol instances
 
 An instance of a protocol type generally has ambiguous truthiness:
