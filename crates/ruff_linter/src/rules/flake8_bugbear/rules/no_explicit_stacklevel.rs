@@ -55,8 +55,7 @@ impl AlwaysFixableViolation for NoExplicitStacklevel {
     }
 
     fn fix_title(&self) -> String {
-        "Set `stacklevel=2`"
-            .to_string()
+        "Set `stacklevel=2`".to_string()
     }
 }
 
