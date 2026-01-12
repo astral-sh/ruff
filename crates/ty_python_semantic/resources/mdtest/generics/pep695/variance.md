@@ -182,12 +182,11 @@ the bound directly. The typevar can be solved to the intersection of the actual 
 class Contra[T]:
     def append(self, x: T): ...
 
-def f[T: int](x: Contra[T]):
-    ...
+def f[T: int](x: Contra[T]) -> T:
+    raise NotImplementedError
 
 def _(x: Contra[str]):
-    # This is valid: T can be solved to `int & str = Never`
-    f(x)
+    reveal_type(f(x))  # revealed: Never
 ```
 
 ## Invariance

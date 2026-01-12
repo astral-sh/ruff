@@ -1878,16 +1878,24 @@ impl<'db> SpecializationBuilder<'db> {
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        // In a contravariant position, the formal type variable is a subtype of
-                        // the actual type (`T <: ty`). Since we also have the upper bound
-                        // constraint `T <: bound`, we just need to ensure that the intersection
-                        // of `ty` and `bound` is non-empty. Since `Never` is always a valid
-                        // intersection if the types are disjoint, we don't need to perform any
-                        // check here.
-                        if !polarity.is_contravariant()
-                            && !ty
-                                .when_assignable_to(self.db, bound, self.inferable)
-                                .is_always_satisfied(self.db)
+                        if polarity.is_contravariant() {
+                            // In a contravariant position, the formal type variable is a subtype of
+                            // the actual type (`T <: ty`). Since we also have the upper bound
+                            // constraint `T <: bound`, we just need to ensure that the intersection
+                            // of `ty` and `bound` is non-empty. Since `Never` is always a valid
+                            // intersection if the types are disjoint, we don't need to perform any
+                            // check here.
+                            self.add_type_mapping(
+                                bound_typevar,
+                                IntersectionType::from_elements(self.db, [bound, ty]),
+                                polarity,
+                                f,
+                            );
+                            return Ok(());
+                        }
+                        if !ty
+                            .when_assignable_to(self.db, bound, self.inferable)
+                            .is_always_satisfied(self.db)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
