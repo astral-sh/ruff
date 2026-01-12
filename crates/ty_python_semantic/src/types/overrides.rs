@@ -131,7 +131,10 @@ fn check_class_declaration<'db>(
     // `NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`, etc.)
     // that cannot be overwritten. Attempting to assign to these attributes (without type
     // annotations) or define methods with these names will raise an `AttributeError` at runtime.
-    if class_kind == Some(CodeGeneratorKind::NamedTuple)
+    //
+    // This only applies to classes that directly inherit from the `NamedTuple` special form,
+    // not to classes that inherit from functional namedtuples (which create regular classes).
+    if literal.directly_inherits_from_named_tuple_special_form(db)
         && configuration.check_prohibited_named_tuple_attrs()
         && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
         && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)

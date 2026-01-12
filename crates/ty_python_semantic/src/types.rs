@@ -4005,6 +4005,33 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
+                // collections.namedtuple(typename, field_names, ...)
+                Some(KnownFunction::NamedTuple) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_or_keyword(Name::new_static("typename"))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_or_keyword(Name::new_static("field_names"))
+                                    .with_annotated_type(Type::any()),
+                                // Additional optional parameters have defaults.
+                                Parameter::keyword_only(Name::new_static("rename"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("defaults"))
+                                    .with_annotated_type(Type::any())
+                                    .with_default_type(Type::none(db)),
+                                Parameter::keyword_only(Name::new_static("module"))
+                                    .with_default_type(Type::none(db)),
+                            ],
+                        ),
+                        KnownClass::NamedTupleFallback.to_class_literal(db),
+                    ),
+                )
+                .into(),
+
                 _ => CallableBinding::from_overloads(
                     self,
                     function_type.signature(db).overloads.iter().cloned(),
@@ -4435,7 +4462,23 @@ impl<'db> Type<'db> {
             }
 
             Type::SpecialForm(SpecialFormType::NamedTuple) => {
-                Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
+                // typing.NamedTuple(typename: str, fields: ...)
+                Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_or_keyword(Name::new_static("typename"))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_or_keyword(Name::new_static("fields"))
+                                    .with_annotated_type(Type::any()),
+                            ],
+                        ),
+                        KnownClass::NamedTupleFallback.to_class_literal(db),
+                    ),
+                )
+                .into()
             }
 
             Type::GenericAlias(_) => {

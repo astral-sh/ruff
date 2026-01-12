@@ -76,12 +76,17 @@ impl<'db> ProtocolClass<'db> {
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
-        self.static_class_literal(db)
-            .is_some_and(|(class_literal, _)| {
-                class_literal
-                    .known_function_decorators(db)
-                    .contains(&KnownFunction::RuntimeCheckable)
-            })
+        // Check if this class or any ancestor protocol is decorated with @runtime_checkable.
+        // Per PEP 544, @runtime_checkable propagates to subclasses.
+        self.0.iter_mro(db).any(|base| {
+            base.into_class()
+                .and_then(|class| class.static_class_literal(db))
+                .is_some_and(|(class_literal, _)| {
+                    class_literal
+                        .known_function_decorators(db)
+                        .contains(&KnownFunction::RuntimeCheckable)
+                })
+        })
     }
 
     /// Iterate through the body of the protocol class. Check that all definitions

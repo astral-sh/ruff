@@ -84,17 +84,154 @@ alice.id = 42
 bob.age = None
 ```
 
-Alternative functional syntax:
+Alternative functional syntax with a list literal:
 
 ```py
 Person2 = NamedTuple("Person", [("id", int), ("name", str)])
 alice2 = Person2(1, "Alice")
 
-# TODO: should be an error
+# error: [missing-argument]
 Person2(1)
 
-reveal_type(alice2.id)  # revealed: @Todo(functional `NamedTuple` syntax)
-reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
+reveal_type(alice2.id)  # revealed: int
+reveal_type(alice2.name)  # revealed: str
+```
+
+Functional syntax with a tuple literal:
+
+```py
+Person3 = NamedTuple("Person", (("id", int), ("name", str)))
+alice3 = Person3(1, "Alice")
+
+reveal_type(alice3.id)  # revealed: int
+reveal_type(alice3.name)  # revealed: str
+```
+
+### Functional syntax with variable name
+
+When the typename is passed via a variable, we can extract it from the inferred literal string type:
+
+```py
+from typing import NamedTuple
+
+name = "Person"
+Person = NamedTuple(name, [("id", int), ("name", str)])
+
+p = Person(1, "Alice")
+reveal_type(p.id)  # revealed: int
+reveal_type(p.name)  # revealed: str
+```
+
+### Functional syntax with tuple variable fields
+
+When fields are passed via a tuple variable, we can extract the literal field names and types from
+the inferred tuple type:
+
+```py
+from typing import NamedTuple
+
+fields = (("host", str), ("port", int))
+Url = NamedTuple("Url", fields)
+
+url = Url("localhost", 8080)
+reveal_type(url.host)  # revealed: str
+reveal_type(url.port)  # revealed: int
+```
+
+### Class inheriting from functional NamedTuple
+
+Classes can inherit from functional namedtuples. The constructor parameters and field types are
+properly inherited:
+
+```py
+from typing import NamedTuple
+
+class Url(NamedTuple("Url", [("host", str), ("path", str)])):
+    pass
+
+reveal_type(Url)  # revealed: <class 'Url'>
+reveal_type(Url.__new__)  # revealed: (cls: type, host: str, path: str) -> Url
+
+# Constructor works with the inherited fields.
+url = Url("example.com", "/path")
+reveal_type(url)  # revealed: Url
+reveal_type(url.host)  # revealed: str
+reveal_type(url.path)  # revealed: str
+
+# Error handling works correctly.
+# error: [missing-argument]
+Url("example.com")
+
+# error: [too-many-positional-arguments]
+Url("example.com", "/path", "extra")
+```
+
+Subclasses can add methods that use inherited fields:
+
+```py
+from typing import NamedTuple
+from typing_extensions import Self
+
+class Url(NamedTuple("Url", [("host", str), ("port", int)])):
+    def with_port(self, port: int) -> Self:
+        reveal_type(self.host)  # revealed: str
+        reveal_type(self.port)  # revealed: int
+        return self._replace(port=port)
+
+url = Url("localhost", 8080)
+reveal_type(url.with_port(9000))  # revealed: Url
+```
+
+Unlike classes that directly use `class Foo(NamedTuple):` syntax, classes inheriting from functional
+namedtuples can use `super()` and override `__new__`:
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+class ExtType(namedtuple("ExtType", "code data")):
+    """Override __new__ to add validation."""
+
+    def __new__(cls, code, data):
+        if not isinstance(code, int):
+            raise TypeError("code must be int")
+        return super().__new__(cls, code, data)
+
+class Url(NamedTuple("Url", [("host", str), ("path", str)])):
+    """Override __new__ to normalize the path."""
+
+    def __new__(cls, host, path):
+        if path and not path.startswith("/"):
+            path = "/" + path
+        return super().__new__(cls, host, path)
+
+# Both work correctly.
+ext = ExtType(42, b"hello")
+reveal_type(ext)  # revealed: ExtType
+
+url = Url("example.com", "path")
+reveal_type(url)  # revealed: Url
+```
+
+### Functional syntax with list variable fields
+
+When fields are passed via a list variable (not a literal), we fall back to `NamedTupleFallback`
+which allows any attribute access. This is a regression test for accessing `Self` attributes in
+methods of classes that inherit from namedtuples with dynamic fields:
+
+```py
+from typing import NamedTuple
+from typing_extensions import Self
+
+fields = [("host", str), ("port", int)]
+
+class Url(NamedTuple("Url", fields)):
+    def with_port(self, port: int) -> Self:
+        # Attribute access on Self works via NamedTupleFallback.__getattr__.
+        reveal_type(self.host)  # revealed: Any
+        reveal_type(self.port)  # revealed: Any
+        reveal_type(self.unknown)  # revealed: Any
+        return self._replace(port=port)
 ```
 
 ### Definition
@@ -309,6 +446,73 @@ Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
 
 alice = Person(1, "Alice", 42)
 bob = Person(2, "Bob")
+```
+
+## `collections.namedtuple` with tuple variable field names
+
+When field names are passed via a tuple variable, we can extract the literal field names from the
+inferred tuple type. The class is properly synthesized (not a fallback), but field types are `Any`
+since `collections.namedtuple` doesn't include type annotations:
+
+```py
+from collections import namedtuple
+
+field_names = ("name", "age")
+Person = namedtuple("Person", field_names)
+
+reveal_type(Person)  # revealed: <class 'Person'>
+
+alice = Person("Alice", 42)
+reveal_type(alice)  # revealed: Person
+reveal_type(alice.name)  # revealed: Any
+reveal_type(alice.age)  # revealed: Any
+```
+
+## `collections.namedtuple` with list variable field names
+
+When field names are passed via a list variable (not a literal), we fall back to
+`NamedTupleFallback` which allows any attribute access. This is a regression test for accessing
+`Self` attributes in methods of classes that inherit from namedtuples with dynamic fields:
+
+```py
+from collections import namedtuple
+from typing_extensions import Self
+
+field_names = ["host", "port"]
+
+class Url(namedtuple("Url", field_names)):
+    def with_port(self, port: int) -> Self:
+        # Attribute access on Self works via NamedTupleFallback.__getattr__.
+        reveal_type(self.host)  # revealed: Any
+        reveal_type(self.port)  # revealed: Any
+        reveal_type(self.unknown)  # revealed: Any
+        return self._replace(port=port)
+```
+
+## `collections.namedtuple` attributes
+
+Functional namedtuples have synthesized attributes similar to class-based namedtuples:
+
+```py
+from collections import namedtuple
+
+Person = namedtuple("Person", ["name", "age"])
+
+reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
+reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Person._replace)  # revealed: (self: Self, *, name: Any = ..., age: Any = ...) -> Self
+
+# _make creates instances from an iterable.
+reveal_type(Person._make(["Alice", 30]))  # revealed: Person
+
+# _asdict converts to a dictionary.
+person = Person("Alice", 30)
+reveal_type(person._asdict())  # revealed: dict[str, Any]
+
+# _replace creates a copy with replaced fields.
+reveal_type(person._replace(name="Bob"))  # revealed: Person
 ```
 
 ## The symbol `NamedTuple` itself

@@ -70,6 +70,7 @@ pub(crate) fn enum_metadata<'db>(
             // TODO: Add a diagnostic for including an enum in a `type(...)` call.
             return None;
         }
+        ClassLiteral::DynamicNamedTuple(..) => return None,
     };
 
     // This is a fast path to avoid traversing the MRO of known classes

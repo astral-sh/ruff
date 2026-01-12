@@ -53,6 +53,7 @@ use crate::semantic_index::{
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::class::DynamicNamedTupleLiteral;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, DynamicClassLiteral, DynamicMetaclassConflict, FieldKind,
     MetaclassErrorKind, MethodDecorator,
@@ -690,6 +691,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         base_class,
                         Type::SpecialForm(SpecialFormType::NamedTuple)
                             | Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                            | Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(_))
                     )
                 {
                     if let Some(builder) = self
@@ -6205,6 +6207,329 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)))
     }
 
+    /// Try to infer a `typing.NamedTuple(typename, fields)` or `collections.namedtuple(typename, field_names)` call.
+    ///
+    /// Returns `None` if the call doesn't match a namedtuple pattern, signalling that
+    /// we should fall back to normal call binding.
+    #[allow(clippy::type_complexity)]
+    fn infer_namedtuple_call_expression(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        callable_type: Type<'db>,
+        definition: Option<Definition<'db>>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+
+        let ast::Arguments {
+            args,
+            keywords,
+            range: _,
+            node_index: _,
+        } = &call_expr.arguments;
+
+        // Check if this is a `typing.NamedTuple` or `collections.namedtuple` call.
+        let is_typing_namedtuple = matches!(
+            callable_type,
+            Type::SpecialForm(SpecialFormType::NamedTuple)
+        );
+        let is_collections_namedtuple = callable_type
+            .as_function_literal()
+            .and_then(|f| f.known(db))
+            == Some(KnownFunction::NamedTuple);
+
+        if !is_typing_namedtuple && !is_collections_namedtuple {
+            return None;
+        }
+
+        // Need at least typename and fields/field_names.
+        if args.len() < 2 {
+            return None;
+        }
+
+        let name_arg = &args[0];
+        let fields_arg = &args[1];
+
+        // Infer name argument type.
+        let name_type = self.infer_expression(name_arg, TypeContext::default());
+
+        // Infer keyword arguments.
+        let mut defaults_count = 0usize;
+        let mut rename_type = None;
+        for kw in keywords {
+            if let Some(arg) = &kw.arg {
+                match arg.id.as_str() {
+                    "defaults" => {
+                        // First try to retrieve the count from the AST (for list and tuple literals).
+                        defaults_count = match &kw.value {
+                            ast::Expr::List(list) => list.elts.len(),
+                            ast::Expr::Tuple(tuple) => tuple.elts.len(),
+                            _ => {
+                                // Fall back to inferring the type.
+                                let ty = self.infer_expression(&kw.value, TypeContext::default());
+                                ty.exact_tuple_instance_spec(db)
+                                    .and_then(|spec| spec.len().maximum())
+                                    .unwrap_or(0)
+                            }
+                        };
+                        // Make sure to infer list and tuple elements.
+                        if let ast::Expr::List(list) = &kw.value {
+                            for elt in &list.elts {
+                                self.infer_expression(elt, TypeContext::default());
+                            }
+                        } else if let ast::Expr::Tuple(tuple) = &kw.value {
+                            for elt in &tuple.elts {
+                                self.infer_expression(elt, TypeContext::default());
+                            }
+                        }
+                    }
+                    "rename" => {
+                        rename_type =
+                            Some(self.infer_expression(&kw.value, TypeContext::default()));
+                    }
+                    _ => {
+                        self.infer_expression(&kw.value, TypeContext::default());
+                    }
+                }
+            } else {
+                self.infer_expression(&kw.value, TypeContext::default());
+            }
+        }
+
+        // Extract name.
+        let name = if let Type::StringLiteral(literal) = name_type {
+            ast::name::Name::new(literal.value(db))
+        } else {
+            // Name must be a string literal for us to synthesize a proper type.
+            return None;
+        };
+
+        // Handle fields based on which namedtuple variant.
+        let (fields, has_known_fields): (
+            Box<[(ast::name::Name, Type<'db>, Option<Type<'db>>)]>,
+            bool,
+        ) = if is_typing_namedtuple {
+            // `typing.NamedTuple`: `fields` is a list or tuple of (name, type) pairs.
+            // First try to extract from the AST directly (for list or tuple literals).
+            if let Some(fields) = self.extract_typing_namedtuple_fields_from_ast(fields_arg) {
+                (fields, true)
+            } else {
+                // Otherwise, infer the type and try to extract from that.
+                let fields_type = self.infer_expression(fields_arg, TypeContext::default());
+                if let Some(fields) = self.extract_typing_namedtuple_fields(fields_type) {
+                    (fields, true)
+                } else {
+                    // Couldn't determine fields statically; attribute lookups will return Any.
+                    (Box::new([]), false)
+                }
+            }
+        } else {
+            // `collections.namedtuple`: `field_names` is a list or tuple of strings, or a space or
+            // comma-separated string.
+
+            // Check for `rename=True`.
+            let rename = matches!(rename_type, Some(Type::BooleanLiteral(true)));
+
+            // Extract field names, first from the AST, then from the inferred type.
+            let maybe_field_names: Option<Box<[ast::name::Name]>> = if let Some(names) =
+                self.extract_collections_namedtuple_fields_from_ast(fields_arg)
+            {
+                Some(names)
+            } else {
+                let fields_type = self.infer_expression(fields_arg, TypeContext::default());
+                if let Some(string_literal) = fields_type.as_string_literal() {
+                    // Handle space/comma-separated string.
+                    let field_str = string_literal.value(db);
+                    Some(
+                        field_str
+                            .replace(',', " ")
+                            .split_whitespace()
+                            .map(ast::name::Name::new)
+                            .collect(),
+                    )
+                } else if let Some(tuple_spec) = fields_type.exact_tuple_instance_spec(db) {
+                    // Handle list/tuple of strings.
+                    tuple_spec
+                        .fixed_elements()
+                        .map(|elt| {
+                            elt.as_string_literal()
+                                .map(|s| ast::name::Name::new(s.value(db)))
+                        })
+                        .collect()
+                } else {
+                    // Couldn't determine field names statically.
+                    None
+                }
+            };
+
+            if let Some(mut field_names) = maybe_field_names {
+                // Apply rename logic, if `rename=True`.
+                if rename {
+                    use ruff_python_stdlib::identifiers::is_identifier;
+                    use ruff_python_stdlib::keyword::is_keyword;
+                    use rustc_hash::FxHashSet;
+
+                    let mut seen_names = FxHashSet::<&str>::default();
+                    for (i, field_name) in field_names.iter_mut().enumerate() {
+                        let name_str = field_name.as_str();
+                        let needs_rename = name_str.starts_with('_')
+                            || is_keyword(name_str)
+                            || !is_identifier(name_str)
+                            || seen_names.contains(name_str);
+                        if needs_rename {
+                            *field_name = ast::name::Name::new(format!("_{i}"));
+                        }
+                        seen_names.insert(field_name.as_str());
+                    }
+                }
+
+                // Build fields with `Any` type and optional defaults.
+                let num_fields = field_names.len();
+                let fields = field_names
+                    .iter()
+                    .enumerate()
+                    .map(|(i, field_name)| {
+                        let default = if defaults_count > 0 && i >= num_fields - defaults_count {
+                            Some(Type::any())
+                        } else {
+                            None
+                        };
+                        (field_name.clone(), Type::any(), default)
+                    })
+                    .collect();
+                (fields, true)
+            } else {
+                // Couldn't determine fields statically; attribute lookups will return Any.
+                (Box::new([]), false)
+            }
+        };
+
+        let file = self.file();
+        let file_scope = self.scope().file_scope_id(db);
+        let namedtuple = DynamicNamedTupleLiteral::new(
+            db,
+            name,
+            fields,
+            has_known_fields,
+            file,
+            file_scope,
+            definition,
+            call_expr.range,
+        );
+
+        Some(Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(
+            namedtuple,
+        )))
+    }
+
+    /// Extract fields from a typing.NamedTuple fields argument.
+    #[allow(clippy::type_complexity)]
+    fn extract_typing_namedtuple_fields(
+        &mut self,
+        fields_type: Type<'db>,
+    ) -> Option<Box<[(ast::name::Name, Type<'db>, Option<Type<'db>>)]>> {
+        let db = self.db();
+
+        // Try to extract from a tuple/list type.
+        let tuple_spec = fields_type.exact_tuple_instance_spec(db)?;
+        let fields: Option<Box<[_]>> = tuple_spec
+            .fixed_elements()
+            .map(|field_tuple| {
+                let field_spec = field_tuple.exact_tuple_instance_spec(db)?;
+                let elements: Vec<_> = field_spec.fixed_elements().collect();
+                if elements.len() != 2 {
+                    return None;
+                }
+                let field_name = elements[0]
+                    .as_string_literal()
+                    .map(|s| ast::name::Name::new(s.value(db)))?;
+                let field_ty = elements[1];
+                // Convert class literals to instances.
+                let resolved_ty = match field_ty {
+                    Type::ClassLiteral(class) => class.to_non_generic_instance(db),
+                    Type::GenericAlias(alias) => Type::instance(db, ClassType::Generic(*alias)),
+                    Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                        crate::types::SubclassOfInner::Class(class) => Type::instance(db, class),
+                        _ => *field_ty,
+                    },
+                    ty => *ty,
+                };
+                Some((field_name, resolved_ty, None))
+            })
+            .collect();
+
+        fields
+    }
+
+    /// Extract fields from a typing.NamedTuple fields argument by looking at the AST directly.
+    /// This handles list/tuple literals that contain (name, type) pairs.
+    #[allow(clippy::type_complexity)]
+    fn extract_typing_namedtuple_fields_from_ast(
+        &mut self,
+        fields_arg: &ast::Expr,
+    ) -> Option<Box<[(ast::name::Name, Type<'db>, Option<Type<'db>>)]>> {
+        let db = self.db();
+
+        // Get the elements from the list or tuple literal.
+        let elements: &[ast::Expr] = match fields_arg {
+            ast::Expr::List(list) => &list.elts,
+            ast::Expr::Tuple(tuple) => &tuple.elts,
+            _ => return None,
+        };
+
+        let fields: Option<Box<[_]>> = elements
+            .iter()
+            .map(|elt| {
+                // Each element should be a tuple like ("field_name", type).
+                let tuple_expr = elt.as_tuple_expr()?;
+                if tuple_expr.elts.len() != 2 {
+                    return None;
+                }
+
+                // First element: field name (string literal).
+                let field_name_expr = &tuple_expr.elts[0];
+                let field_name_ty = self.infer_expression(field_name_expr, TypeContext::default());
+                let field_name_lit = field_name_ty.as_string_literal()?;
+                let field_name = ast::name::Name::new(field_name_lit.value(db));
+
+                // Second element: field type (infer as type expression).
+                let field_type_expr = &tuple_expr.elts[1];
+                let field_ty = self.infer_type_expression(field_type_expr);
+
+                Some((field_name, field_ty, None))
+            })
+            .collect();
+
+        fields
+    }
+
+    /// Extract field names from a collections.namedtuple fields argument by looking at the AST directly.
+    /// This handles list/tuple literals that contain string literals.
+    fn extract_collections_namedtuple_fields_from_ast(
+        &mut self,
+        fields_arg: &ast::Expr,
+    ) -> Option<Box<[ast::name::Name]>> {
+        let db = self.db();
+
+        // Get the elements from the list or tuple literal.
+        let elements: &[ast::Expr] = match fields_arg {
+            ast::Expr::List(list) => &list.elts,
+            ast::Expr::Tuple(tuple) => &tuple.elts,
+            _ => return None,
+        };
+
+        let field_names: Option<Box<[_]>> = elements
+            .iter()
+            .map(|elt| {
+                // Each element should be a string literal.
+                let field_ty = self.infer_expression(elt, TypeContext::default());
+                let field_lit = field_ty.as_string_literal()?;
+                Some(ast::name::Name::new(field_lit.value(db)))
+            })
+            .collect();
+
+        field_names
+    }
+
     /// Extract base classes from the second argument of a `type()` call.
     ///
     /// If any bases were invalid, diagnostics are emitted and the dynamic
@@ -9136,6 +9461,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(dynamic_type) = self.infer_dynamic_type_expression(call_expression, None)
         {
             return dynamic_type;
+        }
+
+        // Handle `typing.NamedTuple(typename, fields)` and `collections.namedtuple(typename, field_names)`.
+        if let Some(namedtuple_type) =
+            self.infer_namedtuple_call_expression(call_expression, callable_type, None)
+        {
+            return namedtuple_type;
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
