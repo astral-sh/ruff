@@ -6529,9 +6529,9 @@ impl<'db> Type<'db> {
                 Some(TypeDefinition::Function(function.definition(db)))
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
-            Self::ClassLiteral(class_literal) => class_literal.type_definition(db),
+            Self::ClassLiteral(class_literal) => Some(class_literal.type_definition(db)),
             Self::GenericAlias(alias) => Some(TypeDefinition::StaticClass(alias.definition(db))),
-            Self::NominalInstance(instance) => instance.class(db).type_definition(db),
+            Self::NominalInstance(instance) => Some(instance.class(db).type_definition(db)),
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
                     Some(TypeDefinition::TypeVar(var.definition(db)?))
@@ -6545,7 +6545,7 @@ impl<'db> Type<'db> {
 
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => None,
-                SubclassOfInner::Class(class) => class.type_definition(db),
+                SubclassOfInner::Class(class) => Some(class.type_definition(db)),
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?))
                 }
@@ -6575,7 +6575,7 @@ impl<'db> Type<'db> {
             Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(class) => class.type_definition(db),
+                Protocol::FromClass(class) => Some(class.type_definition(db)),
                 Protocol::Synthesized(_) => None,
             },
 

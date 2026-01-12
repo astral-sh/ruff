@@ -48,14 +48,14 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DynamicClassLiteral, DynamicClassOrigin,
-    DynamicMetaclassConflict, FieldKind, MetaclassErrorKind, MethodDecorator,
+    ClassLiteral, CodeGeneratorKind, DynamicClassLiteral, DynamicMetaclassConflict, FieldKind,
+    MetaclassErrorKind, MethodDecorator,
 };
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
@@ -5412,7 +5412,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // Try to extract the dynamic class with definition.
                             // This returns `None` if it's not a three-arg call to `type()`,
                             // signalling that we must fall back to normal call inference.
-                            self.infer_dynamic_type_expression(call_expr, Some(definition))
+                            self.infer_dynamic_type_expression(call_expr, definition)
                                 .unwrap_or_else(|| {
                                     self.infer_call_expression_impl(call_expr, callable_type, tcx)
                                 })
@@ -6031,7 +6031,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_dynamic_type_expression(
         &mut self,
         call_expr: &ast::ExprCall,
-        definition: Option<Definition<'db>>,
+        definition: Definition<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
 
@@ -6096,29 +6096,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let bases = self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
 
-        // Get the origin for this dynamic class.
-        let origin = if let Some(def) = definition {
-            // Assigned call: use the definition for stable identity.
-            DynamicClassOrigin::Assigned(def)
-        } else {
-            // Inline call: look up the ScopedCallId from semantic indexing.
-            let file = self.file();
-            let file_scope = self.scope().file_scope_id(db);
-            let index = semantic_index(db, file);
-            let Some(call_id) = index.ast_ids(file_scope).try_call_id(call_expr) else {
-                // If no call ID was tracked for this call during semantic indexing,
-                // we can't create a stable DynamicClassLiteral. Fall back to regular
-                // type inference.
-                return None;
-            };
-            DynamicClassOrigin::Inline {
-                file,
-                file_scope,
-                call_id,
-            }
-        };
-
-        let dynamic_class = DynamicClassLiteral::new(db, name, bases, origin, None);
+        let dynamic_class = DynamicClassLiteral::new(db, name, bases, definition, None);
 
         // Check for MRO errors.
         if let Err(error) = dynamic_class.try_mro(db) {
@@ -9099,14 +9077,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
 
             return Type::TypedDict(typed_dict);
-        }
-
-        // Handle 3-argument `type(name, bases, dict)`.
-        if let Type::ClassLiteral(class) = callable_type
-            && class.is_known(self.db(), KnownClass::Type)
-            && let Some(dynamic_type) = self.infer_dynamic_type_expression(call_expression, None)
-        {
-            return dynamic_type;
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
