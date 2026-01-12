@@ -1066,6 +1066,10 @@ impl AlwaysFixableViolation for MissingBlankLineAfterLastSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -1316,6 +1320,10 @@ impl Violation for UndocumentedParam {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

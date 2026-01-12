@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: mro.md - Method Resolution Order tests - `__bases__` lists with duplicate bases
 mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
@@ -303,7 +304,7 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[unused-ignore-comment]: Unused blanket `type: ignore` directive
+warning[unused-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:72:9
    |
 70 |     A,
@@ -355,7 +356,7 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[unused-ignore-comment]: Unused blanket `type: ignore` directive
+warning[unused-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:81:13
    |
 79 | ):

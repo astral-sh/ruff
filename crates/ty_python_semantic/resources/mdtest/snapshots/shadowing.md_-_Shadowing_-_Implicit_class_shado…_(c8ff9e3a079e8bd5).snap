@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: shadowing.md - Shadowing - Implicit class shadowing
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/shadowing.md
@@ -20,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/shadowing.md
 # Diagnostics
 
 ```
-error[invalid-assignment]: Implicit shadowing of class `C`
+error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `<class 'C'>`
  --> src/mdtest_snippet.py:3:1
   |
 1 | class C: ...
@@ -30,7 +31,7 @@ error[invalid-assignment]: Implicit shadowing of class `C`
   | |
   | Declared type `<class 'C'>`
   |
-info: Annotate to make it explicit if this is intentional
+info: Implicit shadowing of class `C`, add an annotation to make it explicit if this is intentional
 info: rule `invalid-assignment` is enabled by default
 
 ```

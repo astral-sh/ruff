@@ -10,6 +10,10 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via macro expansion.
+ignored = ["colored"]
+
 [lib]
 
 [dependencies]
@@ -27,14 +31,14 @@ ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
+glob = { workspace = true }
+globset = { workspace = true }
 ignore = { workspace = true }
 indexmap = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 matchit = { workspace = true }
-glob = { workspace = true }
-globset = { workspace = true }
 path-absolutize = { workspace = true }
 path-slash = { workspace = true }
 pep440_rs = { workspace = true }
@@ -55,10 +59,6 @@ etcetera = { workspace = true }
 # Enable test rules during development
 ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
 tempfile = { workspace = true }
-
-[package.metadata.cargo-shear]
-# Used via macro expansion.
-ignored = ["colored"]
 
 [features]
 default = []

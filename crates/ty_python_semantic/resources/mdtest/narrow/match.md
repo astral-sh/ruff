@@ -375,3 +375,70 @@ try:
 except ValueError:
     pass
 ```
+
+## Narrowing tagged unions of tuples
+
+Narrow unions of tuples based on literal tag elements in `match` statements:
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    match x[0]:
+        case "tag1":
+            reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+            reveal_type(x[1])  # revealed: A
+        case "tag2":
+            reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+            reveal_type(x[1])  # revealed: B
+            reveal_type(x[2])  # revealed: C
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# With int literals
+def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
+    match x[0]:
+        case 1:
+            reveal_type(x)  # revealed: tuple[Literal[1], A]
+        case 2:
+            reveal_type(x)  # revealed: tuple[Literal[2], B]
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# With bytes literals
+def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
+    match x[0]:
+        case b"a":
+            reveal_type(x)  # revealed: tuple[Literal[b"a"], A]
+        case b"b":
+            reveal_type(x)  # revealed: tuple[Literal[b"b"], B]
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# Using index 1 instead of 0
+def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
+    match x[1]:
+        case "tag1":
+            reveal_type(x)  # revealed: tuple[A, Literal["tag1"]]
+        case "tag2":
+            reveal_type(x)  # revealed: tuple[B, Literal["tag2"]]
+        case _:
+            reveal_type(x)  # revealed: Never
+```
+
+Narrowing is restricted to `Literal` tag elements:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
+    match x[0]:
+        case "tag1":
+            # Can't narrow because second tuple has `str` (not literal) at index 0
+            reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
+        case _:
+            # But we *can* narrow with inequality
+            reveal_type(x)  # revealed: tuple[str, B]
+```

@@ -69,7 +69,7 @@ def _(flag: bool):
 
     else:
         class Spam: ...
-    # error: [non-subscriptable] "Cannot subscript object of type `<class 'Spam'>` with no `__class_getitem__` method"
+    # error: [not-subscriptable] "Cannot subscript object of type `<class 'Spam'>` with no `__class_getitem__` method"
     # revealed: str | Unknown
     reveal_type(Spam[42])
 ```

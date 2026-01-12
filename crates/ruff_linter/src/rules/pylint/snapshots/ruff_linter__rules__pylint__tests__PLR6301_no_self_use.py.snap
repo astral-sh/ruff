@@ -9,6 +9,7 @@ PLR6301 Method `developer_greeting` could be a function, class method, or static
   |         ^^^^^^^^^^^^^^^^^^
 8 |         print(f"Greetings {name}!")
   |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `greeting_1` could be a function, class method, or static method
   --> no_self_use.py:10:9
@@ -19,6 +20,7 @@ PLR6301 Method `greeting_1` could be a function, class method, or static method
    |         ^^^^^^^^^^
 11 |         print("Hello!")
    |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `greeting_2` could be a function, class method, or static method
   --> no_self_use.py:13:9
@@ -29,6 +31,7 @@ PLR6301 Method `greeting_2` could be a function, class method, or static method
    |         ^^^^^^^^^^
 14 |         print("Hi!")
    |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `validate_y` could be a function, class method, or static method
    --> no_self_use.py:103:9
@@ -39,6 +42,7 @@ PLR6301 Method `validate_y` could be a function, class method, or static method
 104 |         if value <= 0:
 105 |             raise ValueError("y must be a positive integer")
     |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `non_simple_assignment` could be a function, class method, or static method
    --> no_self_use.py:128:9
@@ -50,6 +54,7 @@ PLR6301 Method `non_simple_assignment` could be a function, class method, or sta
 129 |         msg = foo = ""
 130 |         raise NotImplementedError(msg)
     |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `non_simple_assignment_2` could be a function, class method, or static method
    --> no_self_use.py:132:9
@@ -61,6 +66,7 @@ PLR6301 Method `non_simple_assignment_2` could be a function, class method, or s
 133 |         msg[0] = ""
 134 |         raise NotImplementedError(msg)
     |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `unused_message` could be a function, class method, or static method
    --> no_self_use.py:136:9
@@ -72,6 +78,7 @@ PLR6301 Method `unused_message` could be a function, class method, or static met
 137 |         msg = ""
 138 |         raise NotImplementedError("")
     |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `unused_message_2` could be a function, class method, or static method
    --> no_self_use.py:140:9
@@ -83,6 +90,7 @@ PLR6301 Method `unused_message_2` could be a function, class method, or static m
 141 |         msg = ""
 142 |         raise NotImplementedError(x)
     |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `developer_greeting` could be a function, class method, or static method
    --> no_self_use.py:145:9
@@ -92,6 +100,7 @@ PLR6301 Method `developer_greeting` could be a function, class method, or static
     |         ^^^^^^^^^^^^^^^^^^
 146 |         print(t"Greetings {name}!")
     |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass
 
 PLR6301 Method `tstring` could be a function, class method, or static method
    --> no_self_use.py:151:9
@@ -103,3 +112,4 @@ PLR6301 Method `tstring` could be a function, class method, or static method
 152 |         msg = t"{x}"
 153 |         raise NotImplementedError(msg)
     |
+help: Consider adding `@typing.override` if this method overrides a method from a superclass

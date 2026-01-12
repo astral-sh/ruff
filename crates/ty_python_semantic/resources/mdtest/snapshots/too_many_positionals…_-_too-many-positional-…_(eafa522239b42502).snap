@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: too_many_positionals.md - too-many-positional-arguments diagnostics
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/too_many_positionals.md

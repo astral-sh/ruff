@@ -72,6 +72,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// As such, migrating to `enum.StrEnum` will introduce a behavior change for
 /// code that relies on the Python 3.11 behavior.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// ## References
 /// - [enum.StrEnum](https://docs.python.org/3/library/enum.html#enum.StrEnum)
 ///

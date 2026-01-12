@@ -132,6 +132,8 @@ if sys.platform != "linux" and sys.platform != "win32":
         """
 
         closed: bool
+        """True if the kqueue handler is closed"""
+
         def __init__(self) -> None: ...
         def close(self) -> None:
             """Close the kqueue control file descriptor.
@@ -226,6 +228,8 @@ if sys.platform == "linux":
             Further operations on the epoll object will raise an exception.
             """
         closed: bool
+        """True if the epoll handler is closed"""
+
         def fileno(self) -> int:
             """Return the epoll control file descriptor."""
 

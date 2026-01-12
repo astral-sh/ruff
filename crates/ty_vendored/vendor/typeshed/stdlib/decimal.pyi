@@ -762,6 +762,8 @@ class Context:
     def __copy__(self) -> Context: ...
     # see https://github.com/python/cpython/issues/94107
     __hash__: ClassVar[None]  # type: ignore[assignment]
+    """Return hash(self)."""
+
     def Etiny(self) -> int:
         """Return a value equal to Emin - prec + 1, which is the minimum exponent value
         for subnormal results.  When underflow occurs, the exponent is set to Etiny.

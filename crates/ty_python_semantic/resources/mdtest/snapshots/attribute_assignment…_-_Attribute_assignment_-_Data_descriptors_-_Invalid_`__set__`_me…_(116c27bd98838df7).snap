@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: attribute_assignment.md - Attribute assignment - Data descriptors - Invalid `__set__` method signature
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md

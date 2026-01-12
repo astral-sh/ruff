@@ -140,7 +140,11 @@ If a child class's method definition is Liskov-compatible with the method defini
 class, Liskov compatibility must also nonetheless be checked with respect to the method definition
 on its grandparent class. This is because type checkers will treat the child class as a subtype of
 the grandparent class just as much as they treat it as a subtype of the parent class, so
-substitutability with respect to the grandparent class is just as important:
+substitutability with respect to the grandparent class is just as important.
+
+However, if the parent class itself already has an LSP violation with an ancestor, we do not report
+the same violation for the child class. This is because the child class cannot fix the violation
+without introducing a new, worse violation against its immediate parent's contract.
 
 <!-- snapshot-diagnostics -->
 
@@ -156,12 +160,30 @@ class Parent(Grandparent):
     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
 
 class Child(Parent):
-    # compatible with the signature of `Parent.method`, but not with `Grandparent.method`:
-    def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+    # compatible with the signature of `Parent.method`, but not with `Grandparent.method`.
+    # However, since `Parent.method` already violates LSP with `Grandparent.method`,
+    # we don't report the same violation for `Child` -- it's inherited from `Parent`.
+    def method(self, x: str) -> None: ...
 
 class OtherChild(Parent):
     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
     def method(self, x: int) -> None: ...  # error: [invalid-method-override]
+
+class ChildWithNewViolation(Parent):
+    # incompatible with BOTH `Parent.method` (str) and `Grandparent.method` (int).
+    # We report the violation against the immediate parent (`Parent`), not the grandparent.
+    def method(self, x: bytes) -> None: ...  # error: [invalid-method-override]
+
+class GrandparentWithReturnType:
+    def method(self) -> int: ...
+
+class ParentWithReturnType(GrandparentWithReturnType):
+    def method(self) -> str: ...  # error: [invalid-method-override]
+
+class ChildWithReturnType(ParentWithReturnType):
+    # Returns `int` again -- compatible with `GrandparentWithReturnType.method`,
+    # but not with `ParentWithReturnType.method`. We report against the immediate parent.
+    def method(self) -> int: ...  # error: [invalid-method-override]
 
 class GradualParent(Grandparent):
     def method(self, x: Any) -> None: ...
@@ -190,8 +212,9 @@ class C(B):
     foo = get
 
 class D(C):
-    # compatible with `C.get` and `B.get`, but not with `A.get`
-    def get(self, my_default): ...  # error: [invalid-method-override]
+    # compatible with `C.get` and `B.get`, but not with `A.get`.
+    # Since `B.get` already violates LSP with `A.get`, we don't report for `D`.
+    def get(self, my_default): ...
 ```
 
 ## Non-generic methods on generic classes work as expected

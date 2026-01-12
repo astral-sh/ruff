@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: invalid_await.md - Invalid await diagnostics - Custom type with missing `__await__`
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md

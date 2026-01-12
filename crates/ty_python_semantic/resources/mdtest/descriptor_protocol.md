@@ -525,6 +525,42 @@ c.name = None
 c.name = 42
 ```
 
+### Overriding properties in subclasses
+
+When a subclass overrides a property, accessing other inherited properties from within the
+overriding property methods should still work correctly.
+
+```py
+class Base:
+    _value: float = 0.0
+
+    @property
+    def value(self) -> float:
+        return self._value
+
+    @value.setter
+    def value(self, v: float) -> None:
+        self._value = v
+
+    @property
+    def other(self) -> float:
+        return self.value
+
+    @other.setter
+    def other(self, v: float) -> None:
+        self.value = v
+
+class Derived(Base):
+    @property
+    def other(self) -> float:
+        return self.value
+
+    @other.setter
+    def other(self, v: float) -> None:
+        reveal_type(self.value)  # revealed: int | float
+        self.value = v
+```
+
 ### Properties with no setters
 
 <!-- snapshot-diagnostics -->

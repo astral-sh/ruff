@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: special_form_attributes.md - Diagnostics for invalid attribute access on special forms
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/special_form_attributes.md

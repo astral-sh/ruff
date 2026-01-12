@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
@@ -21,12 +22,10 @@ use crate::semantic_index::definition::Definition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
-use crate::types::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeRelation,
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
-
-use ordermap::OrderSet;
+use crate::types::{NormalizedVisitor, TypeContext};
 
 bitflags! {
     /// Used for `TypedDict` class parameters.
@@ -49,7 +48,14 @@ impl Default for TypedDictParams {
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
+///
+/// # Ordering
+/// Ordering is derived from the variant order (`Class` < `Synthesized`) and the inner types.
+/// The Salsa IDs of inner types may change between runs or when the type was garbage collected
+/// and recreated.
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, salsa::Update, Hash, get_size2::GetSize,
+)]
 pub enum TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
@@ -879,7 +885,11 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     }
 }
 
-#[salsa::interned(debug)]
+/// # Ordering
+/// Ordering is based on the type's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the type was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub struct SynthesizedTypedDictType<'db> {
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,

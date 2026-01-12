@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: unresolved_reference.md - Diagnostics for unresolved references - New builtin used on old Python version
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_reference.md

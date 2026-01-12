@@ -731,6 +731,8 @@ class defaultdict(dict[_KT, _VT]):
     """
 
     default_factory: Callable[[], _VT] | None
+    """Factory for default value called by __missing__()."""
+
     @overload
     def __init__(self) -> None: ...
     @overload

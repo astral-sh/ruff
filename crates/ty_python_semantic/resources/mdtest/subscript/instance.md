@@ -7,7 +7,7 @@
 ```py
 class NotSubscriptable: ...
 
-a = NotSubscriptable()[0]  # error: [non-subscriptable]
+a = NotSubscriptable()[0]  # error: [not-subscriptable]
 ```
 
 ## `__getitem__` not callable

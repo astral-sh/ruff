@@ -216,7 +216,7 @@ class OnlyDelItem:
 d = OnlyDelItem()
 del d[0]  # OK
 
-# error: [non-subscriptable] "Cannot subscript object of type `OnlyDelItem` with no `__getitem__` method"
+# error: [not-subscriptable] "Cannot subscript object of type `OnlyDelItem` with no `__getitem__` method"
 d[0]
 ```
 
@@ -232,7 +232,7 @@ class OnlyGetItem:
 g = OnlyGetItem()
 reveal_type(g[0])  # revealed: str
 
-# error: [non-subscriptable] "Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method"
+# error: [not-subscriptable] "Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method"
 del g[0]
 ```
 

@@ -25,15 +25,21 @@ that are ready for contributions.
 ty is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
+You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
+
+```shell
+cargo install cargo-insta
+```
+
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
-You can optionally install pre-commit hooks to automatically run the validation checks
+You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install pre-commit
-pre-commit install
+uv tool install prek
+prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run ty's test suite (via `cargo nextest run`),
@@ -60,13 +66,20 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 cargo test  # Rust testing
-uvx pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
 will save you time and expedite the merge process.
 
 If you're using VS Code, you can also install the recommended [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) extension to get these checks while editing.
+
+Note that many code changes also require updating the snapshot tests, which is done interactively
+after running `cargo test` like so:
+
+```shell
+cargo insta review
+```
 
 Include the text `[ty]` at the beginning of your pull request title, to distinguish ty pull requests
 from Ruff ones.
@@ -102,6 +115,10 @@ crates shared with Ruff, such as `ruff_db`, `ruff_python_ast`, and `ruff_python_
     annotations for the Python standard library.
 - `ty_wasm`: library crate for exposing ty as a WebAssembly module. Powers the
     [ty Playground](https://play.ty.dev/).
+- `ty_completion_eval`: Framework for evaluating completion suggestions returned by the ty LSP.
+- `ty_module_resolver`: The module resolver, which allows resolving imports to their modules.
+- `ty_static`: Lists the known environment variables used by `ty`.
+- `ty_combine`: Utility crate containing the `Combine` trait, which is used to combine `Options`.
 
 ## Writing tests
 

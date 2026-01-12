@@ -1942,7 +1942,7 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @r"
+        @"
     bar.foo
     bar.wazoo
     ",
@@ -1964,7 +1964,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @r"
+        @"
     bar.foo
     bar.wazoo
     ",
@@ -2029,7 +2029,7 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @r"
+        @"
     bar.foo
     bar.wazoo
     ",

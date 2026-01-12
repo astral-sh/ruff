@@ -8,7 +8,7 @@ use super::{
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
@@ -94,7 +94,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
-    registry.register_lint(&NON_SUBSCRIPTABLE);
+    registry.register_lint(&NOT_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
@@ -120,11 +120,13 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
+    registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&UNSAFE_TUPLE_SUBCLASS);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
+    registry.register_lint(&INVALID_TOTAL_ORDERING);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1462,7 +1464,7 @@ declare_lint! {
     /// ```python
     /// 4[1]  # TypeError: 'int' object is not subscriptable
     /// ```
-    pub(crate) static NON_SUBSCRIPTABLE = {
+    pub(crate) static NOT_SUBSCRIPTABLE = {
         summary: "detects subscripting objects that do not support subscripting",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -2170,6 +2172,31 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Detects statements other than annotated declarations in `TypedDict` class bodies.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` class bodies aren't allowed to contain any other types of statements. For
+    /// example, method definitions and field values aren't allowed. None of these will be
+    /// available on "instances of the `TypedDict`" at runtime (as `dict` is the runtime class of
+    /// all "`TypedDict` instances").
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Foo(TypedDict):
+    ///     def bar(self):  # error: [invalid-typed-dict-statement]
+    ///         pass
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
+        summary: "detects invalid statements in `TypedDict` class bodies",
+        status: LintStatus::stable("0.0.9"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
     ///
     /// The LSP states that an instance of a subtype should be substitutable for an instance of its supertype.
@@ -2327,6 +2354,46 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Checks for classes decorated with `@functools.total_ordering` that don't
+    /// define any ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`).
+    ///
+    /// ## Why is this bad?
+    /// The `@total_ordering` decorator requires the class to define at least one
+    /// ordering method. If none is defined, Python raises a `ValueError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from functools import total_ordering
+    ///
+    /// @total_ordering
+    /// class MyClass:  # Error: no ordering method defined
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```python
+    /// from functools import total_ordering
+    ///
+    /// @total_ordering
+    /// class MyClass:
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    ///
+    ///     def __lt__(self, other: "MyClass") -> bool:
+    ///         return True
+    /// ```
+    pub(crate) static INVALID_TOTAL_ORDERING = {
+        summary: "detects `@total_ordering` classes without an ordering method",
+        status: LintStatus::stable("0.0.10"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -2426,24 +2493,24 @@ pub(super) fn report_index_out_of_bounds(
 }
 
 /// Emit a diagnostic declaring that a type does not support subscripting.
-pub(super) fn report_non_subscriptable(
+pub(super) fn report_not_subscriptable(
     context: &InferContext,
     node: &ast::ExprSubscript,
-    non_subscriptable_ty: Type,
+    not_subscriptable_ty: Type,
     method: &str,
 ) {
-    let Some(builder) = context.report_lint(&NON_SUBSCRIPTABLE, node) else {
+    let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, node) else {
         return;
     };
     if method == "__delitem__" {
         builder.into_diagnostic(format_args!(
             "Cannot delete subscript on object of type `{}` with no `{method}` method",
-            non_subscriptable_ty.display(context.db())
+            not_subscriptable_ty.display(context.db())
         ));
     } else {
         builder.into_diagnostic(format_args!(
             "Cannot subscript object of type `{}` with no `{method}` method",
-            non_subscriptable_ty.display(context.db())
+            not_subscriptable_ty.display(context.db())
         ));
     }
 }
@@ -2476,29 +2543,25 @@ fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
     message: std::fmt::Arguments,
 ) -> Option<LintDiagnosticGuard<'db, 'ctx>> {
     let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
+
+    let mut diag = builder.into_diagnostic(message);
+
     match target_ty {
         Type::ClassLiteral(class) => {
-            let mut diag = builder.into_diagnostic(format_args!(
-                "Implicit shadowing of class `{}`",
+            diag.info(format_args!(
+                "Implicit shadowing of class `{}`, add an annotation to make it explicit if this is intentional",
                 class.name(context.db()),
             ));
-            diag.info("Annotate to make it explicit if this is intentional");
-            Some(diag)
         }
         Type::FunctionLiteral(function) => {
-            let mut diag = builder.into_diagnostic(format_args!(
-                "Implicit shadowing of function `{}`",
+            diag.info(format_args!(
+                "Implicit shadowing of function `{}`, add an annotation to make it explicit if this is intentional",
                 function.name(context.db()),
             ));
-            diag.info("Annotate to make it explicit if this is intentional");
-            Some(diag)
         }
-
-        _ => {
-            let diag = builder.into_diagnostic(message);
-            Some(diag)
-        }
+        _ => {}
     }
+    Some(diag)
 }
 
 pub(super) fn report_invalid_assignment<'db>(
@@ -4011,10 +4074,14 @@ pub(super) fn report_invalid_method_override<'db>(
             .place
     };
 
-    if let Place::Defined(Type::FunctionLiteral(subclass_function), _, _, _) =
-        class_member(subclass)
-        && let Place::Defined(Type::FunctionLiteral(superclass_function), _, _, _) =
-            class_member(superclass)
+    if let Place::Defined(DefinedPlace {
+        ty: Type::FunctionLiteral(subclass_function),
+        ..
+    }) = class_member(subclass)
+        && let Place::Defined(DefinedPlace {
+            ty: Type::FunctionLiteral(superclass_function),
+            ..
+        }) = class_member(superclass)
         && let Ok(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)
         && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)
@@ -4403,8 +4470,9 @@ pub(super) fn report_unsupported_comparison<'db>(
             && let Some(TupleSpec::Fixed(rhs_spec)) = right_ty.tuple_instance_spec(db).as_deref()
             && lhs_spec.len() == rhs_spec.len()
             && let Some(position) = lhs_spec
-                .elements()
-                .zip(rhs_spec.elements())
+                .all_elements()
+                .iter()
+                .zip(rhs_spec.all_elements())
                 .position(|tup| tup == (&error.left_ty, &error.right_ty))
         {
             if error.left_ty == error.right_ty {
@@ -4646,6 +4714,50 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
 
         diagnostic.sub(sub);
     }
+}
+
+pub(super) fn report_invalid_total_ordering(
+    context: &InferContext<'_, '_>,
+    class: ClassLiteral<'_>,
+    decorator: &ast::Decorator,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_TOTAL_ORDERING, decorator) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "Class decorated with `@total_ordering` must define at least one ordering method",
+    );
+    diagnostic.set_primary_message(format_args!(
+        "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+        class.name(db)
+    ));
+    diagnostic.info("The decorator will raise `ValueError` at runtime");
+}
+
+/// Reports an invalid `total_ordering(cls)` function call where the class
+/// does not define any ordering method.
+pub(super) fn report_invalid_total_ordering_call(
+    context: &InferContext<'_, '_>,
+    class: ClassLiteral<'_>,
+    call_expression: &ast::ExprCall,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_TOTAL_ORDERING, call_expression) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "`@functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined",
+    );
+    diagnostic.set_primary_message(format_args!(
+        "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+        class.name(db)
+    ));
+    diagnostic.info("The function will raise `ValueError` at runtime");
 }
 
 /// This function receives an unresolved `from foo import bar` import,

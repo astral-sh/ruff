@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: for.md - For loops - Bad `__getitem__` method
 mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md

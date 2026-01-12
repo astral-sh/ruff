@@ -34,6 +34,7 @@ PLR0917 Too many positional arguments (6/5)
    |         ^
 44 |         pass
    |
+help: Consider adding `@typing.override` if changing the function signature would violate the Liskov Substitution Principle
 
 PLR0917 Too many positional arguments (6/5)
   --> too_many_positional_arguments.py:47:9
@@ -43,3 +44,4 @@ PLR0917 Too many positional arguments (6/5)
    |         ^
 48 |         pass
    |
+help: Consider adding `@typing.override` if changing the function signature would violate the Liskov Substitution Principle

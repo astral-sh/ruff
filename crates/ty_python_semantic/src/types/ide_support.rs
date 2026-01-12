@@ -73,7 +73,7 @@ pub fn definitions_for_name<'db>(
         let is_global = place_expr.is_global();
         let is_nonlocal = place_expr.is_nonlocal();
 
-        // TODO: The current algorithm doesn't return definintions or bindings
+        // TODO: The current algorithm doesn't return definitions or bindings
         // for other scopes that are outside of this scope hierarchy that target
         // this name using a nonlocal or global binding. The semantic analyzer
         // doesn't appear to track these in a way that we can easily access
@@ -456,8 +456,8 @@ pub struct CallSignatureDetails<'db> {
     /// Parameter kinds, useful to determine correct autocomplete suggestions.
     pub parameter_kinds: Vec<ParameterKind<'db>>,
 
-    /// Parameter kinds, useful to determine correct autocomplete suggestions.
-    pub parameter_types: Vec<Option<Type<'db>>>,
+    /// Annotated types of parameters. If no annotation was provided, this is `Unknown`.
+    pub parameter_types: Vec<Type<'db>>,
 
     /// The definition where this callable was originally defined (useful for
     /// extracting docstrings).
@@ -521,12 +521,11 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(model.db()).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
-                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Option<Type>>) =
-                    signature
-                        .parameters()
-                        .iter()
-                        .map(|param| (param.kind().clone(), param.annotated_type()))
-                        .unzip();
+                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
+                    .parameters()
+                    .iter()
+                    .map(|param| (param.kind().clone(), param.annotated_type()))
+                    .unzip();
 
                 CallSignatureDetails {
                     definition: signature.definition(),
@@ -785,6 +784,12 @@ pub fn inlay_hint_call_argument_details<'db>(
         };
 
         if !arg_mapping.matched {
+            continue;
+        }
+
+        // Skip if this argument maps to multiple parameters (e.g., unpacked tuple filling
+        // multiple slots). Showing a single parameter name would be misleading.
+        if arg_mapping.parameters.len() > 1 {
             continue;
         }
 

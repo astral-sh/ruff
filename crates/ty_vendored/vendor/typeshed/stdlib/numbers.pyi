@@ -74,8 +74,7 @@ class Number(metaclass=ABCMeta):
 
     __slots__ = ()
     @abstractmethod
-    def __hash__(self) -> int:
-        """The type of the None singleton."""
+    def __hash__(self) -> int: ...
 
 # See comment at the top of the file
 # for why some of these return types are purposefully vague

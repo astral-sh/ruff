@@ -78,6 +78,10 @@ use super::{
 /// This rule only applies to generic classes and does not include generic functions. See
 /// [`non-pep695-generic-function`][UP047] for the function version.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/

@@ -386,3 +386,52 @@ def _(target: int, flag: NotBoolable):
 
     reveal_type(y)  # revealed: Literal[1, 2, 3]
 ```
+
+## Matching on enum | None without covering None
+
+When matching on a union of an enum and None, code after the match should still be reachable if None
+is not covered by any case, even when all enum members are covered.
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+def _(answer: Answer | None):
+    y = 0
+    match answer:
+        case Answer.YES:
+            y = 1
+        case Answer.NO:
+            y = 2
+
+    # The match is not exhaustive because None is not covered,
+    # so y could still be 0
+    reveal_type(y)  # revealed: Literal[0, 1, 2]
+
+def _(answer: Answer | None):
+    match answer:
+        case Answer.YES:
+            return 1
+        case Answer.NO:
+            return 2
+
+    # Code here is reachable because None is not covered
+    reveal_type(answer)  # revealed: None
+    return 3
+
+class Foo: ...
+
+def _(answer: Answer | None):
+    match answer:
+        case Answer.YES:
+            return
+        case Answer.NO:
+            return
+
+    # New assignments after the match should not be `Never`
+    x = Foo()
+    reveal_type(x)  # revealed: Foo
+```

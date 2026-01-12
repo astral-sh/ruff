@@ -992,6 +992,46 @@ class TarFile:
         """
 
 open = TarFile.open
+"""Open a tar archive for reading, writing or appending. Return
+an appropriate TarFile class.
+
+mode:
+'r' or 'r:*' open for reading with transparent compression
+'r:'         open for reading exclusively uncompressed
+'r:gz'       open for reading with gzip compression
+'r:bz2'      open for reading with bzip2 compression
+'r:xz'       open for reading with lzma compression
+'r:zst'      open for reading with zstd compression
+'a' or 'a:'  open for appending, creating the file if necessary
+'w' or 'w:'  open for writing without compression
+'w:gz'       open for writing with gzip compression
+'w:bz2'      open for writing with bzip2 compression
+'w:xz'       open for writing with lzma compression
+'w:zst'      open for writing with zstd compression
+
+'x' or 'x:'  create a tarfile exclusively without compression, raise
+             an exception if the file is already created
+'x:gz'       create a gzip compressed tarfile, raise an exception
+             if the file is already created
+'x:bz2'      create a bzip2 compressed tarfile, raise an exception
+             if the file is already created
+'x:xz'       create an lzma compressed tarfile, raise an exception
+             if the file is already created
+'x:zst'      create a zstd compressed tarfile, raise an exception
+             if the file is already created
+
+'r|*'        open a stream of tar blocks with transparent compression
+'r|'         open an uncompressed stream of tar blocks for reading
+'r|gz'       open a gzip compressed stream of tar blocks
+'r|bz2'      open a bzip2 compressed stream of tar blocks
+'r|xz'       open an lzma compressed stream of tar blocks
+'r|zst'      open a zstd compressed stream of tar blocks
+'w|'         open an uncompressed stream for writing
+'w|gz'       open a gzip compressed stream for writing
+'w|bz2'      open a bzip2 compressed stream for writing
+'w|xz'       open an lzma compressed stream for writing
+'w|zst'      open a zstd compressed stream for writing
+"""
 
 def is_tarfile(name: StrOrBytesPath | IO[bytes]) -> bool:
     """Return True if name points to a tar archive that we
@@ -1077,6 +1117,8 @@ class TarInfo:
     )
     name: str
     path: str
+    """In pax headers, "name" is called "path"."""
+
     size: int
     mtime: int | float
     chksum: int

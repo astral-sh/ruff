@@ -757,9 +757,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn record_expression_narrowing_constraint(
         &mut self,
-        precide_node: &ast::Expr,
+        predicate_node: &ast::Expr,
     ) -> PredicateOrLiteral<'db> {
-        let predicate = self.build_predicate(precide_node);
+        let predicate = self.build_predicate(predicate_node);
         self.record_narrowing_constraint(predicate);
         predicate
     }

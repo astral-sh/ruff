@@ -11,14 +11,15 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor, NormalizedVisitor,
+    TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
-
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
@@ -165,7 +166,7 @@ impl<'db> Type<'db> {
         // This matches the behaviour of other type checkers, and is required for us to
         // recognise `str` as a subtype of `Container[str]`.
         structurally_satisfied.or(db, || {
-            let Some(nominal_instance) = protocol.as_nominal_type() else {
+            let Some(nominal_instance) = protocol.to_nominal_instance() else {
                 return ConstraintSet::from(false);
             };
 
@@ -175,7 +176,7 @@ impl<'db> Type<'db> {
             // `Q`'s members in a Liskov-incompatible way.
             let type_to_test = self
                 .as_protocol_instance()
-                .and_then(ProtocolInstanceType::as_nominal_type)
+                .and_then(ProtocolInstanceType::to_nominal_instance)
                 .map(Type::NominalInstance)
                 .unwrap_or(self);
 
@@ -220,10 +221,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class,
-            NominalInstanceInner::Object => KnownClass::Object
-                .try_to_class_literal(db)
-                .expect("Typeshed should always have a `object` class in `builtins.pyi`")
-                .default_specialization(db),
+            NominalInstanceInner::Object => ClassType::object(db),
         }
     }
 
@@ -658,7 +656,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// If this is a synthesized protocol that does not correspond to a class definition
     /// in source code, return `None`. These are "pure" abstract types, that cannot be
     /// treated in a nominal way.
-    pub(super) fn as_nominal_type(self) -> Option<NominalInstanceType<'db>> {
+    pub(super) fn to_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self.inner {
             Protocol::FromClass(class) => {
                 Some(NominalInstanceType(NominalInstanceInner::NonTuple(*class)))

@@ -752,3 +752,32 @@ reveal_type(x)  # revealed: list[Sub]
 y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
 ```
+
+## Bounded TypeVar with callable parameter
+
+When a bounded TypeVar appears in a `Callable` parameter's return type, the inferred type should be
+the actual type from the call, not the TypeVar's upper bound.
+
+See: <https://github.com/astral-sh/ty/issues/2292>
+
+```py
+from typing import Callable, TypeVar
+
+class Base:
+    pass
+
+class Derived(Base):
+    attr: int
+
+T = TypeVar("T", bound=Base)
+
+def takes_factory(factory: Callable[[], T]) -> T:
+    return factory()
+
+# Passing a class as a factory: should infer Derived, not Base
+result = takes_factory(Derived)
+reveal_type(result)  # revealed: Derived
+
+# Accessing an attribute that only exists on Derived should work
+print(result.attr)  # No error
+```

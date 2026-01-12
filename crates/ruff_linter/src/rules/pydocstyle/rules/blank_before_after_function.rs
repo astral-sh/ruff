@@ -33,6 +33,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     """Return the mean of the given values."""
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -79,6 +83,10 @@ impl Violation for BlankLineBeforeFunction {
 ///     """Return the mean of the given values."""
 ///     return sum(values) / len(values)
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

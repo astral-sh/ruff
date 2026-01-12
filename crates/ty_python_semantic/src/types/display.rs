@@ -14,7 +14,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
@@ -27,8 +27,8 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
-    SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeGuardLike, TypedDictType,
+    UnionType, WrapperDescriptorKind, visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -238,7 +238,7 @@ impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
     }
 }
 
-impl std::fmt::Write for TypeWriter<'_, '_, '_> {
+impl Write for TypeWriter<'_, '_, '_> {
     fn write_str(&mut self, val: &str) -> fmt::Result {
         match self {
             TypeWriter::Formatter(formatter) => formatter.write_str(val),
@@ -246,7 +246,7 @@ impl std::fmt::Write for TypeWriter<'_, '_, '_> {
         }
     }
 }
-impl std::fmt::Write for TypeDetailsWriter<'_> {
+impl Write for TypeDetailsWriter<'_> {
     fn write_str(&mut self, val: &str) -> fmt::Result {
         self.label.write_str(val)
     }
@@ -424,7 +424,7 @@ enum AmbiguityState<'db> {
     RequiresFileAndLineNumber,
 }
 
-impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
+impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
     fn should_visit_lazy_type_attributes(&self) -> bool {
         false
     }
@@ -588,6 +588,28 @@ impl Display for ClassDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
+}
+
+/// Helper for displaying `TypeGuardLike` types `TypeIs` and `TypeGuard`.
+fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
+    db: &'db dyn Db,
+    guard: T,
+    settings: &DisplaySettings<'db>,
+    f: &mut TypeWriter<'_, '_, 'db>,
+) -> fmt::Result {
+    f.with_type(Type::SpecialForm(T::special_form()))
+        .write_str(T::FORM_NAME)?;
+    f.write_char('[')?;
+    guard
+        .return_type(db)
+        .display_with(db, settings.singleline())
+        .fmt_detailed(f)?;
+    if let Some(name) = guard.place_name(db) {
+        f.set_invalid_type_annotation();
+        f.write_str(" @ ")?;
+        f.write_str(&name)?;
+    }
+    f.write_str("]")
 }
 
 /// Writes the string representation of a type, which is the value displayed either as
@@ -865,7 +887,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db))
                     .write_str("method-wrapper")?;
                 f.write_str(" '")?;
-                if let Place::Defined(member_ty, _, _, _) =
+                if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
                     class_ty.member(self.db, member_name).place
                 {
                     f.with_type(member_ty).write_str(member_name)?;
@@ -966,25 +988,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ")?;
-                Type::from(bound_super.owner(self.db))
+                bound_super
+                    .owner(self.db)
+                    .owner_type(self.db)
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            Type::TypeIs(type_is) => {
-                f.with_type(Type::SpecialForm(SpecialFormType::TypeIs))
-                    .write_str("TypeIs")?;
-                f.write_char('[')?;
-                type_is
-                    .return_type(self.db)
-                    .display_with(self.db, self.settings.singleline())
-                    .fmt_detailed(f)?;
-                if let Some(name) = type_is.place_name(self.db) {
-                    f.set_invalid_type_annotation();
-                    f.write_str(" @ ")?;
-                    f.write_str(&name)?;
-                }
-                f.write_str("]")
+            Type::TypeIs(type_is) => fmt_type_guard_like(self.db, type_is, &self.settings, f),
+            Type::TypeGuard(type_guard) => {
+                fmt_type_guard_like(self.db, type_guard, &self.settings, f)
             }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
                 ClassType::NonGeneric(class) => class
@@ -1103,14 +1116,14 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
             // S is included if there is either a prefix or a suffix. The initial `tuple[` and
             // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
             TupleSpec::Variable(tuple) => {
-                if !tuple.prefix.is_empty() {
+                if !tuple.prefix_elements().is_empty() {
                     tuple
-                        .prefix
+                        .prefix_elements()
                         .display_with(self.db, self.settings.singleline())
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
-                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
                     f.write_char('*')?;
                     // Might as well link the type again here too
                     f.with_type(KnownClass::Tuple.to_class_literal(self.db))
@@ -1118,17 +1131,17 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_char('[')?;
                 }
                 tuple
-                    .variable
+                    .variable()
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ...")?;
-                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
                     f.write_str("]")?;
                 }
-                if !tuple.suffix.is_empty() {
+                if !tuple.suffix_elements().is_empty() {
                     f.write_str(", ")?;
                     tuple
-                        .suffix
+                        .suffix_elements()
                         .display_with(self.db, self.settings.singleline())
                         .fmt_detailed(f)?;
                 }
@@ -1582,7 +1595,6 @@ impl<'db> CallableType<'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
-            is_top_materialization: self.is_top_materialization(db),
             db,
             settings,
         }
@@ -1592,27 +1604,25 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
-    is_top_materialization: bool,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        // If this callable is a top materialization, wrap it in Top[...]
-        if self.is_top_materialization {
-            f.with_type(Type::SpecialForm(SpecialFormType::Top))
-                .write_str("Top")?;
-            f.write_char('[')?;
-        }
-
         match self.signatures.overloads.as_slice() {
             [signature] => {
                 if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
+                    if signature.parameters().is_top() {
+                        f.write_str("Top[")?;
+                    }
                     signature
                         .parameters()
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
+                    if signature.parameters().is_top() {
+                        f.write_str("]")?;
+                    }
                 } else {
                     signature
                         .display_with(self.db, self.settings.clone())
@@ -1639,9 +1649,6 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
             }
         }
 
-        if self.is_top_materialization {
-            f.write_char(']')?;
-        }
         Ok(())
     }
 }
@@ -1675,7 +1682,7 @@ impl<'db> Signature<'db> {
 pub(crate) struct DisplaySignature<'a, 'db> {
     definition: Option<Definition<'db>>,
     parameters: &'a Parameters<'db>,
-    return_ty: Option<Type<'db>>,
+    return_ty: Type<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
@@ -1701,6 +1708,10 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         // When we exit this function, write a marker signaling we're ending a signature
         let mut f = f.with_detail(TypeDetail::SignatureEnd);
 
+        if self.parameters.is_top() {
+            f.write_str("Top[")?;
+        }
+
         // If we're multiline printing and a name hasn't been emitted, try to
         // remember what the name was by checking if we have a definition
         if self.settings.multiline
@@ -1718,11 +1729,16 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .fmt_detailed(&mut f)?;
 
         // Return type
-        let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
         f.write_str(" -> ")?;
-        return_ty
+        self.return_ty
             .display_with(self.db, self.settings.singleline())
-            .fmt_detailed(&mut f)
+            .fmt_detailed(&mut f)?;
+
+        if self.parameters.is_top() {
+            f.write_str("]")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1831,9 +1847,10 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     f.write_char('/')?;
                 }
             }
-            ParametersKind::Gradual => {
+            ParametersKind::Gradual | ParametersKind::Top => {
                 // We represent gradual form as `...` in the signature, internally the parameters still
-                // contain `(*args, **kwargs)` parameters.
+                // contain `(*args, **kwargs)` parameters. (Top parameters are displayed the same
+                // as gradual parameters, we just wrap the entire signature in `Top[]`.)
                 f.write_str("...")?;
             }
             ParametersKind::ParamSpec(typevar) => {
@@ -1881,17 +1898,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
-            if let Some(annotated_type) = self.param.annotated_type() {
-                if self.param.should_annotation_be_displayed() {
-                    f.write_str(": ")?;
-                    annotated_type
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                }
+            if self.param.should_annotation_be_displayed() {
+                let annotated_type = self.param.annotated_type();
+                f.write_str(": ")?;
+                annotated_type
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_type) = self.param.default_type() {
-                if self.param.annotated_type().is_some() {
+                if self.param.should_annotation_be_displayed() {
                     f.write_str(" = ")?;
                 } else {
                     f.write_str("=")?;
@@ -1924,10 +1940,13 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     _ => f.write_str("...")?,
                 }
             }
-        } else if let Some(ty) = self.param.annotated_type() {
+        } else {
             // This case is specifically for the `Callable` signature where name and default value
-            // cannot be provided.
-            ty.display_with(self.db, self.settings.clone())
+            // cannot be provided. For unnamed parameters we always display the type, to ensure we
+            // have something visible in the parameter slot.
+            self.param
+                .annotated_type()
+                .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         Ok(())
@@ -2250,9 +2269,12 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             f.write_char(')')
         };
         match self.ty {
-            // Callable types with a top materialization are displayed as `Top[(...) -> T]`,
-            // which is already unambiguous and doesn't need additional parentheses.
-            Type::Callable(callable) if !callable.is_top_materialization(self.db) => {
+            Type::Callable(callable)
+                if callable.signatures(self.db).overloads.len() == 1
+                    && !callable.signatures(self.db).overloads[0]
+                        .parameters()
+                        .is_top() =>
+            {
                 write_parentheses(f)
             }
             Type::KnownBoundMethod(_)
@@ -2627,9 +2649,12 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(db, parameters), return_ty)
-            .display(db)
-            .to_string()
+        Signature::new(
+            Parameters::new(db, parameters),
+            return_ty.unwrap_or(Type::unknown()),
+        )
+        .display(db)
+        .to_string()
     }
 
     fn display_signature_multiline<'db>(
@@ -2637,9 +2662,12 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(db, parameters), return_ty)
-            .display_with(db, super::DisplaySettings::default().multiline())
-            .to_string()
+        Signature::new(
+            Parameters::new(db, parameters),
+            return_ty.unwrap_or(Type::unknown()),
+        )
+        .display_with(db, super::DisplaySettings::default().multiline())
+        .to_string()
     }
 
     #[test]

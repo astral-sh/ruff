@@ -7,6 +7,7 @@ use std::fmt;
 #[derive(Debug, Clone, CacheKey, Default)]
 pub struct Settings {
     pub parenthesize_tuple_in_subscript: bool,
+    pub strictly_empty_init_modules: bool,
 }
 
 impl fmt::Display for Settings {
@@ -16,6 +17,7 @@ impl fmt::Display for Settings {
             namespace = "linter.ruff",
             fields = [
                 self.parenthesize_tuple_in_subscript,
+                self.strictly_empty_init_modules,
             ]
         }
         Ok(())
