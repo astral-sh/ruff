@@ -140,17 +140,17 @@ impl<'db> BindingsElement<'db> {
     }
 }
 
-/// Binding information for a possible union or intersection of callables.
+/// Binding information for a union of callables, where each union element may be an intersection.
 ///
-/// For unions: At a call site, the arguments must be compatible with _all_ of the types
+/// This structure represents a union (possibly size one) of callable elements, where each element
+/// is an intersection (possibly size one) of callable bindings.
+///
+/// For the union level: At a call site, the arguments must be compatible with _all_ elements
 /// in the union for the call to be valid. Return types are combined using union.
 ///
-/// For intersections: At a call site, we try each element and discard elements where the
-/// call fails. If at least one element succeeds, the call is valid. Return types are
-/// combined using intersection.
-///
-/// This structure supports nested unions of intersections. Each `BindingsElement` in `elements`
-/// represents a union element, which could itself be an intersection of callables.
+/// For the intersection level within each element: We try each binding and discard bindings
+/// where the call fails. If at least one binding succeeds, the element succeeds. Return types
+/// are combined using intersection.
 #[derive(Debug, Clone)]
 pub(crate) struct Bindings<'db> {
     /// The type that is (hopefully) callable.
