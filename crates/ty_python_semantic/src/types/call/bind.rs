@@ -538,19 +538,38 @@ impl<'db> Bindings<'db> {
             return;
         }
 
+        let is_union = self.elements.len() > 1;
+
         // For intersection elements, use priority hierarchy
         if element.is_intersection() {
             // Find the highest priority error among bindings in this element
             let max_priority = element.error_priority();
 
+            // Construct the intersection type from the bindings
+            let intersection_type = IntersectionType::from_elements(
+                context.db(),
+                element.bindings.iter().map(|b| b.callable_type),
+            );
+
             // Only report errors from bindings with the highest priority
             for binding in &element.bindings {
                 if binding.error_priority() == max_priority {
-                    let intersection_diag = IntersectionDiagnostic {
-                        callable_type: self.callable_type(),
-                        binding,
-                    };
-                    binding.report_diagnostics(context, node, Some(&intersection_diag));
+                    if is_union {
+                        // Use layered diagnostic for intersection inside a union
+                        let layered_diag = LayeredDiagnostic {
+                            union_callable_type: self.callable_type(),
+                            intersection_callable_type: intersection_type,
+                            binding,
+                        };
+                        binding.report_diagnostics(context, node, Some(&layered_diag));
+                    } else {
+                        // Just intersection, no union context needed
+                        let intersection_diag = IntersectionDiagnostic {
+                            callable_type: intersection_type,
+                            binding,
+                        };
+                        binding.report_diagnostics(context, node, Some(&intersection_diag));
+                    }
                 }
             }
         } else {
@@ -4948,6 +4967,52 @@ impl CompoundDiagnostic for IntersectionDiagnostic<'_, '_> {
             format_args!(
                 "Attempted to call intersection type `{}`",
                 self.callable_type.display(db)
+            ),
+        );
+        diag.sub(sub);
+    }
+}
+
+/// Contains both union and intersection context for layered diagnostics.
+///
+/// Used when an intersection fails inside a union - we want to report both
+/// that this is a union variant AND that this is an intersection element.
+struct LayeredDiagnostic<'b, 'db> {
+    /// The type of the union.
+    union_callable_type: Type<'db>,
+    /// The type of the intersection (for intersection context).
+    intersection_callable_type: Type<'db>,
+    /// The specific binding that failed.
+    binding: &'b CallableBinding<'db>,
+}
+
+impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
+    fn add_context(&self, db: &dyn Db, diag: &mut Diagnostic) {
+        // Add intersection context first (more specific)
+        let sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "Intersection element `{callable_ty}` is incompatible with this call site",
+                callable_ty = self.binding.callable_type.display(db),
+            ),
+        );
+        diag.sub(sub);
+
+        let sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "Attempted to call intersection type `{}`",
+                self.intersection_callable_type.display(db)
+            ),
+        );
+        diag.sub(sub);
+
+        // Then add union context (outer layer)
+        let sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "Attempted to call union type `{}`",
+                self.union_callable_type.display(db)
             ),
         );
         diag.sub(sub);

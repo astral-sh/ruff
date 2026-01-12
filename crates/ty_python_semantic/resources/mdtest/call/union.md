@@ -834,3 +834,34 @@ def _(flag: bool):
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `T`, found `dict[str, int] & dict[Unknown | str, Unknown | int]`"
     f({"y": 1})
 ```
+
+## Union of intersections with failing bindings
+
+<!-- snapshot-diagnostics -->
+
+When calling a union where one element is an intersection of callables, and all bindings
+in that intersection fail, we should report errors with both union and intersection context.
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class IntCaller:
+    def __call__(self, x: int) -> int:
+        return x
+
+class StrCaller:
+    def __call__(self, x: str) -> str:
+        return x
+
+class BytesCaller:
+    def __call__(self, x: bytes) -> bytes:
+        return x
+
+def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
+    # Call with None - should fail for IntCaller, StrCaller, and BytesCaller
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    f(None)
+```
