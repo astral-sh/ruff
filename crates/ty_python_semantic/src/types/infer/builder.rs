@@ -6050,6 +6050,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
+        // If any argument is a starred expression, we can't know how many positional arguments
+        // we're receiving, so fall back to normal call binding.
+        if args.iter().any(ast::Expr::is_starred_expr) {
+            return None;
+        }
+
         // Infer the argument types.
         let name_type = self.infer_expression(name_arg, TypeContext::default());
         let bases_type = self.infer_expression(bases_arg, TypeContext::default());

@@ -605,12 +605,15 @@ reveal_type(instance.attr)  # revealed: int
 Unpacking arguments with `*args` or `**kwargs`:
 
 ```py
+from ty_extensions import reveal_mro
+
 class Base: ...
 
 # Unpacking a tuple for bases
 bases_tuple = (Base,)
 Cls1 = type("Cls1", (*bases_tuple,), {})
 reveal_type(Cls1)  # revealed: <class 'Cls1'>
+reveal_mro(Cls1)  # revealed: (<class 'Cls1'>, @Todo(StarredExpression), <class 'object'>)
 
 # Unpacking a dict for the namespace - the dict contents are not tracked anyway
 namespace = {"attr": 1}
@@ -641,6 +644,14 @@ def f(*args, **kwargs):
     D = type("D", (), {}, **kwargs)
     # TODO: `type[Unknown]` would cause fewer false positives
     reveal_type(D)  # revealed: type
+
+    # Three starred expressions - we can't know how they expand
+    a = ("E",)
+    b = ((),)
+    c = ({},)
+    E = type(*a, *b, *c)
+    # TODO: `type[Unknown]` would cause fewer false positives
+    reveal_type(E)  # revealed: type
 ```
 
 ## Explicit type annotations
@@ -671,12 +682,14 @@ synthesized:
 ```py
 # Protocol bases work - the class is created as a subclass of the protocol
 from typing import Protocol
+from ty_extensions import reveal_mro
 
 class MyProtocol(Protocol):
     def method(self) -> int: ...
 
 ProtoImpl = type("ProtoImpl", (MyProtocol,), {})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
+reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 
 instance = ProtoImpl()
 reveal_type(instance)  # revealed: ProtoImpl
@@ -687,6 +700,7 @@ reveal_type(instance)  # revealed: ProtoImpl
 ```py
 # TypedDict bases work but TypedDict semantics aren't applied to dynamic subclasses
 from typing_extensions import TypedDict
+from ty_extensions import reveal_mro
 
 class MyDict(TypedDict):
     name: str
@@ -694,6 +708,7 @@ class MyDict(TypedDict):
 
 DictSubclass = type("DictSubclass", (MyDict,), {})
 reveal_type(DictSubclass)  # revealed: <class 'DictSubclass'>
+reveal_mro(DictSubclass)  # revealed: (<class 'DictSubclass'>, <class 'MyDict'>, typing.TypedDict, <class 'object'>)
 ```
 
 ### NamedTuple bases
@@ -701,6 +716,7 @@ reveal_type(DictSubclass)  # revealed: <class 'DictSubclass'>
 ```py
 # NamedTuple bases work but the dynamic subclass isn't recognized as a NamedTuple
 from typing import NamedTuple
+from ty_extensions import reveal_mro
 
 class Point(NamedTuple):
     x: int
@@ -708,6 +724,9 @@ class Point(NamedTuple):
 
 Point3D = type("Point3D", (Point,), {})
 reveal_type(Point3D)  # revealed: <class 'Point3D'>
+# fmt: off
+reveal_mro(Point3D)  # revealed: (<class 'Point3D'>, <class 'Point'>, <class 'tuple[int, int]'>, <class 'Sequence[int]'>, <class 'Reversible[int]'>, <class 'Collection[int]'>, <class 'Iterable[int]'>, <class 'Container[int]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# fmt: on
 ```
 
 ### Enum bases
