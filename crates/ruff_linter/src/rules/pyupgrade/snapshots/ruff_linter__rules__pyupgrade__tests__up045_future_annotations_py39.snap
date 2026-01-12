@@ -77,4 +77,6 @@ help: Convert to `X | None`
    - x: TypeAlias = "Optional[str]"  # UP045
 14 + x: TypeAlias = "str | None"  # UP045
 15 | x: TypeAlias = Optional[str]  # okay
+16 | 
+17 | # complex (implicitly concatenated) annotations
 note: This is an unsafe fix and may change runtime behavior

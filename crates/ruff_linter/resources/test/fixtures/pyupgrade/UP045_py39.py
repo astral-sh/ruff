@@ -13,3 +13,23 @@ cast("Optional[str]", None)  # UP045
 cast(Optional[str], None)    # okay, str | None is a runtime error
 x: TypeAlias = "Optional[str]"  # UP045
 x: TypeAlias = Optional[str]  # okay
+
+# complex (implicitly concatenated) annotations
+x: (
+    "Optional"
+    "["
+    "str"
+    "]"
+)
+cast((
+    "Optional"
+    "["
+    "str"
+    "]"
+), None)
+x: TypeAlias = (
+    "Optional"
+    "["
+    "str"
+    "]"
+)
