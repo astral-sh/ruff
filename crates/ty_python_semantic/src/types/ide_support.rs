@@ -169,9 +169,9 @@ pub fn definitions_for_name<'db>(
                 // instead of `int` (hover only shows the docstring of the first definition).
                 .rev()
                 .filter_map(|ty| ty.as_nominal_instance())
-                .filter_map(|instance| {
-                    let definition = instance.class_literal(db).definition(db)?;
-                    Some(ResolvedDefinition::Definition(definition))
+                .map(|instance| {
+                    let definition = instance.class_literal(db).definition(db);
+                    ResolvedDefinition::Definition(definition)
                 })
                 .collect();
         }

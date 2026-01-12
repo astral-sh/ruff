@@ -5412,7 +5412,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // Try to extract the dynamic class with definition.
                             // This returns `None` if it's not a three-arg call to `type()`,
                             // signalling that we must fall back to normal call inference.
-                            self.infer_dynamic_type_expression(call_expr, Some(definition))
+                            self.infer_dynamic_type_expression(call_expr, definition)
                                 .unwrap_or_else(|| {
                                     self.infer_call_expression_impl(call_expr, callable_type, tcx)
                                 })
@@ -6031,7 +6031,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_dynamic_type_expression(
         &mut self,
         call_expr: &ast::ExprCall,
-        definition: Option<Definition<'db>>,
+        definition: Definition<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
 
@@ -6090,12 +6090,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let bases = self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
 
-        let file = self.file();
-        let file_scope = self.scope().file_scope_id(db);
-        let node_index = call_expr.node_index().load();
-        let dynamic_class = DynamicClassLiteral::new(
-            db, name, bases, file, file_scope, node_index, definition, None,
-        );
+        let dynamic_class = DynamicClassLiteral::new(db, name, bases, definition, None);
 
         // Check for MRO errors.
         if let Err(error) = dynamic_class.try_mro(db) {
@@ -9076,14 +9071,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
 
             return Type::TypedDict(typed_dict);
-        }
-
-        // Handle 3-argument `type(name, bases, dict)`.
-        if let Type::ClassLiteral(class) = callable_type
-            && class.is_known(self.db(), KnownClass::Type)
-            && let Some(dynamic_type) = self.infer_dynamic_type_expression(call_expression, None)
-        {
-            return dynamic_type;
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the

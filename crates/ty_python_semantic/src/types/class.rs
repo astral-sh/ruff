@@ -74,7 +74,7 @@ use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
@@ -668,10 +668,10 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns the definition of this class, if available.
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+    /// Returns the definition of this class.
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
-            Self::Static(class) => Some(class.definition(db)),
+            Self::Static(class) => class.definition(db),
             Self::Dynamic(class) => class.definition(db),
         }
     }
@@ -679,11 +679,11 @@ impl<'db> ClassLiteral<'db> {
     /// Returns the type definition for this class.
     ///
     /// For static classes, returns `TypeDefinition::StaticClass`.
-    /// For dynamic classes, returns `TypeDefinition::DynamicClass` if a definition is available.
-    pub(crate) fn type_definition(self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
+    /// For dynamic classes, returns `TypeDefinition::DynamicClass`.
+    pub(crate) fn type_definition(self, db: &'db dyn Db) -> TypeDefinition<'db> {
         match self {
-            Self::Static(class) => Some(TypeDefinition::StaticClass(class.definition(db))),
-            Self::Dynamic(class) => class.definition(db).map(TypeDefinition::DynamicClass),
+            Self::Static(class) => TypeDefinition::StaticClass(class.definition(db)),
+            Self::Dynamic(class) => TypeDefinition::DynamicClass(class.definition(db)),
         }
     }
 
@@ -941,13 +941,13 @@ impl<'db> ClassType<'db> {
         self.class_literal(db).known(db)
     }
 
-    /// Returns the definition for this class, if available.
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+    /// Returns the definition for this class.
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.class_literal(db).definition(db)
     }
 
     /// Returns the type definition for this class.
-    pub(crate) fn type_definition(self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
+    pub(crate) fn type_definition(self, db: &'db dyn Db) -> TypeDefinition<'db> {
         self.class_literal(db).type_definition(db)
     }
 
@@ -4680,16 +4680,21 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 ///
 /// # Salsa interning
 ///
-/// Each `type()` call is uniquely identified by its location in the source code
-/// (`file`, `file_scope`, `node_index`), so two different `type()` calls always
-/// produce distinct `DynamicClassLiteral` instances, even if they have the
-/// same name and bases:
+/// Each `type()` call is uniquely identified by its [`Definition`], which provides
+/// stable identity without depending on AST node indices that can change when code
+/// is inserted above the call site.
+///
+/// Two different `type()` calls always produce distinct `DynamicClassLiteral`
+/// instances, even if they have the same name and bases:
 ///
 /// ```python
 /// Foo1 = type("Foo", (Base,), {})
 /// Foo2 = type("Foo", (Base,), {})
 /// # Foo1 and Foo2 are distinct types
 /// ```
+///
+/// Note: Only assigned `type()` calls are currently supported (e.g., `Foo = type(...)`).
+/// Inline calls like `process(type(...))` fall back to normal call handling.
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DynamicClassLiteral<'db> {
@@ -4701,21 +4706,8 @@ pub struct DynamicClassLiteral<'db> {
     #[returns(deref)]
     pub bases: Box<[ClassBase<'db>]>,
 
-    /// The file containing the `type()` call.
-    pub file: File,
-
-    /// The scope containing the `type()` call.
-    pub file_scope: FileScopeId,
-
-    /// The node index of the `type()` call expression, used to uniquely identify
-    /// the call site within the file.
-    pub node_index: NodeIndex,
-
-    /// The definition where this class is created (if in an assignment context).
-    ///
-    /// This is `Some` when the `type()` call is part of an assignment,
-    /// allowing go-to-definition to navigate to the creation site.
-    pub definition: Option<Definition<'db>>,
+    /// The definition where this class is created.
+    pub definition: Definition<'db>,
 
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
     /// or passed to `dataclass()` as a function.
@@ -4735,9 +4727,25 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Returns the range of the `type()` call expression that created this class.
     pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
-        let module = parsed_module(db, self.file(db)).load(db);
-        let node = module.get_by_index(self.node_index(db));
-        node.range()
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        // Dynamic classes are only created from regular assignments (e.g., `Foo = type(...)`).
+        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+            unreachable!("DynamicClassLiteral should only be created from Assignment definitions");
+        };
+        assignment.value(&module).range()
+    }
+
+    /// Returns the file containing the `type()` call.
+    pub(crate) fn file(self, db: &'db dyn Db) -> File {
+        self.definition(db).file(db)
+    }
+
+    /// Returns the scope containing the `type()` call.
+    pub(crate) fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
+        self.definition(db).file_scope(db)
     }
 
     /// Get the metaclass of this dynamic class.
@@ -4911,9 +4919,6 @@ impl<'db> DynamicClassLiteral<'db> {
             db,
             self.name(db).clone(),
             self.bases(db),
-            self.file(db),
-            self.file_scope(db),
-            self.node_index(db),
             self.definition(db),
             dataclass_params,
         )
