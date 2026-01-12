@@ -1772,12 +1772,9 @@ pub(crate) mod implicit_globals {
         db: &dyn Db,
     ) -> impl Iterator<Item = (Name, Type<'_>)> + '_ {
         // Special-cased implicit globals that are not in `module_type_symbols`
-        let special_cased = [
-            Name::new_static("__builtins__"),
-            Name::new_static("__debug__"),
-            Name::new_static("__warningregistry__"),
-        ]
-        .into_iter();
+        let special_cased = ["__builtins__", "__debug__", "__warningregistry__"]
+            .into_iter()
+            .map(Name::new_static);
 
         // All symbols from ModuleType (already includes `__file__`, `__name__`, etc.)
         let module_type_syms = module_type_symbols(db).iter().cloned();
