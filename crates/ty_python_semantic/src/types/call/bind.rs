@@ -43,7 +43,7 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    CallableTypeKind, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, GenericAlias, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
     SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance,
