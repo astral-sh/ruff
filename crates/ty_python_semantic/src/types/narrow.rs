@@ -1220,10 +1220,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         _ => continue,
                     };
 
-                    let is_positive = if is_positive {
-                        op == &ast::CmpOp::Is
-                    } else {
-                        op == &ast::CmpOp::IsNot
+                    let is_positive = match op {
+                        ast::CmpOp::Is => is_positive,
+                        ast::CmpOp::IsNot => !is_positive,
+                        _ => continue,
                     };
 
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
