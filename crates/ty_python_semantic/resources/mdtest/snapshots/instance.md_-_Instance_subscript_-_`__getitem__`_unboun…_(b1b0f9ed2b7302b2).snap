@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: instance.md - Instance subscript - `__getitem__` unbound
 mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/instance.md

@@ -1,0 +1,321 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+---
+## Input
+
+```python
+def foo():
+    pass
+
+
+# comment 1  # fmt: skip
+# comment 2
+
+[
+    (1, 2),
+    # # fmt: off
+    # (3,
+    #    4),
+    # # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    # (3,
+    #    4),
+    # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    # (3,
+    #    4),
+    # # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    # (3,
+    #    4),
+    # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    (3,
+       4),
+    # # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    (3,
+       4),
+    # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    (3,
+       4),
+    # # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    (3,
+       4),
+    # fmt: on
+    (5, 6),
+]
+
+
+if False:
+    # fmt: off # some other comment
+    pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -46,8 +46,7 @@
+ [
+     (1, 2),
+     # # fmt: off
+-    (3,
+-       4),
++    (3, 4),
+     # # fmt: on
+     (5, 6),
+ ]
+@@ -55,8 +54,7 @@
+ [
+     (1, 2),
+     # # fmt: off
+-    (3,
+-       4),
++    (3, 4),
+     # fmt: on
+     (5, 6),
+ ]
+@@ -65,8 +63,7 @@
+ [
+     (1, 2),
+     # fmt: off
+-    (3,
+-       4),
++    (3, 4),
+     # # fmt: on
+     (5, 6),
+ ]
+@@ -75,8 +72,7 @@
+ [
+     (1, 2),
+     # fmt: off
+-    (3,
+-       4),
++    (3, 4),
+     # fmt: on
+     (5, 6),
+ ]
+```
+
+## Ruff Output
+
+```python
+def foo():
+    pass
+
+
+# comment 1  # fmt: skip
+# comment 2
+
+[
+    (1, 2),
+    # # fmt: off
+    # (3,
+    #    4),
+    # # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    # (3,
+    #    4),
+    # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    # (3,
+    #    4),
+    # # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    # (3,
+    #    4),
+    # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    (3, 4),
+    # # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    (3, 4),
+    # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    (3, 4),
+    # # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    (3, 4),
+    # fmt: on
+    (5, 6),
+]
+
+
+if False:
+    # fmt: off # some other comment
+    pass
+```
+
+## Black Output
+
+```python
+def foo():
+    pass
+
+
+# comment 1  # fmt: skip
+# comment 2
+
+[
+    (1, 2),
+    # # fmt: off
+    # (3,
+    #    4),
+    # # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    # (3,
+    #    4),
+    # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    # (3,
+    #    4),
+    # # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    # (3,
+    #    4),
+    # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    (3,
+       4),
+    # # fmt: on
+    (5, 6),
+]
+
+[
+    (1, 2),
+    # # fmt: off
+    (3,
+       4),
+    # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    (3,
+       4),
+    # # fmt: on
+    (5, 6),
+]
+
+
+[
+    (1, 2),
+    # fmt: off
+    (3,
+       4),
+    # fmt: on
+    (5, 6),
+]
+
+
+if False:
+    # fmt: off # some other comment
+    pass
+```

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: unsupported.md - Comparison: Unsupported operators
 mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/unsupported.md

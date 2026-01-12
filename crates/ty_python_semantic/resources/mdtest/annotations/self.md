@@ -359,6 +359,51 @@ reveal_type(GenericCircle[int].bar())  # revealed: GenericCircle[int]
 reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 ```
 
+### Calling `super()` in overridden methods with `Self` return type
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/2122>.
+
+When a child class overrides a parent method with a `Self` return type and calls `super().method()`,
+the return type should be the child's `Self` type variable, not the concrete child class type.
+
+```py
+from typing import Self
+
+class Parent:
+    def copy(self) -> Self:
+        return self
+
+class Child(Parent):
+    def copy(self) -> Self:
+        result = super().copy()
+        reveal_type(result)  # revealed: Self@copy
+        return result
+
+# When called on concrete types, Self is substituted correctly.
+reveal_type(Child().copy())  # revealed: Child
+```
+
+The same applies to classmethods with `Self` return types:
+
+```py
+from typing import Self
+
+class Parent:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Parent):
+    @classmethod
+    def create(cls) -> Self:
+        result = super().create()
+        reveal_type(result)  # revealed: Self@create
+        return result
+
+# When called on concrete types, Self is substituted correctly.
+reveal_type(Child.create())  # revealed: Child
+```
+
 ## Attributes
 
 TODO: The use of `Self` to annotate the `next_node` attribute should be

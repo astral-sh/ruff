@@ -361,6 +361,52 @@ def f(union: A | B):
     static_assert(not has_member(union, "only_on_b"))
 ```
 
+Unless one of the elements of the union is `Any`, thus making it dynamic. In which case, we consider
+items on the intersection of the non-`Any` elements:
+
+```py
+from typing import Any
+from ty_extensions import has_member, static_assert
+
+class A:
+    on_both: int = 1
+    only_on_a: str = "a"
+
+class B:
+    on_both: int = 2
+    only_on_b: str = "b"
+
+def f(union: Any | A):
+    static_assert(has_member(union, "on_both"))
+    static_assert(has_member(union, "only_on_a"))
+
+def g(union: Any | A | B):
+    static_assert(has_member(union, "on_both"))
+    static_assert(not has_member(union, "only_on_a"))
+    static_assert(not has_member(union, "only_on_b"))
+```
+
+Similarly, unioning with an intersection involving `Any` is treated the same as if it was just
+unioned with `Any`:
+
+```py
+from typing import Any
+from ty_extensions import Intersection, has_member, static_assert
+
+class A:
+    on_both: int = 1
+    only_on_a: str = "a"
+
+class B:
+    on_both: int = 2
+    only_on_b: str = "b"
+
+def f(x: Intersection[Any, A] | B):
+    static_assert(has_member(x, "on_both"))
+    static_assert(not has_member(x, "only_on_a"))
+    static_assert(has_member(x, "only_on_b"))
+```
+
 ### Intersections
 
 #### Only positive types

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Invalid key type - For a `dict`
 mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md

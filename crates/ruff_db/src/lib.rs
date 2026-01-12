@@ -85,6 +85,13 @@ pub fn max_parallelism() -> NonZeroUsize {
         })
 }
 
+// Use a reasonably large stack size to avoid running into stack overflows too easily. The
+// size was chosen in such a way as to still be able to handle large expressions involving
+// binary operators (x + x + … + x) both during the AST walk in semantic index building as
+// well as during type checking. Using this stack size, we can handle handle expressions
+// that are several times larger than the corresponding limits in existing type checkers.
+pub const STACK_SIZE: usize = 16 * 1024 * 1024;
+
 /// Trait for types that can provide Rust documentation.
 ///
 /// Use `derive(RustDoc)` to automatically implement this trait for types that have a static string documentation.

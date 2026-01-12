@@ -92,7 +92,7 @@ class Project(NamedTuple):
             )
 
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to clone {self.name}: {e.stderr}")
+            raise RuntimeError(f"Failed to clone {self.name}:\n\n{e.stderr}") from e
 
         logging.info(f"Cloned {self.name} to {checkout_dir}.")
 

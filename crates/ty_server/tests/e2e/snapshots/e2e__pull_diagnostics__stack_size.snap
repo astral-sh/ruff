@@ -1,0 +1,26 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: diagnostics
+---
+{
+  "kind": "full",
+  "resultId": "[RESULT_ID]",
+  "items": [
+    {
+      "range": {
+        "start": {
+          "line": 3,
+          "character": 12
+        },
+        "end": {
+          "line": 3,
+          "character": 17
+        }
+      },
+      "severity": 3,
+      "code": "revealed-type",
+      "source": "ty",
+      "message": "Revealed type: `Literal[2000]`"
+    }
+  ]
+}

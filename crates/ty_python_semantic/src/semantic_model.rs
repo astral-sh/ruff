@@ -10,6 +10,7 @@ use ty_module_resolver::{
 };
 
 use crate::Db;
+use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
@@ -234,6 +235,19 @@ impl<'db> SemanticModel<'db> {
                 ),
             );
         }
+
+        // Add implicit module globals (like `__file__`, `__name__`, etc.) with their
+        // correct types. These are added before builtins so that the deduplication
+        // keeps the correct types (e.g., `__file__` is `str` for the current module,
+        // not `str | None`).
+        completions.extend(
+            all_implicit_module_globals(self.db).map(|(name, ty)| Completion {
+                name,
+                ty: Some(ty),
+                builtin: true,
+            }),
+        );
+
         // Builtins are available in all scopes.
         let builtins = ModuleName::new_static("builtins").expect("valid module name");
         completions.extend(self.module_completions(&builtins));
@@ -425,12 +439,6 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
-}
-
-impl<'db> Completion<'db> {
-    pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
-        self.ty.is_some_and(|ty| ty.is_type_check_only(db))
-    }
 }
 
 pub trait HasType {

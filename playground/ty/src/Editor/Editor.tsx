@@ -337,6 +337,7 @@ class PlaygroundServer
     const digitsLength = String(completions.length - 1).length;
 
     return {
+      incomplete: true,
       suggestions: completions.map((completion, i) => ({
         label: {
           label: completion.name,

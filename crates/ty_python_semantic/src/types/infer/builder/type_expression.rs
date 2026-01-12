@@ -793,7 +793,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         todo_type!("specialized recursive generic type alias"),
                         generic_context.len(db),
                     )
-                    .collect(),
+                    .collect::<Vec<_>>(),
                 ),
             );
             return if in_type_expression {
@@ -1083,13 +1083,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     &mut self.inner_expression_inference_state,
                     InnerExpressionInferenceState::Get,
                 );
-                let union = union
-                    .elements(self.db())
-                    .iter()
-                    .fold(UnionBuilder::new(self.db()), |builder, elem| {
-                        builder.add(self.infer_subscript_type_expression(subscript, *elem))
-                    })
-                    .build();
+                let union = union.map(self.db(), |element| {
+                    self.infer_subscript_type_expression(subscript, *element)
+                });
                 self.inner_expression_inference_state = previous_slice_inference_state;
                 union
             }
@@ -1135,7 +1131,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         let ty = class.to_specialized_instance(
             self.db(),
-            args.iter().map(|node| self.infer_type_expression(node)),
+            args.iter()
+                .map(|node| self.infer_type_expression(node))
+                .collect::<Vec<_>>(),
         );
         if arguments.is_tuple_expr() {
             self.store_expression_type(arguments, ty);
@@ -1180,7 +1178,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let callable_type = if let (Some(parameters), Some(return_type), true) =
             (parameters, return_type, correct_argument_number)
         {
-            Type::single_callable(db, Signature::new(parameters, Some(return_type)))
+            Type::single_callable(db, Signature::new(parameters, return_type))
         } else {
             Type::Callable(CallableType::unknown(db))
         };

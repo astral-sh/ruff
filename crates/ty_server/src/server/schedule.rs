@@ -5,6 +5,8 @@ use crate::session::Session;
 mod task;
 mod thread;
 
+use ruff_db::STACK_SIZE;
+
 use self::{
     task::{BackgroundTaskBuilder, SyncTask},
     thread::ThreadPriority,
@@ -19,13 +21,11 @@ pub(super) use task::{BackgroundSchedule, Task};
 pub(crate) fn spawn_main_loop(
     func: impl FnOnce() -> crate::Result<()> + Send + 'static,
 ) -> crate::Result<thread::JoinHandle<crate::Result<()>>> {
-    // Override OS defaults to avoid stack overflows on platforms with low stack size defaults.
-    const MAIN_THREAD_STACK_SIZE: usize = 2 * 1024 * 1024;
     const MAIN_THREAD_NAME: &str = "ty:main";
     Ok(
         thread::Builder::new(thread::ThreadPriority::LatencySensitive)
             .name(MAIN_THREAD_NAME.into())
-            .stack_size(MAIN_THREAD_STACK_SIZE)
+            .stack_size(STACK_SIZE)
             .spawn(func)?,
     )
 }

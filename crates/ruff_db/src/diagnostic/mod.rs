@@ -98,6 +98,44 @@ impl Diagnostic {
         diag
     }
 
+    /// Adds sub diagnostics that tell the user that this is a bug in ty
+    /// and asks them to open an issue on GitHub.
+    pub fn add_bug_sub_diagnostics(&mut self, url_encoded_title: &str) {
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "This indicates a bug in ty.",
+        ));
+
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title={url_encoded_title}, we'd be very appreciative!"
+            ),
+        ));
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format!(
+                "Platform: {os} {arch}",
+                os = std::env::consts::OS,
+                arch = std::env::consts::ARCH
+            ),
+        ));
+        if let Some(version) = crate::program_version() {
+            self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("Version: {version}"),
+            ));
+        }
+
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format!(
+                "Args: {args:?}",
+                args = std::env::args().collect::<Vec<_>>()
+            ),
+        ));
+    }
+
     /// Add an annotation to this diagnostic.
     ///
     /// Annotations for a diagnostic are optional, but if any are added,
@@ -1017,6 +1055,13 @@ impl DiagnosticId {
     /// Returns `true` if this `DiagnosticId` represents a lint.
     pub fn is_lint(&self) -> bool {
         matches!(self, DiagnosticId::Lint(_))
+    }
+
+    pub const fn as_lint(&self) -> Option<LintName> {
+        match self {
+            DiagnosticId::Lint(name) => Some(*name),
+            _ => None,
+        }
     }
 
     /// Returns `true` if this `DiagnosticId` represents a lint with the given name.

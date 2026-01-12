@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: instances.md - Binary operations on instances - Operations involving types with invalid `__bool__` methods
 mdtest path: crates/ty_python_semantic/resources/mdtest/binary/instances.md

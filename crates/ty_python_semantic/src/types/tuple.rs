@@ -28,10 +28,12 @@ use crate::types::builder::RecursivelyDefined;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IntersectionType, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping,
-    TypeRelation, UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, IntersectionType,
+    NormalizedVisitor, Type, TypeMapping, UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -1634,6 +1636,148 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
+    /// Calls a closure for each pair of elements that could potentially be compared at runtime
+    /// between `self` and `other`.
+    ///
+    /// For two fixed-length tuples, this yields pairs at matching positions.
+    /// For variable-length tuples, this yields all pairs of elements that could overlap at runtime,
+    /// including prefix/suffix elements matched by position, and variable elements that could
+    /// align with any position in the other tuple.
+    pub(crate) fn try_for_each_element_pair<F, E>(&self, other: &Self, mut f: F) -> Result<(), E>
+    where
+        F: FnMut(Type<'db>, Type<'db>) -> Result<(), E>,
+    {
+        match (self, other) {
+            // Both fixed-length: just zip elements at matching positions.
+            (Tuple::Fixed(left), Tuple::Fixed(right)) => {
+                for (l, r) in left.iter_all_elements().zip(right.iter_all_elements()) {
+                    f(l, r)?;
+                }
+            }
+
+            // Both variable-length: all possible element pairings.
+            (Tuple::Variable(left), Tuple::Variable(right)) => {
+                // 1. Prefix elements at matching positions.
+                for (l, r) in left.prefix_elements().iter().zip(right.prefix_elements()) {
+                    f(*l, *r)?;
+                }
+
+                // 2. Left's extra prefix elements with right's variable.
+                for l in left
+                    .prefix_elements()
+                    .iter()
+                    .skip(right.prefix_elements().len())
+                {
+                    f(*l, right.variable())?;
+                }
+
+                // 3. Right's extra prefix elements with left's variable.
+                for r in right
+                    .prefix_elements()
+                    .iter()
+                    .skip(left.prefix_elements().len())
+                {
+                    f(left.variable(), *r)?;
+                }
+
+                // 4. Variable elements with each other.
+                f(left.variable(), right.variable())?;
+
+                // 5. Left's extra suffix elements with right's variable.
+                for l in left
+                    .suffix_elements()
+                    .iter()
+                    .rev()
+                    .skip(right.suffix_elements().len())
+                {
+                    f(*l, right.variable())?;
+                }
+
+                // 6. Right's extra suffix elements with left's variable.
+                for r in right
+                    .suffix_elements()
+                    .iter()
+                    .rev()
+                    .skip(left.suffix_elements().len())
+                {
+                    f(left.variable(), *r)?;
+                }
+
+                // 7. Suffix elements at matching positions (from the end).
+                for (l, r) in left
+                    .suffix_elements()
+                    .iter()
+                    .rev()
+                    .zip(right.suffix_elements().iter().rev())
+                {
+                    f(*l, *r)?;
+                }
+            }
+
+            // Left variable, right fixed.
+            (Tuple::Variable(left), Tuple::Fixed(right)) => {
+                // Left's prefix with right's corresponding elements.
+                for (l, r) in left.prefix_elements().iter().zip(right.all_elements()) {
+                    f(*l, *r)?;
+                }
+
+                // Left's suffix with right's corresponding elements (from end).
+                for (l, r) in left
+                    .suffix_elements()
+                    .iter()
+                    .rev()
+                    .zip(right.all_elements().iter().rev())
+                {
+                    f(*l, *r)?;
+                }
+
+                // Left's variable with right's "middle" elements.
+                let middle_start = left.prefix_elements().len();
+                let middle_end = right.len().saturating_sub(left.suffix_elements().len());
+                for r in right
+                    .all_elements()
+                    .iter()
+                    .skip(middle_start)
+                    .take(middle_end.saturating_sub(middle_start))
+                {
+                    f(left.variable(), *r)?;
+                }
+            }
+
+            // Left fixed, right variable.
+            (Tuple::Fixed(left), Tuple::Variable(right)) => {
+                // Left's elements with right's prefix.
+                for (l, r) in left.all_elements().iter().zip(right.prefix_elements()) {
+                    f(*l, *r)?;
+                }
+
+                // Left's elements (from end) with right's suffix.
+                for (l, r) in left
+                    .all_elements()
+                    .iter()
+                    .rev()
+                    .zip(right.suffix_elements().iter().rev())
+                {
+                    f(*l, *r)?;
+                }
+
+                // Left's "middle" elements with right's variable.
+                let middle_start = right.prefix_elements().len();
+                let middle_end = left.len().saturating_sub(right.suffix_elements().len());
+                for l in left
+                    .all_elements()
+                    .iter()
+                    .skip(middle_start)
+                    .take(middle_end.saturating_sub(middle_start))
+                {
+                    f(*l, right.variable())?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Return the `TupleSpec` for the singleton `sys.version_info`
     pub(crate) fn version_info_spec(db: &'db dyn Db) -> TupleSpec<'db> {
         let python_version = Program::get(db).python_version(db);
@@ -1754,7 +1898,7 @@ impl<'db> TupleUnpacker<'db> {
             .into_all_elements_with_kind()
             .map(|builder| match builder {
                 TupleElement::Variable(builder) => builder.try_build().unwrap_or_else(|| {
-                    KnownClass::List.to_specialized_instance(self.db, [Type::unknown()])
+                    KnownClass::List.to_specialized_instance(self.db, &[Type::unknown()])
                 }),
                 TupleElement::Fixed(builder)
                 | TupleElement::Prefix(builder)
@@ -1783,7 +1927,7 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
             target.add_in_place(value);
         }
         self.variable_element_mut()
-            .add_in_place(KnownClass::List.to_specialized_instance(db, [values.variable()]));
+            .add_in_place(KnownClass::List.to_specialized_instance(db, &[values.variable()]));
         for (target, value) in
             (self.suffix_elements_mut().iter_mut()).zip(values.iter_suffix_elements())
         {
@@ -1929,12 +2073,14 @@ impl<'db> TupleSpecBuilder<'db> {
         }
     }
 
-    /// Return a new tuple-spec builder that reflects the intersection of this tuple and another tuple.
+    /// Return a new tuple-spec builder that reflects the intersection of this tuple and another
+    /// tuple, or `None` if the intersection is impossible (e.g., two fixed-length tuples with
+    /// different lengths).
     ///
     /// For example, if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a
     /// tuple-spec for `tuple[object, object]`, the result will be a tuple-spec builder for
     /// `tuple[int, str]` (since `int & object` simplifies to `int`, and `str & object` to `str`).
-    pub(crate) fn intersect(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+    pub(crate) fn intersect(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Option<Self> {
         match (&mut self, other) {
             // Both fixed-length with the same length: element-wise intersection.
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
@@ -1943,24 +2089,23 @@ impl<'db> TupleSpecBuilder<'db> {
                 for (existing, new) in our_elements.iter_mut().zip(new_elements.all_elements()) {
                     *existing = IntersectionType::from_elements(db, [*existing, *new]);
                 }
-                return self;
+                Some(self)
             }
 
-            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Variable(var)) => {
-                if let Ok(tuple) = var.resize(db, TupleLength::Fixed(our_elements.len())) {
-                    return self.intersect(db, &tuple);
-                }
-            }
+            // Fixed-length tuples with different lengths cannot intersect.
+            (TupleSpecBuilder::Fixed(_), TupleSpec::Fixed(_)) => None,
 
-            (TupleSpecBuilder::Variable { .. }, TupleSpec::Fixed(fixed)) => {
-                if let Ok(tuple) = self
-                    .clone()
-                    .build()
-                    .resize(db, TupleLength::Fixed(fixed.len()))
-                {
-                    return TupleSpecBuilder::from(&tuple).intersect(db, other);
-                }
-            }
+            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Variable(var)) => var
+                .resize(db, TupleLength::Fixed(our_elements.len()))
+                .ok()
+                .and_then(|tuple| self.intersect(db, &tuple)),
+
+            (TupleSpecBuilder::Variable { .. }, TupleSpec::Fixed(fixed)) => self
+                .clone()
+                .build()
+                .resize(db, TupleLength::Fixed(fixed.len()))
+                .ok()
+                .and_then(|tuple| TupleSpecBuilder::from(&tuple).intersect(db, other)),
 
             (
                 TupleSpecBuilder::Variable {
@@ -1980,29 +2125,20 @@ impl<'db> TupleSpecBuilder<'db> {
                     for (existing, new) in suffix.iter_mut().zip(var.suffix_elements()) {
                         *existing = IntersectionType::from_elements(db, [*existing, *new]);
                     }
-                    return self;
+                    return Some(self);
                 }
 
                 let self_built = self.clone().build();
                 let self_len = self_built.len();
-                if let Ok(resized) = var.resize(db, self_len) {
-                    return self.intersect(db, &resized);
-                } else if let Ok(resized) = self_built.resize(db, var.len()) {
-                    return TupleSpecBuilder::from(&resized).intersect(db, other);
-                }
+                var.resize(db, self_len)
+                    .ok()
+                    .and_then(|resized| self.intersect(db, &resized))
+                    .or_else(|| {
+                        self_built.resize(db, var.len()).ok().and_then(|resized| {
+                            TupleSpecBuilder::from(&resized).intersect(db, other)
+                        })
+                    })
             }
-
-            _ => {}
-        }
-
-        // TODO: probably incorrect? `tuple[int, str] & tuple[int, str, bytes]` should resolve to `Never`.
-        // So maybe this function should be fallible (return an `Option`)?
-        let intersected =
-            IntersectionType::from_elements(db, self.all_elements().chain(other.all_elements()));
-        TupleSpecBuilder::Variable {
-            prefix: vec![],
-            variable: intersected,
-            suffix: vec![],
         }
     }
 

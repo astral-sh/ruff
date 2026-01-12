@@ -781,6 +781,13 @@ mod tests {
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
 
+        fn first_public_declaration(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
+            self.end_of_scope_symbol_declarations(symbol)
+                .find_map(|declaration_with_constraint| {
+                    declaration_with_constraint.declaration.definition()
+                })
+        }
+
         fn first_binding_at_use(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
             self.bindings_at_use(use_id)
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
@@ -833,10 +840,19 @@ mod tests {
     #[test]
     fn annotation_only() {
         let TestCase { db, file } = test_case("x: int");
-        let global_table = place_table(&db, global_scope(&db, file));
+        let scope = global_scope(&db, file);
+        let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["int", "x"]);
-        // TODO record definition
+
+        let use_def = use_def_map(&db, scope);
+        let declaration = use_def
+            .first_public_declaration(global_table.symbol_id("x").expect("symbol to exist"))
+            .unwrap();
+        assert!(matches!(
+            declaration.kind(&db),
+            DefinitionKind::AnnotatedAssignment(_)
+        ));
     }
 
     #[test]

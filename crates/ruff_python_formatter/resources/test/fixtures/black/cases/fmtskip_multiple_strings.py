@@ -1,0 +1,35 @@
+# Multiple fmt: skip on string literals
+a = (
+    "this should "  # fmt: skip
+    "be fine"
+)
+
+b = (
+    "this is "  # fmt: skip
+    "not working"  # fmt: skip
+)
+
+c = (
+    "and neither "  # fmt: skip
+    "is this "  # fmt: skip
+    "working"
+)
+
+d = (
+    "nor "
+    "is this "  # fmt: skip
+    "working"  # fmt: skip
+)
+
+e = (
+    "and this "  # fmt: skip
+    "is definitely "
+    "not working"  # fmt: skip
+)
+
+# Dictionary entries with fmt: skip (covers issue with long lines)
+hotkeys = {
+    "editor:swap-line-down": [{"key": "ArrowDown", "modifiers": ["Alt", "Mod"]}],  # fmt: skip
+    "editor:swap-line-up":   [{"key": "ArrowUp",   "modifiers": ["Alt", "Mod"]}],  # fmt: skip
+    "editor:toggle-source":  [{"key": "S",         "modifiers": ["Alt", "Mod"]}],  # fmt: skip
+}

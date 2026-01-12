@@ -234,3 +234,38 @@ def takes_no_argument() -> str:
 @takes_no_argument
 def g(x): ...
 ```
+
+## Class decorators
+
+Class decorator calls are validated, emitting diagnostics for invalid arguments:
+
+```py
+def takes_int(x: int) -> int:
+    return x
+
+# error: [invalid-argument-type]
+@takes_int
+class Foo: ...
+```
+
+Using `None` as a decorator is an error:
+
+```py
+# error: [call-non-callable]
+@None
+class Bar: ...
+```
+
+A decorator can enforce type constraints on the class being decorated:
+
+```py
+def decorator(cls: type[int]) -> type[int]:
+    return cls
+
+# error: [invalid-argument-type]
+@decorator
+class Baz: ...
+
+# TODO: the revealed type should ideally be `type[int]` (the decorator's return type)
+reveal_type(Baz)  # revealed: <class 'Baz'>
+```

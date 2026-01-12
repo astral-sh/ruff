@@ -2124,20 +2124,26 @@ shows up in a subset of the union members) is present, but that isn't generally 
 field, it could be *assigned to* with another `TypedDict` that does:
 
 ```py
+from typing_extensions import Literal
+
 class Foo(TypedDict):
     foo: int
 
 class Bar(TypedDict):
     bar: int
 
-def disappointment(u: Foo | Bar):
+def disappointment(u: Foo | Bar, v: Literal["foo"]):
     if "foo" in u:
         # We can't narrow the union here...
         reveal_type(u)  # revealed: Foo | Bar
     else:
         # ...(even though we *can* narrow it here)...
-        # TODO: This should narrow to `Bar`, because "foo" is required in `Foo`.
+        reveal_type(u)  # revealed: Bar
+
+    if v in u:
         reveal_type(u)  # revealed: Foo | Bar
+    else:
+        reveal_type(u)  # revealed: Bar
 
 # ...because `u` could turn out to be one of these.
 class FooBar(TypedDict):
@@ -2146,6 +2152,39 @@ class FooBar(TypedDict):
 
 static_assert(is_assignable_to(FooBar, Foo))
 static_assert(is_assignable_to(FooBar, Bar))
+```
+
+`not in` works in the opposite way to `in`: we can narrow in the positive case, but we cannot narrow
+in the negative case. The following snippet also tests our narrowing behaviour for intersections
+that contain `TypedDict`s, and unions that contain intersections that contain `TypedDict`s:
+
+```py
+from typing_extensions import Literal, Any
+from ty_extensions import Intersection, is_assignable_to, static_assert
+
+def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Literal["bar"]):
+    reveal_type(u)  # revealed: Foo | (Bar & Any)
+    reveal_type(v)  # revealed: Bar & Any
+
+    if "bar" not in t:
+        reveal_type(t)  # revealed: Never
+    else:
+        reveal_type(t)  # revealed: Bar
+
+    if "bar" not in u:
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Foo | (Bar & Any)
+
+    if "bar" not in v:
+        reveal_type(v)  # revealed: Never
+    else:
+        reveal_type(v)  # revealed: Bar & Any
+
+    if w not in u:
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Foo | (Bar & Any)
 ```
 
 TODO: The narrowing that we didn't do above will become possible when we add support for
@@ -2225,6 +2264,47 @@ def match_with_dict(u: Foo | Bar | dict):
             # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
             # false negative in `is_disjoint_impl`.
             reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+```
+
+## Only annotated declarations are allowed in the class body
+
+<!-- snapshot-diagnostics -->
+
+`TypedDict` class bodies are very restricted in what kinds of statements they can contain. Besides
+annotated items, the only allowed statements are docstrings and `pass`. Annotated items are are also
+not allowed to have a value.
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    """docstring"""
+
+    annotated_item: int
+    """attribute docstring"""
+
+    pass
+
+    # As a non-standard but common extension, we interpret `...` as equivalent to `pass`.
+    ...
+
+class Bar(TypedDict):
+    a: int
+    # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
+    42
+    # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
+    b: str = "hello"
+    # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
+    def bar(self): ...
+```
+
+These rules are also enforced for `TypedDict` classes that don't directly inherit from `TypedDict`:
+
+```py
+class Baz(Bar):
+    # error: [invalid-typed-dict-statement]
+    def baz(self):
+        pass
 ```
 
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly

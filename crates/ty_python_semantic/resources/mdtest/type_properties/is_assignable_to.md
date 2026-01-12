@@ -736,6 +736,29 @@ static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], No
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
 ```
 
+## Callable types with Unknown/missing return type
+
+See <https://github.com/astral-sh/ty/issues/2363>, a property test failure involving
+`~type & ~((...) -> Unknown)` not being assignable to `~type`. Since `~type & ~Callable` is a subset
+of `~type`, the intersection should be assignable to `~type`.
+
+The root cause was that we failed to properly materialize a `Callable[..., Unknown]` type when the
+`Unknown` return type originated from a missing annotation.
+
+```py
+from ty_extensions import static_assert, is_assignable_to, Intersection, Not, Unknown, CallableTypeOf
+from typing import Callable
+
+# `Callable[..., Unknown]` has explicit Unknown return type
+static_assert(is_assignable_to(Intersection[Not[type], Not[Callable[..., Unknown]]], Not[type]))
+
+# Function with no return annotation (has implicit Unknown return type internally)
+def no_return_annotation(*args, **kwargs): ...
+
+# `CallableTypeOf[no_return_annotation]` has `returns: None` internally (no annotation)
+static_assert(is_assignable_to(Intersection[Not[type], Not[CallableTypeOf[no_return_annotation]]], Not[type]))
+```
+
 ## Intersections with non-fully-static negated elements
 
 A type can be _assignable_ to an intersection containing negated elements only if the _bottom_

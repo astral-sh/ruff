@@ -1,8 +1,8 @@
 ---
 source: crates/ty_test/src/lib.rs
-assertion_line: 623
 expression: snapshot
 ---
+
 ---
 mdtest name: override.md - `typing.override` - Basics
 mdtest path: crates/ty_python_semantic/resources/mdtest/override.md

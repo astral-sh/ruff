@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::types::class::CodeGeneratorKind;
-use crate::types::generics::Specialization;
+use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
@@ -75,10 +75,7 @@ impl<'db> ClassBase<'db> {
 
     /// Return a `ClassBase` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
-        KnownClass::Object
-            .to_class_literal(db)
-            .to_class_type(db)
-            .map_or(Self::unknown(), Self::Class)
+        Self::Class(ClassType::object(db))
     }
 
     pub(super) const fn is_typed_dict(self) -> bool {
@@ -335,7 +332,9 @@ impl<'db> ClassBase<'db> {
         if let Some(specialization) = specialization {
             let new_self = self.apply_type_mapping_impl(
                 db,
-                &TypeMapping::Specialization(specialization),
+                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                    specialization,
+                )),
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );

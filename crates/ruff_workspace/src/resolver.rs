@@ -102,8 +102,8 @@ impl Relativity {
 #[derive(Debug)]
 pub struct Resolver<'a> {
     pyproject_config: &'a PyprojectConfig,
-    /// All [`Settings`] that have been added to the resolver.
-    settings: Vec<Settings>,
+    /// All [`Settings`] that have been added to the resolver, along with their config file paths.
+    settings: Vec<(Settings, PathBuf)>,
     /// A router from path to index into the `settings` vector.
     router: Router<usize>,
 }
@@ -146,8 +146,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: &Path, settings: Settings) {
-        self.settings.push(settings);
+    fn add(&mut self, path: &Path, settings: Settings, config_path: PathBuf) {
+        self.settings.push((settings, config_path));
 
         // Normalize the path to use `/` separators and escape the '{' and '}' characters,
         // which matchit uses for routing parameters.
@@ -172,13 +172,27 @@ impl<'a> Resolver<'a> {
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
     pub fn resolve(&self, path: &Path) -> &Settings {
+        self.resolve_with_path(path).0
+    }
+
+    /// Return the appropriate [`Settings`] and config file path for a given [`Path`].
+    pub fn resolve_with_path(&self, path: &Path) -> (&Settings, Option<&Path>) {
         match self.pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => &self.pyproject_config.settings,
+            PyprojectDiscoveryStrategy::Fixed => (
+                &self.pyproject_config.settings,
+                self.pyproject_config.path.as_deref(),
+            ),
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
                 .at(path.to_slash_lossy().as_ref())
-                .map(|Match { value, .. }| &self.settings[*value])
-                .unwrap_or(&self.pyproject_config.settings),
+                .map(|Match { value, .. }| {
+                    let (settings, config_path) = &self.settings[*value];
+                    (settings, Some(config_path.as_path()))
+                })
+                .unwrap_or((
+                    &self.pyproject_config.settings,
+                    self.pyproject_config.path.as_deref(),
+                )),
         }
     }
 
@@ -255,7 +269,8 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::once(&self.pyproject_config.settings).chain(&self.settings)
+        std::iter::once(&self.pyproject_config.settings)
+            .chain(self.settings.iter().map(|(settings, _)| settings))
     }
 }
 
@@ -379,17 +394,17 @@ pub fn resolve_configuration(
 
 /// Extract the project root (scope) and [`Settings`] from a given
 /// `pyproject.toml`.
-fn resolve_scoped_settings<'a>(
-    pyproject: &'a Path,
+fn resolve_scoped_settings(
+    pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
-) -> Result<(&'a Path, Settings)> {
+) -> Result<(PathBuf, Settings)> {
     let relativity = Relativity::from(origin);
 
     let configuration = resolve_configuration(pyproject, transformer, origin)?;
     let project_root = relativity.resolve(pyproject);
     let settings = configuration.into_settings(project_root)?;
-    Ok((project_root, settings))
+    Ok((project_root.to_path_buf(), settings))
 }
 
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
@@ -455,7 +470,7 @@ pub fn python_files_in_path<'a>(
                             transformer,
                             ConfigurationOrigin::Ancestor,
                         )?;
-                        resolver.add(root, settings);
+                        resolver.add(&root, settings, pyproject);
                         // We found the closest configuration.
                         break;
                     }
@@ -647,7 +662,11 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                             ConfigurationOrigin::Ancestor,
                         ) {
                             Ok((root, settings)) => {
-                                self.global.resolver.write().unwrap().add(root, settings);
+                                self.global
+                                    .resolver
+                                    .write()
+                                    .unwrap()
+                                    .add(&root, settings, pyproject);
                             }
                             Err(err) => {
                                 self.local_error = Err(err);
@@ -767,7 +786,7 @@ pub fn python_file_at_path(
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
                     resolve_scoped_settings(&pyproject, transformer, ConfigurationOrigin::Unknown)?;
-                resolver.add(root, settings);
+                resolver.add(&root, settings, pyproject);
                 break;
             }
         }

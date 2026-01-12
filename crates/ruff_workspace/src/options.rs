@@ -1,15 +1,19 @@
+use anyhow::Result;
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::str::FromStr;
 use strum::IntoEnumIterator;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
 use ruff_graph::Direction;
+use ruff_linter::RUFF_PKG_VERSION;
+
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -554,6 +558,17 @@ pub struct LintOptions {
         "#
     )]
     pub future_annotations: Option<bool>,
+}
+
+pub fn validate_required_version(required_version: &RequiredVersion) -> anyhow::Result<()> {
+    let ruff_pkg_version = pep440_rs::Version::from_str(RUFF_PKG_VERSION)
+        .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
+    if !required_version.contains(&ruff_pkg_version) {
+        return Err(anyhow::anyhow!(
+            "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
+        ));
+    }
+    Ok(())
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].

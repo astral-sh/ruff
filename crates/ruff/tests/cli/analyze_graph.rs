@@ -29,7 +29,7 @@ fn type_checking_imports() -> anyhow::Result<()> {
         ("ruff/c.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(test.command(), @r###"
+    assert_cmd_snapshot!(test.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -46,12 +46,12 @@ fn type_checking_imports() -> anyhow::Result<()> {
     }
 
     ----- stderr -----
-    "###);
+    "#);
 
     assert_cmd_snapshot!(
         test.command()
             .arg("--no-type-checking-imports"),
-        @r###"
+        @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -65,7 +65,7 @@ fn type_checking_imports() -> anyhow::Result<()> {
     }
 
     ----- stderr -----
-    "###
+    "#
     );
 
     Ok(())
@@ -103,7 +103,7 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(test.command(), @r###"
+    assert_cmd_snapshot!(test.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -117,7 +117,7 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
     }
 
     ----- stderr -----
-    "###);
+    "#);
 
     test.write_file(
         "ruff.toml",
@@ -127,7 +127,7 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(test.command(), @r###"
+    assert_cmd_snapshot!(test.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -144,7 +144,7 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
     }
 
     ----- stderr -----
-    "###
+    "#
     );
 
     Ok(())

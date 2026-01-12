@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: mro.md - Method Resolution Order tests - Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
 mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md

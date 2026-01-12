@@ -134,12 +134,17 @@ class IsEqualToEverything(type):
 class A(metaclass=IsEqualToEverything): ...
 class B(metaclass=IsEqualToEverything): ...
 
-def _(x: A | B):
+def _(x: A | B, y: object):
     if type(x) == A:
         reveal_type(x)  # revealed: A | B
 
     if type(x) != A:
         reveal_type(x)  # revealed: A | B
+
+    if type(y) == bool:
+        reveal_type(y)  # revealed: object
+    else:
+        reveal_type(y)  # revealed: object
 ```
 
 ## No narrowing for custom `type` callable

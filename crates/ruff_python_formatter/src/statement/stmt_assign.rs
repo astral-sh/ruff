@@ -19,6 +19,7 @@ use crate::expression::{
     maybe_parenthesize_expression,
 };
 use crate::other::interpolated_string::InterpolatedStringLayout;
+use crate::prelude::*;
 use crate::preview::is_parenthesize_lambda_bodies_enabled;
 use crate::statement::trailing_semicolon;
 use crate::string::StringLikeExtensions;
@@ -26,7 +27,6 @@ use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
     ImplicitConcatenatedLayout,
 };
-use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtAssign;
@@ -103,14 +103,6 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
         }
 
         Ok(())
-    }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
     }
 }
 

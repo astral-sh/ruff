@@ -1,0 +1,133 @@
+class Simple:
+    x=1
+    x=2 # fmt: skip
+    x=3
+
+class Semicolon:
+    x=1
+    x=2;x=3 # fmt: skip
+    x=4
+
+class TrailingSemicolon:
+    x=1
+    x=2;x=3    ; # fmt: skip
+    x=4
+
+class SemicolonNewLogicalLine:
+    x=1;
+    x=2;x=3 # fmt: skip
+    x=4
+
+class ManySemicolonOneLine:
+    x=1
+    x=2;x=3;x=4 # fmt: skip
+    x=5
+
+class CompoundInSuite:
+    x=1
+    def foo(): y=1 # fmt: skip
+    x=2
+
+class CompoundInSuiteNewline:
+    x=1
+    def foo():
+        y=1 # fmt: skip
+    x=2
+
+class MultiLineSkip:
+    x=1
+    x = [
+        '1',
+        '2',
+    ] # fmt: skip
+
+class MultiLineSemicolon:
+    x=1
+    x = [
+        '1',
+        '2',
+    ]; x=2 # fmt: skip
+
+class LineContinuationSemicolonAfter:
+    x=1
+    x = ['a']\
+    ; y=1 # fmt: skip
+
+class LineContinuationSemicolonBefore:
+    x=1
+    x = ['a']; \
+    y=1 # fmt: skip
+
+class LineContinuationSemicolonAndNewline:
+    x=1
+    x = ['a']; \
+
+    y=1 # fmt: skip
+
+class LineContinuationSemicolonAndNewlineAndComment:
+    x=1
+    x = ['a']; \
+    # 1
+    y=1 # fmt: skip
+
+class RepeatedLineContinuation:
+    x=1
+    x = ['a']; \
+    \
+    \
+    y=1 # fmt: skip
+
+class MultiLineSemicolonComments:
+    x=1
+          # 1
+    x = [     # 2
+        '1',    # 3
+        '2',
+            # 4
+    ]; x=2    # 5   # fmt: skip    # 6
+
+class DocstringSkipped:
+    '''This is a docstring''' # fmt: skip
+    x=1
+
+class MultilineDocstringSkipped:
+    '''This is a docstring
+    ''' # fmt: skip
+    x=1
+
+class FirstStatementNewlines:
+
+
+
+
+    x=1 # fmt: skip
+
+class ChainingSemicolons:
+    x=[
+        '1',
+        '2',
+        '3',
+    ];x=1;x=[
+        '1',
+        '2',
+        '3'
+    ];x=1;x=1 # fmt: skip
+
+class LotsOfComments:
+    # 1
+    x=[ # 2
+        '1', # 3
+        '2',
+        '3'
+    ]    ;x=2;x=3 # 4 # fmt: skip # 5
+    # 6
+
+class MixingCompound:
+    def foo(): bar(); import zoo # fmt: skip
+
+# https://github.com/astral-sh/ruff/issues/17331
+def main() -> None:
+    import ipdb; ipdb.set_trace()  # noqa: E402,E702,I001 # fmt: skip
+
+# https://github.com/astral-sh/ruff/issues/11430
+print(); print() # noqa # fmt: skip

@@ -20,9 +20,11 @@
 # ty
 /crates/ty* @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
 /crates/ruff_db/ @carljm @MichaReiser @sharkdp @dcreager
-/crates/ty_project/ @carljm @MichaReiser @sharkdp @dcreager
-/crates/ty_server/ @carljm @MichaReiser @sharkdp @dcreager
+/crates/ty_project/ @carljm @MichaReiser @sharkdp @dcreager @Gankra
+/crates/ty_ide/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager @Gankra
+/crates/ty_server/ @carljm @MichaReiser @sharkdp @dcreager @Gankra
 /crates/ty/ @carljm @MichaReiser @sharkdp @dcreager
-/crates/ty_wasm/ @carljm @MichaReiser @sharkdp @dcreager
+/crates/ty_wasm/ @carljm @MichaReiser @sharkdp @dcreager @Gankra
 /scripts/ty_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
-/crates/ty_python_semantic @carljm @AlexWaygood @sharkdp @dcreager
+/crates/ty_python_semantic/ @carljm @AlexWaygood @sharkdp @dcreager
+/crates/ty_module_resolver/ @carljm @MichaReiser @AlexWaygood @Gankra

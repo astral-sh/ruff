@@ -11,14 +11,15 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor, NormalizedVisitor,
+    TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
-
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
@@ -220,10 +221,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class,
-            NominalInstanceInner::Object => KnownClass::Object
-                .try_to_class_literal(db)
-                .expect("Typeshed should always have a `object` class in `builtins.pyi`")
-                .default_specialization(db),
+            NominalInstanceInner::Object => ClassType::object(db),
         }
     }
 
