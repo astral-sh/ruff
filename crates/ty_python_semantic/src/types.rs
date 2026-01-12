@@ -2598,14 +2598,9 @@ impl<'db> Type<'db> {
                 // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
                 // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
 
-                // For classmethod-like callables, bind to the owner class (or instance's meta type).
-                // For function-like callables, bind to the instance.
-                let self_type = if callable.is_classmethod_like(db) {
-                    if instance.is_none(db) {
-                        owner
-                    } else {
-                        instance.to_meta_type(db)
-                    }
+                // For classmethod-like callables, bind to the owner class. For function-like callables, bind to the instance.
+                let self_type = if callable.is_classmethod_like(db) && instance.is_none(db) {
+                    owner
                 } else {
                     instance
                 };
