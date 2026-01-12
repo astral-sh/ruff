@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return_type_no_parameters.py
 ---
 ## Input
 ```python
@@ -362,4 +361,37 @@ def f() -> [
     b,
 ]:
     pass
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -106,9 +106,9 @@
+ # 1. Black tries to keep the list flat by parenthesizing the list as shown below even when the `list` identifier
+ #    fits on the header line. IMO, this adds unnecessary parentheses that can be avoided
+ #    and supporting it requires extra complexity (best_fitting! layout)
+-def no_parameters_overlong_subscript_return_type_with_single_element() -> list[
+-    xxxxxxxxxxxxxxxxxxxxx
+-]:
++def no_parameters_overlong_subscript_return_type_with_single_element() -> (
++    list[xxxxxxxxxxxxxxxxxxxxx]
++):
+     pass
+ 
+ 
+@@ -147,9 +147,9 @@
+ # `no_parameters_subscript_return_type_multiple_overlong_elements` shows. However, it doesn't
+ # when the subscript contains a single element. Black then keeps the parentheses.
+ # Ruff removes the parentheses in this case for consistency.
+-def no_parameters_overlong_subscript_return_type_with_overlong_single_element() -> list[
+-    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+-]:
++def no_parameters_overlong_subscript_return_type_with_overlong_single_element() -> (
++    list[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
++):
+     pass
+ 
+ 
 ```

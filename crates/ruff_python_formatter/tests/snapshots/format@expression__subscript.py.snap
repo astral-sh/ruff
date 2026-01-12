@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/subscript.py
 ---
 ## Input
 ```python
@@ -87,4 +86,38 @@ repro(
 (
     repro  # some long comment also taking up space
 )[0]
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -11,17 +11,17 @@
+     0
+ ]
+ 
+-repro("some long string that takes up some space")[
+-    0  # some long comment also taking up space
+-]
++repro(
++    "some long string that takes up some space"
++)[0]  # some long comment also taking up space
+ 
+-repro("some long string that takes up some space")[
+-    0
+-]  # some long comment also taking up space
++repro(
++    "some long string that takes up some space"
++)[0]  # some long comment also taking up space
+ 
+-repro("some long string that takes up some space")[
+-    0
+-]  # some long comment also taking up space
++repro(
++    "some long string that takes up some space"
++)[0]  # some long comment also taking up space
+ 
+ repro(
+     "some long string that takes up some space"
 ```
