@@ -1149,7 +1149,7 @@ impl SessionSnapshot {
 pub(crate) fn log_guidance(client_name: Option<&str>) -> &'static str {
     match client_name {
         Some("Zed") => {
-            "Check the logs for more details (find logs via the command palette: `zed: open language server logs`)."
+            "Check the logs for more details (find logs via the command palette: `dev: open language server logs`)."
         }
         // Generic message for other editors. VS Code has a "Show Logs" button via the ty extension.
         _ => "Check the logs for more details.",
