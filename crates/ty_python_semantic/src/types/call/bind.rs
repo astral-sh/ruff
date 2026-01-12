@@ -103,21 +103,23 @@ impl<'db> BindingsElement<'db> {
 
     /// Returns the result of calling this element.
     /// For intersections, if any binding succeeds, the element succeeds.
+    /// When all bindings fail, returns the error from the highest-priority binding.
     fn as_result(&self) -> Result<(), CallErrorKind> {
-        if self.is_intersection() {
-            // For intersections: if ANY binding succeeds, the element succeeds
-            if self.bindings.iter().any(|b| b.as_result().is_ok()) {
-                return Ok(());
-            }
-            // All bindings failed
-            Err(CallErrorKind::BindingError)
-        } else {
-            // For a single binding, return its result directly
-            self.bindings
-                .first()
-                .map(CallableBinding::as_result)
-                .unwrap_or(Err(CallErrorKind::NotCallable))
+        // If any binding succeeds, the element succeeds
+        if self.bindings.iter().any(|b| b.as_result().is_ok()) {
+            return Ok(());
         }
+
+        // All bindings failed - find highest priority and return that error kind
+        let max_priority = self.error_priority();
+
+        // Return the error from the first binding with the highest priority
+        Err(self
+            .bindings
+            .iter()
+            .find(|b| b.error_priority() == max_priority)
+            .map(|b| b.as_result().unwrap_err())
+            .unwrap_or(CallErrorKind::NotCallable))
     }
 
     /// Filter bindings to keep only those that succeeded.
