@@ -444,7 +444,7 @@ class Base:
     base_attr: int = 1
 
 def f(x: type[Base]):
-    # error: [unsupported-base] "Unsupported class base"
+    # error: [unsupported-dynamic-base] "Unsupported class base"
     Child = type("Child", (x,), {})
 
     # The class is still created with `Unknown` in MRO, allowing attribute access

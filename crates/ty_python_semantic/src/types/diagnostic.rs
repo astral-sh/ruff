@@ -113,6 +113,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_BASE);
+    registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
@@ -838,6 +839,36 @@ declare_lint! {
         summary: "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
         status: LintStatus::stable("0.0.1-alpha.7"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for dynamic class definitions (using `type()`) that have bases
+    /// which are unsupported by ty.
+    ///
+    /// ## Why is this bad?
+    /// If a dynamically created class has a base that is an unsupported type
+    /// such as `type[T]`, ty will not be able to resolve the
+    /// [method resolution order] (MRO) for the class. This may lead to an inferior
+    /// understanding of your codebase and unpredictable type-checking behavior.
+    ///
+    /// ## Default level
+    /// This rule is disabled by default because it will not cause a runtime error,
+    /// and may be noisy on codebases that use `type()` in highly dynamic ways.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def factory(base: type[Base]) -> type:
+    ///     # `base` has type `type[Base]`, not `type[Base]` itself
+    ///     return type("Dynamic", (base,), {})  # error: [unsupported-dynamic-base]
+    /// ```
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
+        summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Ignore,
     }
 }
 
