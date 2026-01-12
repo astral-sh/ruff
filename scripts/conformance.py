@@ -68,6 +68,17 @@ class Classification(StrEnum):
     TRUE_NEGATIVE = auto()
     FALSE_NEGATIVE = auto()
 
+    def into_title(self) -> str:
+        match self:
+            case Classification.TRUE_POSITIVE:
+                return "True positives added 🎉"
+            case Classification.FALSE_POSITIVE:
+                return "False positives added 🫤"
+            case Classification.TRUE_NEGATIVE:
+                return "False positives removed 🎉"
+            case Classification.FALSE_NEGATIVE:
+                return "True positives removed 🫤"
+
 
 @dataclass(kw_only=True, slots=True)
 class Position:
@@ -345,7 +356,7 @@ def render_grouped_diagnostics(
     ):
         group = list(group)
 
-        lines.append(f"## {classification.value.replace('_', ' ').title()}s:")
+        lines.append(f"## {classification.into_title()}:")
         lines.append("")
         lines.append("```diff")
 
