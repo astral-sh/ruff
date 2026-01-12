@@ -1,6 +1,10 @@
 """
 Run typing conformance tests and compare results between two ty versions.
 
+By default, this script will use `uv` to run the latest version of ty
+as the new version with `uvx ty@latest`. This requires `uv` to be installed
+and available in the system PATH.
+
 Examples:
     # Compare two specific ty versions
     %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
@@ -418,7 +422,6 @@ def parse_args():
     parser.add_argument(
         "--old-ty",
         nargs="+",
-        default=["uvx", "ty@0.0.1a35"],
         help="Command to run old version of ty (default: uvx ty@0.0.1a35)",
     )
 
