@@ -3431,6 +3431,8 @@ impl<'a> Iterator for ArgumentsSourceOrder<'a> {
     }
 }
 
+impl FusedIterator for ArgumentsSourceOrder<'_> {}
+
 /// An AST node used to represent a sequence of type parameters.
 ///
 /// For example, given:

@@ -316,6 +316,12 @@ class X:
 def _(x: X):
     # revealed: Bar
     x[reveal_type({"baz": 1})] = reveal_type({"baz": 2})  # revealed: Bar
+
+# TODO: Support type context with union subscripting.
+def _(x: X | dict[Bar, Bar]):
+    # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    x[{"baz": 1}] = {"baz": 2}
 ```
 
 ## Multi-inference diagnostics

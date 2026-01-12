@@ -4166,14 +4166,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             _ => {
-                let callable = object_ty
-                    .member_lookup_with_policy(
-                        db,
-                        "__setitem__".into(),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                    )
-                    .place;
-
                 let ast_arguments = [
                     ArgOrKeyword::Arg(&target.slice),
                     ArgOrKeyword::Arg(rhs_value_node),
@@ -4193,7 +4185,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let Err(call_dunder_err) = self.infer_and_try_call_dunder(
                     db,
-                    callable,
+                    object_ty,
+                    "__setitem__",
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,
                     &mut infer_argument_ty,
@@ -7554,16 +7547,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn infer_and_try_call_dunder(
         &mut self,
         db: &'db dyn Db,
-        place: Place<'db>,
+        object: Type<'db>,
+        name: &str,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        match place {
+        match object
+            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .place
+        {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
@@ -13670,7 +13668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 }
 
-/// An expression represented the function argument at the given index, along with its type
+/// An expression representing the function argument at the given index, along with its type
 /// context.
 type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
 
