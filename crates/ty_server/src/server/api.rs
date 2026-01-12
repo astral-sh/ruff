@@ -412,18 +412,14 @@ where
                 Ok(result) => result,
                 Err(panic) => {
                     tracing::error!("An error occurred while running {id}: {panic}");
-                    client.show_error_message(format!(
-                        "ty encountered a panic. {log_guidance}",
-                    ));
+                    client.show_error_message(format!("ty encountered a panic. {log_guidance}"));
                     return;
                 }
             };
 
             if let Err(err) = result {
                 tracing::error!("An error occurred while running {id}: {err}");
-                client.show_error_message(format!(
-                    "ty encountered a problem. {log_guidance}",
-                ));
+                client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
             }
         })
     }))
