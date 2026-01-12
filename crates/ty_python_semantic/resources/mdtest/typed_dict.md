@@ -321,6 +321,7 @@ literal:
 
 ```py
 from typing import TypedDict
+from typing_extensions import NotRequired
 
 class Foo(TypedDict):
     foo: int
@@ -352,11 +353,19 @@ class FooBar2(TypedDict):
     foo: int
     bar: int
 
-x6: FooBar1 | FooBar2 | None = {"foo": 1, "bar": 1}
+class FooBar3(TypedDict):
+    foo: int
+    bar: int
+    baz: NotRequired[int]
+
+x6: FooBar1 | FooBar2 = {"foo": 1, "bar": 1}
 reveal_type(x6)  # revealed: FooBar1 | FooBar2
 
-x7: FooBar1 | FooBar2 | None = {"foo": 1, "bar": 1}
-reveal_type(x7)  # revealed: FooBar1 | FooBar2
+x7: FooBar1 | FooBar3 = {"foo": 1, "bar": 1}
+reveal_type(x7)  # revealed: FooBar1 | FooBar3
+
+x8: FooBar1 | FooBar2 | FooBar3 | None = {"foo": 1, "bar": 1}
+reveal_type(x8)  # revealed: FooBar1 | FooBar2 | FooBar3
 ```
 
 In doing so, may have to infer the same type with multiple distinct type contexts:

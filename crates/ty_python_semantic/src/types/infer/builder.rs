@@ -7898,9 +7898,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut narrowed_typed_dicts = Vec::new();
                 for element in tcx.elements(self.db()) {
-                    let Some(typed_dict) = element.as_typed_dict() else {
-                        continue;
-                    };
+                    let typed_dict = element
+                        .as_typed_dict()
+                        .expect("filtered out non-typed-dict types above");
 
                     if self
                         .infer_typed_dict_expression(dict, typed_dict, &mut item_types)
