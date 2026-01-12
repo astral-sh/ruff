@@ -67,7 +67,7 @@ where
     ///
     /// This method may panic or produce unspecified results if the provided module is from a
     /// different file or Salsa revision than the module to which the node belongs.
-    pub(super) fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
+    pub(crate) fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
         let index = node.node_index().load();
         debug_assert_eq!(module_ref.get_by_index(index).try_into().ok(), Some(node));
 
