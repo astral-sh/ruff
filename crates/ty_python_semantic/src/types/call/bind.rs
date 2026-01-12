@@ -123,9 +123,9 @@ impl<'db> BindingsElement<'db> {
     }
 
     /// Filter bindings to keep only those that succeeded.
-    /// This is called when at least one binding in an intersection succeeded.
+    /// Only applies to intersections where at least one binding succeeded.
     fn retain_successful(&mut self) {
-        if self.is_intersection() {
+        if self.is_intersection() && self.as_result().is_ok() {
             self.bindings.retain(|b| b.as_result().is_ok());
         }
     }
@@ -383,12 +383,10 @@ impl<'db> Bindings<'db> {
 
         self.evaluate_known_cases(db, argument_types, dataclass_field_specifiers);
 
-        // For each element that is an intersection with at least one successful binding,
-        // filter out the failing bindings within that element.
+        // For intersection elements with at least one successful binding,
+        // filter out the failing bindings.
         for element in &mut self.elements {
-            if element.is_intersection() && element.as_result().is_ok() {
-                element.retain_successful();
-            }
+            element.retain_successful();
         }
 
         // Apply union semantics at the outer level:
