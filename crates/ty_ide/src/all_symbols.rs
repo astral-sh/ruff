@@ -1,4 +1,5 @@
 use ruff_db::files::File;
+use ruff_python_ast::name::Name;
 use ty_module_resolver::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
 use ty_project::Db;
 
@@ -72,21 +73,14 @@ pub fn all_symbols<'db>(
                     let _entered = symbols_for_file_span.entered();
 
                     if query.is_match_symbol_name(module.name(&*db)) {
-                        results.lock().unwrap().push(AllSymbolInfo {
-                            symbol: None,
-                            module,
-                            file,
-                        });
+                        let symbol = AllSymbolInfo::from_module(&*db, module, file);
+                        results.lock().unwrap().push(symbol);
                     }
                     for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,
                         // but this works pretty well as it is.
-                        results.lock().unwrap().push(AllSymbolInfo {
-                            symbol: Some(symbol.to_owned()),
-                            module,
-                            file,
-                        });
+                        results.lock().unwrap().push(symbol);
                     }
                 });
             }
@@ -120,6 +114,8 @@ pub struct AllSymbolInfo<'db> {
     ///
     /// When absent, this implies the symbol is the module itself.
     symbol: Option<SymbolInfo<'static>>,
+    /// The fully qualified name of this symbol.
+    qualified: Name,
     /// The module containing the symbol.
     module: Module<'db>,
     /// The file containing the symbol.
@@ -130,6 +126,35 @@ pub struct AllSymbolInfo<'db> {
 }
 
 impl<'db> AllSymbolInfo<'db> {
+    fn from_non_module_symbol(
+        db: &'_ dyn Db,
+        symbol: SymbolInfo<'static>,
+        module: Module<'db>,
+        file: File,
+    ) -> AllSymbolInfo<'db> {
+        let qualified = Name::from(compact_str::format_compact!(
+            "{module_name}.{name}",
+            module_name = module.name(db),
+            name = symbol.name,
+        ));
+        AllSymbolInfo {
+            symbol: Some(symbol),
+            qualified,
+            module,
+            file,
+        }
+    }
+
+    /// Creates a new symbol referencing an entire module.
+    fn from_module(db: &'_ dyn Db, module: Module<'db>, file: File) -> AllSymbolInfo<'db> {
+        AllSymbolInfo {
+            symbol: None,
+            qualified: module.name(db).as_str().into(),
+            module,
+            file,
+        }
+    }
+
     /// Returns the name of this symbol as it exists in a file.
     ///
     /// When absent, there is no concrete symbol in a module
@@ -138,6 +163,16 @@ impl<'db> AllSymbolInfo<'db> {
     /// should use `AllSymbolInfo::module().name()`.
     pub fn name_in_file(&self) -> Option<&str> {
         self.symbol.as_ref().map(|symbol| &*symbol.name)
+    }
+
+    /// Returns the fully qualified name for this symbol.
+    ///
+    /// This includes the full absolute module name for the symbol.
+    ///
+    /// When this symbol corresponds to a module, then this is
+    /// just the full absolute module name itself.
+    pub fn qualified(&self) -> &str {
+        &self.qualified
     }
 
     /// Returns the "kind" of this symbol.

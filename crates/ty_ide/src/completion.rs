@@ -1563,23 +1563,19 @@ fn add_unimported_completions<'db>(
         }
 
         let module_name = symbol.module().name(db);
-        let (name, qualified, request) = symbol
+        let (name, request) = symbol
             .name_in_file()
-            .map(|name| {
-                let qualified = format!("{module_name}.{name}");
-                (name, qualified, create_import_request(module_name, name))
-            })
+            .map(|name| (name, create_import_request(module_name, name)))
             .unwrap_or_else(|| {
                 let name = module_name.as_str();
-                let qualified = name.to_string();
-                (name, qualified, ImportRequest::module(name))
+                (name, ImportRequest::module(name))
             });
         let import_action = importer.import(request, &members);
         // N.B. We use `add_skip_query` here because `all_symbols`
         // already takes our query into account.
         completions.add_skip_query(
             Completion::builder(name)
-                .qualified(qualified)
+                .qualified(symbol.qualified())
                 .insert(import_action.symbol_text())
                 .kind(symbol.kind().to_completion_kind())
                 .module_name(module_name)
