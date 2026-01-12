@@ -1160,6 +1160,16 @@
             }
           ]
         },
+        "unsupported-dynamic-base": {
+          "title": "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
+          "description": "## What it does\nChecks for dynamic class definitions (using `type()`) that have bases\nwhich are unsupported by ty.\n\nThis is equivalent to [`unsupported-base`] but applies to classes created\nvia `type()` rather than `class` statements.\n\n## Why is this bad?\nIf a dynamically created class has a base that is an unsupported type\nsuch as `type[T]`, ty will not be able to resolve the\n[method resolution order] (MRO) for the class. This may lead to an inferior\nunderstanding of your codebase and unpredictable type-checking behavior.\n\n## Default level\nThis rule is disabled by default because it will not cause a runtime error,\nand may be noisy on codebases that use `type()` in highly dynamic ways.\n\n## Examples\n```python\ndef factory(base: type[Base]) -> type:\n    # `base` has type `type[Base]`, not `type[Base]` itself\n    return type(\"Dynamic\", (base,), {})  # error: [unsupported-dynamic-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order\n[`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unsupported-operator": {
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
           "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where\nthe operands don't support the operator.\n\n## Why is this bad?\nAttempting to use an unsupported operator will raise a `TypeError` at\nruntime.\n\n## Examples\n```python\nclass A: ...\n\nA() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'\n```",

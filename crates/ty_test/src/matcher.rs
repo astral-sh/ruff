@@ -200,13 +200,28 @@ impl UnmatchedWithColumn for &Diagnostic {
 
 /// Discard `@Todo`-type metadata from expected types, which is not available
 /// when running in release mode.
+///
+/// Some `@Todo` variants (like `@Todo(StarredExpression)` and `@Todo(typing.Unpack)`)
+/// are hardcoded enum variants that always display their message, so we preserve those.
 fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
     #[cfg(not(debug_assertions))]
     {
+        /// `@Todo` variants that are hardcoded and always display their message,
+        /// even in release mode.
+        const PRESERVED_TODO_VARIANTS: &[&str] =
+            &["@Todo(StarredExpression)", "@Todo(typing.Unpack)"];
+
         static TODO_METADATA_REGEX: LazyLock<regex::Regex> =
             LazyLock::new(|| regex::Regex::new(r"@Todo\([^)]*\)").unwrap());
 
-        TODO_METADATA_REGEX.replace_all(ty, "@Todo")
+        TODO_METADATA_REGEX.replace_all(ty, |caps: &regex::Captures| {
+            let matched = caps.get(0).unwrap().as_str();
+            if PRESERVED_TODO_VARIANTS.contains(&matched) {
+                matched.to_string()
+            } else {
+                "@Todo".to_string()
+            }
+        })
     }
 
     #[cfg(debug_assertions)]
