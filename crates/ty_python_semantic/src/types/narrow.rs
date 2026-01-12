@@ -1248,10 +1248,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         );
                     }
                 }
-                // If left is not a narrowable target and not a Call expression try to narrow the
-                // right operand instead. For symmetric operators (==, !=, is, is not), we can swap
-                // the operands.
-                //
+                // For symmetric operators (==, !=, is, is not), if left is not a narrowable target,
+                // try to narrow the right operand instead by swapping the operands.
                 // E.g., `None != x` should narrow `x` the same way as `x != None`.
                 _ if matches!(
                     op,
