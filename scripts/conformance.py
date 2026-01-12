@@ -34,10 +34,10 @@ from typing import Any, Self
 # The conformance tests include 4 types of errors:
 # 1. Required errors (E): The type checker must raise an error on this line
 # 2. Optional errors (E?): The type checker may raise an error on this line
-# 3. Tagged errors ([tag]): The type checker must raise at most one error on any of the lines in a file with matching tags
-# 4. Tagged multi-errors ([tag]+): The type checker should raise one or more errors on any of the tagged lines
-# # This regex pattern parses the error lines in the conformance tests, but the following
-# # implementation treats all errors as required errors.
+# 3. Tagged errors (E[tag]): The type checker must raise at most one error on any of the lines in a file with matching tags
+# 4. Tagged multi-errors (E[tag+]): The type checker should raise one or more errors on any of the tagged lines
+# This regex pattern parses the error lines in the conformance tests, but the following
+# implementation treats all errors as required errors.
 CONFORMANCE_ERROR_PATTERN = re.compile(
     r"""
     \#\s*E                  # "# E" begins each error
@@ -257,7 +257,7 @@ def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
 def collect_ty_diagnostics(
     ty_path: list[str],
     source: Source,
-    target_path: str = ".",
+    tests_path: str = ".",
     python_version: str = "3.12",
 ) -> list[Diagnostic]:
     process = subprocess.run(
@@ -267,7 +267,7 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--exit-zero",
-            target_path,
+            tests_path,
         ],
         capture_output=True,
         text=True,
@@ -389,8 +389,8 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
         ### Summary
 
-        | Metric     | Old | New | Δ |
-        |------------|-----|-----|---|
+        | Metric     | Old | New | Delta |
+        |------------|-----|-----|-------|
         | True Positives | {old.true_positives} | {new.true_positives} | {old.true_positives - new.true_positives} |
         | False Positives | {old.false_positives} | {new.false_positives} | {new.false_positives - old.false_positives} |
         | False Negatives | {old.false_negatives} | {new.false_negatives} | {new.false_negatives - old.false_negatives} |
@@ -425,12 +425,12 @@ def parse_args():
     parser.add_argument(
         "--new-ty",
         nargs="+",
-        default=["uvx", "ty@0.0.7"],
+        default=["uvx", "ty@latest"],
         help="Command to run new version of ty (default: uvx ty@0.0.7)",
     )
 
     parser.add_argument(
-        "--target-path",
+        "--tests-path",
         type=Path,
         default=Path("typing/conformance/tests"),
         help="Path to conformance tests directory (default: typing/conformance/tests)",
@@ -461,18 +461,18 @@ def parse_args():
 def main():
     args = parse_args()
 
-    expected = collect_expected_diagnostics(args.target_path)
+    expected = collect_expected_diagnostics(args.tests_path)
 
     old = collect_ty_diagnostics(
         ty_path=args.old_ty,
-        target_path=str(args.target_path),
+        tests_path=str(args.tests_path),
         source=Source.OLD,
         python_version=args.python_version,
     )
 
     new = collect_ty_diagnostics(
         ty_path=args.new_ty,
-        target_path=str(args.target_path),
+        tests_path=str(args.tests_path),
         source=Source.NEW,
         python_version=args.python_version,
     )
