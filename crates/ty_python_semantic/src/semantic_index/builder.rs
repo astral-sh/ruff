@@ -14,7 +14,7 @@ use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
@@ -2741,6 +2741,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
                 walk_expr(self, expr);
             }
+            ast::Expr::Call(call_expr) => {
+                // Track potential synthesized-type calls for stable identity.
+                // Assigned calls use `Definition` for identity; inline calls need a `ScopedCallId`.
+                if self.current_assignment().is_none()
+                    && is_potential_synthesized_type_call(call_expr)
+                {
+                    self.current_ast_ids()
+                        .record_call(call_expr, call_expr.range());
+                }
+                walk_expr(self, expr);
+            }
             _ => {
                 walk_expr(self, expr);
             }
@@ -3194,4 +3205,32 @@ fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
             ..
         }) if is_if_type_checking(operand)
     )
+}
+
+/// Returns whether a call expression might create a synthesized type.
+///
+/// This is a heuristic used during semantic indexing to assign stable IDs
+/// to calls that may produce `NamedTuple`, `TypedDict`, `type()` classes, etc.
+/// False positives are acceptable (the ID just won't be used during inference).
+fn is_potential_synthesized_type_call(call: &ast::ExprCall) -> bool {
+    // Check for `type(...)` or `builtins.type(...)`
+    let is_type_call = match call.func.as_ref() {
+        ast::Expr::Name(name) => name.id.as_str() == "type",
+        ast::Expr::Attribute(attr) => {
+            attr.attr.as_str() == "type"
+                && matches!(attr.value.as_ref(), ast::Expr::Name(name) if name.id.as_str() == "builtins")
+        }
+        _ => false,
+    };
+
+    if is_type_call {
+        // type("Name", bases, dict)
+        return call.arguments.keywords.is_empty() && call.arguments.args.len() == 3;
+    }
+
+    // TODO: Add more patterns as we support them:
+    // - NamedTuple("Name", [...]) or NamedTuple("Name", field1=type1, ...)
+    // - TypedDict("Name", {...}) or TypedDict("Name", field1=type1, ...)
+
+    false
 }

@@ -1,8 +1,8 @@
-use rustc_hash::FxHashMap;
-
-use ruff_index::newtype_index;
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
+use ruff_text_size::TextRange;
+use rustc_hash::FxHashMap;
 
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -28,11 +28,26 @@ use crate::semantic_index::semantic_index;
 pub(crate) struct AstIds {
     /// Maps expressions which "use" a place (that is, [`ast::ExprName`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`]) to a use id.
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    /// Maps potential synthesized-type call expressions to a call id for stable identity.
+    tracked_calls_map: FxHashMap<ExpressionNodeKey, ScopedCallId>,
+    /// Stores the ranges of tracked calls, indexed by their [`ScopedCallId`].
+    /// Used for diagnostics (e.g., `header_range`).
+    tracked_call_ranges: IndexVec<ScopedCallId, TextRange>,
 }
 
 impl AstIds {
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
+    }
+
+    /// Returns the call ID for a potential synthesized-type call, if it was tracked during semantic indexing.
+    pub(crate) fn try_call_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedCallId> {
+        self.tracked_calls_map.get(&key.into()).copied()
+    }
+
+    /// Returns the range of a tracked call by its ID.
+    pub(crate) fn call_range(&self, id: ScopedCallId) -> TextRange {
+        self.tracked_call_ranges[id]
     }
 }
 
@@ -44,6 +59,15 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
 #[newtype_index]
 #[derive(get_size2::GetSize)]
 pub struct ScopedUseId;
+
+/// Uniquely identifies a potential synthesized-type call in a [`crate::semantic_index::FileScopeId`].
+///
+/// This is used to provide stable identity for inline calls that create synthesized types,
+/// such as `type()`, `NamedTuple()`, `TypedDict()`, etc. The ID is assigned during semantic
+/// indexing for calls that match known patterns for these synthesizers.
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+pub struct ScopedCallId;
 
 pub trait HasScopedUseId {
     /// Returns the ID that uniquely identifies the use in `scope`.
@@ -88,6 +112,8 @@ impl HasScopedUseId for ast::ExprRef<'_> {
 #[derive(Debug, Default)]
 pub(super) struct AstIdsBuilder {
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    tracked_calls_map: FxHashMap<ExpressionNodeKey, ScopedCallId>,
+    tracked_call_ranges: IndexVec<ScopedCallId, TextRange>,
 }
 
 impl AstIdsBuilder {
@@ -100,11 +126,25 @@ impl AstIdsBuilder {
         use_id
     }
 
+    /// Records a potential synthesized-type call for stable identity tracking.
+    pub(super) fn record_call(
+        &mut self,
+        expr: impl Into<ExpressionNodeKey>,
+        range: TextRange,
+    ) -> ScopedCallId {
+        let call_id = self.tracked_call_ranges.push(range);
+        self.tracked_calls_map.insert(expr.into(), call_id);
+        call_id
+    }
+
     pub(super) fn finish(mut self) -> AstIds {
         self.uses_map.shrink_to_fit();
+        self.tracked_calls_map.shrink_to_fit();
 
         AstIds {
             uses_map: self.uses_map,
+            tracked_calls_map: self.tracked_calls_map,
+            tracked_call_ranges: self.tracked_call_ranges,
         }
     }
 }
