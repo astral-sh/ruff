@@ -16,9 +16,12 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// from higher up the stack.
 ///
 /// It's recommended to use a `stacklevel` of 2 or higher, to give the caller
-/// more context about the warning, or to set the prefixes of the files
-/// which stack frames should be ignored when counting stack levels.
+/// more context about the warning.
 ///
+/// In Python 3.12 and higher, one may also use `skip_file_prefixes` to specify
+/// which file prefixes are ignored when counting the stack level. This implicitly overrides the `stacklevel` to be
+/// at least 2, according to the [Python documentation].
+/// 
 /// ## Example
 /// ```python
 /// import warnings
@@ -48,11 +51,11 @@ pub(crate) struct NoExplicitStacklevel;
 impl AlwaysFixableViolation for NoExplicitStacklevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "No explicit `stacklevel` and `skip_file_prefixes` keyword argument found".to_string()
+        "No explicit `stacklevel` keyword argument found".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Set `stacklevel=2` or add the desired prefixes to be ignored to `skip_file_prefixes`"
+        "Set `stacklevel=2`"
             .to_string()
     }
 }
