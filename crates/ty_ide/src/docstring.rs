@@ -349,16 +349,24 @@ fn render_markdown(docstring: &str) -> String {
                     | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
                     | "version-removed" | "versionremoved",
                 ) => {
+                    // Map version directives to human-readable phrases (matching Sphinx output)
+                    let pretty_directive = match directive.unwrap() {
+                        "versionadded" | "version-added" => "Added in version",
+                        "versionchanged" | "version-changed" => "Changed in version",
+                        "deprecated" | "version-deprecated" => "Deprecated since version",
+                        "versionremoved" | "version-removed" => "Removed in version",
+                        other => other,
+                    };
+
                     // Render the argument of things like `.. version-added:: 4.0`
                     let suffix = if let Some(lang) = lang {
-                        format!(" *{lang}*")
+                        format!(" {lang}")
                     } else {
                         String::new()
                     };
                     // We prepend without_directive here out of caution for preserving input.
                     // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
-                    temp_owned_line =
-                        format!("**{without_directive}{}:**{suffix}", directive.unwrap());
+                    temp_owned_line = format!("**{without_directive}{pretty_directive}{suffix}:**");
 
                     line = temp_owned_line.as_str();
                     None
@@ -1115,12 +1123,12 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @"
         Some much-updated docs  
           
-        **version-added:** *3.0*  
+        **Added in version 3.0:**  
         &nbsp;&nbsp;&nbsp;Function added  
           
-        **version-changed:** *4.0*  
+        **Changed in version 4.0:**  
         &nbsp;&nbsp;&nbsp;The `spam` argument was added  
-        **version-changed:** *4.1*  
+        **Changed in version 4.1:**  
         &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.  
           
         &nbsp;&nbsp;&nbsp;You really shouldnt use it  
@@ -1141,7 +1149,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        **wow this is some changes deprecated:** *1.2.3*  
+        **wow this is some changes Deprecated since version 1.2.3:**  
         &nbsp;&nbsp;&nbsp;&nbsp;x = 2
         ");
     }
