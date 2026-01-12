@@ -138,6 +138,11 @@ impl<'db> BindingsElement<'db> {
             .max()
             .unwrap_or(CallErrorPriority::NotCallable)
     }
+
+    /// Returns true if any binding in this element is callable.
+    fn is_callable(&self) -> bool {
+        self.bindings.iter().any(CallableBinding::is_callable)
+    }
 }
 
 /// Binding information for a union of callables, where each union element may be an intersection.
@@ -271,11 +276,18 @@ impl<'db> Bindings<'db> {
     }
 
     /// Returns an iterator over all `CallableBinding`s, flattening the two-level structure.
+    ///
+    /// Note: This loses the union/intersection distinction. The returned iterator yields
+    /// all `CallableBinding`s from all elements, which can then be further flattened to
+    /// individual `Binding`s via `CallableBinding`'s `IntoIterator` implementation.
     pub(crate) fn iter(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
         self.elements.iter().flat_map(|e| e.bindings.iter())
     }
 
     /// Returns a mutable iterator over all `CallableBinding`s, flattening the two-level structure.
+    ///
+    /// Note: This loses the union/intersection distinction. Use only when you need to
+    /// modify all bindings regardless of their union/intersection grouping.
     pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut CallableBinding<'db>> {
         self.elements.iter_mut().flat_map(|e| e.bindings.iter_mut())
     }
@@ -480,8 +492,8 @@ impl<'db> Bindings<'db> {
         context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
     ) {
-        // If all bindings are not callable, report that the type as a whole is not callable.
-        if self.iter().all(|b| !b.is_callable()) {
+        // If all elements are not callable, report that the type as a whole is not callable.
+        if self.elements.iter().all(|e| !e.is_callable()) {
             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
                 builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
