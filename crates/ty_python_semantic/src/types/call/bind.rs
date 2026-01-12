@@ -1418,17 +1418,9 @@ impl<'db> Bindings<'db> {
                                     overload.parameter_types()
                                 {
                                     let params = DataclassParams::default_params(db);
-                                    overload.set_return_type(Type::from(ClassLiteral::new(
-                                        db,
-                                        class_literal.name(db),
-                                        class_literal.body_scope(db),
-                                        class_literal.known(db),
-                                        class_literal.deprecated(db),
-                                        class_literal.type_check_only(db),
-                                        Some(params),
-                                        class_literal.dataclass_transformer_params(db),
-                                        class_literal.total_ordering(db),
-                                    )));
+                                    overload.set_return_type(Type::from(
+                                        class_literal.with_dataclass_params(db, Some(params)),
+                                    ));
                                 }
                             }
 
