@@ -372,20 +372,55 @@ def render_grouped_diagnostics(
     return "\n".join(lines)
 
 
-def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
-    def pct(value):
-        return f"{value:.2%}"
+def diff_format(
+    diff: float,
+    greater_is_better: bool = True,
+    neutral: bool = False,
+    is_percentage: bool = False,
+):
+    increased = diff > 0
+    good = "✅" if not neutral else ""
+    bad = "❌" if not neutral else ""
+    up = "⏫"
+    down = "⏬"
 
-    def trend(value):
-        if value == 0:
-            return "does not change"
-        return "improves" if value > 0 else "regresses"
+    match (greater_is_better, increased):
+        case (True, True):
+            return f"{good}{up}"
+        case (False, True):
+            return f"{bad}{down}"
+        case (True, False):
+            return f"{bad}{down}"
+        case (False, False):
+            return f"{good}{up}"
+
+
+def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
+    def format_metric(diff: float, old: float, new: float):
+        if diff > 0:
+            return f"increased from {old:.2%} to {new:.2%}"
+        if diff < 0:
+            return f"decreased from {old:.2%} to {new:.2%}"
+        return f"held steady at {old:.2%}"
 
     old = compute_stats(grouped_diagnostics, source=Source.OLD)
     new = compute_stats(grouped_diagnostics, source=Source.NEW)
 
-    precision_delta = new.precision - old.precision
-    recall_delta = new.recall - old.recall
+    precision_change = new.precision - old.precision
+    recall_change = new.recall - old.recall
+    true_pos_change = new.true_positives - old.true_positives
+    false_pos_change = new.false_positives - old.false_positives
+    false_neg_change = new.false_negatives - old.false_negatives
+    total_change = new.total - old.total
+
+    true_pos_diff = diff_format(true_pos_change, greater_is_better=True)
+    false_pos_diff = diff_format(false_pos_change, greater_is_better=False)
+    false_neg_diff = diff_format(false_neg_change, greater_is_better=False)
+    precision_diff = diff_format(
+        precision_change, greater_is_better=True, is_percentage=True
+    )
+    recall_diff = diff_format(recall_change, greater_is_better=True, is_percentage=True)
+    total_diff = diff_format(total_change, neutral=True)
 
     table = dedent(
         f"""
@@ -393,21 +428,23 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
         ### Summary
 
-        | Metric     | Old | New | Delta |
-        |------------|-----|-----|-------|
-        | True Positives | {old.true_positives} | {new.true_positives} | {old.true_positives - new.true_positives} |
-        | False Positives | {old.false_positives} | {new.false_positives} | {new.false_positives - old.false_positives} |
-        | False Negatives | {old.false_negatives} | {new.false_negatives} | {new.false_negatives - old.false_negatives} |
-        | Precision  | {old.precision:.2} | {new.precision:.2} | {pct(precision_delta)} |
-        | Recall     | {old.recall:.2} | {new.recall:.2} | {pct(recall_delta)} |
-        | Total      | {old.total} | {new.total} | {new.total - old.total} |
+        | Metric | Old | New | Diff | Outcome |
+        |--------|-----|-----|------|---------|
+        | True Positives  | {old.true_positives} | {new.true_positives} | {true_pos_change} | {true_pos_diff} |
+        | False Positives | {old.false_positives} | {new.false_positives} | {false_pos_change} | {false_pos_diff} |
+        | False Negatives | {old.false_negatives} | {new.false_negatives} | {false_neg_change} | {false_neg_diff} |
+        | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:.2%} | {precision_diff} |
+        | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:.2%} | {recall_diff} |
+        | Total | {old.total} | {new.total} | {total_change} | {total_diff} |
 
         """
     )
 
     summary = (
-        f"Compared to the current merge base, this PR {trend(precision_delta)} precision "
-        f"and {trend(recall_delta)} recall (TP: {new.true_positives - old.true_positives}, FP: {new.false_positives - old.false_positives}, FN: {new.false_negatives - old.false_negatives}))."
+        f"The percentage of diagnostics emitted that were true positives"
+        f" {format_metric(precision_change, old.precision, new.precision)},"
+        " and the percentage of true positives that received a diagnostic"
+        f" {format_metric(recall_change, old.recall, new.recall)}."
     )
 
     return "\n".join([table, summary])
@@ -458,7 +495,12 @@ def parse_args():
         help="Write output to file instead of stdout",
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.old_ty is None:
+        raise ValueError("old_ty is required")
+
+    return args
 
 
 def main():
