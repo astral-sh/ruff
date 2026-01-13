@@ -2590,17 +2590,16 @@ impl<'db> Type<'db> {
                 // method of these synthesized functions. The method-wrapper would then be returned from
                 // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
                 // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-
-                // For classmethod-like callables, bind to the owner class. For function-like callables, bind to the instance.
-                let self_type = if callable.is_classmethod_like(db) && instance.is_none(db) {
-                    owner.to_instance(db).unwrap_or(owner)
-                } else {
-                    instance
-                };
-
-                return if self_type.is_none(db) && callable.is_function_like(db) {
+                return if instance.is_none(db) && callable.is_function_like(db) {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
+                    // For classmethod-like callables, bind to the owner class. For function-like callables, bind to the instance.
+                    let self_type = if callable.is_classmethod_like(db) && instance.is_none(db) {
+                        owner.to_instance(db).unwrap_or(owner)
+                    } else {
+                        instance
+                    };
+
                     Some((
                         Type::Callable(callable.bind_self(db, Some(self_type))),
                         AttributeKind::NormalOrNonDataDescriptor,
