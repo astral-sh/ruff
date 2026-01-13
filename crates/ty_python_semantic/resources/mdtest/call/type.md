@@ -593,6 +593,19 @@ class Y(C, B): ...
 Conflict = type("Conflict", (X, Y), {})
 ```
 
+## MRO error highlighting (snapshot)
+
+<!-- snapshot-diagnostics -->
+
+This snapshot test documents the diagnostic highlighting range for dynamic class literals.
+Currently, the entire `type()` call expression is highlighted:
+
+```py
+class A: ...
+
+Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
+```
+
 ## Metaclass conflicts
 
 Metaclass conflicts are detected and reported:

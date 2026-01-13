@@ -1649,6 +1649,65 @@ Traceb<CURSOR>ackType
         assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
+    /// goto-definition on a dynamic class literal (created via `type()`)
+    #[test]
+    fn goto_definition_dynamic_class_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+DynClass = type("DynClass", (), {})
+
+x = DynCla<CURSOR>ss()
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:5
+          |
+        2 | DynClass = type("DynClass", (), {})
+        3 |
+        4 | x = DynClass()
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 2 definitions
+           --> main.py:2:1
+            |
+          2 | DynClass = type("DynClass", (), {})
+            | --------
+          3 |
+          4 | x = DynClass()
+            |
+           ::: stdlib/builtins.pyi:137:9
+            |
+        135 |     def __class__(self, type: type[Self], /) -> None: ...
+        136 |     def __init__(self) -> None: ...
+        137 |     def __new__(cls) -> Self: ...
+            |         -------
+        138 |     # N.B. `object.__setattr__` and `object.__delattr__` are heavily special-cased by type checkers.
+        139 |     # Overriding them in subclasses has different semantics, even if the override has an identical signature.
+            |
+        "#);
+    }
+
+    /// goto-definition on a dangling dynamic class literal (not assigned to a variable)
+    #[test]
+    fn goto_definition_dangling_dynamic_class_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class Foo(type("Ba<CURSOR>r", (), {})):
+    pass
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
     // TODO: Should only list `a: int`
     #[test]
     fn redeclarations() {
