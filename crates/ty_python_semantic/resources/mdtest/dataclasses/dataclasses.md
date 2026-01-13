@@ -1682,11 +1682,9 @@ def sequence4(cls: type) -> type:
 class Foo: ...
 
 ordered_foo = dataclass(order=True)(Foo)
-reveal_type(ordered_foo)  # revealed: type[Foo] & Any
-reveal_type(ordered_foo())  # revealed: Foo & Any
-# The result is `bool & Any` because the comparison operators on `type[Foo]` return `bool`
-# and `Any`'s comparison operators return `Any`, and the return types are intersected.
-reveal_type(ordered_foo() < ordered_foo())  # revealed: bool & Any
+reveal_type(ordered_foo)  # revealed: <class 'Foo'>
+reveal_type(ordered_foo())  # revealed: Foo
+reveal_type(ordered_foo() < ordered_foo())  # revealed: bool
 ```
 
 ## Dynamic class literals
