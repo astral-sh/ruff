@@ -285,6 +285,8 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     TypeVar(&'ast ast::TypeParamTypeVar),
     ParamSpec(&'ast ast::TypeParamParamSpec),
     TypeVarTuple(&'ast ast::TypeParamTypeVarTuple),
+    /// A loop header definition for cyclic control flow analysis.
+    LoopHeader(&'ast ast::StmtWhile),
 }
 
 impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
@@ -332,6 +334,12 @@ impl<'ast> From<&'ast ast::TypeParamParamSpec> for DefinitionNodeRef<'ast, '_> {
 impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_> {
     fn from(value: &'ast ast::TypeParamTypeVarTuple) -> Self {
         Self::TypeVarTuple(value)
+    }
+}
+
+impl<'ast> From<&'ast ast::StmtWhile> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: &'ast ast::StmtWhile) -> Self {
+        Self::LoopHeader(value)
     }
 }
 
@@ -619,6 +627,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::TypeVarTuple(node) => {
                 DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
             }
+            DefinitionNodeRef::LoopHeader(node) => {
+                DefinitionKind::LoopHeader(AstNodeRef::new(parsed, node))
+            }
         }
     }
 
@@ -683,6 +694,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::TypeVar(node) => node.into(),
             Self::ParamSpec(node) => node.into(),
             Self::TypeVarTuple(node) => node.into(),
+            Self::LoopHeader(node) => node.into(),
         }
     }
 }
@@ -753,6 +765,11 @@ pub enum DefinitionKind<'db> {
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
+    /// A loop header definition representing the fixed-point type of a place at loop entry.
+    ///
+    /// This is used to handle cyclic control flow in loops, where a variable's type at the
+    /// start of an iteration depends on assignments from previous iterations.
+    LoopHeader(AstNodeRef<ast::StmtWhile>),
 }
 
 impl DefinitionKind<'_> {
@@ -835,6 +852,8 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeVarTuple(type_var_tuple) => {
                 type_var_tuple.node(module).name.range()
             }
+            // For loop headers, use the while statement's test expression range
+            DefinitionKind::LoopHeader(while_stmt) => while_stmt.node(module).test.range(),
         }
     }
 
@@ -880,6 +899,8 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeVar(type_var) => type_var.node(module).range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
+            // For loop headers, use the entire while statement range
+            DefinitionKind::LoopHeader(while_stmt) => while_stmt.node(module).range(),
         }
     }
 
@@ -935,7 +956,8 @@ impl DefinitionKind<'_> {
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
-            | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
+            | DefinitionKind::ExceptHandler(_)
+            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
         }
     }
 }
@@ -1276,6 +1298,12 @@ impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
 
 impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
     fn from(node: &ast::StmtAugAssign) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtWhile> for DefinitionNodeKey {
+    fn from(node: &ast::StmtWhile) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

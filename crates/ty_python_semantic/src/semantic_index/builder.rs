@@ -65,6 +65,217 @@ impl Loop {
     }
 }
 
+/// Visitor that collects all places (symbols and members) that are bound within a loop body.
+///
+/// This is used to identify which places need loop header definitions for cyclic control flow.
+/// The visitor does NOT recurse into nested function/class definitions since those are different scopes.
+#[derive(Debug, Default)]
+struct LoopBindingCollector {
+    /// The places that are bound within the loop body.
+    bound_places: Vec<PlaceExpr>,
+}
+
+impl LoopBindingCollector {
+    /// Collect all places bound in the given statements.
+    fn collect(body: &[ast::Stmt]) -> Vec<PlaceExpr> {
+        let mut collector = Self::default();
+        collector.visit_body(body);
+        collector.bound_places
+    }
+
+    /// Try to add a place from an expression target (assignment LHS).
+    fn add_place_from_target(&mut self, target: &ast::Expr) {
+        match target {
+            // Simple name assignment: x = ...
+            ast::Expr::Name(name) => {
+                self.bound_places.push(PlaceExpr::from_expr_name(name));
+            }
+            // Attribute/subscript assignment: x.y = ..., x[0] = ...
+            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                if let Some(place) = PlaceExpr::try_from_expr(target) {
+                    self.bound_places.push(place);
+                }
+            }
+            // Unpacking: x, y = ... or (x, y) = ... or [x, y] = ...
+            ast::Expr::Tuple(tuple) => {
+                for elt in &tuple.elts {
+                    self.add_place_from_target(elt);
+                }
+            }
+            ast::Expr::List(list) => {
+                for elt in &list.elts {
+                    self.add_place_from_target(elt);
+                }
+            }
+            // Starred in unpacking: *x = ...
+            ast::Expr::Starred(starred) => {
+                self.add_place_from_target(&starred.value);
+            }
+            _ => {}
+        }
+    }
+}
+
+impl<'ast> Visitor<'ast> for LoopBindingCollector {
+    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+        match stmt {
+            // Assignment statements
+            ast::Stmt::Assign(node) => {
+                for target in &node.targets {
+                    self.add_place_from_target(target);
+                }
+                // Don't need to visit value - we only care about binding targets
+            }
+            ast::Stmt::AugAssign(node) => {
+                self.add_place_from_target(&node.target);
+            }
+            ast::Stmt::AnnAssign(node) => {
+                // Only a binding if there's a value
+                if node.value.is_some() {
+                    self.add_place_from_target(&node.target);
+                }
+            }
+
+            // For loop target is bound
+            ast::Stmt::For(node) => {
+                self.add_place_from_target(&node.target);
+                // Recurse into body (same scope)
+                self.visit_body(&node.body);
+                self.visit_body(&node.orelse);
+            }
+
+            // With statement binds the `as` target
+            ast::Stmt::With(node) => {
+                for item in &node.items {
+                    if let Some(vars) = &item.optional_vars {
+                        self.add_place_from_target(vars);
+                    }
+                }
+                self.visit_body(&node.body);
+            }
+
+            // Exception handler binds the `as` name
+            ast::Stmt::Try(node) => {
+                self.visit_body(&node.body);
+                for handler in &node.handlers {
+                    let ast::ExceptHandler::ExceptHandler(h) = handler;
+                    if let Some(name) = &h.name {
+                        self.bound_places
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                    }
+                    self.visit_body(&h.body);
+                }
+                self.visit_body(&node.orelse);
+                self.visit_body(&node.finalbody);
+            }
+
+            // Import statements bind names
+            ast::Stmt::Import(node) => {
+                for alias in &node.names {
+                    let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                    self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                }
+            }
+            ast::Stmt::ImportFrom(node) => {
+                for alias in &node.names {
+                    // Skip star imports
+                    if &*alias.name != "*" {
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        self.bound_places
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                    }
+                }
+            }
+
+            // Function/class definitions bind their name (but we don't recurse into their body)
+            ast::Stmt::FunctionDef(node) => {
+                self.bound_places
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+                // Do NOT recurse - different scope
+            }
+            ast::Stmt::ClassDef(node) => {
+                self.bound_places
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+                // Do NOT recurse - different scope
+            }
+
+            // Match statement can bind names in patterns
+            ast::Stmt::Match(node) => {
+                for case in &node.cases {
+                    self.collect_pattern_bindings(&case.pattern);
+                    self.visit_body(&case.body);
+                }
+            }
+
+            // Other statements: recurse using default behavior
+            _ => walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        // Named expressions (walrus operator): x := ...
+        if let ast::Expr::Named(node) = expr {
+            self.add_place_from_target(&node.target);
+        }
+        // Continue walking to find nested named expressions
+        walk_expr(self, expr);
+    }
+}
+
+impl LoopBindingCollector {
+    /// Collect bindings from match patterns.
+    fn collect_pattern_bindings(&mut self, pattern: &ast::Pattern) {
+        match pattern {
+            ast::Pattern::MatchAs(p) => {
+                if let Some(name) = &p.name {
+                    self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                }
+                if let Some(pat) = &p.pattern {
+                    self.collect_pattern_bindings(pat);
+                }
+            }
+            ast::Pattern::MatchStar(p) => {
+                if let Some(name) = &p.name {
+                    self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                }
+            }
+            ast::Pattern::MatchMapping(p) => {
+                for pat in &p.patterns {
+                    self.collect_pattern_bindings(pat);
+                }
+                if let Some(rest) = &p.rest {
+                    self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(rest.id.clone())));
+                }
+            }
+            ast::Pattern::MatchSequence(p) => {
+                for pat in &p.patterns {
+                    self.collect_pattern_bindings(pat);
+                }
+            }
+            ast::Pattern::MatchClass(p) => {
+                for pat in &p.arguments.patterns {
+                    self.collect_pattern_bindings(pat);
+                }
+                for kw in &p.arguments.keywords {
+                    self.collect_pattern_bindings(&kw.pattern);
+                }
+            }
+            ast::Pattern::MatchOr(p) => {
+                for pat in &p.patterns {
+                    self.collect_pattern_bindings(pat);
+                }
+            }
+            ast::Pattern::MatchValue(_) | ast::Pattern::MatchSingleton(_) => {
+                // These don't bind names
+            }
+        }
+    }
+}
+
 struct ScopeInfo {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
@@ -1924,7 +2135,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
             }
-            ast::Stmt::While(ast::StmtWhile {
+            ast::Stmt::While(while_stmt @ ast::StmtWhile {
                 test,
                 body,
                 orelse,
@@ -1936,6 +2147,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let pre_loop = self.flow_snapshot();
                 let predicate = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
+
+                // Collect places that are bound within the loop body.
+                // These need loop header definitions for cyclic control flow analysis.
+                let bound_places = LoopBindingCollector::collect(body);
+
+                // Create loop header definitions for each bound place.
+                // This makes the headers visible to uses inside the loop body.
+                for place_expr in bound_places {
+                    let place_id = self.add_place(place_expr);
+                    // Use push_additional_definition to allow multiple headers for the same while loop
+                    self.push_additional_definition(place_id, while_stmt);
+                }
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);

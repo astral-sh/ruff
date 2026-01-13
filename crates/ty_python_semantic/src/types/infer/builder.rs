@@ -1541,6 +1541,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::TypeVarTuple(node) => {
                 self.infer_typevartuple_definition(node.node(self.module()), definition);
             }
+            DefinitionKind::LoopHeader(_while_stmt) => {
+                // TODO: Implement proper loop header type inference
+                // This should union the seed bindings (pre-loop) with body bindings (end-of-loop)
+                // For now, store Unknown as a placeholder so the definition has a type.
+                self.bindings
+                    .insert(definition, Type::unknown(), self.multi_inference_state);
+            }
         }
     }
 
