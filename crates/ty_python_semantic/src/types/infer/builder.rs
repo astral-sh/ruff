@@ -79,12 +79,12 @@ use crate::types::diagnostic::{
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
     report_conflicting_metaclass_from_bases, report_duplicate_bases, report_implicit_return_type,
     report_index_out_of_bounds, report_instance_layout_conflict,
-    report_invalid_arguments_to_annotated, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
-    report_invalid_return_type, report_invalid_total_ordering,
+    report_instance_layout_conflict_dynamic, report_invalid_arguments_to_annotated,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
     report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
@@ -6174,7 +6174,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::name::Name::new_static("<unknown>")
         };
 
-        let bases = self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
+        let (bases, mut disjoint_bases) =
+            self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
 
         let dynamic_class = DynamicClassLiteral::new(
             db,
@@ -6187,8 +6188,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Check for MRO errors.
-        if let Err(error) = dynamic_class.try_mro(db) {
-            match error.reason() {
+        match dynamic_class.try_mro(db) {
+            Err(error) => match error.reason() {
                 DynamicMroErrorKind::DuplicateBases(duplicates) => {
                     if let Some(builder) = self.context.report_lint(&DUPLICATE_BASE, call_expr) {
                         builder.into_diagnostic(format_args!(
@@ -6215,6 +6216,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .join(", ")
                         ));
                     }
+                }
+            },
+            Ok(_) => {
+                // MRO succeeded, check for instance-layout-conflict.
+                disjoint_bases.remove_redundant_entries(db);
+                if disjoint_bases.len() > 1 {
+                    report_instance_layout_conflict_dynamic(
+                        &self.context,
+                        dynamic_class,
+                        bases_arg,
+                        &disjoint_bases,
+                    );
                 }
             }
         }
@@ -6243,14 +6256,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Extract base classes from the second argument of a `type()` call.
     ///
-    /// If any bases were invalid, diagnostics are emitted and the dynamic
-    /// class is inferred as inheriting from `Unknown`.
+    /// Returns the extracted bases and any disjoint bases found (for instance-layout-conflict
+    /// checking). If any bases were invalid, diagnostics are emitted and the dynamic class is
+    /// inferred as inheriting from `Unknown`.
     fn extract_dynamic_type_bases(
         &mut self,
         bases_node: &ast::Expr,
         bases_type: Type<'db>,
         name: &ast::name::Name,
-    ) -> Box<[ClassBase<'db>]> {
+    ) -> (Box<[ClassBase<'db>]>, IncompatibleBases<'db>) {
         let db = self.db();
 
         // Get AST nodes for base expressions (for diagnostics).
@@ -6261,7 +6275,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let placeholder_class: ClassLiteral<'db> =
             KnownClass::Object.try_to_class_literal(db).unwrap().into();
 
-        bases_type
+        let mut disjoint_bases = IncompatibleBases::default();
+
+        let bases = bases_type
             .tuple_instance_spec(db)
             .as_deref()
             .and_then(|spec| spec.as_fixed_length())
@@ -6276,6 +6292,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(class_base) =
                             ClassBase::try_from_type(db, *base, placeholder_class)
                         {
+                            // Collect disjoint bases for instance-layout-conflict checking.
+                            if let ClassBase::Class(base_class) = class_base {
+                                if let Some(disjoint_base) = base_class.nearest_disjoint_base(db) {
+                                    disjoint_bases.insert(
+                                        disjoint_base,
+                                        idx,
+                                        base_class.class_literal(db),
+                                    );
+                                }
+                            }
                             return class_base;
                         }
 
@@ -6308,20 +6334,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     "Only class objects or `Any` are supported as class bases",
                                 );
                             }
-                        } else {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_BASE, diagnostic_node)
-                            {
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Invalid class base with type `{}`",
-                                    base.display(db)
+                        } else if let Some(builder) =
+                            self.context.report_lint(&INVALID_BASE, diagnostic_node)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Invalid class base with type `{}`",
+                                base.display(db)
+                            ));
+                            if bases_tuple_elts.is_none() {
+                                diagnostic.info(format_args!(
+                                    "Element {} of the tuple is invalid",
+                                    idx + 1
                                 ));
-                                if bases_tuple_elts.is_none() {
-                                    diagnostic.info(format_args!(
-                                        "Element {} of the tuple is invalid",
-                                        idx + 1
-                                    ));
-                                }
                             }
                         }
 
@@ -6344,7 +6368,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
                 }
                 Box::from([ClassBase::unknown()])
-            })
+            });
+
+        (bases, disjoint_bases)
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {

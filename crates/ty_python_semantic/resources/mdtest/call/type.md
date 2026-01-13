@@ -150,6 +150,26 @@ def f(attributes: dict[str, Any]):
     reveal_type(x.bar)  # revealed: Unknown
 ```
 
+When a namespace dictionary is partially dynamic (e.g., a dict literal with spread or non-literal
+keys), static attributes have precise types while unknown attributes return `Unknown`:
+
+```py
+from typing import Any
+
+def f(extra_attrs: dict[str, Any], y: str):
+    X = type("X", (), {"a": 42, **extra_attrs})
+
+    # Static attributes in the namespace dictionary have precise types,
+    # but the dictionary was not entirely static, so other attributes
+    # are still available and resolve to `Unknown`:
+    reveal_type(X().a)  # revealed: Literal[42]
+    reveal_type(X().whatever)  # revealed: Unknown
+
+    Y = type("Y", (), {"a": 56, y: 72})
+    reveal_type(Y().a)  # revealed: Literal[56]
+    reveal_type(Y().whatever)  # revealed: Unknown
+```
+
 When a `TypedDict` is passed as the namespace argument, we synthesize a class type with the known
 keys from the `TypedDict` as attributes. Since `TypedDict` instances are "open" (they can have
 arbitrary additional string keys), unknown attributes return `Unknown`:
@@ -594,12 +614,12 @@ Bad = type("Bad", (A, B), {})
 
 ## `__slots__` in namespace dictionary
 
-Functional classes can define `__slots__` in the namespace dictionary. Non-empty `__slots__` makes
-the class a "disjoint base", which prevents it from being used alongside other disjoint bases in a
-class hierarchy:
+Dynamic classes can define `__slots__` in the namespace dictionary. Non-empty `__slots__` makes the
+class a "disjoint base", which prevents it from being used alongside other disjoint bases in a class
+hierarchy:
 
 ```py
-# Functional class with non-empty __slots__
+# Dynamic class with non-empty __slots__
 Slotted = type("Slotted", (), {"__slots__": ("x", "y")})
 slotted = Slotted()
 reveal_type(slotted)  # revealed: Slotted
@@ -614,22 +634,22 @@ NoSlots = type("NoSlots", (), {})
 StringSlots = type("StringSlots", (), {"__slots__": "x"})
 ```
 
-Functional classes with non-empty `__slots__` cannot coexist with other disjoint bases:
+Dynamic classes with non-empty `__slots__` cannot coexist with other disjoint bases:
 
 ```py
 class RegularSlotted:
     __slots__ = ("a",)
 
-FuncSlotted = type("FuncSlotted", (), {"__slots__": ("b",)})
+DynSlotted = type("DynSlotted", (), {"__slots__": ("b",)})
 
 # error: [instance-layout-conflict]
 class Conflict(
     RegularSlotted,
-    FuncSlotted,
+    DynSlotted,
 ): ...
 ```
 
-Two functional classes with non-empty `__slots__` also conflict:
+Two dynamic classes with non-empty `__slots__` also conflict:
 
 ```py
 A = type("A", (), {"__slots__": ("x",)})
@@ -640,6 +660,29 @@ class Conflict(
     A,
     B,
 ): ...
+```
+
+`instance-layout-conflict` errors are also emitted for classes that inherit from dynamic classes
+with disjoint bases:
+
+```py
+from typing import Any
+
+class DisjointBase1:
+    __slots__ = ("a",)
+
+class DisjointBase2:
+    __slots__ = ("b",)
+
+def f(ns: dict[str, Any]):
+    cls1 = type("cls1", (DisjointBase1,), ns)
+    cls2 = type("cls2", (DisjointBase2,), ns)
+
+    # error: [instance-layout-conflict]
+    cls3 = type("cls3", (cls1, cls2), {})
+
+    # error: [instance-layout-conflict]
+    class Cls4(cls1, cls2): ...
 ```
 
 When the namespace dictionary is dynamic (not a literal), we can't determine if `__slots__` is

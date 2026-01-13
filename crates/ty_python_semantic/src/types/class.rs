@@ -4702,9 +4702,8 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// - name: "Foo"
 /// - bases: [Base]
 ///
-/// This is called "functional" because it mirrors the terminology used for `NamedTuple`
-/// and `TypedDict`, where the "functional form" means creating via a function call
-/// rather than a class statement.
+/// This is called "dynamic" because the class is created dynamically at runtime
+/// via a function call rather than a class statement.
 ///
 /// # Salsa interning
 ///
@@ -4943,18 +4942,14 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns [`Member::unbound`] if the member is not found in the namespace dict,
     /// unless the namespace is dynamic, in which case returns `Unknown`.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        for (member_name, member_type) in self.members(db) {
-            if member_name.as_str() == name {
-                return Member::definitely_declared(*member_type);
-            }
-        }
-        // If the namespace is dynamic (not a literal dict), return Unknown
-        // since we can't know what attributes might be defined.
-        if self.has_dynamic_namespace(db) {
-            Member::definitely_declared(Type::unknown())
-        } else {
-            Member::unbound()
-        }
+        // If the namespace is dynamic (not a literal dict) and the name isn't in `self.members`,
+        // return Unknown since we can't know what attributes might be defined.
+        self.members(db)
+            .iter()
+            .find_map(|(member_name, ty)| (name == member_name).then_some(*ty))
+            .or_else(|| self.has_dynamic_namespace(db).then(Type::unknown))
+            .map(Member::definitely_declared)
+            .unwrap_or_default()
     }
 
     /// Look up an instance member defined directly on this class (not inherited).
@@ -5009,11 +5004,13 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns `true` if this dynamic class defines any ordering method (`__lt__`, `__le__`,
     /// `__gt__`, `__ge__`) in its namespace dictionary. Used by `@total_ordering` to determine
     /// if synthesis is valid.
+    ///
+    /// If the namespace is dynamic, returns `true` since we can't know if ordering methods exist.
     pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
         const ORDERING_METHODS: &[&str] = &["__lt__", "__le__", "__gt__", "__ge__"];
-        self.members(db)
+        ORDERING_METHODS
             .iter()
-            .any(|(name, _)| ORDERING_METHODS.contains(&name.as_str()))
+            .any(|name| !self.own_class_member(db, name).is_undefined())
     }
 
     /// Returns a new [`DynamicClassLiteral`] with the given dataclass params, preserving all other fields.

@@ -558,17 +558,40 @@ reveal_type(o1 > o2)  # revealed: bool
 reveal_type(o1 >= o2)  # revealed: bool
 ```
 
-When the functional base class does not define any ordering method, `@total_ordering` emits an
-error:
+When the dynamic base class does not define any ordering method, `@total_ordering` emits an error:
 
 ```py
 from functools import total_ordering
 
-# Functional class without ordering methods (invalid for @total_ordering)
+# Dynamic class without ordering methods (invalid for @total_ordering)
 NoOrderBase = type("NoOrderBase", (), {})
 
 @total_ordering  # error: [invalid-total-ordering]
 class NoOrder(NoOrderBase):
     def __eq__(self, other: object) -> bool:
         return True
+```
+
+## Dynamic namespace
+
+When a `type()`-constructed class has a dynamic namespace, we assume it might provide an ordering
+method (since we can't know what's in the namespace). No error is emitted when such a class is
+passed to `@total_ordering`:
+
+```py
+from functools import total_ordering
+from typing import Any
+
+def f(ns: dict[str, Any]):
+    # Dynamic class with dynamic namespace - might have ordering methods
+    DynamicBase = type("DynamicBase", (), ns)
+
+    # No error: the dynamic namespace might contain __lt__ or another ordering method
+    @total_ordering
+    class Ordered(DynamicBase):
+        def __eq__(self, other: object) -> bool:
+            return True
+
+    # Also works when calling total_ordering as a function
+    OrderedDirect = total_ordering(type("OrderedDirect", (), ns))
 ```
