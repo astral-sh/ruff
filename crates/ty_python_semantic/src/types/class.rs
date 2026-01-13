@@ -5,7 +5,7 @@ use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
+    BoundTypeVarInstance, MemberLookupPolicy, Mro, MroIterator, SpecialFormType, StaticMroError,
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
@@ -128,8 +128,8 @@ fn try_mro_cycle_initial<'db>(
     _id: salsa::Id,
     self_: StaticClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
-) -> Result<Mro<'db>, MroError<'db>> {
-    Err(MroError::cycle(
+) -> Result<Mro<'db>, StaticMroError<'db>> {
+    Err(StaticMroError::cycle(
         db,
         self_.apply_optional_specialization(db, specialization),
     ))
@@ -2498,7 +2498,7 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> Result<Mro<'db>, MroError<'db>> {
+    ) -> Result<Mro<'db>, StaticMroError<'db>> {
         tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
         Mro::of_static_class(db, self, specialization)
     }
@@ -2605,7 +2605,7 @@ impl<'db> StaticClassLiteral<'db> {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
-        if self.try_mro(db, None).is_err_and(MroError::is_cycle) {
+        if self.try_mro(db, None).is_err_and(StaticMroError::is_cycle) {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 

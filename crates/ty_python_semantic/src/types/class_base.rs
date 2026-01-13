@@ -6,7 +6,7 @@ use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, MroError, NormalizedVisitor, SpecialFormType, Type, TypeContext,
+    MaterializationKind, NormalizedVisitor, SpecialFormType, StaticMroError, Type, TypeContext,
     TypeMapping, todo_type,
 };
 
@@ -381,7 +381,7 @@ impl<'db> ClassBase<'db> {
                 };
                 class_literal
                     .try_mro(db, specialization)
-                    .is_err_and(MroError::is_cycle)
+                    .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Dynamic(_)
             | ClassBase::Generic
