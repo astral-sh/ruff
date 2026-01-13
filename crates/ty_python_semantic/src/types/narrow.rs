@@ -1110,7 +1110,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //         if union["tag"] == "foo":
         //             reveal_type(union)  # Foo
         //
-        // Importantly, `my_typeddict_union["tag"]` isn't the place we're going to constraint.
+        // Importantly, `my_typeddict_union["tag"]` isn't the place we're going to constrain.
         // Instead, we're going to constrain `my_typeddict_union` itself.
         if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq])
             && let ast::Expr::Subscript(subscript) = &**left
