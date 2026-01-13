@@ -88,8 +88,8 @@ jobs:
             echo "Creating comment with conformance comparison"
 
             python "${RUFF_DIR}/scripts/conformance.py" \
-             --old-ty ./ty-old \
-             --new-ty ./ty-new \
+             --old-ty ${RUFF_DIR}/ty-old \
+             --new-ty ${RUFF_DIR}/ty-new \
              --tests-path "typing/conformance/tests" \
              --python-version "$PYTHON_VERSION" \
              --output typing_conformance_diagnostics.diff
