@@ -70,6 +70,47 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A
 ```
 
+## The top materialization is used for generic classes
+
+```py
+# list is invariant
+def f(x: list[int] | None):
+    if type(x) is list:
+        reveal_type(x)  # revealed: list[int]
+    else:
+        reveal_type(x)  # revealed: list[int] | None
+
+    if type(x) is not list:
+        reveal_type(x)  # revealed: list[int] | None
+    else:
+        reveal_type(x)  # revealed: list[int]
+
+# frozenset is covariant
+def g(x: frozenset[bytes] | None):
+    if type(x) is frozenset:
+        reveal_type(x)  # revealed: frozenset[bytes]
+    else:
+        reveal_type(x)  # revealed: frozenset[bytes] | None
+
+    if type(x) is not frozenset:
+        reveal_type(x)  # revealed: frozenset[bytes] | None
+    else:
+        reveal_type(x)  # revealed: frozenset[bytes]
+
+def h(x: object):
+    if type(x) is list:
+        reveal_type(x)  # revealed: Top[list[Unknown]]
+    elif type(x) is frozenset:
+        reveal_type(x)  # revealed: frozenset[object]
+    else:
+        reveal_type(x)  # revealed: object
+
+    if type(x) is not list and type(x) is not frozenset:
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: Top[list[Unknown]] | frozenset[object]
+```
+
 ## No narrowing for `type(x) is C[int]`
 
 At runtime, `type(x)` will never return a generic alias object (only ever a class-literal object),
@@ -234,8 +275,7 @@ An early version of <https://github.com/astral-sh/ruff/pull/19920> caused us to 
 ```py
 def _(val):
     if type(val) is tuple:
-        # TODO: better would be `Unknown & tuple[object, ...]`
-        reveal_type(val)  # revealed: Unknown & tuple[Unknown, ...]
+        reveal_type(val)  # revealed: Unknown & tuple[object, ...]
 ```
 
 ## Limitations
