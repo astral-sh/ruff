@@ -1012,3 +1012,124 @@ def _(value: list[Not[str]]):
     for x in value:
         reveal_type(x)  # revealed: ~str
 ```
+
+## Walrus definitions in the iterator expression are always evaluated
+
+```py
+for _ in (x := []):
+    pass
+reveal_type(x)  # revealed: list[Unknown]
+```
+
+## Cyclic control flow
+
+```py
+i = 0
+reveal_type(i)  # revealed: Literal[0]
+for _ in range(1_000_000):
+    i += 1
+    reveal_type(i)  # revealed: int
+```
+
+A binding that didn't exist before the loop started:
+
+```py
+i = 0
+for _ in range(1_000_000):
+    if i > 0:
+        loop_only += 1  # error: [possibly-unresolved-reference]
+    if i == 0:
+        loop_only = 0
+    i += 1
+reveal_type(i)  # revealed: int
+# error: [possibly-unresolved-reference]
+reveal_type(loop_only)  # revealed: int
+```
+
+Nested loops with `break` and `continue`:
+
+```py
+def random() -> bool:
+    return False
+
+x = "A"
+for _ in range(1_000_000):
+    reveal_type(x)  # revealed: Literal["A", "D"]
+    for _ in range(1_000_000):
+        # The "C" binding isn't visible here. It breaks this inner loop, and it always gets
+        # overwritten before the end of the outer loop.
+        reveal_type(x)  # revealed: Literal["A", "D", "B"]
+        if random():
+            x = "B"
+            continue
+        else:
+            x = "C"
+            break
+        reveal_type(x)  # revealed: Never
+    # We don't know whether a `for` loop will execute its body at all, so "A" is still visible here.
+    # Similarly, we don't know when the loop will terminate, so "B" is also visible here despite the
+    # `continue` above.
+    reveal_type(x)  # revealed: Literal["A", "D", "B", "C"]
+    if random():
+        x = "D"
+        continue
+    else:
+        x = "E"
+        break
+    reveal_type(x)  # revealed: Never
+reveal_type(x)  # revealed: Literal["A", "D", "E"]
+```
+
+The walrus operator is not very useful in `for` loops, because it's only allowed in the iterable
+expression, where the loop header bindings aren't visible:
+
+```py
+x = "hello"
+for _ in (y := x):
+    # This assignment is not visible when the iterable `x` is used above.
+    x = None
+reveal_type(y)  # revealed: Literal["hello"]
+```
+
+"Member" (as opposed to "symbol") places are also given loopback bindings:
+
+```py
+my_dict = {}
+my_dict["x"] = 0
+reveal_type(my_dict["x"])  # revealed: Literal[0]
+for _ in range(1_000_000):
+    my_dict["x"] += 1
+reveal_type(my_dict["x"])  # revealed: int
+```
+
+`del` prevents bindings from reaching the loopback:
+
+```py
+# Start with an unreachable binding, to avoid triggering a semantic syntax error.
+if False:
+    unique_variable_name = 99
+for _ in range(1_000_000):
+    unique_variable_name  # error: [unresolved-reference]
+    unique_variable_name = 42
+    del unique_variable_name
+```
+
+Swap bindings converge normally under fixpoint iteration:
+
+```py
+x = 1
+y = 2
+for _ in range(1_000_000):
+    x, y = y, x
+    reveal_type(x)  # revealed: Literal[2, 1]
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+And tuple assignments in general are inferred correctly:
+
+```py
+x = 0
+for _ in range(1_000_000):
+    x, y = x + 1, None
+    reveal_type(x)  # revealed: int
+```

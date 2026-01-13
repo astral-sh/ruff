@@ -93,6 +93,14 @@ impl NarrowingConstraintsBuilder {
         }
     }
 
+    /// Iterates over the predicates in a narrowing constraint.
+    pub(crate) fn iter_predicates(
+        &self,
+        set: ScopedNarrowingConstraint,
+    ) -> NarrowingConstraintsIterator<'_> {
+        self.lists.iter_set_reverse(set).copied()
+    }
+
     /// Adds a predicate to an existing narrowing constraint.
     pub(crate) fn add_predicate_to_constraint(
         &mut self,
@@ -139,15 +147,6 @@ mod tests {
     impl ScopedNarrowingConstraintPredicate {
         pub(crate) fn as_u32(self) -> u32 {
             self.0.as_u32()
-        }
-    }
-
-    impl NarrowingConstraintsBuilder {
-        pub(crate) fn iter_predicates(
-            &self,
-            set: ScopedNarrowingConstraint,
-        ) -> NarrowingConstraintsIterator<'_> {
-            self.lists.iter_set_reverse(set).copied()
         }
     }
 }

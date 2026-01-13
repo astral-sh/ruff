@@ -27,8 +27,8 @@ use crate::semantic_index::definition::{
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
     DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
     ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
-    ImportFromSubmoduleDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
@@ -49,7 +49,10 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
+use crate::semantic_index::{
+    ExpressionsScopeMap, LoopHeader, LoopToken, SemanticIndex, VisibleAncestorsIter,
+    get_loop_header,
+};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -60,11 +63,189 @@ mod except_handlers;
 struct Loop {
     /// Flow states at each `break` in the current loop.
     break_states: Vec<FlowSnapshot>,
+    /// Flow states at each `continue` in the current loop.
+    continue_states: Vec<FlowSnapshot>,
 }
 
 impl Loop {
     fn push_break(&mut self, state: FlowSnapshot) {
         self.break_states.push(state);
+    }
+
+    fn push_continue(&mut self, state: FlowSnapshot) {
+        self.continue_states.push(state);
+    }
+}
+
+/// Do a pre-walk of a `while` loop to collect all the places that are bound, prior to visiting the
+/// loop with `SemanticIndexBuilder`. This walk includes bindings in nested loops, but not in
+/// nested scopes. (I.e. we don't descend into function bodies or class definitions.) We need this
+/// pre-walk so that we can synthesize "loop header definitions" that are visible to the loop body
+/// (and condition). See `LoopHeader`.
+/// TODO: Handle `nonlocal` bindings from nested scopes somehow.
+fn collect_while_loop_bindings(while_stmt: &ast::StmtWhile) -> Vec<PlaceExpr> {
+    let mut collector = LoopBindingsVisitor::default();
+    collector.visit_expr(&while_stmt.test);
+    collector.visit_body(&while_stmt.body);
+    collector.bound_places
+}
+
+/// Like `collect_while_loop_bindings` above, but for `for` loops.
+fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExpr> {
+    let mut collector = LoopBindingsVisitor::default();
+    collector.add_place_from_target(&for_stmt.target);
+    collector.visit_body(&for_stmt.body);
+    collector.bound_places
+}
+
+/// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.
+///
+/// This visitor doesn't walk nested function/class definitions since those are different scopes.
+#[derive(Debug, Default)]
+struct LoopBindingsVisitor {
+    bound_places: Vec<PlaceExpr>,
+}
+
+impl LoopBindingsVisitor {
+    fn add_place_from_target(&mut self, target: &ast::Expr) {
+        match target {
+            ast::Expr::Name(name) => {
+                self.bound_places.push(PlaceExpr::from_expr_name(name));
+            }
+            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                if let Some(place) = PlaceExpr::try_from_expr(target) {
+                    self.bound_places.push(place);
+                }
+            }
+            ast::Expr::Tuple(tuple) => {
+                for elt in &tuple.elts {
+                    self.add_place_from_target(elt);
+                }
+            }
+            ast::Expr::List(list) => {
+                for elt in &list.elts {
+                    self.add_place_from_target(elt);
+                }
+            }
+            ast::Expr::Starred(starred) => {
+                self.add_place_from_target(&starred.value);
+            }
+            _ => {}
+        }
+    }
+}
+
+impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
+    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+        match stmt {
+            ast::Stmt::Assign(node) => {
+                for target in &node.targets {
+                    self.add_place_from_target(target);
+                }
+            }
+            ast::Stmt::AugAssign(node) => {
+                self.add_place_from_target(&node.target);
+            }
+            ast::Stmt::AnnAssign(node) => {
+                if node.value.is_some() {
+                    self.add_place_from_target(&node.target);
+                }
+            }
+            ast::Stmt::For(node) => {
+                self.add_place_from_target(&node.target);
+                self.visit_body(&node.body);
+                self.visit_body(&node.orelse);
+            }
+            ast::Stmt::While(node) => {
+                self.visit_body(&node.body);
+                self.visit_body(&node.orelse);
+            }
+            ast::Stmt::With(node) => {
+                for item in &node.items {
+                    if let Some(vars) = &item.optional_vars {
+                        self.add_place_from_target(vars);
+                    }
+                }
+                self.visit_body(&node.body);
+            }
+            ast::Stmt::Try(node) => {
+                self.visit_body(&node.body);
+                for handler in &node.handlers {
+                    let ast::ExceptHandler::ExceptHandler(h) = handler;
+                    if let Some(name) = &h.name {
+                        self.bound_places
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                    }
+                    self.visit_body(&h.body);
+                }
+                self.visit_body(&node.orelse);
+                self.visit_body(&node.finalbody);
+            }
+            ast::Stmt::Import(node) => {
+                for alias in &node.names {
+                    let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                    self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                }
+            }
+            ast::Stmt::ImportFrom(node) => {
+                for alias in &node.names {
+                    if &*alias.name != "*" {
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        self.bound_places
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                    }
+                }
+            }
+            ast::Stmt::FunctionDef(node) => {
+                self.bound_places
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+            }
+            ast::Stmt::ClassDef(node) => {
+                self.bound_places
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+            }
+            ast::Stmt::Match(node) => {
+                for case in &node.cases {
+                    self.visit_pattern(&case.pattern);
+                    self.visit_body(&case.body);
+                }
+            }
+            _ => walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        // the walrus operator
+        if let ast::Expr::Named(node) = expr {
+            self.add_place_from_target(&node.target);
+        }
+        walk_expr(self, expr);
+    }
+
+    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        match pattern {
+            ast::Pattern::MatchAs(p) => {
+                if let Some(name) = &p.name {
+                    self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                }
+            }
+            ast::Pattern::MatchStar(p) => {
+                if let Some(name) = &p.name {
+                    self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                }
+            }
+            ast::Pattern::MatchMapping(p) => {
+                if let Some(rest) = &p.rest {
+                    self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(rest.id.clone())));
+                }
+            }
+            _ => {}
+        }
+        walk_pattern(self, pattern);
     }
 }
 
@@ -809,6 +990,64 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 );
             }
         }
+    }
+
+    /// Push a loop header definition, keeping UNBOUND visible as a possible state.
+    /// This is used for places first assigned inside a loop body, where the place
+    /// may be unbound on the first iteration.
+    fn push_loop_header_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize) {
+        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
+
+        let category = kind.category(self.source_type.is_stub(), self.module);
+        let is_reexported = kind.is_reexported();
+
+        let definition: Definition<'db> = Definition::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            place,
+            kind,
+            is_reexported,
+        );
+
+        let num_definitions = {
+            let definitions = self.add_entry_for_definition_key(definition_node.key());
+            definitions.push(definition);
+            definitions.len()
+        };
+
+        if category.is_binding() {
+            self.mark_place_bound(place);
+        }
+        if category.is_declaration() {
+            self.mark_place_declared(place);
+        }
+
+        // For loop headers, use record_binding_keeping_unbound to preserve UNBOUND
+        // as a possible state for places first assigned inside the loop body.
+        let use_def = self.current_use_def_map_mut();
+        debug_assert!(category.is_binding());
+        use_def.record_binding_keeping_unbound(place, definition);
+        self.delete_associated_bindings(place);
+
+        if category.is_binding() {
+            if let Some(id) = place.as_symbol() {
+                self.update_lazy_snapshots(id);
+            }
+        }
+
+        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
+        try_node_stack_manager.record_definition(self);
+        self.try_node_context_stack_manager = try_node_stack_manager;
+
+        (definition, num_definitions)
     }
 
     fn record_expression_narrowing_constraint(
@@ -1980,22 +2219,112 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
             }
-            ast::Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::While(
+                while_stmt @ ast::StmtWhile {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                    node_index: _,
+                },
+            ) => {
+                // Collect all places assigned in the loop (test expression and body).
+                // Loop headers are needed for all bindings to track values that could
+                // flow back from previous iterations. The test expression can contain
+                // walrus operators that bind names.
+                let bound_places = collect_while_loop_bindings(while_stmt);
+
+                // Create the LoopToken that we'll use to look up the LoopHeader.
+                let loop_token = LoopToken::new(self.db);
+
+                // Track which places have loop header definitions so we can collect
+                // their bindings after walking the body. Use a set to avoid duplicates
+                // (a variable might be assigned multiple times in the loop body).
+                let mut loop_header_places: FxHashSet<ScopedPlaceId> = FxHashSet::default();
+
+                // Create loop header definitions for all places assigned in the loop body.
+                // The loop header type will be the union of the seed type (before loop,
+                // which may be Unbound) and all types assigned in the loop body.
+                // These must be created BEFORE visiting the test expression so that
+                // uses in the test see the loop header bindings.
+                for place_expr in bound_places {
+                    let place_id = self.add_place(place_expr);
+                    // Only create one loop header per place (a variable might be assigned
+                    // multiple times in the loop body)
+                    if loop_header_places.insert(place_id) {
+                        let loop_header_ref = LoopHeaderDefinitionNodeRef {
+                            loop_stmt: LoopStmtRef::While(while_stmt),
+                            place: place_id,
+                            loop_token,
+                        };
+                        // Use push_loop_header_definition to preserve UNBOUND as a possible
+                        // state for places first assigned inside the loop body. This ensures
+                        // that if we break out of the loop before assigning the variable,
+                        // UNBOUND remains visible.
+                        self.push_loop_header_definition(place_id, loop_header_ref);
+                    }
+                }
+
+                // Visit the test expression AFTER creating loop headers so that
+                // variable uses in the test see the loop header type.
                 self.visit_expr(test);
 
+                // Take the pre_loop snapshot AFTER visiting the test expression.
+                // This ensures that walrus bindings from the test (which are always
+                // evaluated at least once) remain visible after the loop.
                 let pre_loop = self.flow_snapshot();
+
                 let predicate = self.record_expression_narrowing_constraint(test);
+                self.record_narrowing_constraint(predicate);
                 self.record_reachability_constraint(predicate);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
+
+                // Merge continue states into current flow before collecting loop-back bindings.
+                // Continue jumps directly to the loop-back edge, so bindings from continue paths
+                // should be visible at the start of the next iteration.
+                for continue_state in this_loop.continue_states {
+                    self.flow_merge(continue_state);
+                }
+
+                // After walking the body, collect the bindings at the loop-back edge
+                // for each place that has a loop header definition.
+                // Only collect bindings if control flow can actually reach the loop-back edge.
+                // If all paths in the body end with break/return/raise, there are no loop-back bindings.
+                let mut loop_header = LoopHeader::new();
+                let use_def = self.current_use_def_map();
+                if !use_def.is_statically_unreachable() {
+                    for place_id in &loop_header_places {
+                        // Get all definitions currently visible for this place, along with
+                        // their narrowing predicates
+                        for (def_state, narrowing_predicates) in
+                            use_def.bindings_at_loop_back(*place_id)
+                        {
+                            if let crate::semantic_index::definition::DefinitionState::Defined(
+                                def,
+                            ) = def_state
+                            {
+                                // Skip other loop headers - their type represents the union of
+                                // types at the inner loop entry, not the types that exit the
+                                // inner loop. Including them would incorrectly propagate types
+                                // that are narrowed by the inner loop's condition.
+                                if matches!(
+                                    def.kind(self.db),
+                                    crate::semantic_index::definition::DefinitionKind::LoopHeader(
+                                        _
+                                    )
+                                ) {
+                                    continue;
+                                }
+                                loop_header.add_binding(*place_id, def, narrowing_predicates);
+                            }
+                        }
+                    }
+                }
+                // Store the loop-back bindings using salsa's specify mechanism
+                get_loop_header::specify(self.db, loop_token, loop_header);
 
                 // We execute the `else` branch once the condition evaluates to false. This could
                 // happen without ever executing the body, if the condition is false the first time
@@ -2073,11 +2402,75 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 let pre_loop = self.flow_snapshot();
 
+                // Collect all places assigned in the loop (target and body).
+                // Loop headers are needed for all bindings to track values that could
+                // flow back from previous iterations.
+                let bound_places = collect_for_loop_bindings(for_stmt);
+
+                // Create the LoopToken that we'll use to look up the LoopHeader.
+                let loop_token = LoopToken::new(self.db);
+
+                // Track which places have loop header definitions so we can collect
+                // their bindings after walking the body. Use a set to avoid duplicates.
+                let mut loop_header_places: FxHashSet<ScopedPlaceId> = FxHashSet::default();
+
+                // Create loop header definitions for all places assigned in the loop.
+                // These must be created BEFORE the target assignment and body so that
+                // uses see the loop header bindings.
+                for place_expr in bound_places {
+                    let place_id = self.add_place(place_expr);
+                    if loop_header_places.insert(place_id) {
+                        let loop_header_ref = LoopHeaderDefinitionNodeRef {
+                            loop_stmt: LoopStmtRef::For(for_stmt),
+                            place: place_id,
+                            loop_token,
+                        };
+                        self.push_loop_header_definition(place_id, loop_header_ref);
+                    }
+                }
+
                 self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
+
+                // Merge continue states into current flow before collecting loop-back bindings.
+                // Continue jumps directly to the loop-back edge, so bindings from continue paths
+                // should be visible at the start of the next iteration.
+                for continue_state in this_loop.continue_states {
+                    self.flow_merge(continue_state);
+                }
+
+                // After walking the body, collect the bindings at the loop-back edge
+                // for each place that has a loop header definition.
+                let mut loop_header = LoopHeader::new();
+                let use_def = self.current_use_def_map();
+                if !use_def.is_statically_unreachable() {
+                    for place_id in &loop_header_places {
+                        for (def_state, narrowing_predicates) in
+                            use_def.bindings_at_loop_back(*place_id)
+                        {
+                            if let crate::semantic_index::definition::DefinitionState::Defined(
+                                def,
+                            ) = def_state
+                            {
+                                // Skip other loop headers to avoid incorrect type propagation.
+                                if matches!(
+                                    def.kind(self.db),
+                                    crate::semantic_index::definition::DefinitionKind::LoopHeader(
+                                        _
+                                    )
+                                ) {
+                                    continue;
+                                }
+                                loop_header.add_binding(*place_id, def, narrowing_predicates);
+                            }
+                        }
+                    }
+                }
+                // Store the loop-back bindings using salsa's specify mechanism
+                get_loop_header::specify(self.db, loop_token, loop_header);
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
@@ -2299,8 +2692,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_body(finalbody);
             }
 
-            ast::Stmt::Raise(_) | ast::Stmt::Return(_) | ast::Stmt::Continue(_) => {
+            ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
                 walk_stmt(self, stmt);
+                // Everything in the current block after a terminal statement is unreachable.
+                self.mark_unreachable();
+            }
+
+            ast::Stmt::Continue(_) => {
+                let snapshot = self.flow_snapshot();
+                if let Some(current_loop) = self.current_loop_mut() {
+                    current_loop.push_continue(snapshot);
+                }
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
@@ -3277,4 +3679,252 @@ fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
             ..
         }) if is_if_type_checking(operand)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ruff_python_parser::parse_module;
+    use ruff_python_trivia::textwrap::dedent;
+
+    // Test collecting `while` loop bindings.
+
+    fn collect_while_loop_place_names(code: &str) -> Vec<String> {
+        let parsed = parse_module(code).expect("valid Python code");
+        let stmt = &parsed.suite()[0];
+        let ast::Stmt::While(while_stmt) = stmt else {
+            panic!("Expected a while statement");
+        };
+        collect_while_loop_bindings(while_stmt)
+            .into_iter()
+            .map(|place| match place {
+                PlaceExpr::Symbol(sym) => sym.name().to_string(),
+                PlaceExpr::Member(member) => member.to_string(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_collect_while_loop() {
+        let bindings = collect_while_loop_place_names(&dedent(
+            "
+            while True:
+                x = 1
+                y = 2
+                x = 3
+            else:
+                z = 4
+            ",
+        ));
+        // `z` is not collected, because it's not visible to the loopback edge.
+        assert_eq!(bindings, vec!["x", "y", "x"]);
+    }
+
+    #[test]
+    fn test_collect_while_loop_nested() {
+        let bindings = collect_while_loop_place_names(&dedent(
+            "
+            while True:
+                a = 1
+                if some_condition:
+                    b = 2
+                while some_condition:
+                    c = 3
+                for d in e:
+                    f = 4
+                [g := 42 for x in [h := 99 for _ in 'hello world']]
+            ",
+        ));
+        // Note that "x", the comprehension variable, is not included, but "g", a walrus assignment
+        // within the comprehension, is included.
+        assert_eq!(bindings, vec!["a", "b", "c", "d", "f", "h", "g"]);
+    }
+
+    #[test]
+    fn test_collect_while_loop_walrus_in_condition() {
+        let bindings = collect_while_loop_place_names(&dedent(
+            "
+            while (x := get_next()):
+                y = x + 1
+            ",
+        ));
+        assert_eq!(bindings, vec!["x", "y"]);
+    }
+
+    // Test collecting `for` loop bindings.
+
+    fn collect_for_loop_place_names(code: &str) -> Vec<String> {
+        let parsed = parse_module(code).expect("valid Python code");
+        let stmt = &parsed.suite()[0];
+        let ast::Stmt::For(for_stmt) = stmt else {
+            panic!("Expected a for statement");
+        };
+        collect_for_loop_bindings(for_stmt)
+            .into_iter()
+            .map(|place| match place {
+                PlaceExpr::Symbol(sym) => sym.name().to_string(),
+                PlaceExpr::Member(member) => member.to_string(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_collect_for_loop() {
+        let bindings = collect_for_loop_place_names(&dedent(
+            "
+            for i in range(10):
+                x = 1
+                y = 2
+                x = 3
+            else:
+                z = 4
+            ",
+        ));
+        // `z` is not collected, because it's not visible to the loopback edge.
+        assert_eq!(bindings, vec!["i", "x", "y", "x"]);
+    }
+
+    #[test]
+    fn test_collect_for_loop_nested() {
+        let bindings = collect_for_loop_place_names(&dedent(
+            "
+            for i in range(10):
+                a = 1
+                if some_condition:
+                    b = 2
+                while some_condition:
+                    c = 3
+                for d in e:
+                    f = 4
+                [g := 42 for x in [h := 99 for _ in 'hello world']]
+            ",
+        ));
+        // Note that "x", the comprehension variable, is not included, but "g", a walrus assignment
+        // within the comprehension, is included.
+        assert_eq!(bindings, vec!["i", "a", "b", "c", "d", "f", "h", "g"]);
+    }
+
+    /// `LoopBindingsVisitor` has to handle a lot of different types of bindings. Exercise all of
+    /// them at least once.
+    #[test]
+    fn test_all_different_binding_kinds() {
+        enum LoopKind {
+            While,
+            For,
+        }
+        let loop_cases = [
+            ("while True:", LoopKind::While),
+            ("for for_loop_var in range(1_000_000):", LoopKind::For),
+            ("async for for_loop_var in range(1_000_000):", LoopKind::For),
+        ];
+        for (loop_header, loop_kind) in loop_cases {
+            let code_snippet = dedent(&format!(
+                r#"
+            {loop_header}
+                simple_assign = 1
+                tuple_unpack_a, tuple_unpack_b = (1, 2)
+                [list_unpack_a, list_unpack_b] = [1, 2]
+                first, *starred_rest, last = [1, 2, 3, 4]
+                obj.attr_target = 1
+                obj["subscript_target"] = 1
+                aug_assign += 1
+                ann_assign: int = 1
+                for for_target in items:
+                    for_body_binding = 1
+                while condition:
+                    while_body_binding = 1
+                with ctx() as with_var:
+                    with_body_binding = 1
+                with ctx() as (with_tuple_a, with_tuple_b):
+                    pass
+                async with ctx() as async_with_var:
+                    async_with_body_binding = 1
+                try:
+                    try_body_binding = 1
+                except Exception as exc_var:
+                    except_body_binding = 1
+                finally:
+                    finally_binding = 1
+                import mod_a
+                import mod_b as mod_b_alias
+                from pkg import name_c
+                from pkg import name_d as name_d_alias
+                def func_def(): ...
+                class ClassDef: ...
+                (walrus_var := 42)
+                match subject:
+                    case match_as_var:
+                        match_as_body = 1
+                    case int() as match_as_with_pattern: ...
+                    case [seq_first, *match_star_rest, seq_last]: ...
+                    case {{"key": mapping_val, **match_mapping_rest}}: ...
+                    case Point(class_pos_x, y=class_kw_y): ...
+                    case match_or_a | match_or_b: ...
+                    case [seq_a, seq_b]: ...
+                    case 42 | None | True: ...
+                del deleted_variable  # This place does NOT get collected.
+            "#,
+            ))
+            .into_owned();
+
+            let mut expected_bindings = vec![
+                "simple_assign",
+                "tuple_unpack_a",
+                "tuple_unpack_b",
+                "list_unpack_a",
+                "list_unpack_b",
+                "first",
+                "starred_rest",
+                "last",
+                "obj.attr_target",
+                "obj[\"subscript_target\"]",
+                "aug_assign",
+                "ann_assign",
+                "for_target",
+                "for_body_binding",
+                "while_body_binding",
+                "with_var",
+                "with_body_binding",
+                "with_tuple_a",
+                "with_tuple_b",
+                "async_with_var",
+                "async_with_body_binding",
+                "try_body_binding",
+                "exc_var",
+                "except_body_binding",
+                "finally_binding",
+                "mod_a",
+                "mod_b_alias",
+                "name_c",
+                "name_d_alias",
+                "func_def",
+                "ClassDef",
+                "walrus_var",
+                "match_as_var",
+                "match_as_body",
+                "match_as_with_pattern",
+                "seq_first",
+                "match_star_rest",
+                "seq_last",
+                "match_mapping_rest",
+                "mapping_val",
+                "class_pos_x",
+                "class_kw_y",
+                "match_or_a",
+                "match_or_b",
+                "seq_a",
+                "seq_b",
+            ];
+            if matches!(loop_kind, LoopKind::For) {
+                expected_bindings.insert(0, "for_loop_var");
+            }
+
+            let bindings = match loop_kind {
+                LoopKind::While => collect_while_loop_place_names(&code_snippet),
+                LoopKind::For => collect_for_loop_place_names(&code_snippet),
+            };
+
+            assert_eq!(bindings, expected_bindings);
+        }
+    }
 }
