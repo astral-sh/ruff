@@ -399,8 +399,8 @@ impl<'a> SuppressionsBuilder<'a> {
         'comments: while let Some(suppression) = suppressions.peek() {
             indents.clear();
 
-            let last_indent = tokens
-                .before(suppression.range.start())
+            let (before, after) = tokens.split_at(suppression.range.start());
+            let last_indent = before
                 .iter()
                 .rfind(|token| token.kind() == TokenKind::Indent)
                 .map(|token| self.source.slice(token))
@@ -408,11 +408,9 @@ impl<'a> SuppressionsBuilder<'a> {
 
             indents.push(last_indent);
 
-            let tokens = tokens.after(suppression.range.start());
-
             // Iterate through tokens, tracking indentation, filtering trailing comments, and then
             // looking for matching comments from the previous block when reaching a dedent token.
-            for (token_index, token) in tokens.iter().enumerate() {
+            for (token_index, token) in after.iter().enumerate() {
                 let current_indent = indents.last().copied().unwrap_or_default();
                 match token.kind() {
                     TokenKind::Indent => {
@@ -448,7 +446,7 @@ impl<'a> SuppressionsBuilder<'a> {
 
                         // comment matches current block's indentation, or precedes an indent/dedent token
                         if indent == current_indent
-                            || tokens[token_index..]
+                            || after[token_index..]
                                 .iter()
                                 .find(|t| !t.kind().is_trivia())
                                 .is_some_and(|t| {
