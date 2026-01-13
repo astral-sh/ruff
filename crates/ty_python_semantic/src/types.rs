@@ -2600,7 +2600,7 @@ impl<'db> Type<'db> {
 
                 // For classmethod-like callables, bind to the owner class. For function-like callables, bind to the instance.
                 let self_type = if callable.is_classmethod_like(db) && instance.is_none(db) {
-                    owner
+                    owner.to_instance(db).unwrap_or(owner)
                 } else {
                     instance
                 };
