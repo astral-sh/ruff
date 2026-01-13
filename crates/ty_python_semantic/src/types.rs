@@ -6942,7 +6942,7 @@ impl<'db> TypeMapping<'_, 'db> {
 /// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
 /// constraint sets to check things like assignability; they're only used as a debugging aid in
 /// mdtests. That means there's no need for this to be interned; being tracked is sufficient.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TrackedConstraintSet<'db> {
     constraints: ConstraintSet<'db>,
