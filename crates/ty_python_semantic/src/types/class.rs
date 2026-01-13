@@ -628,7 +628,8 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => class.is_final(db),
-            Self::Dynamic(class) => class.is_final(db),
+            // Dynamic classes created via `type()` cannot be marked as final.
+            Self::Dynamic(_) => false,
         }
     }
 
@@ -4741,9 +4742,6 @@ pub struct DynamicClassLiteral<'db> {
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
     /// or passed to `dataclass()` as a function.
     pub dataclass_params: Option<DataclassParams<'db>>,
-
-    /// Whether this class has been marked as `@final`.
-    pub is_final: bool,
 }
 
 /// Anchor for identifying a dynamic class literal.
@@ -4769,28 +4767,6 @@ pub enum DynamicClassAnchor<'db> {
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
-
-impl<'db> DynamicClassLiteral<'db> {
-    /// Create a version of this class marked as `@final`.
-    ///
-    /// Used when `final(type(...))` is called to create a final dynamic class.
-    pub(crate) fn with_final(self, db: &'db dyn Db) -> Self {
-        if self.is_final(db) {
-            return self;
-        }
-        Self::new(
-            db,
-            self.name(db).clone(),
-            self.bases(db),
-            self.scope(db),
-            self.anchor(db),
-            self.members(db),
-            self.has_dynamic_namespace(db),
-            self.dataclass_params(db),
-            true,
-        )
-    }
-}
 
 #[salsa::tracked]
 impl<'db> DynamicClassLiteral<'db> {
@@ -5093,7 +5069,6 @@ impl<'db> DynamicClassLiteral<'db> {
             self.members(db),
             self.has_dynamic_namespace(db),
             dataclass_params,
-            self.is_final(db),
         )
     }
 }

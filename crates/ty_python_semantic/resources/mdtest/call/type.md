@@ -1070,23 +1070,26 @@ reveal_type(Dynamic)  # revealed: <class 'Dynamic'>
 reveal_type(Dynamic.custom_attr)  # revealed: str
 ```
 
-## `@final` on dynamic classes
+## `final()` on dynamic classes
 
-Dynamic classes can be marked as `@final` using `final(type(...))`:
+Using `final()` as a function (not a decorator) on dynamic classes has no effect. The class is
+passed through unchanged:
 
 ```py
 from typing import final
 
+# TODO: Add a diagnostic for ineffective use of `final()` here.
 FinalClass = final(type("FinalClass", (), {}))
 reveal_type(FinalClass)  # revealed: <class 'FinalClass'>
 
-# Cannot subclass a final dynamic class
-class Child(FinalClass): ...  # error: [subclass-of-final-class]
+# Subclassing is allowed because `final()` as a function has no effect
+class Child(FinalClass): ...
 
-# Also works with base classes
+# Same with base classes
 class Base: ...
 
+# TODO: Add a diagnostic for ineffective use of `final()` here.
 FinalDerived = final(type("FinalDerived", (Base,), {}))
 
-class Child2(FinalDerived): ...  # error: [subclass-of-final-class]
+class Child2(FinalDerived): ...
 ```
