@@ -886,8 +886,6 @@ class GenericClass[T]:
         raise NotImplementedError
 
 def _(x: list[str]):
-    # TODO: This fails because we are not propagating GenericClass's generic context into the
-    # Callable that we create for it.
     # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
     reveal_type(into_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
@@ -895,15 +893,10 @@ def _(x: list[str]):
 
     # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
     reveal_type(accepts_callable(GenericClass))
-    # TODO: revealed: ty_extensions.GenericContext[T@GenericClass]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(accepts_callable(GenericClass)))
 
-    # TODO: revealed: GenericClass[str]
-    # TODO: no errors
-    # revealed: GenericClass[T@GenericClass]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
+    # revealed: GenericClass[str]
     reveal_type(accepts_callable(GenericClass)(x, x))
 ```
 
