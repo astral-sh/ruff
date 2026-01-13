@@ -834,7 +834,7 @@ class Base: ...
 bases_tuple = (Base,)
 Cls1 = type("Cls1", (*bases_tuple,), {})
 reveal_type(Cls1)  # revealed: <class 'Cls1'>
-reveal_mro(Cls1)  # revealed: (<class 'Cls1'>, @Todo(StarredExpression), <class 'object'>)
+reveal_mro(Cls1)  # revealed: (<class 'Cls1'>, <class 'Base'>, <class 'object'>)
 
 # Unpacking a dict for the namespace - the dict contents are not tracked anyway
 namespace = {"attr": 1}

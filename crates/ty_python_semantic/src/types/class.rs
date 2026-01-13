@@ -45,10 +45,10 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    DeprecatedInstance, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    TypeAliasType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder, VarianceInferable,
-    binding_type, declaration_type, determine_upper_bound,
+    DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
+    PropertyInstanceType, TypeAliasType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder,
+    VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -2371,6 +2371,11 @@ impl<'db> StaticClassLiteral<'db> {
 
         let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
+
+        if class_stmt.bases().iter().any(ast::Expr::is_starred_expr) {
+            return Box::new([Type::Dynamic(DynamicType::TodoStarredExpression)]);
+        }
+
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
