@@ -5,11 +5,12 @@ use ty_module_resolver::{
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, get_loop_header,
+    place_table,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
@@ -1276,6 +1277,44 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
+            // We need to "look through" loop header definitions to do boundness analysis. The
+            // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
+            // like all other bindings, so that it can participate in fixpoint iteration.
+            if let DefinitionKind::LoopHeader(loop_header_kind) = binding.kind(db) {
+                let loop_header = get_loop_header(db, loop_header_kind.loop_token());
+                let place = loop_header_kind.place();
+                let mut has_defined_bindings = false;
+                for loop_back in loop_header.bindings_for_place(place) {
+                    match loop_back.definition_state {
+                        DefinitionState::Defined(_) => {
+                            has_defined_bindings = true;
+                        }
+                        // `del` in the loop body is always visible to code after the loop via the
+                        // normal control flow merge. Updating `deleted_reachability` here is
+                        // necessary for prior uses in the loop to see it.
+                        DefinitionState::Deleted => {
+                            deleted_reachability =
+                                deleted_reachability.or(reachability_constraints.evaluate(
+                                    db,
+                                    predicates,
+                                    reachability_constraint,
+                                ));
+                        }
+                        // If UNBOUND is visible at loop-back, then it was visible before the loop.
+                        // Loop header definitions don't shadow preexisting bindings, so we don't
+                        // need to do anything with this.
+                        DefinitionState::Undefined => {}
+                    }
+                }
+                // If all the bindings in the loop are in statically false branches, it might be
+                // that none of them loop-back. In that case short-circuit, so that we don't
+                // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
+                // possibility below.
+                if !has_defined_bindings {
+                    return None;
+                }
+            }
+
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
             Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
@@ -1300,13 +1339,15 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
-                Some(Truthiness::AlwaysTrue) => {
-                    unreachable!(
-                        "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
-                    )
-                }
                 Some(Truthiness::AlwaysFalse) | None => Definedness::AlwaysDefined,
                 Some(Truthiness::Ambiguous) => Definedness::PossiblyUndefined,
+                // A place shouldn't be definitely-unbound when there are visible bindings. The
+                // initial UNBOUND definition should either get shadowed by those bindings (if
+                // they're unconditional), or it should have constraints attached to it (if the
+                // other bindings are conditional). However, there's one exception to that
+                // intuitive rule: Loop header definitions don't shadow prior bindings, because
+                // prior bindings are always visible at the start of the first loop iteration.
+                Some(Truthiness::AlwaysTrue) => Definedness::PossiblyUndefined,
             },
         };
 

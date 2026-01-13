@@ -42,7 +42,7 @@ use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
-    ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
+    ForStmtDefinitionKind, LoopHeaderDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
@@ -52,8 +52,9 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, get_loop_header, place_table,
 };
+use crate::types::builder::RecursivelyDefined;
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
@@ -121,14 +122,14 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, NarrowingConstraint,
+    PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_narrowing_constraint, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -1923,6 +1924,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::TypeVarTuple(node) => {
                 self.infer_typevartuple_definition(node.node(self.module()), definition);
+            }
+            DefinitionKind::LoopHeader(loop_header) => {
+                self.infer_loop_header_definition(loop_header, definition);
             }
         }
     }
@@ -4207,6 +4211,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
         );
+    }
+
+    /// Infer the type for a loop header definition.
+    ///
+    /// The loop header sees all bindings that loop-back, either by reaching the end of the loop
+    /// body or a `continue` statement. This includes bindings from before the loop too, though
+    /// that's technically redundant, since the loop header definition itself doesn't shadow those
+    /// bindings. See `struct LoopHeader` in the semantic index for more on how all this fits
+    /// together.
+    fn infer_loop_header_definition(
+        &mut self,
+        loop_header_kind: &LoopHeaderDefinitionKind<'db>,
+        definition: Definition<'db>,
+    ) {
+        let db = self.db();
+        let loop_token = loop_header_kind.loop_token();
+        let place = loop_header_kind.place();
+        let loop_back_bindings = get_loop_header(db, loop_token);
+        let mut union = UnionBuilder::new(db)
+            .cycle_recovery(true)
+            .recursively_defined(RecursivelyDefined::Yes);
+        for loop_back_binding in loop_back_bindings.bindings_for_place(place) {
+            // Boundness analysis is handled by looking at these bindings again in
+            // `place_from_bindings_impl`. Here we're only concerned with the type.
+            let def = match loop_back_binding.definition_state {
+                DefinitionState::Defined(def) => def,
+                DefinitionState::Deleted | DefinitionState::Undefined => continue,
+            };
+            // This loop header is visible to itself. Filter it out to avoid a pointless cycle.
+            if def == definition {
+                continue;
+            }
+            let binding_ty = binding_type(db, def);
+            let narrowed_ty = if let Some(constraint) = loop_back_binding
+                .narrowing_predicates
+                .iter()
+                .filter_map(|predicate| infer_narrowing_constraint(db, *predicate, place))
+                .reduce(|acc, constraint| constraint.merge_constraint_and(acc, db))
+            {
+                NarrowingConstraint::intersection(binding_ty)
+                    .merge_constraint_and(constraint, db)
+                    .evaluate_constraint_type(db)
+            } else {
+                binding_ty
+            };
+            union.add_in_place(narrowed_ty);
+        }
+
+        self.bindings
+            .insert(definition, union.build(), self.multi_inference_state);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {

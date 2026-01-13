@@ -1780,9 +1780,9 @@ impl<'db> Type<'db> {
         }
         match self {
             Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
-            Type::Intersection(intersection) => intersection
-                .recursive_type_normalized_impl(db, div, nested)
-                .map(Type::Intersection),
+            Type::Intersection(intersection) => {
+                intersection.recursive_type_normalized_impl(db, div, nested)
+            }
             Type::Callable(callable) => callable
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::Callable),
@@ -12502,6 +12502,27 @@ impl<'db> NegativeIntersectionElements<'db> {
             }
         }
     }
+
+    /// Apply a filter-map to all elements in this collection, dropping the ones that return
+    /// `None`.
+    fn filter_map(&self, filter_map_fn: impl Fn(&Type<'db>) -> Option<Type<'db>>) -> Self {
+        match self {
+            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
+            NegativeIntersectionElements::Single(ty) => match filter_map_fn(ty) {
+                Some(mapped) => NegativeIntersectionElements::Single(mapped),
+                None => NegativeIntersectionElements::Empty,
+            },
+            NegativeIntersectionElements::Multiple(set) => {
+                let filtered: FxOrderSet<Type<'db>> =
+                    set.iter().filter_map(filter_map_fn).collect();
+                match filtered.len() {
+                    0 => NegativeIntersectionElements::Empty,
+                    1 => NegativeIntersectionElements::Single(filtered.into_iter().next().unwrap()),
+                    _ => NegativeIntersectionElements::Multiple(filtered),
+                }
+            }
+        }
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElements<'db> {
@@ -12607,33 +12628,49 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-    ) -> Option<Self> {
+    ) -> Option<Type<'db>> {
         let positive = if nested {
             self.positive(db)
                 .iter()
                 .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
                 .collect::<Option<FxOrderSet<Type<'db>>>>()?
         } else {
-            self.positive(db)
+            // In non-nested intersections, if any positive element normalizes to `Divergent`, the
+            // whole intersection becomes `Never`.
+            let positive: FxOrderSet<Type<'db>> = self
+                .positive(db)
                 .iter()
                 .map(|ty| {
                     ty.recursive_type_normalized_impl(db, div, nested)
-                        .unwrap_or(div)
+                        .expect("nested=false guarantees Some")
                 })
-                .collect()
+                .collect();
+            if positive.iter().any(|ty| *ty == div) {
+                return Some(Type::Never);
+            }
+            positive
         };
 
         let negative = if nested {
             self.negative(db)
                 .try_map(|ty| ty.recursive_type_normalized_impl(db, div, nested))?
         } else {
-            self.negative(db).map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, nested)
-                    .unwrap_or(div)
+            // In non-nested intersections, `~Divergent` is treated as `~Never` and dropped.
+            self.negative(db).filter_map(|ty| {
+                let normalized = ty
+                    .recursive_type_normalized_impl(db, div, nested)
+                    .expect("nested=false guarantees Some");
+                if normalized == div {
+                    None
+                } else {
+                    Some(normalized)
+                }
             })
         };
 
-        Some(IntersectionType::new(db, positive, negative))
+        Some(Type::Intersection(IntersectionType::new(
+            db, positive, negative,
+        )))
     }
 
     /// Return `true` if `self` represents exactly the same set of possible runtime objects as `other`

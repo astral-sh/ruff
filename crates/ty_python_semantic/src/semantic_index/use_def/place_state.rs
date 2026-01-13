@@ -89,7 +89,7 @@ pub(super) struct LiveDeclaration {
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
 #[derive(Clone, Copy, Debug)]
-pub(super) enum PreviousDefinitions {
+pub(in crate::semantic_index) enum PreviousDefinitions {
     AreShadowed,
     AreKept,
 }
@@ -381,6 +381,7 @@ impl PlaceState {
         reachability_constraint: ScopedReachabilityConstraintId,
         is_class_scope: bool,
         is_place_name: bool,
+        previous_definitions: PreviousDefinitions,
     ) {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
         self.bindings.record_binding(
@@ -388,7 +389,7 @@ impl PlaceState {
             reachability_constraint,
             is_class_scope,
             is_place_name,
-            PreviousDefinitions::AreShadowed,
+            previous_definitions,
         );
     }
 
@@ -526,6 +527,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
 
         assert_bindings(&narrowing_constraints, &sym, &["1<>"]);
@@ -540,6 +542,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
         let predicate = ScopedPredicateId::new(0).into();
         sym.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -559,6 +562,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
         let predicate = ScopedPredicateId::new(0).into();
         sym1a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -569,6 +573,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
         let predicate = ScopedPredicateId::new(0).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -588,6 +593,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
         let predicate = ScopedPredicateId::new(1).into();
         sym2a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -598,6 +604,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
         let predicate = ScopedPredicateId::new(2).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -617,6 +624,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
         let predicate = ScopedPredicateId::new(3).into();
         sym3a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
