@@ -962,8 +962,10 @@ declare_lint! {
     /// Checks for enum classes that are also generic.
     ///
     /// ## Why is this bad?
-    /// Enum classes cannot be generic. Python does not support generic enums,
-    /// and attempting to create one will result in a `TypeError` at runtime.
+    /// Enum classes cannot be generic. Python does not support generic enums:
+    /// attempting to create one will either result in an immediate `TypeError`
+    /// at runtime, or will create a class that cannot be specialized in the way
+    /// that a normal generic class can.
     ///
     /// ## Examples
     /// ```python
