@@ -1,14 +1,16 @@
+use rustc_hash::FxHashMap;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{BindingKind, Imported, Scope, ScopeId};
+use ruff_python_semantic::{
+    BindingKind, Imported, NodeId, Scope, ScopeId,
+    analyze::{typing::is_type_checking_block, visibility},
+};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::{Fix, FixAvailability, Violation};
-
-use rustc_hash::FxHashMap;
 
 /// ## What it does
 /// Checks for variable definitions that redefine (or "shadow") unused
@@ -130,9 +132,35 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 
             // If the bindings are in different forks, abort.
             if shadowed.source.is_none_or(|left| {
-                binding
-                    .source
-                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+                binding.source.is_none_or(|right| {
+                    fn is_in_type_checking_block(checker: &Checker, node_id: NodeId) -> bool {
+                        checker.semantic().statements(node_id).any(|stmt| {
+                            stmt.as_if_stmt()
+                                .map(|if_stmt| is_type_checking_block(if_stmt, checker.semantic()))
+                                .unwrap_or(false)
+                        })
+                    }
+
+                    let left_in_type_checking = is_in_type_checking_block(checker, left);
+                    let right_in_type_checking = is_in_type_checking_block(checker, right);
+
+                    if (left_in_type_checking || right_in_type_checking)
+                        && !(left_in_type_checking && right_in_type_checking)
+                    {
+                        let left_binding = &checker.semantic().bindings[shadow.shadowed_id()];
+                        let right_binding = &checker.semantic().bindings[shadow.binding_id()];
+
+                        if let (Some(left_import), Some(right_import)) =
+                            (left_binding.as_any_import(), right_binding.as_any_import())
+                        {
+                            if left_import.qualified_name() == right_import.qualified_name() {
+                                return false;
+                            }
+                        }
+                    }
+
+                    !checker.semantic().same_branch(left, right)
+                })
             }) {
                 continue;
             }
@@ -169,7 +197,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             let statement = checker.semantic().statement(*source);
             let parent = checker.semantic().parent_statement(*source);
             let Ok(edit) = edits::remove_unused_imports(
-                member_names.iter().map(std::convert::AsRef::as_ref),
+                member_names.iter().map(AsRef::as_ref),
                 statement,
                 parent,
                 checker.locator(),
