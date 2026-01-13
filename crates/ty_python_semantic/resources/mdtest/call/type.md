@@ -924,7 +924,7 @@ T = TypeVar("T")
 # error: [invalid-base] "Invalid base for class created via `type()`"
 GenericClass = type("GenericClass", (Generic[T],), {})
 
-# error: [unsupported-dynamic-base] "Invalid base for class created via `type()`"
+# error: [unsupported-dynamic-base] "Unsupported base for class created via `type()`"
 ProtocolClass = type("ProtocolClass", (Protocol,), {})
 
 # error: [invalid-base] "Invalid base for class created via `type()`"

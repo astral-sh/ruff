@@ -30,7 +30,7 @@ error[invalid-base]: Invalid base for class created via `type()`
   |                ^^^^^^^^^ Has type `<special-form 'typing.TypedDict'>`
   |
 info: Classes created via `type()` cannot be TypedDicts
-info: Consider using `TypedDict("X", ...)` instead
+info: Consider using `TypedDict("X", {})` instead
 info: rule `invalid-base` is enabled by default
 
 ```

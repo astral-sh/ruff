@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_
 # Diagnostics
 
 ```
-info[unsupported-dynamic-base]: Invalid base for class created via `type()`
+info[unsupported-dynamic-base]: Unsupported base for class created via `type()`
  --> src/mdtest_snippet.py:3:16
   |
 1 | from typing import Protocol

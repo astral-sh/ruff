@@ -33,7 +33,7 @@ error[invalid-base]: Invalid base for class created via `type()`
   |                ^^^^^^ Has type `<class 'MyEnum'>`
   |
 info: Creating an enum class via `type()` is not supported
-info: Consider using `class X(...): ...` instead
+info: Consider using `Enum("X", [])` instead
 info: rule `invalid-base` is enabled by default
 
 ```
