@@ -4,6 +4,7 @@ auto-import-includes-modules,main.py,1,2
 auto-import-includes-modules,main.py,2,1
 auto-import-skips-current-module,main.py,0,1
 class-arg-completion,main.py,0,1
+class-arg-completion,main.py,1,1
 exact-over-fuzzy,main.py,0,1
 fstring-completions,main.py,0,1
 higher-level-symbols-preferred,main.py,0,

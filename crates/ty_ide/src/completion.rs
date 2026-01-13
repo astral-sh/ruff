@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
-use ty_python_semantic::types::UnionType;
+use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
     types::{CycleDetector, KnownClass, Type},
@@ -378,20 +378,30 @@ impl<'db> CompletionBuilder<'db> {
         ctx: &CollectionContext<'db>,
         query: &UserQuery,
     ) -> Completion<'db> {
-        // Tags completions with context-specific if they are
-        // known to be usable in a `raise` context and we have
-        // determined a raisable type `raisable_ty`.
-        //
-        // It's possible that some completions are usable in a `raise`
-        // but aren't marked here. That is, false negatives are
-        // possible but false positives are not.
-        if let Some(raisable_ty) = ctx.raisable_ty {
-            if let Some(ty) = self.ty {
-                self.is_context_specific |= ty.is_assignable_to(db, raisable_ty);
-            }
-        }
         if let Some(ty) = self.ty {
             self.is_type_check_only = ty.is_type_check_only(db);
+            // Tags completions with context-specific if they are
+            // known to be usable in a `raise` context and we have
+            // determined a raisable type `raisable_ty`.
+            //
+            // It's possible that some completions are usable in a `raise`
+            // but aren't marked here. That is, false negatives are
+            // possible but false positives are not.
+            if let Some(raisable_ty) = ctx.raisable_ty {
+                self.is_context_specific |= ty.is_assignable_to(db, raisable_ty);
+            }
+            if ctx.is_in_class_def {
+                self.is_context_specific |= ty.is_class_literal()
+                    || matches!(
+                        ty,
+                        Type::SpecialForm(
+                            SpecialFormType::Protocol
+                                | SpecialFormType::Generic
+                                | SpecialFormType::TypedDict
+                                | SpecialFormType::NamedTuple
+                        )
+                    );
+            }
         }
         let kind = self
             .kind
@@ -596,6 +606,7 @@ impl<'m> Context<'m> {
                         )
                     }),
                     is_raising_exception,
+                    is_in_class_def: self.cursor.is_in_class_def(),
                     valid_keywords: self.cursor.valid_keywords(),
                 }
             }
@@ -816,6 +827,25 @@ impl<'m> ContextCursor<'m> {
         false
     }
 
+    /// Returns true when the curser is within the
+    /// arguments node of a class definition.
+    ///
+    /// E.g. `class Foo(Bar<CURSOR>)`
+    fn is_in_class_def(&self) -> bool {
+        for node in self.covering_node(self.range).ancestors() {
+            if let ast::AnyNodeRef::StmtClassDef(class_def) = node {
+                return class_def
+                    .arguments
+                    .as_ref()
+                    .is_some_and(|args| args.range.contains_range(self.range));
+            }
+            if node.is_statement() {
+                return false;
+            }
+        }
+        false
+    }
+
     /// Returns a set of keywords that are valid at
     /// the current cursor position.
     ///
@@ -1008,6 +1038,8 @@ struct CollectionContext<'db> {
     raisable_ty: Option<Type<'db>>,
     /// Whether we're in a `raise <EXPR>` context or not.
     is_raising_exception: bool,
+    /// Whether we're in a class definition context or not.
+    is_in_class_def: bool,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -3344,9 +3376,9 @@ class Foo(<CURSOR>):
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3362,9 +3394,9 @@ class Bar: ...
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3380,9 +3412,9 @@ class Bar: ...
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3396,9 +3428,9 @@ class Foo(<CURSOR>",
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
         Foo
+        metaclass=
         ");
     }
 
