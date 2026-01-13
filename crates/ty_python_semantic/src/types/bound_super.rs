@@ -392,7 +392,7 @@ impl<'db> BoundSuperType<'db> {
              typevar: TypeVarInstance<'db>,
              make_owner: fn(BoundTypeVarInstance<'db>, ClassType<'db>) -> SuperOwnerKind<'db>|
              -> Result<Type<'db>, BoundSuperError<'db>> {
-                let pivot_class_literal = pivot_class.into_class().map(|c| c.class_literal(db).0);
+                let pivot_class_literal = pivot_class.into_class().map(|c| c.class_literal(db));
                 let mut builder = UnionBuilder::new(db);
                 for constraint in constraints.elements(db) {
                     let class = match constraint {
@@ -409,7 +409,7 @@ impl<'db> BoundSuperType<'db> {
                                     | ClassBase::Protocol
                                     | ClassBase::TypedDict => false,
                                     ClassBase::Class(superclass) => {
-                                        superclass.class_literal(db).0 == pivot
+                                        superclass.class_literal(db) == pivot
                                     }
                                 }) {
                                     return Err(BoundSuperError::FailingConditionCheck {
@@ -627,11 +627,11 @@ impl<'db> BoundSuperType<'db> {
         if let Some(pivot_class) = pivot_class.into_class()
             && let Some(owner_class) = owner.into_class(db)
         {
-            let pivot_class = pivot_class.class_literal(db).0;
+            let pivot_class = pivot_class.class_literal(db);
             if !owner_class.iter_mro(db).any(|superclass| match superclass {
                 ClassBase::Dynamic(_) => true,
                 ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
-                ClassBase::Class(superclass) => superclass.class_literal(db).0 == pivot_class,
+                ClassBase::Class(superclass) => superclass.class_literal(db) == pivot_class,
             }) {
                 return Err(BoundSuperError::FailingConditionCheck {
                     pivot_class: pivot_class_type,
@@ -748,7 +748,7 @@ impl<'db> BoundSuperType<'db> {
             }
         };
 
-        let (class_literal, _) = class.class_literal(db);
+        let class_literal = class.class_literal(db);
         // TODO properly support super() with generic types
         // * requires a fix for https://github.com/astral-sh/ruff/issues/17432
         // * also requires understanding how we should handle cases like this:

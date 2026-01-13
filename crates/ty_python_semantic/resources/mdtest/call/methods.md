@@ -464,6 +464,42 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+### Classmethods with `Self` and callable-returning decorators
+
+When a classmethod is decorated with a decorator that returns a callable type (like
+`@contextmanager`), `Self` in the return type should correctly resolve to the subclass when accessed
+on a derived class.
+
+```py
+from contextlib import contextmanager
+from typing import Iterator
+from typing_extensions import Self
+
+class Base:
+    @classmethod
+    @contextmanager
+    def create(cls) -> Iterator[Self]:
+        yield cls()
+
+class Child(Base): ...
+
+reveal_type(Base.create())  # revealed: _GeneratorContextManager[Base, None, None]
+with Base.create() as base:
+    reveal_type(base)  # revealed: Base
+
+reveal_type(Base().create())  # revealed: _GeneratorContextManager[Base, None, None]
+with Base().create() as base:
+    reveal_type(base)  # revealed: Base
+
+reveal_type(Child.create())  # revealed: _GeneratorContextManager[Child, None, None]
+with Child.create() as child:
+    reveal_type(child)  # revealed: Child
+
+reveal_type(Child().create())  # revealed: _GeneratorContextManager[Child, None, None]
+with Child().create() as child:
+    reveal_type(child)  # revealed: Child
+```
+
 ### `__init_subclass__`
 
 The [`__init_subclass__`] method is implicitly a classmethod:

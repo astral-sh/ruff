@@ -155,7 +155,7 @@ impl ClassInfoConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
-        let constraint_fn = |class: ClassLiteral<'db>| match self {
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
                 Type::instance(db, class.top_materialization(db))
             }
@@ -166,9 +166,11 @@ impl ClassInfoConstraintFunction {
 
         match classinfo {
             Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
-            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal)),
+            Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
+                SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
+                    Some(constraint_from_class_literal(class_literal))
+                }
                 // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
                 // e.g. `isinstance(x, list[int])` fails at runtime.
                 SubclassOfInner::Class(ClassType::Generic(_)) => None,
@@ -1246,6 +1248,29 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                                     .negate_if(self.db, !is_positive),
                             ),
                         );
+                    }
+                }
+                // For symmetric operators (==, !=, is, is not), if left is not a narrowable target,
+                // try to narrow the right operand instead by swapping the operands.
+                // E.g., `None != x` should narrow `x` the same way as `x != None`.
+                _ if matches!(
+                    op,
+                    ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot
+                ) && matches!(
+                    right,
+                    ast::Expr::Name(_)
+                        | ast::Expr::Attribute(_)
+                        | ast::Expr::Subscript(_)
+                        | ast::Expr::Named(_)
+                ) =>
+                {
+                    if let Some(right_place) = place_expr(right)
+                        // Swap lhs_ty and rhs_ty since we're narrowing the right operand
+                        && let Some(ty) =
+                            self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
+                    {
+                        let place = self.expect_place(&right_place);
+                        constraints.insert(place, NarrowingConstraint::regular(ty));
                     }
                 }
                 _ => {}
