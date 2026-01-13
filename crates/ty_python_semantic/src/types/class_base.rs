@@ -1,7 +1,7 @@
-use crate::Db;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
+use crate::{Db, DisplaySettings};
 
 use crate::types::tuple::TupleType;
 use crate::types::{
@@ -408,16 +408,27 @@ impl<'db> ClassBase<'db> {
     }
 
     pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
+        self.display_with(db, DisplaySettings::default())
+    }
+
+    pub(super) fn display_with(
+        self,
+        db: &'db dyn Db,
+        display_settings: DisplaySettings<'db>,
+    ) -> impl std::fmt::Display {
         struct ClassBaseDisplay<'db> {
             db: &'db dyn Db,
             base: ClassBase<'db>,
+            settings: DisplaySettings<'db>,
         }
 
         impl std::fmt::Display for ClassBaseDisplay<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Class(class) => Type::from(class).display(self.db).fmt(f),
+                    ClassBase::Class(class) => Type::from(class)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt(f),
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
                     ClassBase::TypedDict => f.write_str("typing.TypedDict"),
@@ -425,7 +436,11 @@ impl<'db> ClassBase<'db> {
             }
         }
 
-        ClassBaseDisplay { db, base: self }
+        ClassBaseDisplay {
+            db,
+            base: self,
+            settings: display_settings,
+        }
     }
 }
 
