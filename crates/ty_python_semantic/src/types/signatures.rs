@@ -713,6 +713,19 @@ impl<'db> Signature<'db> {
         Self::new(Parameters::bottom(), Type::Never)
     }
 
+    /// Returns `true` if `Self` should be hidden from the generic context display.
+    ///
+    /// `Self` is hidden if it does not appear in:
+    /// 1. The return type
+    /// 2. Any explicitly annotated parameter (not inferred)
+    pub(crate) fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
+        !self.return_ty.contains_self(db)
+            && !self
+                .parameters()
+                .iter()
+                .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db))
+    }
+
     pub(crate) fn with_inherited_generic_context(
         mut self,
         db: &'db dyn Db,

@@ -786,17 +786,17 @@ argument:
 ```py
 from typing_extensions import Self
 
-reveal_type(object.__new__)  # revealed: def __new__(cls) -> Self@__new__
-reveal_type(object().__new__)  # revealed: def __new__(cls) -> Self@__new__
-# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type(object.__new__)  # revealed: def __new__[Self](cls) -> Self
+reveal_type(object().__new__)  # revealed: def __new__[Self](cls) -> Self
+# revealed: Overload[[Self](cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
 reveal_type(int.__new__)
-# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+# revealed: Overload[[Self](cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
 reveal_type((42).__new__)
 
 class X:
     def __init__(self, val: int): ...
     def make_another(self) -> Self:
-        reveal_type(self.__new__)  # revealed: def __new__(cls) -> Self@__new__
+        reveal_type(self.__new__)  # revealed: def __new__[Self](cls) -> Self
         return self.__new__(type(self))
 ```
 

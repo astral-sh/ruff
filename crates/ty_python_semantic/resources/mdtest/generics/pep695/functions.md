@@ -867,7 +867,7 @@ class ClassWithOverloadedInit[T]:
 # overload. We would then also have to determine that R must be equal to the return type of **P's
 # solution.
 
-# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
+# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(into_callable(ClassWithOverloadedInit))
 # TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
 # revealed: Overload[(x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], (x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
@@ -888,7 +888,7 @@ class GenericClass[T]:
 def _(x: list[str]):
     # TODO: This fails because we are not propagating GenericClass's generic context into the
     # Callable that we create for it.
-    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(into_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_callable(GenericClass)))

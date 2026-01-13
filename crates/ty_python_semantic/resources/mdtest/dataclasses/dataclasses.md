@@ -1208,7 +1208,7 @@ def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
 # revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
 reveal_type(ParentDataclass.__init__)
 
-# revealed: (self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
+# revealed: [T](self: ParentDataclass[T], value: T) -> None
 reveal_type(ChildOfParentDataclass.__init__)
 
 result_int = uses_dataclass(42)
