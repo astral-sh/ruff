@@ -5,6 +5,10 @@ By default, this script will use `uv` to run the latest version of ty
 as the new version with `uvx ty@latest`. This requires `uv` to be installed
 and available in the system PATH.
 
+If CONFORMANCE_SUITE_COMMIT is set, the hash will be used to create
+links to the corresponding line in the conformance repository for each
+diagnostic. Otherwise, it will default to `main'.
+
 Examples:
     # Compare two specific ty versions
     %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
@@ -17,12 +21,16 @@ Examples:
 
     # Show all diagnostics (not just changed ones)
     %(prog)s --all --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
+
+    # Show a diff with local paths to the test directory instead of table of links
+    %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7 --format diff
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -33,7 +41,7 @@ from itertools import groupby
 from operator import attrgetter, or_
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 # The conformance tests include 4 types of errors:
 # 1. Required errors (E): The type checker must raise an error on this line
@@ -58,6 +66,9 @@ CONFORMANCE_ERROR_PATTERN = re.compile(
     """,
     re.VERBOSE,
 )
+
+CONFORMANCE_URL = "https://github.com/python/typing/blob/{conformance_suite_commit}/conformance/tests/{filename}#L{line}"
+CONFORMANCE_SUITE_COMMIT = os.environ.get("CONFORMANCE_SUITE_COMMIT", "main")
 
 
 class Source(Flag):
@@ -100,6 +111,15 @@ class Positions:
 class Location:
     path: str
     positions: Positions
+
+    def as_link(self) -> str:
+        file = os.path.basename(self.path)
+        link = CONFORMANCE_URL.format(
+            conformance_suite_commit=CONFORMANCE_SUITE_COMMIT,
+            filename=file,
+            line=self.positions.begin.line,
+        )
+        return f"[{file}:{self.positions.begin.line}:{self.positions.begin.column}]({link})"
 
 
 @dataclass(kw_only=True, slots=True)
@@ -183,19 +203,32 @@ class GroupedDiagnostics:
         else:
             return Classification.TRUE_NEGATIVE
 
-    def display(self) -> str:
+    def _render_row(self, diagnostic: Diagnostic):
+        return f"| {diagnostic.location.as_link()} | {diagnostic.check_name} | {diagnostic.description} |"
+
+    def _render_diff(self, diagnostic: Diagnostic, *, removed: bool = False):
+        sign = "-" if removed else "+"
+        return f"{sign} {diagnostic}"
+
+    def display(self, format: Literal["diff", "github"]) -> str:
         match self.classification:
             case Classification.TRUE_POSITIVE | Classification.FALSE_POSITIVE:
                 assert self.new is not None
-                return f"+ {self.new}"
+                return (
+                    self._render_diff(self.new)
+                    if format == "diff"
+                    else self._render_row(self.new)
+                )
 
             case Classification.FALSE_NEGATIVE | Classification.TRUE_NEGATIVE:
-                if self.old is not None:
-                    return f"- {self.old}"
-                elif self.expected is not None:
-                    return f"- {self.expected}"
-                else:
-                    return ""
+                diagnostic = self.old or self.expected
+                assert diagnostic is not None
+                return (
+                    self._render_diff(diagnostic, removed=True)
+                    if format == "diff"
+                    else self._render_row(diagnostic)
+                )
+
             case _:
                 raise ValueError(f"Unexpected classification: {self.classification}")
 
@@ -325,7 +358,9 @@ def compute_stats(
         # ty currently raises a false positive here due to incomplete enum.Flag support
         # see https://github.com/astral-sh/ty/issues/876
         num_errors = sum(
-            [1 for g in grouped_diagnostics if source.EXPECTED in g.sources]  # ty:ignore[unsupported-operator]
+            1
+            for g in grouped_diagnostics
+            if source.EXPECTED in g.sources  # ty:ignore[unsupported-operator]
         )
         return Statistics(
             true_positives=num_errors, false_positives=0, false_negatives=0
@@ -336,7 +371,7 @@ def compute_stats(
             statistics.true_positives += 1
         elif source in grouped.sources:
             statistics.false_positives += 1
-        else:
+        elif Source.EXPECTED in grouped.sources:
             statistics.false_negatives += 1
         return statistics
 
@@ -344,15 +379,32 @@ def compute_stats(
 
 
 def render_grouped_diagnostics(
-    grouped: list[GroupedDiagnostics], changed_only: bool = True
+    grouped: list[GroupedDiagnostics],
+    *,
+    changed_only: bool = True,
+    format: Literal["diff", "github"] = "diff",
 ) -> str:
     if changed_only:
         grouped = [diag for diag in grouped if diag.changed]
+
     sorted_by_class = sorted(
         grouped,
         key=attrgetter("classification"),
         reverse=True,
     )
+
+    match format:
+        case "diff":
+            header = ["```diff"]
+            footer = "```"
+        case "github":
+            header = [
+                "| Location | Name | Message |",
+                "|----------|------|---------|",
+            ]
+            footer = ""
+        case _:
+            raise ValueError("format must be one of 'diff' or 'github'")
 
     lines = []
     for classification, group in groupby(
@@ -362,37 +414,39 @@ def render_grouped_diagnostics(
 
         lines.append(f"## {classification.into_title()}:")
         lines.append("")
-        lines.append("```diff")
+
+        lines.extend(header)
 
         for diag in group:
-            lines.append(diag.display())
+            lines.append(diag.display(format=format))
 
-        lines.append("```")
+        lines.append(footer)
 
     return "\n".join(lines)
 
 
 def diff_format(
     diff: float,
+    *,
     greater_is_better: bool = True,
     neutral: bool = False,
     is_percentage: bool = False,
 ):
     increased = diff > 0
-    good = "✅" if not neutral else ""
-    bad = "❌" if not neutral else ""
+    good = "(✅)" if not neutral else ""
+    bad = "(❌)" if not neutral else ""
     up = "⏫"
     down = "⏬"
 
     match (greater_is_better, increased):
         case (True, True):
-            return f"{good}{up}"
+            return f"{up}{good}"
         case (False, True):
-            return f"{bad}{down}"
+            return f"{up}{bad}"
         case (True, False):
-            return f"{bad}{down}"
+            return f"{down}{bad}"
         case (False, False):
-            return f"{good}{up}"
+            return f"{down}{good}"
 
 
 def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
@@ -430,20 +484,20 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
         | Metric | Old | New | Diff | Outcome |
         |--------|-----|-----|------|---------|
-        | True Positives  | {old.true_positives} | {new.true_positives} | {true_pos_change} | {true_pos_diff} |
-        | False Positives | {old.false_positives} | {new.false_positives} | {false_pos_change} | {false_pos_diff} |
-        | False Negatives | {old.false_negatives} | {new.false_negatives} | {false_neg_change} | {false_neg_diff} |
-        | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:.2%} | {precision_diff} |
-        | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:.2%} | {recall_diff} |
-        | Total | {old.total} | {new.total} | {total_change} | {total_diff} |
+        | True Positives  | {old.true_positives} | {new.true_positives} | {true_pos_change:+} | {true_pos_diff} |
+        | False Positives | {old.false_positives} | {new.false_positives} | {false_pos_change:+} | {false_pos_diff} |
+        | False Negatives | {old.false_negatives} | {new.false_negatives} | {false_neg_change:+} | {false_neg_diff} |
+        | Total Diagnostics | {old.total} | {new.total} | {total_change} | {total_diff} |
+        | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:+.2%} | {precision_diff} |
+        | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
 
         """
     )
 
     summary = (
-        f"The percentage of diagnostics emitted that were true positives"
+        f"The percentage of diagnostics emitted that were expected errors"
         f" {format_metric(precision_change, old.precision, new.precision)},"
-        " and the percentage of true positives that received a diagnostic"
+        " and the percentage of expected errors that received a diagnostic"
         f" {format_metric(recall_change, old.recall, new.recall)}."
     )
 
@@ -490,6 +544,10 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--format", type=str, choices=["diff", "github"], default="github"
+    )
+
+    parser.add_argument(
         "--output",
         type=Path,
         help="Write output to file instead of stdout",
@@ -531,7 +589,9 @@ def main():
     rendered = "\n\n".join(
         [
             render_summary(grouped),
-            render_grouped_diagnostics(grouped, changed_only=not args.all),
+            render_grouped_diagnostics(
+                grouped, changed_only=not args.all, format=args.format
+            ),
         ]
     )
 
