@@ -25,7 +25,7 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
-X = type("X", (Generic[T],), {})  # error: [unsupported-base]
+X = type("X", (Generic[T],), {})  # error: [invalid-base]
 ```
 
 ## `Protocol` base
@@ -46,7 +46,7 @@ Dynamic classes created via `type()` cannot inherit from `TypedDict` directly. U
 ```py
 from typing_extensions import TypedDict
 
-X = type("X", (TypedDict,), {})  # error: [unsupported-base]
+X = type("X", (TypedDict,), {})  # error: [invalid-base]
 ```
 
 ## Enum base
@@ -60,7 +60,7 @@ from enum import Enum
 class MyEnum(Enum):
     pass
 
-X = type("X", (MyEnum,), {})  # error: [unsupported-base]
+X = type("X", (MyEnum,), {})  # error: [invalid-base]
 ```
 
 ## Enum with members

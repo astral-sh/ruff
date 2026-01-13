@@ -921,13 +921,13 @@ from typing_extensions import TypedDict
 
 T = TypeVar("T")
 
-# error: [unsupported-base] "Invalid base for class created via `type()`"
+# error: [invalid-base] "Invalid base for class created via `type()`"
 GenericClass = type("GenericClass", (Generic[T],), {})
 
 # error: [unsupported-dynamic-base] "Invalid base for class created via `type()`"
 ProtocolClass = type("ProtocolClass", (Protocol,), {})
 
-# error: [unsupported-base] "Invalid base for class created via `type()`"
+# error: [invalid-base] "Invalid base for class created via `type()`"
 TypedDictClass = type("TypedDictClass", (TypedDict,), {})
 ```
 
@@ -1005,7 +1005,7 @@ class EmptyEnum(Enum):
     pass
 
 # Empty enums fail because EnumMeta requires special dict handling
-# error: [unsupported-base] "Invalid base for class created via `type()`"
+# error: [invalid-base] "Invalid base for class created via `type()`"
 InvalidExtension = type("InvalidExtension", (EmptyEnum,), {})
 ```
 

@@ -15,22 +15,22 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_
 ```
 1 | from typing_extensions import TypedDict
 2 | 
-3 | X = type("X", (TypedDict,), {})  # error: [unsupported-base]
+3 | X = type("X", (TypedDict,), {})  # error: [invalid-base]
 ```
 
 # Diagnostics
 
 ```
-warning[unsupported-base]: Invalid base for class created via `type()`
+error[invalid-base]: Invalid base for class created via `type()`
  --> src/mdtest_snippet.py:3:16
   |
 1 | from typing_extensions import TypedDict
 2 |
-3 | X = type("X", (TypedDict,), {})  # error: [unsupported-base]
+3 | X = type("X", (TypedDict,), {})  # error: [invalid-base]
   |                ^^^^^^^^^ Has type `<special-form 'typing.TypedDict'>`
   |
 info: Classes created via `type()` cannot be TypedDicts
 info: Consider using `TypedDict("X", ...)` instead
-info: rule `unsupported-base` is enabled by default
+info: rule `invalid-base` is enabled by default
 
 ```
