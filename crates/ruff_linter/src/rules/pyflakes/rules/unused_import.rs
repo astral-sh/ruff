@@ -414,7 +414,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                                         .unwrap()
                                         .member_name()
                                         .to_string(),
-                                    binding: name.to_string(),
+                                    binding: name.clone(),
                                     context: UnusedImportContext::TryBlock,
                                     multiple: false,
                                     ignore_init_module_imports: false,
@@ -510,13 +510,13 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                 let context = if in_except_handler {
                     UnusedImportContext::ExceptHandler
                 } else if is_type_checking_duplicate(
-                    &import.name,
+                    import.name,
                     &shadowing_imports,
                     original_binding,
                 ) {
                     UnusedImportContext::TypeCheckingDuplicate
                 } else if is_try_block_redefinition(
-                    &import.name,
+                    import.name,
                     &shadowing_imports,
                     original_binding,
                 ) {
