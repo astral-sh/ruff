@@ -185,6 +185,31 @@ impl Tokens {
 
         after
     }
+
+    /// Returns a pair of token slices from both before and after the given [`TextSize`] offset.
+    ///
+    /// If the given offset is between two tokens, the "before" slice will end just before the
+    /// following token. In other words, if the offset is between the end of previous token and
+    /// start of next token, the "before" slice will end just before the next token. The "after"
+    /// slice will contain the rest of the tokens.
+    ///
+    /// # Panics
+    ///
+    /// If the given offset is inside a token range at any point
+    /// other than the start of the range.
+    pub fn split_at(&self, offset: TextSize) -> (&[Token], &[Token]) {
+        let partition_point = self.partition_point(|token| token.start() < offset);
+        let before = &self.raw[..partition_point];
+        let after = &self.raw[partition_point..];
+
+        if let Some(last) = before.last() {
+            assert!(
+                offset >= last.end(),
+                "Offset {offset:?} is inside token `{last:?}`"
+            );
+        }
+        (before, after)
+    }
 }
 
 impl<'a> IntoIterator for &'a Tokens {
@@ -512,5 +537,45 @@ mod tests {
     fn tokens_in_range_end_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.in_range(TextRange::new(0.into(), 6.into()));
+    }
+
+    #[test]
+    fn tokens_split_at_first_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let (before, after) = tokens.split_at(TextSize::new(0));
+        assert_eq!(before.len(), 0);
+        assert_eq!(after.len(), 10);
+    }
+
+    #[test]
+    fn tokens_split_at_last_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let (before, after) = tokens.split_at(TextSize::new(33));
+        assert_eq!(before.len(), 10);
+        assert_eq!(after.len(), 0);
+    }
+
+    #[test]
+    fn tokens_split_at_inside_gap() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let (before, after) = tokens.split_at(TextSize::new(13));
+        assert_eq!(before.len(), 6);
+        assert_eq!(after.len(), 4);
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 18 is inside token `Comment 15..24`")]
+    fn tokens_split_at_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.split_at(TextSize::new(18));
+    }
+
+    #[test]
+    fn tokens_split_at_matches_before_and_after() {
+        let offset = TextSize::new(15);
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let (before, after) = tokens.split_at(offset);
+        assert_eq!(before, tokens.before(offset));
+        assert_eq!(after, tokens.after(offset));
     }
 }
