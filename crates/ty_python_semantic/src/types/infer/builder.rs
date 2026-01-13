@@ -44,7 +44,7 @@ use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
-    ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
+    ForStmtDefinitionKind, LoopHeaderDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
@@ -55,8 +55,9 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, attribute_assignments,
-    place_table,
+    get_loop_header, place_table,
 };
+use crate::types::builder::RecursivelyDefined;
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
@@ -2333,6 +2334,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::TypeVarTuple(node) => {
                 self.infer_typevartuple_definition(node.node(self.module()), definition);
+            }
+            DefinitionKind::LoopHeader(loop_header) => {
+                self.infer_loop_header_definition(loop_header, definition);
             }
         }
     }
@@ -4944,6 +4948,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
         );
+    }
+
+    /// Infer the type for a loop header definition.
+    ///
+    /// The loop header sees all bindings that loop-back, either by reaching the end of the loop
+    /// body or a `continue` statement. This can include bindings from before the loop too, though
+    /// that's technically redundant, since the loop header definition itself doesn't shadow those
+    /// bindings. See `struct LoopHeader` in the semantic index for more on how all this fits
+    /// together.
+    fn infer_loop_header_definition(
+        &mut self,
+        loop_header_kind: &LoopHeaderDefinitionKind<'db>,
+        definition: Definition<'db>,
+    ) {
+        let db = self.db();
+        let loop_token = loop_header_kind.loop_token();
+        let place = loop_header_kind.place();
+        let loop_header = get_loop_header(db, loop_token);
+        let use_def = self
+            .index
+            .use_def_map(self.scope().file_scope_id(self.db()));
+
+        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+
+        for live_binding in loop_header.bindings_for_place(place) {
+            // Skip unreachable bindings.
+            if !use_def.is_reachable(db, live_binding.reachability_constraint) {
+                continue;
+            }
+
+            // Boundness analysis is handled by looking at these bindings again in
+            // `place_from_bindings_impl`. Here we're only concerned with the type.
+            let def_state = use_def.definition(live_binding.binding);
+            let def = match def_state {
+                DefinitionState::Defined(def) => def,
+                DefinitionState::Deleted | DefinitionState::Undefined => continue,
+            };
+
+            // This loop header is visible to itself. Filter it out to avoid a pointless cycle.
+            if def == definition {
+                continue;
+            }
+
+            let binding_ty = binding_type(db, def);
+            let narrowed_ty = use_def
+                .narrowing_evaluator(live_binding.narrowing_constraint)
+                .narrow(db, binding_ty, place);
+
+            union.add_in_place(narrowed_ty);
+        }
+
+        self.bindings
+            .insert(definition, union.build(), self.multi_inference_state);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
