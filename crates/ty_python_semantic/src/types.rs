@@ -1284,13 +1284,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub(crate) const fn is_class_object(&self) -> bool {
-        matches!(
-            self,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
-        )
-    }
-
     pub(crate) const fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::EnumLiteral(enum_literal) => Some(enum_literal),
