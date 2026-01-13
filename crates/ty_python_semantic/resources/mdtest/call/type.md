@@ -702,6 +702,38 @@ def f(ns: dict[str, Any]):
     class MaybeConflict(SlottedBase, Dynamic): ...
 ```
 
+## `instance-layout-conflict` diagnostic snapshots
+
+<!-- snapshot-diagnostics -->
+
+When the bases are a tuple literal, the diagnostic includes annotations for each conflicting base:
+
+```py
+class A:
+    __slots__ = ("x",)
+
+class B:
+    __slots__ = ("y",)
+
+# error: [instance-layout-conflict]
+X = type("X", (A, B), {})
+```
+
+When the bases are not a tuple literal (e.g., a variable), the diagnostic is emitted without
+per-base annotations:
+
+```py
+class C:
+    __slots__ = ("x",)
+
+class D:
+    __slots__ = ("y",)
+
+bases: tuple[type[C], type[D]] = (C, D)
+# error: [instance-layout-conflict]
+Y = type("Y", bases, {})
+```
+
 ## Cyclic functional class definitions
 
 Self-referential class definitions using `type()` are detected. The name being defined is referenced

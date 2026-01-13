@@ -14,9 +14,7 @@ use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
-use crate::types::class::{
-    CodeGeneratorKind, DisjointBase, DisjointBaseKind, DynamicClassLiteral, MethodDecorator,
-};
+use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
@@ -3011,16 +3009,15 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
 
 pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
-    class: StaticClassLiteral,
-    node: &ast::StmtClassDef,
+    header_range: TextRange,
+    base_nodes: Option<&[ast::Expr]>,
     disjoint_bases: &IncompatibleBases,
 ) {
     debug_assert!(disjoint_bases.len() > 1);
 
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, class.header_range(db))
-    else {
+    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, header_range) else {
         return;
     };
 
@@ -3044,104 +3041,8 @@ pub(crate) fn report_instance_layout_conflict(
             originating_base,
         } = disjoint_base_info;
 
-        let span = context.span(&node.bases()[*node_index]);
-        let mut annotation = Annotation::secondary(span.clone());
-        if *originating_base == disjoint_base.class {
-            match disjoint_base.kind {
-                DisjointBaseKind::DefinesSlots => {
-                    annotation = annotation.message(format_args!(
-                        "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
-                        base = originating_base.name(db)
-                    ));
-                }
-                DisjointBaseKind::DisjointBaseDecorator => {
-                    annotation = annotation.message(format_args!(
-                        "`{base}` instances have a distinct memory layout because of the way `{base}` \
-                        is implemented in a C extension",
-                        base = originating_base.name(db)
-                    ));
-                }
-            }
-            subdiagnostic.annotate(annotation);
-        } else {
-            annotation = annotation.message(format_args!(
-                "`{base}` instances have a distinct memory layout \
-                because `{base}` inherits from `{disjoint_base}`",
-                base = originating_base.name(db),
-                disjoint_base = disjoint_base.class.name(db)
-            ));
-            subdiagnostic.annotate(annotation);
-
-            let mut additional_annotation = Annotation::secondary(span);
-
-            additional_annotation = match disjoint_base.kind {
-                DisjointBaseKind::DefinesSlots => additional_annotation.message(format_args!(
-                    "`{disjoint_base}` instances have a distinct memory layout because `{disjoint_base}` \
-                        defines non-empty `__slots__`",
-                    disjoint_base = disjoint_base.class.name(db),
-                )),
-
-                DisjointBaseKind::DisjointBaseDecorator => {
-                    additional_annotation.message(format_args!(
-                        "`{disjoint_base}` instances have a distinct memory layout \
-                        because of the way `{disjoint_base}` is implemented in a C extension",
-                        disjoint_base = disjoint_base.class.name(db),
-                    ))
-                }
-            };
-
-            subdiagnostic.annotate(additional_annotation);
-        }
-    }
-
-    diagnostic.sub(subdiagnostic);
-}
-
-/// Emit a diagnostic for a dynamic class (created via `type()`) with incompatible bases
-/// that have instance layout conflicts.
-pub(crate) fn report_instance_layout_conflict_dynamic(
-    context: &InferContext,
-    class: DynamicClassLiteral,
-    bases_node: &ast::Expr,
-    disjoint_bases: &IncompatibleBases,
-) {
-    debug_assert!(disjoint_bases.len() > 1);
-
-    let db = context.db();
-
-    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, class.header_range(db))
-    else {
-        return;
-    };
-
-    let mut diagnostic = builder
-        .into_diagnostic("Class will raise `TypeError` at runtime due to incompatible bases");
-
-    diagnostic.set_primary_message(format_args!(
-        "Bases {} cannot be combined in multiple inheritance",
-        disjoint_bases.describe_problematic_class_bases(db)
-    ));
-
-    let mut subdiagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        "Two classes cannot coexist in a class's MRO if their instances \
-        have incompatible memory layouts",
-    );
-
-    // Get the AST elements for the bases tuple for annotations
-    let bases_tuple_elts = bases_node.as_tuple_expr().map(|t| t.elts.as_slice());
-
-    for (disjoint_base, disjoint_base_info) in disjoint_bases {
-        let IncompatibleBaseInfo {
-            node_index,
-            originating_base,
-        } = disjoint_base_info;
-
-        // Get the span for this base from the AST
-        let Some(base_nodes) = bases_tuple_elts else {
-            continue;
-        };
-        let Some(base_node) = base_nodes.get(*node_index) else {
+        // Get the span for this base from the AST (if available)
+        let Some(base_node) = base_nodes.and_then(|nodes| nodes.get(*node_index)) else {
             continue;
         };
 
