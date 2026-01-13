@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811 [*] Import `BrokerUsecase` is duplicated in `typing.TYPE_CHECKING` block
+ --> F811_33.py:4:41
+  |
+2 | from typing import TYPE_CHECKING, Any, Protocol, Union
+3 |
+4 | from faststream._internal.broker import BrokerUsecase
+  |                                         ------------- runtime import of `BrokerUsecase` here
+5 |
+6 | if TYPE_CHECKING:
+7 |     from faststream._internal.broker import BrokerUsecase
+  |                                             ^^^^^^^^^^^^^ `BrokerUsecase` redefined here
+8 |     from faststream.specification.schema import Contact, License
+  |
+help: Remove runtime `BrokerUsecase` import
+1 | from abc import abstractmethod
+2 | from typing import TYPE_CHECKING, Any, Protocol, Union
+3 | 
+  - from faststream._internal.broker import BrokerUsecase
+4 | 
+5 | if TYPE_CHECKING:
+6 |     from faststream._internal.broker import BrokerUsecase
