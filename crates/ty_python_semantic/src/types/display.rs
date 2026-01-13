@@ -47,7 +47,7 @@ pub struct DisplaySettings<'db> {
     /// Scopes that are currently active in the display context (e.g. function scopes
     /// whose type parameters are currently being displayed).
     /// Used to suppress redundant `@{scope}` suffixes for type variables.
-    pub active_scopes: Rc<FxHashSet<crate::semantic_index::definition::Definition<'db>>>,
+    pub active_scopes: Rc<FxHashSet<Definition<'db>>>,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -92,10 +92,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn with_active_scopes(
-        &self,
-        scopes: impl IntoIterator<Item = crate::semantic_index::definition::Definition<'db>>,
-    ) -> Self {
+    pub fn with_active_scopes(&self, scopes: impl IntoIterator<Item = Definition<'db>>) -> Self {
         let mut active_scopes = (*self.active_scopes).clone();
         active_scopes.extend(scopes);
         Self {
@@ -1094,20 +1091,12 @@ struct DisplayBoundTypeVarIdentity<'db> {
 impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
-        if let Some(binding_context_name) =
-            self.bound_typevar_identity.binding_context.name(self.db)
+        let binding_context = self.bound_typevar_identity.binding_context;
+        if let Some(binding_context_name) = binding_context.name(self.db)
+            && let Some(definition) = binding_context.definition()
+            && !self.settings.active_scopes.contains(&definition)
         {
-            let mut suppressed = false;
-            if let BindingContext::Definition(definition) =
-                self.bound_typevar_identity.binding_context
-            {
-                if self.settings.active_scopes.contains(&definition) {
-                    suppressed = true;
-                }
-            }
-            if !suppressed {
-                write!(f, "@{binding_context_name}")?;
-            }
+            write!(f, "@{binding_context_name}")?;
         }
         if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
             write!(f, ".{paramspec_attr}")?;
@@ -1479,10 +1468,7 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             .variables(self.db)
             .filter(|bound_typevar| {
                 // If hide_unused_self is true and this is a Self typevar, skip it
-                if self.hide_unused_self && bound_typevar.typevar(self.db).is_self(self.db) {
-                    return false;
-                }
-                true
+                !self.hide_unused_self || !bound_typevar.typevar(self.db).is_self(self.db)
             })
             .peekable();
 
@@ -1779,12 +1765,11 @@ impl<'db> DisplaySignature<'_, 'db> {
     }
 
     pub(crate) fn should_hide_self_from_display(&self, db: &'db dyn Db) -> bool {
-        let return_contains_self = self.return_ty.contains_self(db);
-        let param_contains_self = self
-            .parameters
-            .iter()
-            .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db));
-        !return_contains_self && !param_contains_self
+        !self.return_ty.contains_self(db)
+            && !self
+                .parameters
+                .iter()
+                .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db))
     }
 }
 
