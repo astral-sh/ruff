@@ -102,7 +102,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
-use crate::types::mro::{DynamicMroErrorKind, MroErrorKind};
+use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
@@ -797,13 +797,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (4) Check that the class's MRO is resolvable
             match class.try_mro(self.db(), None) {
                 Err(mro_error) => match mro_error.reason() {
-                    MroErrorKind::DuplicateBases(duplicates) => {
+                    StaticMroErrorKind::DuplicateBases(duplicates) => {
                         let base_nodes = class_node.bases();
                         for duplicate in duplicates {
                             report_duplicate_bases(&self.context, class, duplicate, base_nodes);
                         }
                     }
-                    MroErrorKind::InvalidBases(bases) => {
+                    StaticMroErrorKind::InvalidBases(bases) => {
                         let base_nodes = class_node.bases();
                         for (index, base_ty) in bases {
                             report_invalid_or_unsupported_base(
@@ -814,7 +814,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
                     }
-                    MroErrorKind::UnresolvableMro { bases_list } => {
+                    StaticMroErrorKind::UnresolvableMro { bases_list } => {
                         if let Some(builder) =
                             self.context.report_lint(&INCONSISTENT_MRO, class_node)
                         {
@@ -829,7 +829,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ));
                         }
                     }
-                    MroErrorKind::Pep695ClassWithGenericInheritance => {
+                    StaticMroErrorKind::Pep695ClassWithGenericInheritance => {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
                         {
@@ -839,7 +839,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
                     }
-                    MroErrorKind::InheritanceCycle => {
+                    StaticMroErrorKind::InheritanceCycle => {
                         if let Some(builder) = self
                             .context
                             .report_lint(&CYCLIC_CLASS_DEFINITION, class_node)

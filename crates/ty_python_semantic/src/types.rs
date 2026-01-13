@@ -64,7 +64,7 @@ use crate::types::generics::{
     ApplySpecialization, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
     typing_self, walk_generic_context,
 };
-use crate::types::mro::{Mro, MroError, MroIterator};
+use crate::types::mro::{Mro, MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
