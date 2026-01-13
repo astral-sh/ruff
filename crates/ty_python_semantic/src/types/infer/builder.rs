@@ -25,7 +25,6 @@ use super::{
     infer_definition_types, infer_expression_types, infer_same_file_expression_type,
     infer_unpack_types,
 };
-use crate::ast_node_ref::AstNodeRef;
 use crate::diagnostic::format_enumeration;
 use crate::node_key::NodeKey;
 use crate::place::{
@@ -56,8 +55,8 @@ use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DynamicClassLiteral, DynamicMetaclassConflict, FieldKind,
-    MetaclassErrorKind, MethodDecorator,
+    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
+    DynamicMetaclassConflict, FieldKind, MetaclassErrorKind, MethodDecorator,
 };
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
@@ -6178,12 +6177,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let (bases, mut disjoint_bases) =
             self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
 
-        let file = self.file();
-        let file_scope = self.scope().file_scope_id(db);
-        let node_ref = AstNodeRef::new(self.module(), call_expr);
+        let scope = self.scope();
+
+        // Create the anchor for identifying this dynamic class.
+        // - For assigned `type()` calls, the Definition uniquely identifies the class.
+        // - For dangling calls, compute a relative offset from the scope's node index.
+        let anchor = if let Some(def) = definition {
+            DynamicClassAnchor::Definition(def)
+        } else {
+            let call_node_index = call_expr.node_index().load();
+            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+            let anchor_u32 = scope_anchor
+                .as_u32()
+                .expect("scope anchor should not be NodeIndex::NONE");
+            let call_u32 = call_node_index
+                .as_u32()
+                .expect("call node should not be NodeIndex::NONE");
+            DynamicClassAnchor::ScopeOffset(call_u32 - anchor_u32)
+        };
+
         let dynamic_class = DynamicClassLiteral::new(
-            db, name, bases, file, file_scope, node_ref, definition,             members,
-            has_dynamic_namespace, None,
+            db,
+            name,
+            bases,
+            scope,
+            anchor,
+            members,
+            has_dynamic_namespace,
+            None,
         );
 
         // Check for MRO errors.
