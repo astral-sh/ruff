@@ -8432,6 +8432,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 spec.resize(self.db(), TupleLength::Fixed(elts.len())).ok()
             });
 
+        // TODO: this is a simplification for now.
+        //
+        // It might be possible to use the type context where the annotation is not a pure-homogeneous
+        // tuple and the actual tuple has starred elements in it. It seems complex to reason about,
+        // though, and unlikely to come up much.
         let can_use_type_context =
             is_homogeneous_tuple_annotation || elts.iter().all(|elt| !elt.is_starred_expr());
 
@@ -8821,12 +8826,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // assignments from the type context to potentially _narrow_ the inferred type,
                 // by avoiding literal promotion.
                 let elt_ty_identity = elt_ty.identity(self.db());
+
+                // If the element is a starred expression, we want to apply the type context to each element
+                // in the unpacked expression (which we will store as a tuple when inferring it). We
+                // therefore wrap the type context in an `tuple[T, ...]` specialization.
                 let elt_tcx = elt_tcx_constraints
                     .get(&elt_ty_identity)
                     .copied()
                     .map(|tcx| {
                         if elt.is_starred_expr() && collection_class != KnownClass::Dict {
-                            KnownClass::Iterable.to_specialized_instance(self.db(), &[tcx])
+                            Type::homogeneous_tuple(self.db(), tcx)
                         } else {
                             tcx
                         }
