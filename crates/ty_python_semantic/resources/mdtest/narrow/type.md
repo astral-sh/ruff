@@ -96,6 +96,19 @@ def g(x: frozenset[bytes] | None):
         reveal_type(x)  # revealed: frozenset[bytes] | None
     else:
         reveal_type(x)  # revealed: frozenset[bytes]
+
+def h(x: object):
+    if type(x) is list:
+        reveal_type(x)  # revealed: Top[list[Unknown]]
+    elif type(x) is frozenset:
+        reveal_type(x)  # revealed: frozenset[object]
+    else:
+        reveal_type(x)  # revealed: object
+
+    if type(x) is not list and type(x) is not frozenset:
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: Top[list[Unknown]] | frozenset[object]
 ```
 
 ## No narrowing for `type(x) is C[int]`
