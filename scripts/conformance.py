@@ -412,8 +412,8 @@ def render_grouped_diagnostics(
     ):
         group = list(group)
 
-        lines.append(f"## {classification.into_title()}:")
-        lines.append("")
+        lines.append(f"## {classification.into_title()}")
+        lines.extend(["", "<details>", ""])
 
         lines.extend(header)
 
@@ -421,6 +421,7 @@ def render_grouped_diagnostics(
             lines.append(diag.display(format=format))
 
         lines.append(footer)
+        lines.extend(["", "</details>", ""])
 
     return "\n".join(lines)
 
@@ -433,8 +434,8 @@ def diff_format(
     is_percentage: bool = False,
 ):
     increased = diff > 0
-    good = "(✅)" if not neutral else ""
-    bad = "(❌)" if not neutral else ""
+    good = " (✅)" if not neutral else ""
+    bad = " (❌)" if not neutral else ""
     up = "⏫"
     down = "⏬"
 
