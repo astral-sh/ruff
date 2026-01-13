@@ -360,6 +360,8 @@ impl Matcher {
                         return false;
                     };
 
+                    let primary_annotation = normalize_paths(primary_annotation);
+
                     // reveal_type, reveal_protocol_interface
                     if matches!(
                         primary_message,
