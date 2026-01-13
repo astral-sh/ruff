@@ -6116,6 +6116,9 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
             Type::TypeAlias(alias) => {
+                // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
+                // detection rather than the visitor's cycle detection, because the visitor tracks
+                // Type values and `RecursiveList` is different from `RecursiveList[T]`.
                 if TypeMapping::EagerExpansion == *type_mapping {
                     return alias.raw_value_type(db).expand_eagerly(db);
                 }
@@ -6123,17 +6126,27 @@ impl<'db> Type<'db> {
                 // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
                 // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
                 // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
-                let value_type = visitor.visit(self, || {
+                //
+                // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
+                // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
+                // will detect the cycle and return the fallback value.
+                let mapped = visitor.visit(self, || {
                     match type_mapping {
-                        // We only want to perform the unique specialization onto the specialization of the type alias below,
-                        // not the raw value type.
-                        TypeMapping::UniqueSpecialization { .. } => alias.raw_value_type(db),
+                        TypeMapping::EagerExpansion => unreachable!("handled above"),
 
-                        _ => alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        // For UniqueSpecialization, get raw value type, apply specialization, then apply mapping.
+                        TypeMapping::UniqueSpecialization { .. } => {
+                            let value_type = alias.raw_value_type(db);
+                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        }
+
+                        _ => {
+                            let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                            alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        }
                     }
                 });
 
-                let mapped = alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                 let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), &|ty| ty.is_divergent(), false);
 
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
