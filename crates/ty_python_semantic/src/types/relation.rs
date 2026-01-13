@@ -715,17 +715,6 @@ impl<'db> Type<'db> {
                         }
                     })
             }
-            // All other `NewType` assignments fall back to the concrete base type.
-            (Type::NewTypeInstance(self_newtype), _) => {
-                self_newtype.concrete_base_type(db).has_relation_to_impl(
-                    db,
-                    target,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }
 
             (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
                 elem_ty.has_relation_to_impl(
@@ -867,6 +856,21 @@ impl<'db> Type<'db> {
                 // All inferable cases should have been handled above
                 assert!(!bound_typevar.is_inferable(db, inferable));
                 ConstraintSet::from(false)
+            }
+
+            // All other `NewType` assignments fall back to the concrete base type.
+            // This case must come after the TypeVar cases above, so that when checking
+            // `NewType <: TypeVar`, we use the TypeVar handling rather than falling back
+            // to the NewType's concrete base type.
+            (Type::NewTypeInstance(self_newtype), _) => {
+                self_newtype.concrete_base_type(db).has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
             }
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
