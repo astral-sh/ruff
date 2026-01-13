@@ -60,7 +60,39 @@ use crate::types::class::{
 };
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
-use crate::types::diagnostic::{self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions, hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation, report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance, report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict, report_conflicting_metaclass_from_bases, report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds, report_instance_layout_conflict, report_invalid_arguments_to_annotated, report_invalid_assignment, report_invalid_attribute_assignment, report_invalid_exception_caught, report_invalid_exception_cause, report_invalid_exception_raised, report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering, report_invalid_type_checking_constant, report_invalid_type_param_order, report_named_tuple_field_with_leading_underscore, report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable, report_possibly_missing_attribute, report_possibly_unresolved_reference, report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment, report_unsupported_binary_operation, report_unsupported_comparison, INVALID_GENERIC_ENUM};
+use crate::types::diagnostic::{
+    self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+    CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
+    DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
+    INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS,
+    INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
+    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
+    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
+    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT,
+    IncompatibleBases, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
+    report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
+    report_conflicting_metaclass_from_bases, report_duplicate_bases, report_implicit_return_type,
+    report_index_out_of_bounds, report_instance_layout_conflict,
+    report_invalid_arguments_to_annotated, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
+    report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
+    report_invalid_return_type, report_invalid_total_ordering,
+    report_invalid_type_checking_constant, report_invalid_type_param_order,
+    report_named_tuple_field_with_leading_underscore,
+    report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
+    report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
+    report_unsupported_binary_operation, report_unsupported_comparison,
+};
+use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
     is_implicit_classmethod, is_implicit_staticmethod,
@@ -96,7 +128,6 @@ use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
-use crate::types::enums::is_enum_class_by_inheritance;
 
 mod annotation_expression;
 mod type_expression;

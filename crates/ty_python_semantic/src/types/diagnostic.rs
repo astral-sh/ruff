@@ -974,20 +974,27 @@ declare_lint! {
     ///
     /// T = TypeVar("T")
     ///
-    /// # error: enum class cannot be generic
+    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
     /// class E[T](Enum):
     ///     A = 1
     ///
-    /// # error: enum class cannot be generic
+    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
     /// class F(Enum, Generic[T]):
     ///     A = 1
+    ///
+    /// # error: enum class cannot be generic -- the class creation does not immediately fail...
+    /// class G(Generic[T], Enum):
+    ///     A = 1
+    ///
+    /// # ...but this raises `KeyError`:
+    /// x: G[int]
     /// ```
     ///
     /// ## References
     /// - [Python documentation: Enum](https://docs.python.org/3/library/enum.html)
     pub(crate) static INVALID_GENERIC_ENUM = {
         summary: "detects generic enum classes",
-        status: LintStatus::stable("0.0.10"),
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Error,
     }
 }
