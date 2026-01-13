@@ -397,6 +397,8 @@ impl<'a> SuppressionsBuilder<'a> {
             .peekable();
 
         'comments: while let Some(suppression) = suppressions.peek() {
+            indents.clear();
+
             let last_indent = tokens
                 .before(suppression.range.start())
                 .iter()
