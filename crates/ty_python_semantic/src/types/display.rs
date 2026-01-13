@@ -7,9 +7,10 @@ use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
 use ruff_db::files::FilePath;
-use ruff_db::source::line_index;
+use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
+use ruff_source_file::LineColumn;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -581,9 +582,10 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
                 FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
             };
             let line_index = line_index(self.db, file);
-            let line_number = line_index.line_index(class_offset);
+            let LineColumn { line, column } =
+                line_index.line_column(class_offset, &source_text(self.db, file));
             f.set_invalid_type_annotation();
-            write!(f, " @ {path}:{line_number}")?;
+            write!(f, " @ {path}:{line}:{column}")?;
         }
         Ok(())
     }

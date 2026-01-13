@@ -77,9 +77,9 @@ def takes_foo2(x: Foo2) -> None: ...
 takes_foo1(foo1)  # OK
 takes_foo2(foo2)  # OK
 
-# error: [invalid-argument-type] "Argument to function `takes_foo1` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:5`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:6`"
+# error: [invalid-argument-type] "Argument to function `takes_foo1` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:5:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`"
 takes_foo1(foo2)
-# error: [invalid-argument-type] "Argument to function `takes_foo2` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:6`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:5`"
+# error: [invalid-argument-type] "Argument to function `takes_foo2` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:5:8`"
 takes_foo2(foo1)
 ```
 
@@ -762,7 +762,7 @@ def make_classes(name1: str, name2: str):
 
     def inner(x: cls1): ...
 
-    # error: [invalid-argument-type] "Argument to function `inner` is incorrect: Expected `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:8`, found `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:9`"
+    # error: [invalid-argument-type] "Argument to function `inner` is incorrect: Expected `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:8:12`, found `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:9:12`"
     inner(cls2())
 ```
 
