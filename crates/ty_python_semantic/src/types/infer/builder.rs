@@ -857,8 +857,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if disjoint_bases.len() > 1 {
                         report_instance_layout_conflict(
                             &self.context,
-                            class,
-                            class_node,
+                            class.header_range(self.db()),
+                            Some(class_node.bases()),
                             &disjoint_bases,
                         );
                     }
@@ -6095,15 +6095,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer the argument types.
         let name_type = self.infer_expression(name_arg, TypeContext::default());
         let bases_type = self.infer_expression(bases_arg, TypeContext::default());
-        let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
 
-        if !namespace_type.is_assignable_to(
-            db,
-            KnownClass::Dict
-                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
-        ) && let Some(builder) = self
-            .context
-            .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
+        // Extract members from the namespace dict (third argument).
+        // Infer the whole dict first to avoid double-inferring individual values.
+        let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
+        let (members, has_dynamic_namespace): (Box<[(ast::name::Name, Type<'db>)]>, bool) =
+            if let ast::Expr::Dict(dict) = namespace_arg {
+                // Check if all keys are string literal types. If any key is not a string literal
+                // type or is missing (spread), the namespace is considered dynamic.
+                let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                    item.key
+                        .as_ref()
+                        .is_some_and(|k| matches!(self.expression_type(k), Type::StringLiteral(_)))
+                });
+                let members = dict
+                    .items
+                    .iter()
+                    .filter_map(|item| {
+                        // Only extract items with string literal keys.
+                        let key_expr = item.key.as_ref()?;
+                        let key_name = match self.expression_type(key_expr) {
+                            Type::StringLiteral(s) => ast::name::Name::new(s.value(db)),
+                            _ => return None,
+                        };
+                        // Get the already-inferred type from when we inferred the dict above.
+                        let value_ty = self.expression_type(&item.value);
+                        Some((key_name, value_ty))
+                    })
+                    .collect();
+                (members, !all_keys_are_string_literals)
+            } else if let Type::TypedDict(typed_dict) = namespace_type {
+                // Namespace is a TypedDict instance. Extract known keys as members.
+                // TypedDicts are "open" (can have additional string keys), so this
+                // is still a dynamic namespace for unknown attributes.
+                let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| (name.clone(), field.declared_ty))
+                    .collect();
+                (members, true)
+            } else {
+                // Namespace is not a dict literal, so it's dynamic.
+                (Box::new([]), true)
+            };
+
+        if !matches!(namespace_type, Type::TypedDict(_))
+            && !namespace_type.is_assignable_to(
+                db,
+                KnownClass::Dict
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
+            )
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
         {
             let mut diagnostic = builder
                 .into_diagnostic("Invalid argument to parameter 3 (`namespace`) of `type()`");
@@ -6130,13 +6174,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::name::Name::new_static("<unknown>")
         };
 
-        let bases = self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
+        let (bases, mut disjoint_bases) =
+            self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
 
-        let dynamic_class = DynamicClassLiteral::new(db, name, bases, definition, None);
+        let dynamic_class = DynamicClassLiteral::new(
+            db,
+            name,
+            bases,
+            definition,
+            members,
+            has_dynamic_namespace,
+            None,
+        );
 
         // Check for MRO errors.
-        if let Err(error) = dynamic_class.try_mro(db) {
-            match error.reason() {
+        match dynamic_class.try_mro(db) {
+            Err(error) => match error.reason() {
                 DynamicMroErrorKind::DuplicateBases(duplicates) => {
                     if let Some(builder) = self.context.report_lint(&DUPLICATE_BASE, call_expr) {
                         builder.into_diagnostic(format_args!(
@@ -6163,6 +6216,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .join(", ")
                         ));
                     }
+                }
+            },
+            Ok(_) => {
+                // MRO succeeded, check for instance-layout-conflict.
+                disjoint_bases.remove_redundant_entries(db);
+                if disjoint_bases.len() > 1 {
+                    report_instance_layout_conflict(
+                        &self.context,
+                        dynamic_class.header_range(db),
+                        bases_arg.as_tuple_expr().map(|tuple| tuple.elts.as_slice()),
+                        &disjoint_bases,
+                    );
                 }
             }
         }
@@ -6191,14 +6256,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Extract base classes from the second argument of a `type()` call.
     ///
-    /// If any bases were invalid, diagnostics are emitted and the dynamic
-    /// class is inferred as inheriting from `Unknown`.
+    /// Returns the extracted bases and any disjoint bases found (for instance-layout-conflict
+    /// checking). If any bases were invalid, diagnostics are emitted and the dynamic class is
+    /// inferred as inheriting from `Unknown`.
     fn extract_dynamic_type_bases(
         &mut self,
         bases_node: &ast::Expr,
         bases_type: Type<'db>,
         name: &ast::name::Name,
-    ) -> Box<[ClassBase<'db>]> {
+    ) -> (Box<[ClassBase<'db>]>, IncompatibleBases<'db>) {
         let db = self.db();
 
         // Get AST nodes for base expressions (for diagnostics).
@@ -6209,7 +6275,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let placeholder_class: ClassLiteral<'db> =
             KnownClass::Object.try_to_class_literal(db).unwrap().into();
 
-        bases_type
+        let mut disjoint_bases = IncompatibleBases::default();
+
+        let bases = bases_type
             .tuple_instance_spec(db)
             .as_deref()
             .and_then(|spec| spec.as_fixed_length())
@@ -6224,6 +6292,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(class_base) =
                             ClassBase::try_from_type(db, *base, placeholder_class)
                         {
+                            // Collect disjoint bases for instance-layout-conflict checking.
+                            if let ClassBase::Class(base_class) = class_base {
+                                if let Some(disjoint_base) = base_class.nearest_disjoint_base(db) {
+                                    disjoint_bases.insert(
+                                        disjoint_base,
+                                        idx,
+                                        base_class.class_literal(db),
+                                    );
+                                }
+                            }
                             return class_base;
                         }
 
@@ -6256,20 +6334,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     "Only class objects or `Any` are supported as class bases",
                                 );
                             }
-                        } else {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_BASE, diagnostic_node)
-                            {
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Invalid class base with type `{}`",
-                                    base.display(db)
+                        } else if let Some(builder) =
+                            self.context.report_lint(&INVALID_BASE, diagnostic_node)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Invalid class base with type `{}`",
+                                base.display(db)
+                            ));
+                            if bases_tuple_elts.is_none() {
+                                diagnostic.info(format_args!(
+                                    "Element {} of the tuple is invalid",
+                                    idx + 1
                                 ));
-                                if bases_tuple_elts.is_none() {
-                                    diagnostic.info(format_args!(
-                                        "Element {} of the tuple is invalid",
-                                        idx + 1
-                                    ));
-                                }
                             }
                         }
 
@@ -6292,7 +6368,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
                 }
                 Box::from([ClassBase::unknown()])
-            })
+            });
+
+        (bases, disjoint_bases)
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {

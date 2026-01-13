@@ -115,17 +115,116 @@ reveal_type(bar.base_attr)  # revealed: int
 reveal_type(bar.mixin_attr)  # revealed: str
 ```
 
-Attributes from the namespace dict (third argument) are not tracked. Like Pyright, we error when
-attempting to access them:
+Attributes from the namespace dict (third argument) are tracked:
 
 ```py
 class Base: ...
 
 Foo = type("Foo", (Base,), {"custom_attr": 42})
-foo = Foo()
 
-# error: [unresolved-attribute] "Object of type `Foo` has no attribute `custom_attr`"
-reveal_type(foo.custom_attr)  # revealed: Unknown
+# Class attribute access
+reveal_type(Foo.custom_attr)  # revealed: Literal[42]
+
+# Instance attribute access
+foo = Foo()
+reveal_type(foo.custom_attr)  # revealed: Literal[42]
+```
+
+When the namespace dict is not a literal (e.g., passed as a parameter), attribute access returns
+`Unknown` since we can't know what attributes might be defined:
+
+```py
+from typing import Any
+
+class DynamicBase: ...
+
+def f(attributes: dict[str, Any]):
+    X = type("X", (DynamicBase,), attributes)
+
+    reveal_type(X)  # revealed: <class 'X'>
+
+    # Attribute access returns Unknown since the namespace is dynamic
+    reveal_type(X.foo)  # revealed: Unknown
+
+    x = X()
+    reveal_type(x.bar)  # revealed: Unknown
+```
+
+When a namespace dictionary is partially dynamic (e.g., a dict literal with spread or non-literal
+keys), static attributes have precise types while unknown attributes return `Unknown`:
+
+```py
+from typing import Any
+
+def f(extra_attrs: dict[str, Any], y: str):
+    X = type("X", (), {"a": 42, **extra_attrs})
+
+    # Static attributes in the namespace dictionary have precise types,
+    # but the dictionary was not entirely static, so other attributes
+    # are still available and resolve to `Unknown`:
+    reveal_type(X().a)  # revealed: Literal[42]
+    reveal_type(X().whatever)  # revealed: Unknown
+
+    Y = type("Y", (), {"a": 56, y: 72})
+    reveal_type(Y().a)  # revealed: Literal[56]
+    reveal_type(Y().whatever)  # revealed: Unknown
+```
+
+When a `TypedDict` is passed as the namespace argument, we synthesize a class type with the known
+keys from the `TypedDict` as attributes. Since `TypedDict` instances are "open" (they can have
+arbitrary additional string keys), unknown attributes return `Unknown`:
+
+```py
+from typing import TypedDict
+
+class Namespace(TypedDict):
+    z: int
+
+def g(attributes: Namespace):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+
+    # Known keys from the TypedDict are tracked as attributes
+    reveal_type(Y.z)  # revealed: int
+
+    y = Y()
+    reveal_type(y.z)  # revealed: int
+
+    # Unknown attributes return Unknown since TypedDicts are open
+    reveal_type(Y.unknown)  # revealed: Unknown
+    reveal_type(y.unknown)  # revealed: Unknown
+```
+
+## Closed TypedDicts (PEP-728)
+
+TODO: We don't support the PEP-728 `closed=True` keyword argument to `TypedDict` yet. When we do, a
+closed TypedDict namespace should NOT be marked as dynamic, and accessing unknown attributes should
+emit an error instead of returning `Unknown`.
+
+```py
+from typing import TypedDict
+
+class ClosedNamespace(TypedDict, closed=True):
+    x: int
+    y: str
+
+def h(ns: ClosedNamespace):
+    X = type("X", (), ns)
+
+    reveal_type(X)  # revealed: <class 'X'>
+
+    # Known keys from the TypedDict are tracked as attributes
+    reveal_type(X.x)  # revealed: int
+    reveal_type(X.y)  # revealed: str
+
+    x = X()
+    reveal_type(x.x)  # revealed: int
+    reveal_type(x.y)  # revealed: str
+
+    # TODO: Once we support `closed=True`, these should emit errors instead of returning Unknown
+    reveal_type(X.unknown)  # revealed: Unknown
+    reveal_type(x.unknown)  # revealed: Unknown
 ```
 
 ## Inheritance from dynamic classes
@@ -513,7 +612,129 @@ class B(metaclass=Meta2): ...
 Bad = type("Bad", (A, B), {})
 ```
 
-## Cyclic dynamic class definitions
+## `__slots__` in namespace dictionary
+
+Dynamic classes can define `__slots__` in the namespace dictionary. Non-empty `__slots__` makes the
+class a "disjoint base", which prevents it from being used alongside other disjoint bases in a class
+hierarchy:
+
+```py
+# Dynamic class with non-empty __slots__
+Slotted = type("Slotted", (), {"__slots__": ("x", "y")})
+slotted = Slotted()
+reveal_type(slotted)  # revealed: Slotted
+
+# Classes with empty __slots__ are not disjoint bases
+EmptySlots = type("EmptySlots", (), {"__slots__": ()})
+
+# Classes with no __slots__ are not disjoint bases
+NoSlots = type("NoSlots", (), {})
+
+# String __slots__ are treated as a single slot (non-empty)
+StringSlots = type("StringSlots", (), {"__slots__": "x"})
+```
+
+Dynamic classes with non-empty `__slots__` cannot coexist with other disjoint bases:
+
+```py
+class RegularSlotted:
+    __slots__ = ("a",)
+
+DynSlotted = type("DynSlotted", (), {"__slots__": ("b",)})
+
+# error: [instance-layout-conflict]
+class Conflict(
+    RegularSlotted,
+    DynSlotted,
+): ...
+```
+
+Two dynamic classes with non-empty `__slots__` also conflict:
+
+```py
+A = type("A", (), {"__slots__": ("x",)})
+B = type("B", (), {"__slots__": ("y",)})
+
+# error: [instance-layout-conflict]
+class Conflict(
+    A,
+    B,
+): ...
+```
+
+`instance-layout-conflict` errors are also emitted for classes that inherit from dynamic classes
+with disjoint bases:
+
+```py
+from typing import Any
+
+class DisjointBase1:
+    __slots__ = ("a",)
+
+class DisjointBase2:
+    __slots__ = ("b",)
+
+def f(ns: dict[str, Any]):
+    cls1 = type("cls1", (DisjointBase1,), ns)
+    cls2 = type("cls2", (DisjointBase2,), ns)
+
+    # error: [instance-layout-conflict]
+    cls3 = type("cls3", (cls1, cls2), {})
+
+    # error: [instance-layout-conflict]
+    class Cls4(cls1, cls2): ...
+```
+
+When the namespace dictionary is dynamic (not a literal), we can't determine if `__slots__` is
+defined, so no diagnostic is emitted:
+
+```py
+from typing import Any
+
+class SlottedBase:
+    __slots__ = ("a",)
+
+def f(ns: dict[str, Any]):
+    # The namespace might or might not contain __slots__, so no error is emitted
+    Dynamic = type("Dynamic", (), ns)
+
+    # No error: we can't prove there's a conflict since ns might not have __slots__
+    class MaybeConflict(SlottedBase, Dynamic): ...
+```
+
+## `instance-layout-conflict` diagnostic snapshots
+
+<!-- snapshot-diagnostics -->
+
+When the bases are a tuple literal, the diagnostic includes annotations for each conflicting base:
+
+```py
+class A:
+    __slots__ = ("x",)
+
+class B:
+    __slots__ = ("y",)
+
+# error: [instance-layout-conflict]
+X = type("X", (A, B), {})
+```
+
+When the bases are not a tuple literal (e.g., a variable), the diagnostic is emitted without
+per-base annotations:
+
+```py
+class C:
+    __slots__ = ("x",)
+
+class D:
+    __slots__ = ("y",)
+
+bases: tuple[type[C], type[D]] = (C, D)
+# error: [instance-layout-conflict]
+Y = type("Y", bases, {})
+```
+
+## Cyclic functional class definitions
 
 Self-referential class definitions using `type()` are detected. The name being defined is referenced
 in the bases tuple before it's available:

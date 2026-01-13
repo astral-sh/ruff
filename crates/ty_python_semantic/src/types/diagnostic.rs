@@ -3009,16 +3009,15 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
 
 pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
-    class: StaticClassLiteral,
-    node: &ast::StmtClassDef,
+    header_range: TextRange,
+    base_nodes: Option<&[ast::Expr]>,
     disjoint_bases: &IncompatibleBases,
 ) {
     debug_assert!(disjoint_bases.len() > 1);
 
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, class.header_range(db))
-    else {
+    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, header_range) else {
         return;
     };
 
@@ -3042,9 +3041,14 @@ pub(crate) fn report_instance_layout_conflict(
             originating_base,
         } = disjoint_base_info;
 
-        let span = context.span(&node.bases()[*node_index]);
+        // Get the span for this base from the AST (if available)
+        let Some(base_node) = base_nodes.and_then(|nodes| nodes.get(*node_index)) else {
+            continue;
+        };
+
+        let span = context.span(base_node);
         let mut annotation = Annotation::secondary(span.clone());
-        if originating_base.as_static() == Some(disjoint_base.class) {
+        if *originating_base == disjoint_base.class {
             match disjoint_base.kind {
                 DisjointBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
@@ -3168,11 +3172,10 @@ impl<'db> IncompatibleBases<'db> {
                     .keys()
                     .filter(|other_base| other_base != disjoint_base)
                     .all(|other_base| {
-                        !disjoint_base.class.is_subclass_of(
-                            db,
-                            None,
-                            other_base.class.default_specialization(db),
-                        )
+                        !disjoint_base
+                            .class
+                            .default_specialization(db)
+                            .is_subclass_of(db, other_base.class.default_specialization(db))
                     })
             })
             .map(|(base, info)| (*base, *info))
