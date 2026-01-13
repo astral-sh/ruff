@@ -664,14 +664,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns an unknown specialization for this class.
-    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.unknown_specialization(db),
-            Self::Dynamic(_) => ClassType::NonGeneric(self),
-        }
-    }
-
     /// Returns the definition of this class.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {

@@ -1244,7 +1244,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         constraints.insert(
                             place,
                             NarrowingConstraint::regular(
-                                Type::instance(self.db, rhs_class.unknown_specialization(self.db))
+                                Type::instance(self.db, rhs_class.top_materialization(self.db))
                                     .negate_if(self.db, !is_positive),
                             ),
                         );
