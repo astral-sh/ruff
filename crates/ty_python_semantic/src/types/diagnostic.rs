@@ -73,6 +73,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
@@ -952,6 +953,48 @@ declare_lint! {
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for enum classes that are also generic.
+    ///
+    /// ## Why is this bad?
+    /// Enum classes cannot be generic. Python does not support generic enums:
+    /// attempting to create one will either result in an immediate `TypeError`
+    /// at runtime, or will create a class that cannot be specialized in the way
+    /// that a normal generic class can.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from enum import Enum
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")
+    ///
+    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
+    /// class E[T](Enum):
+    ///     A = 1
+    ///
+    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
+    /// class F(Enum, Generic[T]):
+    ///     A = 1
+    ///
+    /// # error: enum class cannot be generic -- the class creation does not immediately fail...
+    /// class G(Generic[T], Enum):
+    ///     A = 1
+    ///
+    /// # ...but this raises `KeyError`:
+    /// x: G[int]
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: Enum](https://docs.python.org/3/library/enum.html)
+    pub(crate) static INVALID_GENERIC_ENUM = {
+        summary: "detects generic enum classes",
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Error,
     }
 }
