@@ -839,8 +839,8 @@ def _(flag: bool):
 
 <!-- snapshot-diagnostics -->
 
-When calling a union where one element is an intersection of callables, and all bindings
-in that intersection fail, we should report errors with both union and intersection context.
+When calling a union where one element is an intersection of callables, and all bindings in that
+intersection fail, we should report errors with both union and intersection context.
 
 ```py
 from ty_extensions import Intersection
