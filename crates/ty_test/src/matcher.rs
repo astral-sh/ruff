@@ -235,7 +235,7 @@ fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
 /// but `foo.bar.A @ src\foo\bar.py:10:5` on Windows).
 fn normalize_paths(ty: &str) -> Cow<'_, str> {
     static PATH_IN_CLASS_DISPLAY_REGEX: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r"( @ )(.+)(\.pyi?:\d+:\d+)").unwrap());
+        LazyLock::new(|| regex::Regex::new(r"( @ )([^\.]+?)(\.pyi?:\d)").unwrap());
 
     fn normalize_path_captures(path_captures: &regex::Captures) -> String {
         let normalized_path = std::path::Path::new(&path_captures[2])
