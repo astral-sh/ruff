@@ -919,6 +919,12 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    /// Check if the current control flow is statically known to be unreachable.
+    /// This is true when all control flow paths have terminated (e.g., via break, return, raise).
+    pub(super) fn is_statically_unreachable(&self) -> bool {
+        self.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE
+    }
+
     pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
         match place {
             ScopedPlaceId::Symbol(symbol) => {
@@ -967,6 +973,54 @@ impl<'db> UseDefMapBuilder<'db> {
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
         place_state.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            place.is_symbol(),
+        );
+
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => {
+                &mut self.reachable_symbol_definitions[symbol].bindings
+            }
+            ScopedPlaceId::Member(member) => {
+                &mut self.reachable_member_definitions[member].bindings
+            }
+        };
+
+        bindings.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            place.is_symbol(),
+            PreviousDefinitions::AreKept,
+        );
+    }
+
+    /// Record a binding while keeping previous bindings (including UNBOUND) visible.
+    /// This is used for loop headers, where UNBOUND should remain visible as a possible state
+    /// for places first assigned inside the loop body.
+    pub(super) fn record_binding_keeping_unbound(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+    ) {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        self.bindings_by_definition
+            .insert(binding, bindings.clone());
+
+        let def_id = self.all_definitions.push(DefinitionState::Defined(binding));
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+        self.declarations_by_binding
+            .insert(binding, place_state.declarations().clone());
+        place_state.record_binding_keeping_unbound(
             def_id,
             self.reachability,
             self.is_class_scope,
@@ -1307,6 +1361,37 @@ impl<'db> UseDefMapBuilder<'db> {
             member_states: self.member_states.clone(),
             reachability: self.reachability,
         }
+    }
+
+    /// Get the current bindings for a place at the loop-back edge.
+    ///
+    /// This returns an iterator over tuples of (`DefinitionState`, `narrowing_predicates`).
+    /// The narrowing predicates are the constraints that apply to this binding at the loop-back edge.
+    pub(super) fn bindings_at_loop_back(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<
+        Item = (
+            DefinitionState<'db>,
+            smallvec::SmallVec<[crate::semantic_index::predicate::Predicate<'db>; 4]>,
+        ),
+    > + '_ {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        bindings.iter().map(|live_binding| {
+            let def_state = self.all_definitions[live_binding.binding];
+            let predicates: smallvec::SmallVec<
+                [crate::semantic_index::predicate::Predicate<'db>; 4],
+            > = self
+                .narrowing_constraints
+                .iter_predicates(live_binding.narrowing_constraint)
+                .map(|constraint_pred| self.predicates.get(constraint_pred.predicate()))
+                .collect();
+            (def_state, predicates)
+        })
     }
 
     /// Restore the current builder places state to the given snapshot.
