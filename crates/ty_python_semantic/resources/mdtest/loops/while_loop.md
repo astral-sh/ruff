@@ -127,3 +127,53 @@ class NotBoolable:
 while NotBoolable():
     ...
 ```
+
+## Cyclic control flow
+
+```py
+def random() -> bool:
+    return False
+
+i = 0
+reveal_type(i)  # revealed: Literal[0]
+while random():
+    i += 1
+    reveal_type(i)  # revealed: int
+```
+
+A more complex example, where the loop condition narrows both the loop-back value and the
+end-of-loop value.
+
+```py
+x = "A"
+while x != "C":
+    reveal_type(x) # revealed: Literal["A", "B"]
+    if random():
+        x = "B"
+    else:
+        x = "C"
+    reveal_type(x) # revealed: Literal["B", "C"]
+reveal_type(x) # revealed: Literal["C"]
+```
+
+The same thing, but nested loops.
+
+```py
+x = "A"
+while x != "E":
+    reveal_type(x) # revealed: Literal["A", "B", "D"]
+    while x != "C":
+        reveal_type(x) # revealed: Literal["A", "B", "D"]
+        if random():
+            x = "B"
+        else:
+            x = "C"
+        reveal_type(x) # revealed: Literal["B", "C", "D"]
+    reveal_type(x) # revealed: Literal["C"]
+    if random():
+        x = "D"
+    else:
+        x = "E"
+    reveal_type(x) # revealed: Literal["D", "E"]
+reveal_type(x) # revealed: Literal["E"]
+```
