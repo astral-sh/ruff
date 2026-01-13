@@ -1078,7 +1078,7 @@ passed through unchanged:
 ```py
 from typing import final
 
-# TODO: Add a diagnostic for ineffective use of `final()` here.
+# error: [ineffective-final]
 FinalClass = final(type("FinalClass", (), {}))
 reveal_type(FinalClass)  # revealed: <class 'FinalClass'>
 
@@ -1088,7 +1088,7 @@ class Child(FinalClass): ...
 # Same with base classes
 class Base: ...
 
-# TODO: Add a diagnostic for ineffective use of `final()` here.
+# error: [ineffective-final]
 FinalDerived = final(type("FinalDerived", (Base,), {}))
 
 class Child2(FinalDerived): ...

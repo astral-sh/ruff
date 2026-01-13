@@ -579,6 +579,40 @@ t = (0, 1, 2)
 t[3]  # IndexError: tuple index out of range
 ```
 
+## `ineffective-final`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.33">0.0.1-alpha.33</a>) ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20ineffective-final" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1750" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for calls to `final()` where the decorator has no effect.
+
+**Why is this bad?**
+
+The `final()` function is designed to be used as a decorator. When called directly
+as a function (e.g., `final(type(...))`), it simply returns its argument unchanged
+and has no effect at runtime or for type checking.
+
+**Example**
+
+
+```python
+from typing import final
+
+# Incorrect: `final()` has no effect when called as a function
+MyClass = final(type("MyClass", (), {}))
+
+# Correct: use `final` as a decorator
+@final
+class MyClass: ...
+```
+
 ## `instance-layout-conflict`
 
 <small>
@@ -729,7 +763,11 @@ a: int = ''
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-attribute-access" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2122" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2108" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -923,7 +961,11 @@ except ZeroDivisionError:
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.28">0.0.1-alpha.28</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-explicit-override" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1792" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1778" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -965,7 +1007,11 @@ class D(A):
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.35">0.0.1-alpha.35</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-frozen-dataclass-subclass" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2373" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2359" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1009,7 +1055,11 @@ class NonFrozenChild(FrozenBase):  # Error raised here
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-generic-class" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1002" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L960" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1165,7 +1215,11 @@ carol = Person(name="Carol", age=25)  # typo!
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-legacy-type-variable" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1033" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L991" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1200,7 +1254,11 @@ def f(t: TypeVar("U")): ...
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-metaclass" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1130" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1088" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1234,7 +1292,11 @@ class B(metaclass=f): ...
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.20">0.0.1-alpha.20</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-method-override" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2275" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2261" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1395,7 +1457,11 @@ AttributeError: Cannot overwrite NamedTuple attribute _asdict
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/1.0.0">1.0.0</a>) ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-newtype" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1106" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1064" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1425,7 +1491,11 @@ Baz = NewType("Baz", int | str)  # error: invalid base for `typing.NewType`
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-overload" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1157" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1115" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1475,7 +1545,11 @@ def foo(x: int) -> int: ...
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-parameter-default" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1256" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1214" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1501,7 +1575,11 @@ def f(a: int = ''): ...
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-paramspec" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1061" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1019" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1566,7 +1644,11 @@ TypeError: Protocols can only inherit from other protocols, got <class 'int'>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-raise" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1276" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1234" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1640,7 +1722,11 @@ def func() -> int:
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-super-argument" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1319" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1277" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1736,7 +1822,11 @@ class C: ...
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.10">0.0.10</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-total-ordering" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2411" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2397" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1782,7 +1872,11 @@ class MyClass:
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.6">0.0.1-alpha.6</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-alias-type" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1085" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1043" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1809,7 +1903,11 @@ NewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name mus
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.29">0.0.1-alpha.29</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-arguments" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1551" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1509" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1856,7 +1954,11 @@ Bar[int]  # error: too few arguments
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-checking-constant" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1358" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1316" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1886,7 +1988,11 @@ TYPE_CHECKING = ''
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-form" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1382" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1340" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1916,7 +2022,11 @@ b: Annotated[int]  # `Annotated` expects at least two arguments
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.11">0.0.1-alpha.11</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-guard-call" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1434" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1392" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1950,7 +2060,11 @@ f(10)  # Error
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.11">0.0.1-alpha.11</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-guard-definition" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1406" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1364" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -1984,7 +2098,11 @@ class C:
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-type-variable-constraints" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1462" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1420" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2019,7 +2137,11 @@ T = TypeVar('T', bound=str)  # valid bound TypeVar
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.9">0.0.9</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-typed-dict-statement" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2250" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2236" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2050,7 +2172,11 @@ class Foo(TypedDict):
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20missing-argument" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1491" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1449" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2075,7 +2201,11 @@ func()  # TypeError: func() missing 1 required positional argument: 'x'
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.20">0.0.1-alpha.20</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20missing-typed-dict-key" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2223" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2209" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2108,7 +2238,11 @@ alice["age"]  # KeyError
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20no-matching-overload" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1510" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1468" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2137,7 +2271,11 @@ func("string")  # error: [no-matching-overload]
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20not-iterable" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1592" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1550" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2163,7 +2301,11 @@ for i in 34:  # TypeError: 'int' object is not iterable
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20not-subscriptable" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1533" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1491" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2187,7 +2329,11 @@ Subscripting an object that does not support it will raise a `TypeError` at runt
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.29">0.0.1-alpha.29</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20override-of-final-method" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1765" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1723" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2220,7 +2366,11 @@ class B(A):
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20parameter-already-assigned" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1643" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1601" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2247,7 +2397,11 @@ f(1, x=2)  # Error raised here
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20positional-only-parameter-as-kwarg" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1976" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1962" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2274,7 +2428,11 @@ f(x=1)  # Error raised here
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-attribute" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1664" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1622" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2334,7 +2492,11 @@ A()[0]  # TypeError: 'A' object is not subscriptable
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-import" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1686" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1644" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2371,7 +2533,11 @@ from module import a  # ImportError: cannot import name 'a' from 'module'
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unresolved-reference" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1716" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1674" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2435,7 +2601,11 @@ def test(): -> "int":
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20redundant-cast" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2150" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2136" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2462,7 +2632,11 @@ cast(int, f())  # Redundant
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20static-assert-error" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2098" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2084" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2492,7 +2666,11 @@ static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known tr
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20subclass-of-final-class" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1742" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1700" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2521,7 +2699,11 @@ class B(A): ...  # Error raised here
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.30">0.0.1-alpha.30</a>) ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20super-call-in-named-tuple-method" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1910" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1896" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2555,7 +2737,11 @@ class F(NamedTuple):
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20too-many-positional-arguments" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1850" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1836" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2582,7 +2768,11 @@ f("foo")  # Error raised here
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20type-assertion-failure" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1828" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1814" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2610,7 +2800,11 @@ def _(x: int):
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unavailable-implicit-super-arguments" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1871" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1857" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2656,7 +2850,11 @@ class A:
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20undefined-reveal" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1937" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1923" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2680,7 +2878,11 @@ reveal_type(1)  # NameError: name 'reveal_type' is not defined
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unknown-argument" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1955" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1941" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2707,7 +2909,11 @@ f(x=1, y=2)  # Error raised here
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-attribute" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1997" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1983" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2735,7 +2941,11 @@ A().foo  # AttributeError: 'A' object has no attribute 'foo'
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.15">0.0.1-alpha.15</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-global" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2171" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2157" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2793,7 +3003,11 @@ def g():
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-import" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2019" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2005" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2818,7 +3032,11 @@ import foo  # ModuleNotFoundError: No module named 'foo'
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-reference" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2038" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2024" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2882,7 +3100,11 @@ class D(C): ...  # error: [unsupported-base]
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unsupported-bool-conversion" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1612" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1570" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -2960,7 +3182,11 @@ def factory(base: type[Base]) -> type:
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unsupported-operator" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2057" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2043" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -3024,7 +3250,11 @@ to `false` to prevent this rule from reporting unused `type: ignore` comments.
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20useless-overload-body" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1200" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1158" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
@@ -3087,7 +3317,11 @@ def foo(x: int | str) -> int | str:
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20zero-stepsize-in-slice" target="_blank">Related issues</a> ·
+<<<<<<< HEAD
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2079" target="_blank">View source</a>
+=======
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2065" target="_blank">View source</a>
+>>>>>>> 5dbf6997ce ([ty] Add a diagnostic for non-decorator uses of final)
 </small>
 
 
