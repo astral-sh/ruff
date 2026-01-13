@@ -34,7 +34,7 @@
 //! traits in action.
 
 use crate::session::client::Client;
-use crate::session::{DocumentSnapshot, Session, SessionSnapshot, log_guidance};
+use crate::session::{DocumentSnapshot, Session, SessionSnapshot};
 use lsp_server::RequestId;
 use std::borrow::Cow;
 
@@ -118,7 +118,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
             tracing::error!("An error occurred with request ID {id}: {err}");
             client.show_error_message(format!(
                 "ty encountered a problem. {}",
-                log_guidance(snapshot.client_name())
+                snapshot.client_name().log_guidance()
             ));
         }
 
@@ -158,7 +158,7 @@ pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
             tracing::error!("An error occurred with request ID {id}: {err}");
             client.show_error_message(format!(
                 "ty encountered a problem. {}",
-                log_guidance(snapshot.client_name())
+                snapshot.client_name().log_guidance()
             ));
         }
 

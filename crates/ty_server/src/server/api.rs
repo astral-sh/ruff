@@ -1,5 +1,5 @@
 use crate::server::schedule::Task;
-use crate::session::{Session, log_guidance};
+use crate::session::Session;
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::{ErrorCode, RequestId};
@@ -123,7 +123,7 @@ pub(super) fn request(req: server::Request) -> Task {
             if matches!(err.code, ErrorCode::InternalError) {
                 client.show_error_message(format!(
                     "ty failed to handle a request from the editor. {}",
-                    log_guidance(session.client_name())
+                    session.client_name().log_guidance()
                 ));
             }
 
@@ -182,7 +182,7 @@ pub(super) fn notification(notif: server::Notification) -> Task {
             if matches!(err.code, ErrorCode::InternalError) {
                 client.show_error_message(format!(
                     "ty failed to handle a notification from the editor. {}",
-                    log_guidance(session.client_name())
+                    session.client_name().log_guidance()
                 ));
             }
         })
@@ -197,7 +197,7 @@ where
     Ok(Task::sync(move |session, client: &Client| {
         let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, client, params);
-        respond::<R>(&id, result, client, log_guidance(session.client_name()));
+        respond::<R>(&id, result, client, session.client_name().log_guidance());
     }))
 }
 
@@ -221,7 +221,7 @@ where
         // SAFETY: The `snapshot` is safe to move across the unwind boundary because it is not used
         // after unwinding.
         let snapshot = AssertUnwindSafe(session.snapshot_session());
-        let log_guidance = log_guidance(snapshot.0.client_name());
+        let log_guidance = snapshot.0.client_name().log_guidance();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -289,7 +289,7 @@ where
 
         let path = document.notebook_or_file_path();
         let db = session.project_db(path).clone();
-        let log_guidance = log_guidance(document.client_name());
+        let log_guidance = document.client_name().log_guidance();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -368,7 +368,7 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
             tracing::error!("An error occurred while running {id}: {err}");
             client.show_error_message(format!(
                 "ty encountered a problem. {}",
-                log_guidance(session.client_name())
+                session.client_name().log_guidance()
             ));
 
             return;
@@ -401,7 +401,7 @@ where
             return Box::new(|_| {});
         };
 
-        let log_guidance = log_guidance(snapshot.client_name());
+        let log_guidance = snapshot.client_name().log_guidance();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("notification", method = N::METHOD).entered();

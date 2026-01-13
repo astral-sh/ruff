@@ -13,7 +13,7 @@ use lsp_types::request::{
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
-    DiagnosticRegistrationOptions, DiagnosticServerCapabilities,
+    ClientInfo, DiagnosticRegistrationOptions, DiagnosticServerCapabilities,
     DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
@@ -115,8 +115,7 @@ pub(crate) struct Session {
     registrations: HashSet<String>,
 
     /// The name of the client (editor) that connected to this server.
-    /// This is used to provide editor-specific guidance in error messages.
-    client_name: Option<String>,
+    client_name: ClientName,
 }
 
 /// LSP State for a Project
@@ -152,7 +151,7 @@ impl Session {
         workspace_urls: Vec<Url>,
         initialization_options: InitializationOptions,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
-        client_name: Option<String>,
+        client_name: ClientName,
         in_test: bool,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new());
@@ -543,7 +542,7 @@ impl Session {
 
                     client.show_error_message(format!(
                         "Failed to load project for workspace {url}. {}",
-                        log_guidance(self.client_name()),
+                        self.client_name.log_guidance(),
                     ));
 
                     let db_with_default_settings = ProjectMetadata::from_options(
@@ -829,7 +828,7 @@ impl Session {
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
             document: document_handle,
-            client_name: self.client_name.clone(),
+            client_name: self.client_name,
         })
     }
 
@@ -848,7 +847,7 @@ impl Session {
             in_test: self.in_test,
             resolved_client_capabilities: self.resolved_client_capabilities,
             revision: self.revision,
-            client_name: self.client_name.clone(),
+            client_name: self.client_name,
         }
     }
 
@@ -981,8 +980,8 @@ impl Session {
         self.position_encoding
     }
 
-    pub(crate) fn client_name(&self) -> Option<&str> {
-        self.client_name.as_deref()
+    pub(crate) fn client_name(&self) -> ClientName {
+        self.client_name
     }
 }
 
@@ -1033,7 +1032,7 @@ pub(crate) struct DocumentSnapshot {
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
     document: DocumentHandle,
-    client_name: Option<String>,
+    client_name: ClientName,
 }
 
 impl DocumentSnapshot {
@@ -1081,8 +1080,8 @@ impl DocumentSnapshot {
         self.document.notebook_or_file_path()
     }
 
-    pub(crate) fn client_name(&self) -> Option<&str> {
-        self.client_name.as_deref()
+    pub(crate) fn client_name(&self) -> ClientName {
+        self.client_name
     }
 }
 
@@ -1094,7 +1093,7 @@ pub(crate) struct SessionSnapshot {
     resolved_client_capabilities: ResolvedClientCapabilities,
     in_test: bool,
     revision: u64,
-    client_name: Option<String>,
+    client_name: ClientName,
 
     /// IMPORTANT: It's important that the databases come last, or at least,
     /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
@@ -1137,22 +1136,39 @@ impl SessionSnapshot {
         self.revision
     }
 
-    pub(crate) fn client_name(&self) -> Option<&str> {
-        self.client_name.as_deref()
+    pub(crate) fn client_name(&self) -> ClientName {
+        self.client_name
     }
 }
 
-/// Returns editor-specific guidance for finding logs.
-///
-/// Different editors have different ways to access language server logs,
-/// so we provide tailored instructions based on the connected client.
-pub(crate) fn log_guidance(client_name: Option<&str>) -> &'static str {
-    match client_name {
-        Some("Zed") => {
-            "Check the logs for more details (find logs via the command palette: `dev: open language server logs`)."
+/// Represents the client (editor) that's connected to the language server.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ClientName {
+    Zed,
+    Other,
+}
+
+impl From<Option<ClientInfo>> for ClientName {
+    fn from(info: Option<ClientInfo>) -> Self {
+        match info {
+            Some(info) if matches!(info.name.as_str(), "Zed") => ClientName::Zed,
+            _ => ClientName::Other,
         }
-        // Generic message for other editors. VS Code has a "Show Logs" button via the ty extension.
-        _ => "Check the logs for more details.",
+    }
+}
+
+impl ClientName {
+    /// Returns editor-specific guidance for finding logs.
+    ///
+    /// Different editors have different ways to access language server logs, so we provide tailored
+    /// instructions based on the connected client.
+    pub(crate) fn log_guidance(self) -> &'static str {
+        match self {
+            ClientName::Zed => {
+                "Check the logs for more details (command palette: `dev: open language server logs`)."
+            }
+            ClientName::Other => "Check the logs for more details.",
+        }
     }
 }
 

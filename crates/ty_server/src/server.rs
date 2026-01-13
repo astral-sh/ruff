@@ -3,7 +3,7 @@
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
 use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
-use crate::session::{InitializationOptions, Session, warn_about_unknown_options};
+use crate::session::{ClientName, InitializationOptions, Session, warn_about_unknown_options};
 use anyhow::Context;
 use lsp_server::Connection;
 use lsp_types::{ClientCapabilities, InitializeParams, MessageType, Url};
@@ -146,8 +146,6 @@ impl Server {
             workspace_urls
         };
 
-        let client_name = client_info.map(|info| info.name);
-
         Ok(Self {
             connection,
             worker_threads,
@@ -159,7 +157,7 @@ impl Server {
                 workspace_urls,
                 initialization_options,
                 native_system,
-                client_name,
+                ClientName::from(client_info),
                 in_test,
             )?,
         })
