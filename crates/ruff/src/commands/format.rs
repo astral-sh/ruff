@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use regex::{Captures, Regex};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
@@ -18,6 +19,7 @@ use ruff_linter::message::{EmitterContext, create_panic_diagnostic, render_diagn
 use ruff_linter::settings::types::OutputFormat;
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
+use ruff_python_trivia::textwrap::{dedent, indent};
 use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
 use tracing::debug;
@@ -489,8 +491,65 @@ pub(crate) fn format_source(
                 formatted,
             )))
         }
-        SourceKind::Markdown(source) => {
-            unimplemented!()
+        SourceKind::Markdown(unformatted_document) => {
+            // adapted from blacken-docs
+            // https://github.com/adamchainz/blacken-docs/blob/fb107c1dce25f9206e29297aaa1ed7afc2980a5a/src/blacken_docs/__init__.py#L17
+            let code_block_regex = Regex::new(
+                r"(?imsx)
+                (?<before>
+                    ^(?<indent>\ *)```[^\S\r\n]*
+                    (?:python|py|python3|py3)
+                    (?:\ .*?)?\n
+                )
+                (?<code>.*?)
+                (?<after>
+                    ^\ *```[^\S\r\n]*$
+                )
+                ",
+            )
+            .unwrap();
+
+            let mut changed = false;
+            let formatted_document =
+                code_block_regex.replace_all(unformatted_document, |capture: &Captures| {
+                    let (original, [before, code_indent, unformatted_code, after]) =
+                        capture.extract();
+
+                    let unformatted_code = dedent(unformatted_code);
+                    let options = settings.to_format_options(source_type, &unformatted_code, path);
+
+                    let formatted_code = if let Some(_range) = range {
+                        unimplemented!()
+                    } else {
+                        // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
+                        #[expect(clippy::redundant_closure_for_method_calls)]
+                        format_module_source(&unformatted_code, options)
+                            .map(|formatted| formatted.into_code())
+                    };
+
+                    // TODO: figure out how to properly raise errors from inside closure
+                    if let Ok(formatted_code) = formatted_code {
+                        if formatted_code.len() == unformatted_code.len()
+                            && formatted_code == *unformatted_code
+                        {
+                            original.to_string()
+                        } else {
+                            changed = true;
+                            let formatted_code = indent(formatted_code.as_str(), code_indent);
+                            format!("{before}{formatted_code}{after}")
+                        }
+                    } else {
+                        original.to_string()
+                    }
+                });
+
+            if changed {
+                Ok(FormattedSource::Formatted(SourceKind::Markdown(
+                    formatted_document.to_string(),
+                )))
+            } else {
+                Ok(FormattedSource::Unchanged)
+            }
         }
     }
 }
