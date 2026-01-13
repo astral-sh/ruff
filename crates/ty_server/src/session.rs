@@ -1165,9 +1165,10 @@ impl ClientName {
     pub(crate) fn log_guidance(self) -> &'static str {
         match self {
             ClientName::Zed => {
-                "Check the logs for more details (command palette: `dev: open language server logs`)."
+                "Please refer to the logs for more details \
+                    (command palette: `dev: open language server logs`)."
             }
-            ClientName::Other => "Check the logs for more details.",
+            ClientName::Other => "Please refer to the logs for more details.",
         }
     }
 }
