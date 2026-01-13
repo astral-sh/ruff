@@ -504,6 +504,11 @@ with Child().create() as child:
 
 The [`__init_subclass__`] method is implicitly a classmethod:
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 class Base:
     def __init_subclass__(cls, **kwargs):
@@ -514,6 +519,130 @@ class Derived(Base):
     pass
 
 reveal_type(Derived.custom_attribute)  # revealed: int
+```
+
+Subclasses must be constructed with arguments matching the required arguments of the base
+`__init_subclass__` method.
+
+```py
+class Empty: ...
+
+class RequiresArg:
+    def __init_subclass__(cls, arg: int): ...
+
+class NoArg:
+    def __init_subclass__(cls): ...
+
+# Single-base definitions
+class MissingArg(RequiresArg): ...  # error: [missing-argument]
+class InvalidType(RequiresArg, arg="foo"): ...  # error: [invalid-argument-type]
+class Valid(RequiresArg, arg=1): ...
+
+# error: [missing-argument]
+# error: [unknown-argument]
+class IncorrectArg(RequiresArg, not_arg="foo"): ...
+```
+
+For multiple inheritance, the first resolved `__init_subclass__` method is used.
+
+```py
+class Empty: ...
+
+class RequiresArg:
+    def __init_subclass__(cls, arg: int): ...
+
+class NoArg:
+    def __init_subclass__(cls): ...
+
+class Valid(NoArg, RequiresArg): ...
+class MissingArg(RequiresArg, NoArg): ...  # error: [missing-argument]
+class InvalidType(RequiresArg, NoArg, arg="foo"): ...  # error: [invalid-argument-type]
+class Valid(RequiresArg, NoArg, arg=1): ...
+
+# Ensure base class without __init_subclass__ is ignored
+class Valid(Empty, NoArg): ...
+class Valid(Empty, RequiresArg, NoArg, arg=1): ...
+class MissingArg(Empty, RequiresArg): ...  # error: [missing-argument]
+class MissingArg(Empty, RequiresArg, NoArg): ...  # error: [missing-argument]
+class InvalidType(Empty, RequiresArg, NoArg, arg="foo"): ...  # error: [invalid-argument-type]
+
+# Multiple inheritance with args
+class Base(Empty, RequiresArg, NoArg, arg=1): ...
+class Valid(Base, arg=1): ...
+class MissingArg(Base): ...  # error: [missing-argument]
+class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
+```
+
+Keyword splats are allowed if their type can be determined:
+
+```py
+from typing import TypedDict
+
+class RequiresKwarg:
+    def __init_subclass__(cls, arg: int): ...
+
+class WrongArg(TypedDict):
+    kwarg: int
+
+class InvalidType(TypedDict):
+    arg: str
+
+wrong_arg: WrongArg = {"kwarg": 5}
+
+# error: [missing-argument]
+# error: [unknown-argument]
+class MissingArg(RequiresKwarg, **wrong_arg): ...
+
+invalid_type: InvalidType = {"arg": "foo"}
+
+# error: [invalid-argument-type]
+class InvalidType(RequiresKwarg, **invalid_type): ...
+```
+
+So are generics:
+
+```py
+from typing import Generic, TypeVar, Literal, overload
+
+class Base[T]:
+    def __init_subclass__(cls, arg: T): ...
+
+class Valid(Base[int], arg=1): ...
+class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
+
+# Old generic syntax
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __init_subclass__(cls, arg: T) -> None: ...
+
+class Valid(Base[int], arg=1): ...
+class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
+```
+
+So are overloads:
+
+```py
+class Base:
+    @overload
+    def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+    @overload
+    def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+    def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+
+class Valid(Base, mode="a", arg=5): ...
+class Valid(Base, mode="b", arg="foo"): ...
+class InvalidType(Base, mode="b", arg=5): ...  # error: [no-matching-overload]
+```
+
+The `metaclass` keyword is ignored, as it has special meaning and is not passed to
+`__init_subclass__` at runtime.
+
+```py
+class Base:
+    def __init_subclass__(cls, arg: int): ...
+
+class Valid(Base, arg=5, metaclass=object): ...
 ```
 
 ## `@staticmethod`
