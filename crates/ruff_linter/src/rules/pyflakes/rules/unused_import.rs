@@ -1,9 +1,8 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::iter;
 
 use anyhow::{Result, anyhow, bail};
-use std::collections::BTreeMap;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::{self as ast, Stmt};
@@ -12,6 +11,7 @@ use ruff_python_semantic::{
     ScopeId, SemanticModel, SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashMap;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
@@ -168,6 +168,14 @@ impl Violation for UnusedImport {
                     "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
                 )
             }
+            UnusedImportContext::TryBlock => {
+                format!("`{name}` imported but unused; shadows previous import")
+            }
+            UnusedImportContext::TypeCheckingDuplicate => {
+                format!(
+                    "`{name}` imported but unused; duplicate import in `typing.TYPE_CHECKING` block"
+                )
+            }
             UnusedImportContext::DunderInitFirstParty { .. } => {
                 format!(
                     "`{name}` imported but unused; consider removing, adding to `__all__`, or using a redundant alias"
@@ -225,6 +233,8 @@ impl Violation for UnusedImport {
                     submodule_import: _,
                 }
                 | UnusedImportContext::ExceptHandler
+                | UnusedImportContext::TryBlock
+                | UnusedImportContext::TypeCheckingDuplicate
                 | UnusedImportContext::Other => {}
             }
         }
@@ -259,6 +269,10 @@ impl From<usize> for DunderAllCount {
 enum UnusedImportContext {
     /// The unused import occurs inside an except handler
     ExceptHandler,
+    /// The unused import is a duplicate inside a `typing.TYPE_CHECKING` block
+    TypeCheckingDuplicate,
+    /// ???
+    TryBlock,
     /// The unused import is a first-party import in an `__init__.py` file
     DunderInitFirstParty {
         dunder_all_count: DunderAllCount,
@@ -324,8 +338,96 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
 ///
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     // Collect all unused imports by statement.
-    let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
-    let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
+    let mut unused: BTreeMap<(NodeId, Exceptions), Vec<(ImportBinding, &Binding)>> =
+        BTreeMap::default();
+    let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<(ImportBinding, &Binding)>> =
+        BTreeMap::default();
+
+    let mut shadowing_imports: FxHashMap<String, Vec<&Binding>> = FxHashMap::default();
+
+    check_type_checking_duplicates(checker, scope);
+
+    for (name, binding_id) in scope.all_bindings() {
+        let binding = checker.semantic().binding(binding_id);
+        if matches!(
+            binding.kind,
+            BindingKind::Import(_) | BindingKind::FromImport(_) | BindingKind::SubmoduleImport(_)
+        ) {
+            shadowing_imports
+                .entry(name.to_string())
+                .or_default()
+                .push(binding);
+        }
+    }
+
+    for (name, bindings) in &shadowing_imports {
+        if bindings.len() > 1 {
+            let mut sorted_bindings: Vec<_> = bindings.iter().collect();
+            sorted_bindings.sort_by_key(|b| b.range.start());
+
+            let is_fallback = if bindings.len() >= 2 {
+                let last_import = sorted_bindings.last().unwrap();
+                let last_import_end = last_import.range.end();
+
+                let all_in_try_except = sorted_bindings.iter().all(|binding| {
+                    binding
+                        .exceptions
+                        .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR)
+                });
+
+                if all_in_try_except {
+                    let mut has_usage_after = false;
+                    for reference_id in last_import.references() {
+                        let reference = checker.semantic().reference(reference_id);
+                        if reference.range().start() > last_import_end {
+                            has_usage_after = true;
+                            break;
+                        }
+                    }
+                    has_usage_after
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if is_fallback {
+                continue;
+            }
+
+            for (i, binding) in sorted_bindings.iter().enumerate() {
+                if !binding.is_used() {
+                    for later_binding in sorted_bindings.iter().skip(i + 1) {
+                        if later_binding.exceptions.intersects(
+                            Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR,
+                        ) {
+                            checker.report_diagnostic(
+                                UnusedImport {
+                                    name: binding
+                                        .as_any_import()
+                                        .unwrap()
+                                        .qualified_name()
+                                        .to_string(),
+                                    module: binding
+                                        .as_any_import()
+                                        .unwrap()
+                                        .member_name()
+                                        .to_string(),
+                                    binding: name.to_string(),
+                                    context: UnusedImportContext::TryBlock,
+                                    multiple: false,
+                                    ignore_init_module_imports: false,
+                                },
+                                binding.range(),
+                            );
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     for binding in unused_imports_in_scope(checker.semantic(), scope, checker.settings()) {
         let Some(import) = binding.as_any_import() else {
@@ -364,7 +466,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
             continue;
         }
 
-        let import = ImportBinding {
+        let import_binding = ImportBinding {
             name,
             import,
             range: binding.range(),
@@ -372,20 +474,20 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
             scope: binding.scope,
         };
 
-        if checker.rule_is_ignored(Rule::UnusedImport, import.start())
-            || import.parent_range.is_some_and(|parent_range| {
+        if checker.rule_is_ignored(Rule::UnusedImport, import_binding.start())
+            || import_binding.parent_range.is_some_and(|parent_range| {
                 checker.rule_is_ignored(Rule::UnusedImport, parent_range.start())
             })
         {
             ignored
                 .entry((node_id, binding.exceptions))
                 .or_default()
-                .push(import);
+                .push((import_binding, binding));
         } else {
             unused
                 .entry((node_id, binding.exceptions))
                 .or_default()
-                .push(import);
+                .push((import_binding, binding));
         }
     }
 
@@ -404,21 +506,33 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         // pair each binding with context; divide them by how we want to fix them
         let (to_reexport, to_remove): (Vec<_>, Vec<_>) = bindings
             .into_iter()
-            .map(|binding| {
+            .map(|(import, original_binding)| {
                 let context = if in_except_handler {
                     UnusedImportContext::ExceptHandler
+                } else if is_type_checking_duplicate(
+                    &import.name,
+                    &shadowing_imports,
+                    original_binding,
+                ) {
+                    UnusedImportContext::TypeCheckingDuplicate
+                } else if is_try_block_redefinition(
+                    &import.name,
+                    &shadowing_imports,
+                    original_binding,
+                ) {
+                    UnusedImportContext::TryBlock
                 } else if in_init
-                    && binding.scope.is_global()
-                    && is_first_party(&binding.import, checker)
+                    && import.scope.is_global()
+                    && is_first_party(&import.import, checker)
                 {
                     UnusedImportContext::DunderInitFirstParty {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
-                        submodule_import: binding.import.is_submodule_import(),
+                        submodule_import: import.import.is_submodule_import(),
                     }
                 } else {
                     UnusedImportContext::Other
                 };
-                (binding, context)
+                (import, context)
             })
             .partition(|(_, context)| context.is_dunder_init_first_party() && preview_mode);
 
@@ -445,7 +559,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                 (None, None)
             };
 
-        for ((binding, context), fix) in iter::Iterator::chain(
+        for ((binding, context), fix) in Iterator::chain(
             iter::zip(to_remove, iter::repeat(fix_remove)),
             iter::zip(to_reexport, iter::repeat(fix_reexport)),
         ) {
@@ -473,9 +587,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         }
     }
 
-    // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
-    // suppression comments aren't marked as unused.
-    for binding in ignored.into_values().flatten() {
+    // Separately, generate a diagnostic for ignored imports
+    for (binding, _) in ignored.into_values().flatten() {
         let mut diagnostic = checker.report_diagnostic(
             UnusedImport {
                 name: binding.import.qualified_name().to_string(),
@@ -949,4 +1062,110 @@ fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &Semanti
             BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
         ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
     })
+}
+
+fn is_try_block_redefinition(
+    name: &str,
+    redefinitions: &FxHashMap<String, Vec<&Binding>>,
+    current_binding: &Binding,
+) -> bool {
+    let bindings = match redefinitions.get(name) {
+        Some(b) if b.len() > 1 => b,
+        _ => return false,
+    };
+
+    if !current_binding
+        .exceptions
+        .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR)
+    {
+        return false;
+    }
+
+    bindings
+        .iter()
+        .any(|binding| binding.source != current_binding.source && !binding.is_used())
+}
+
+fn is_type_checking_duplicate(
+    name: &str,
+    redefinitions: &FxHashMap<String, Vec<&Binding>>,
+    current_binding: &Binding,
+) -> bool {
+    let bindings = match redefinitions.get(name) {
+        Some(b) if b.len() > 1 => b,
+        _ => return false,
+    };
+
+    if !current_binding.context.is_typing() {
+        return false;
+    }
+
+    let Some(current_import) = current_binding.as_any_import() else {
+        return false;
+    };
+    let current_qualified_name = current_import.qualified_name();
+
+    bindings.iter().any(|binding| {
+        if binding.source == current_binding.source {
+            return false;
+        }
+
+        let Some(binding_import) = binding.as_any_import() else {
+            return false;
+        };
+
+        binding_import.qualified_name() == current_qualified_name && !binding.context.is_typing()
+    })
+}
+
+fn check_type_checking_duplicates(checker: &Checker, scope: &Scope) {
+    let mut import_map: FxHashMap<String, Vec<&Binding>> = FxHashMap::default();
+
+    for (_, binding_id) in scope.all_bindings() {
+        let binding = checker.semantic().binding(binding_id);
+        if matches!(
+            binding.kind,
+            BindingKind::Import(_) | BindingKind::FromImport(_) | BindingKind::SubmoduleImport(_)
+        ) {
+            if let Some(import) = binding.as_any_import() {
+                let qualified_name = import.qualified_name().to_string();
+                import_map.entry(qualified_name).or_default().push(binding);
+            }
+        }
+    }
+
+    for (qualified_name, bindings) in import_map {
+        if bindings.len() > 1 {
+            let mut typing_bindings = Vec::new();
+            let mut runtime_bindings = Vec::new();
+
+            for binding in &bindings {
+                if binding.context.is_typing() {
+                    typing_bindings.push(binding);
+                } else {
+                    runtime_bindings.push(binding);
+                }
+            }
+
+            if !runtime_bindings.is_empty() && !typing_bindings.is_empty() {
+                for typing_binding in typing_bindings {
+                    checker.report_diagnostic(
+                        UnusedImport {
+                            name: qualified_name.clone(),
+                            module: typing_binding
+                                .as_any_import()
+                                .unwrap()
+                                .member_name()
+                                .to_string(),
+                            binding: typing_binding.name(checker.source()).to_string(),
+                            context: UnusedImportContext::TypeCheckingDuplicate,
+                            multiple: false,
+                            ignore_init_module_imports: false,
+                        },
+                        typing_binding.range(),
+                    );
+                }
+            }
+        }
+    }
 }
