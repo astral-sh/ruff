@@ -5,7 +5,7 @@ use ty_project::Db;
 
 use crate::{
     SymbolKind,
-    symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only},
+    symbols::{ImportedFrom, QueryPattern, SymbolInfo, symbols_for_file_global_only},
 };
 
 /// Get all symbols matching the query string.
@@ -199,6 +199,16 @@ impl<'db> AllSymbolInfo<'db> {
     pub fn file(&self) -> File {
         self.file
     }
+
+    /// Returns the module that this symbol was re-exported from.
+    ///
+    /// This is only available for symbols that have been imported
+    /// into `Self::module()` *and* are determined to be re-exports.
+    pub(crate) fn imported_from(&self) -> Option<&ImportedFrom> {
+        self.symbol
+            .as_ref()
+            .and_then(|symbol| symbol.imported_from.as_ref())
+    }
 }
 
 #[cfg(test)]
@@ -213,7 +223,7 @@ mod tests {
     };
 
     #[test]
-    fn test_all_symbols_multi_file() {
+    fn all_symbols_multi_file() {
         // We use odd symbol names here so that we can
         // write queries that target them specifically
         // and (hopefully) nothing else.
