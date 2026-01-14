@@ -222,6 +222,86 @@ mod tests {
         SubDiagnosticSeverity,
     };
 
+    /// Tests that we merge redundant re-exports in a real world use case.
+    ///
+    /// This mimics how pandas exports `read_csv` in its top-level module
+    /// but where it is actually defined in a deeper module. Note though
+    /// that we use `zqzqzq` instead of `read_csv` to make our fuzzy query
+    /// return only exactly what we care about.
+    #[test]
+    fn pandas_read_csv_merged() {
+        let test = CursorTest::builder()
+            .source("main.py", "<CURSOR>")
+            .source(
+                "pandas/__init__.py",
+                "
+from pandas.io.api import zqzqzq
+__all__ = ['zqzqzq']
+",
+            )
+            .source("pandas/io/__init__.py", "")
+            .source(
+                "pandas/io/api.py",
+                "
+from pandas.io.parsers import zqzqzq
+__all__ = ['zqzqzq']
+",
+            )
+            .source(
+                "pandas/io/parsers/__init__.py",
+                "
+from pandas.io.parsers.readers import zqzqzq
+__all__ = ['zqzqzq']
+",
+            )
+            .source(
+                "pandas/io/parsers/readers.py",
+                "
+def zqzqzq():
+    pass
+",
+            )
+            .build();
+
+        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        info[all-symbols]: AllSymbolInfo
+         --> pandas/__init__.py:2:27
+          |
+        2 | from pandas.io.api import zqzqzq
+          |                           ^^^^^^
+        3 | __all__ = ['zqzqzq']
+          |
+        info: Variable zqzqzq
+
+        info[all-symbols]: AllSymbolInfo
+         --> pandas/io/api.py:2:31
+          |
+        2 | from pandas.io.parsers import zqzqzq
+          |                               ^^^^^^
+        3 | __all__ = ['zqzqzq']
+          |
+        info: Variable zqzqzq
+
+        info[all-symbols]: AllSymbolInfo
+         --> pandas/io/parsers/__init__.py:2:39
+          |
+        2 | from pandas.io.parsers.readers import zqzqzq
+          |                                       ^^^^^^
+        3 | __all__ = ['zqzqzq']
+          |
+        info: Variable zqzqzq
+
+        info[all-symbols]: AllSymbolInfo
+         --> pandas/io/parsers/readers.py:2:5
+          |
+        2 | def zqzqzq():
+          |     ^^^^^^
+        3 |     pass
+          |
+        info: Function zqzqzq
+        ");
+    }
+
     #[test]
     fn all_symbols_multi_file() {
         // We use odd symbol names here so that we can
