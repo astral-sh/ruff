@@ -1072,8 +1072,8 @@ reveal_type(Dynamic.custom_attr)  # revealed: str
 
 ## `final()` on dynamic classes
 
-Using `final()` as a function (not a decorator) on dynamic classes has no effect. The class is
-passed through unchanged:
+Using `final()` as a function (not a decorator) on dynamic classes will not be understood by type
+checkers. The class is passed through unchanged, and subclassing will not be prevented:
 
 ```py
 from typing import final
@@ -1082,7 +1082,7 @@ from typing import final
 FinalClass = final(type("FinalClass", (), {}))
 reveal_type(FinalClass)  # revealed: <class 'FinalClass'>
 
-# Subclassing is allowed because `final()` as a function has no effect
+# Subclassing is allowed because type checkers don't understand `final()` called as a function
 class Child(FinalClass): ...
 
 # Same with base classes

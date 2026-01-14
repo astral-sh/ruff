@@ -521,8 +521,8 @@
           ]
         },
         "ineffective-final": {
-          "title": "detects calls to `final()` that have no effect",
-          "description": "## What it does\nChecks for calls to `final()` where the decorator has no effect.\n\n## Why is this bad?\nThe `final()` function is designed to be used as a decorator. When called directly\nas a function (e.g., `final(type(...))`), it simply returns its argument unchanged\nand has no effect at runtime or for type checking.\n\n## Example\n\n```python\nfrom typing import final\n\n# Incorrect: `final()` has no effect when called as a function\nMyClass = final(type(\"MyClass\", (), {}))\n\n# Correct: use `final` as a decorator\n@final\nclass MyClass: ...\n```",
+          "title": "detects calls to `final()` that type checkers cannot interpret",
+          "description": "## What it does\nChecks for calls to `final()` that type checkers cannot interpret.\n\n## Why is this bad?\nThe `final()` function is designed to be used as a decorator. When called directly\nas a function (e.g., `final(type(...))`), type checkers will not understand the\napplication of `final` and will not prevent subclassing.\n\n## Example\n\n```python\nfrom typing import final\n\n# Incorrect: type checkers will not prevent subclassing\nMyClass = final(type(\"MyClass\", (), {}))\n\n# Correct: use `final` as a decorator\n@final\nclass MyClass: ...\n```",
           "default": "warn",
           "oneOf": [
             {

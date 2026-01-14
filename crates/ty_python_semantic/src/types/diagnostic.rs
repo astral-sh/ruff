@@ -1792,19 +1792,19 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for calls to `final()` where the decorator has no effect.
+    /// Checks for calls to `final()` that type checkers cannot interpret.
     ///
     /// ## Why is this bad?
     /// The `final()` function is designed to be used as a decorator. When called directly
-    /// as a function (e.g., `final(type(...))`), it simply returns its argument unchanged
-    /// and has no effect at runtime or for type checking.
+    /// as a function (e.g., `final(type(...))`), type checkers will not understand the
+    /// application of `final` and will not prevent subclassing.
     ///
     /// ## Example
     ///
     /// ```python
     /// from typing import final
     ///
-    /// # Incorrect: `final()` has no effect when called as a function
+    /// # Incorrect: type checkers will not prevent subclassing
     /// MyClass = final(type("MyClass", (), {}))
     ///
     /// # Correct: use `final` as a decorator
@@ -1812,7 +1812,7 @@ declare_lint! {
     /// class MyClass: ...
     /// ```
     pub(crate) static INEFFECTIVE_FINAL = {
-        summary: "detects calls to `final()` that have no effect",
+        summary: "detects calls to `final()` that type checkers cannot interpret",
         status: LintStatus::preview("0.0.1-alpha.33"),
         default_level: Level::Warn,
     }

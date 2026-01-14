@@ -9741,15 +9741,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Warn when `final()` is called as a function (not a decorator).
-            // The `final()` function simply returns its argument unchanged, so calling it
-            // directly has no effect.
+            // Type checkers cannot interpret this usage and will not prevent subclassing.
             if function.is_known(self.db(), KnownFunction::Final) {
                 if let Some(builder) = self
                     .context
                     .report_lint(&INEFFECTIVE_FINAL, call_expression)
                 {
-                    let mut diagnostic = builder
-                        .into_diagnostic("`final()` has no effect when called as a function");
+                    let mut diagnostic = builder.into_diagnostic(
+                        "Type checkers will not prevent subclassing when `final()` is called as a function",
+                    );
                     diagnostic.info("Use `@final` as a decorator on a class or method instead");
                 }
             }
