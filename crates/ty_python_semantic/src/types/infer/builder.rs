@@ -6739,13 +6739,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (e.g., `rename=1`), though we'd still want a diagnostic for non-bool types.
             let rename = rename_type.is_some_and(|ty| ty.bool(db).is_always_true());
 
+            // Always infer first to ensure all sub-expressions are typed.
+            self.infer_expression(fields_arg, TypeContext::default());
+
             // Extract field names, first from the AST, then from the inferred type.
             let maybe_field_names: Option<Box<[ast::name::Name]>> = if let Some(names) =
                 self.extract_collections_namedtuple_fields_from_ast(fields_arg)
             {
                 Some(names)
             } else {
-                let fields_type = self.infer_expression(fields_arg, TypeContext::default());
+                let fields_type = self.expression_type(fields_arg);
                 if let Some(string_literal) = fields_type.as_string_literal() {
                     // Handle space/comma-separated string.
                     let field_str = string_literal.value(db);
@@ -6943,20 +6946,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let fields: Option<Box<[_]>> = elements
             .iter()
             .map(|elt| {
-                // Each element should be a tuple like ("field_name", type).
-                let tuple_expr = elt.as_tuple_expr()?;
-                if tuple_expr.elts.len() != 2 {
+                // Each element should be a tuple or list like ("field_name", type) or ["field_name", type].
+                let field_spec_elts: &[ast::Expr] = match elt {
+                    ast::Expr::Tuple(tuple) => &tuple.elts,
+                    ast::Expr::List(list) => &list.elts,
+                    _ => return None,
+                };
+                if field_spec_elts.len() != 2 {
                     return None;
                 }
 
                 // First element: field name (string literal).
-                let field_name_expr = &tuple_expr.elts[0];
+                let field_name_expr = &field_spec_elts[0];
                 let field_name_ty = self.infer_expression(field_name_expr, TypeContext::default());
                 let field_name_lit = field_name_ty.as_string_literal()?;
                 let field_name = ast::name::Name::new(field_name_lit.value(db));
 
                 // Second element: field type (infer as type expression).
-                let field_type_expr = &tuple_expr.elts[1];
+                let field_type_expr = &field_spec_elts[1];
                 let field_ty = self.infer_type_expression(field_type_expr);
 
                 Some((field_name, field_ty, None))
@@ -6985,7 +6992,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .map(|elt| {
                 // Each element should be a string literal.
-                let field_ty = self.infer_expression(elt, TypeContext::default());
+                let field_ty = self.expression_type(elt);
                 let field_lit = field_ty.as_string_literal()?;
                 Some(ast::name::Name::new(field_lit.value(db)))
             })
