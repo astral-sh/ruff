@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Applicability, Fix};
-use ruff_text_size::Ranged;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_diagnostics::{Applicability, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
