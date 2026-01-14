@@ -154,8 +154,7 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
         };
 
         if !deduplicated_elts.insert(string_value.value.to_str()) {
-            let range = expr.range();
-            let mut diagnostic = checker.report_diagnostic(DuplicateEntryInDunderAll, range);
+            let mut diagnostic = checker.report_diagnostic(DuplicateEntryInDunderAll, expr);
 
             match edits::remove_member(elts, index, source) {
                 Ok(edit) => {
