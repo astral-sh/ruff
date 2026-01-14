@@ -194,6 +194,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
+                | KnownInstanceType::DataclassSpec(_)
                 // A class inheriting from a newtype would make intuitive sense, but newtype
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
