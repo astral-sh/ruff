@@ -209,14 +209,14 @@ impl<'db> ConstraintSet<'db> {
     fn never(db: &'db dyn Db) -> Self {
         Self {
             node: Node::AlwaysFalse,
-            support: Support::empty(db),
+            support: Support::Empty,
         }
     }
 
     fn always(db: &'db dyn Db) -> Self {
         Self {
             node: Node::AlwaysTrue,
-            support: Support::empty(db),
+            support: Support::Empty,
         }
     }
 
@@ -229,7 +229,7 @@ impl<'db> ConstraintSet<'db> {
     ) -> Self {
         let (mut node, support) =
             ConstrainedTypeVar::new_node_with_support(db, typevar, lower, upper);
-        node = node.prune_impossible_paths(db, &support);
+        node = node.prune_impossible_paths(db, Some(&support));
         Self {
             node,
             support: Support::new(db, support),
@@ -494,7 +494,8 @@ impl<'db> ConstraintSet<'db> {
         let support_constraints: FxOrderSet<_> = self
             .support
             .constraints(db)
-            .iter()
+            .into_iter()
+            .flatten()
             .copied()
             .filter(|constraint| {
                 let identity = constraint.typevar(db).identity(db);
@@ -547,29 +548,48 @@ impl<'db> ConstraintSet<'db> {
 }
 
 /// The set of constraints explicitly added to a constraint set.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+enum Support<'db> {
+    Empty,
+    Inner(SupportInner<'db>),
+}
+
+impl<'db> Support<'db> {
+    fn new(db: &'db dyn Db, constraints: FxOrderSet<ConstrainedTypeVar<'db>>) -> Self {
+        Support::Inner(SupportInner::new(db, constraints))
+    }
+
+    fn constraints(self, db: &'db dyn Db) -> Option<&'db FxOrderSet<ConstrainedTypeVar<'db>>> {
+        match self {
+            Support::Empty => None,
+            Support::Inner(inner) => Some(inner.constraints(db)),
+        }
+    }
+
+    fn union(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (Support::Empty, Support::Empty) => Support::Empty,
+            (Support::Empty, other) | (other, Support::Empty) => other,
+            (Support::Inner(self_inner), Support::Inner(other_inner)) => {
+                let constraints: FxOrderSet<_> = self_inner
+                    .constraints(db)
+                    .union(other_inner.constraints(db))
+                    .copied()
+                    .collect();
+                Support::new(db, constraints)
+            }
+        }
+    }
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct Support<'db> {
+struct SupportInner<'db> {
     #[returns(ref)]
     constraints: FxOrderSet<ConstrainedTypeVar<'db>>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for Support<'_> {}
-
-impl<'db> Support<'db> {
-    fn empty(db: &'db dyn Db) -> Self {
-        Support::new(db, FxOrderSet::default())
-    }
-
-    fn union(self, db: &'db dyn Db, other: Self) -> Self {
-        let constraints: FxOrderSet<_> = self
-            .constraints(db)
-            .union(other.constraints(db))
-            .copied()
-            .collect();
-        Support::new(db, constraints)
-    }
-}
+impl get_size2::GetSize for SupportInner<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
     /// Returns whether this typevar can be the lower or upper bound of another typevar in a
@@ -1050,7 +1070,7 @@ impl<'db> Node<'db> {
     fn prune_impossible_paths(
         self,
         db: &'db dyn Db,
-        support: &FxOrderSet<ConstrainedTypeVar<'db>>,
+        support: Option<&FxOrderSet<ConstrainedTypeVar<'db>>>,
     ) -> Self {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
@@ -1089,7 +1109,7 @@ impl<'db> Node<'db> {
     fn for_each_path(
         self,
         db: &'db dyn Db,
-        support: &FxOrderSet<ConstrainedTypeVar<'db>>,
+        support: Option<&FxOrderSet<ConstrainedTypeVar<'db>>>,
         mut f: impl FnMut(&PathAssignments<'_, 'db>),
     ) {
         let mut path = match self {
@@ -1097,7 +1117,7 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new_with_support(db, support),
         };
 
-        let mut missing = support.clone();
+        let mut missing = support.cloned().unwrap_or_default();
         self.for_each_constraint(db, &mut |constraint| {
             missing.remove(&constraint);
         });
@@ -1148,7 +1168,7 @@ impl<'db> Node<'db> {
     fn is_always_satisfied(
         self,
         db: &'db dyn Db,
-        support: &FxOrderSet<ConstrainedTypeVar<'db>>,
+        support: Option<&FxOrderSet<ConstrainedTypeVar<'db>>>,
     ) -> bool {
         match self {
             Node::AlwaysTrue => true,
@@ -1195,7 +1215,7 @@ impl<'db> Node<'db> {
     fn is_never_satisfied(
         self,
         db: &'db dyn Db,
-        support: &FxOrderSet<ConstrainedTypeVar<'db>>,
+        support: Option<&FxOrderSet<ConstrainedTypeVar<'db>>>,
     ) -> bool {
         match self {
             Node::AlwaysTrue => false,
@@ -1338,7 +1358,7 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         inferable: InferableTypeVars<'_, 'db>,
-        support: &FxOrderSet<ConstrainedTypeVar<'db>>,
+        support: Option<&FxOrderSet<ConstrainedTypeVar<'db>>>,
     ) -> bool {
         match self {
             Node::AlwaysTrue => return true,
@@ -1357,11 +1377,11 @@ impl<'db> Node<'db> {
                 .node
                 .implies(db, self)
                 .and(db, specializations.node);
-            let combined_support: FxOrderSet<_> = support
-                .union(specializations.support.constraints(db))
-                .copied()
+            let other_support = specializations.support.constraints(db);
+            let combined_support: FxOrderSet<_> = (support.into_iter().flatten().copied())
+                .chain(other_support.into_iter().flatten().copied())
                 .collect();
-            !when_satisfied.is_never_satisfied(db, &combined_support)
+            !when_satisfied.is_never_satisfied(db, Some(&combined_support))
         };
 
         // Returns if all specializations satisfy this constraint set.
@@ -1370,13 +1390,13 @@ impl<'db> Node<'db> {
                 .node
                 .implies(db, self)
                 .and(db, specializations.node);
-            let combined_support: FxOrderSet<_> = support
-                .union(specializations.support.constraints(db))
-                .copied()
+            let other_support = specializations.support.constraints(db);
+            let combined_support: FxOrderSet<_> = (support.into_iter().flatten().copied())
+                .chain(other_support.into_iter().flatten().copied())
                 .collect();
             when_satisfied
                 .iff(db, specializations.node)
-                .is_always_satisfied(db, &combined_support)
+                .is_always_satisfied(db, Some(&combined_support))
         };
 
         for typevar in typevars {
@@ -1494,11 +1514,12 @@ impl<'db> Node<'db> {
         let retained = self.retain_one(db, bound_typevar, support);
         let support_order: FxOrderSet<_> = support
             .constraints(db)
-            .iter()
+            .into_iter()
+            .flatten()
             .filter(|constraint| constraint.typevar(db).identity(db) == bound_typevar)
             .copied()
             .collect();
-        retained.for_each_path(db, &support_order, |path| {
+        retained.for_each_path(db, Some(&support_order), |path| {
             let mut bounds: Vec<_> = path
                 .positive_constraints()
                 .map(|(constraint, source_order)| {
@@ -2132,9 +2153,9 @@ impl<'db> InteriorNode<'db> {
     fn sequent_map_with_support(
         self,
         db: &'db dyn Db,
-        support: &FxOrderSet<ConstrainedTypeVar<'db>>,
+        support: Option<&FxOrderSet<ConstrainedTypeVar<'db>>>,
     ) -> SequentMap<'db> {
-        let mut map = SequentMap::new(support.iter().copied());
+        let mut map = SequentMap::new(support.into_iter().flatten().copied());
         Node::Interior(self).for_each_constraint(db, &mut |constraint| {
             map.discover_constraint(constraint);
         });
@@ -2144,7 +2165,7 @@ impl<'db> InteriorNode<'db> {
     fn path_assignments<'a>(
         self,
         db: &'db dyn Db,
-        support: &'a FxOrderSet<ConstrainedTypeVar<'db>>,
+        support: Option<&'a FxOrderSet<ConstrainedTypeVar<'db>>>,
     ) -> PathAssignments<'a, 'db> {
         PathAssignments {
             map: self.sequent_map_with_support(db, support),
@@ -3149,16 +3170,16 @@ impl<'db> SequentMap<'db> {
 pub(crate) struct PathAssignments<'a, 'db> {
     map: SequentMap<'db>,
     assignments: FxOrderMap<ConstraintAssignment<'db>, usize>,
-    support: &'a FxOrderSet<ConstrainedTypeVar<'db>>,
+    support: Option<&'a FxOrderSet<ConstrainedTypeVar<'db>>>,
 }
 
 impl<'a, 'db> PathAssignments<'a, 'db> {
     fn new_with_support(
         _db: &'db dyn Db,
-        support: &'a FxOrderSet<ConstrainedTypeVar<'db>>,
+        support: Option<&'a FxOrderSet<ConstrainedTypeVar<'db>>>,
     ) -> Self {
         Self {
-            map: SequentMap::new(support.iter().copied()),
+            map: SequentMap::new(support.into_iter().flatten().copied()),
             assignments: FxOrderMap::default(),
             support,
         }
@@ -3209,7 +3230,7 @@ impl<'a, 'db> PathAssignments<'a, 'db> {
         );
         let source_order = self
             .support
-            .get_index_of(&assignment.constraint())
+            .and_then(|support| support.get_index_of(&assignment.constraint()))
             .unwrap_or(0);
         let found_conflict = self.add_assignment(db, assignment, source_order);
         let result = if found_conflict.is_err() {
