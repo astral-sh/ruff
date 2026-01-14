@@ -1,4 +1,3 @@
-use log::trace;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -147,7 +146,7 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                     // See: https://docs.python.org/3/library/ctypes.html#ctypes.Structure._fields_
                     if is_ctypes_structure_fields(class_def, checker.semantic(), targets) {
                         return;
-                    };
+                    }
 
                     // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
                     if has_default_copy_semantics(class_def, checker.semantic()) {
