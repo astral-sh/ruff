@@ -128,9 +128,9 @@ pub(crate) trait IteratorConstraintsExtension<T> {
 
     /// Returns the constraints under which every element of the iterator holds.
     ///
-    /// This method short-circuits; if we encounter any element that
-    /// [`is_never_satisfied`][ConstraintSet::is_never_satisfied], then the overall result
-    /// must be as well, and we stop consuming elements from the iterator.
+    /// This method is not guaranteed to short-circuit — we might invoke your callback for later
+    /// iterator elements even if you produce
+    /// [`is_never_satisfied`][ConstraintSet::is_never_satisfied] for earlier elements.
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
@@ -157,13 +157,9 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always();
-        for child in self {
-            if result.intersect(db, f(child)).is_never_satisfied(db) {
-                return result;
-            }
-        }
-        result
+        let inputs: Vec<_> = self.map(|element| f(element).node).collect();
+        let node = Node::distributed_and(db, &inputs);
+        ConstraintSet { node }
     }
 }
 
@@ -1180,6 +1176,20 @@ impl<'db> Node<'db> {
                 let first = Self::distributed_or(db, first);
                 let second = Self::distributed_or(db, second);
                 first.or(db, second)
+            }
+        }
+    }
+
+    fn distributed_and(db: &'db dyn Db, inputs: &[Self]) -> Self {
+        match inputs {
+            [] => Node::AlwaysTrue,
+            [one] => *one,
+            [first, second] => first.and_with_offset(db, *second),
+            _ => {
+                let (first, second) = inputs.split_at(inputs.len() / 2);
+                let first = Self::distributed_and(db, first);
+                let second = Self::distributed_and(db, second);
+                first.and(db, second)
             }
         }
     }
