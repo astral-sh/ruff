@@ -828,7 +828,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 warning_message: None,
             },
 
-            // TODO: update it as SourceModuleMoved
             // airflow.utils.log.secrets_masker
             ["log", "secrets_masker"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk.execution_time",
