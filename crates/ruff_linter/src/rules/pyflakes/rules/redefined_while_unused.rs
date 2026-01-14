@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{
-    BindingKind, Imported, NodeId, Scope, ScopeId,
+    Binding, BindingKind, Imported, NodeId, Scope, ScopeId,
     analyze::{typing::is_type_checking_block, visibility},
 };
 use ruff_source_file::SourceRow;
@@ -73,6 +73,41 @@ impl Violation for RedefinedWhileUnused {
             Some(format!("Remove runtime `{name}` import"))
         } else {
             Some(format!("Remove definition: `{name}`"))
+        }
+    }
+}
+
+struct EntryInfo {
+    is_type_checking_duplicate: bool,
+    runtime_import: Option<NodeId>,
+}
+
+impl EntryInfo {
+    fn new(shadowed: &Binding, binding: &Binding, source: NodeId, checker: &Checker) -> Self {
+        let shadowed_in_type_checking = shadowed
+            .source
+            .map(|source| is_in_type_checking_block(checker, source))
+            .unwrap_or(false);
+
+        let binding_in_type_checking = binding
+            .source
+            .map(|source| is_in_type_checking_block(checker, source))
+            .unwrap_or(false);
+
+        let is_type_checking_duplicate = (shadowed_in_type_checking || binding_in_type_checking)
+            && !(shadowed_in_type_checking && binding_in_type_checking);
+
+        let runtime_import = if shadowed_in_type_checking && !binding_in_type_checking {
+            binding.source
+        } else if !shadowed_in_type_checking && binding_in_type_checking {
+            shadowed.source
+        } else {
+            Some(source)
+        };
+
+        Self {
+            is_type_checking_duplicate,
+            runtime_import,
         }
     }
 }
@@ -184,20 +219,22 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
     // Create a fix for each source statement.
     let mut fixes = FxHashMap::default();
     for (source, entries) in &redefinitions {
-        let runtime_import_source = entries.iter().find_map(|(shadowed, binding)| {
-            let shadowed_in_type_checking = is_in_type_checking_block(checker, shadowed.source?);
-            let binding_in_type_checking = is_in_type_checking_block(checker, binding.source?);
+        let Some(source) = source else {
+            continue;
+        };
 
-            if shadowed_in_type_checking && !binding_in_type_checking {
-                binding.source
-            } else if !shadowed_in_type_checking && binding_in_type_checking {
-                shadowed.source
-            } else {
-                *source
-            }
-        });
+        let entry_infos: Vec<EntryInfo> = entries
+            .iter()
+            .map(|(shadowed, binding)| EntryInfo::new(shadowed, binding, *source, checker))
+            .collect();
 
-        let Some(source) = runtime_import_source else {
+        let has_type_checking_duplicate = entry_infos
+            .iter()
+            .any(|info| info.is_type_checking_duplicate);
+
+        let runtime_import = entry_infos.iter().find_map(|info| info.runtime_import);
+
+        let Some(source) = runtime_import else {
             continue;
         };
 
@@ -228,9 +265,18 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             ) else {
                 continue;
             };
+
+            let fix = if has_type_checking_duplicate {
+                // Mark fix always unsafe, because it can
+                // break behavior in projects like `mypy`
+                Fix::unsafe_edit(edit)
+            } else {
+                Fix::safe_edit(edit)
+            };
+
             fixes.insert(
                 source,
-                Fix::safe_edit(edit).isolate(Checker::isolation(
+                fix.isolate(Checker::isolation(
                     checker.semantic().parent_statement_id(source),
                 )),
             );
@@ -239,41 +285,30 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 
     // Create diagnostics for each statement.
     for (source, entries) in &redefinitions {
-        for (shadowed, binding) in entries {
+        let Some(source) = source else {
+            continue;
+        };
+
+        let entry_infos: Vec<EntryInfo> = entries
+            .iter()
+            .map(|(shadowed, binding)| EntryInfo::new(shadowed, binding, *source, checker))
+            .collect();
+
+        for (i, (shadowed, binding)) in entries.iter().enumerate() {
+            let info = &entry_infos[i];
             let name = binding.name(checker.source());
-
-            let shadowed_in_type_checking = shadowed
-                .source
-                .map(|source| is_in_type_checking_block(checker, source))
-                .unwrap_or(false);
-            let binding_in_type_checking = binding
-                .source
-                .map(|source| is_in_type_checking_block(checker, source))
-                .unwrap_or(false);
-
-            let is_type_checking_duplicate = (shadowed_in_type_checking
-                || binding_in_type_checking)
-                && !(shadowed_in_type_checking && binding_in_type_checking);
-
-            let runtime_import_source = if shadowed_in_type_checking && !binding_in_type_checking {
-                binding.source
-            } else if !shadowed_in_type_checking && binding_in_type_checking {
-                shadowed.source
-            } else {
-                *source
-            };
 
             let mut diagnostic = checker.report_diagnostic(
                 RedefinedWhileUnused {
                     name: name.to_string(),
                     row: checker.compute_source_row(shadowed.start()),
-                    is_type_checking_duplicate,
+                    is_type_checking_duplicate: info.is_type_checking_duplicate,
                 },
                 binding.range(),
             );
             diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 
-            if is_type_checking_duplicate {
+            if info.is_type_checking_duplicate {
                 diagnostic.secondary_annotation(
                     format_args!("runtime import of `{name}` here"),
                     shadowed,
@@ -291,7 +326,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 diagnostic.set_parent(range.start());
             }
 
-            if let Some(runtime_source) = runtime_import_source {
+            if let Some(runtime_source) = info.runtime_import {
                 if let Some(fix) = fixes.get(&runtime_source) {
                     diagnostic.set_fix(fix.clone());
                 }

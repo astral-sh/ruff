@@ -22,3 +22,4 @@ help: Remove runtime `BrokerUsecase` import
 4 | 
 5 | if TYPE_CHECKING:
 6 |     from faststream._internal.broker import BrokerUsecase
+note: This is an unsafe fix and may change runtime behavior
