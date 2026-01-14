@@ -113,12 +113,14 @@ impl AutofixSkipped {
     fn message(&self) -> &'static str {
         match self {
             Self::EllipsisAfterDefault => {
-                "Fix unavailable: Cannot convert required parameter (ellipsis) after optional parameter"
+                "Automatic fix is not available because a required parameter (ellipsis '...') comes after an optional parameter."
             }
             Self::RequiredAfterOptional => {
-                "Fix unavailable: Cannot convert required parameter after optional parameter"
+                "Automatic fix is not available because a required parameter comes after an optional parameter."
             }
-            Self::ImportError => "Fix unavailable: Could not resolve import for `Annotated`",
+            Self::ImportError => {
+                "Automatic fix is not available because `Annotated` could not be imported."
+            }
         }
     }
 }
