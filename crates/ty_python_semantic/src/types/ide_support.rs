@@ -4,7 +4,9 @@ use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
-use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
+use crate::types::class::{
+    DynamicClassAnchor, DynamicDataclassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor,
+};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
 use crate::types::{
@@ -2079,6 +2081,16 @@ fn class_literal_to_hierarchy_info(
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
                 let header_range = namedtuple.header_range(db);
+                (header_range, header_range)
+            }
+        }
+        ClassLiteral::DynamicDataclass(dataclass) => {
+            if let DynamicDataclassAnchor::Definition(definition) = dataclass.anchor(db) {
+                let parsed = parsed_module(db, file).load(db);
+                let kind = definition.kind(db);
+                (kind.full_range(&parsed), kind.target_range(&parsed))
+            } else {
+                let header_range = dataclass.header_range(db);
                 (header_range, header_range)
             }
         }

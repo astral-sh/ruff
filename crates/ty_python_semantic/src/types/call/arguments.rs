@@ -199,6 +199,20 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .collect()
     }
 
+    /// Append synthetic keyword arguments to this argument list.
+    pub(crate) fn with_keyword_arguments(
+        mut self,
+        keyword_tys: impl IntoIterator<Item = (&'a str, Type<'db>)>,
+    ) -> Self {
+        for (name, ty) in keyword_tys {
+            self.items.push(CallArgument {
+                argument: Argument::Keyword(name),
+                types: CallArgumentTypes::new(Some(ty)),
+            });
+        }
+        self
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.items.len()
     }

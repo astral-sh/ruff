@@ -3117,6 +3117,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
+            KnownInstanceType::DataclassSpec(_) => f.write_str("DataclassSpec"),
         }
     }
 }

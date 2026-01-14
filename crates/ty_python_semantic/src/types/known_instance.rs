@@ -6,7 +6,7 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
         TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
-        class::NamedTupleSpec,
+        class::{DataclassSpec, NamedTupleSpec},
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
@@ -118,6 +118,9 @@ pub enum KnownInstanceType<'db> {
     /// A `functools.partial(func, ...)` call result where we could determine
     /// the remaining callable signature after binding some arguments.
     FunctoolsPartial(FunctoolsPartialInstance<'db>),
+
+    /// The inferred spec for a functional `make_dataclass` class.
+    DataclassSpec(DataclassSpec<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -175,6 +178,14 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::FunctoolsPartial(partial) => {
             visitor.visit_callable_type(db, partial.partial(db));
+        }
+        KnownInstanceType::DataclassSpec(spec) => {
+            for field in spec.fields(db) {
+                visitor.visit_type(db, field.ty);
+                if let Some(default) = field.default_ty {
+                    visitor.visit_type(db, default);
+                }
+            }
         }
     }
 }
@@ -241,6 +252,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::FunctoolsPartial(partial) => partial
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::FunctoolsPartial),
+            Self::DataclassSpec(spec) => spec
+                .recursive_type_normalized_impl(db, div, true)
+                .map(Self::DataclassSpec),
         }
     }
 
@@ -267,7 +281,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Callable(_) => KnownClass::GenericAlias,
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
-            Self::NamedTupleSpec(_) => KnownClass::Sequence,
+            Self::NamedTupleSpec(_) | Self::DataclassSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
         }
     }
@@ -358,6 +372,7 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::Literal(_)
             | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
+            | KnownInstanceType::DataclassSpec(_)
             | KnownInstanceType::NewType(_) => {
                 // TODO: For some of these, we may need to apply the type mapping to inner types.
                 Type::KnownInstance(self)

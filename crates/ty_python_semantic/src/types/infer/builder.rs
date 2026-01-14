@@ -126,6 +126,7 @@ mod enum_call;
 mod final_attribute;
 mod function;
 mod imports;
+mod make_dataclass;
 mod named_tuple;
 mod new_class;
 mod paramspec_validation;
@@ -137,6 +138,7 @@ mod typed_dict;
 mod typevar;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
+pub(super) use make_dataclass::report_dynamic_dataclass_mro_errors;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct TypeAndRange<'db> {
@@ -559,6 +561,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.expression_cache = None;
     }
 
+    fn with_dataclass_field_specifiers<T>(
+        &mut self,
+        field_specifiers: &[Type<'db>],
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous_field_specifiers = std::mem::replace(
+            &mut self.dataclass_field_specifiers,
+            SmallVec::from(field_specifiers),
+        );
+        let result = f(self);
+        self.dataclass_field_specifiers = previous_field_specifiers;
+        result
+    }
+
     /// Are we currently inferring types in file with deferred types?
     /// This is true for stub files, for files with `__future__.annotations`, and
     /// by default for all source files in Python 3.14 and later.
@@ -825,6 +841,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             for definition in &deferred_definitions {
                 post_inference::dynamic_class::check_dynamic_class_definition(
+                    &self.context,
+                    *definition,
+                );
+                post_inference::dynamic_dataclass::check_dynamic_dataclass_definition(
                     &self.context,
                     *definition,
                 );
@@ -3359,6 +3379,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.infer_enum_call_expression(call_expr, Some(definition), base_class)
                     {
                         ty
+                    } else if callable_type
+                        .as_function_literal()
+                        .is_some_and(|f| f.is_known(self.db(), KnownFunction::MakeDataclass))
+                    {
+                        self.infer_make_dataclass_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -3542,6 +3567,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Only the `fields` argument is deferred for `NamedTuple`;
             // other arguments are inferred eagerly.
             self.infer_typing_namedtuple_fields(&arguments.args[1]);
+            return;
+        }
+        if func_ty
+            .as_function_literal()
+            .is_some_and(|f| f.is_known(self.db(), KnownFunction::MakeDataclass))
+        {
+            // The `fields` and `bases` arguments are deferred for `make_dataclass`;
+            // other arguments are inferred eagerly.
+            self.infer_make_dataclass_deferred(arguments);
             return;
         }
         let known_class = func_ty
@@ -3793,7 +3827,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.typevar_binding_context = previous_context;
     }
-
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
         if assignment.target.is_name_expr() {
             self.infer_definition(assignment);
@@ -7085,6 +7118,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
             return self.infer_typeddict_call_expression(call_expression, None);
+        }
+
+        // Handle `dataclasses.make_dataclass(cls_name, fields, ...)`.
+        if callable_type
+            .as_function_literal()
+            .is_some_and(|f| f.is_known(self.db(), KnownFunction::MakeDataclass))
+        {
+            return self.infer_make_dataclass_call_expression(call_expression, None);
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the

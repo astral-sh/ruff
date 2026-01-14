@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::Db;
-use crate::types::class::{DynamicClassLiteral, DynamicEnumLiteral};
+use crate::types::class::{DynamicClassLiteral, DynamicDataclassLiteral, DynamicEnumLiteral};
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{
@@ -333,31 +333,21 @@ impl<'db> Mro<'db> {
         ])
     }
 
-    /// Attempt to resolve the MRO of a dynamic class (created via `type(name, bases, dict)`).
+    /// Attempt to resolve the MRO of a dynamic class literal with explicit bases.
     ///
+    /// Works for both `type(name, bases, dict)` and `make_dataclass(...)`.
     /// Uses C3 linearization when possible, returning an error if the MRO cannot be resolved.
-    pub(super) fn of_dynamic_class(
+    pub(super) fn of_dynamic(
         db: &'db dyn Db,
-        dynamic: DynamicClassLiteral<'db>,
+        literal: DynamicLiteralWithBases<'db>,
     ) -> Result<Self, DynamicMroError<'db>> {
-        let original_bases = dynamic.explicit_bases(db);
-
-        // Convert Types to ClassBases, tracking any that fail conversion.
-        let mut resolved_bases = Vec::with_capacity(original_bases.len());
-        let mut invalid_bases = Vec::new();
-
-        for (i, base_type) in original_bases.iter().enumerate() {
-            match ClassBase::try_from_type(db, *base_type, None) {
-                Some(class_base) => resolved_bases.push(class_base),
-                None => invalid_bases.push((i, *base_type)),
-            }
-        }
+        let (resolved_bases, invalid_bases) = literal.resolve_bases(db);
 
         // If there are any invalid bases, return an error.
         if !invalid_bases.is_empty() {
             return Err(
                 DynamicMroErrorKind::InvalidBases(invalid_bases.into_boxed_slice())
-                    .into_error(db, dynamic),
+                    .into_error(db, literal),
             );
         }
 
@@ -366,7 +356,7 @@ impl<'db> Mro<'db> {
             .iter()
             .any(|base| matches!(base, ClassBase::Dynamic(_)));
 
-        let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
+        let self_base = ClassBase::Class(ClassType::NonGeneric(literal.into()));
 
         // Handle empty bases case: MRO is just [self, object].
         if resolved_bases.is_empty() {
@@ -377,7 +367,7 @@ impl<'db> Mro<'db> {
         let mut seqs = vec![VecDeque::from([self_base])];
         for base in &resolved_bases {
             if base.has_cyclic_mro(db) {
-                return Err(DynamicMroErrorKind::InheritanceCycle.into_error(db, dynamic));
+                return Err(DynamicMroErrorKind::InheritanceCycle.into_error(db, literal));
             }
             seqs.push(base.mro(db, None).collect());
         }
@@ -409,15 +399,15 @@ impl<'db> Mro<'db> {
         if !duplicates.is_empty() {
             return Err(
                 DynamicMroErrorKind::DuplicateBases(duplicates.into_boxed_slice())
-                    .into_error(db, dynamic),
+                    .into_error(db, literal),
             );
         }
 
         // No duplicate concrete bases. If there are dynamic bases, use fallback MRO.
         if has_dynamic_bases || has_duplicate_dynamic_bases {
-            Ok(Self::dynamic_fallback(db, dynamic))
+            Ok(Self::dynamic_fallback(db, literal))
         } else {
-            Err(DynamicMroErrorKind::UnresolvableMro.into_error(db, dynamic))
+            Err(DynamicMroErrorKind::UnresolvableMro.into_error(db, literal))
         }
     }
 
@@ -491,20 +481,16 @@ impl<'db> Mro<'db> {
         })
     }
 
-    /// Compute a fallback MRO for a dynamic class when `of_dynamic_class` fails.
+    /// Compute a fallback MRO for a dynamic class when `of_dynamic` fails.
     ///
     /// Iterates over base MROs sequentially with deduplication.
-    pub(super) fn dynamic_fallback(db: &'db dyn Db, dynamic: DynamicClassLiteral<'db>) -> Self {
-        let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
+    pub(super) fn dynamic_fallback(db: &'db dyn Db, literal: DynamicLiteralWithBases<'db>) -> Self {
+        let self_base = ClassBase::Class(ClassType::NonGeneric(literal.into()));
         let mut result = vec![self_base];
         let mut seen = FxHashSet::default();
         seen.insert(self_base);
 
-        for base_type in dynamic.explicit_bases(db) {
-            // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
-            let base =
-                ClassBase::try_from_type(db, *base_type, None).unwrap_or_else(ClassBase::unknown);
-
+        for base in literal.fallback_bases(db) {
             for item in base.mro(db, None) {
                 if seen.insert(item) {
                     result.push(item);
@@ -607,6 +593,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::DynamicNamedTuple(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
+            ClassLiteral::DynamicDataclass(literal) => {
+                ClassBase::Class(ClassType::NonGeneric(literal.into()))
+            }
             ClassLiteral::DynamicTypedDict(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
@@ -639,6 +628,14 @@ impl<'db> MroIterator<'db> {
                 }
                 ClassLiteral::DynamicNamedTuple(literal) => {
                     let mut full_mro_iter = literal.mro(self.db).iter();
+                    full_mro_iter.next();
+                    full_mro_iter
+                }
+                ClassLiteral::DynamicDataclass(literal) => {
+                    let mut full_mro_iter = match literal.try_mro(self.db) {
+                        Ok(mro) => mro.iter(),
+                        Err(error) => error.fallback_mro().iter(),
+                    };
                     full_mro_iter.next();
                     full_mro_iter
                 }
@@ -913,11 +910,92 @@ impl<'db> DynamicMroErrorKind<'db> {
     fn into_error(
         self,
         db: &'db dyn Db,
-        class_literal: DynamicClassLiteral<'db>,
+        literal: DynamicLiteralWithBases<'db>,
     ) -> DynamicMroError<'db> {
         DynamicMroError {
             kind: self,
-            fallback_mro: Mro::dynamic_fallback(db, class_literal),
+            fallback_mro: Mro::dynamic_fallback(db, literal),
+        }
+    }
+}
+
+/// Dynamic class literals that have explicit bases and use C3 linearization for MRO.
+///
+/// This enum distinguishes dynamic classes created via `type(name, bases, dict)` or
+/// `make_dataclass(...)` from other dynamic types like `NamedTuple` which have
+/// fixed MRO structures.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub(super) enum DynamicLiteralWithBases<'db> {
+    Class(DynamicClassLiteral<'db>),
+    Dataclass(DynamicDataclassLiteral<'db>),
+}
+
+impl<'db> DynamicLiteralWithBases<'db> {
+    /// Returns resolved base classes and any invalid bases.
+    ///
+    /// For `DynamicClassLiteral`, this converts `Type` values to `ClassBase` via
+    /// `ClassBase::try_from_type`. Types that fail conversion are returned as invalid bases
+    /// (with their index and type).
+    ///
+    /// For `DynamicDataclassLiteral`, bases are already stored as `ClassBase`, so there
+    /// are never invalid bases.
+    fn resolve_bases(self, db: &'db dyn Db) -> (Vec<ClassBase<'db>>, Vec<(usize, Type<'db>)>) {
+        match self {
+            Self::Class(class) => {
+                let original_bases = class.explicit_bases(db);
+                let mut resolved = Vec::with_capacity(original_bases.len());
+                let mut invalid = Vec::new();
+
+                for (i, base_type) in original_bases.iter().enumerate() {
+                    match ClassBase::try_from_type(db, *base_type, None) {
+                        Some(class_base) => resolved.push(class_base),
+                        None => invalid.push((i, *base_type)),
+                    }
+                }
+
+                (resolved, invalid)
+            }
+            Self::Dataclass(class) => (class.bases(db).to_vec(), Vec::new()),
+        }
+    }
+
+    /// Returns bases for the fallback MRO computation.
+    ///
+    /// For `DynamicClassLiteral`, this converts each base type to a `ClassBase`,
+    /// falling back to `Unknown` for types that can't be converted. This ensures
+    /// the fallback MRO includes entries for all bases, even invalid ones.
+    fn fallback_bases(self, db: &'db dyn Db) -> Vec<ClassBase<'db>> {
+        match self {
+            Self::Class(class) => class
+                .explicit_bases(db)
+                .iter()
+                .map(|base_type| {
+                    ClassBase::try_from_type(db, *base_type, None)
+                        .unwrap_or_else(ClassBase::unknown)
+                })
+                .collect(),
+            Self::Dataclass(class) => class.bases(db).to_vec(),
+        }
+    }
+}
+
+impl<'db> From<DynamicClassLiteral<'db>> for DynamicLiteralWithBases<'db> {
+    fn from(literal: DynamicClassLiteral<'db>) -> Self {
+        Self::Class(literal)
+    }
+}
+
+impl<'db> From<DynamicDataclassLiteral<'db>> for DynamicLiteralWithBases<'db> {
+    fn from(literal: DynamicDataclassLiteral<'db>) -> Self {
+        Self::Dataclass(literal)
+    }
+}
+
+impl<'db> From<DynamicLiteralWithBases<'db>> for ClassLiteral<'db> {
+    fn from(literal: DynamicLiteralWithBases<'db>) -> Self {
+        match literal {
+            DynamicLiteralWithBases::Class(class) => class.into(),
+            DynamicLiteralWithBases::Dataclass(class) => class.into(),
         }
     }
 }
