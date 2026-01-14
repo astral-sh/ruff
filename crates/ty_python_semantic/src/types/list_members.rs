@@ -423,7 +423,7 @@ impl<'db> AllMembers<'db> {
 
                 self.members
                     .extend(literal.available_submodule_attributes(db).filter_map(
-                        |submodule_name| {
+                        |(submodule_name, _)| {
                             let ty = literal.resolve_submodule(db, &submodule_name)?;
                             let name = submodule_name.clone();
                             Some(Member { name, ty })
