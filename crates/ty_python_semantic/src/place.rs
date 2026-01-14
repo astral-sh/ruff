@@ -1127,33 +1127,33 @@ fn symbol_impl<'db>(
         // We special-case `__file__` here because we know that for a successfully imported
         // Python module, that hasn't been explicitly overridden it is always a string,
         // even though typeshed says `str | None`.
-        // This is not assumed to be the case for stubs though, where we will stick with typeshed
-        if let Some(module) = file_to_module(db, scope.file(db)) {
-            if let Some(f) = module.file(db) {
-                if !f.is_stub(db) {
-                    let implicit_type = KnownClass::Str.to_instance(db);
-
-                    match place.place {
-                        // If explicitly Undefined we assume str
-                        Place::Undefined => {
-                            return Place::bound(implicit_type).into();
-                        }
-                        // If possibly undefined, union with the implicit type
-                        Place::Defined(ty, origin, Definedness::PossiblyUndefined, widening) => {
-                            let new_type = UnionType::from_elements(db, [ty, implicit_type]);
-                            return Place::Defined(
-                                new_type,
-                                origin,
-                                Definedness::AlwaysDefined,
-                                widening,
-                            )
-                            .with_qualifiers(place.qualifiers);
-                        }
-                        // If explicitly defined, respect the definition
-                        Place::Defined(_, _, Definedness::AlwaysDefined, _) => {
-                            return place;
-                        }
+        //
+        // Cases where this isn't the case:
+        //  - statically linked stdlib modules using C Extensions (e.g sys, itertools)
+        //    we do not handle this and will infer these as `str`, this matches other major
+        //    typecheckers
+        //  - namespace packages, `__file__` is None at runtime but we type
+        //    this as `Unknown` and emit a `unresolved-attribute`
+        if let Some(module) = file_to_module(db, scope.file(db))
+            && let Some(_f) = module.file(db)
+        {
+            match place.place {
+                Place::Defined(defined_place) => match defined_place.definedness {
+                    Definedness::AlwaysDefined => return place,
+                    Definedness::PossiblyUndefined => {
+                        let new_type = UnionType::from_elements(
+                            db,
+                            [defined_place.ty, KnownClass::Str.to_instance(db)],
+                        );
+                        let def_place = DefinedPlace::new(new_type)
+                            .with_definedness(Definedness::AlwaysDefined)
+                            .with_widening(defined_place.widening)
+                            .with_origin(defined_place.origin);
+                        return Place::Defined(def_place).into();
                     }
+                },
+                Place::Undefined => {
+                    return Place::bound(KnownClass::Str.to_instance(db)).into();
                 }
             }
         }
