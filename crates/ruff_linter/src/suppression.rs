@@ -470,9 +470,9 @@ impl<'a> SuppressionsBuilder<'a> {
                     _ => {}
                 }
             }
-
-            self.match_comments("", TextRange::up_to(self.source.text_len()));
         }
+
+        self.match_comments("", TextRange::up_to(self.source.text_len()));
 
         Suppressions {
             valid: self.valid,
