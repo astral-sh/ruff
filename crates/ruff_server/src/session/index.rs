@@ -228,10 +228,7 @@ impl Index {
                 }
             })
             .unwrap_or_else(|| {
-                tracing::warn!(
-                    "No settings available for {} - falling back to default settings",
-                    url
-                );
+                tracing::warn!("No settings available for {}", url);
                 // The path here is only for completeness, it's okay to use a non-existing path
                 // in case this is an unsaved (untitled) document.
                 let path = Path::new(url.path());
@@ -296,7 +293,41 @@ impl Index {
         }
     }
 
-    pub(super) fn open_text_document(&mut self, url: Url, document: TextDocument) {
+    pub(super) fn open_text_document(
+        &mut self,
+        url: Url,
+        document: TextDocument,
+        global: &GlobalClientSettings,
+    ) {
+        // Check if we have settings for the given url, for example if we're
+        // opening a file outside of the existing workspaces.
+        // See https://github.com/astral-sh/ruff/issues/17944
+        let has_settings = match self.settings_for_url(&url) {
+            None => {
+                tracing::debug!("{url} not in index");
+                false
+            }
+            Some(settings) => {
+                if let Ok(file_path) = url.to_file_path() {
+                    settings.ruff_settings.has_settings_for(&file_path)
+                } else {
+                    false
+                }
+            }
+        };
+
+        if !has_settings && let Ok(file_path) = url.to_file_path() {
+            // This file is below an open workspace, most likely the default
+            // one, so we can cache any found settings files in that workspace
+            tracing::warn!("No settings for {}, looking for some", file_path.display());
+            if let Some(settings) = self.settings_for_url_mut(&url) {
+                let root = file_path.parent().unwrap_or(&file_path);
+                settings
+                    .ruff_settings
+                    .find_and_add_new_settings(root, &global.to_settings_arc().editor_settings);
+            }
+        }
+
         self.documents
             .insert(url, DocumentController::new_text(document));
     }
@@ -379,6 +410,29 @@ impl Index {
     fn settings_for_path(&self, path: &Path) -> Option<&WorkspaceSettings> {
         self.settings
             .range(..path.to_path_buf())
+            .next_back()
+            .map(|(_, settings)| settings)
+    }
+
+    fn settings_for_url_mut(&mut self, url: &Url) -> Option<&mut WorkspaceSettings> {
+        if let Ok(path) = url.to_file_path() {
+            self.settings_for_path_mut(&path)
+        } else {
+            // If there's only a single workspace, use that configuration for an untitled document.
+            if self.settings.len() == 1 {
+                tracing::debug!(
+                    "Falling back to configuration of the only active workspace for the new document '{url}'."
+                );
+                self.settings.values_mut().next()
+            } else {
+                None
+            }
+        }
+    }
+
+    fn settings_for_path_mut(&mut self, path: &Path) -> Option<&mut WorkspaceSettings> {
+        self.settings
+            .range_mut(..path.to_path_buf())
             .next_back()
             .map(|(_, settings)| settings)
     }
