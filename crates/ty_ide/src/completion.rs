@@ -2585,7 +2585,7 @@ type<CURSOR>
 
         assert_snapshot!(
             test.type_signatures().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         type :: <class 'type'>
         TypeError :: <class 'TypeError'>
         ",
@@ -8009,7 +8009,7 @@ my_list[0].remove<CURSOR>
         );
         assert_snapshot!(
             builder.build().snapshot(),
-            @r"
+            @"
         removeprefix
         removesuffix
         ",
@@ -8030,7 +8030,7 @@ def f(x: Any | str):
         );
         assert_snapshot!(
             builder.build().snapshot(),
-            @r"
+            @"
         removeprefix
         removesuffix
         ",
@@ -8052,7 +8052,7 @@ def f(x: Intersection[int, Any] | str):
         );
         assert_snapshot!(
             builder.build().snapshot(),
-            @r"
+            @"
         removeprefix
         removesuffix
         ",
