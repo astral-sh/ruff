@@ -1128,7 +1128,7 @@ fn symbol_impl<'db>(
         // Python module, that hasn't been explicitly overridden it is always a string,
         // even though typeshed says `str | None`.
         //
-        // Cases where this isn't the case:
+        // Cases where this doesn't hold:
         //  - statically linked stdlib modules using C Extensions (e.g sys, itertools)
         //    we do not handle this and will infer these as `str`, this matches other major
         //    typecheckers

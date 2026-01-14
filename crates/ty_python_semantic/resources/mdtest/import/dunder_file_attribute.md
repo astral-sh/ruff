@@ -13,7 +13,7 @@ reveal_type(module_path)  # revealed: str
 reveal_type(stub_path)  # revealed: str
 reveal_type(overidden_path)  # revealed: None
 # NOTE: This is `None` at runtime as this is a statically linked C Extension
-#       but this behaviour matches other typecheckers in not
+#       but this behaviour matches other typecheckers
 reveal_type(no_path)  # revealed: str
 ```
 
