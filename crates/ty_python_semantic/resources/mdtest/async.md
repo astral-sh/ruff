@@ -129,3 +129,96 @@ async def f():
 
 reveal_type(f())  # revealed: CoroutineType[Any, Any, Unknown]
 ```
+
+## Awaiting intersection types (3.13+)
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Intersection types can be awaited when their elements are awaitable. This is important for patterns
+like `inspect.isawaitable()` which narrow types to intersections with `Awaitable`.
+
+```py
+import inspect
+
+def get_unknown():
+    pass
+
+async def test():
+    x = get_unknown()
+    if inspect.isawaitable(x):
+        reveal_type(x)  # revealed: Unknown & Awaitable[object]
+        y = await x
+        reveal_type(y)  # revealed: Unknown
+```
+
+The return type of awaiting an intersection is the intersection of the return types of awaiting each
+element:
+
+```py
+from typing import Coroutine
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, object, B]]):
+    y = await x
+    reveal_type(y)  # revealed: A & B
+```
+
+If some intersection elements are not awaitable, we skip them and use the return types from the
+awaitable elements:
+
+```py
+from typing import Coroutine
+from ty_extensions import Intersection
+
+class NotAwaitable:
+    pass
+
+async def test(x: Intersection[Coroutine[object, object, str], NotAwaitable]):
+    y = await x
+    reveal_type(y)  # revealed: str
+```
+
+If all intersection elements fail to be awaitable, the await is invalid:
+
+```py
+from ty_extensions import Intersection
+
+class NotAwaitable1:
+    pass
+
+class NotAwaitable2:
+    pass
+
+async def test(x: Intersection[NotAwaitable1, NotAwaitable2]):
+    # error: [invalid-await]
+    await x
+```
+
+## Awaiting intersection types (Python 3.12 or lower)
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The return type of awaiting an intersection is the intersection of the return types of awaiting each
+element:
+
+```py
+from typing import Coroutine
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, object, B]]):
+    y = await x
+    # TODO: should be `A & B`, but suffers from https://github.com/astral-sh/ty/issues/2426
+    reveal_type(y)  # revealed: A
+```
