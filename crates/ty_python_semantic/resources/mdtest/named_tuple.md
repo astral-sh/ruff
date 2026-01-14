@@ -84,7 +84,7 @@ alice.id = 42
 bob.age = None
 ```
 
-Alternative functional syntax with a list literal:
+Alternative functional syntax with a list of tuples:
 
 ```py
 Person2 = NamedTuple("Person", [("id", int), ("name", str)])
@@ -97,7 +97,7 @@ reveal_type(alice2.id)  # revealed: int
 reveal_type(alice2.name)  # revealed: str
 ```
 
-Functional syntax with a tuple literal:
+Functional syntax with a tuple of tuples:
 
 ```py
 Person3 = NamedTuple("Person", (("id", int), ("name", str)))
@@ -105,6 +105,26 @@ alice3 = Person3(1, "Alice")
 
 reveal_type(alice3.id)  # revealed: int
 reveal_type(alice3.name)  # revealed: str
+```
+
+Functional syntax with a tuple of lists:
+
+```py
+Person4 = NamedTuple("Person", (["id", int], ["name", str]))
+alice4 = Person4(1, "Alice")
+
+reveal_type(alice4.id)  # revealed: int
+reveal_type(alice4.name)  # revealed: str
+```
+
+Functional syntax with a list of lists:
+
+```py
+Person5 = NamedTuple("Person", [["id", int], ["name", str]])
+alice5 = Person5(1, "Alice")
+
+reveal_type(alice5.id)  # revealed: int
+reveal_type(alice5.name)  # revealed: str
 ```
 
 ### Functional syntax with variable name
