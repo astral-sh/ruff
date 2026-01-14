@@ -6564,7 +6564,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Infer keyword arguments.
-        let mut defaults_count = None;
+        let mut default_types: Vec<Type<'db>> = vec![];
         let mut rename_type = None;
 
         for kw in keywords {
@@ -6575,11 +6575,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             match arg.id.as_str() {
                 "defaults" if kind.is_collections() => {
-                    defaults_count = kw_type
-                        .exact_tuple_instance_spec(db)
-                        .and_then(|spec| spec.len().maximum())
-                        .or_else(|| kw.value.as_list_expr().map(|list| list.elts.len()));
-
+                    // Extract element types from AST literals (using already-inferred types)
+                    // or fall back to the inferred tuple spec.
+                    match &kw.value {
+                        ast::Expr::List(list) => {
+                            // Elements were already inferred when we inferred kw.value above.
+                            default_types = list
+                                .elts
+                                .iter()
+                                .map(|elt| self.expression_type(elt))
+                                .collect();
+                        }
+                        ast::Expr::Tuple(tuple) => {
+                            // Elements were already inferred when we inferred kw.value above.
+                            default_types = tuple
+                                .elts
+                                .iter()
+                                .map(|elt| self.expression_type(elt))
+                                .collect();
+                        }
+                        _ => {
+                            // Fall back to using the already-inferred type.
+                            // Try to extract element types from tuple.
+                            if let Some(spec) = kw_type.exact_tuple_instance_spec(db)
+                                && let Some(fixed) = spec.as_fixed_length()
+                            {
+                                default_types = fixed.all_elements().to_vec();
+                            } else {
+                                // Can't determine individual types; use Any for each element.
+                                let count = kw_type
+                                    .exact_tuple_instance_spec(db)
+                                    .and_then(|spec| spec.len().maximum())
+                                    .unwrap_or(0);
+                                default_types = vec![Type::any(); count];
+                            }
+                        }
+                    }
                     // Emit diagnostic for invalid types (not Iterable[Any] | None).
                     let iterable_any =
                         KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
@@ -6643,8 +6674,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
-
-        let defaults_count = defaults_count.unwrap_or_default();
 
         // Extract name.
         let name = if let Type::StringLiteral(literal) = name_type {
@@ -6778,14 +6807,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // TODO: emit a diagnostic when `defaults_count > num_fields` (which would
                         // fail at runtime with `TypeError: Got more default values than field names`).
                         let num_fields = field_names.len();
-                        let defaults_count = defaults_count.min(num_fields);
+                        let defaults_count = default_types.len().min(num_fields);
                         let fields = field_names
                             .iter()
                             .enumerate()
                             .map(|(i, field_name)| {
                                 let default =
                                     if defaults_count > 0 && i >= num_fields - defaults_count {
-                                        Some(Type::any())
+                                        // Index into default_types: first default corresponds to first
+                                        // field that has a default.
+                                        let default_idx = i - (num_fields - defaults_count);
+                                        Some(default_types[default_idx])
                                     } else {
                                         None
                                     };

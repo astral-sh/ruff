@@ -469,7 +469,8 @@ reveal_type(Point2.__new__)  # revealed: (cls: type, _0: Any, _1: Any) -> Point2
 # `defaults` provides default values for the rightmost fields
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
-reveal_type(Person.__new__)  # revealed: (cls: type, name: Any, age: Any, city: Any = ...) -> Person
+reveal_type(Person.__new__)  # revealed: (cls: type, name: Any, age: Any, city: Any = "Unknown") -> Person
+
 reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'tuple[Any, Any, Any]'>, <class 'object'>)
 # Can create with all fields
 person1 = Person("Alice", 30, "NYC")
@@ -486,7 +487,7 @@ reveal_type(Config)  # revealed: <class 'Config'>
 # TODO: This should emit a diagnostic since it would fail at runtime.
 TooManyDefaults = collections.namedtuple("TooManyDefaults", ["x", "y"], defaults=("a", "b", "c"))
 reveal_type(TooManyDefaults)  # revealed: <class 'TooManyDefaults'>
-reveal_type(TooManyDefaults.__new__)  # revealed: (cls: type, x: Any = ..., y: Any = ...) -> TooManyDefaults
+reveal_type(TooManyDefaults.__new__)  # revealed: (cls: type, x: Any = "a", y: Any = "b") -> TooManyDefaults
 
 # Unknown keyword arguments produce an error
 # error: [unknown-argument]
