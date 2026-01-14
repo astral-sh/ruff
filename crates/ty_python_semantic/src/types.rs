@@ -12642,7 +12642,7 @@ impl<'db> IntersectionType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
-    value: CompactString,
+    pub value: CompactString,
 }
 
 // The Salsa heap is tracked separately.

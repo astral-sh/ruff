@@ -540,6 +540,10 @@ pub(crate) struct ScopeInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct ScopeInferenceExtra<'db> {
+    /// Expected types for expressions in this region.
+    // TODO: Consider gating expected_types behind an IDE feature flag to avoid
+    // keeping this map when an IDE isn't present/relevant
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
@@ -571,6 +575,15 @@ impl<'db> ScopeInference<'db> {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
+        if let Some(extra) = &mut self.extra {
+            for (expr, ty) in &mut extra.expected_types {
+                if let Some(previous_ty) = previous_inference.expected_type(*expr) {
+                    *ty = ty.cycle_normalized(db, previous_ty, cycle);
+                } else {
+                    *ty = ty.recursive_type_normalized(db, cycle);
+                }
+            }
+        }
 
         self
     }
@@ -582,6 +595,16 @@ impl<'db> ScopeInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn expected_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        let Some(extra) = &self.extra else {
+            return None;
+        };
+        extra.expected_types.get(&expression.into()).copied()
     }
 
     pub(crate) fn try_expression_type(
@@ -638,6 +661,8 @@ pub(crate) struct DefinitionInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct DefinitionInferenceExtra<'db> {
+    /// Expected types for expressions in this region.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
@@ -681,6 +706,15 @@ impl<'db> DefinitionInference<'db> {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
+        if let Some(extra) = &mut self.extra {
+            for (expr, ty) in &mut extra.expected_types {
+                if let Some(previous_ty) = previous_inference.expected_type(*expr) {
+                    *ty = ty.cycle_normalized(db, previous_ty, cycle);
+                } else {
+                    *ty = ty.recursive_type_normalized(db, cycle);
+                }
+            }
+        }
         for (binding, binding_ty) in &mut self.bindings {
             if let Some((_, previous_binding)) = previous_inference
                 .bindings
@@ -713,6 +747,16 @@ impl<'db> DefinitionInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn expected_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        let Some(extra) = &self.extra else {
+            return None;
+        };
+        extra.expected_types.get(&expression.into()).copied()
     }
 
     pub(crate) fn try_expression_type(
@@ -798,6 +842,8 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize, Default)]
 struct ExpressionInferenceExtra<'db> {
+    /// Expected types for expressions in this region.
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
@@ -850,6 +896,13 @@ impl<'db> ExpressionInference<'db> {
                     *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
                 }
             }
+            for (expr, ty) in &mut extra.expected_types {
+                if let Some(previous_ty) = previous.expected_type(*expr) {
+                    *ty = ty.cycle_normalized(db, previous_ty, cycle);
+                } else {
+                    *ty = ty.recursive_type_normalized(db, cycle);
+                }
+            }
         }
 
         for (expr, ty) in &mut self.expressions {
@@ -873,6 +926,16 @@ impl<'db> ExpressionInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn expected_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        let Some(extra) = &self.extra else {
+            return None;
+        };
+        extra.expected_types.get(&expression.into()).copied()
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {

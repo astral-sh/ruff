@@ -449,6 +449,14 @@ pub trait HasType {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>>;
 }
 
+pub trait HasExpectedType {
+    /// Returns the expected type of `self` based on inference context.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
+    fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>>;
+}
+
 pub trait HasDefinition {
     /// Returns the definition of `self`.
     ///
@@ -471,6 +479,16 @@ impl HasType for ast::ExprRef<'_> {
     }
 }
 
+impl HasExpectedType for ast::ExprRef<'_> {
+    fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        let index = semantic_index(model.db, model.file);
+        let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
+        let scope = file_scope.to_scope_id(model.db, model.file);
+
+        infer_scope_types(model.db, scope).expected_type(*self)
+    }
+}
+
 macro_rules! impl_expression_has_type {
     ($ty: ty) => {
         impl HasType for $ty {
@@ -478,6 +496,18 @@ macro_rules! impl_expression_has_type {
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
                 let expression_ref = ExprRef::from(self);
                 expression_ref.inferred_type(model)
+            }
+        }
+    };
+}
+
+macro_rules! impl_expression_has_expected_type {
+    ($ty: ty) => {
+        impl HasExpectedType for $ty {
+            #[inline]
+            fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+                let expression_ref = ExprRef::from(self);
+                expression_ref.expected_type(model)
             }
         }
     };
@@ -517,6 +547,40 @@ impl_expression_has_type!(ast::ExprTuple);
 impl_expression_has_type!(ast::ExprSlice);
 impl_expression_has_type!(ast::ExprIpyEscapeCommand);
 
+impl_expression_has_expected_type!(ast::ExprBoolOp);
+impl_expression_has_expected_type!(ast::ExprNamed);
+impl_expression_has_expected_type!(ast::ExprBinOp);
+impl_expression_has_expected_type!(ast::ExprUnaryOp);
+impl_expression_has_expected_type!(ast::ExprLambda);
+impl_expression_has_expected_type!(ast::ExprIf);
+impl_expression_has_expected_type!(ast::ExprDict);
+impl_expression_has_expected_type!(ast::ExprSet);
+impl_expression_has_expected_type!(ast::ExprListComp);
+impl_expression_has_expected_type!(ast::ExprSetComp);
+impl_expression_has_expected_type!(ast::ExprDictComp);
+impl_expression_has_expected_type!(ast::ExprGenerator);
+impl_expression_has_expected_type!(ast::ExprAwait);
+impl_expression_has_expected_type!(ast::ExprYield);
+impl_expression_has_expected_type!(ast::ExprYieldFrom);
+impl_expression_has_expected_type!(ast::ExprCompare);
+impl_expression_has_expected_type!(ast::ExprCall);
+impl_expression_has_expected_type!(ast::ExprFString);
+impl_expression_has_expected_type!(ast::ExprTString);
+impl_expression_has_expected_type!(ast::ExprStringLiteral);
+impl_expression_has_expected_type!(ast::ExprBytesLiteral);
+impl_expression_has_expected_type!(ast::ExprNumberLiteral);
+impl_expression_has_expected_type!(ast::ExprBooleanLiteral);
+impl_expression_has_expected_type!(ast::ExprNoneLiteral);
+impl_expression_has_expected_type!(ast::ExprEllipsisLiteral);
+impl_expression_has_expected_type!(ast::ExprAttribute);
+impl_expression_has_expected_type!(ast::ExprSubscript);
+impl_expression_has_expected_type!(ast::ExprStarred);
+impl_expression_has_expected_type!(ast::ExprName);
+impl_expression_has_expected_type!(ast::ExprList);
+impl_expression_has_expected_type!(ast::ExprTuple);
+impl_expression_has_expected_type!(ast::ExprSlice);
+impl_expression_has_expected_type!(ast::ExprIpyEscapeCommand);
+
 impl HasType for ast::Expr {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         match self {
@@ -553,6 +617,46 @@ impl HasType for ast::Expr {
             Expr::Tuple(inner) => inner.inferred_type(model),
             Expr::Slice(inner) => inner.inferred_type(model),
             Expr::IpyEscapeCommand(inner) => inner.inferred_type(model),
+        }
+    }
+}
+
+impl HasExpectedType for ast::Expr {
+    fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        match self {
+            Expr::BoolOp(inner) => inner.expected_type(model),
+            Expr::Named(inner) => inner.expected_type(model),
+            Expr::BinOp(inner) => inner.expected_type(model),
+            Expr::UnaryOp(inner) => inner.expected_type(model),
+            Expr::Lambda(inner) => inner.expected_type(model),
+            Expr::If(inner) => inner.expected_type(model),
+            Expr::Dict(inner) => inner.expected_type(model),
+            Expr::Set(inner) => inner.expected_type(model),
+            Expr::ListComp(inner) => inner.expected_type(model),
+            Expr::SetComp(inner) => inner.expected_type(model),
+            Expr::DictComp(inner) => inner.expected_type(model),
+            Expr::Generator(inner) => inner.expected_type(model),
+            Expr::Await(inner) => inner.expected_type(model),
+            Expr::Yield(inner) => inner.expected_type(model),
+            Expr::YieldFrom(inner) => inner.expected_type(model),
+            Expr::Compare(inner) => inner.expected_type(model),
+            Expr::Call(inner) => inner.expected_type(model),
+            Expr::FString(inner) => inner.expected_type(model),
+            Expr::TString(inner) => inner.expected_type(model),
+            Expr::StringLiteral(inner) => inner.expected_type(model),
+            Expr::BytesLiteral(inner) => inner.expected_type(model),
+            Expr::NumberLiteral(inner) => inner.expected_type(model),
+            Expr::BooleanLiteral(inner) => inner.expected_type(model),
+            Expr::NoneLiteral(inner) => inner.expected_type(model),
+            Expr::EllipsisLiteral(inner) => inner.expected_type(model),
+            Expr::Attribute(inner) => inner.expected_type(model),
+            Expr::Subscript(inner) => inner.expected_type(model),
+            Expr::Starred(inner) => inner.expected_type(model),
+            Expr::Name(inner) => inner.expected_type(model),
+            Expr::List(inner) => inner.expected_type(model),
+            Expr::Tuple(inner) => inner.expected_type(model),
+            Expr::Slice(inner) => inner.expected_type(model),
+            Expr::IpyEscapeCommand(inner) => inner.expected_type(model),
         }
     }
 }

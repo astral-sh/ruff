@@ -78,7 +78,7 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
-    pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
+    pub fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
         #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
         fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
             let Some((class_literal, specialization)) = class.static_class_literal(db) else {

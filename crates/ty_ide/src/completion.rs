@@ -1,22 +1,25 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::Name;
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
-use ty_python_semantic::HasType;
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
-    Completion as SemanticCompletion, NameKind, SemanticModel,
-    types::{CycleDetector, KnownClass, Type},
+    Completion as SemanticCompletion, HasExpectedType, HasType, NameKind, SemanticModel,
+    types::{CycleDetector, KnownClass, StringLiteralType, Type},
 };
 
 use crate::docstring::Docstring;
@@ -42,6 +45,16 @@ pub fn completion<'db>(
     match context.kind {
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
+        }
+        ContextKind::StringLiteral(ref string_context) => {
+            add_string_literal_completions(
+                db,
+                file,
+                &parsed,
+                &context.cursor,
+                string_context,
+                &mut completions,
+            );
         }
         ContextKind::NonImport(ref non_import) => {
             let model = SemanticModel::new(db, file);
@@ -291,6 +304,75 @@ impl<'db> Completion<'db> {
     }
 }
 
+impl<'db> Completion<'db> {
+    /// Returns the "kind" of this completion.
+    ///
+    /// This is meant to be a very general classification of this completion.
+    /// Typically, this is communicated from the LSP server to a client, and
+    /// the client uses this information to help improve the UX (perhaps by
+    /// assigning an icon of some kind to the completion).
+    pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
+        type CompletionKindVisitor<'db> =
+            CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
+
+        fn imp<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &CompletionKindVisitor<'db>,
+        ) -> Option<CompletionKind> {
+            Some(match ty {
+                Type::FunctionLiteral(_)
+                | Type::DataclassDecorator(_)
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_) => CompletionKind::Function,
+                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
+                Type::ModuleLiteral(_) => CompletionKind::Module,
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                    CompletionKind::Class
+                }
+                // This is a little weird for "struct." I'm mostly interpreting
+                // "struct" here as a more general "object." ---AG
+                Type::NominalInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::BoundSuper(_)
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_) => CompletionKind::Struct,
+                Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::TypeIs(_)
+                | Type::TypeGuard(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_) => CompletionKind::Value,
+                Type::EnumLiteral(_) => CompletionKind::Enum,
+                Type::ProtocolInstance(_) => CompletionKind::Interface,
+                Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .find_map(|&ty| imp(db, ty, visitor))?,
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .find_map(|ty| imp(db, ty, visitor))?,
+                Type::Dynamic(_)
+                | Type::Never
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy => return None,
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                }
+            })
+        }
+
+        self.kind.or_else(|| {
+            self.ty
+                .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
+        })
+    }
+}
 /// A builder for construction a `Completion`.
 #[derive(Debug)]
 struct CompletionBuilder<'db> {
@@ -544,6 +626,7 @@ struct Context<'m> {
 #[derive(Debug)]
 enum ContextKind<'m> {
     Import(ImportStatement<'m>),
+    StringLiteral(StringLiteralContext<'m>),
     NonImport(ContextNonImport<'m>),
 }
 
@@ -552,6 +635,11 @@ enum ContextKind<'m> {
 struct ContextNonImport<'m> {
     /// The AST of the completion target.
     target: CompletionTargetAst<'m>,
+}
+
+#[derive(Debug)]
+struct StringLiteralContext<'m> {
+    literal: &'m ast::ExprStringLiteral,
 }
 
 impl<'m> Context<'m> {
@@ -568,6 +656,14 @@ impl<'m> Context<'m> {
             return None;
         }
 
+        if cursor.is_in_string() {
+            let literal = cursor.string_literal()?;
+            return Some(Context {
+                kind: ContextKind::StringLiteral(StringLiteralContext { literal }),
+                cursor,
+            });
+        }
+
         let kind = if let Some(import) = ImportStatement::detect(db, file, &cursor) {
             ContextKind::Import(import)
         } else {
@@ -582,7 +678,7 @@ impl<'m> Context<'m> {
     /// Returns a filtering context for use with a completion collector.
     fn collection_context<'db>(&self, db: &'db dyn Db) -> CollectionContext<'db> {
         match self.kind {
-            ContextKind::Import(_) => CollectionContext::none(),
+            ContextKind::Import(_) | ContextKind::StringLiteral(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
                 let is_raising_exception = self.cursor.is_raising_exception();
                 CollectionContext {
@@ -700,7 +796,7 @@ impl<'m> ContextCursor<'m> {
 
     /// Whether the last token is in a place where we should not provide completions.
     fn is_in_no_completions_place(&self) -> bool {
-        self.is_in_comment() || self.is_in_string() || self.is_in_definition_place()
+        self.is_in_comment() || self.is_in_definition_place()
     }
 
     /// Whether the last token is within a comment or not.
@@ -708,6 +804,37 @@ impl<'m> ContextCursor<'m> {
         self.tokens_before
             .last()
             .is_some_and(|t| t.kind().is_comment())
+    }
+
+    /// Returns the string literal expression under the cursor, if present.
+    fn string_literal(&self) -> Option<&'m ast::ExprStringLiteral> {
+        if !self.is_in_string() {
+            return None;
+        }
+
+        let range = TextRange::empty(self.offset);
+        let node = self
+            .covering_node(range)
+            .find_last(|node| node.is_expr_string_literal())
+            .ok()?;
+
+        let AnyNodeRef::ExprStringLiteral(literal) = node.node() else {
+            return None;
+        };
+        Some(literal)
+    }
+
+    /// Returns the expected type for the expression under the cursor, if available.
+    fn expected_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        let range = TextRange::empty(self.offset);
+        let node = self
+            .covering_node(range)
+            // NOTE: This picks the narrowest expression, seems good, but we may want
+            // argument-level or parent expression expected types instead sometimes?
+            .find_first(|node| node.as_expr_ref().is_some())
+            .ok()?;
+        let expr = node.node().as_expr_ref()?;
+        expr.expected_type(model)
     }
 
     /// Whether the last token is positioned within a string token (regular, f-string, t-string, etc).
@@ -1264,6 +1391,94 @@ enum Sort {
     Lower,
 }
 
+fn add_string_literal_completions<'db>(
+    db: &'db dyn Db,
+    file: File,
+    _parsed: &ParsedModuleRef,
+    cursor: &ContextCursor<'_>,
+    ctx: &StringLiteralContext<'_>,
+    completions: &mut Completions<'db>,
+) {
+    let model = SemanticModel::new(db, file);
+    let Some(expected_ty) = cursor.expected_type(&model) else {
+        return;
+    };
+
+    let mut out: BTreeMap<&'db str, StringLiteralType<'db>> = BTreeMap::new();
+    let mut seen_types: FxHashSet<Type<'db>> = FxHashSet::default();
+    collect_string_literals_from_type(db, expected_ty, &mut seen_types, &mut out);
+
+    if out.is_empty() {
+        return;
+    }
+
+    let quote_char = match ctx.literal.value.first_literal_flags().quote_style() {
+        Quote::Single => '\'',
+        Quote::Double => '"',
+    };
+
+    for (value, literal_ty) in out {
+        let escaped = escape_for_quote(value, quote_char);
+        let insert: Box<str> = match escaped {
+            Cow::Borrowed(s) => Box::<str>::from(s),
+            Cow::Owned(s) => s.into_boxed_str(),
+        };
+
+        completions.add(
+            CompletionBuilder::new(Name::new(value))
+                .insert(Name::new(insert))
+                .ty(Type::StringLiteral(literal_ty))
+                .kind(CompletionKind::Value),
+        );
+    }
+}
+
+fn collect_string_literals_from_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen_types: &mut FxHashSet<Type<'db>>,
+    out: &mut BTreeMap<&'db str, StringLiteralType<'db>>,
+) {
+    if !seen_types.insert(ty) {
+        return;
+    }
+
+    match ty {
+        Type::StringLiteral(literal) => {
+            out.entry(literal.value(db)).or_insert(literal);
+        }
+        Type::Union(union) => {
+            for ty in union.elements(db) {
+                collect_string_literals_from_type(db, *ty, seen_types, out);
+            }
+        }
+        Type::Intersection(intersection) => {
+            for ty in intersection.iter_positive(db) {
+                collect_string_literals_from_type(db, ty, seen_types, out);
+            }
+        }
+        Type::TypeAlias(alias) => {
+            collect_string_literals_from_type(db, alias.value_type(db), seen_types, out);
+        }
+        _ => {}
+    }
+}
+
+fn escape_for_quote(value: &str, quote: char) -> Cow<'_, str> {
+    if !value.bytes().any(|b| b == b'\\' || b == quote as u8) {
+        return Cow::Borrowed(value);
+    }
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch == quote || ch == '\\' {
+            escaped.push('\\');
+        }
+        escaped.push(ch);
+    }
+    Cow::Owned(escaped)
+}
+
+/// Detect and construct completions for unset function arguments.
 /// Detect and add completions for unset arguments.
 fn add_argument_completions<'db>(
     db: &'db dyn Db,
@@ -7997,6 +8212,132 @@ TypedDi<CURSOR>
         );
     }
 
+    #[test]
+    fn string_literal_completions_for_calls() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import Literal
+
+    A = Literal["a", "b", "c"]
+    def func(a: A):
+        ...
+
+    func("<CURSOR>")
+    "#,
+        )
+        .type_signatures()
+        .skip_builtins()
+        .skip_auto_import()
+        .skip_keywords()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    a :: Literal["a"]
+    b :: Literal["b"]
+    c :: Literal["c"]
+    "#);
+    }
+
+    #[test]
+    fn string_literal_completions_for_typed_assignment() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import Literal
+
+    value: Literal["x", "y"] = "<CURSOR>"
+    "#,
+        )
+        .type_signatures()
+        .skip_builtins()
+        .skip_auto_import()
+        .skip_keywords()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    x :: Literal["x"]
+    y :: Literal["y"]
+    "#);
+    }
+
+    #[test]
+    fn string_literal_completions_for_typed_list_assignment() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import Literal
+
+    type A = Literal["foo", "bar", "baz"]
+    xs: list[A] = ["<CURSOR>"]
+    "#,
+        )
+        .type_signatures()
+        .skip_builtins()
+        .skip_auto_import()
+        .skip_keywords()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    bar :: Literal["bar"]
+    baz :: Literal["baz"]
+    foo :: Literal["foo"]
+    "#);
+    }
+
+    #[test]
+    fn string_literal_completions_filter_non_strings() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import Literal
+
+    Mixed = Literal["left", 1, "right"]
+    def consume(value: Mixed):
+        ...
+
+    consume("<CURSOR>")
+    "#,
+        )
+        .type_signatures()
+        .skip_auto_import()
+        .skip_keywords()
+        .skip_builtins()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    left :: Literal["left"]
+    right :: Literal["right"]
+    "#);
+    }
+
+    #[test]
+    fn string_literal_completions_for_typeddict_subscript_keys() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import TypedDict
+
+    class TD(TypedDict):
+        left: int
+        right: str
+
+    td: TD = {"left": 1, "right": "x"}
+
+    td["<CURSOR>"]
+    "#,
+        )
+        .type_signatures()
+        .skip_auto_import()
+        .skip_keywords()
+        .skip_builtins()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    left :: Literal["left"]
+    right :: Literal["right"]
+    "#);
+    }
     /// Tests that `xs = ["..."]; xs[0].<CURSOR>` gets completions
     /// appropriate for `str`.
     #[test]
