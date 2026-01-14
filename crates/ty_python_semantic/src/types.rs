@@ -4022,52 +4022,6 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                // collections.namedtuple(typename, field_names, ...)
-                Some(KnownFunction::NamedTuple) => {
-                    let str_type = KnownClass::Str.to_instance(db);
-                    let none_type = Type::none(db);
-
-                    let parameters = [
-                        Parameter::positional_or_keyword(Name::new_static("typename"))
-                            .with_annotated_type(str_type),
-                        Parameter::positional_or_keyword(Name::new_static("field_names"))
-                            .with_annotated_type(UnionType::from_elements(
-                                db,
-                                [
-                                    str_type,
-                                    KnownClass::Iterable.to_specialized_instance(db, &[str_type]),
-                                ],
-                            )),
-                        // Additional optional parameters have defaults.
-                        Parameter::keyword_only(Name::new_static("rename"))
-                            .with_annotated_type(KnownClass::Bool.to_instance(db))
-                            .with_default_type(Type::BooleanLiteral(false)),
-                        Parameter::keyword_only(Name::new_static("defaults"))
-                            .with_annotated_type(UnionType::from_elements(
-                                db,
-                                [
-                                    KnownClass::Iterable
-                                        .to_specialized_instance(db, &[Type::any()]),
-                                    none_type,
-                                ],
-                            ))
-                            .with_default_type(none_type),
-                        Parameter::keyword_only(Name::new_static("module"))
-                            .with_annotated_type(UnionType::from_elements(
-                                db,
-                                [str_type, none_type],
-                            ))
-                            .with_default_type(none_type),
-                    ];
-
-                    let signature = Signature::new(
-                        Parameters::new(db, parameters),
-                        KnownClass::NamedTupleFallback.to_subclass_of(db),
-                    );
-
-                    Binding::single(self, signature).into()
-                }
-
                 _ => CallableBinding::from_overloads(
                     self,
                     function_type.signature(db).overloads.iter().cloned(),

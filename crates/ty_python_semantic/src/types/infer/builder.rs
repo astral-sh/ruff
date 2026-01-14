@@ -6488,42 +6488,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
     }
 
-    /// Try to infer a `typing.NamedTuple(typename, fields)` or `collections.namedtuple(typename, field_names)` call.
+    /// Infer a `typing.NamedTuple(typename, fields)` or `collections.namedtuple(typename, field_names)` call.
     ///
-    /// Returns `None` if the call doesn't match a namedtuple pattern, signalling that
-    /// we should fall back to normal call binding.
+    /// This method *does not* call `infer_expression` on the object being called;
+    /// it is assumed that the type for this AST node has already been inferred before this method is called.
     #[expect(clippy::type_complexity)]
     fn infer_namedtuple_call_expression(
         &mut self,
         call_expr: &ast::ExprCall,
-        callable_type: Type<'db>,
         definition: Option<Definition<'db>>,
-    ) -> Option<Type<'db>> {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        enum NamedTupleKind {
-            Collections,
-            Typing,
-        }
-
-        impl NamedTupleKind {
-            const fn is_collections(self) -> bool {
-                matches!(self, Self::Collections)
-            }
-
-            const fn is_typing(self) -> bool {
-                matches!(self, Self::Typing)
-            }
-        }
-
-        impl std::fmt::Display for NamedTupleKind {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str(match self {
-                    NamedTupleKind::Collections => "namedtuple",
-                    NamedTupleKind::Typing => "NamedTuple",
-                })
-            }
-        }
-
+        kind: NamedTupleKind,
+    ) -> Type<'db> {
         let db = self.db();
 
         let ast::Arguments {
@@ -6533,28 +6508,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
         } = &call_expr.arguments;
 
-        let kind = match callable_type {
-            Type::SpecialForm(SpecialFormType::NamedTuple) => NamedTupleKind::Typing,
-            Type::FunctionLiteral(function) if function.is_known(db, KnownFunction::NamedTuple) => {
-                NamedTupleKind::Collections
-            }
-            _ => return None,
-        };
-
         // Need at least typename and fields/field_names.
         let [name_arg, fields_arg, rest @ ..] = &**args else {
-            return None;
+            for arg in args {
+                self.infer_expression(arg, TypeContext::default());
+            }
+            for kw in keywords {
+                self.infer_expression(&kw.value, TypeContext::default());
+            }
+            return KnownClass::NamedTupleFallback.to_subclass_of(self.db());
         };
+
+        let name_type = self.infer_expression(name_arg, TypeContext::default());
+        let fields_type = self.infer_expression(fields_arg, TypeContext::default());
+
+        for arg in rest {
+            self.infer_expression(arg, TypeContext::default());
+        }
 
         // If any argument is a starred expression or any keyword is a double-starred expression,
         // we can't statically determine the arguments, so fall back to normal call binding.
         if args.iter().any(ast::Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none())
         {
-            return None;
+            for kw in keywords {
+                self.infer_expression(&kw.value, TypeContext::default());
+            }
+            return KnownClass::NamedTupleFallback.to_subclass_of(self.db());
         }
-
-        let name_type = self.infer_expression(name_arg, TypeContext::default());
-        let fields_type = self.infer_expression(fields_arg, TypeContext::default());
 
         // Check for excess positional arguments (only typename and fields are expected).
         if !rest.is_empty() {
@@ -6566,10 +6546,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "Too many positional arguments to function `{kind}`: expected 2, got {}",
                     args.len()
                 ));
-            }
-            // Infer all excess arguments to ensure complete type inference.
-            for arg in rest {
-                self.infer_expression(arg, TypeContext::default());
             }
         }
 
@@ -6840,9 +6816,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let namedtuple = DynamicNamedTupleLiteral::new(db, name, fields, has_known_fields, anchor);
 
-        Some(Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(
-            namedtuple,
-        )))
+        Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple))
     }
 
     /// Extract fields from a typing.NamedTuple fields argument.
@@ -10208,10 +10182,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Handle `typing.NamedTuple(typename, fields)` and `collections.namedtuple(typename, field_names)`.
-        if let Some(namedtuple_type) =
-            self.infer_namedtuple_call_expression(call_expression, callable_type, None)
-        {
-            return namedtuple_type;
+        if let Some(namedtuple_kind) = NamedTupleKind::from_type(self.db(), callable_type) {
+            return self.infer_namedtuple_call_expression(call_expression, None, namedtuple_kind);
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
@@ -15347,5 +15319,40 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         .zip(safe_mutable_class.generic_origin(db))
                         .is_some_and(|(l, r)| l == r)
             })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NamedTupleKind {
+    Collections,
+    Typing,
+}
+
+impl NamedTupleKind {
+    const fn is_collections(self) -> bool {
+        matches!(self, Self::Collections)
+    }
+
+    const fn is_typing(self) -> bool {
+        matches!(self, Self::Typing)
+    }
+
+    fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        match ty {
+            Type::SpecialForm(SpecialFormType::NamedTuple) => Some(NamedTupleKind::Typing),
+            Type::FunctionLiteral(function) => function
+                .is_known(db, KnownFunction::NamedTuple)
+                .then_some(NamedTupleKind::Collections),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for NamedTupleKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            NamedTupleKind::Collections => "namedtuple",
+            NamedTupleKind::Typing => "NamedTuple",
+        })
     }
 }

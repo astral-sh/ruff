@@ -556,13 +556,12 @@ kwargs = {"rename": True}
 Point1 = collections.namedtuple(*args)
 reveal_type(Point1)  # revealed: type[NamedTupleFallback]
 
-# error: [invalid-argument-type]
+# Ideally we'd catch this false negative,
+# but it's unclear if it's worth the added complexity
 Point2 = NamedTuple(*args)
 reveal_type(Point2)  # revealed: type[NamedTupleFallback]
 
 # Double-starred keyword arguments - falls back to NamedTupleFallback
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 Point3 = collections.namedtuple("Point", ["x", "y"], **kwargs)
 reveal_type(Point3)  # revealed: type[NamedTupleFallback]
 
