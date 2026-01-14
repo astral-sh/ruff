@@ -358,4 +358,4 @@ FAST002 FastAPI dependency without `Annotated`
 72 |     pass
    |
 help: Replace with `typing.Annotated`
-info: Fix unavailable: Cannot convert required parameter after optional parameter
+info: Automatic fix is not available because a required parameter comes after an optional parameter.
