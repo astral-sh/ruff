@@ -271,7 +271,7 @@ def f[T](x: T) -> list[T]:
 
 class A:
     def __new__(cls, value: list[int | str]):
-        return super().__new__(cls, value)
+        return super().__new__(cls)
 
     def __init__(self, value: list[int | None]): ...
 
