@@ -5562,35 +5562,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         TypeContext::default(),
                     );
 
-                    let ty = match callable_type
-                        .as_class_literal()
-                        .and_then(|cls| cls.known(self.db()))
+                    let ty = if let Some(namedtuple_kind) =
+                        NamedTupleKind::from_type(self.db(), callable_type)
                     {
-                        Some(
-                            typevar_class @ (KnownClass::TypeVar | KnownClass::ExtensionsTypeVar),
-                        ) => {
-                            self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
-                        }
-                        Some(
-                            paramspec_class @ (KnownClass::ParamSpec
-                            | KnownClass::ExtensionsParamSpec),
-                        ) => self.infer_legacy_paramspec(
-                            target,
+                        self.infer_namedtuple_call_expression(
                             call_expr,
-                            definition,
-                            paramspec_class,
-                        ),
-                        Some(KnownClass::NewType) => {
-                            self.infer_newtype_expression(target, call_expr, definition)
-                        }
-                        Some(KnownClass::Type) => {
-                            // Try to extract the dynamic class with definition.
-                            // This returns `None` if it's not a three-arg call to `type()`,
-                            // signalling that we must fall back to normal call inference.
-                            self.infer_builtins_type_call(call_expr, Some(definition))
-                        }
-                        Some(_) | None => {
-                            self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                            Some(definition),
+                            namedtuple_kind,
+                        )
+                    } else {
+                        match callable_type
+                            .as_class_literal()
+                            .and_then(|cls| cls.known(self.db()))
+                        {
+                            Some(
+                                typevar_class @ (KnownClass::TypeVar
+                                | KnownClass::ExtensionsTypeVar),
+                            ) => self.infer_legacy_typevar(
+                                target,
+                                call_expr,
+                                definition,
+                                typevar_class,
+                            ),
+                            Some(
+                                paramspec_class @ (KnownClass::ParamSpec
+                                | KnownClass::ExtensionsParamSpec),
+                            ) => self.infer_legacy_paramspec(
+                                target,
+                                call_expr,
+                                definition,
+                                paramspec_class,
+                            ),
+                            Some(KnownClass::NewType) => {
+                                self.infer_newtype_expression(target, call_expr, definition)
+                            }
+                            Some(KnownClass::Type) => {
+                                // Try to extract the dynamic class with definition.
+                                // This returns `None` if it's not a three-arg call to `type()`,
+                                // signalling that we must fall back to normal call inference.
+                                self.infer_builtins_type_call(call_expr, Some(definition))
+                            }
+                            Some(_) | None => {
+                                self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                            }
                         }
                     };
 
@@ -15325,10 +15339,6 @@ enum NamedTupleKind {
 impl NamedTupleKind {
     const fn is_collections(self) -> bool {
         matches!(self, Self::Collections)
-    }
-
-    const fn is_typing(self) -> bool {
-        matches!(self, Self::Typing)
     }
 
     fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
