@@ -6704,12 +6704,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // `typing.NamedTuple`: `fields` is a list or tuple of (name, type) pairs.
             // First try to extract from the AST directly (for list or tuple literals).
             if let Some(fields) = self.extract_typing_namedtuple_fields_from_ast(fields_arg) {
-                // The extraction method inferred types for field names and type expressions.
-                // We still need to infer the container expressions to satisfy the invariant
-                // that all expressions are typed.
-                let prev = self.set_multi_inference_state(MultiInferenceState::Overwrite);
-                self.infer_expression(fields_arg, TypeContext::default());
-                self.multi_inference_state = prev;
                 (fields, true)
             } else {
                 // Otherwise, infer the type and try to extract from that.
