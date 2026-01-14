@@ -72,25 +72,19 @@ impl Loop {
 /// a different value on subsequent iterations, so we create loop header definitions
 /// to represent the possible values at loop entry.
 ///
-/// The visitor also tracks which places have augmented assignments (like `i += 1`), since
-/// these create unbounded value growth that requires type widening.
-///
 /// The visitor does NOT recurse into nested function/class definitions since those are different scopes.
 #[derive(Debug, Default)]
 struct LoopBindingCollector {
     /// All places that are assigned within the loop body.
     bound_places: Vec<PlaceExpr>,
-    /// Places that have augmented assignments (subset of `bound_places`).
-    augmented_places: Vec<PlaceExpr>,
 }
 
 impl LoopBindingCollector {
     /// Collect all places assigned in the given statements.
-    /// Returns `(all_bound_places, augmented_places)`.
-    fn collect(body: &[ast::Stmt]) -> (Vec<PlaceExpr>, Vec<PlaceExpr>) {
+    fn collect(body: &[ast::Stmt]) -> Vec<PlaceExpr> {
         let mut collector = Self::default();
         collector.visit_body(body);
-        (collector.bound_places, collector.augmented_places)
+        collector.bound_places
     }
 
     /// Add a place from an expression target (assignment LHS).
@@ -124,25 +118,6 @@ impl LoopBindingCollector {
             _ => {}
         }
     }
-
-    /// Add a place from an augmented assignment target.
-    fn add_augmented_place(&mut self, target: &ast::Expr) {
-        // First add to bound_places
-        self.add_place_from_target(target);
-
-        // Then also track as augmented
-        match target {
-            ast::Expr::Name(name) => {
-                self.augmented_places.push(PlaceExpr::from_expr_name(name));
-            }
-            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                if let Some(place) = PlaceExpr::try_from_expr(target) {
-                    self.augmented_places.push(place);
-                }
-            }
-            _ => {}
-        }
-    }
 }
 
 impl<'ast> Visitor<'ast> for LoopBindingCollector {
@@ -155,7 +130,7 @@ impl<'ast> Visitor<'ast> for LoopBindingCollector {
                 }
             }
             ast::Stmt::AugAssign(node) => {
-                self.add_augmented_place(&node.target);
+                self.add_place_from_target(&node.target);
             }
             ast::Stmt::AnnAssign(node) => {
                 // Only a binding if there's a value
@@ -2174,7 +2149,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // Collect all places assigned in the loop body.
                 // Loop headers are needed for all bindings to track values that could
                 // flow back from previous iterations.
-                let (bound_places, _augmented_places) = LoopBindingCollector::collect(body);
+                let bound_places = LoopBindingCollector::collect(body);
 
                 // Create loop header definitions for each bound place.
                 // The loop header type will be the union of the seed type (before loop)
