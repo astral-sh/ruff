@@ -6595,7 +6595,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 "rename" if is_collections_namedtuple => {
-                    rename_type = Some(self.infer_expression(&kw.value, TypeContext::default()));
+                    let ty = self.infer_expression(&kw.value, TypeContext::default());
+                    rename_type = Some(ty);
+                    // Emit diagnostic for non-bool types.
+                    if !ty.is_assignable_to(db, KnownClass::Bool.to_instance(db))
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `rename` of `namedtuple()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected `bool`, found `{}`",
+                            ty.display(db)
+                        ));
+                    }
                 }
                 "module" if is_collections_namedtuple => {
                     // module is valid but we don't use it for type checking.
@@ -6666,8 +6680,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // `collections.namedtuple`: `field_names` is a list or tuple of strings, or a space or
             // comma-separated string.
 
-            // Check for `rename=True`.
-            let rename = matches!(rename_type, Some(Type::BooleanLiteral(true)));
+            // Check for `rename=True`. Use `is_always_true()` to handle truthy values
+            // (e.g., `rename=1`), though we'd still want a diagnostic for non-bool types.
+            let rename = rename_type.is_some_and(|ty| ty.bool(db).is_always_true());
 
             // Extract field names, first from the AST, then from the inferred type.
             let maybe_field_names: Option<Box<[ast::name::Name]>> = if let Some(names) =
@@ -6705,7 +6720,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if let Some(mut field_names) = maybe_field_names {
-                // Apply rename logic, if `rename=True`.
+                // TODO: When `rename` is false (or not specified), emit diagnostics for:
+                // - Duplicate field names (e.g., `namedtuple("Foo", "x x")`)
+                // - Field names starting with underscore (e.g., `namedtuple("Bar", "_x")`)
+                // - Field names that are Python keywords (e.g., `namedtuple("Baz", "class")`)
+                // - Field names that are not valid identifiers
+                // These all raise ValueError at runtime. When `rename=True`, invalid names
+                // are automatically replaced with `_0`, `_1`, etc., so no diagnostic is needed.
+
+                // Apply rename logic.
                 if rename {
                     let mut seen_names = FxHashSet::<&str>::default();
                     for (i, field_name) in field_names.iter_mut().enumerate() {
@@ -6722,7 +6745,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 // Build fields with `Any` type and optional defaults.
+                // TODO: emit a diagnostic when `defaults_count > num_fields` (which would
+                // fail at runtime with `TypeError: Got more default values than field names`).
                 let num_fields = field_names.len();
+                let defaults_count = defaults_count.min(num_fields);
                 let fields = field_names
                     .iter()
                     .enumerate()

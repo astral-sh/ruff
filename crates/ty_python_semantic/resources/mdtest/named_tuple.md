@@ -440,6 +440,12 @@ reveal_type(p._2)  # revealed: Any
 reveal_type(p.z)  # revealed: Any
 reveal_type(p._4)  # revealed: Any
 
+# Truthy non-bool values for `rename` are also handled, but emit a diagnostic
+# error: [invalid-argument-type] "Invalid argument to parameter `rename` of `namedtuple()`"
+Point2 = collections.namedtuple("Point2", ["_x", "class"], rename=1)
+reveal_type(Point2)  # revealed: <class 'Point2'>
+reveal_type(Point2.__new__)  # revealed: (cls: type, _0: Any, _1: Any) -> Point2
+
 # `defaults` provides default values for the rightmost fields
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
@@ -455,6 +461,12 @@ reveal_type(person2.city)  # revealed: Any
 # `module` is valid but doesn't affect type checking
 Config = collections.namedtuple("Config", ["host", "port"], module="myapp")
 reveal_type(Config)  # revealed: <class 'Config'>
+
+# When more defaults are provided than fields, we treat all fields as having defaults.
+# TODO: This should emit a diagnostic since it would fail at runtime.
+TooManyDefaults = collections.namedtuple("TooManyDefaults", ["x", "y"], defaults=("a", "b", "c"))
+reveal_type(TooManyDefaults)  # revealed: <class 'TooManyDefaults'>
+reveal_type(TooManyDefaults.__new__)  # revealed: (cls: type, x: Any = ..., y: Any = ...) -> TooManyDefaults
 
 # Unknown keyword arguments produce an error
 # error: [unknown-argument]
@@ -598,11 +610,33 @@ reveal_type(u.host)  # revealed: str
 reveal_type(u.port)  # revealed: int
 ```
 
-### Ordering methods inherited from tuple
+### Inherited tuple methods
 
-Namedtuples inherit comparison methods (`__lt__`, `__le__`, `__gt__`, `__ge__`) from their tuple
-base class. This means `@total_ordering` should not emit a diagnostic, since the required `__lt__`
-method is already present:
+Namedtuples inherit methods from their tuple base class, including `count`, `index`, and comparison
+methods (`__lt__`, `__le__`, `__gt__`, `__ge__`).
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+# typing.NamedTuple inherits tuple methods
+class Point(NamedTuple):
+    x: int
+    y: int
+
+p = Point(1, 2)
+reveal_type(p.count(1))  # revealed: int
+reveal_type(p.index(2))  # revealed: int
+
+# collections.namedtuple also inherits tuple methods
+Person = namedtuple("Person", ["name", "age"])
+alice = Person("Alice", 30)
+reveal_type(alice.count("Alice"))  # revealed: int
+reveal_type(alice.index(30))  # revealed: int
+```
+
+The `@total_ordering` decorator should not emit a diagnostic, since the required `__lt__` method is
+already present:
 
 ```py
 from collections import namedtuple

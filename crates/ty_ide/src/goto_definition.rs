@@ -1708,6 +1708,44 @@ class Foo(type("Ba<CURSOR>r", (), {})):
         assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
+    /// goto-definition on a dynamic namedtuple class literal (created via `collections.namedtuple()`)
+    #[test]
+    fn goto_definition_dynamic_namedtuple_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from collections import namedtuple
+
+Point = namedtuple("Point", ["x", "y"])
+
+p = Poi<CURSOR>nt(1, 2)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:6:5
+          |
+        4 | Point = namedtuple("Point", ["x", "y"])
+        5 |
+        6 | p = Point(1, 2)
+          |     ^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:4:1
+          |
+        2 | from collections import namedtuple
+        3 |
+        4 | Point = namedtuple("Point", ["x", "y"])
+          | -----
+        5 |
+        6 | p = Point(1, 2)
+          |
+        "#);
+    }
+
     // TODO: Should only list `a: int`
     #[test]
     fn redeclarations() {

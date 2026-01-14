@@ -803,6 +803,11 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns a new `ClassLiteral` with the given dataclass params, preserving all other fields.
+    ///
+    /// TODO: Applying `@dataclasses.dataclass` to a `NamedTuple` subclass doesn't fail at runtime
+    /// (e.g., `@dataclasses.dataclass class Foo(NamedTuple): ...`), and neither does
+    /// `dataclasses.dataclass(collections.namedtuple("A", ()))`. We should either infer these
+    /// accurately or emit a diagnostic on them.
     pub(crate) fn with_dataclass_params(
         self,
         db: &'db dyn Db,
@@ -1676,9 +1681,9 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
                 dynamic.own_instance_member(db, name)
             }
-            Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => Member {
-                inner: namedtuple.instance_member(db, name),
-            },
+            Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
+                namedtuple.own_instance_member(db, name)
+            }
             Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
                 class_literal.own_instance_member(db, name)
             }
@@ -5387,7 +5392,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         KnownClass::Type.to_class_literal(db)
     }
 
-    /// Compute the tuple type that this namedtuple inherits from.
+    /// Compute the specialized tuple class that this namedtuple inherits from.
     ///
     /// For example, `namedtuple("Point", [("x", int), ("y", int)])` inherits from `tuple[int, int]`.
     pub(crate) fn tuple_base_class(self, db: &'db dyn Db) -> ClassType<'db> {
@@ -5409,25 +5414,34 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             })
     }
 
-    /// Look up an instance member by name.
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        // First check if it's one of the field names.
+    /// Look up an instance member defined directly on this class (not inherited).
+    ///
+    /// For dynamic namedtuples, instance members are the field names.
+    /// If fields are unknown (dynamic), returns `Any` for any attribute.
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         for (field_name, field_ty, _) in self.fields(db).as_ref() {
             if field_name.as_str() == name {
-                return Place::bound(*field_ty).into();
+                return Member::definitely_declared(*field_ty);
             }
         }
 
-        // Fall back to the tuple base type for other attributes.
-        let result = Type::instance(db, self.tuple_base_class(db)).instance_member(db, name);
-
-        // If fields are unknown (dynamic) and the attribute wasn't found,
-        // return `Any` instead of failing.
-        if !self.has_known_fields(db) && result.place.is_undefined() {
-            return Place::bound(Type::any()).into();
+        if !self.has_known_fields(db) {
+            return Member::definitely_declared(Type::any());
         }
 
-        result
+        Member::unbound()
+    }
+
+    /// Look up an instance member by name (including superclasses).
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        // First check own instance members.
+        let result = self.own_instance_member(db, name);
+        if !result.is_undefined() {
+            return result.inner;
+        }
+
+        // Fall back to the tuple base type for other attributes.
+        Type::instance(db, self.tuple_base_class(db)).instance_member(db, name)
     }
 
     /// Look up a class-level member by name.
