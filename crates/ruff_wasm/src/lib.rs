@@ -4,6 +4,7 @@ use js_sys::Error;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 use ruff_formatter::printer::SourceMapGeneration;
@@ -99,8 +100,6 @@ pub fn before_main() {}
 
 #[wasm_bindgen(start)]
 pub fn run() {
-    use log::Level;
-
     before_main();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -111,8 +110,20 @@ pub fn run() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
 
-    console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+/// Initializes the logger with the given log level.
+///
+/// The `level` string should be one of: "trace", "debug", "info", "warn", or "error".
+/// This function should be called at most once.
+#[wasm_bindgen]
+pub fn init_logging(level: &str) {
+    #[cfg(feature = "console_log")]
+    {
+        if let Ok(level) = log::Level::from_str(level) {
+            let _ = console_log::init_with_level(level);
+        }
+    }
 }
 
 #[wasm_bindgen]
