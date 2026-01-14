@@ -20,16 +20,13 @@ class Base: ...
 class Mixin: ...
 
 # We synthesize a class type using the name argument
-Foo = type("Foo", (), {})
-reveal_type(Foo)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (), {}))  # revealed: <class 'Foo'>
 
 # With a single base class
-Foo2 = type("Foo", (Base,), {"attr": 1})
-reveal_type(Foo2)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: <class 'Foo'>
 
 # With multiple base classes
-Foo3 = type("Foo", (Base, Mixin), {})
-reveal_type(Foo3)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (Base, Mixin), {}))  # revealed: <class 'Foo'>
 
 # The inferred type is assignable to type[Base] since Foo inherits from Base
 tests: list[type[Base]] = []
@@ -514,24 +511,22 @@ reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: Unknown
 reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: Unknown
 ```
 
-The following calls are also invalid, due to incorrect argument types.
-
-Inline calls (not assigned to a variable) fall back to regular `type` overload matching, which
-produces slightly different error messages than assigned dynamic class creation:
+The following calls are also invalid, due to incorrect argument types:
 
 ```py
 class Base: ...
 
-# error: 6 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `Literal[b"Foo"]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 1 (`name`) of `type()`: Expected `str`, found `Literal[b"Foo"]`"
 type(b"Foo", (), {})
 
-# error: 13 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
 type("Foo", Base, {})
 
-# error: 13 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `tuple[Literal[1], Literal[2]]`"
+# error: 14 [invalid-base] "Invalid class base with type `Literal[1]`"
+# error: 17 [invalid-base] "Invalid class base with type `Literal[2]`"
 type("Foo", (1, 2), {})
 
-# error: 22 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `dict[str, Any]`, found `dict[str | bytes, Any]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[Unknown | bytes, Unknown | int]`"
 type("Foo", (Base,), {b"attr": 1})
 ```
 
@@ -596,6 +591,19 @@ class Y(C, B): ...
 
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Conflict` with bases `[<class 'X'>, <class 'Y'>]`"
 Conflict = type("Conflict", (X, Y), {})
+```
+
+## MRO error highlighting (snapshot)
+
+<!-- snapshot-diagnostics -->
+
+This snapshot test documents the diagnostic highlighting range for dynamic class literals.
+Currently, the entire `type()` call expression is highlighted:
+
+```py
+class A: ...
+
+Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
 ```
 
 ## Metaclass conflicts
@@ -877,20 +885,24 @@ def f(*args, **kwargs):
 
 ## Explicit type annotations
 
-TODO: Annotated assignments with `type()` calls don't currently synthesize the specific class type.
-This will be fixed when we support all `type()` calls (including inline) via generic handling.
+When an explicit type annotation is provided, the inferred type is checked against it:
 
 ```py
+# The annotation `type` is compatible with the inferred class literal type
+T: type = type("T", (), {})
+reveal_type(T)  # revealed: <class 'T'>
+
+# The annotation `type[Base]` is compatible with the inferred type
 class Base: ...
 
-# TODO: Should infer `<class 'T'>` instead of `type`
-T: type = type("T", (), {})
-reveal_type(T)  # revealed: type
-
-# TODO: Should infer `<class 'Derived'>` instead of `type[Base]}
-# error: [invalid-assignment] "Object of type `type` is not assignable to `type[Base]`"
 Derived: type[Base] = type("Derived", (Base,), {})
-reveal_type(Derived)  # revealed: type[Base]
+reveal_type(Derived)  # revealed: <class 'Derived'>
+
+# Incompatible annotation produces an error
+class Unrelated: ...
+
+# error: [invalid-assignment]
+Bad: type[Unrelated] = type("Bad", (Base,), {})
 ```
 
 ## Special base classes

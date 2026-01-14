@@ -55,8 +55,8 @@ use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DynamicClassLiteral, DynamicMetaclassConflict, FieldKind,
-    MetaclassErrorKind, MethodDecorator,
+    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
+    DynamicMetaclassConflict, FieldKind, MetaclassErrorKind, MethodDecorator,
 };
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
@@ -5581,7 +5581,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // Try to extract the dynamic class with definition.
                             // This returns `None` if it's not a three-arg call to `type()`,
                             // signalling that we must fall back to normal call inference.
-                            self.infer_dynamic_type_expression(call_expr, definition)
+                            self.infer_dynamic_type_expression(call_expr, Some(definition))
                                 .unwrap_or_else(|| {
                                     self.infer_call_expression_impl(call_expr, callable_type, tcx)
                                 })
@@ -6200,7 +6200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_dynamic_type_expression(
         &mut self,
         call_expr: &ast::ExprCall,
-        definition: Definition<'db>,
+        definition: Option<Definition<'db>>,
     ) -> Option<Type<'db>> {
         let db = self.db();
 
@@ -6310,11 +6310,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let (bases, mut disjoint_bases) =
             self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
 
+        let scope = self.scope();
+
+        // Create the anchor for identifying this dynamic class.
+        // - For assigned `type()` calls, the Definition uniquely identifies the class.
+        // - For dangling calls, compute a relative offset from the scope's node index.
+        let anchor = if let Some(def) = definition {
+            DynamicClassAnchor::Definition(def)
+        } else {
+            let call_node_index = call_expr.node_index().load();
+            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+            let anchor_u32 = scope_anchor
+                .as_u32()
+                .expect("scope anchor should not be NodeIndex::NONE");
+            let call_u32 = call_node_index
+                .as_u32()
+                .expect("call node should not be NodeIndex::NONE");
+            DynamicClassAnchor::ScopeOffset {
+                scope,
+                offset: call_u32 - anchor_u32,
+            }
+        };
+
         let dynamic_class = DynamicClassLiteral::new(
             db,
             name,
             bases,
-            definition,
+            anchor,
             members,
             has_dynamic_namespace,
             None,
@@ -9512,6 +9534,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
 
             return Type::TypedDict(typed_dict);
+        }
+
+        // Handle 3-argument `type(name, bases, dict)`.
+        if let Type::ClassLiteral(class) = callable_type
+            && class.is_known(self.db(), KnownClass::Type)
+            && let Some(dynamic_type) = self.infer_dynamic_type_expression(call_expression, None)
+        {
+            return dynamic_type;
         }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
