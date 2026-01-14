@@ -670,6 +670,25 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
+            // Fast path: `object` (an instance type) is not a subtype of any `type[X]` (a class type).
+            (Type::NominalInstance(source), Type::SubclassOf(_)) if source.is_object() => {
+                ConstraintSet::from(false)
+            }
+
+            // Fast path: `object` is not a subtype of any non-inferable type variable, since the
+            // type variable could be specialized to a type smaller than `object`.
+            (Type::NominalInstance(source), Type::TypeVar(typevar))
+                if source.is_object() && !typevar.is_inferable(db, inferable) =>
+            {
+                ConstraintSet::from(false)
+            }
+
+            // Fast path: `object` is not a subtype of any callable type, since not all objects
+            // are callable.
+            (Type::NominalInstance(source), Type::Callable(_)) if source.is_object() => {
+                ConstraintSet::from(false)
+            }
+
             // `Never` is the bottom type, the empty set.
             (_, Type::Never) => ConstraintSet::from(false),
 
