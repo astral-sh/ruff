@@ -6654,36 +6654,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Handle fields based on which namedtuple variant.
         let (fields, has_known_fields): (Box<[(Name, Type<'db>, Option<Type<'db>>)]>, bool) =
             if kind.is_typing() {
-                // `typing.NamedTuple`: `fields` is a list or tuple of (name, type) pairs.
-                // First try to extract from the AST directly (for list or tuple literals).
-                if let Some(fields) = self.extract_typing_namedtuple_fields_from_ast(fields_arg) {
-                    (fields, true)
-                } else {
-                    // Otherwise, try to extract from the type.
-                    if let Some(fields) =
-                        self.extract_typing_namedtuple_fields(fields_arg, fields_type)
+                let fields = self
+                    .extract_typing_namedtuple_fields(fields_arg, fields_type)
+                    .or_else(|| self.extract_typing_namedtuple_fields_from_ast(fields_arg));
+
+                // Emit diagnostic if the type is outright invalid (not an iterable).
+                if fields.is_none() {
+                    let iterable_any =
+                        KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+                    if !fields_type.is_assignable_to(db, iterable_any)
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
                     {
-                        (fields, true)
-                    } else {
-                        // Emit diagnostic if the type is outright invalid (not an iterable).
-                        let iterable_any =
-                            KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                        if !fields_type.is_assignable_to(db, iterable_any)
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Invalid argument to parameter `fields` of `NamedTuple()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected an iterable of `(name, type)` pairs, found `{}`",
-                                fields_type.display(db)
-                            ));
-                        }
-                        // Couldn't determine fields statically; attribute lookups will return Any.
-                        (Box::new([]), false)
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `fields` of `NamedTuple()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected an iterable of `(name, type)` pairs, found `{}`",
+                            fields_type.display(db)
+                        ));
                     }
                 }
+
+                let has_known_fields = fields.is_some();
+                (fields.unwrap_or_default(), has_known_fields)
             } else {
                 // `collections.namedtuple`: `field_names` is a list or tuple of strings, or a space or
                 // comma-separated string.
@@ -6692,17 +6686,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // (e.g., `rename=1`), though we'd still want a diagnostic for non-bool types.
                 let rename = rename_type.is_some_and(|ty| ty.bool(db).is_always_true());
 
-                // Extract field names, first from the AST, then from the inferred type.
-                let maybe_field_names: Option<Box<[Name]>> = if let Some(names) =
-                    self.extract_collections_namedtuple_fields_from_ast(fields_arg)
-                {
-                    Some(names)
-                } else {
-                    if let Some(string_literal) = fields_type.as_string_literal() {
+                // Extract field names, first from the inferred type, then from the AST.
+                let maybe_field_names: Option<Box<[Name]>> =
+                    if let Type::StringLiteral(string_literal) = fields_type {
                         // Handle space/comma-separated string.
-                        let field_str = string_literal.value(db);
                         Some(
-                            field_str
+                            string_literal
+                                .value(db)
                                 .replace(',', " ")
                                 .split_whitespace()
                                 .map(Name::new)
@@ -6718,29 +6708,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
                             .collect()
                     } else {
-                        // Emit diagnostic if the type is outright invalid (not str | Iterable[str]).
-                        let iterable_str =
-                            KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                        let valid_type = UnionType::from_elements(
-                            db,
-                            [KnownClass::Str.to_instance(db), iterable_str],
-                        );
-                        if !fields_type.is_assignable_to(db, valid_type)
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Invalid argument to parameter `field_names` of `namedtuple()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected `str` or an iterable of strings, found `{}`",
-                                fields_type.display(db)
-                            ));
-                        }
-                        // Couldn't determine field names statically.
-                        None
+                        self.extract_collections_namedtuple_fields_from_ast(fields_arg)
+                    };
+
+                if maybe_field_names.is_none() {
+                    // Emit diagnostic if the type is outright invalid (not str | Iterable[str]).
+                    let iterable_str =
+                        KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+                    let valid_type = UnionType::from_elements(
+                        db,
+                        [KnownClass::Str.to_instance(db), iterable_str],
+                    );
+                    if !fields_type.is_assignable_to(db, valid_type)
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `field_names` of `namedtuple()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected `str` or an iterable of strings, found `{}`",
+                            fields_type.display(db)
+                        ));
                     }
-                };
+                }
 
                 if let Some(mut field_names) = maybe_field_names {
                     // TODO: When `rename` is false (or not specified), emit diagnostics for:
