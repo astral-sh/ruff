@@ -131,7 +131,12 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
-        let result = infer_scope_types(db, scope_id);
+        // TODO: Scopes that need type context, e.g., list comprehensions, are inferred during
+        // the inference of their outer scope, and so end up getting inferred a second time here
+        // without type context. This does not affect the type inferred in its outer scope, but
+        // is necessary as some IDE operations may be performed without type context, e.g.,
+        // hovering in the inner scope.
+        let result = infer_scope_types(db, scope_id, TypeContext::default());
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
@@ -198,7 +203,7 @@ fn definition_expression_type<'db>(
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_types(db, scope).expression_type(expression)
+        infer_scope_types(db, scope, TypeContext::default()).expression_type(expression)
     }
 }
 
