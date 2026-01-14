@@ -2959,11 +2959,11 @@ Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/1.0.0">1.0.
 
 **What it does**
 
-Checks for dynamic class definitions (using `type()`) that have bases
-which are unsupported by ty.
+Checks for dynamic class definitions that have bases which are unsupported by ty.
 
 This is equivalent to [`unsupported-base`] but applies to classes created
-via `type()` rather than `class` statements.
+dynamically via `type()`, `make_dataclass()`, or similar functions rather
+than `class` statements.
 
 **Why is this bad?**
 
@@ -2975,7 +2975,7 @@ understanding of your codebase and unpredictable type-checking behavior.
 **Default level**
 
 This rule is disabled by default because it will not cause a runtime error,
-and may be noisy on codebases that use `type()` in highly dynamic ways.
+and may be noisy on codebases that use dynamic class creation in highly dynamic ways.
 
 **Examples**
 

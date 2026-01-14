@@ -5,11 +5,11 @@ use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::Db;
+use crate::types::class::{DynamicClassLiteral, DynamicDataclassLiteral};
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{
-    ClassLiteral, ClassType, DynamicClassLiteral, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, Type,
+    ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, StaticClassLiteral, Type,
 };
 
 /// The inferred method resolution order of a given class.
@@ -320,14 +320,15 @@ impl<'db> Mro<'db> {
         ])
     }
 
-    /// Attempt to resolve the MRO of a dynamic class (created via `type(name, bases, dict)`).
+    /// Attempt to resolve the MRO of a dynamic class literal with explicit bases.
     ///
+    /// Works for both `type(name, bases, dict)` and `make_dataclass(...)`.
     /// Uses C3 linearization when possible, returning an error if the MRO cannot be resolved.
-    pub(super) fn of_dynamic_class(
+    pub(super) fn of_dynamic(
         db: &'db dyn Db,
-        dynamic: DynamicClassLiteral<'db>,
+        literal: DynamicLiteralWithBases<'db>,
     ) -> Result<Self, DynamicMroError<'db>> {
-        let bases = dynamic.bases(db);
+        let bases = literal.bases(db);
 
         // Check for duplicate bases first, but skip dynamic bases like `Unknown` or `Any`.
         let mut seen = FxHashSet::default();
@@ -343,7 +344,7 @@ impl<'db> Mro<'db> {
         if !duplicates.is_empty() {
             return Err(
                 DynamicMroErrorKind::DuplicateBases(duplicates.into_boxed_slice())
-                    .into_error(db, dynamic),
+                    .into_error(db, literal),
             );
         }
 
@@ -376,7 +377,7 @@ impl<'db> Mro<'db> {
 
         match mro_bases {
             Some(mro) => {
-                let mut result = vec![ClassBase::Class(ClassType::NonGeneric(dynamic.into()))];
+                let mut result = vec![ClassBase::Class(ClassType::NonGeneric(literal.into()))];
                 result.extend(mro);
                 Ok(Self::from(result))
             }
@@ -384,24 +385,24 @@ impl<'db> Mro<'db> {
                 // C3 merge failed. If there are dynamic bases, use the fallback MRO.
                 // Otherwise, report an error.
                 if has_dynamic_bases {
-                    Ok(Self::dynamic_fallback(db, dynamic))
+                    Ok(Self::dynamic_fallback(db, literal))
                 } else {
-                    Err(DynamicMroErrorKind::UnresolvableMro.into_error(db, dynamic))
+                    Err(DynamicMroErrorKind::UnresolvableMro.into_error(db, literal))
                 }
             }
         }
     }
 
-    /// Compute a fallback MRO for a dynamic class when `of_dynamic_class` fails.
+    /// Compute a fallback MRO for a dynamic class when `of_dynamic` fails.
     ///
     /// Iterates over base MROs sequentially with deduplication.
-    pub(super) fn dynamic_fallback(db: &'db dyn Db, dynamic: DynamicClassLiteral<'db>) -> Self {
-        let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
+    pub(super) fn dynamic_fallback(db: &'db dyn Db, literal: DynamicLiteralWithBases<'db>) -> Self {
+        let self_base = ClassBase::Class(ClassType::NonGeneric(literal.into()));
         let mut result = vec![self_base];
         let mut seen = FxHashSet::default();
         seen.insert(self_base);
 
-        for base in dynamic.bases(db) {
+        for base in literal.bases(db) {
             for item in base.mro(db, None) {
                 if seen.insert(item) {
                     result.push(item);
@@ -503,6 +504,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::DynamicNamedTuple(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
+            ClassLiteral::DynamicDataclass(literal) => {
+                ClassBase::Class(ClassType::NonGeneric(literal.into()))
+            }
         }
     }
 
@@ -529,6 +533,14 @@ impl<'db> MroIterator<'db> {
                 }
                 ClassLiteral::DynamicNamedTuple(literal) => {
                     let mut full_mro_iter = literal.mro(self.db).iter();
+                    full_mro_iter.next();
+                    full_mro_iter
+                }
+                ClassLiteral::DynamicDataclass(literal) => {
+                    let mut full_mro_iter = match literal.try_mro(self.db) {
+                        Ok(mro) => mro.iter(),
+                        Err(error) => error.fallback_mro().iter(),
+                    };
                     full_mro_iter.next();
                     full_mro_iter
                 }
@@ -713,11 +725,52 @@ impl<'db> DynamicMroErrorKind<'db> {
     fn into_error(
         self,
         db: &'db dyn Db,
-        class_literal: DynamicClassLiteral<'db>,
+        literal: DynamicLiteralWithBases<'db>,
     ) -> DynamicMroError<'db> {
         DynamicMroError {
             kind: self,
-            fallback_mro: Mro::dynamic_fallback(db, class_literal),
+            fallback_mro: Mro::dynamic_fallback(db, literal),
+        }
+    }
+}
+
+/// Dynamic class literals that have explicit bases and use C3 linearization for MRO.
+///
+/// This enum distinguishes dynamic classes created via `type(name, bases, dict)` or
+/// `make_dataclass(...)` from other dynamic types like `NamedTuple` which have
+/// fixed MRO structures.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub(super) enum DynamicLiteralWithBases<'db> {
+    Class(DynamicClassLiteral<'db>),
+    Dataclass(DynamicDataclassLiteral<'db>),
+}
+
+impl<'db> DynamicLiteralWithBases<'db> {
+    fn bases(self, db: &'db dyn Db) -> &'db [ClassBase<'db>] {
+        match self {
+            Self::Class(class) => class.bases(db),
+            Self::Dataclass(class) => class.bases(db),
+        }
+    }
+}
+
+impl<'db> From<DynamicClassLiteral<'db>> for DynamicLiteralWithBases<'db> {
+    fn from(literal: DynamicClassLiteral<'db>) -> Self {
+        Self::Class(literal)
+    }
+}
+
+impl<'db> From<DynamicDataclassLiteral<'db>> for DynamicLiteralWithBases<'db> {
+    fn from(literal: DynamicDataclassLiteral<'db>) -> Self {
+        Self::Dataclass(literal)
+    }
+}
+
+impl<'db> From<DynamicLiteralWithBases<'db>> for ClassLiteral<'db> {
+    fn from(literal: DynamicLiteralWithBases<'db>) -> Self {
+        match literal {
+            DynamicLiteralWithBases::Class(class) => class.into(),
+            DynamicLiteralWithBases::Dataclass(class) => class.into(),
         }
     }
 }

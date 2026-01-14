@@ -846,11 +846,11 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for dynamic class definitions (using `type()`) that have bases
-    /// which are unsupported by ty.
+    /// Checks for dynamic class definitions that have bases which are unsupported by ty.
     ///
     /// This is equivalent to [`unsupported-base`] but applies to classes created
-    /// via `type()` rather than `class` statements.
+    /// dynamically via `type()`, `make_dataclass()`, or similar functions rather
+    /// than `class` statements.
     ///
     /// ## Why is this bad?
     /// If a dynamically created class has a base that is an unsupported type
@@ -860,7 +860,7 @@ declare_lint! {
     ///
     /// ## Default level
     /// This rule is disabled by default because it will not cause a runtime error,
-    /// and may be noisy on codebases that use `type()` in highly dynamic ways.
+    /// and may be noisy on codebases that use dynamic class creation in highly dynamic ways.
     ///
     /// ## Examples
     /// ```python
