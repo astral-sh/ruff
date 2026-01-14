@@ -1,0 +1,1 @@
+from my_module import a_very_long_name_that_should_not_wrap_if_line_length_is_high_enough

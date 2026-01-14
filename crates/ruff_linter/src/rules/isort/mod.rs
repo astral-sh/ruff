@@ -78,6 +78,7 @@ pub(crate) fn format_imports(
     settings: &Settings,
     tokens: &Tokens,
 ) -> String {
+    let line_length = settings.line_length.unwrap_or(line_length);
     let trailer = &block.trailer;
     let block = annotate_imports(
         &block.imports,
@@ -288,6 +289,7 @@ mod tests {
     use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
 
     use crate::assert_diagnostics;
+    use crate::line_width::LineLength;
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::LinterSettings;
@@ -599,6 +601,62 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("group_by_package.py"))]
+    fn group_by_package(path: &Path) -> Result<()> {
+        let snapshot = format!("group_by_package_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    group_by_package: true,
+                    force_sort_within_sections: true,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("lexicographical.py"))]
+    fn lexicographical(path: &Path) -> Result<()> {
+        let snapshot = format!("lexicographical_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    lexicographical: true,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("line_length.py"))]
+    fn line_length(path: &Path) -> Result<()> {
+        let snapshot = format!("line_length_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    line_length: Some(LineLength::try_from(120).unwrap()),
+                    ..super::settings::Settings::default()
+                },
+                line_length: LineLength::try_from(10).unwrap(), // Global constraint defaults to very narrow (causing wrap)
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("force_single_line.py"))]
     fn force_single_line(path: &Path) -> Result<()> {
         let snapshot = format!("force_single_line_{}", path.to_string_lossy());
@@ -620,6 +678,8 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+
 
     #[test_case(Path::new("propagate_inline_comments.py"))]
     fn propagate_inline_comments(path: &Path) -> Result<()> {

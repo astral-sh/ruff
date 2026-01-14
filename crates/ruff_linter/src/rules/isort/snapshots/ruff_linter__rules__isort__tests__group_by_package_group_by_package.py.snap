@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> group_by_package.py:1:1
+  |
+1 | / from a import b
+2 | | import a.c
+3 | | from a.d import e
+4 | | import a
+5 | | from b import a
+6 | | import a.e
+  | |__________^
+  |
+help: Organize imports
+1 + import a
+2 | from a import b
+3 | import a.c
+4 | from a.d import e
+  - import a
+5 + import a.e
+6 | from b import a
+  - import a.e
