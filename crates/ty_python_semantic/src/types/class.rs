@@ -3244,7 +3244,10 @@ impl<'db> StaticClassLiteral<'db> {
                         )
                     })
             }
-            (CodeGeneratorKind::NamedTuple, "__new__" | "_replace" | "__replace__" | "_fields") => {
+            (
+                CodeGeneratorKind::NamedTuple,
+                "__new__" | "_replace" | "__replace__" | "_fields" | "__slots__",
+            ) => {
                 let fields = self.fields(db, specialization, field_policy);
                 let fields_iter = fields.iter().map(|(name, field)| {
                     let default_ty = match &field.kind {
@@ -5212,6 +5215,10 @@ fn synthesize_namedtuple_class_member<'db>(
                 fields.map(|(field_name, _, _)| Type::string_literal(db, &field_name));
             Some(Type::heterogeneous_tuple(db, field_types))
         }
+        "__slots__" => {
+            // __slots__: tuple[()] - always empty for namedtuples
+            Some(Type::empty_tuple(db))
+        }
         "_replace" | "__replace__" => {
             if name == "__replace__" && Program::get(db).python_version(db) < PythonVersion::PY313 {
                 return None;
@@ -5536,7 +5543,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // For fallback members from NamedTupleFallback, apply type mapping to handle
         // `Self` types. The explicitly synthesized members (__new__, _fields, _replace,
         // __replace__) don't need this mapping.
-        if matches!(name, "__new__" | "_fields" | "_replace" | "__replace__") {
+        if matches!(
+            name,
+            "__new__" | "_fields" | "_replace" | "__replace__" | "__slots__"
+        ) {
             result
         } else {
             result.map(|ty| {

@@ -845,6 +845,7 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__slots__)  # revealed: tuple[()]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: (self: Self, *, name: str = ..., age: int | None = ...) -> Self
@@ -887,6 +888,8 @@ Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
 
 alice = Person(1, "Alice", 42)
 bob = Person(2, "Bob")
+
+reveal_type(Person.__slots__)  # revealed: tuple[()]
 ```
 
 ## `collections.namedtuple` with tuple variable field names
