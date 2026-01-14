@@ -4402,10 +4402,6 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::SpecialForm(SpecialFormType::NamedTuple) => {
-                Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
-            }
-
             Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
