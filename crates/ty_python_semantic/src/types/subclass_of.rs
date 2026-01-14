@@ -1,6 +1,6 @@
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::generics::InferableTypeVars;
 use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
@@ -212,10 +212,12 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
+    #[expect(clippy::too_many_arguments)]
     pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -239,6 +241,7 @@ impl<'db> SubclassOfType<'db> {
                 .has_relation_to_impl(
                     db,
                     other_class,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -258,6 +261,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        _constraints: &ConstraintSetBuilder<'db>,
         _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

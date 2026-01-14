@@ -20,7 +20,10 @@ use crate::{
         FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
         MemberLookupPolicy, PropertyInstanceType, Signature, StaticClassLiteral, Type, TypeMapping,
         TypeQualifiers, TypeVarVariance, VarianceInferable,
-        constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
+        constraints::{
+            ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+            OptionConstraintsExtension,
+        },
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
         generics::InferableTypeVars,
@@ -287,87 +290,58 @@ impl<'db> ProtocolInterface<'db> {
             .unwrap_or_else(|| Type::object().member(db, name))
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        other.members(db).when_all(db, |other_member| {
-            self.member_by_name(db, other_member.name)
-                .when_some_and(|our_member| match (our_member.kind, other_member.kind) {
-                    // Method members are always immutable;
-                    // they can never be subtypes of/assignable to mutable attribute members.
-                    (ProtocolMemberKind::Method(_), ProtocolMemberKind::Other(_)) => {
-                        ConstraintSet::from(false)
-                    }
+        other.members(db).when_all(db, constraints, |other_member| {
+            self.member_by_name(db, other_member.name).when_some_and(
+                db,
+                constraints,
+                |our_member| {
+                    match (our_member.kind, other_member.kind) {
+                        // Method members are always immutable;
+                        // they can never be subtypes of/assignable to mutable attribute members.
+                        (ProtocolMemberKind::Method(_), ProtocolMemberKind::Other(_)) => {
+                            ConstraintSet::from(false)
+                        }
 
-                    // A property member can only be a subtype of an attribute member
-                    // if the property is readable *and* writable.
-                    //
-                    // TODO: this should also consider the types of the members on both sides.
-                    (ProtocolMemberKind::Property(property), ProtocolMemberKind::Other(_)) => {
-                        ConstraintSet::from(
-                            property.getter(db).is_some() && property.setter(db).is_some(),
-                        )
-                    }
+                        // A property member can only be a subtype of an attribute member
+                        // if the property is readable *and* writable.
+                        //
+                        // TODO: this should also consider the types of the members on both sides.
+                        (ProtocolMemberKind::Property(property), ProtocolMemberKind::Other(_)) => {
+                            ConstraintSet::from(
+                                property.getter(db).is_some() && property.setter(db).is_some(),
+                            )
+                        }
 
-                    // A `@property` member can never be a subtype of a method member, as it is not necessarily
-                    // accessible on the meta-type, whereas a method member must be.
-                    (ProtocolMemberKind::Property(_), ProtocolMemberKind::Method(_)) => {
-                        ConstraintSet::from(false)
-                    }
+                        // A `@property` member can never be a subtype of a method member, as it is not necessarily
+                        // accessible on the meta-type, whereas a method member must be.
+                        (ProtocolMemberKind::Property(_), ProtocolMemberKind::Method(_)) => {
+                            ConstraintSet::from(false)
+                        }
 
-                    // But an attribute member *can* be a subtype of a method member,
-                    // providing it is marked `ClassVar`
-                    (
-                        ProtocolMemberKind::Other(our_type),
-                        ProtocolMemberKind::Method(other_type),
-                    ) => ConstraintSet::from(
-                        our_member.qualifiers.contains(TypeQualifiers::CLASS_VAR),
-                    )
-                    .and(db, || {
-                        our_type.has_relation_to_impl(
-                            db,
-                            Type::Callable(protocol_bind_self(db, other_type, None)),
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                    }),
-
-                    (
-                        ProtocolMemberKind::Method(our_method),
-                        ProtocolMemberKind::Method(other_method),
-                    ) => our_method.bind_self(db, None).has_relation_to_impl(
-                        db,
-                        protocol_bind_self(db, other_method, None),
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    ),
-
-                    (
-                        ProtocolMemberKind::Other(our_type),
-                        ProtocolMemberKind::Other(other_type),
-                    ) => our_type
-                        .has_relation_to_impl(
-                            db,
-                            other_type,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
+                        // But an attribute member *can* be a subtype of a method member,
+                        // providing it is marked `ClassVar`
+                        (
+                            ProtocolMemberKind::Other(our_type),
+                            ProtocolMemberKind::Method(other_type),
+                        ) => ConstraintSet::from(
+                            our_member.qualifiers.contains(TypeQualifiers::CLASS_VAR),
                         )
                         .and(db, || {
-                            other_type.has_relation_to_impl(
+                            our_type.has_relation_to_impl(
                                 db,
-                                our_type,
+                                Type::Callable(protocol_bind_self(db, other_type, None)),
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -375,15 +349,55 @@ impl<'db> ProtocolInterface<'db> {
                             )
                         }),
 
-                    // TODO: finish assignability/subtyping between two `@property` members,
-                    // and between a `@property` member and a member of a different kind.
-                    (
-                        ProtocolMemberKind::Property(_)
-                        | ProtocolMemberKind::Method(_)
-                        | ProtocolMemberKind::Other(_),
-                        ProtocolMemberKind::Property(_),
-                    ) => ConstraintSet::from(true),
-                })
+                        (
+                            ProtocolMemberKind::Method(our_method),
+                            ProtocolMemberKind::Method(other_method),
+                        ) => our_method.bind_self(db, None).has_relation_to_impl(
+                            db,
+                            protocol_bind_self(db, other_method, None),
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        ),
+
+                        (
+                            ProtocolMemberKind::Other(our_type),
+                            ProtocolMemberKind::Other(other_type),
+                        ) => our_type
+                            .has_relation_to_impl(
+                                db,
+                                other_type,
+                                constraints,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                            .and(db, || {
+                                other_type.has_relation_to_impl(
+                                    db,
+                                    our_type,
+                                    constraints,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            }),
+
+                        // TODO: finish assignability/subtyping between two `@property` members,
+                        // and between a `@property` member and a member of a different kind.
+                        (
+                            ProtocolMemberKind::Property(_)
+                            | ProtocolMemberKind::Method(_)
+                            | ProtocolMemberKind::Other(_),
+                            ProtocolMemberKind::Property(_),
+                        ) => ConstraintSet::from(true),
+                    }
+                },
+            )
         })
     }
 
@@ -684,6 +698,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -696,6 +711,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(
                 db,
                 other,
+                constraints,
                 inferable,
                 disjointness_visitor,
                 relation_visitor,
@@ -705,10 +721,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
     /// the part of the interface defined by this protocol member.
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn is_satisfied_by(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -759,20 +777,23 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 // With the new solver, we should be to replace all of this with an additional
                 // constraint that enforces what `Self` can specialize to.
                 let fallback_other = other.literal_fallback_instance(db).unwrap_or(other);
-                attribute_type
-                    .try_upcast_to_callable(db)
-                    .when_some_and(|callables| {
+                attribute_type.try_upcast_to_callable(db).when_some_and(
+                    db,
+                    constraints,
+                    |callables| {
                         callables
                             .map(|callable| callable.apply_self(db, fallback_other))
                             .has_relation_to_impl(
                                 db,
                                 protocol_bind_self(db, *method, Some(fallback_other)),
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
                                 disjointness_visitor,
                             )
-                    })
+                    },
+                )
             }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
@@ -795,6 +816,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     .has_relation_to_impl(
                         db,
                         attribute_type,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -804,6 +826,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         attribute_type.has_relation_to_impl(
                             db,
                             *member_type,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,

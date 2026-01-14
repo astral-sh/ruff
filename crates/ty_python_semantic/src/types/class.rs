@@ -17,7 +17,9 @@ use crate::semantic_index::{
     DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
 };
 use crate::types::bound_super::BoundSuperError;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_DATACLASS_OVERRIDE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
 use crate::types::enums::{
@@ -1113,19 +1115,26 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other, InferableTypeVars::None)
-            .is_always_satisfied(db)
+        self.when_subclass_of(
+            db,
+            other,
+            &ConstraintSetBuilder::new(),
+            InferableTypeVars::None,
+        )
+        .is_always_satisfied(db)
     }
 
     pub(super) fn when_subclass_of(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
             other,
+            constraints,
             inferable,
             TypeRelation::Subtyping,
             &HasRelationToVisitor::default(),
@@ -1133,16 +1142,18 @@ impl<'db> ClassType<'db> {
         )
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        self.iter_mro(db).when_any(db, |base| {
+        self.iter_mro(db).when_any(db, constraints, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
@@ -1170,6 +1181,7 @@ impl<'db> ClassType<'db> {
                             base.specialization(db).has_relation_to_impl(
                                 db,
                                 other.specialization(db),
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,

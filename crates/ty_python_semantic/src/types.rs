@@ -50,7 +50,9 @@ use crate::types::builder::RecursivelyDefined;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 use crate::types::class::NamedTupleSpec;
 pub(crate) use crate::types::class_base::ClassBase;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -10307,10 +10309,12 @@ impl<'db> BoundMethodType<'db> {
         ))
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -10324,6 +10328,7 @@ impl<'db> BoundMethodType<'db> {
             .has_relation_to_impl(
                 db,
                 other.function(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -10333,6 +10338,7 @@ impl<'db> BoundMethodType<'db> {
                 other.self_instance(db).has_relation_to_impl(
                     db,
                     self.self_instance(db),
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -10534,10 +10540,12 @@ impl<'db> CallableType<'db> {
     /// Check whether this callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
+    #[expect(clippy::too_many_arguments)]
     fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -10550,6 +10558,7 @@ impl<'db> CallableType<'db> {
         self.signatures(db).has_relation_to_impl(
             db,
             other.signatures(db),
+            constraints,
             inferable,
             relation,
             relation_visitor,
@@ -10606,19 +10615,22 @@ impl<'db> CallableTypes<'db> {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: CallableType<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        self.0.iter().when_all(db, |element| {
+        self.0.iter().when_all(db, constraints, |element| {
             element.has_relation_to_impl(
                 db,
                 other,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -10696,10 +10708,12 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> KnownBoundMethodType<'db> {
+    #[expect(clippy::too_many_arguments)]
     fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -10712,6 +10726,7 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => self_function.has_relation_to_impl(
                 db,
                 other_function,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -10724,6 +10739,7 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => self_function.has_relation_to_impl(
                 db,
                 other_function,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -10740,6 +10756,7 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => Type::PropertyInstance(self_property).when_equivalent_to_impl(
                 db,
                 Type::PropertyInstance(other_property),
+                constraints,
                 relation_visitor,
                 disjointness_visitor,
             ),

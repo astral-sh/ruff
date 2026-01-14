@@ -69,6 +69,7 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::marker::PhantomData;
 use std::ops::Range;
 
 use indexmap::map::Entry;
@@ -92,22 +93,42 @@ use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
+    fn when_none_or<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 
     /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
+    fn when_some_and<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 }
 
 impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
+    fn when_none_or<'db>(
+        self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
             None => ConstraintSet::always(),
         }
     }
 
-    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
+    fn when_some_and<'db>(
+        self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
             None => ConstraintSet::never(),
@@ -125,6 +146,7 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     fn when_any<'db>(
         self,
         db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db>;
 
@@ -136,6 +158,7 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db>;
 }
@@ -147,6 +170,7 @@ where
     fn when_any<'db>(
         self,
         db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
         let node = Node::distributed_or(db, self.map(|element| f(element).node));
@@ -156,6 +180,7 @@ where
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
         let node = Node::distributed_and(db, self.map(|element| f(element).node));
@@ -473,6 +498,18 @@ impl<'db> ConstraintSet<'db> {
 impl From<bool> for ConstraintSet<'_> {
     fn from(b: bool) -> Self {
         if b { Self::always() } else { Self::never() }
+    }
+}
+
+pub(crate) struct ConstraintSetBuilder<'db> {
+    _dummy: PhantomData<&'db ()>,
+}
+
+impl ConstraintSetBuilder<'_> {
+    pub(crate) fn new() -> Self {
+        Self {
+            _dummy: PhantomData,
+        }
     }
 }
 
@@ -4170,6 +4207,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn specialize_constrained(
         self,
         db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         constraints: ConstraintSet<'db>,
     ) -> Result<Specialization<'db>, ()> {
         tracing::trace!(

@@ -65,7 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
@@ -1187,10 +1187,12 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -1205,6 +1207,7 @@ impl<'db> FunctionType<'db> {
         self_signature.has_relation_to_impl(
             db,
             other_signature,
+            constraints,
             inferable,
             relation,
             relation_visitor,

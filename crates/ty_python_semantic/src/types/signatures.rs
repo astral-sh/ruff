@@ -18,7 +18,9 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, semantic_index};
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
@@ -286,10 +288,12 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub(crate) fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -299,6 +303,7 @@ impl<'db> CallableSignature<'db> {
             db,
             &self.overloads,
             &other.overloads,
+            constraints,
             inferable,
             relation,
             relation_visitor,
@@ -330,11 +335,13 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
             other,
+            constraints,
             inferable,
             TypeRelation::ConstraintSetAssignability,
             &HasRelationToVisitor::default(),
@@ -439,10 +446,12 @@ impl<'db> CallableSignature<'db> {
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
+    #[expect(clippy::too_many_arguments)]
     fn has_relation_to_inner(
         db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -471,6 +480,7 @@ impl<'db> CallableSignature<'db> {
                     let return_types_match = self_return_type.has_relation_to_impl(
                         db,
                         other_return_type,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -502,10 +512,11 @@ impl<'db> CallableSignature<'db> {
                     let return_types_match = other_signatures
                         .iter()
                         .map(|signature| signature.return_ty)
-                        .when_any(db, |other_return_type| {
+                        .when_any(db, constraints, |other_return_type| {
                             self_return_type.has_relation_to_impl(
                                 db,
                                 other_return_type,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -538,10 +549,11 @@ impl<'db> CallableSignature<'db> {
                     let return_types_match = self_signatures
                         .iter()
                         .map(|signature| signature.return_ty)
-                        .when_any(db, |self_return_type| {
+                        .when_any(db, constraints, |self_return_type| {
                             self_return_type.has_relation_to_impl(
                                 db,
                                 other_return_type,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -561,6 +573,7 @@ impl<'db> CallableSignature<'db> {
                 self_signature.has_relation_to_impl(
                     db,
                     other_signature,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -580,44 +593,53 @@ impl<'db> CallableSignature<'db> {
                     return aggregate_relation;
                 }
 
-                self_signatures.iter().when_any(db, |self_signature| {
+                self_signatures
+                    .iter()
+                    .when_any(db, constraints, |self_signature| {
+                        Self::has_relation_to_inner(
+                            db,
+                            std::slice::from_ref(self_signature),
+                            other_signatures,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+            }
+
+            // `self` is definitely not overloaded while `other` is possibly overloaded.
+            ([_], _) => other_signatures
+                .iter()
+                .when_all(db, constraints, |other_signature| {
                     Self::has_relation_to_inner(
                         db,
-                        std::slice::from_ref(self_signature),
-                        other_signatures,
+                        self_signatures,
+                        std::slice::from_ref(other_signature),
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
                     )
-                })
-            }
-
-            // `self` is definitely not overloaded while `other` is possibly overloaded.
-            ([_], _) => other_signatures.iter().when_all(db, |other_signature| {
-                Self::has_relation_to_inner(
-                    db,
-                    self_signatures,
-                    std::slice::from_ref(other_signature),
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+                }),
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
-            (_, _) => other_signatures.iter().when_all(db, |other_signature| {
-                Self::has_relation_to_inner(
-                    db,
-                    self_signatures,
-                    std::slice::from_ref(other_signature),
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+            (_, _) => other_signatures
+                .iter()
+                .when_all(db, constraints, |other_signature| {
+                    Self::has_relation_to_inner(
+                        db,
+                        self_signatures,
+                        std::slice::from_ref(other_signature),
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                }),
         }
     }
 }
@@ -1017,6 +1039,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         other: &CallableSignature<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         // If this signature is a paramspec, bind it to the entire overloaded other callable.
@@ -1040,7 +1063,7 @@ impl<'db> Signature<'db> {
                 .overloads
                 .iter()
                 .map(|signature| signature.return_ty)
-                .when_any(db, |other_return_type| {
+                .when_any(db, constraints, |other_return_type| {
                     self.return_ty.when_constraint_set_assignable_to(
                         db,
                         other_return_type,
@@ -1050,20 +1073,25 @@ impl<'db> Signature<'db> {
             return param_spec_matches.and(db, || return_types_match);
         }
 
-        other.overloads.iter().when_all(db, |other_signature| {
-            self.when_constraint_set_assignable_to(db, other_signature, inferable)
-        })
+        other
+            .overloads
+            .iter()
+            .when_all(db, constraints, |other_signature| {
+                self.when_constraint_set_assignable_to(db, other_signature, constraints, inferable)
+            })
     }
 
     fn when_constraint_set_assignable_to(
         &self,
         db: &'db dyn Db,
         other: &Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
             other,
+            constraints,
             inferable,
             TypeRelation::ConstraintSetAssignability,
             &HasRelationToVisitor::default(),
@@ -1072,10 +1100,12 @@ impl<'db> Signature<'db> {
     }
 
     /// Implementation of subtyping and assignability for signature.
+    #[expect(clippy::too_many_arguments)]
     fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -1102,6 +1132,7 @@ impl<'db> Signature<'db> {
         let when = self.has_relation_to_inner(
             db,
             other,
+            constraints,
             inferable,
             relation,
             relation_visitor,
@@ -1115,10 +1146,12 @@ impl<'db> Signature<'db> {
         when.reduce_inferable(db, self_inferable.iter().chain(other_inferable.iter()))
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn has_relation_to_inner(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -1216,6 +1249,7 @@ impl<'db> Signature<'db> {
                     type1.has_relation_to_impl(
                         db,
                         type2,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,

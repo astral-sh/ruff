@@ -11,7 +11,9 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
@@ -137,10 +139,12 @@ impl<'db> Type<'db> {
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn satisfies_protocol(
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -164,6 +168,7 @@ impl<'db> Type<'db> {
             let nominally_satisfied = type_to_test.has_relation_to_impl(
                 db,
                 Type::NominalInstance(nominal_instance),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -195,6 +200,7 @@ impl<'db> Type<'db> {
             self_protocol.interface(db).has_relation_to_impl(
                 db,
                 protocol.interface(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -205,10 +211,11 @@ impl<'db> Type<'db> {
                 .inner
                 .interface(db)
                 .members(db)
-                .when_all(db, |member| {
+                .when_all(db, constraints, |member| {
                     member.is_satisfied_by(
                         db,
                         self,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -430,10 +437,12 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -447,6 +456,7 @@ impl<'db> NominalInstanceType<'db> {
             ) => tuple1.has_relation_to_impl(
                 db,
                 tuple2,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -455,6 +465,7 @@ impl<'db> NominalInstanceType<'db> {
             _ => self.class(db).has_relation_to_impl(
                 db,
                 other.class(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -467,6 +478,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -480,6 +492,7 @@ impl<'db> NominalInstanceType<'db> {
                 let compatible = self_spec.is_disjoint_from_impl(
                     db,
                     &other_spec,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
@@ -716,6 +729,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 .satisfies_protocol(
                     db,
                     protocol,
+                    &ConstraintSetBuilder::new(),
                     InferableTypeVars::None,
                     TypeRelation::Subtyping,
                     &HasRelationToVisitor::default(),
@@ -748,6 +762,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         _db: &'db dyn Db,
         _other: Self,
+        _constraints: &ConstraintSetBuilder<'db>,
         _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

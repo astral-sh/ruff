@@ -22,7 +22,9 @@ use crate::semantic_index::definition::Definition;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::generics::InferableTypeVars;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 
@@ -126,10 +128,12 @@ impl<'db> TypedDictType<'db> {
 
     // Subtyping between `TypedDict`s follows the algorithm described at:
     // https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         target: TypedDictType<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -149,7 +153,7 @@ impl<'db> TypedDictType<'db> {
         let target_items = target.items(db);
         // Many rules violations short-circuit with "never", but asking whether one field is
         // [relation] to/of another can produce more complicated constraints, and we collect those.
-        let mut constraints = ConstraintSet::from(true);
+        let mut result = ConstraintSet::from(true);
         for (target_item_name, target_item_field) in target_items {
             let field_constraints = if target_item_field.is_required() {
                 // required target fields
@@ -169,6 +173,7 @@ impl<'db> TypedDictType<'db> {
                     self_item_field.declared_ty.has_relation_to_impl(
                         db,
                         target_item_field.declared_ty,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -189,6 +194,7 @@ impl<'db> TypedDictType<'db> {
                         .has_relation_to_impl(
                             db,
                             target_item_field.declared_ty,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -198,6 +204,7 @@ impl<'db> TypedDictType<'db> {
                             target_item_field.declared_ty.has_relation_to_impl(
                                 db,
                                 self_item_field.declared_ty,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -218,6 +225,7 @@ impl<'db> TypedDictType<'db> {
                         self_item_field.declared_ty.has_relation_to_impl(
                             db,
                             target_item_field.declared_ty,
+                            constraints,
                             inferable,
                             relation,
                             relation_visitor,
@@ -258,6 +266,7 @@ impl<'db> TypedDictType<'db> {
                             .has_relation_to_impl(
                                 db,
                                 target_item_field.declared_ty,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -267,6 +276,7 @@ impl<'db> TypedDictType<'db> {
                                 target_item_field.declared_ty.has_relation_to_impl(
                                     db,
                                     self_item_field.declared_ty,
+                                    constraints,
                                     inferable,
                                     relation,
                                     relation_visitor,
@@ -284,12 +294,12 @@ impl<'db> TypedDictType<'db> {
                     }
                 }
             };
-            constraints.intersect(db, field_constraints);
-            if constraints.is_never_satisfied(db) {
-                return constraints;
+            result.intersect(db, field_constraints);
+            if result.is_never_satisfied(db) {
+                return result;
             }
         }
-        constraints
+        result
     }
 
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
@@ -369,12 +379,13 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         other: TypedDictType<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let fields_in_common = btreemap_values_with_same_key(self.items(db), other.items(db));
-        fields_in_common.when_any(db, |(self_field, other_field)| {
+        fields_in_common.when_any(db, constraints, |(self_field, other_field)| {
             // Condition 1 above.
             if self_field.is_required() || other_field.is_required() {
                 if (!self_field.is_required() && !self_field.is_read_only())
@@ -393,6 +404,7 @@ impl<'db> TypedDictType<'db> {
                     .has_relation_to_impl(
                         db,
                         other_field.declared_ty,
+                        constraints,
                         inferable,
                         TypeRelation::Assignability,
                         relation_visitor,
@@ -402,6 +414,7 @@ impl<'db> TypedDictType<'db> {
                         other_field.declared_ty.has_relation_to_impl(
                             db,
                             self_field.declared_ty,
+                            constraints,
                             inferable,
                             TypeRelation::Assignability,
                             relation_visitor,
@@ -416,6 +429,7 @@ impl<'db> TypedDictType<'db> {
                     .has_relation_to_impl(
                         db,
                         other_field.declared_ty,
+                        constraints,
                         inferable,
                         TypeRelation::Assignability,
                         relation_visitor,
@@ -429,6 +443,7 @@ impl<'db> TypedDictType<'db> {
                     .has_relation_to_impl(
                         db,
                         self_field.declared_ty,
+                        constraints,
                         inferable,
                         TypeRelation::Assignability,
                         relation_visitor,
@@ -440,6 +455,7 @@ impl<'db> TypedDictType<'db> {
                 self_field.declared_ty.is_disjoint_from_impl(
                     db,
                     other_field.declared_ty,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,

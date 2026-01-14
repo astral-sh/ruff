@@ -11,7 +11,7 @@ use crate::{
         BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
         MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
         Type, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarInstance, UnionBuilder,
-        constraints::ConstraintSet,
+        constraints::{ConstraintSet, ConstraintSetBuilder},
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         relation::{HasRelationToVisitor, IsDisjointVisitor},
@@ -751,6 +751,7 @@ impl<'db> BoundSuperType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -759,6 +760,7 @@ impl<'db> BoundSuperType<'db> {
                 .when_equivalent_to_impl(
                     db,
                     Type::from(right),
+                    constraints,
                     relation_visitor,
                     disjointness_visitor,
                 ),
@@ -791,6 +793,7 @@ impl<'db> BoundSuperType<'db> {
                 .when_equivalent_to_impl(
                     db,
                     Type::from(right),
+                    constraints,
                     relation_visitor,
                     disjointness_visitor,
                 ),
@@ -800,6 +803,7 @@ impl<'db> BoundSuperType<'db> {
                 .when_equivalent_to_impl(
                     db,
                     Type::from(right),
+                    constraints,
                     relation_visitor,
                     disjointness_visitor,
                 ),
@@ -826,6 +830,7 @@ impl<'db> BoundSuperType<'db> {
                 .when_equivalent_to_impl(
                     db,
                     Type::TypeVar(r_typevar),
+                    constraints,
                     relation_visitor,
                     disjointness_visitor,
                 )
@@ -833,6 +838,7 @@ impl<'db> BoundSuperType<'db> {
                     Type::from(l_class).when_equivalent_to_impl(
                         db,
                         Type::from(r_class),
+                        constraints,
                         relation_visitor,
                         disjointness_visitor,
                     )

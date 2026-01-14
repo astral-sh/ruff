@@ -25,7 +25,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
     INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
@@ -1830,16 +1830,18 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::GenericContextSpecializeConstrained(generic_context),
                     ) => {
-                        let [Some(constraints)] = overload.parameter_types() else {
+                        let [Some(set)] = overload.parameter_types() else {
                             continue;
                         };
-                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)) =
-                            constraints
-                        else {
+                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(set)) = set else {
                             continue;
                         };
-                        let specialization =
-                            generic_context.specialize_constrained(db, constraints.constraints(db));
+                        let constraints = ConstraintSetBuilder::new();
+                        let specialization = generic_context.specialize_constrained(
+                            db,
+                            &constraints,
+                            set.constraints(db),
+                        );
                         let result = match specialization {
                             Ok(specialization) => Type::KnownInstance(
                                 KnownInstanceType::Specialization(specialization),
