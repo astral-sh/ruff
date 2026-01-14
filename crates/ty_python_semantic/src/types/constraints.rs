@@ -117,9 +117,9 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
 pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
     ///
-    /// This method short-circuits; if we encounter any element that
-    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied], then the overall result
-    /// must be as well, and we stop consuming elements from the iterator.
+    /// This method is not guaranteed to short-circuit — we might invoke your callback for later
+    /// iterator elements even if you produce
+    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied] for earlier elements.
     fn when_any<'db>(
         self,
         db: &'db dyn Db,
@@ -147,13 +147,9 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::never();
-        for child in self {
-            if result.union(db, f(child)).is_always_satisfied(db) {
-                return result;
-            }
-        }
-        result
+        let inputs: Vec<_> = self.map(|element| f(element).node).collect();
+        let node = Node::distributed_or(db, &inputs);
+        ConstraintSet { node }
     }
 
     fn when_all<'db>(
@@ -1170,6 +1166,20 @@ impl<'db> Node<'db> {
             (_, Node::AlwaysFalse) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
                 self_interior.or(db, other_interior, other_offset)
+            }
+        }
+    }
+
+    fn distributed_or(db: &'db dyn Db, inputs: &[Self]) -> Self {
+        match inputs {
+            [] => Node::AlwaysFalse,
+            [one] => *one,
+            [first, second] => first.or_with_offset(db, *second),
+            _ => {
+                let (first, second) = inputs.split_at(inputs.len() / 2);
+                let first = Self::distributed_or(db, first);
+                let second = Self::distributed_or(db, second);
+                first.or(db, second)
             }
         }
     }
