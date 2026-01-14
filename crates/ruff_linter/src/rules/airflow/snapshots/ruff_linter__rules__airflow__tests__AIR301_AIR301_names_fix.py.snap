@@ -318,7 +318,7 @@ AIR301 [*] `airflow.operators.python.get_current_context` is removed in Airflow 
 48 |
 49 | # airflow.providers.mysql
    |
-help: Use `get_current_context` from `airflow.sdk` instead.
+help: `get_current_context` has been moved to `airflow.sdk` since Airflow 3.0 (with task-sdk 1.0). 
 42 | 
 43 | 
 44 | # airflow.operators.python
@@ -402,7 +402,7 @@ AIR301 [*] `airflow.notifications.basenotifier.BaseNotifier` is removed in Airfl
 68 |
 69 | # airflow.auth.manager
    |
-help: Use `BaseNotifier` from `airflow.sdk.bases.notifier` instead.
+help: `BaseNotifier` has been moved to `airflow.sdk.bases.notifier` since Airflow 3.0 (with task-sdk 1.0). 
 62 | sanitize_uri
 63 | 
 64 | # airflow.notifications.basenotifier
@@ -636,7 +636,7 @@ AIR301 [*] `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed 
    | ^^^^^^^^^^^^^^^^^^
 97 | BaseHook()
    |
-help: Use `BaseSensorOperator` from `airflow.sdk.bases.sensor` instead.
+help: `BaseSensorOperator` has been moved to `airflow.sdk.bases.sensor` since Airflow 3.0 (with task-sdk 1.0). 
 90 | # airflow.hooks
 91 | BaseHook()
 92 | 
@@ -681,7 +681,7 @@ AIR301 [*] `airflow.utils.helpers.chain` is removed in Airflow 3.0
     | ^^^^^^^^^^^^
 104 | helper_cross_downstream
     |
-help: Use `chain` from `airflow.sdk` instead.
+help: `chain` has been moved to `airflow.sdk` since Airflow 3.0 (with task-sdk 1.0). 
 98  | 
 99  | from airflow.utils.helpers import chain as helper_chain
 100 | from airflow.utils.helpers import cross_downstream as helper_cross_downstream
@@ -704,7 +704,7 @@ AIR301 [*] `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
 105 |
 106 | # airflow.utils.file
     |
-help: Use `cross_downstream` from `airflow.sdk` instead.
+help: `cross_downstream` has been moved to `airflow.sdk` since Airflow 3.0 (with task-sdk 1.0). 
 98  | 
 99  | from airflow.utils.helpers import chain as helper_chain
 100 | from airflow.utils.helpers import cross_downstream as helper_cross_downstream
@@ -746,7 +746,7 @@ AIR301 [*] `airflow.utils.log.secrets_masker` is removed in Airflow 3.0
 114 | secrets_masker
     | ^^^^^^^^^^^^^^
     |
-help: Use `secrets_masker` from `airflow.sdk.execution_time` instead.
+help: `secrets_masker` has been moved to `airflow.sdk.execution_time` since Airflow 3.0 (with task-sdk 1.0). 
 108 | 
 109 | TemporaryDirectory()
 110 | 
