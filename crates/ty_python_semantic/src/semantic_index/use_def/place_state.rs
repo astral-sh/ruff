@@ -253,6 +253,14 @@ impl Bindings {
         }
     }
 
+    /// Check if this place has only the implicit "unbound" binding.
+    ///
+    /// Returns `true` if the only live binding is the initial unbound binding,
+    /// meaning the place has never been assigned a value.
+    pub(super) fn is_only_unbound(&self) -> bool {
+        self.live_bindings.len() == 1 && self.live_bindings[0].binding.is_unbound()
+    }
+
     /// Record a newly-encountered binding for this place.
     pub(super) fn record_binding(
         &mut self,
@@ -372,6 +380,14 @@ impl PlaceState {
             declarations: Declarations::undeclared(reachability),
             bindings: Bindings::unbound(reachability),
         }
+    }
+
+    /// Check if this place has only the implicit "unbound" binding.
+    ///
+    /// Returns `true` if the place has never been assigned a value in any reachable
+    /// control flow path.
+    pub(super) fn is_only_unbound(&self) -> bool {
+        self.bindings.is_only_unbound()
     }
 
     /// Record a newly-encountered binding for this place.

@@ -11827,9 +11827,7 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(
-                UnionBuilder::new(db)
-                    .cycle_recovery(true)
-                    .recursively_defined(RecursivelyDefined::Yes),
+                UnionBuilder::new(db).cycle_recovery(true),
                 |builder, element| builder.add(element.into()),
             )
             .build()

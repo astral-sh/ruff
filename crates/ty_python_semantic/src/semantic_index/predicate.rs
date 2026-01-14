@@ -64,6 +64,11 @@ pub(crate) struct PredicatesBuilder<'db> {
 }
 
 impl<'db> PredicatesBuilder<'db> {
+    /// Gets a predicate by ID.
+    pub(crate) fn get(&self, id: ScopedPredicateId) -> Predicate<'db> {
+        self.predicates[id]
+    }
+
     /// Adds a predicate. Note that we do not deduplicate predicates. If you add a `Predicate`
     /// more than once, you will get distinct `ScopedPredicateId`s for each one. (This lets you
     /// model predicates that might evaluate to different values at different points of execution.)

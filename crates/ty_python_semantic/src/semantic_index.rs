@@ -4,12 +4,16 @@ use std::sync::Arc;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
-use ruff_python_ast::NodeIndex;
+use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
+use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
+
+use crate::ast_node_ref::AstNodeRef;
+use crate::semantic_index::place::ScopedPlaceId;
 
 use crate::Db;
 use crate::node_key::NodeKey;
@@ -93,6 +97,101 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
     Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+}
+
+/// A loop header represents a while loop for cyclic control flow analysis.
+///
+/// Each while loop gets a unique `LoopHeader` that identifies it. The loop header
+/// is used to associate bindings at the loop-back edge with the loop.
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LoopHeader<'db> {
+    /// The file containing the loop.
+    pub file: File,
+
+    /// The scope containing the loop.
+    pub(crate) file_scope: FileScopeId,
+
+    /// The while statement node.
+    /// WARNING: Only access this field when doing type inference for the same
+    /// file as where the loop is defined to avoid cross-file query dependencies.
+    #[no_eq]
+    #[returns(ref)]
+    #[tracked]
+    pub while_stmt: AstNodeRef<ast::StmtWhile>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for LoopHeader<'_> {}
+
+/// A single binding at the loop-back edge, with its narrowing predicates.
+#[derive(Debug, Clone, PartialEq, Eq, Update, get_size2::GetSize)]
+pub(crate) struct LoopBackBinding<'db> {
+    /// The definition (binding).
+    pub(crate) definition: Definition<'db>,
+    /// Narrowing predicates that apply to this binding at the loop-back edge.
+    /// These are stored in reverse source order (as they appear in `ConstraintsIterator`).
+    pub(crate) narrowing_predicates:
+        SmallVec<[crate::semantic_index::predicate::Predicate<'db>; 4]>,
+}
+
+/// Bindings at the loop-back edge of a while loop, for each place.
+///
+/// This is populated using `specify` during semantic index building, after the
+/// loop body has been walked.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
+pub(crate) struct LoopBackBindings<'db> {
+    /// Map from place ID to bindings visible at the loop-back edge.
+    bindings: FxHashMap<ScopedPlaceId, SmallVec<[LoopBackBinding<'db>; 4]>>,
+}
+
+impl<'db> LoopBackBindings<'db> {
+    /// Create new empty loop-back bindings.
+    pub(crate) fn new() -> Self {
+        Self {
+            bindings: FxHashMap::default(),
+        }
+    }
+
+    /// Add a binding for a place at the loop-back edge.
+    pub(crate) fn add_binding(
+        &mut self,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+        narrowing_predicates: SmallVec<[crate::semantic_index::predicate::Predicate<'db>; 4]>,
+    ) {
+        self.bindings
+            .entry(place)
+            .or_default()
+            .push(LoopBackBinding {
+                definition,
+                narrowing_predicates,
+            });
+    }
+
+    /// Get the bindings for a place at the loop-back edge.
+    pub(crate) fn bindings_for_place(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = &LoopBackBinding<'db>> + '_ {
+        self.bindings
+            .get(&place)
+            .map(|v| v.iter())
+            .into_iter()
+            .flatten()
+    }
+}
+
+/// Returns the bindings at the loop-back edge for a loop header.
+///
+/// This function uses `specify` to set its value during semantic index building,
+/// after the loop body has been walked. The value is set by calling
+/// `bindings_from_loop_header::specify(db, loop_header, bindings)`.
+#[salsa::tracked(specify, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn bindings_from_loop_header<'db>(
+    _db: &'db dyn Db,
+    _loop_header: LoopHeader<'db>,
+) -> LoopBackBindings<'db> {
+    panic!("should always be set by specify()");
 }
 
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching

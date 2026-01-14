@@ -47,7 +47,10 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
+use crate::semantic_index::{
+    ExpressionsScopeMap, LoopBackBindings, LoopHeader, SemanticIndex, VisibleAncestorsIter,
+    bindings_from_loop_header,
+};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -139,10 +142,17 @@ impl<'ast> Visitor<'ast> for LoopBindingCollector {
                 }
             }
 
-            // For loop target is bound
+            // For loop target is bound.
+            // Don't recurse into nested loop body - assignments there have their own
+            // loop header and can't flow back to the outer loop. But do visit orelse.
             ast::Stmt::For(node) => {
                 self.add_place_from_target(&node.target);
-                self.visit_body(&node.body);
+                self.visit_body(&node.orelse);
+            }
+
+            // Don't recurse into nested while loop body - assignments there have their
+            // own loop header and can't flow back to the outer loop. But do visit orelse.
+            ast::Stmt::While(node) => {
                 self.visit_body(&node.orelse);
             }
 
@@ -2147,18 +2157,42 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // flow back from previous iterations.
                 let bound_places = LoopBindingCollector::collect(body);
 
-                // Create loop header definitions for each bound place.
+                // Create a LoopHeader tracked struct for this while loop
+                let loop_header = LoopHeader::new(
+                    self.db,
+                    self.file,
+                    self.current_scope(),
+                    AstNodeRef::new(self.module, while_stmt),
+                );
+
+                // Track which places have loop header definitions so we can collect
+                // their bindings after walking the body. Use a set to avoid duplicates
+                // (a variable might be assigned multiple times in the loop body).
+                let mut loop_header_places: FxHashSet<ScopedPlaceId> = FxHashSet::default();
+
+                // Create loop header definitions for places that are bound before the loop.
                 // The loop header type will be the union of the seed type (before loop)
                 // and all types assigned in the loop body.
                 // These must be created BEFORE visiting the test expression so that
                 // uses in the test see the loop header bindings.
+                //
+                // We only create loop headers for places that are already bound. Places
+                // that are only assigned inside the loop don't need loop headers because
+                // there's no pre-existing value that could be modified across iterations.
                 for place_expr in bound_places {
                     let place_id = self.add_place(place_expr);
-                    let loop_header_ref = LoopHeaderDefinitionNodeRef {
-                        while_stmt,
-                        place: place_id,
-                    };
-                    self.push_additional_definition(place_id, loop_header_ref);
+                    // Only create a loop header if the place is already bound before the loop
+                    // and we haven't already created one for this place
+                    if self.current_use_def_map().place_has_bindings(place_id)
+                        && loop_header_places.insert(place_id)
+                    {
+                        let loop_header_ref = LoopHeaderDefinitionNodeRef {
+                            while_stmt,
+                            place: place_id,
+                            loop_header,
+                        };
+                        self.push_additional_definition(place_id, loop_header_ref);
+                    }
                 }
 
                 // Visit the test expression AFTER creating loop headers so that
@@ -2171,6 +2205,47 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
+
+                // After walking the body, collect the bindings at the loop-back edge
+                // for each place that has a loop header definition.
+                // Only collect bindings if control flow can actually reach the loop-back edge.
+                // If all paths in the body end with break/return/raise, there are no loop-back bindings.
+                let mut loop_back_bindings = LoopBackBindings::new();
+                let use_def = self.current_use_def_map();
+                if !use_def.is_statically_unreachable() {
+                    for place_id in &loop_header_places {
+                        // Get all definitions currently visible for this place, along with
+                        // their narrowing predicates
+                        for (def_state, narrowing_predicates) in
+                            use_def.bindings_at_loop_back(*place_id)
+                        {
+                            if let crate::semantic_index::definition::DefinitionState::Defined(
+                                def,
+                            ) = def_state
+                            {
+                                // Skip other loop headers - their type represents the union of
+                                // types at the inner loop entry, not the types that exit the
+                                // inner loop. Including them would incorrectly propagate types
+                                // that are narrowed by the inner loop's condition.
+                                if matches!(
+                                    def.kind(self.db),
+                                    crate::semantic_index::definition::DefinitionKind::LoopHeader(
+                                        _
+                                    )
+                                ) {
+                                    continue;
+                                }
+                                loop_back_bindings.add_binding(
+                                    *place_id,
+                                    def,
+                                    narrowing_predicates,
+                                );
+                            }
+                        }
+                    }
+                }
+                // Store the loop-back bindings using salsa's specify mechanism
+                bindings_from_loop_header::specify(self.db, loop_header, loop_back_bindings);
 
                 // We execute the `else` branch once the condition evaluates to false. This could
                 // happen without ever executing the body, if the condition is false the first time

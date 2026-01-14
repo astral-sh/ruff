@@ -147,33 +147,31 @@ end-of-loop value.
 ```py
 x = "A"
 while x != "C":
-    reveal_type(x) # revealed: Literal["A", "B"]
+    reveal_type(x)  # revealed: Literal["A", "B"]
     if random():
         x = "B"
     else:
         x = "C"
-    reveal_type(x) # revealed: Literal["B", "C"]
-reveal_type(x) # revealed: Literal["C"]
+    reveal_type(x)  # revealed: Literal["B", "C"]
+reveal_type(x)  # revealed: Literal["C"]
 ```
-
-The same thing, but nested loops.
 
 ```py
 x = "A"
 while x != "E":
-    reveal_type(x) # revealed: Literal["A", "D"]
+    reveal_type(x)  # revealed: Literal["A", "C", "D"]
     while x != "C":
-        reveal_type(x) # revealed: Literal["B", "A", "D"]
+        reveal_type(x)  # revealed: Literal["A", "B", "D"]
         if random():
             x = "B"
         else:
             x = "C"
-        reveal_type(x) # revealed: Literal["B", "C"]
-    reveal_type(x) # revealed: Literal["C"]
+        reveal_type(x)  # revealed: Literal["B", "C"]
+    reveal_type(x)  # revealed: Literal["C"]
     if random():
         x = "D"
-    else:
+    if random():
         x = "E"
-    reveal_type(x) # revealed: Literal["D", "E"]
-reveal_type(x) # revealed: Literal["E"]
+    reveal_type(x)  # revealed: Literal["C", "D", "E"]
+reveal_type(x)  # revealed: Literal["E"]
 ```

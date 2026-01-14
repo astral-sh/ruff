@@ -49,9 +49,11 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, bindings_from_loop_header,
+    place_table,
 };
 use crate::subscript::{PyIndex, PySlice};
+use crate::types::builder::RecursivelyDefined;
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
@@ -115,13 +117,13 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
-    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
-    todo_type,
+    MemberLookupPolicy, MetaclassCandidate, NarrowingConstraint, PEP695TypeAliasType,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
+    UnionTypeInstance, binding_type, infer_narrowing_constraint, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -3817,14 +3819,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Loop headers represent the fixed-point type of a place at loop entry.
     /// The type is the union of:
     /// 1. The seed type (visible before the loop)
-    /// 2. Types from all bindings within the loop body
+    /// 2. Types from all bindings at the loop-back edge (end of loop body), narrowed by
+    ///    the narrowing predicates that were active at that point
     fn infer_loop_header_definition(
         &mut self,
-        loop_header: &LoopHeaderDefinitionKind,
+        loop_header_kind: &LoopHeaderDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
         let db = self.db();
-        let module = self.module();
 
         // Get seed type (visible before loop)
         let file_scope = self.scope().file_scope_id(db);
@@ -3836,41 +3838,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Undefined => Type::unknown(),
         };
 
-        // Get the while loop body range
-        let while_stmt = loop_header.while_stmt(&module);
-        let body_range = while_stmt.body.first().map(|first| {
-            let last = while_stmt.body.last().unwrap();
-            ruff_text_size::TextRange::new(first.range().start(), last.range().end())
-        });
+        // Get the loop-back bindings that were captured during semantic index building.
+        // These are the bindings visible at the end of the loop body for this place.
+        let loop_header = loop_header_kind.loop_header();
+        let place = loop_header_kind.place();
+        let loop_back_bindings = bindings_from_loop_header(db, loop_header);
 
-        // Find all bindings for this place within the loop body and collect their types
-        let place = definition.place(db);
+        // Start with the seed type
         let mut all_types = vec![seed_ty];
 
-        if let Some(body_range) = body_range {
-            let all_bindings = use_def.reachable_bindings(place);
-
-            for binding_with_constraints in all_bindings {
-                let DefinitionState::Defined(binding) = binding_with_constraints.binding else {
-                    continue;
-                };
-
-                // Skip the loop header itself
-                if binding == definition {
-                    continue;
-                }
-
-                // Check if this binding is within the loop body
-                let binding_range = binding.kind(db).full_range(&module);
-                if body_range.contains_range(binding_range) {
-                    let binding_ty = binding_type(db, binding);
-                    all_types.push(binding_ty);
-                }
+        // Add types from all loop-back bindings for this place, applying narrowing
+        for loop_back_binding in loop_back_bindings.bindings_for_place(place) {
+            // Skip the loop header itself to avoid self-reference issues
+            if loop_back_binding.definition == definition {
+                continue;
             }
+            let binding_ty = binding_type(db, loop_back_binding.definition);
+
+            // Apply narrowing predicates to narrow the binding's type.
+            // This ensures that bindings that are narrowed out by control flow
+            // (e.g., inner loop conditions) don't contribute to the type.
+            //
+            // Note: Due to cycle dependencies in type inference, the narrowing
+            // may not fully work for deeply nested loops where the narrowing
+            // constraint computation depends on types that are still being computed.
+            let narrowed_ty = if loop_back_binding.narrowing_predicates.is_empty() {
+                binding_ty
+            } else {
+                let constraint = loop_back_binding
+                    .narrowing_predicates
+                    .iter()
+                    .filter_map(|predicate| infer_narrowing_constraint(db, *predicate, place))
+                    .reduce(|acc, constraint| constraint.merge_constraint_and(acc, db));
+
+                match constraint {
+                    Some(constraint) => NarrowingConstraint::regular(binding_ty)
+                        .merge_constraint_and(constraint, db)
+                        .evaluate_constraint_type(db),
+                    None => binding_ty,
+                }
+            };
+
+            all_types.push(narrowed_ty);
         }
 
-        // Union all types together
-        let final_ty = UnionType::from_elements(db, all_types);
+        // Union all types together with recursive definition flag for faster convergence.
+        // Loop headers can create cycles (e.g., `i = i + 1`) where literal types accumulate.
+        // With recursively_defined, literals widen to their base type at a lower threshold,
+        // allowing the cycle to converge within the iteration limit.
+        let final_ty = all_types
+            .into_iter()
+            .fold(
+                UnionBuilder::new(db)
+                    .cycle_recovery(true)
+                    .recursively_defined(RecursivelyDefined::Yes),
+                UnionBuilder::add,
+            )
+            .build();
 
         self.bindings
             .insert(definition, final_ty, self.multi_inference_state);
