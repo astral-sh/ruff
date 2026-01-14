@@ -14,8 +14,8 @@ def _(
     b: TypeIs[str | int],
     c: TypeGuard[bool],
     d: TypeIs[tuple[TypeOf[bytes]]],
-    e: TypeGuard,  # error: [invalid-type-form]
-    f: TypeIs,  # error: [invalid-type-form]
+    e: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a type expression"
+    f: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
 ):
     reveal_type(a)  # revealed: TypeGuard[str]
     reveal_type(b)  # revealed: TypeIs[str | int]
@@ -46,12 +46,23 @@ A user-defined type guard must accept at least one positional argument (in addit
 for non-static methods).
 
 ```pyi
+from typing import Any, TypeVar
 from typing_extensions import TypeGuard, TypeIs
 
-# TODO: error: [invalid-type-guard-definition]
+T = TypeVar("T")
+
+# Multiple parameters are allowed
+def is_str_list(val: list[object], allow_empty: bool) -> TypeGuard[list[str]]: ...
+def is_set_of(val: set[Any], type: type[T]) -> TypeGuard[set[T]]: ...
+def is_two_element_tuple(val: tuple[object, ...], a: str, b: str) -> TypeIs[tuple[str, str]]: ...
+
+# error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
 def _() -> TypeGuard[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+def _(*args) -> TypeGuard[str]: ...
+
+# error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
 def _(**kwargs) -> TypeIs[str]: ...
 
 class _:
@@ -63,14 +74,14 @@ class _:
     def _(a) -> TypeIs[str]: ...
 
     # errors
-    def _(self) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
-    def _(self, /, *, a) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _(self) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(self, /, *, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
     @classmethod
-    def _(cls) -> TypeIs[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _(cls) -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @classmethod
-    def _() -> TypeIs[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _() -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @staticmethod
-    def _(*, a) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _(*, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
 ```
 
 For `TypeIs` functions, the narrowed type must be assignable to the declared type of that parameter,
@@ -86,10 +97,10 @@ def _(a: tuple[object]) -> TypeIs[tuple[str]]: ...
 def _(a: str | Any) -> TypeIs[str]: ...
 def _(a) -> TypeIs[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
 def _(a: int) -> TypeIs[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition] "Narrowed type `int` is not assignable to the declared parameter type `bool | str`"
 def _(a: bool | str) -> TypeIs[int]: ...
 ```
 
@@ -107,12 +118,14 @@ class C:
     @classmethod
     def g(cls, x: object) -> TypeGuard[int]:
         return True
-    # TODO: this could error at definition time
-    def h(self) -> TypeGuard[str]:
+
+    def h(
+        self,
+    ) -> TypeGuard[str]:  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
         return True
-    # TODO: this could error at definition time
+
     @classmethod
-    def j(cls) -> TypeGuard[int]:
+    def j(cls) -> TypeGuard[int]:  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
         return True
 
 def _(x: object):
@@ -221,7 +234,7 @@ def g(a: object) -> TypeIs[int]:
     return True
 
 def _(d: Any):
-    if f():  # error: [missing-argument]
+    if f():  # error: [missing-argument] "No argument provided for required parameter `a` of function `f`"
         ...
 
     if g(*d):
@@ -230,7 +243,7 @@ def _(d: Any):
     if f("foo"):  # TODO: error: [invalid-type-guard-call]
         ...
 
-    if g(a=d):  # error: [invalid-type-guard-call]
+    if g(a=d):  # error: [invalid-type-guard-call] "Type guard call does not have a target"
         ...
 ```
 
