@@ -6572,25 +6572,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             match arg.id.as_str() {
                 "defaults" if is_collections_namedtuple => {
                     // First try to retrieve the count from the AST (for list and tuple literals).
-                    defaults_count = match &kw.value {
-                        ast::Expr::List(list) => list.elts.len(),
-                        ast::Expr::Tuple(tuple) => tuple.elts.len(),
+                    let ty = match &kw.value {
+                        ast::Expr::List(list) => {
+                            defaults_count = list.elts.len();
+                            for elt in &list.elts {
+                                self.infer_expression(elt, TypeContext::default());
+                            }
+                            None
+                        }
+                        ast::Expr::Tuple(tuple) => {
+                            defaults_count = tuple.elts.len();
+                            for elt in &tuple.elts {
+                                self.infer_expression(elt, TypeContext::default());
+                            }
+                            None
+                        }
                         _ => {
                             // Fall back to inferring the type.
                             let ty = self.infer_expression(&kw.value, TypeContext::default());
-                            ty.exact_tuple_instance_spec(db)
+                            defaults_count = ty
+                                .exact_tuple_instance_spec(db)
                                 .and_then(|spec| spec.len().maximum())
-                                .unwrap_or(0)
+                                .unwrap_or(0);
+                            Some(ty)
                         }
                     };
-                    // Make sure to infer list and tuple elements.
-                    if let ast::Expr::List(list) = &kw.value {
-                        for elt in &list.elts {
-                            self.infer_expression(elt, TypeContext::default());
-                        }
-                    } else if let ast::Expr::Tuple(tuple) = &kw.value {
-                        for elt in &tuple.elts {
-                            self.infer_expression(elt, TypeContext::default());
+                    // Emit diagnostic for invalid types (not Iterable[Any] | None).
+                    if let Some(ty) = ty {
+                        let iterable_any =
+                            KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+                        let valid_type =
+                            UnionType::from_elements(db, [iterable_any, Type::none(db)]);
+                        if !ty.is_assignable_to(db, valid_type)
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Invalid argument to parameter `defaults` of `namedtuple()`"
+                            ));
+                            diagnostic.set_primary_message(format_args!(
+                                "Expected `Iterable[Any] | None`, found `{}`",
+                                ty.display(db)
+                            ));
                         }
                     }
                 }
@@ -6613,7 +6636,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 "module" if is_collections_namedtuple => {
                     // module is valid but we don't use it for type checking.
-                    self.infer_expression(&kw.value, TypeContext::default());
+                    let ty = self.infer_expression(&kw.value, TypeContext::default());
+                    // Emit diagnostic for invalid types (not str | None).
+                    let valid_type = UnionType::from_elements(
+                        db,
+                        [KnownClass::Str.to_instance(db), Type::none(db)],
+                    );
+                    if !ty.is_assignable_to(db, valid_type)
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `module` of `namedtuple()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected `str | None`, found `{}`",
+                            ty.display(db)
+                        ));
+                    }
                 }
                 unknown_kwarg => {
                     self.infer_expression(&kw.value, TypeContext::default());
@@ -6672,6 +6712,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     (fields, true)
                 } else {
+                    // Emit diagnostic if the type is outright invalid (not an iterable).
+                    let iterable_any =
+                        KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+                    if !fields_type.is_assignable_to(db, iterable_any)
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `fields` of `NamedTuple()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected an iterable of `(name, type)` pairs, found `{}`",
+                            fields_type.display(db)
+                        ));
+                    }
                     // Couldn't determine fields statically; attribute lookups will return Any.
                     (Box::new([]), false)
                 }
@@ -6714,6 +6769,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         })
                         .collect()
                 } else {
+                    // Emit diagnostic if the type is outright invalid (not str | Iterable[str]).
+                    let iterable_str =
+                        KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+                    let valid_type = UnionType::from_elements(
+                        db,
+                        [KnownClass::Str.to_instance(db), iterable_str],
+                    );
+                    if !fields_type.is_assignable_to(db, valid_type)
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `field_names` of `namedtuple()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected `str` or an iterable of strings, found `{}`",
+                            fields_type.display(db)
+                        ));
+                    }
                     // Couldn't determine field names statically.
                     None
                 }

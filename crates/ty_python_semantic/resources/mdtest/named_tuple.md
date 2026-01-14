@@ -480,6 +480,21 @@ reveal_mro(Bad1)  # revealed: (<class 'Bad1'>, <class 'tuple[Any, Any]'>, <class
 Bad2 = collections.namedtuple("Bad2", ["x"], invalid1=True, invalid2=False)
 reveal_type(Bad2)  # revealed: <class 'Bad2'>
 reveal_mro(Bad2)  # revealed: (<class 'Bad2'>, <class 'tuple[Any]'>, <class 'object'>)
+
+# Invalid type for `defaults` (not Iterable[Any] | None)
+# error: [invalid-argument-type] "Invalid argument to parameter `defaults` of `namedtuple()`"
+Bad3 = collections.namedtuple("Bad3", ["x"], defaults=123)
+reveal_type(Bad3)  # revealed: <class 'Bad3'>
+
+# Invalid type for `module` (not str | None)
+# error: [invalid-argument-type] "Invalid argument to parameter `module` of `namedtuple()`"
+Bad4 = collections.namedtuple("Bad4", ["x"], module=456)
+reveal_type(Bad4)  # revealed: <class 'Bad4'>
+
+# Invalid type for `field_names` (not str | Iterable[str])
+# error: [invalid-argument-type] "Invalid argument to parameter `field_names` of `namedtuple()`"
+Bad5 = collections.namedtuple("Bad5", 12345)
+reveal_type(Bad5)  # revealed: <class 'Bad5'>
 ```
 
 ### Keyword arguments for `typing.NamedTuple`
@@ -497,6 +512,11 @@ Bad4 = NamedTuple("Bad4", [("x", int)], defaults=[0])
 
 # error: [unknown-argument]
 Bad5 = NamedTuple("Bad5", [("x", int)], foobarbaz=42)
+
+# Invalid type for `fields` (not an iterable)
+# error: [invalid-argument-type] "Invalid argument to parameter `fields` of `NamedTuple()`"
+Bad6 = NamedTuple("Bad6", 12345)
+reveal_type(Bad6)  # revealed: <class 'Bad6'>
 ```
 
 ### Starred and double-starred arguments
