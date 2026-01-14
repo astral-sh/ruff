@@ -650,6 +650,27 @@ reveal_type(x5)  # revealed: list[Iterable[Any]]
 x6: Iterable[list[Any]] = [[1, 2, 3]]
 reveal_type(x6)  # revealed: list[list[Any]]
 
+x7: Sequence[Any] = [i for i in [1, 2, 3]]
+# TODO: This should infer `list[int]`.
+reveal_type(x7)  # revealed: list[Unknown | int]
+
+x8: MutableSequence[Any] = [i for i in [1, 2, 3]]
+reveal_type(x8)  # revealed: list[Any]
+
+x9: Iterable[Any] = [i for i in [1, 2, 3]]
+# TODO: This should infer `list[int]`.
+reveal_type(x9)  # revealed: list[Unknown | int]
+
+x10: Iterable[Iterable[Any]] = [[i] for i in [1, 2, 3]]
+# TODO: This should infer `list[list[int]]`.
+reveal_type(x10)  # revealed: list[list[Unknown | int]]
+
+x11: list[Iterable[Any]] = [[i] for i in [1, 2, 3]]
+reveal_type(x11)  # revealed: list[Iterable[Any]]
+
+x12: Iterable[list[Any]] = [[i] for i in [1, 2, 3]]
+reveal_type(x12)  # revealed: list[list[Any]]
+
 class X[T]:
     value: T
 
@@ -660,29 +681,29 @@ class A[T](X[T]): ...
 def a[T](value: T) -> A[T]:
     return A(value)
 
-x7: A[object] = A(1)
-reveal_type(x7)  # revealed: A[object]
+x13: A[object] = A(1)
+reveal_type(x13)  # revealed: A[object]
 
-x8: X[object] = A(1)
-reveal_type(x8)  # revealed: A[object]
+x14: X[object] = A(1)
+reveal_type(x14)  # revealed: A[object]
 
-x9: X[object] | None = A(1)
-reveal_type(x9)  # revealed: A[object]
+x15: X[object] | None = A(1)
+reveal_type(x15)  # revealed: A[object]
 
-x10: X[object] | None = a(1)
-reveal_type(x10)  # revealed: A[object]
+x16: X[object] | None = a(1)
+reveal_type(x16)  # revealed: A[object]
 
 def f[T](x: T) -> list[list[T]]:
     return [[x]]
 
-x11: Sequence[Sequence[Any]] = f(1)
-reveal_type(x11)  # revealed: list[list[int]]
+x17: Sequence[Sequence[Any]] = f(1)
+reveal_type(x17)  # revealed: list[list[int]]
 
-x12: Sequence[list[Any]] = f(1)
-reveal_type(x12)  # revealed: list[list[Any]]
+x18: Sequence[list[Any]] = f(1)
+reveal_type(x18)  # revealed: list[list[Any]]
 
-x13: dict[int, dict[str, int]] = defaultdict(dict)
-reveal_type(x13)  # revealed: defaultdict[int, dict[str, int]]
+x19: dict[int, dict[str, int]] = defaultdict(dict)
+reveal_type(x19)  # revealed: defaultdict[int, dict[str, int]]
 ```
 
 ## Narrow generic unions
