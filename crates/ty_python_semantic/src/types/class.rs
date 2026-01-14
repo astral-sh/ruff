@@ -1,5 +1,8 @@
 use std::fmt::Write;
 
+pub(super) use self::dataclass::{
+    DataclassFieldSpec, DataclassSpec, DynamicDataclassAnchor, DynamicDataclassLiteral,
+};
 pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
@@ -33,7 +36,7 @@ use crate::types::relation::{
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionBuilder, TypeContext, TypeMapping, UnionBuilder,
     VarianceInferable,
 };
@@ -52,6 +55,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
 
+mod dataclass;
 mod dynamic_literal;
 mod known;
 mod named_tuple;
@@ -81,6 +85,7 @@ impl<'db> CodeGeneratorKind<'db> {
             }
             ClassLiteral::Dynamic(dynamic_class) => Self::from_dynamic_class(db, dynamic_class),
             ClassLiteral::DynamicNamedTuple(_) => Some(Self::NamedTuple),
+            ClassLiteral::DynamicDataclass(_) => Some(Self::DataclassLike(None)),
             ClassLiteral::DynamicTypedDict(_) => Some(Self::TypedDict),
         }
     }
@@ -324,6 +329,8 @@ pub enum ClassLiteral<'db> {
     Dynamic(DynamicClassLiteral<'db>),
     /// A class created via `collections.namedtuple()` or `typing.NamedTuple()`.
     DynamicNamedTuple(DynamicNamedTupleLiteral<'db>),
+    /// A class created via `dataclasses.make_dataclass()`.
+    DynamicDataclass(DynamicDataclassLiteral<'db>),
     /// A class created via functional `TypedDict("Name", {...})`.
     DynamicTypedDict(DynamicTypedDictLiteral<'db>),
 }
@@ -343,6 +350,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.name(db),
             Self::Dynamic(class) => class.name(db),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.name(db),
+            Self::DynamicDataclass(dataclass) => dataclass.name(db),
             Self::DynamicTypedDict(typeddict) => typeddict.name(db),
         }
     }
@@ -369,6 +377,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.metaclass(db),
             Self::Dynamic(class) => class.metaclass(db),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.metaclass(db),
+            Self::DynamicDataclass(dataclass) => dataclass.metaclass(db),
             Self::DynamicTypedDict(typeddict) => typeddict.metaclass(db),
         }
     }
@@ -384,6 +393,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.class_member(db, name, policy),
             Self::Dynamic(class) => class.class_member(db, name, policy),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, name, policy),
+            Self::DynamicDataclass(dataclass) => dataclass.class_member(db, name, policy),
             Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, name, policy),
         }
     }
@@ -400,7 +410,10 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::Static(class) => class.class_member_from_mro(db, name, policy, mro_iter),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => {
                 // Dynamic classes don't have inherited generic context and are never `object`.
                 let result = MroLookup::new(db, mro_iter).class_member(name, policy, None, false);
                 match result {
@@ -426,9 +439,10 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.default_specialization(db),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
-                ClassType::NonGeneric(self)
-            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -440,9 +454,10 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.unknown_specialization(db),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
-                ClassType::NonGeneric(self)
-            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -450,9 +465,10 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.identity_specialization(db),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
-                ClassType::NonGeneric(self)
-            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -471,7 +487,7 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.is_typed_dict(db),
             Self::DynamicTypedDict(_) => true,
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => false,
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicDataclass(_) => false,
         }
     }
 
@@ -479,7 +495,10 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => class.is_tuple(db),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => false,
         }
     }
 
@@ -502,6 +521,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.file(db),
             Self::Dynamic(class) => class.scope(db).file(db),
             Self::DynamicNamedTuple(class) => class.scope(db).file(db),
+            Self::DynamicDataclass(class) => class.scope(db).file(db),
             Self::DynamicTypedDict(class) => class.scope(db).file(db),
         }
     }
@@ -515,6 +535,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.header_range(db),
             Self::Dynamic(class) => class.header_range(db),
             Self::DynamicNamedTuple(class) => class.header_range(db),
+            Self::DynamicDataclass(class) => class.header_range(db),
             Self::DynamicTypedDict(class) => class.header_range(db),
         }
     }
@@ -530,7 +551,10 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.is_final(db),
             // Dynamic classes created via `type()`, `collections.namedtuple()`, etc. cannot be
             // marked as final.
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => false,
         }
     }
 
@@ -548,6 +572,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.has_own_ordering_method(db),
             Self::Dynamic(class) => class.has_own_ordering_method(db),
             Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
+            Self::DynamicDataclass(dataclass) => dataclass.has_own_ordering_method(db),
         }
     }
 
@@ -555,7 +580,10 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn as_static(self) -> Option<StaticClassLiteral<'db>> {
         match self {
             Self::Static(class) => Some(class),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => None,
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => None,
         }
     }
 
@@ -565,6 +593,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => Some(class.definition(db)),
             Self::Dynamic(class) => class.definition(db),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.definition(db),
+            Self::DynamicDataclass(dataclass) => dataclass.definition(db),
             Self::DynamicTypedDict(typeddict) => typeddict.definition(db),
         }
     }
@@ -579,6 +608,9 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(class) => class.definition(db).map(TypeDefinition::DynamicClass),
             Self::DynamicNamedTuple(namedtuple) => {
                 namedtuple.definition(db).map(TypeDefinition::DynamicClass)
+            }
+            Self::DynamicDataclass(dataclass) => {
+                dataclass.definition(db).map(TypeDefinition::DynamicClass)
             }
             Self::DynamicTypedDict(typeddict) => {
                 typeddict.definition(db).map(TypeDefinition::DynamicClass)
@@ -600,6 +632,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.header_span(db),
             Self::Dynamic(class) => class.header_span(db),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.header_span(db),
+            Self::DynamicDataclass(dataclass) => dataclass.header_span(db),
             Self::DynamicTypedDict(typeddict) => typeddict.header_span(db),
         }
     }
@@ -627,8 +660,25 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(class) => class.as_disjoint_base(db),
             // Dynamic namedtuples define `__slots__ = ()`, but `__slots__` must be
             // non-empty for a class to be a disjoint base.
+            Self::DynamicNamedTuple(_) => None,
+            // Dynamic dataclasses can define `__slots__` if `slots=True`.
+            // However, empty slots (dataclass with no fields) are not disjoint bases.
+            Self::DynamicDataclass(dataclass) => {
+                let has_slots = dataclass
+                    .dataclass_params(db)
+                    .flags(db)
+                    .contains(DataclassFlags::SLOTS);
+                let has_fields = !dataclass.fields(db).is_empty();
+                if has_slots && has_fields {
+                    Some(DisjointBase::due_to_dunder_slots(
+                        ClassLiteral::DynamicDataclass(dataclass),
+                    ))
+                } else {
+                    None
+                }
+            }
             // Dynamic TypedDicts don't define `__slots__`.
-            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => None,
+            Self::DynamicTypedDict(_) => None,
         }
     }
 
@@ -636,9 +686,10 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Static(class) => class.to_non_generic_instance(db),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
-                Type::instance(db, ClassType::NonGeneric(self))
-            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => Type::instance(db, ClassType::NonGeneric(self)),
         }
     }
 
@@ -659,9 +710,10 @@ impl<'db> ClassLiteral<'db> {
     ) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.apply_specialization(db, f),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
-                ClassType::NonGeneric(self)
-            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -676,6 +728,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.instance_member(db, specialization, name),
             Self::Dynamic(class) => class.instance_member(db, name),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, name),
+            Self::DynamicDataclass(dataclass) => dataclass.instance_member(db, name),
             Self::DynamicTypedDict(_) => PlaceAndQualifiers::default(),
         }
     }
@@ -684,9 +737,10 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.top_materialization(db),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
-                ClassType::NonGeneric(self)
-            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -701,7 +755,9 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.typed_dict_member(db, specialization, name, policy),
             Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, name, policy),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => Place::Undefined.into(),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicDataclass(_) => {
+                Place::Undefined.into()
+            }
         }
     }
 
@@ -717,6 +773,9 @@ impl<'db> ClassLiteral<'db> {
                 Self::Dynamic(class.with_dataclass_params(db, dataclass_params))
             }
             Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => self,
+            Self::DynamicDataclass(class) => {
+                Self::DynamicDataclass(class.with_dataclass_params(db, dataclass_params))
+            }
         }
     }
 
@@ -730,6 +789,9 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(dynamic_class) => dynamic_class.explicit_bases(db).into(),
             Self::DynamicNamedTuple(namedtuple) => {
                 [Type::from(namedtuple.tuple_base_class(db))].into()
+            }
+            Self::DynamicDataclass(dataclass) => {
+                dataclass.bases(db).iter().map(Type::from).collect()
             }
             Self::DynamicTypedDict(_) => {
                 // TypedDicts always inherit from `dict`
@@ -760,6 +822,12 @@ impl<'db> From<DynamicNamedTupleLiteral<'db>> for ClassLiteral<'db> {
 impl<'db> From<DynamicTypedDictLiteral<'db>> for ClassLiteral<'db> {
     fn from(literal: DynamicTypedDictLiteral<'db>) -> Self {
         ClassLiteral::DynamicTypedDict(literal)
+    }
+}
+
+impl<'db> From<DynamicDataclassLiteral<'db>> for ClassLiteral<'db> {
+    fn from(literal: DynamicDataclassLiteral<'db>) -> Self {
+        ClassLiteral::DynamicDataclass(literal)
     }
 }
 
@@ -853,6 +921,7 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicDataclass(_)
                 | ClassLiteral::DynamicTypedDict(_),
             ) => None,
             Self::Generic(generic) => Some((generic.origin(db), Some(generic.specialization(db)))),
@@ -871,6 +940,7 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicDataclass(_)
                 | ClassLiteral::DynamicTypedDict(_),
             ) => None,
             Self::Generic(generic) => Some((
@@ -1325,6 +1395,9 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
                 return namedtuple.own_class_member(db, name);
             }
+            Self::NonGeneric(ClassLiteral::DynamicDataclass(dataclass)) => {
+                return dataclass.own_class_member(db, name);
+            }
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(typeddict)) => {
                 return typeddict.own_class_member(db, name);
             }
@@ -1611,6 +1684,9 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
                 namedtuple.instance_member(db, name)
             }
+            Self::NonGeneric(ClassLiteral::DynamicDataclass(dataclass)) => {
+                dataclass.instance_member(db, name)
+            }
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(_)) => PlaceAndQualifiers::default(),
             Self::NonGeneric(ClassLiteral::Static(class)) => {
                 if class.is_typed_dict(db) {
@@ -1650,6 +1726,7 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicDataclass(_)
                 | ClassLiteral::DynamicTypedDict(_),
             ) => None,
         }
@@ -1664,6 +1741,9 @@ impl<'db> ClassType<'db> {
             }
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
                 namedtuple.own_instance_member(db, name)
+            }
+            Self::NonGeneric(ClassLiteral::DynamicDataclass(dataclass)) => {
+                dataclass.own_instance_member(db, name)
             }
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(_)) => Member::default(),
             Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
@@ -1931,6 +2011,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicDataclass(_)
                 | ClassLiteral::DynamicTypedDict(_),
             ) => TypeVarVariance::Bivariant,
             Self::Generic(generic) => generic.variance_of(db, typevar),
@@ -2124,9 +2205,10 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
             Self::Static(class) => class.variance_of(db, typevar),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => {
-                TypeVarVariance::Bivariant
-            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicDataclass(_)
+            | Self::DynamicTypedDict(_) => TypeVarVariance::Bivariant,
         }
     }
 }
@@ -2414,6 +2496,11 @@ impl<'db> QualifiedClassName<'db> {
             ClassLiteral::DynamicNamedTuple(namedtuple) => {
                 // Dynamic namedtuples don't have a body scope; start from the enclosing scope.
                 let scope = namedtuple.scope(self.db);
+                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+            }
+            ClassLiteral::DynamicDataclass(dataclass) => {
+                // Dynamic dataclasses don't have a body scope; start from the enclosing scope.
+                let scope = dataclass.scope(self.db);
                 (scope.file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicTypedDict(typeddict) => {
