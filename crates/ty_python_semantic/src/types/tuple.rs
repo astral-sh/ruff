@@ -516,7 +516,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     ) -> ConstraintSet<'db> {
         match other {
             Tuple::Fixed(other) => {
-                ConstraintSet::from_bool(db, self.0.len() == other.0.len()).and(db, || {
+                ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
                     (self.0.iter().zip(&other.0)).when_all(db, |(self_ty, other_ty)| {
                         self_ty.has_relation_to_impl(
                             db,
@@ -533,11 +533,11 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             Tuple::Variable(other) => {
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
-                let mut result = ConstraintSet::from_bool(db, true);
+                let mut result = ConstraintSet::from(true);
                 let mut self_iter = self.0.iter();
                 for other_ty in other.prefix_elements() {
                     let Some(self_ty) = self_iter.next() else {
-                        return ConstraintSet::from_bool(db, false);
+                        return ConstraintSet::from(false);
                     };
                     let element_constraints = self_ty.has_relation_to_impl(
                         db,
@@ -556,7 +556,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 }
                 for other_ty in other.iter_suffix_elements().rev() {
                     let Some(self_ty) = self_iter.next_back() else {
-                        return ConstraintSet::from_bool(db, false);
+                        return ConstraintSet::from(false);
                     };
                     let element_constraints = self_ty.has_relation_to_impl(
                         db,
@@ -599,7 +599,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        ConstraintSet::from_bool(db, self.0.len() == other.0.len()).and(db, || {
+        ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
             (self.0.iter())
                 .zip(&other.0)
                 .when_all(db, |(self_ty, other_ty)| {
@@ -1031,17 +1031,17 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
                 // length.
                 if !relation.is_assignability() || !self.variable().is_dynamic() {
-                    return ConstraintSet::from_bool(db, false);
+                    return ConstraintSet::from(false);
                 }
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
-                let mut result = ConstraintSet::from_bool(db, true);
+                let mut result = ConstraintSet::from(true);
                 let mut other_iter = other.iter_all_elements();
                 for self_ty in self.prenormalized_prefix_elements(db, None) {
                     let Some(other_ty) = other_iter.next() else {
-                        return ConstraintSet::from_bool(db, false);
+                        return ConstraintSet::from(false);
                     };
                     let element_constraints = self_ty.has_relation_to_impl(
                         db,
@@ -1061,7 +1061,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 let suffix: Vec<_> = self.prenormalized_suffix_elements(db, None).collect();
                 for self_ty in suffix.iter().rev() {
                     let Some(other_ty) = other_iter.next_back() else {
-                        return ConstraintSet::from_bool(db, false);
+                        return ConstraintSet::from(false);
                     };
                     let element_constraints = self_ty.has_relation_to_impl(
                         db,
@@ -1097,7 +1097,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                let mut result = ConstraintSet::from_bool(db, true);
+                let mut result = ConstraintSet::from(true);
                 let pairwise = self
                     .prenormalized_prefix_elements(db, self_prenormalize_variable)
                     .zip_longest(
@@ -1127,7 +1127,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
                             if !relation.is_assignability() || !self.variable().is_dynamic() {
-                                return ConstraintSet::from_bool(db, false);
+                                return ConstraintSet::from(false);
                             }
                             self.variable().has_relation_to_impl(
                                 db,
@@ -1181,7 +1181,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
                             if !relation.is_assignability() || !self.variable().is_dynamic() {
-                                return ConstraintSet::from_bool(db, false);
+                                return ConstraintSet::from(false);
                             }
                             self.variable().has_relation_to_impl(
                                 db,
@@ -1233,7 +1233,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             self_ty.is_equivalent_to_impl(db, other_ty, inferable, visitor)
                         }
                         EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
-                            ConstraintSet::from_bool(db, false)
+                            ConstraintSet::from(false)
                         }
                     })
             })
@@ -1245,7 +1245,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             self_ty.is_equivalent_to_impl(db, other_ty, inferable, visitor)
                         }
                         EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
-                            ConstraintSet::from_bool(db, false)
+                            ConstraintSet::from(false)
                         }
                     })
             })
@@ -1513,7 +1513,7 @@ impl<'db> Tuple<Type<'db>> {
                 self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor)
             }
             (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => {
-                ConstraintSet::from_bool(db, false)
+                ConstraintSet::from(false)
             }
         }
     }
@@ -1530,10 +1530,10 @@ impl<'db> Tuple<Type<'db>> {
         let (self_min, self_max) = self.len().size_hint();
         let (other_min, other_max) = other.len().size_hint();
         if self_max.is_some_and(|max| max < other_min) {
-            return ConstraintSet::from_bool(db, true);
+            return ConstraintSet::from(true);
         }
         if other_max.is_some_and(|max| max < self_min) {
-            return ConstraintSet::from_bool(db, true);
+            return ConstraintSet::from(true);
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.

@@ -125,16 +125,16 @@ impl<'db> NewType<'db> {
     // base class, we don't have to keep looking.
     pub(crate) fn has_relation_to_impl(self, db: &'db dyn Db, other: Self) -> ConstraintSet<'db> {
         if self.is_equivalent_to_impl(db, other) {
-            return ConstraintSet::from_bool(db, true);
+            return ConstraintSet::from(true);
         }
         for base in self.iter_bases(db) {
             if let NewTypeBase::NewType(base_newtype) = base {
                 if base_newtype.is_equivalent_to_impl(db, other) {
-                    return ConstraintSet::from_bool(db, true);
+                    return ConstraintSet::from(true);
                 }
             }
         }
-        ConstraintSet::from_bool(db, false)
+        ConstraintSet::from(false)
     }
 
     pub(crate) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> ConstraintSet<'db> {

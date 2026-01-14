@@ -90,41 +90,25 @@ use crate::{Db, FxOrderMap, FxOrderSet};
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_none_or<'db>(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db>;
+    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
 
     /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db>(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db>;
+    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
 }
 
 impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db>(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db> {
+    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::always(db),
+            None => ConstraintSet::always(),
         }
     }
 
-    fn when_some_and<'db>(
-        self,
-        db: &'db dyn Db,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db> {
+    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::never(db),
+            None => ConstraintSet::never(),
         }
     }
 }
@@ -163,7 +147,7 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::never(db);
+        let mut result = ConstraintSet::never();
         for child in self {
             if result.union(db, f(child)).is_always_satisfied(db) {
                 return result;
@@ -177,7 +161,7 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always(db);
+        let mut result = ConstraintSet::always();
         for child in self {
             if result.intersect(db, f(child)).is_never_satisfied(db) {
                 return result;
@@ -206,14 +190,14 @@ pub struct ConstraintSet<'db> {
 }
 
 impl<'db> ConstraintSet<'db> {
-    fn never(db: &'db dyn Db) -> Self {
+    fn never() -> Self {
         Self {
             node: Node::AlwaysFalse,
             support: Support::Empty,
         }
     }
 
-    fn always(db: &'db dyn Db) -> Self {
+    fn always() -> Self {
         Self {
             node: Node::AlwaysTrue,
             support: Support::Empty,
@@ -541,9 +525,9 @@ impl<'db> ConstraintSet<'db> {
     }
 }
 
-impl<'db> ConstraintSet<'db> {
-    pub(crate) fn from_bool(db: &'db dyn Db, b: bool) -> Self {
-        if b { Self::always(db) } else { Self::never(db) }
+impl From<bool> for ConstraintSet<'_> {
+    fn from(b: bool) -> Self {
+        if b { Self::always() } else { Self::never() }
     }
 }
 
@@ -3621,7 +3605,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         // that _some_ valid specialization satisfies the constraint set, it's correct for us to
         // return the range of valid materializations that we can choose from.
         match self.typevar(db).bound_or_constraints(db) {
-            None => ConstraintSet::from_bool(db, true),
+            None => ConstraintSet::from(true),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.top_materialization(db);
                 ConstraintSet::constrain_typevar(db, self, Type::Never, bound)
@@ -3638,7 +3622,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 let (static_constraints, gradual_constraints): (Vec<_>, Vec<_>) = materialized
                     .into_iter()
                     .partition(|(lower, upper)| *lower == *upper);
-                let mut specializations = ConstraintSet::from_bool(db, false);
+                let mut specializations = ConstraintSet::from(false);
                 for (constraint_lower, constraint_upper) in
                     static_constraints.into_iter().chain(gradual_constraints)
                 {
@@ -3679,7 +3663,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         // valid specializations that must satisfy the check. We therefore take the bottom
         // materialization of the bound or constraints.
         match self.typevar(db).bound_or_constraints(db) {
-            None => (ConstraintSet::from_bool(db, true), Vec::new()),
+            None => (ConstraintSet::from(true), Vec::new()),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.bottom_materialization(db);
                 (
@@ -3688,7 +3672,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 )
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                let mut non_gradual_constraints = ConstraintSet::from_bool(db, false);
+                let mut non_gradual_constraints = ConstraintSet::from(false);
                 let mut gradual_constraints = Vec::new();
                 for constraint in constraints.elements(db) {
                     let constraint_lower = constraint.bottom_materialization(db);
