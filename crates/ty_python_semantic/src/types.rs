@@ -4402,32 +4402,6 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::SpecialForm(SpecialFormType::NamedTuple) => {
-                // typing.NamedTuple(typename: str, fields: Iterable[tuple[str, Any]])
-                let str_type = KnownClass::Str.to_instance(db);
-                // tuple[str, Any]
-                let field_tuple = Type::heterogeneous_tuple(db, [str_type, Type::any()]);
-                // Iterable[tuple[str, Any]]
-                let fields_type = KnownClass::Iterable.to_specialized_instance(db, &[field_tuple]);
-
-                Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_or_keyword(Name::new_static("typename"))
-                                    .with_annotated_type(str_type),
-                                Parameter::positional_or_keyword(Name::new_static("fields"))
-                                    .with_annotated_type(fields_type),
-                            ],
-                        ),
-                        KnownClass::NamedTupleFallback.to_subclass_of(db),
-                    ),
-                )
-                .into()
-            }
-
             Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
