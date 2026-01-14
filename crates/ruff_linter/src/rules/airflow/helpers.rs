@@ -33,6 +33,14 @@ pub(crate) enum Replacement {
         module: &'static str,
         name: String,
     },
+    // Symbols moved to Task SDK in Airflow 3 with only module changed. Used when we want to match multiple names.
+    // e.g., `airflow.io.get_fs | has_fs | Properties` to `airflow.sdk.io.get_fs | has_fs | Properties`
+    SourceModuleMovedToSDK {
+        module: &'static str,
+        name: String,
+        version: &'static str,
+        warning_message: Option<&'static str>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

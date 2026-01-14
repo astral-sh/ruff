@@ -908,13 +908,13 @@ AIR311 [*] `airflow.sensors.base.poke_mode_only` is removed in Airflow 3.0; It s
 119 | poke_mode_only()
     | ^^^^^^^^^^^^^^
     |
-help: Use `poke_mode_only` from `airflow.sdk` instead.
+help: Use `poke_mode_only` from `airflow.sdk.bases.sensor` instead.
 110 | from airflow.sensors.base import (
 111 |     BaseSensorOperator,
 112 |     PokeReturnValue,
     -     poke_mode_only,
 113 | )
-114 + from airflow.sdk import poke_mode_only
+114 + from airflow.sdk.bases.sensor import poke_mode_only
 115 | 
 116 | # airflow.sensors.base
 117 | BaseSensorOperator()
