@@ -664,14 +664,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns an unknown specialization for this class.
-    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.unknown_specialization(db),
-            Self::Dynamic(_) => ClassType::NonGeneric(self),
-        }
-    }
-
     /// Returns the definition of this class, if available.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
@@ -4712,7 +4704,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 ///
 /// # Salsa interning
 ///
-/// This is a salsa interned struct. Two different `type()` calls always produce
+/// This is a Salsa-interned struct. Two different `type()` calls always produce
 /// distinct `DynamicClassLiteral` instances, even if they have the same name and bases:
 ///
 /// ```python
@@ -4735,9 +4727,6 @@ pub struct DynamicClassLiteral<'db> {
     /// The base classes (from the second argument to `type()`).
     #[returns(deref)]
     pub bases: Box<[ClassBase<'db>]>,
-
-    /// The scope containing the `type()` call.
-    pub scope: ScopeId<'db>,
 
     /// The anchor for this dynamic class, providing stable identity.
     ///
@@ -4781,7 +4770,7 @@ pub enum DynamicClassAnchor<'db> {
     ///
     /// The offset is relative to the enclosing scope's anchor node index.
     /// For module scope, this is equivalent to an absolute index (anchor is 0).
-    ScopeOffset(u32),
+    ScopeOffset { scope: ScopeId<'db>, offset: u32 },
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
@@ -4792,7 +4781,15 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => Some(definition),
-            DynamicClassAnchor::ScopeOffset(_) => None,
+            DynamicClassAnchor::ScopeOffset { .. } => None,
+        }
+    }
+
+    /// Returns the scope in which this dynamic class was created.
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => definition.scope(db),
+            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
         }
     }
 
@@ -4819,7 +4816,7 @@ impl<'db> DynamicClassLiteral<'db> {
                     .expect("DynamicClassAnchor::Definition should only be used for assignments")
                     .range()
             }
-            DynamicClassAnchor::ScopeOffset(offset) => {
+            DynamicClassAnchor::ScopeOffset { offset, .. } => {
                 // For dangling `type()` calls, compute the absolute index from the offset.
                 let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
                 let anchor_u32 = scope_anchor
@@ -5075,7 +5072,6 @@ impl<'db> DynamicClassLiteral<'db> {
             db,
             self.name(db).clone(),
             self.bases(db),
-            self.scope(db),
             self.anchor(db),
             self.members(db),
             self.has_dynamic_namespace(db),

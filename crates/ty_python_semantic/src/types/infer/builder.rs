@@ -6246,14 +6246,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let call_u32 = call_node_index
                 .as_u32()
                 .expect("call node should not be NodeIndex::NONE");
-            DynamicClassAnchor::ScopeOffset(call_u32 - anchor_u32)
+            DynamicClassAnchor::ScopeOffset {
+                scope,
+                offset: call_u32 - anchor_u32,
+            }
         };
 
         let dynamic_class = DynamicClassLiteral::new(
             db,
             name,
             bases,
-            scope,
             anchor,
             members,
             has_dynamic_namespace,
