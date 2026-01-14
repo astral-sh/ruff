@@ -57,7 +57,10 @@ impl Violation for Airflow3SuggestedUpdate {
             | Replacement::AttrName(_)
             | Replacement::Message(_)
             | Replacement::Rename { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ } => {
+            | Replacement::SourceModuleMoved { module: _, name: _ }
+            | Replacement::SourceModuleMovedToSDK {
+                module: _, name: _, ..
+            } => {
                 format!(
                     "`{deprecated}` is removed in Airflow 3.0; \
                     It still works in Airflow 3.0 but is expected to be removed in a future version."
@@ -77,6 +80,17 @@ impl Violation for Airflow3SuggestedUpdate {
             }
             Replacement::SourceModuleMoved { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
+            }
+            Replacement::SourceModuleMovedToSDK {
+                module,
+                name,
+                version,
+                warning_message,
+            } => {
+                let warning = warning_message.unwrap_or("");
+                Some(format!(
+                    "`{name}` has been moved to `{module}` since Airflow 3.0 (with task-sdk {version}). {warning}"
+                ))
             }
         }
     }
@@ -300,10 +314,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "sensors",
             "base",
-            rest @ ("BaseSensorOperator" | "PokeReturnValue" | "poke_mode_only"),
+            rest @ ("BaseSensorOperator" | "PokeReturnValue"),
         ] => Replacement::SourceModuleMoved {
             module: "airflow.sdk",
             name: (*rest).to_string(),
+        },
+
+        ["airflow", "sensors", "base", "poke_mode_only"] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk.bases.sensor",
+            name: "poke_mode_only".to_string(),
         },
 
         // airflow.timetables

@@ -10,7 +10,7 @@ AIR321 [*] `airflow.utils.setup_teardown.BaseSetupTeardownContext` is removed in
    | ^^^^^^^^^^^^^^^^^^^^^^^^
 10 | SetupTeardownContext()
    |
-help: Use `BaseSetupTeardownContext` from `airflow.sdk.definitions._internal.setup_teardown` instead.
+help: `BaseSetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` since Airflow 3.1 (with task-sdk 1.1). WARNING: This is an internal API and may change without notice.
 2  | 
 3  | # airflow.utils.setup_teardown
 4  | from airflow.utils.setup_teardown import (
@@ -32,7 +32,7 @@ AIR321 [*] `airflow.utils.setup_teardown.SetupTeardownContext` is removed in Air
 11 |
 12 | # airflow.utils.xcom
    |
-help: Use `SetupTeardownContext` from `airflow.sdk.definitions._internal.setup_teardown` instead.
+help: `SetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` since Airflow 3.1 (with task-sdk 1.1). WARNING: This is an internal API and may change without notice.
 3  | # airflow.utils.setup_teardown
 4  | from airflow.utils.setup_teardown import (
 5  |     BaseSetupTeardownContext,
@@ -75,7 +75,7 @@ AIR321 [*] `airflow.utils.task_group.TaskGroup` is removed in Airflow 3.1
 21 |
 22 | # airflow.utils.timezone
    |
-help: Use `TaskGroup` from `airflow.sdk` instead.
+help: `TaskGroup` has been moved to `airflow.sdk` since Airflow 3.1 (with task-sdk 1.1). 
 15 | XCOM_RETURN_KEY
 16 | 
 17 | # airflow.utils.task_group
@@ -96,7 +96,7 @@ AIR321 [*] `airflow.utils.timezone.coerce_datetime` is removed in Airflow 3.1
 37 | convert_to_utc(current_time)
 38 | datetime(2026, 1, 1, 21, 30, 0)
    |
-help: Use `coerce_datetime` from `airflow.sdk.timezone` instead.
+help: `coerce_datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with task-sdk 1.1). 
 22 | # airflow.utils.timezone
 23 | from datetime import datetime as dt
 24 | from airflow.utils.timezone import (
@@ -123,7 +123,7 @@ AIR321 [*] `airflow.utils.timezone.convert_to_utc` is removed in Airflow 3.1
 38 | datetime(2026, 1, 1, 21, 30, 0)
 39 | make_naive(current_time, tz=None)
    |
-help: Use `convert_to_utc` from `airflow.sdk.timezone` instead.
+help: `convert_to_utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with task-sdk 1.1). 
 23 | from datetime import datetime as dt
 24 | from airflow.utils.timezone import (
 25 |     coerce_datetime,
@@ -150,7 +150,7 @@ AIR321 [*] `airflow.utils.timezone.datetime` is removed in Airflow 3.1
 39 | make_naive(current_time, tz=None)
 40 | parse("2026-01-01 21:30:00")
    |
-help: Use `datetime` from `airflow.sdk.timezone` instead.
+help: `datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with task-sdk 1.1). 
 24 | from airflow.utils.timezone import (
 25 |     coerce_datetime,
 26 |     convert_to_utc,
@@ -176,7 +176,7 @@ AIR321 [*] `airflow.utils.timezone.make_naive` is removed in Airflow 3.1
 40 | parse("2026-01-01 21:30:00")
 41 | utc
    |
-help: Use `make_naive` from `airflow.sdk.timezone` instead.
+help: `make_naive` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with task-sdk 1.1). 
 25 |     coerce_datetime,
 26 |     convert_to_utc,
 27 |     datetime,
@@ -201,7 +201,7 @@ AIR321 [*] `airflow.utils.timezone.parse` is removed in Airflow 3.1
 41 | utc
 42 | utcnow()
    |
-help: Use `parse` from `airflow.sdk.timezone` instead.
+help: `parse` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with task-sdk 1.1). 
 26 |     convert_to_utc,
 27 |     datetime,
 28 |     make_naive,
@@ -224,7 +224,7 @@ AIR321 [*] `airflow.utils.timezone.utc` is removed in Airflow 3.1
    | ^^^
 42 | utcnow()
    |
-help: Use `utc` from `airflow.sdk.timezone` instead.
+help: `utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with task-sdk 1.1). 
 27 |     datetime,
 28 |     make_naive,
 29 |     parse,
@@ -247,7 +247,7 @@ AIR321 [*] `airflow.utils.timezone.utcnow` is removed in Airflow 3.1
 43 |
 44 | # airflow.utils.decorators
    |
-help: Use `utcnow` from `airflow.sdk.timezone` instead.
+help: `utcnow` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with task-sdk 1.1). 
 28 |     make_naive,
 29 |     parse,
 30 |     utc,
@@ -268,7 +268,7 @@ AIR321 [*] `airflow.utils.decorators.remove_task_decorator` is removed in Airflo
    | ^^^^^^^^^^^^^^^^^^^^^
 51 | fixup_decorator_warning_stack()
    |
-help: Use `remove_task_decorator` from `airflow.sdk.definitions._internal.decorators` instead.
+help: `remove_task_decorator` has been moved to `airflow.sdk.definitions._internal.decorators` since Airflow 3.1 (with task-sdk 1.1). WARNING: This is an internal API and may change without notice.
 43 | 
 44 | # airflow.utils.decorators
 45 | from airflow.utils.decorators import (
@@ -290,7 +290,7 @@ AIR321 [*] `airflow.utils.decorators.fixup_decorator_warning_stack` is removed i
 52 |
 53 | # airflow.models.abstractoperator
    |
-help: Use `fixup_decorator_warning_stack` from `airflow.sdk.definitions._internal.decorators` instead.
+help: `fixup_decorator_warning_stack` has been moved to `airflow.sdk.definitions._internal.decorators` since Airflow 3.1 (with task-sdk 1.1). WARNING: This is an internal API and may change without notice.
 44 | # airflow.utils.decorators
 45 | from airflow.utils.decorators import (
 46 |     remove_task_decorator,
@@ -312,7 +312,7 @@ AIR321 [*] `airflow.models.abstractoperator.AbstractOperator` is removed in Airf
 61 | NotMapped()
 62 | TaskStateChangeCallback()
    |
-help: Use `AbstractOperator` from `airflow.sdk.definitions._internal.abstractoperator` instead.
+help: `AbstractOperator` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1 (with task-sdk 1.1). WARNING: This is an internal API and may change without notice.
 52 | 
 53 | # airflow.models.abstractoperator
 54 | from airflow.models.abstractoperator import (
@@ -334,7 +334,7 @@ AIR321 [*] `airflow.models.abstractoperator.NotMapped` is removed in Airflow 3.1
    | ^^^^^^^^^
 62 | TaskStateChangeCallback()
    |
-help: Use `NotMapped` from `airflow.sdk.definitions._internal.abstractoperator` instead.
+help: `NotMapped` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1 (with task-sdk 1.1). WARNING: This is an internal API and may change without notice.
 53 | # airflow.models.abstractoperator
 54 | from airflow.models.abstractoperator import (
 55 |     AbstractOperator,
@@ -357,7 +357,7 @@ AIR321 [*] `airflow.models.abstractoperator.TaskStateChangeCallback` is removed 
 63 |
 64 | # airflow.models.baseoperator
    |
-help: Use `TaskStateChangeCallback` from `airflow.sdk.definitions._internal.abstractoperator` instead.
+help: `TaskStateChangeCallback` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1 (with task-sdk 1.1). WARNING: This is an internal API and may change without notice.
 54 | from airflow.models.abstractoperator import (
 55 |     AbstractOperator,
 56 |     NotMapped,
@@ -379,7 +379,7 @@ AIR321 [*] `airflow.models.baseoperator.BaseOperator` is removed in Airflow 3.1
 68 |
 69 | # airflow.macros
    |
-help: Use `BaseOperator` from `airflow.sdk` instead.
+help: `BaseOperator` has been moved to `airflow.sdk` since Airflow 3.1 (with task-sdk 1.1). 
 62 | TaskStateChangeCallback()
 63 | 
 64 | # airflow.models.baseoperator
@@ -400,7 +400,7 @@ AIR321 [*] `airflow.macros.ds_add` is removed in Airflow 3.1
 78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
 79 | datetime_diff_for_humans(
    |
-help: Use `ds_add` from `airflow.sdk.execution_time.macros` instead.
+help: `ds_add` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with task-sdk 1.1). 
 68 | 
 69 | # airflow.macros
 70 | from airflow.macros import (
@@ -424,7 +424,7 @@ AIR321 [*] `airflow.macros.ds_format` is removed in Airflow 3.1
 79 | datetime_diff_for_humans(
 80 |     dt(2026, 1, 1, 21, 30, 0),
    |
-help: Use `ds_format` from `airflow.sdk.execution_time.macros` instead.
+help: `ds_format` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with task-sdk 1.1). 
 69 | # airflow.macros
 70 | from airflow.macros import (
 71 |     ds_add,
@@ -448,7 +448,7 @@ AIR321 [*] `airflow.macros.datetime_diff_for_humans` is removed in Airflow 3.1
 80 |     dt(2026, 1, 1, 21, 30, 0),
 81 |     since=dt(2026, 1, 2, 21, 30, 0)
    |
-help: Use `datetime_diff_for_humans` from `airflow.sdk.execution_time.macros` instead.
+help: `datetime_diff_for_humans` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with task-sdk 1.1). 
 70 | from airflow.macros import (
 71 |     ds_add,
 72 |     ds_format,
@@ -471,7 +471,7 @@ AIR321 [*] `airflow.macros.ds_format_locale` is removed in Airflow 3.1
 84 |
 85 | # airflow.io
    |
-help: Use `ds_format_locale` from `airflow.sdk.execution_time.macros` instead.
+help: `ds_format_locale` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with task-sdk 1.1). 
 71 |     ds_add,
 72 |     ds_format,
 73 |     datetime_diff_for_humans,
@@ -493,7 +493,7 @@ AIR321 [*] `airflow.io.get_fs` is removed in Airflow 3.1
 93 | has_fs()
 94 | Properties()
    |
-help: Use `get_fs` from `airflow.sdk.io` instead.
+help: `get_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with task-sdk 1.1). 
 84 | 
 85 | # airflow.io
 86 | from airflow.io import (
@@ -515,7 +515,7 @@ AIR321 [*] `airflow.io.has_fs` is removed in Airflow 3.1
    | ^^^^^^
 94 | Properties()
    |
-help: Use `has_fs` from `airflow.sdk.io` instead.
+help: `has_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with task-sdk 1.1). 
 85 | # airflow.io
 86 | from airflow.io import (
 87 |     get_fs,
@@ -536,7 +536,7 @@ AIR321 [*] `airflow.io.Properties` is removed in Airflow 3.1
 94 | Properties()
    | ^^^^^^^^^^
    |
-help: Use `Properties` from `airflow.sdk.io` instead.
+help: `Properties` has been moved to `airflow.sdk.io` since Airflow 3.1 (with task-sdk 1.1). 
 86 | from airflow.io import (
 87 |     get_fs,
 88 |     has_fs,

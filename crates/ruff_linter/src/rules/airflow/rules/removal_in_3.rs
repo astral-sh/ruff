@@ -61,7 +61,10 @@ impl Violation for Airflow3Removal {
             | Replacement::AttrName(_)
             | Replacement::Message(_)
             | Replacement::Rename { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ } => {
+            | Replacement::SourceModuleMoved { module: _, name: _ }
+            | Replacement::SourceModuleMovedToSDK {
+                module: _, name: _, ..
+            } => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
             }
         }
@@ -78,6 +81,17 @@ impl Violation for Airflow3Removal {
             }
             Replacement::SourceModuleMoved { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
+            }
+            Replacement::SourceModuleMovedToSDK {
+                module,
+                name,
+                version,
+                warning_message,
+            } => {
+                let warning = warning_message.unwrap_or("");
+                Some(format!(
+                    "`{name}` has been moved to `{module}` since Airflow 3.0 (with task-sdk {version}). {warning}"
+                ))
             }
         }
     }
@@ -724,10 +738,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.secrets
-        ["airflow", "secrets", "cache", "SecretCache"] => Replacement::Rename {
-            module: "airflow.sdk",
-            name: "SecretCache",
-        },
         ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::Rename {
             module: "airflow.secrets.local_filesystem",
             name: "load_connections_dict",

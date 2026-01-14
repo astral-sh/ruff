@@ -138,31 +138,6 @@ AIR301 `airflow.operators.postgres_operator.Mapping` is removed in Airflow 3.0
 60 | # airflow.secrets
    |
 
-AIR301 [*] `airflow.secrets.cache.SecretCache` is removed in Airflow 3.0
-  --> AIR301_names.py:65:1
-   |
-64 | # airflow.secrets.cache
-65 | SecretCache()
-   | ^^^^^^^^^^^
-   |
-help: Use `SecretCache` from `airflow.sdk` instead.
-14 | from airflow.datasets import DatasetAliasEvent, DatasetEvent
-15 | from airflow.operators.postgres_operator import Mapping
-16 | from airflow.operators.subdag import SubDagOperator
-   - from airflow.secrets.cache import SecretCache
-17 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
-18 | from airflow.triggers.external_task import TaskStateTrigger
-19 | from airflow.utils import dates
---------------------------------------------------------------------------------
-34 | from airflow.utils.trigger_rule import TriggerRule
-35 | from airflow.www.auth import has_access, has_access_dataset
-36 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-37 + from airflow.sdk import SecretCache
-38 | 
-39 | # airflow root
-40 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-note: This is an unsafe fix and may change runtime behavior
-
 AIR301 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
   --> AIR301_names.py:69:1
    |
