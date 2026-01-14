@@ -104,6 +104,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
+    registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -1786,6 +1787,34 @@ declare_lint! {
         summary: "detects overrides of final methods",
         status: LintStatus::stable("0.0.1-alpha.29"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to `final()` that type checkers cannot interpret.
+    ///
+    /// ## Why is this bad?
+    /// The `final()` function is designed to be used as a decorator. When called directly
+    /// as a function (e.g., `final(type(...))`), type checkers will not understand the
+    /// application of `final` and will not prevent subclassing.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// # Incorrect: type checkers will not prevent subclassing
+    /// MyClass = final(type("MyClass", (), {}))
+    ///
+    /// # Correct: use `final` as a decorator
+    /// @final
+    /// class MyClass: ...
+    /// ```
+    pub(crate) static INEFFECTIVE_FINAL = {
+        summary: "detects calls to `final()` that type checkers cannot interpret",
+        status: LintStatus::preview("0.0.1-alpha.33"),
+        default_level: Level::Warn,
     }
 }
 

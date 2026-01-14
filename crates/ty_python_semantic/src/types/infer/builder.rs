@@ -63,17 +63,18 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
-    DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
-    INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS,
-    INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
-    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
-    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
-    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR,
-    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
+    INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
+    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases,
+    NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -9737,6 +9738,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && function.definition(self.db()).scope(self.db()) == self.scope()
             {
                 self.called_functions.insert(function);
+            }
+
+            // Warn when `final()` is called as a function (not a decorator).
+            // Type checkers cannot interpret this usage and will not prevent subclassing.
+            if function.is_known(self.db(), KnownFunction::Final) {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INEFFECTIVE_FINAL, call_expression)
+                {
+                    let mut diagnostic = builder.into_diagnostic(
+                        "Type checkers will not prevent subclassing when `final()` is called as a function",
+                    );
+                    diagnostic.info("Use `@final` as a decorator on a class or method instead");
+                }
             }
         }
 
