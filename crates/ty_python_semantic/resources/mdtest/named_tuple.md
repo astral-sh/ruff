@@ -466,6 +466,27 @@ Point2 = collections.namedtuple("Point2", ["_x", "class"], rename=1)
 reveal_type(Point2)  # revealed: <class 'Point2'>
 reveal_type(Point2.__new__)  # revealed: (cls: type, _0: Any, _1: Any) -> Point2
 
+# Without `rename=True`, invalid field names emit diagnostics:
+# - Field names starting with underscore
+# error: [invalid-named-tuple] "Field name `_x` in `namedtuple()` cannot start with an underscore"
+Underscore = collections.namedtuple("Underscore", ["_x", "y"])
+reveal_type(Underscore)  # revealed: <class 'Underscore'>
+
+# - Python keywords
+# error: [invalid-named-tuple] "Field name `class` in `namedtuple()` cannot be a Python keyword"
+Keyword = collections.namedtuple("Keyword", ["x", "class"])
+reveal_type(Keyword)  # revealed: <class 'Keyword'>
+
+# - Duplicate field names
+# error: [invalid-named-tuple] "Duplicate field name `x` in `namedtuple()`"
+Duplicate = collections.namedtuple("Duplicate", ["x", "y", "x"])
+reveal_type(Duplicate)  # revealed: <class 'Duplicate'>
+
+# - Invalid identifiers (e.g., containing spaces)
+# error: [invalid-named-tuple] "Field name `not valid` in `namedtuple()` is not a valid identifier"
+Invalid = collections.namedtuple("Invalid", ["not valid", "ok"])
+reveal_type(Invalid)  # revealed: <class 'Invalid'>
+
 # `defaults` provides default values for the rightmost fields
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
@@ -483,8 +504,8 @@ reveal_type(person2.city)  # revealed: Any
 Config = collections.namedtuple("Config", ["host", "port"], module="myapp")
 reveal_type(Config)  # revealed: <class 'Config'>
 
-# When more defaults are provided than fields, we treat all fields as having defaults.
-# TODO: This should emit a diagnostic since it would fail at runtime.
+# When more defaults are provided than fields, an error is emitted.
+# error: [invalid-named-tuple] "Too many defaults for `namedtuple()`"
 TooManyDefaults = collections.namedtuple("TooManyDefaults", ["x", "y"], defaults=("a", "b", "c"))
 reveal_type(TooManyDefaults)  # revealed: <class 'TooManyDefaults'>
 reveal_type(TooManyDefaults.__new__)  # revealed: (cls: type, x: Any = "a", y: Any = "b") -> TooManyDefaults

@@ -6565,6 +6565,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Infer keyword arguments.
         let mut default_types: Vec<Type<'db>> = vec![];
+        let mut defaults_kw: Option<&ast::Keyword> = None;
         let mut rename_type = None;
 
         for kw in keywords {
@@ -6575,6 +6576,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             match arg.id.as_str() {
                 "defaults" if kind.is_collections() => {
+                    defaults_kw = Some(kw);
                     // Extract element types from AST literals (using already-inferred types)
                     // or fall back to the inferred tuple spec.
                     match &kw.value {
@@ -6779,16 +6781,60 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
 
                     if let Some(mut field_names) = maybe_field_names {
-                        // TODO: When `rename` is false (or not specified), emit diagnostics for:
-                        // - Duplicate field names (e.g., `namedtuple("Foo", "x x")`)
-                        // - Field names starting with underscore (e.g., `namedtuple("Bar", "_x")`)
-                        // - Field names that are Python keywords (e.g., `namedtuple("Baz", "class")`)
-                        // - Field names that are not valid identifiers
-                        // These all raise ValueError at runtime. When `rename=True`, invalid names
-                        // are automatically replaced with `_0`, `_1`, etc., so no diagnostic is needed.
+                        // When `rename` is false (or not specified), emit diagnostics for invalid
+                        // field names. These all raise ValueError at runtime. When `rename=True`,
+                        // invalid names are automatically replaced with `_0`, `_1`, etc., so no
+                        // diagnostic is needed.
+                        if !rename {
+                            for (i, field_name) in field_names.iter().enumerate() {
+                                let name_str = field_name.as_str();
 
-                        // Apply rename logic.
-                        if rename {
+                                if field_names[..i].iter().any(|f| f.as_str() == name_str)
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Duplicate field name `{name_str}` in `namedtuple()`"
+                                    ));
+                                    diagnostic.set_primary_message(format_args!(
+                                        "Field `{name_str}` already defined; will raise `ValueError` at runtime"
+                                    ));
+                                }
+
+                                if name_str.starts_with('_')
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Field name `{name_str}` in `namedtuple()` cannot start with an underscore"
+                                    ));
+                                    diagnostic.set_primary_message(format_args!(
+                                        "Will raise `ValueError` at runtime"
+                                    ));
+                                } else if is_keyword(name_str)
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Field name `{name_str}` in `namedtuple()` cannot be a Python keyword"
+                                    ));
+                                    diagnostic.set_primary_message(format_args!(
+                                        "Will raise `ValueError` at runtime"
+                                    ));
+                                } else if !is_identifier(name_str)
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Field name `{name_str}` in `namedtuple()` is not a valid identifier"
+                                    ));
+                                    diagnostic.set_primary_message(format_args!(
+                                        "Will raise `ValueError` at runtime"
+                                    ));
+                                }
+                            }
+                        } else {
+                            // Apply rename logic.
                             let mut seen_names = FxHashSet::<&str>::default();
                             for (i, field_name) in field_names.iter_mut().enumerate() {
                                 let name_str = field_name.as_str();
@@ -6803,11 +6849,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
 
-                        // Build fields with `Any` type and optional defaults.
-                        // TODO: emit a diagnostic when `defaults_count > num_fields` (which would
-                        // fail at runtime with `TypeError: Got more default values than field names`).
                         let num_fields = field_names.len();
-                        let defaults_count = default_types.len().min(num_fields);
+                        let defaults_count = default_types.len();
+
+                        if defaults_count > num_fields
+                            && let Some(defaults_kw) = defaults_kw
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_NAMED_TUPLE, defaults_kw)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Too many defaults for `namedtuple()`"
+                            ));
+                            diagnostic.set_primary_message(format_args!(
+                                "Got {defaults_count} default values but only {num_fields} field names"
+                            ));
+                            diagnostic.info("This will raise `TypeError` at runtime");
+                        }
+
+                        let defaults_count = defaults_count.min(num_fields);
                         let fields = field_names
                             .iter()
                             .enumerate()
