@@ -2963,6 +2963,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.write_str("'>")
             }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
+            KnownInstanceType::DataclassSpec(_) => f.write_str("DataclassSpec"),
         }
     }
 }

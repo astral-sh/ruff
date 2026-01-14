@@ -4953,6 +4953,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::NamedTupleSpec],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::DataclassSpec(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::DataclassSpec],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::UnionType(instance) => {
                     // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
                     // expensive if there are errors.
@@ -5637,6 +5641,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
+                | KnownInstanceType::DataclassSpec(_)
                 | KnownInstanceType::NewType(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
@@ -6556,6 +6561,8 @@ enum InvalidTypeExpression<'db> {
     Specialization,
     /// Same for `NamedTupleSpec`
     NamedTupleSpec,
+    /// Same for `DataclassSpec`
+    DataclassSpec,
     /// Same for `typing.TypedDict`
     TypedDict,
     /// Same for `typing.TypeAlias`, anywhere except for as the sole annotation on an annotated
@@ -6617,6 +6624,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::NamedTupleSpec => {
                         f.write_str("`NamedTupleSpec` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::DataclassSpec => {
+                        f.write_str("`DataclassSpec` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypedDict => f.write_str(
                         "The special form `typing.TypedDict` \
