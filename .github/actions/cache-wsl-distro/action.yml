@@ -1,0 +1,89 @@
+name: "Create and cache WSL vhdx"
+
+inputs:
+  cache_key:
+    description: "The cache key to use with actions/cache"
+    required: true
+  cache_path:
+    description: "The path to use with actions/cache"
+    required: true
+  vhdx_file:
+    description: "The full path to the vhdx file restored by actions/cache"
+    required: true
+  distro:
+    description: "The distro name to use with wsl --import-in-place and Vampire/setup-wsl"
+    required: true
+  ext4_workspace:
+    description: "The path to the workspace directory on the wsl ext4 filesystem"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Install ${{ inputs.distro }} with build-essential & mold"
+      uses: Vampire/setup-wsl@f40fb59d850112c9a292b0218bca8271305b9127 # v5.0.0
+      with:
+        distribution: ${{ inputs.distro }}
+        use-cache: "false"
+        additional-packages: build-essential mold
+    - name: "Validate Installation"
+      uses: ubuntu/WSL/.github/actions/wsl-bash@dd06b19f5acdd0d085ab539427980e49bb5e8143 # 2024-02-01
+      with:
+        distro: ${{ inputs.distro }}
+        exec: |
+          id
+          uname -a
+          df -T
+    - name: "Install Toolchain"
+      uses: ubuntu/WSL/.github/actions/wsl-bash@dd06b19f5acdd0d085ab539427980e49bb5e8143 # 2024-02-01
+      with:
+        distro: ${{ inputs.distro }}
+        exec: |
+          set -ex
+          export CI=1
+          echo "::group::Rustup"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "::endgroup::"
+          echo "::group::Insta"
+          curl -LsSf https://insta.rs/install.sh | sh
+          echo "::endgroup::"
+          echo "::group::Nextest"
+          source $HOME/.cargo/env
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          cargo binstall cargo-nextest --secure -y
+          echo "::endgroup::"
+    - name: "Create dir for ext4 workspace"
+      uses: ubuntu/WSL/.github/actions/wsl-bash@dd06b19f5acdd0d085ab539427980e49bb5e8143 # 2024-02-01
+      with:
+        distro: ${{ inputs.distro }}
+        exec: |
+          mkdir --parents ${{ inputs.ext4_workspace }}
+    - name: "Export distro for cache"
+      shell: pwsh
+      env:
+        CACHE_PATH: ${{ inputs.cache_path }}
+        VHDX_FILE: ${{ inputs.vhdx_file }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        wsl --list
+        wsl --shutdown
+        New-Item -ItemType Directory -Path $env:CACHE_PATH -Force
+        wsl --export --vhd $env:DISTRO $env:VHDX_FILE
+    - name: "Check vhdx file exists"
+      id: check
+      shell: pwsh
+      env:
+        VHDX_FILE: ${{ inputs.vhdx_file }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        if (Test-Path $env:VHDX_FILE) {
+        exit 0
+        } else {
+        Write-Error "File not found: $env:VHDX_FILE"
+        exit 1
+        }
+    - name: "Write cache"
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ inputs.cache_path }}
+        key: ${{ inputs.cache_key }}

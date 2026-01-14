@@ -1,0 +1,216 @@
+# This workflow will check flake8_executable lints on:
+# - Native Linux
+# - WSL, using an ext4 filesystem
+# - WSL, using a windows filesystem
+#
+# This is to ensure that EXE001 & EXE002 are automatically disabled
+# where appropriate.
+#
+# It will run when:
+# - this file is changed or
+# - any of the flake8_executable code, tests, fixtures, ... are changed.
+#
+# On first run it will cache the installed WSL distro, as the initial
+# installation is time-consuming.
+
+name: Check flake8_executable lints
+
+on:
+  push:
+    paths:
+      [
+        ".github/workflows/test_flake8_executable_wsl.yml",
+        ".github/actions/cache-wsl-distro/action.yml",
+        "**/flake8_executable/**",
+      ]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  find_wsl_cache:
+    name: "Check/Create WSL vhdx"
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      CACHE_FILE: "ubuntu_ruff.vhdx"
+      CACHE_DIR: ".wsl_cache"
+      DISTRO: "Ubuntu-24.04"
+      EXT4_WORKSPACE: "/workspaces/${{ github.repository }}"
+    outputs:
+      cache_key: ${{ steps.calc_vars.outputs.cache_key }}
+      cache_path: ${{ steps.calc_vars.outputs.cache_path }}
+      vhdx_file: ${{ steps.calc_vars.outputs.vhdx_file }}
+      distro: ${{ env.DISTRO }}
+      ext4_workspace: ${{ env.EXT4_WORKSPACE }}
+    steps:
+      # Using version numbers, not SHAs, throughout to avoid dependabot triggering this workflow often
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - id: calc_vars
+        name: "Calculate paths & key"
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cachePath = Join-Path ${{ runner.temp }} $env:CACHE_DIR
+          Write-Output "cache_path=$cachePath"
+          Write-Output "cache_path=$cachePath" >> $env:GITHUB_OUTPUT
+          $vhdxPath = Join-Path $cachePath $env:CACHE_FILE
+          Write-Output "vhdx_file=$vhdxPath"
+          Write-Output "vhdx_file=$vhdxPath" >> $env:GITHUB_OUTPUT
+          $workflowHash = (Get-FileHash .github/actions/cache-wsl-distro/action.yml).Hash
+          Write-Output "cache_key=wsl_distro_cache-$env:DISTRO-$workflowHash"
+          Write-Output "cache_key=wsl_distro_cache-$env:DISTRO-$workflowHash" >> $env:GITHUB_OUTPUT
+      - id: check-wsl-cache
+        uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          key: ${{ steps.calc_vars.outputs.cache_key }}
+          path: ${{ steps.calc_vars.outputs.cache_path}}
+          lookup-only: true
+      - name: "Create and cache distro"
+        if: ${{ steps.check-wsl-cache.outputs.cache-hit != 'true'}}
+        uses: ./.github/actions/cache-wsl-distro
+        with:
+          cache_key: ${{ steps.calc_vars.outputs.cache_key }}
+          cache_path: ${{ steps.calc_vars.outputs.cache_path }}
+          vhdx_file: ${{ steps.calc_vars.outputs.vhdx_file }}
+          distro: ${{ env.DISTRO }}
+          ext4_workspace: ${{ env.EXT4_WORKSPACE }}
+
+  test_wsl_ntfs:
+    needs: find_wsl_cache
+    name: "Run tests on WSL - mounted NTFS filesystem"
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - name: "Get wsl distro from cache"
+        uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          key: ${{ needs.find_wsl_cache.outputs.cache_key }}
+          path: ${{ needs.find_wsl_cache.outputs.cache_path }}
+          fail-on-cache-miss: true
+      - name: "Import cached Distro"
+        id: import-wsl
+        shell: pwsh
+        env:
+          VHDX_FILE: ${{ needs.find_wsl_cache.outputs.vhdx_file }}
+          DISTRO: ${{ needs.find_wsl_cache.outputs.distro }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Output "Updating WSL"
+          wsl --update
+          Write-Output "Importing $env:VHDX_FILE as $env:DISTRO"
+          wsl --import-in-place $env:DISTRO $env:VHDX_FILE
+
+          # We use this --cd trick otherwise bash gets confused with the \ path separators
+          $workspacePath = wsl.exe -d $env:DISTRO --cd $env:GITHUB_WORKSPACE -- wslpath -ua .
+          Write-Output "WSL Path to Workspace: $workspacePath"
+          Write-Output "workspace_path=$workspacePath" >> $env:GITHUB_OUTPUT
+      # Using the wsl-native filesystem for storing build artifacts reduces build from 10 mins to 3 mins
+      - name: "Use wsl-native file system for ./target"
+        uses: ubuntu/WSL/.github/actions/wsl-bash@dd06b19f5acdd0d085ab539427980e49bb5e8143 # 2024-02-01
+        with:
+          distro: ${{ needs.find_wsl_cache.outputs.distro }}
+          working-dir: ${{ steps.import-wsl.outputs.workspace_path }}
+          exec: |
+            set -ex
+            mkdir /tmp/target
+            mkdir target || true
+            mount --bind /tmp/target target
+      - name: "Run tests"
+        uses: ubuntu/WSL/.github/actions/wsl-bash@dd06b19f5acdd0d085ab539427980e49bb5e8143 # 2024-02-01
+        with:
+          distro: ${{ needs.find_wsl_cache.outputs.distro }}
+          working-dir: ${{ steps.import-wsl.outputs.workspace_path }}
+          exec: |
+            set -ex
+            source $HOME/.cargo/env
+            export NEXTEST_PROFILE="ci-short"
+            RUFF_TEST_ENVIRONMENT="ntfs" cargo insta test --check --test-runner nextest --package ruff_linter -- flake8_executable
+
+  test_wsl_ext4:
+    needs: find_wsl_cache
+    name: "Run tests on WSL Native filesystem"
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Get wsl distro from cache"
+        uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          key: ${{ needs.find_wsl_cache.outputs.cache_key }}
+          path: ${{ needs.find_wsl_cache.outputs.cache_path }}
+          fail-on-cache-miss: true
+      - name: "Import cached Distro"
+        shell: pwsh
+        env:
+          VHDX_FILE: ${{ needs.find_wsl_cache.outputs.vhdx_file }}
+          DISTRO: ${{ needs.find_wsl_cache.outputs.distro }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Output "Updating WSL"
+          wsl --update
+          Write-Output "Importing $env:VHDX_FILE as $env:DISTRO"
+          wsl --import-in-place $env:DISTRO $env:VHDX_FILE
+      - name: Checkout
+        uses: ubuntu/WSL/.github/actions/wsl-checkout@0cbf324d47c733b1b5026a07357a9ec15ab11408 # 2023-05-30
+        with:
+          distro: ${{ needs.find_wsl_cache.outputs.distro }}
+          working-dir: ${{ needs.find_wsl_cache.outputs.ext4_workspace }}
+      - name: "Run tests"
+        uses: ubuntu/WSL/.github/actions/wsl-bash@dd06b19f5acdd0d085ab539427980e49bb5e8143 # 2024-02-01
+        with:
+          distro: ${{ needs.find_wsl_cache.outputs.distro }}
+          working-dir: ${{ needs.find_wsl_cache.outputs.ext4_workspace }}
+          exec: |
+            set -ex
+            source "$HOME/.cargo/env"
+            export NEXTEST_PROFILE="ci-short"
+            cargo insta test --check --test-runner nextest --package ruff_linter -- flake8_executable
+
+  test_non_wsl:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    name: "Test on ${{ matrix.os }}"
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 10 || 5 }}
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        if: runner.os != 'Windows'
+        # Known performance problems windows - see https://github.com/Swatinem/rust-cache/issues/169
+      - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        if: runner.os == 'Windows'
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        if: runner.os != 'Windows'
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@90558ad1e179036f31467972b00dec6cb80701fa # v2.66.3
+        with:
+          tool: cargo-nextest
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@90558ad1e179036f31467972b00dec6cb80701fa # v2.66.3
+        with:
+          tool: cargo-insta
+      - name: "Run tests"
+        shell: bash
+        env:
+          NEXTEST_PROFILE: "ci-short"
+        run: cargo insta test --check --test-runner nextest --package ruff_linter -- flake8_executable
