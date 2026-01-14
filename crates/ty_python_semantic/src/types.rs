@@ -4111,55 +4111,6 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownClass::Type) => {
-                    let str_instance = KnownClass::Str.to_instance(db);
-                    let type_instance = KnownClass::Type.to_instance(db);
-
-                    // ```py
-                    // class type:
-                    //     @overload
-                    //     def __init__(self, o: object, /) -> None: ...
-                    //     @overload
-                    //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
-                    // ```
-                    CallableBinding::from_overloads(
-                        self,
-                        [
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_only(Some(Name::new_static("o")))
-                                        .with_annotated_type(Type::any())],
-                                ),
-                                type_instance,
-                            ),
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [
-                                        Parameter::positional_only(Some(Name::new_static("name")))
-                                            .with_annotated_type(str_instance),
-                                        Parameter::positional_only(Some(Name::new_static("bases")))
-                                            .with_annotated_type(Type::homogeneous_tuple(
-                                                db,
-                                                type_instance,
-                                            )),
-                                        Parameter::positional_only(Some(Name::new_static("dict")))
-                                            .with_annotated_type(
-                                                KnownClass::Dict.to_specialized_instance(
-                                                    db,
-                                                    &[str_instance, Type::any()],
-                                                ),
-                                            ),
-                                    ],
-                                ),
-                                type_instance,
-                            ),
-                        ],
-                    )
-                    .into()
-                }
-
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:
