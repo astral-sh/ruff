@@ -562,25 +562,16 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the generic context if this is a generic class.
-    ///
-    // TODO: We should emit a diagnostic if a dynamic class (created via `type()`) attempts
-    // to inherit from `Generic[T]`, since dynamic classes can't be generic. See also: `is_protocol`.
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.as_static().and_then(|class| class.generic_context(db))
     }
 
     /// Returns whether this class is a protocol.
-    ///
-    // TODO: We should emit a diagnostic if a dynamic class (created via `type()`) attempts
-    // to inherit from `Protocol`, since dynamic classes can't be protocols. See also: `generic_context`.
     pub(crate) fn is_protocol(self, db: &'db dyn Db) -> bool {
         self.as_static().is_some_and(|class| class.is_protocol(db))
     }
 
     /// Returns whether this class is a `TypedDict`.
-    // TODO: We should emit a diagnostic if a dynamic class (created via `type()`) attempts
-    // to inherit from `TypedDict`. To create a dynamic TypedDict, you should invoke
-    // `TypedDict` as a function, not `type`. See also: `generic_context`, `is_protocol`.
     pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => class.is_typed_dict(db),
@@ -634,10 +625,12 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns whether this class is final.
-    // TODO: Support `@final` on dynamic classes, e.g. `X = final(type("X", (), {}))`.
-    // We should either recognize and track this, or emit a diagnostic if unsupported.
     pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
-        self.as_static().is_some_and(|class| class.is_final(db))
+        match self {
+            Self::Static(class) => class.is_final(db),
+            // Dynamic classes created via `type()` cannot be marked as final.
+            Self::Dynamic(_) => false,
+        }
     }
 
     /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
