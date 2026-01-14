@@ -90,7 +90,7 @@ jobs:
             python "${RUFF_DIR}/scripts/conformance.py" \
              --old-ty "${RUFF_DIR}/ty-old" \
              --new-ty "${RUFF_DIR}/ty-new" \
-             --tests-path "${RUFF_DIR}/typing/conformance/tests/" \
+             --tests-path "${GITHUB_WORKSPACE}/typing/conformance/tests/" \
              --python-version "$PYTHON_VERSION" \
              --output typing_conformance_diagnostics.diff
           )
