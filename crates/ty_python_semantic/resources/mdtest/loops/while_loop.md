@@ -161,14 +161,14 @@ The same thing, but nested loops.
 ```py
 x = "A"
 while x != "E":
-    reveal_type(x) # revealed: Literal["A", "B", "D"]
+    reveal_type(x) # revealed: Literal["A", "D"]
     while x != "C":
-        reveal_type(x) # revealed: Literal["A", "B", "D"]
+        reveal_type(x) # revealed: Literal["B", "A", "D"]
         if random():
             x = "B"
         else:
             x = "C"
-        reveal_type(x) # revealed: Literal["B", "C", "D"]
+        reveal_type(x) # revealed: Literal["B", "C"]
     reveal_type(x) # revealed: Literal["C"]
     if random():
         x = "D"
