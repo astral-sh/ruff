@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for MetaClassABCMeta {
 /// FURB180
 pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
 
-    // Determine whether the class definition contains at least one attribute.
+    // Determine whether the class definition contains at least one argument.
     let Some(arguments) = &class_def.arguments.as_ref() else {
         return;
     };
