@@ -496,19 +496,20 @@ Other numbers of arguments are invalid:
 
 ```py
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Foo", ()))  # revealed: Unknown
+reveal_type(type("Foo", ()))  # revealed: type[Unknown]
 
 # TODO: the keyword arguments for `Foo`/`Bar`/`Baz` here are invalid
-# (you cannot pass `metaclass=` to `type()`, and none of them have
-# base classes with `__init_subclass__` methods),
-# but `type[Unknown]` would be better than `Unknown` here
+# (none of them have base classes with `__init_subclass__` methods).
 #
+# The intent to create a new class is however clear,
+# so we still infer these as class-literal types.
+reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: <class 'Foo'>
+reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: <class 'Bar'>
+
+# You can't pass `metaclass=` to the `type()` constructor, but the intent is clear,
+# so we infer `<class 'Baz'>` here rather than `type[Unknown]`
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: Unknown
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: Unknown
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: Unknown
+reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: <class 'Baz'>
 ```
 
 The following calls are also invalid, due to incorrect argument types:
@@ -861,26 +862,22 @@ def f(*args, **kwargs):
 
     # Has a string first arg, but unknown additional args from *args
     B = type("B", *args, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(B)  # revealed: <class 'str'>
+    reveal_type(B)  # revealed: type[Unknown]
 
     # Has string and tuple, but unknown additional args
     C = type("C", (), *args, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(C)  # revealed: type
+    reveal_type(C)  # revealed: type[Unknown]
 
     # All three positional args provided, only **kwargs unknown
     D = type("D", (), {}, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(D)  # revealed: type
+    reveal_type(D)  # revealed: <class 'D'>
 
     # Three starred expressions - we can't know how they expand
     a = ("E",)
     b = ((),)
     c = ({},)
     E = type(*a, *b, *c)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(E)  # revealed: type
+    reveal_type(E)  # revealed: type[Unknown]
 ```
 
 ## Explicit type annotations
@@ -1027,9 +1024,6 @@ class Child(Base, required_arg="value"):
 # The dynamically assigned attribute has Unknown in its type
 reveal_type(Child.config)  # revealed: Unknown | str
 
-# Dynamic class creation - keyword arguments are not yet supported
-# TODO: This should work: type("DynamicChild", (Base,), {}, required_arg="value")
-# error: [no-matching-overload]
 DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 ```
 
