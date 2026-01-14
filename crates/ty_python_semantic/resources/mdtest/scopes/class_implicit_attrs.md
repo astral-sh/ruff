@@ -62,10 +62,12 @@ within the class body:
 __qualname__ = 42
 __module__ = 42
 
+
 class Foo:
     # Inside the class body, these are the implicit class attributes
     reveal_type(__qualname__)  # revealed: str
     reveal_type(__module__)  # revealed: str
+
 
 # Outside the class, the globals are visible
 reveal_type(__qualname__)  # revealed: Literal[42]
@@ -84,8 +86,10 @@ python-version = "3.13"
 ```py
 __firstlineno__ = "not an int"
 
+
 class Foo:
     reveal_type(__firstlineno__)  # revealed: int
+
 
 reveal_type(__firstlineno__)  # revealed: Literal["not an int"]
 ```
@@ -113,6 +117,7 @@ A common use case is defining a logger with the class name:
 
 ```py
 import logging
+
 
 class MyClass:
     logger = logging.getLogger(__qualname__)

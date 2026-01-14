@@ -5,11 +5,13 @@
 ```py
 from dataclasses import dataclass, field
 
+
 @dataclass
 class Member:
     name: str
     role: str = field(default="user")
     tag: str | None = field(default=None, init=False)
+
 
 # revealed: (self: Member, name: str, role: str = "user") -> None
 reveal_type(Member.__init__)
@@ -32,10 +34,12 @@ field:
 from dataclasses import dataclass, field
 from datetime import datetime
 
+
 @dataclass
 class Data:
     content: list[int] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now, init=False)
+
 
 # revealed: (self: Data, content: list[int] = ...) -> None
 reveal_type(Data.__init__)
@@ -57,11 +61,13 @@ If `kw_only` is set to `True`, the field can only be set using keyword arguments
 ```py
 from dataclasses import dataclass, field
 
+
 @dataclass
 class Person:
     name: str
     age: int | None = field(default=None, kw_only=True)
     role: str = field(default="user", kw_only=True)
+
 
 # revealed: (self: Person, name: str, *, age: int | None = None, role: str = "user") -> None
 reveal_type(Person.__init__)
@@ -77,8 +83,10 @@ bob = Person("Bob", 30)
 ```py
 from dataclasses import field
 
+
 def get_default() -> str:
     return "default"
+
 
 reveal_type(field(default=1))  # revealed: dataclasses.Field[Literal[1]]
 reveal_type(field(default=None))  # revealed: dataclasses.Field[None]
@@ -97,22 +105,28 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
+
 @dataclass_transform()
 def create_model(*, init: bool = True):
     def deco(cls: type[T]) -> type[T]:
         return cls
+
     return deco
+
 
 @create_model()
 class A:
     name: str = field(init=False)
 
+
 # field(init=False) should be ignored for dataclass_transform without explicit field_specifiers
 reveal_type(A.__init__)  # revealed: (self: A, name: str) -> None
+
 
 @dataclass
 class B:
     name: str = field(init=False)
+
 
 # Regular @dataclass should respect field(init=False)
 reveal_type(B.__init__)  # revealed: (self: B) -> None

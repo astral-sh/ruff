@@ -5,6 +5,7 @@
 ```py
 class NotSubscriptable: ...
 
+
 # error: "Cannot subscript object of type `<class 'NotSubscriptable'>` with no `__class_getitem__` method"
 a = NotSubscriptable[0]
 ```
@@ -15,6 +16,7 @@ a = NotSubscriptable[0]
 class Identity:
     def __class_getitem__(cls, item: int) -> str:
         return str(item)
+
 
 reveal_type(Identity[0])  # revealed: str
 ```
@@ -31,9 +33,12 @@ reveal_type(Identity.__class_getitem__(0))  # revealed: str
 def _(flag: bool):
     class UnionClassGetItem:
         if flag:
+
             def __class_getitem__(cls, item: int) -> str:
                 return str(item)
+
         else:
+
             def __class_getitem__(cls, item: int) -> int:
                 return item
 
@@ -63,12 +68,15 @@ def _(flag: bool):
 ```py
 def _(flag: bool):
     if flag:
+
         class Spam:
             def __class_getitem__(self, x: int) -> str:
                 return "foo"
 
     else:
+
         class Spam: ...
+
     # error: [not-subscriptable] "Cannot subscript object of type `<class 'Spam'>` with no `__class_getitem__` method"
     # revealed: str | Unknown
     reveal_type(Spam[42])
@@ -79,6 +87,7 @@ def _(flag: bool):
 ```py
 def _(flag: bool):
     if flag:
+
         class Eggs:
             def __class_getitem__(self, x: int) -> str:
                 return "foo"
@@ -99,9 +108,11 @@ should be reported even if it would not succeed for some other element of the in
 ```py
 class Foo: ...
 
+
 class Bar:
     def __getitem__(self, key: str) -> int:
         return 42
+
 
 def f(x: Foo):
     if isinstance(x, Bar):

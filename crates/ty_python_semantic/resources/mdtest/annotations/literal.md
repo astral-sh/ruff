@@ -18,15 +18,18 @@ a6: Literal[True]
 a7: Literal[None]
 a8: Literal[Literal[1]]
 
+
 class Color(Enum):
     RED = 0
     GREEN = 1
     BLUE = 2
 
+
 b1: Literal[Color.RED]
 
 MissingT = Enum("MissingT", {"MISSING": "MISSING"})
 b2: Literal[MissingT.MISSING]
+
 
 def f():
     reveal_type(mode)  # revealed: Literal["w", "r"]
@@ -41,6 +44,7 @@ def f():
     reveal_type(b1)  # revealed: Literal[Color.RED]
     # TODO should be `Literal[MissingT.MISSING]`
     reveal_type(b2)  # revealed: @Todo(functional `Enum` syntax)
+
 
 # error: [invalid-type-form]
 invalid1: Literal[3 + 4]
@@ -57,8 +61,10 @@ invalid4: Literal[
     (1, 2, 3),  # error: [invalid-type-form]
 ]
 
+
 class NotAnEnum:
     x: int = 1
+
 
 # error: [invalid-type-form]
 invalid5: Literal[NotAnEnum.x]
@@ -86,9 +92,11 @@ from enum import Enum
 
 import mod
 
+
 class E(Enum):
     A = 1
     B = 2
+
 
 type SingleInt = Literal[1]
 type SingleStr = Literal["foo"]
@@ -104,6 +112,7 @@ type AnEnum2 = Literal[E.A, E.B]
 # Similarly, we support this because it is equivalent to `Literal[True, False]`.
 type Bool1 = bool
 type Bool2 = Literal[True, False]
+
 
 def _(
     single_int: Literal[SingleInt],
@@ -149,9 +158,11 @@ type SingleInt = Literal[2]
 from typing import Literal, TypeAlias
 from enum import Enum
 
+
 class E(Enum):
     A = 1
     B = 2
+
 
 SingleInt: TypeAlias = Literal[1]
 SingleStr: TypeAlias = Literal["foo"]
@@ -164,6 +175,7 @@ AnEnum1: TypeAlias = E
 AnEnum2: TypeAlias = Literal[E.A, E.B]
 Bool1: TypeAlias = bool
 Bool2: TypeAlias = Literal[True, False]
+
 
 def _(
     single_int: Literal[SingleInt],
@@ -203,9 +215,11 @@ def _(
 from typing import Literal
 from enum import Enum
 
+
 class E(Enum):
     A = 1
     B = 2
+
 
 SingleInt = Literal[1]
 SingleStr = Literal["foo"]
@@ -221,6 +235,7 @@ AnEnum2 = Literal[E.A, E.B]
 # For implicit type aliases, we may not want to support this.
 Bool1 = bool
 Bool2 = Literal[True, False]
+
 
 def _(
     single_int: Literal[SingleInt],
@@ -258,6 +273,7 @@ the union of those types.
 ```py
 from typing import Literal
 
+
 def x(
     a1: Literal[Literal[Literal[1, 2, 3], "foo"], 5, None],
     a2: Literal["w"] | Literal["r"],
@@ -275,14 +291,20 @@ def x(
 ```py
 from typing import Literal, Union
 
+
 def foo(x: int) -> int:
     return x + 1
+
 
 def bar(s: str) -> str:
     return s
 
+
 class A: ...
+
+
 class B: ...
+
 
 def union_example(
     x: Union[
@@ -333,6 +355,7 @@ from other import Literal
 # error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in type expression"
 a1: Literal[26]
 
+
 def f():
     reveal_type(a1)  # revealed: Unknown
 ```
@@ -344,6 +367,7 @@ from typing_extensions import Literal
 
 a1: Literal[26]
 
+
 def f():
     reveal_type(a1)  # revealed: Literal[26]
 ```
@@ -352,6 +376,7 @@ def f():
 
 ```py
 from typing import Literal
+
 
 # error: [invalid-type-form] "`typing.Literal` requires at least one argument when used in a type expression"
 def _(x: Literal):

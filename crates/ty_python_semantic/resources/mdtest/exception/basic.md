@@ -68,7 +68,9 @@ MRO, as the dynamic element in the MRO could materialize to some subclass of `Ba
 ```py
 from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
 
+
 class Error(BASE_EXCEPTION_CLASS): ...
+
 
 try:
     ...
@@ -95,6 +97,7 @@ python-version = "3.12"
 ```py
 from typing import Callable
 
+
 def silence[T: type[BaseException]](
     func: Callable[[], None],
     exception_type: T,
@@ -103,6 +106,7 @@ def silence[T: type[BaseException]](
         func()
     except exception_type as e:
         reveal_type(e)  # revealed: T'instance@silence
+
 
 def silence2[
     T: (
@@ -133,6 +137,7 @@ try:
 except (ValueError, OSError, "foo", b"bar") as e:
     reveal_type(e)  # revealed: ValueError | OSError | Unknown
 
+
 def foo(
     x: type[str],
     y: tuple[type[OSError], type[RuntimeError], int],
@@ -149,6 +154,7 @@ def foo(
     # error: [invalid-exception-caught]
     except z as g:
         reveal_type(g)  # revealed: Unknown
+
 
 try:
     {}.get("foo")
@@ -180,8 +186,10 @@ try:
 except:
     ...
 
+
 def _(e: Exception | type[Exception]):
     raise e  # fine
+
 
 def _(e: Exception | type[Exception] | None):
     raise e  # error: [invalid-raise]
@@ -196,11 +204,13 @@ def _():
     except:
         ...
 
+
 def _():
     try:
         raise StopIteration from MemoryError()  # fine
     except:
         ...
+
 
 def _():
     try:
@@ -208,17 +218,20 @@ def _():
     except:
         ...
 
+
 def _():
     try:
         raise ZeroDivisionError from False  # error: [invalid-raise]
     except:
         ...
 
+
 def _():
     try:
         raise SystemExit from bool()  # error: [invalid-raise]
     except:
         ...
+
 
 def _():
     try:
@@ -227,6 +240,7 @@ def _():
         reveal_type(e)  # revealed: KeyboardInterrupt
         raise LookupError from e  # fine
 
+
 def _():
     try:
         raise
@@ -234,11 +248,14 @@ def _():
         reveal_type(e)  # revealed: Unknown
         raise KeyError from e
 
+
 def _(e: Exception | type[Exception]):
     raise ModuleNotFoundError from e  # fine
 
+
 def _(e: Exception | type[Exception] | None):
     raise IndexError from e  # fine
+
 
 def _(e: int | None):
     raise IndexError from e  # error: [invalid-raise]
@@ -259,8 +276,10 @@ reveal_type(e)  # revealed: Unknown
 
 e = None
 
+
 def cond() -> bool:
     return True
+
 
 try:
     if cond():
@@ -269,6 +288,7 @@ except ValueError as e:
     reveal_type(e)  # revealed: ValueError
 # error: [possibly-unresolved-reference]
 reveal_type(e)  # revealed: None
+
 
 def f(x: type[Exception]):
     e = None

@@ -3,6 +3,7 @@
 ```py
 class A: ...
 
+
 def _(a1: A, a2: A, o: object):
     n1 = None
     n2 = None

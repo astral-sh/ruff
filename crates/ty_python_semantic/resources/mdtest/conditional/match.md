@@ -63,9 +63,11 @@ This leads us to infer `Literal[1, 3]` as the type of `y` after the `match` stat
 ```py
 from typing import final
 
+
 @final
 class C:
     pass
+
 
 def _(subject: C):
     y = 1
@@ -85,18 +87,23 @@ all subpatterns in the class pattern match.
 ```py
 from typing import final
 
+
 class Foo:
     pass
+
 
 class FooSub(Foo):
     pass
 
+
 class Bar:
     pass
+
 
 @final
 class Baz:
     pass
+
 
 def _(target: FooSub):
     y = 1
@@ -111,6 +118,7 @@ def _(target: FooSub):
 
     reveal_type(y)  # revealed: Literal[3]
 
+
 def _(target: FooSub):
     y = 1
 
@@ -123,6 +131,7 @@ def _(target: FooSub):
             y = 4
 
     reveal_type(y)  # revealed: Literal[3, 4]
+
 
 def _(target: FooSub | str):
     y = 1
@@ -144,12 +153,15 @@ def _(target: FooSub | str):
 from typing_extensions import assert_never
 from dataclasses import dataclass
 
+
 @dataclass
 class Point:
     x: int
     y: int
 
+
 class Other: ...
+
 
 def _(target: Point):
     y = 1
@@ -164,12 +176,14 @@ def _(target: Point):
 
     reveal_type(y)  # revealed: Literal[1, 2, 3, 4]
 
+
 def _(target: Point):
     match target:
         case Point(x, y):  # irrefutable sub-patterns
             pass
         case _:
             assert_never(target)
+
 
 def _(target: Point | Other):
     match target:
@@ -190,6 +204,7 @@ Singleton patterns are matched based on identity, not equality comparisons or `i
 ```py
 from typing import Literal
 
+
 def _(target: Literal[True, False]):
     y = 1
 
@@ -202,6 +217,7 @@ def _(target: Literal[True, False]):
             y = 4
 
     reveal_type(y)  # revealed: Literal[2, 3]
+
 
 def _(target: bool):
     y = 1
@@ -216,6 +232,7 @@ def _(target: bool):
 
     reveal_type(y)  # revealed: Literal[2, 3]
 
+
 def _(target: None):
     y = 1
 
@@ -228,6 +245,7 @@ def _(target: None):
             y = 4
 
     reveal_type(y)  # revealed: Literal[4]
+
 
 def _(target: None | Literal[True]):
     y = 1
@@ -242,6 +260,7 @@ def _(target: None | Literal[True]):
 
     reveal_type(y)  # revealed: Literal[2, 4]
 
+
 # bool is an int subclass
 def _(target: int):
     y = 1
@@ -255,6 +274,7 @@ def _(target: int):
             y = 4
 
     reveal_type(y)  # revealed: Literal[1, 2, 3]
+
 
 def _(target: str):
     y = 1
@@ -275,9 +295,11 @@ def _(target: str):
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 def _(answer: Answer):
     y = 0
@@ -299,6 +321,7 @@ A `|` pattern matches if any of the subpatterns match.
 ```py
 from typing import Literal, final
 
+
 def _(target: Literal["foo", "baz"]):
     y = 1
 
@@ -309,6 +332,7 @@ def _(target: Literal["foo", "baz"]):
             y = 3
 
     reveal_type(y)  # revealed: Literal[2, 3]
+
 
 def _(target: None):
     y = 1
@@ -321,9 +345,11 @@ def _(target: None):
 
     reveal_type(y)  # revealed: Literal[2]
 
+
 @final
 class Baz:
     pass
+
 
 def _(target: int | None | float):
     y = 1
@@ -336,7 +362,9 @@ def _(target: int | None | float):
 
     reveal_type(y)  # revealed: Literal[1, 2]
 
+
 class Foo: ...
+
 
 def _(target: None | Foo):
     y = 1
@@ -375,6 +403,7 @@ def _(target: int | str):
 class NotBoolable:
     __bool__: int = 3
 
+
 def _(target: int, flag: NotBoolable):
     y = 1
     match target:
@@ -395,9 +424,11 @@ is not covered by any case, even when all enum members are covered.
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
+
 
 def _(answer: Answer | None):
     y = 0
@@ -411,6 +442,7 @@ def _(answer: Answer | None):
     # so y could still be 0
     reveal_type(y)  # revealed: Literal[0, 1, 2]
 
+
 def _(answer: Answer | None):
     match answer:
         case Answer.YES:
@@ -422,7 +454,9 @@ def _(answer: Answer | None):
     reveal_type(answer)  # revealed: None
     return 3
 
+
 class Foo: ...
+
 
 def _(answer: Answer | None):
     match answer:

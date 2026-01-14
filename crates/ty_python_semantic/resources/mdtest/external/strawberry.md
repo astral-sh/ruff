@@ -14,10 +14,12 @@ dependencies = ["strawberry-graphql==0.283.3"]
 ```py
 import strawberry
 
+
 @strawberry.type
 class User:
     id: int
     role: str = strawberry.field(default="user")
+
 
 reveal_type(User.__init__)  # revealed: (self: User, *, id: int, role: str = ...) -> None
 

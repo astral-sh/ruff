@@ -9,6 +9,7 @@ types for undeclared symbols. This is best illustrated with an example:
 class Wrapper:
     value = None
 
+
 wrapper = Wrapper()
 
 reveal_type(wrapper.value)  # revealed: Unknown | None
@@ -37,6 +38,7 @@ where `wrapper.value` is used in a way that is incompatible with `None`:
 def accepts_int(i: int) -> None:
     pass
 
+
 def f(w: Wrapper) -> None:
     # This is fine
     v: int | None = w.value
@@ -58,6 +60,7 @@ untyped module:
 ```py
 class OptionalInt:
     value = 10
+
 
 def reset(o):
     o.value = None
@@ -91,6 +94,7 @@ class, this would probably be:
 class OptionalInt:
     value: int | None = 10
 
+
 o = OptionalInt()
 
 # The following public type is now
@@ -117,6 +121,7 @@ class Wrapper:
 
     # Type as seen from the same scope:
     reveal_type(value)  # revealed: None
+
 
 # Type as seen from another scope:
 reveal_type(Wrapper.value)  # revealed: Unknown | None

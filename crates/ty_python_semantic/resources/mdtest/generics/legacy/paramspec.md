@@ -158,11 +158,14 @@ from typing import ParamSpec, Callable, Concatenate, Protocol, Generic
 
 P = ParamSpec("P")
 
+
 class ValidProtocol(Protocol[P]):
     def method(self, c: Callable[P, int]) -> None: ...
 
+
 class ValidGeneric(Generic[P]):
     def method(self, c: Callable[P, int]) -> None: ...
+
 
 def valid(
     a1: Callable[P, int],
@@ -192,6 +195,7 @@ from typing import Generic, Callable, ParamSpec
 
 P = ParamSpec("P")
 
+
 def foo1(c: Callable[P, int]) -> None:
     def nested1(*args: P.args, **kwargs: P.kwargs) -> None: ...
     def nested2(
@@ -210,9 +214,11 @@ def foo1(c: Callable[P, int]) -> None:
     # TODO: error
     def nested5(*args: P.args, x: int, **kwargs: P.kwargs) -> None: ...
 
+
 # TODO: error
 def bar1(*args: P.args, **kwargs: P.kwargs) -> None:
     pass
+
 
 class Foo1:
     # TODO: error
@@ -228,6 +234,7 @@ def foo2(c: Callable[P, int]) -> None:
 
     # TODO: error
     def nested2(**kwargs: P.kwargs) -> None: ...
+
 
 class Foo2:
     # TODO: error
@@ -261,12 +268,15 @@ P1 = ParamSpec("P1")
 P2 = ParamSpec("P2")
 T1 = TypeVar("T1")
 
+
 class OnlyParamSpec(Generic[P1]):
     attr: Callable[P1, None]
+
 
 class TwoParamSpec(Generic[P1, P2]):
     attr1: Callable[P1, None]
     attr2: Callable[P2, None]
+
 
 class TypeVarAndParamSpec(Generic[T1, P1]):
     attr: Callable[P1, T1]
@@ -280,8 +290,10 @@ reveal_type(OnlyParamSpec[[]]().attr)  # revealed: () -> None
 reveal_type(OnlyParamSpec[[int, str]]().attr)  # revealed: (int, str, /) -> None
 reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 
+
 def func(c: Callable[P2, None]):
     reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (**P2@func) -> None
+
 
 # error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
@@ -378,6 +390,7 @@ PAnotherWithDefault = ParamSpec("PAnotherWithDefault", default=PList)
 class ParamSpecWithDefault1(Generic[PList]):
     attr: Callable[PList, None]
 
+
 reveal_type(ParamSpecWithDefault1().attr)  # revealed: (int, str, /) -> None
 reveal_type(ParamSpecWithDefault1[[int]]().attr)  # revealed: (int, /) -> None
 ```
@@ -385,6 +398,7 @@ reveal_type(ParamSpecWithDefault1[[int]]().attr)  # revealed: (int, /) -> None
 ```py
 class ParamSpecWithDefault2(Generic[PEllipsis]):
     attr: Callable[PEllipsis, None]
+
 
 reveal_type(ParamSpecWithDefault2().attr)  # revealed: (...) -> None
 reveal_type(ParamSpecWithDefault2[[int, str]]().attr)  # revealed: (int, str, /) -> None
@@ -394,6 +408,7 @@ reveal_type(ParamSpecWithDefault2[[int, str]]().attr)  # revealed: (int, str, /)
 class ParamSpecWithDefault3(Generic[P, PAnother]):
     attr1: Callable[P, None]
     attr2: Callable[PAnother, None]
+
 
 # `P` hasn't been specialized, so it defaults to `Unknown` gradual form
 p1 = ParamSpecWithDefault3()
@@ -408,9 +423,11 @@ p3 = ParamSpecWithDefault3[[int], [str]]()
 reveal_type(p3.attr1)  # revealed: (int, /) -> None
 reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
+
 class ParamSpecWithDefault4(Generic[PList, PAnotherWithDefault]):
     attr1: Callable[PList, None]
     attr2: Callable[PAnotherWithDefault, None]
+
 
 p1 = ParamSpecWithDefault4()
 reveal_type(p1.attr1)  # revealed: (int, str, /) -> None
@@ -424,9 +441,11 @@ p3 = ParamSpecWithDefault4[[int], [str]]()
 reveal_type(p3.attr1)  # revealed: (int, /) -> None
 reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
+
 # Un-ordered type variables as the default of `PAnother` is `P`
 class ParamSpecWithDefault5(Generic[PAnother, P]):  # error: [invalid-generic-class]
     attr: Callable[PAnother, None]
+
 
 # TODO: error
 # PAnother has default as P (another ParamSpec) which is not in scope

@@ -28,6 +28,7 @@ the possible outcomes:
 ```py
 from typing import Literal
 
+
 def f3(two_or_three: Literal[2, 3], a_or_b: Literal["a", "b"]):
     reveal_type(two_or_three + two_or_three)  # revealed: Literal[4, 5, 6]
     reveal_type(two_or_three**two_or_three)  # revealed: Literal[4, 8, 9, 27]

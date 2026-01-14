@@ -22,6 +22,7 @@ reveal_type(x)  # revealed: Unknown
 y = b[-6]  # error: [index-out-of-bounds] "Index -6 is out of bounds for bytes literal `Literal[b"\x00abc\xff"]` with length 5"
 reveal_type(y)  # revealed: Unknown
 
+
 def _(n: int):
     a = b"abcde"[n]
     reveal_type(a)  # revealed: int
@@ -40,9 +41,11 @@ b[:4:0]  # error: [zero-stepsize-in-slice]
 b[0::0]  # error: [zero-stepsize-in-slice]
 b[::0]  # error: [zero-stepsize-in-slice]
 
+
 def _(m: int, n: int):
     byte_slice1 = b[m:n]
     reveal_type(byte_slice1)  # revealed: bytes
+
 
 def _(s: bytes) -> bytes:
     byte_slice2 = s[0:5]

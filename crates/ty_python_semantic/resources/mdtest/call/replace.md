@@ -31,10 +31,12 @@ Dataclasses support the `__replace__` protocol:
 from dataclasses import dataclass
 from copy import replace
 
+
 @dataclass
 class Point:
     x: int
     y: int
+
 
 reveal_type(Point.__replace__)  # revealed: (self: Point, *, x: int = ..., y: int = ...) -> Point
 ```
@@ -80,9 +82,11 @@ NamedTuples also support the `__replace__` protocol:
 from typing import NamedTuple
 from copy import replace
 
+
 class Point(NamedTuple):
     x: int
     y: int
+
 
 reveal_type(Point.__replace__)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
 ```

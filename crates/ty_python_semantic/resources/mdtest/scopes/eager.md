@@ -11,8 +11,10 @@ Function definitions are evaluated lazily.
 ```py
 x = 1
 
+
 def f():
     reveal_type(x)  # revealed: Literal[1, 2]
+
 
 x = 2
 ```
@@ -135,10 +137,12 @@ scope.
 ```py
 x = 1
 
+
 class A:
     reveal_type(x)  # revealed: Literal[1]
 
     y = x
+
 
 x = 2
 
@@ -279,7 +283,9 @@ def _():
 
     x = 2
 
+
 x = 1
+
 
 def _():
     class C:
@@ -301,6 +307,7 @@ def _():
     def f():
         # revealed: Literal[1, 2]
         [reveal_type(x) for a in range(1)]
+
     x = 2
 ```
 
@@ -335,6 +342,7 @@ def _():
         def g():
             # revealed: Literal[1, 2]
             reveal_type(x)
+
     x = 2
 ```
 
@@ -369,8 +377,10 @@ from typing import ClassVar
 
 x = int
 
+
 class C:
     var: ClassVar[x]
+
 
 reveal_type(C.var)  # revealed: int
 
@@ -386,8 +396,10 @@ from typing import ClassVar
 
 x = int
 
+
 class C:
     var: ClassVar[x]
+
 
 reveal_type(C.var)  # revealed: int | str
 
@@ -422,8 +434,10 @@ python-version = "3.12"
 ```py
 type Foo = Bar
 
+
 class Bar:
     pass
+
 
 def _(x: Foo):
     if isinstance(x, Bar):
@@ -439,15 +453,19 @@ def _(x: Foo):
 class D[T](Bar):
     pass
 
+
 class E[T: Bar]:
     pass
+
 
 # error: [unresolved-reference]
 def g[T](x: Bar):
     pass
 
+
 def h[T: Bar](x: T):
     pass
+
 
 class Bar:
     pass

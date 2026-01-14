@@ -114,6 +114,7 @@ python-version = "3.10"
 ```py
 from typing import Any, Literal, NamedTuple
 
+
 def _(x: int | list[int] | bytes):
     # error: [invalid-argument-type]
     if isinstance(x, list[int] | int):
@@ -158,6 +159,7 @@ IntOrStr = Union[int, str]
 
 reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 
+
 def _(x: int | str | bytes | memoryview | range):
     if isinstance(x, IntOrStr):
         reveal_type(x)  # revealed: int | str
@@ -166,13 +168,16 @@ def _(x: int | str | bytes | memoryview | range):
     else:
         reveal_type(x)  # revealed: range
 
+
 def _(x: int | str | None):
     if isinstance(x, Union[int, None]):
         reveal_type(x)  # revealed: int | None
     else:
         reveal_type(x)  # revealed: str
 
+
 ListStrOrInt = Union[list[str], int]
+
 
 def _(x: dict[int, str] | ListStrOrInt):
     # TODO: this should ideally be an error
@@ -191,6 +196,7 @@ def _(x: dict[int, str] | ListStrOrInt):
 ```py
 from typing import Optional
 
+
 def _(x: int | str | None):
     if isinstance(x, Optional[int]):
         reveal_type(x)  # revealed: int | None
@@ -206,6 +212,7 @@ can be used in `isinstance()` and `issubclass()` checks. We support narrowing us
 ```py
 import typing as t
 
+
 def f(x: dict[str, int] | list[str], y: object):
     if isinstance(x, t.Dict):
         reveal_type(x)  # revealed: dict[str, int]
@@ -220,8 +227,13 @@ def f(x: dict[str, int] | list[str], y: object):
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 x = object()
 
@@ -256,6 +268,7 @@ def _(flag: bool, t: type):
 def _(flag: bool):
     def isinstance(x, t):
         return True
+
     x = 1 if flag else "a"
 
     if isinstance(x, int):
@@ -278,6 +291,7 @@ def _(flag: bool):
 
 ```py
 from builtins import isinstance as imported_isinstance
+
 
 def _(flag: bool):
     x = 1 if flag else "a"
@@ -344,7 +358,9 @@ We used to incorrectly infer `Literal` booleans for some of these.
 ```py
 from ty_extensions import Not, Intersection, AlwaysTruthy, AlwaysFalsy
 
+
 class P: ...
+
 
 def f(
     a: Intersection[P, AlwaysTruthy],
@@ -382,7 +398,9 @@ type of the second argument is a dynamic type:
 from typing import Any
 from something_unresolvable import SomethingUnknown  # error: [unresolved-import]
 
+
 class Foo: ...
+
 
 def f(a: Foo, b: Any):
     if isinstance(a, SomethingUnknown):
@@ -407,13 +425,17 @@ python-version = "3.12"
 from typing import Any
 from ty_extensions import Intersection
 
+
 class Foo: ...
+
 
 class Bar:
     attribute: int
 
+
 class Baz:
     attribute: str
+
 
 def f(x: Foo, y: Intersection[type[Bar], type[Baz]], z: type[Any]):
     if isinstance(x, y):
@@ -438,12 +460,14 @@ from typing import TypeVar
 
 T = TypeVar("T", bound=type[Bar])
 
+
 def h_old_syntax(x: Foo, y: T) -> T:
     if isinstance(x, y):
         reveal_type(x)  # revealed: Foo & Bar
         reveal_type(x.attribute)  # revealed: int
 
     return y
+
 
 def h[U: type[Bar | Baz]](x: Foo, y: U) -> U:
     if isinstance(x, y):
@@ -458,10 +482,18 @@ Or even a tuple of tuple of typevars that have intersection bounds...
 ```py
 from ty_extensions import Intersection
 
+
 class Spam: ...
+
+
 class Eggs: ...
+
+
 class Ham: ...
+
+
 class Mushrooms: ...
+
 
 def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](x: Foo, y: T, z: U) -> tuple[T, U]:
     if isinstance(x, (y, (z, Mushrooms))):
@@ -484,9 +516,11 @@ a covariant generic, this is equivalent to using the upper bound of the type par
 ```py
 from typing import Self
 
+
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
+
 
 def _(x: object):
     if isinstance(x, Covariant):
@@ -499,6 +533,7 @@ Similarly, contravariant type parameters use their lower bound of `Never`:
 ```py
 class Contravariant[T]:
     def push(self, x: T) -> None: ...
+
 
 def _(x: object):
     if isinstance(x, Contravariant):
@@ -516,6 +551,7 @@ class Invariant[T]:
     def push(self, x: T) -> None: ...
     def get(self) -> T:
         raise NotImplementedError
+
 
 def _(x: object):
     if isinstance(x, Invariant):
@@ -566,13 +602,17 @@ during type ordering of normalized intersection types. Regression test for
 ```py
 from typing import Any, TypedDict, cast
 
+
 class A(TypedDict):
     x: str
+
 
 class B(TypedDict):
     y: str
 
+
 T = int | A | B
+
 
 def test(a: Any, items: list[T]) -> None:
     combined = a or items
@@ -589,6 +629,7 @@ narrowed.
 ```py
 def get_value() -> int | str:
     return 1
+
 
 def f():
     if isinstance(x := get_value(), int):

@@ -9,8 +9,10 @@ interchangeably.
 ```py
 from typing import NoReturn
 
+
 def stop() -> NoReturn:
     raise RuntimeError("no way")
+
 
 # revealed: Never
 reveal_type(stop())
@@ -27,6 +29,7 @@ a1: NoReturn
 a2: Never
 b1: Any
 b2: int
+
 
 def f():
     # revealed: Never

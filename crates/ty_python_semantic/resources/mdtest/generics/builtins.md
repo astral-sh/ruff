@@ -31,6 +31,7 @@ arguments.
 def f(**kwargs):
     reveal_type(kwargs)  # revealed: dict[Unknown, Unknown, Unknown]
 
+
 def g(**kwargs: int):
     reveal_type(kwargs)  # revealed: dict[Unknown, Unknown, Unknown]
 ```

@@ -39,6 +39,7 @@ And similiarly, we should still infer `bool` if the instance or the prefix are n
 ```py
 from typing_extensions import LiteralString
 
+
 def _(string_instance: str, literalstring: LiteralString):
     reveal_type(string_instance.startswith("a"))  # revealed: bool
     reveal_type(literalstring.startswith("a"))  # revealed: bool

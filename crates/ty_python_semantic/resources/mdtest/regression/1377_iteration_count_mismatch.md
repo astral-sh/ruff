@@ -44,14 +44,19 @@ if TYPE_CHECKING:
 UserT = TypeVar("UserT", covariant=True)
 MessageT = TypeVar("MessageT", bound="Message", default="Message", covariant=True)
 
+
 class Messageable(Protocol[MessageT]): ...
+
 
 ClanT = TypeVar("ClanT", bound="Clan | None", default="Clan | None", covariant=True)
 GroupT = TypeVar("GroupT", bound="Group | None", default="Group | None", covariant=True)
 
+
 class Channel(Messageable[MessageT], Generic[MessageT, ClanT, GroupT]): ...
 
+
 ChannelT = TypeVar("ChannelT", bound=Channel, default=Channel, covariant=True)
+
 
 class Message(Generic[UserT, ChannelT]): ...
 ```
@@ -76,13 +81,18 @@ MemberT = TypeVar("MemberT", covariant=True)
 
 AuthorT = TypeVar("AuthorT", covariant=True)
 
+
 class ChatMessage(Message[AuthorT, ChatT], Generic[AuthorT, MemberT, ChatT]): ...
+
 
 ChatMessageT = TypeVar("ChatMessageT", bound="GroupMessage | ClanMessage", default="GroupMessage | ClanMessage", covariant=True)
 
+
 class Chat(Channel[ChatMessageT, ClanT, GroupT]): ...
 
+
 ChatGroupTypeT = TypeVar("ChatGroupTypeT", covariant=True)
+
 
 class ChatGroup(Generic[MemberT, ChatT, ChatGroupTypeT]): ...
 ```
@@ -99,6 +109,7 @@ from .chat import Chat
 if TYPE_CHECKING:
     from .clan import Clan
 
+
 class ClanChannel(Chat["Clan", None]): ...
 ```
 
@@ -113,6 +124,7 @@ from typing_extensions import Self
 
 from .chat import ChatGroup
 
+
 class Clan(ChatGroup[str], str): ...
 ```
 
@@ -122,6 +134,7 @@ class Clan(ChatGroup[str], str): ...
 from __future__ import annotations
 
 from .chat import ChatGroup
+
 
 class Group(ChatGroup[str]): ...
 ```
@@ -141,6 +154,9 @@ from .chat import ChatMessage
 if TYPE_CHECKING:
     from .channel import ClanChannel
 
+
 class GroupMessage(ChatMessage["str"]): ...
+
+
 class ClanMessage(ChatMessage["ClanChannel"]): ...
 ```

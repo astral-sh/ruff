@@ -25,7 +25,9 @@ aliases, `Any` and `Unknown`.
 ```py
 from ty_extensions import reveal_mro
 
+
 class C: ...
+
 
 reveal_mro(C)  # revealed: (<class 'C'>, <class 'object'>)
 ```
@@ -43,7 +45,9 @@ reveal_mro(object)  # revealed: (<class 'object'>,)
 ```py
 from ty_extensions import reveal_mro
 
+
 class C(object): ...
+
 
 reveal_mro(C)  # revealed: (<class 'C'>, <class 'object'>)
 ```
@@ -53,8 +57,12 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'object'>)
 ```py
 from ty_extensions import reveal_mro
 
+
 class A: ...
+
+
 class B(A): ...
+
 
 reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, <class 'object'>)
 ```
@@ -64,9 +72,15 @@ reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, <class 'object'>)
 ```py
 from ty_extensions import reveal_mro
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C(A, B): ...
+
 
 reveal_mro(C)  # revealed: (<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>)
 ```
@@ -78,11 +92,21 @@ This is "ex_2" from <https://docs.python.org/3/howto/mro.html#the-end>
 ```py
 from ty_extensions import reveal_mro
 
+
 class O: ...
+
+
 class X(O): ...
+
+
 class Y(O): ...
+
+
 class A(X, Y): ...
+
+
 class B(Y, X): ...
+
 
 reveal_mro(A)  # revealed: (<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>)
 reveal_mro(B)  # revealed: (<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>)
@@ -95,13 +119,27 @@ This is "ex_5" from <https://docs.python.org/3/howto/mro.html#the-end>
 ```py
 from ty_extensions import reveal_mro
 
+
 class O: ...
+
+
 class F(O): ...
+
+
 class E(O): ...
+
+
 class D(O): ...
+
+
 class C(D, F): ...
+
+
 class B(D, E): ...
+
+
 class A(B, C): ...
+
 
 # revealed: (<class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>)
 reveal_mro(C)
@@ -118,13 +156,27 @@ This is "ex_6" from <https://docs.python.org/3/howto/mro.html#the-end>
 ```py
 from ty_extensions import reveal_mro
 
+
 class O: ...
+
+
 class F(O): ...
+
+
 class E(O): ...
+
+
 class D(O): ...
+
+
 class C(D, F): ...
+
+
 class B(E, D): ...
+
+
 class A(B, C): ...
+
 
 # revealed: (<class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>)
 reveal_mro(C)
@@ -141,16 +193,36 @@ This is "ex_9" from <https://docs.python.org/3/howto/mro.html#the-end>
 ```py
 from ty_extensions import reveal_mro
 
+
 class O: ...
+
+
 class A(O): ...
+
+
 class B(O): ...
+
+
 class C(O): ...
+
+
 class D(O): ...
+
+
 class E(O): ...
+
+
 class K1(A, B, C): ...
+
+
 class K2(D, B, E): ...
+
+
 class K3(D, A): ...
+
+
 class Z(K1, K2, K3): ...
+
 
 # revealed: (<class 'K1'>, <class 'A'>, <class 'B'>, <class 'C'>, <class 'O'>, <class 'object'>)
 reveal_mro(K1)
@@ -168,12 +240,24 @@ reveal_mro(Z)
 from ty_extensions import reveal_mro
 from does_not_exist import DoesNotExist  # error: [unresolved-import]
 
+
 class A(DoesNotExist): ...
+
+
 class B: ...
+
+
 class C: ...
+
+
 class D(A, B, C): ...
+
+
 class E(B, C): ...
+
+
 class F(E, A): ...
+
 
 reveal_mro(A)  # revealed: (<class 'A'>, Unknown, <class 'object'>)
 reveal_mro(D)  # revealed: (<class 'D'>, <class 'A'>, Unknown, <class 'B'>, <class 'C'>, <class 'object'>)
@@ -197,12 +281,14 @@ if hasattr(DoesNotExist, "__mro__"):
     reveal_type(DoesNotExist)  # revealed: Unknown & <Protocol with members '__mro__'>
 
     class Foo(DoesNotExist): ...  # no error!
+
     reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
 if not isinstance(DoesNotExist, type):
     reveal_type(DoesNotExist)  # revealed: Unknown & ~type
 
     class Foo(DoesNotExist): ...  # error: [unsupported-base]
+
     reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
 
@@ -215,11 +301,14 @@ guarantee:
 from typing import Any
 from ty_extensions import Unknown, Intersection, reveal_mro
 
+
 def f(x: type[Any], y: Intersection[Unknown, type[Any]]):
     class Foo(x): ...
+
     reveal_mro(Foo)  # revealed: (<class 'Foo'>, Any, <class 'object'>)
 
     class Bar(y): ...
+
     reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
 ```
 
@@ -231,32 +320,50 @@ creation to fail, we infer the class's `__mro__` as being `[<class>, Unknown, ob
 ```py
 from ty_extensions import reveal_mro
 
+
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Foo` with bases list `[<class 'object'>, <class 'int'>]`"
 class Foo(object, int): ...
 
+
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+
 
 class Bar(Foo): ...
 
+
 reveal_mro(Bar)  # revealed: (<class 'Bar'>, <class 'Foo'>, Unknown, <class 'object'>)
+
 
 # This is the `TypeError` at the bottom of "ex_2"
 # in the examples at <https://docs.python.org/3/howto/mro.html#the-end>
 class O: ...
+
+
 class X(O): ...
+
+
 class Y(O): ...
+
+
 class A(X, Y): ...
+
+
 class B(Y, X): ...
+
 
 reveal_mro(A)  # revealed: (<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>)
 reveal_mro(B)  # revealed: (<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>)
 
+
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Z` with bases list `[<class 'A'>, <class 'B'>]`"
 class Z(A, B): ...
 
+
 reveal_mro(Z)  # revealed: (<class 'Z'>, Unknown, <class 'object'>)
 
+
 class AA(Z): ...
+
 
 reveal_mro(AA)  # revealed: (<class 'AA'>, <class 'Z'>, Unknown, <class 'object'>)
 ```
@@ -272,11 +379,16 @@ find a union type in a class's bases, we infer the class's `__mro__` as being
 ```py
 from ty_extensions import reveal_mro
 
+
 def returns_bool() -> bool:
     return True
 
+
 class A: ...
+
+
 class B: ...
+
 
 if returns_bool():
     x = A
@@ -285,15 +397,21 @@ else:
 
 reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
 
+
 # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
 class Foo(x): ...
 
+
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+
 
 def f():
     if returns_bool():
+
         class C: ...
+
     else:
+
         class C: ...
 
     class D(C): ...  # error: [unsupported-base]
@@ -305,9 +423,13 @@ This is not legal:
 
 ```py
 class A: ...
+
+
 class B: ...
 
+
 EitherOr = A | B
+
 
 # error: [invalid-base] "Invalid class base with type `<types.UnionType special-form 'A | B'>`"
 class Foo(EitherOr): ...
@@ -323,13 +445,16 @@ diagnostic, and we use the dynamic type as a base to prevent further downstream 
 from typing import Any
 from ty_extensions import reveal_mro
 
+
 def _(flag: bool, any: Any):
     if flag:
         Base = any
     else:
+
         class Base: ...
 
     class Foo(Base): ...
+
     reveal_mro(Foo)  # revealed: (<class 'Foo'>, Any, <class 'object'>)
 ```
 
@@ -338,13 +463,22 @@ def _(flag: bool, any: Any):
 ```py
 from ty_extensions import reveal_mro
 
+
 def returns_bool() -> bool:
     return True
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
+
 class D: ...
+
 
 if returns_bool():
     x = A
@@ -359,9 +493,11 @@ else:
 reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
 reveal_type(y)  # revealed: <class 'C'> | <class 'D'>
 
+
 # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
 # error: 14 [unsupported-base] "Unsupported class base with type `<class 'C'> | <class 'D'>`"
 class Foo(x, y): ...
+
 
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
@@ -371,38 +507,54 @@ reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```py
 from ty_extensions import reveal_mro
 
+
 def returns_bool() -> bool:
     return True
 
+
 class O: ...
+
+
 class X(O): ...
+
+
 class Y(O): ...
+
 
 if returns_bool():
     foo = Y
 else:
     foo = object
 
+
 # error: 21 [unsupported-base] "Unsupported class base with type `<class 'Y'> | <class 'object'>`"
 class PossibleError(foo, X): ...
 
+
 reveal_mro(PossibleError)  # revealed: (<class 'PossibleError'>, Unknown, <class 'object'>)
 
+
 class A(X, Y): ...
+
 
 reveal_mro(A)  # revealed: (<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>)
 
 if returns_bool():
+
     class B(X, Y): ...
 
 else:
+
     class B(Y, X): ...
+
 
 # revealed: (<class 'mdtest_snippet.B @ src/mdtest_snippet.py:25:11'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>) | (<class 'mdtest_snippet.B @ src/mdtest_snippet.py:28:11'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>)
 reveal_mro(B)
 
+
 # error: 12 [unsupported-base] "Unsupported class base with type `<class 'mdtest_snippet.B @ src/mdtest_snippet.py:25:11'> | <class 'mdtest_snippet.B @ src/mdtest_snippet.py:28:11'>`"
 class Z(A, B): ...
+
 
 reveal_mro(Z)  # revealed: (<class 'Z'>, Unknown, <class 'object'>)
 ```
@@ -423,6 +575,7 @@ class Foo:
     def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
         return ()
 
+
 class Bar(Foo()): ...  # error: [unsupported-base]
 ```
 
@@ -434,11 +587,15 @@ class Bad1:
     def __mro_entries__(self, bases, extra_arg):
         return ()
 
+
 class Bad2:
     def __mro_entries__(self, bases) -> int:
         return 42
 
+
 class BadSub1(Bad1()): ...  # error: [invalid-base]
+
+
 class BadSub2(Bad2()): ...  # error: [invalid-base]
 ```
 
@@ -449,14 +606,24 @@ class BadSub2(Bad2()): ...  # error: [invalid-base]
 ```py
 from ty_extensions import reveal_mro
 
+
 class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
+
 
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
+
 class Spam: ...
+
+
 class Eggs: ...
+
+
 class Bar: ...
+
+
 class Baz: ...
+
 
 # fmt: off
 
@@ -475,8 +642,12 @@ class Ham(
 
 reveal_mro(Ham)  # revealed: (<class 'Ham'>, Unknown, <class 'object'>)
 
+
 class Mushrooms: ...
+
+
 class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
+
 
 reveal_mro(Omelette)  # revealed: (<class 'Omelette'>, Unknown, <class 'object'>)
 
@@ -560,8 +731,10 @@ from unresolvable_module import UnknownBase1, UnknownBase2  # error: [unresolved
 reveal_type(UnknownBase1)  # revealed: Unknown
 reveal_type(UnknownBase2)  # revealed: Unknown
 
+
 # no error here -- we respect the gradual guarantee:
 class Foo(UnknownBase1, UnknownBase2): ...
+
 
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
@@ -573,6 +746,7 @@ bases materialize to:
 ```py
 # error: [duplicate-base] "Duplicate base class `Foo`"
 class Bar(UnknownBase1, Foo, UnknownBase2, Foo): ...
+
 
 reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
 ```
@@ -594,19 +768,29 @@ from ty_extensions import reveal_mro
 
 T = TypeVar("T")
 
+
 class peekable(Generic[T], Iterator[T]): ...
+
 
 # revealed: (<class 'peekable[Unknown]'>, <class 'Iterator[T@peekable]'>, <class 'Iterable[T@peekable]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(peekable)
 
+
 class peekable2(Iterator[T], Generic[T]): ...
+
 
 # revealed: (<class 'peekable2[Unknown]'>, <class 'Iterator[T@peekable2]'>, <class 'Iterable[T@peekable2]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(peekable2)
 
+
 class Base: ...
+
+
 class Intermediate(Base, Generic[T]): ...
+
+
 class Sub(Intermediate[T], Base): ...
+
 
 # revealed: (<class 'Sub[Unknown]'>, <class 'Intermediate[T@Sub]'>, <class 'Base'>, typing.Generic, <class 'object'>)
 reveal_mro(Sub)
@@ -621,8 +805,13 @@ from typing_extensions import Protocol, TypeVar, Generic
 
 T = TypeVar("T")
 
+
 class Foo(Protocol): ...
+
+
 class Bar(Protocol[T]): ...
+
+
 class Baz(Protocol[T], Foo, Bar[T]): ...  # error: [inconsistent-mro]
 ```
 

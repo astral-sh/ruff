@@ -9,6 +9,7 @@ User-defined type guards are functions of which the return type is either `TypeG
 from ty_extensions import Intersection, Not, TypeOf
 from typing_extensions import TypeGuard, TypeIs
 
+
 def _(
     a: TypeGuard[str],
     b: TypeIs[str | int],
@@ -24,16 +25,20 @@ def _(
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
 
+
 # error: [invalid-return-type] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
 def _(a) -> TypeGuard[str]: ...
+
 
 # error: [invalid-return-type] "Function always implicitly returns `None`, which is not assignable to return type `TypeIs[str]`"
 def _(a) -> TypeIs[str]: ...
 def f(a) -> TypeGuard[str]:
     return True
 
+
 def g(a) -> TypeIs[str]:
     return True
+
 
 def _(a: object):
     reveal_type(f(a))  # revealed: TypeGuard[str @ a]
@@ -111,6 +116,7 @@ Methods narrow the first positional argument after `self` or `cls`
 ```py
 from typing import TypeGuard
 
+
 class C:
     def f(self, x: object) -> TypeGuard[str]:
         return True
@@ -127,6 +133,7 @@ class C:
     @classmethod
     def j(cls) -> TypeGuard[int]:  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
         return True
+
 
 def _(x: object):
     if C().f(x):
@@ -147,8 +154,10 @@ def _(x: object):
 ```py
 from typing_extensions import TypeIs
 
+
 def is_int(val: object) -> TypeIs[int]:
     return isinstance(val, int)
+
 
 class A:
     def is_int(self, val: object) -> TypeIs[int]:
@@ -157,6 +166,7 @@ class A:
     @classmethod
     def is_int2(cls, val: object) -> TypeIs[int]:
         return isinstance(val, int)
+
 
 def _(x: object):
     if is_int(x):
@@ -181,12 +191,15 @@ from typing_extensions import TypeGuard, TypeIs
 
 a = 123
 
+
 # error: [invalid-type-form] "Special form `typing.TypeGuard` expected exactly one type parameter"
 def f(_) -> TypeGuard[int, str]: ...
+
 
 # error: [invalid-type-form] "Special form `typing.TypeIs` expected exactly one type parameter"
 # error: [invalid-type-form] "Variable of type `Literal[123]` is not allowed in a type expression"
 def g(_) -> TypeIs[a, str]: ...
+
 
 reveal_type(f(0))  # revealed: Unknown
 reveal_type(g(0))  # revealed: Unknown
@@ -199,6 +212,7 @@ All code paths in a type guard function must return booleans.
 ```py
 from typing_extensions import Literal, TypeGuard, TypeIs, assert_never
 
+
 def _(a: object, flag: bool) -> TypeGuard[str]:
     if flag:
         # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal[0]`"
@@ -207,11 +221,13 @@ def _(a: object, flag: bool) -> TypeGuard[str]:
     # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal["foo"]`"
     return "foo"
 
+
 # error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
 def f(a: object, flag: bool) -> TypeIs[str]:
     if flag:
         # error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `float`"
         return 1.2
+
 
 def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
     if a == "foo":
@@ -227,11 +243,14 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
+
 def f(a: object) -> TypeGuard[str]:
     return True
 
+
 def g(a: object) -> TypeIs[int]:
     return True
+
 
 def _(d: Any):
     if f():  # error: [missing-argument] "No argument provided for required parameter `a` of function `f`"
@@ -258,14 +277,20 @@ python-version = "3.12"
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
+
 class Foo: ...
+
+
 class Bar: ...
+
 
 def guard_foo(a: object) -> TypeGuard[Foo]:
     return True
 
+
 def is_bar(a: object) -> TypeIs[Bar]:
     return True
+
 
 def _(a: Foo | Bar):
     if guard_foo(a):
@@ -282,17 +307,22 @@ def _(a: Foo | Bar):
 ```py
 from typing import TypeGuard, reveal_type
 
+
 class P:
     pass
+
 
 class A:
     pass
 
+
 class B:
     pass
 
+
 def is_b(val: object) -> TypeGuard[B]:
     return isinstance(val, B)
+
 
 def _(x: P):
     if isinstance(x, A) or is_b(x):
@@ -306,8 +336,10 @@ from typing_extensions import Any, Generic, Protocol, TypeVar
 
 T = TypeVar("T")
 
+
 class C(Generic[T]):
     v: T
+
 
 def _(a: tuple[Foo, Bar] | tuple[Bar, Foo], c: C[Any]):
     if reveal_type(guard_foo(a[1])):  # revealed: TypeGuard[Foo @ a[1]]
@@ -373,11 +405,14 @@ from typing_extensions import TypeVar
 
 T = TypeVar("T")
 
+
 def f(v: object) -> TypeIs[Bar]:
     return True
 
+
 def g(v: T) -> T:
     return v
+
 
 def _(a: Foo):
     # `reveal_type()` has the type `[T]() -> T`
@@ -399,15 +434,19 @@ transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovar
 ```py
 class Unrelated: ...
 
+
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
 
+
 def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
     return isinstance(arg, Covariant)
 
+
 def needs_instance_of_unrelated(arg: Unrelated):
     pass
+
 
 def _(x: Unrelated | Covariant[int]):
     if is_instance_of_covariant(x):
@@ -426,24 +465,34 @@ def _(x: Unrelated | Covariant[int]):
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
 
+
 class Foo: ...
+
+
 class Bar: ...
+
+
 class Baz(Bar): ...
+
 
 def guard_foo(a: object) -> TypeGuard[Foo]:
     return True
 
+
 def guard_bar(a: object) -> TypeGuard[Bar]:
     return True
 
+
 def is_bar(a: object) -> TypeIs[Bar]:
     return True
+
 
 def does_not_narrow_in_negative_case(a: Foo | Bar):
     if not guard_foo(a):
         reveal_type(a)  # revealed: Foo | Bar
     else:
         reveal_type(a)  # revealed: Foo
+
 
 def narrowed_type_must_be_exact(a: object, b: Baz):
     if guard_foo(b):
@@ -466,18 +515,27 @@ added on to TypeGuard constraints.
 ```py
 from typing_extensions import TypeGuard, TypeIs
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def f(x: object) -> TypeGuard[A]:
     return True
 
+
 def g(x: object) -> TypeGuard[B]:
     return True
 
+
 def h(x: object) -> TypeIs[C]:
     return True
+
 
 def _(x: object):
     if f(x) and g(x) and h(x):
@@ -491,18 +549,27 @@ TypeGuard constraints need to properly distribute through boolean operations.
 ```py
 from typing_extensions import TypeGuard, TypeIs
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def f(x: object) -> TypeIs[A]:
     return True
 
+
 def g(x: object) -> TypeGuard[B]:
     return True
 
+
 def h(x: object) -> TypeIs[C]:
     return True
+
 
 def _(x: object):
     # g(x) or h(x) should give B | C
@@ -521,14 +588,18 @@ narrowed.
 ```py
 from typing_extensions import TypeGuard, TypeIs
 
+
 def is_str(x: object) -> TypeIs[str]:
     return isinstance(x, str)
+
 
 def guard_str(x: object) -> TypeGuard[str]:
     return isinstance(x, str)
 
+
 def get_value() -> int | str:
     return 1
+
 
 def f():
     if is_str(x := get_value()):

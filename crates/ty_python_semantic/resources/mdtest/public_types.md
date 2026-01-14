@@ -13,14 +13,20 @@ or `B`:
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def outer() -> None:
     x = A()
 
     def inner() -> None:
         reveal_type(x)  # revealed: A | B
+
     # This call would observe `x` as `A`.
     inner()
 
@@ -38,6 +44,7 @@ def outer(flag: bool) -> None:
 
     def inner() -> None:
         reveal_type(x)  # revealed: A | B | C
+
     inner()
 
     if flag:
@@ -60,6 +67,7 @@ def outer() -> None:
 
     def inner() -> None:
         reveal_type(x)  # revealed: A | C
+
     inner()
 
     if False:
@@ -69,11 +77,13 @@ def outer() -> None:
     x = C()
     inner()
 
+
 def outer(flag: bool) -> None:
     x = A()
 
     def inner() -> None:
         reveal_type(x)  # revealed: A | C
+
     inner()
 
     if flag:
@@ -83,6 +93,7 @@ def outer(flag: bool) -> None:
 
     x = C()
     inner()
+
 
 def outer(flag: bool) -> None:
     if flag:
@@ -93,6 +104,7 @@ def outer(flag: bool) -> None:
 
     def inner() -> None:
         reveal_type(x)  # revealed: A | C
+
     x = C()
     inner()
 ```
@@ -106,6 +118,7 @@ def outer(flag: bool) -> None:
 
         def inner() -> None:
             reveal_type(x)  # revealed: A
+
         inner()
 ```
 
@@ -117,6 +130,7 @@ def outer(flag: bool) -> None:
     def inner() -> None:
         # TODO: Ideally, we would emit a possibly-unresolved-reference error here.
         reveal_type(x)  # revealed: A
+
     inner()
 ```
 
@@ -130,16 +144,19 @@ def outer() -> None:
 
     def inner() -> None:
         reveal_type(x)  # revealed: A
+
     inner()
 
     return
     # unreachable
+
 
 def outer(flag: bool) -> None:
     x = A()
 
     def inner() -> None:
         reveal_type(x)  # revealed: A | B
+
     if flag:
         x = B()
         inner()
@@ -148,9 +165,11 @@ def outer(flag: bool) -> None:
 
     inner()
 
+
 def outer(x: A) -> None:
     def inner() -> None:
         reveal_type(x)  # revealed: A
+
     raise
 ```
 
@@ -165,9 +184,13 @@ def f0() -> None:
             def f3() -> None:
                 def f4() -> None:
                     reveal_type(x)  # revealed: A | B
+
                 f4()
+
             f3()
+
         f2()
+
     f1()
 
     x = B()
@@ -184,17 +207,23 @@ evaluated), but they can be applied if there is no reassignment of the symbol.
 ```py
 class A: ...
 
-def outer(x: A | None):
-    if x is not None:
-        def inner() -> None:
-            reveal_type(x)  # revealed: A | None
-        inner()
-    x = None
 
 def outer(x: A | None):
     if x is not None:
+
+        def inner() -> None:
+            reveal_type(x)  # revealed: A | None
+
+        inner()
+    x = None
+
+
+def outer(x: A | None):
+    if x is not None:
+
         def inner() -> None:
             reveal_type(x)  # revealed: A
+
         inner()
 ```
 
@@ -209,6 +238,7 @@ def outer() -> None:
     def inner() -> None:
         # In this scope, `x` may refer to `x = None` or `x = 1`.
         reveal_type(x)  # revealed: None | Literal[1]
+
     inner()
 
     x = 1
@@ -218,7 +248,9 @@ def outer() -> None:
     def inner2() -> None:
         # In this scope, `x = None` appears as being shadowed by `x = 1`.
         reveal_type(x)  # revealed: Literal[1]
+
     inner2()
+
 
 def outer() -> None:
     x = None
@@ -227,9 +259,11 @@ def outer() -> None:
 
     def inner() -> None:
         reveal_type(x)  # revealed: Literal[1, 2]
+
     inner()
 
     x = 2
+
 
 def outer(x: A | None):
     if x is None:
@@ -239,7 +273,9 @@ def outer(x: A | None):
 
     def inner() -> None:
         reveal_type(x)  # revealed: A
+
     inner()
+
 
 def outer(x: A | None):
     x = x or A()
@@ -248,6 +284,7 @@ def outer(x: A | None):
 
     def inner() -> None:
         reveal_type(x)  # revealed: A
+
     inner()
 ```
 
@@ -259,11 +296,13 @@ The behavior is the same if the outer scope is the global scope of a module:
 def flag() -> bool:
     return True
 
+
 if flag():
     x = 1
 
     def f() -> None:
         reveal_type(x)  # revealed: Literal[1, 2]
+
     # Function only used inside this branch
     f()
 
@@ -282,12 +321,14 @@ in other branches:
 def flag() -> bool:
     return True
 
+
 if flag():
     A: str = ""
 else:
     A = None
 
 reveal_type(A)  # revealed: Literal[""] | None
+
 
 def _():
     reveal_type(A)  # revealed: str | None
@@ -305,6 +346,7 @@ except ImportError:
 
 reveal_type(optional_dependency)  # revealed: Unknown | None
 
+
 def _():
     reveal_type(optional_dependency)  # revealed: Unknown | None
 ```
@@ -321,6 +363,7 @@ def outer() -> None:
     def inner() -> None:
         # TODO: this should ideally be `Literal[1]`, but no other type checker supports this either
         reveal_type(x)  # revealed: None | Literal[1]
+
     x = None
 
     # [additional code here]
@@ -335,7 +378,10 @@ modules) cannot be recognized from lazy scopes.
 
 ```py
 class A: ...
+
+
 class A: ...
+
 
 def f(x: A):
     # TODO: no error
@@ -354,11 +400,13 @@ def outer() -> None:
     def set_x() -> None:
         nonlocal x
         x = 1
+
     set_x()
 
     def inner() -> None:
         # TODO: this should ideally be `None | Literal[1]`. Mypy and pyright support this.
         reveal_type(x)  # revealed: None
+
     inner()
 ```
 
@@ -372,6 +420,7 @@ definitions of `f`. This would otherwise result in a union of all three definiti
 ```py
 from typing import overload
 
+
 @overload
 def f(x: int) -> int: ...
 @overload
@@ -379,7 +428,9 @@ def f(x: str) -> str: ...
 def f(x: int | str) -> int | str:
     raise NotImplementedError
 
+
 reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+
 
 def _():
     reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
@@ -391,7 +442,9 @@ This also works if there are conflicting declarations:
 def flag() -> bool:
     return True
 
+
 if flag():
+
     @overload
     def g(x: int) -> int: ...
     @overload
@@ -402,8 +455,10 @@ if flag():
 else:
     g: str = ""
 
+
 def _():
     reveal_type(g)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | str
+
 
 # error: [conflicting-declarations]
 g = "test"
@@ -450,10 +505,13 @@ def _():
 ```py
 from typing import overload
 
+
 def flag() -> bool:
     return True
 
+
 if flag():
+
     @overload
     def f(x: int) -> int: ...
     @overload

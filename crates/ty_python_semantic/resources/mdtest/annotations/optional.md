@@ -12,6 +12,7 @@ a1: Optional[bool]
 a2: Optional[Optional[bool]]
 a3: Optional[None]
 
+
 def f():
     # revealed: int | None
     reveal_type(a)
@@ -41,6 +42,7 @@ from typing_extensions import Optional
 
 a: Optional[int]
 
+
 def f():
     # revealed: int | None
     reveal_type(a)
@@ -50,6 +52,7 @@ def f():
 
 ```py
 from typing import Optional
+
 
 # error: [invalid-type-form] "`typing.Optional` requires exactly one argument when used in a type expression"
 def f(x: Optional) -> None:

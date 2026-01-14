@@ -6,6 +6,7 @@
 class NotBool:
     __bool__ = None
 
+
 # error: [too-many-positional-arguments] "Too many positional arguments to class `bool`: expected 1, got 2"
 bool(1, 2)
 
@@ -68,9 +69,11 @@ from enum import Enum
 from types import FunctionType
 from typing import TypeVar
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 reveal_type(isinstance(True, bool))  # revealed: Literal[True]
 reveal_type(isinstance(True, int))  # revealed: Literal[True]
@@ -82,16 +85,26 @@ reveal_type(isinstance(Answer.NO, Answer))  # revealed: Literal[True]
 
 reveal_type(isinstance((1, 2), tuple))  # revealed: Literal[True]
 
+
 def f(): ...
+
 
 reveal_type(isinstance(f, FunctionType))  # revealed: Literal[True]
 
 reveal_type(isinstance("", int))  # revealed: bool
 
+
 class A: ...
+
+
 class SubclassOfA(A): ...
+
+
 class OtherSubclassOfA(A): ...
+
+
 class B: ...
+
 
 reveal_type(isinstance(A, type))  # revealed: Literal[True]
 
@@ -106,6 +119,7 @@ s = SubclassOfA()
 reveal_type(isinstance(s, SubclassOfA))  # revealed: Literal[True]
 reveal_type(isinstance(s, A))  # revealed: Literal[True]
 
+
 def _(x: A | B, y: list[int]):
     reveal_type(isinstance(y, list))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
@@ -116,9 +130,11 @@ def _(x: A | B, y: list[int]):
         reveal_type(x)  # revealed: B & ~A
         reveal_type(isinstance(x, B))  # revealed: Literal[True]
 
+
 T = TypeVar("T")
 T_bound_A = TypeVar("T_bound_A", bound=A)
 T_constrained = TypeVar("T_constrained", SubclassOfA, OtherSubclassOfA)
+
 
 def _(
     x: T,

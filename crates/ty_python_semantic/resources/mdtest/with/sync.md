@@ -8,11 +8,13 @@ The type of the target variable in a `with` statement is the return type from th
 ```py
 class Target: ...
 
+
 class Manager:
     def __enter__(self) -> Target:
         return Target()
 
     def __exit__(self, exc_type, exc_value, traceback): ...
+
 
 with Manager() as f:
     reveal_type(f)  # revealed: Target
@@ -45,6 +47,7 @@ def _(flag: bool):
 ```py
 class Manager: ...
 
+
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
     ...
@@ -56,6 +59,7 @@ with Manager():
 class Manager:
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
+
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__`"
 with Manager():
     ...
@@ -66,6 +70,7 @@ with Manager():
 ```py
 class Manager:
     def __enter__(self): ...
+
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__exit__`"
 with Manager():
@@ -80,6 +85,7 @@ class Manager:
 
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
+
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__enter__`"
 with Manager():
     ...
@@ -90,10 +96,13 @@ with Manager():
 ```py
 from typing_extensions import Self
 
+
 class Manager:
     def __enter__(self) -> Self:
         return self
+
     __exit__: int = 32
+
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__exit__`"
 with Manager():
@@ -111,6 +120,7 @@ def _(flag: bool):
         def __exit__(self, exc_type, exc_value, traceback): ...
 
     class NotAContextManager: ...
+
     context_expr = Manager1() if flag else NotAContextManager()
 
     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
@@ -124,6 +134,7 @@ def _(flag: bool):
 def _(flag: bool):
     class Manager:
         if flag:
+
             def __enter__(self) -> str:
                 return "abcd"
 
@@ -142,6 +153,7 @@ class Manager:
         return "foo"
 
     def __exit__(self, exc_type, exc_value, traceback): ...
+
 
 context_expr = Manager()
 
@@ -162,6 +174,7 @@ class Manager:
     async def __aenter__(self): ...
     async def __aexit__(self, *args): ...
 
+
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
     ...
@@ -177,6 +190,7 @@ class Manager:
     async def __aenter__(self): ...
     async def __aexit__(self, typ: str, exc, traceback): ...
 
+
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
     ...
@@ -190,6 +204,7 @@ Similarly, we also show the hint if the functions have the wrong number of argum
 class Manager:
     async def __aenter__(self, wrong_extra_arg): ...
     async def __aexit__(self, typ, exc, traceback, wrong_extra_arg): ...
+
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():

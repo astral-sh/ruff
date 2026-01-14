@@ -16,8 +16,10 @@ Make sure that we recognize `pytest.fail` calls as terminal:
 ```py
 import pytest
 
+
 def some_runtime_condition() -> bool:
     return True
+
 
 def test_something():
     if not some_runtime_condition():

@@ -7,6 +7,7 @@ A name reference to a never-defined symbol in a function is implicitly a global 
 ```py
 x = 1
 
+
 def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
@@ -15,6 +16,7 @@ def f():
 
 ```py
 x = 1
+
 
 def f():
     global x
@@ -25,6 +27,7 @@ def f():
 
 ```py
 x: int = 1
+
 
 def f():
     y: int = 1
@@ -39,6 +42,7 @@ def f():
     # error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
     z = ""
 
+
 z: int
 ```
 
@@ -48,6 +52,7 @@ A `global` statement causes lookup to skip any bindings in intervening scopes:
 
 ```py
 x: int = 1
+
 
 def outer():
     x: str = ""
@@ -65,6 +70,7 @@ assignment.
 ```py
 x: int | None
 
+
 def f():
     global x
     x = 1
@@ -75,6 +81,7 @@ Same for an `if` statement:
 
 ```py
 x: int | None
+
 
 def f():
     # The `global` keyword isn't necessary here, but this is testing that it doesn't get in the way
@@ -92,8 +99,10 @@ marks the `nonlocal` line, while `mypy`, `pyright`, and `ruff` (`PLE0115`) mark 
 ```py
 x = 1
 
+
 def f():
     x = 1
+
     def g() -> None:
         nonlocal x
         global x  # error: [invalid-syntax] "name `x` is nonlocal and global"
@@ -108,6 +117,7 @@ def f():
     y = x
     x = 1  # No error.
 
+
 x = 2
 ```
 
@@ -119,10 +129,12 @@ Using a name prior to its `global` declaration in the same scope is a syntax err
 x = 1
 y = 2
 
+
 def f():
     print(x)
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
+
 
 def f():
     global x
@@ -130,10 +142,12 @@ def f():
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
 
+
 def f():
     print(x)
     global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
+
 
 def f():
     global x, y
@@ -141,10 +155,12 @@ def f():
     global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
 
+
 def f():
     x = 1
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     x = 1
+
 
 def f():
     global x
@@ -152,10 +168,12 @@ def f():
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     x = 1
 
+
 def f():
     del x
     global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
+
 
 def f():
     global x, y
@@ -163,10 +181,12 @@ def f():
     global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
+
 def f():
     del x
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
+
 
 def f():
     global x
@@ -174,20 +194,24 @@ def f():
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
+
 def f():
     del x
     global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
+
 
 def f():
     global x, y
     del x
     global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
+
 
 def f():
     print(f"{x=}")
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+
 
 # still an error in module scope
 x = None
@@ -198,6 +222,7 @@ global x  # error: [invalid-syntax] "name `x` is used prior to global declaratio
 
 ```py
 x = 42
+
 
 def f():
     global x
@@ -211,6 +236,7 @@ def f():
 ```py
 x = 42
 
+
 def f():
     # error: [unresolved-reference] "Name `x` used when not defined"
     reveal_type(x)  # revealed: Unknown
@@ -222,6 +248,7 @@ def f():
 
 ```py
 x: int = 1
+
 
 def f():
     global x
@@ -235,8 +262,10 @@ Even if the `global` declaration isn't used in an assignment, we conservatively 
 ```py
 x = 1
 
+
 def f():
     global x
+
 
 # TODO: reveal_type(x)  # revealed: Unknown | Literal["1"]
 ```
@@ -250,6 +279,7 @@ explicit definition in the global scope, but we consider that fishy and prefer t
 x = 1
 y: int
 # z is neither bound nor declared in the global scope
+
 
 def f():
     global x, y, z  # error: [unresolved-global] "Invalid global declaration of `z`: `z` has no declarations or bindings in the global scope"
@@ -272,6 +302,7 @@ global.
 import secrets
 
 x: str = "a"
+
 
 def f(x: int, y: int):
     class C:

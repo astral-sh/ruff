@@ -7,9 +7,11 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
+
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
+
 
 for x in IntIterable():
     pass
@@ -26,9 +28,11 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
+
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
+
 
 x = "foo"
 
@@ -45,9 +49,11 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
+
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
+
 
 for x in IntIterable():
     pass
@@ -64,9 +70,11 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
+
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
+
 
 for x in IntIterable():
     if x > 5:
@@ -83,6 +91,7 @@ reveal_type(x)  # revealed: int | Literal["foo"]
 class OldStyleIterable:
     def __getitem__(self, key: int) -> int:
         return 42
+
 
 for x in OldStyleIterable():
     pass
@@ -142,7 +151,9 @@ for x in nonsense:  # error: [not-iterable]
 class NotIterable:
     def __getitem__(self, key: int) -> int:
         return 42
+
     __iter__: None = None
+
 
 for x in NotIterable():  # error: [not-iterable]
     pass
@@ -155,13 +166,16 @@ class TestIter:
     def __next__(self) -> int:
         return 42
 
+
 class Test:
     def __iter__(self) -> TestIter:
         return TestIter()
 
+
 class Test2:
     def __iter__(self) -> TestIter:
         return TestIter()
+
 
 def _(flag: bool):
     for x in Test() if flag else Test2():
@@ -175,13 +189,16 @@ class TestIter:
     def __next__(self) -> int:
         return 42
 
+
 class TestIter2:
     def __next__(self) -> int:
         return 42
 
+
 class Test:
     def __iter__(self) -> TestIter | TestIter2:
         return TestIter()
+
 
 for x in Test():
     reveal_type(x)  # revealed: int
@@ -191,35 +208,52 @@ for x in Test():
 
 ```py
 class Result1A: ...
+
+
 class Result1B: ...
+
+
 class Result2A: ...
+
+
 class Result2B: ...
+
+
 class Result3: ...
+
+
 class Result4: ...
+
 
 class TestIter1:
     def __next__(self) -> Result1A | Result1B:
         return Result1B()
 
+
 class TestIter2:
     def __next__(self) -> Result2A | Result2B:
         return Result2B()
+
 
 class TestIter3:
     def __next__(self) -> Result3:
         return Result3()
 
+
 class TestIter4:
     def __next__(self) -> Result4:
         return Result4()
+
 
 class Test:
     def __iter__(self) -> TestIter1 | TestIter2:
         return TestIter1()
 
+
 class Test2:
     def __iter__(self) -> TestIter3 | TestIter4:
         return TestIter3()
+
 
 def _(flag: bool):
     for x in Test() if flag else Test2():
@@ -235,13 +269,16 @@ annotation.
 ```py
 from typing import Iterator, Literal
 
+
 class IntIterator:
     def __iter__(self) -> Iterator[int]:
         return iter(range(42))
 
+
 class StrIterator:
     def __iter__(self) -> Iterator[str]:
         return iter("foo")
+
 
 def f(x: IntIterator | StrIterator):
     for a in x:
@@ -271,6 +308,7 @@ infer a precise type for the iterable element when iterating over a `Literal` st
 ```py
 from typing import Literal
 
+
 def f(x: Literal["foo", b"bar"], y: Literal["foo"] | range):
     for item in x:
         reveal_type(item)  # revealed: Literal["f", "o", 98, 97, 114]
@@ -287,9 +325,11 @@ class TestIter:
     def __next__(self) -> int:
         return 42
 
+
 class Test:
     def __iter__(self) -> TestIter:
         return TestIter()
+
 
 def _(flag: bool):
     # error: [not-iterable]
@@ -306,13 +346,16 @@ class TestIter:
     def __next__(self) -> int:
         return 42
 
+
 class Test:
     def __iter__(self) -> TestIter:
         return TestIter()
 
+
 class Test2:
     def __iter__(self) -> int:
         return 42
+
 
 def _(flag: bool):
     # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
@@ -328,9 +371,11 @@ class TestIter:
     def __next__(self) -> int:
         return 42
 
+
 class Test:
     def __iter__(self) -> TestIter | int:
         return TestIter()
+
 
 # error: [not-iterable] "Object of type `Test` may not be iterable"
 for x in Test():
@@ -344,6 +389,7 @@ iterable element type precisely:
 
 ```py
 from typing import Sequence
+
 
 def _(x: Sequence[int], y: object):
     reveal_type(x)  # revealed: Sequence[int]
@@ -371,8 +417,10 @@ and intersect their element types.
 ```py
 from ty_extensions import Intersection
 
+
 class NotIterable:
     pass
+
 
 def _(x: Intersection[list[int], NotIterable]):
     # `list[int]` is iterable (yielding `int`), but `NotIterable` is not.
@@ -389,11 +437,14 @@ fail to iterate.
 ```py
 from ty_extensions import Intersection
 
+
 class NotIterable1:
     pass
 
+
 class NotIterable2:
     pass
+
 
 def _(x: Intersection[NotIterable1, NotIterable2]):
     # error: [not-iterable]
@@ -408,6 +459,7 @@ intersect the element types position-by-position.
 
 ```py
 from ty_extensions import Intersection
+
 
 def _(x: Intersection[tuple[int, str], tuple[object, object]]):
     # `tuple[int, str]` yields `int | str` when iterated.
@@ -426,9 +478,11 @@ element type with the iterator's element type.
 ```py
 from collections.abc import Iterator
 
+
 class Foo:
     def __iter__(self) -> Iterator[object]:
         raise NotImplementedError
+
 
 def _(x: tuple[int, str, bytes]):
     if isinstance(x, Foo):
@@ -449,9 +503,11 @@ specs, we should intersect their element types.
 ```py
 from collections.abc import Iterator
 
+
 class Foo:
     def __iter__(self) -> Iterator[object]:
         raise NotImplementedError
+
 
 def _(x: list[int]):
     if isinstance(x, Foo):
@@ -471,8 +527,10 @@ def _(flag: bool):
 
     class CustomCallable:
         if flag:
+
             def __call__(self, *args, **kwargs) -> Iterator:
                 return Iterator()
+
         else:
             __call__: None = None
 
@@ -481,8 +539,10 @@ def _(flag: bool):
 
     class Iterable2:
         if flag:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         else:
             __iter__: None = None
 
@@ -506,9 +566,11 @@ class Iterator:
     def __next__(self) -> int:
         return 42
 
+
 class Iterable:
     def __iter__(self, extra_arg) -> Iterator:
         return Iterator()
+
 
 # error: [not-iterable]
 for x in Iterable():
@@ -524,6 +586,7 @@ class Bad:
     def __iter__(self) -> int:
         return 42
 
+
 # error: [not-iterable]
 for x in Bad():
     reveal_type(x)  # revealed: Unknown
@@ -535,6 +598,7 @@ for x in Bad():
 def _(flag: bool):
     class Iterator:
         if flag:
+
             def __next__(self) -> int:
                 return 42
 
@@ -556,16 +620,20 @@ class Iterator1:
     def __next__(self, extra_arg) -> int:
         return 42
 
+
 class Iterator2:
     __next__: None = None
+
 
 class Iterable1:
     def __iter__(self) -> Iterator1:
         return Iterator1()
 
+
 class Iterable2:
     def __iter__(self) -> Iterator2:
         return Iterator2()
+
 
 # error: [not-iterable]
 for x in Iterable1():
@@ -588,8 +656,10 @@ def _(flag: bool):
 
     class Iterable:
         if flag:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         # invalid signature because it only accepts a `str`,
         # but the old-style iteration protocol will pass it an `int`
         def __getitem__(self, key: str) -> bytes:
@@ -619,8 +689,10 @@ def _(flag: bool):
 
     class Iterable:
         if flag:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         __getitem__: None = None
 
     # error: [not-iterable] "Object of type `Iterable` may not be iterable"
@@ -637,12 +709,16 @@ class Iterator:
     def __next__(self) -> int:
         return 42
 
+
 def _(flag1: bool, flag2: bool):
     class Iterable:
         if flag1:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         if flag2:
+
             def __getitem__(self, key: int) -> bytes:
                 return bytes()
 
@@ -659,6 +735,7 @@ def _(flag1: bool, flag2: bool):
 class Bad:
     __getitem__: None = None
 
+
 # error: [not-iterable]
 for x in Bad():
     reveal_type(x)  # revealed: Unknown
@@ -672,8 +749,10 @@ for x in Bad():
 def _(flag: bool):
     class CustomCallable:
         if flag:
+
             def __call__(self, *args, **kwargs) -> int:
                 return 42
+
         else:
             __call__: None = None
 
@@ -682,8 +761,10 @@ def _(flag: bool):
 
     class Iterable2:
         if flag:
+
             def __getitem__(self, key: int) -> int:
                 return 42
+
         else:
             __getitem__: None = None
 
@@ -709,6 +790,7 @@ class Iterable:
     def __getitem__(self, key: str) -> int:
         return 42
 
+
 # error: [not-iterable]
 for x in Iterable():
     reveal_type(x)  # revealed: int
@@ -724,9 +806,11 @@ class Iterator:
     def __next__(self) -> str:
         return "foo"
 
+
 def _(flag: bool):
     class Iterable:
         if flag:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
 
@@ -746,12 +830,16 @@ class Iterator:
     def __next__(self) -> int:
         return 42
 
+
 def _(flag: bool):
     class Iterable1:
         if flag:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         else:
+
             def __iter__(self, invalid_extra_arg) -> Iterator:
                 return Iterator()
 
@@ -761,8 +849,10 @@ def _(flag: bool):
 
     class Iterable2:
         if flag:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         else:
             __iter__: None = None
 
@@ -780,16 +870,21 @@ def _(flag: bool):
 def _(flag: bool):
     class Iterator1:
         if flag:
+
             def __next__(self) -> int:
                 return 42
+
         else:
+
             def __next__(self, invalid_extra_arg) -> str:
                 return "foo"
 
     class Iterator2:
         if flag:
+
             def __next__(self) -> int:
                 return 42
+
         else:
             __next__: None = None
 
@@ -819,16 +914,21 @@ def _(flag: bool):
 def _(flag: bool):
     class Iterable1:
         if flag:
+
             def __getitem__(self, item: int) -> str:
                 return "foo"
+
         else:
             __getitem__: None = None
 
     class Iterable2:
         if flag:
+
             def __getitem__(self, item: int) -> str:
                 return "foo"
+
         else:
+
             def __getitem__(self, item: str) -> int:
                 return 42
 
@@ -851,26 +951,35 @@ class Iterator:
     def __next__(self) -> bytes:
         return b"foo"
 
+
 def _(flag: bool, flag2: bool):
     class Iterable1:
         if flag:
+
             def __getitem__(self, item: int) -> str:
                 return "foo"
+
         else:
             __getitem__: None = None
 
         if flag2:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
 
     class Iterable2:
         if flag:
+
             def __getitem__(self, item: int) -> str:
                 return "foo"
+
         else:
+
             def __getitem__(self, item: str) -> int:
                 return 42
+
         if flag2:
+
             def __iter__(self) -> Iterator:
                 return Iterator()
 
@@ -895,6 +1004,7 @@ for x in ():
 
 ```py
 from typing_extensions import Never
+
 
 def f(never: Never):
     for x in never:
@@ -924,7 +1034,9 @@ from unresolved_module import SomethingUnknown  # error: [unresolved-import]
 from typing import Any, Iterable
 from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown, reveal_mro
 
+
 class Foo(SomethingUnknown): ...
+
 
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
@@ -937,7 +1049,9 @@ static_assert(is_assignable_to(type[Foo], Iterable[Unknown]))  # error: [static-
 for x in Foo:
     reveal_type(x)  # revealed: Unknown
 
+
 class Bar(Any): ...
+
 
 reveal_mro(Bar)  # revealed: (<class 'Bar'>, Any, <class 'object'>)
 

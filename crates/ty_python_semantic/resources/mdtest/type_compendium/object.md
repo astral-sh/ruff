@@ -67,8 +67,12 @@ Intersecting with `object` is equivalent to the original type:
 ```py
 from ty_extensions import static_assert, is_equivalent_to, Intersection
 
+
 class P: ...
+
+
 class Q: ...
+
 
 static_assert(is_equivalent_to(Intersection[P, object, Q], Intersection[P, Q]))
 ```

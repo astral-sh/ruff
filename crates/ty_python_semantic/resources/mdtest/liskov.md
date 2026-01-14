@@ -474,6 +474,7 @@ class D(C):
 ```py
 class Bad:
     x: int
+
     def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
         return self.x == other.x
 ```
@@ -615,8 +616,10 @@ have bigger problems:
 ```py
 from __future__ import annotations
 
+
 class MaybeEqWhile:
     while ...:
+
         def __eq__(self, other: MaybeEqWhile) -> bool:
             return True
 ```

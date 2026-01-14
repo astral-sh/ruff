@@ -264,6 +264,7 @@ class Pentagon:
     sides: int
     area: float
 
+
 class Hexagon:
     sides: int
     area: float
@@ -273,6 +274,8 @@ class Hexagon:
 
 ```py
 class Pentagon: ...
+
+
 class Hexagon: ...
 ```
 

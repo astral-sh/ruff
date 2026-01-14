@@ -10,6 +10,7 @@ All of the following symbols can be mapped one-to-one with the actual type:
 ```py
 import typing
 
+
 def f(
     list_bare: typing.List,
     list_parametrized: typing.List[int],
@@ -64,6 +65,7 @@ In case the incorrect number of type arguments is passed, a diagnostic is given.
 
 ```py
 import typing
+
 
 def f(
     # error: [invalid-type-form] "Legacy alias `typing.List` expected exactly 1 argument, got 2"
@@ -120,22 +122,30 @@ from ty_extensions import reveal_mro
 ### Built-ins
 ####################
 
+
 class ListSubclass(typing.List): ...
+
 
 # revealed: (<class 'ListSubclass'>, <class 'list[Unknown]'>, <class 'MutableSequence[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(ListSubclass)
 
+
 class DictSubclass(typing.Dict): ...
+
 
 # revealed: (<class 'DictSubclass'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(DictSubclass)
 
+
 class SetSubclass(typing.Set): ...
+
 
 # revealed: (<class 'SetSubclass'>, <class 'set[Unknown]'>, <class 'MutableSet[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(SetSubclass)
 
+
 class FrozenSetSubclass(typing.FrozenSet): ...
+
 
 # revealed: (<class 'FrozenSetSubclass'>, <class 'frozenset[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(FrozenSetSubclass)
@@ -144,27 +154,37 @@ reveal_mro(FrozenSetSubclass)
 ### `collections`
 ####################
 
+
 class ChainMapSubclass(typing.ChainMap): ...
+
 
 # revealed: (<class 'ChainMapSubclass'>, <class 'ChainMap[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(ChainMapSubclass)
 
+
 class CounterSubclass(typing.Counter): ...
+
 
 # revealed: (<class 'CounterSubclass'>, <class 'Counter[Unknown]'>, <class 'dict[Unknown, int]'>, <class 'MutableMapping[Unknown, int]'>, <class 'Mapping[Unknown, int]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(CounterSubclass)
 
+
 class DefaultDictSubclass(typing.DefaultDict): ...
+
 
 # revealed: (<class 'DefaultDictSubclass'>, <class 'defaultdict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(DefaultDictSubclass)
 
+
 class DequeSubclass(typing.Deque): ...
+
 
 # revealed: (<class 'DequeSubclass'>, <class 'deque[Unknown]'>, <class 'MutableSequence[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(DequeSubclass)
 
+
 class OrderedDictSubclass(typing.OrderedDict): ...
+
 
 # revealed: (<class 'OrderedDictSubclass'>, <class 'OrderedDict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(OrderedDictSubclass)

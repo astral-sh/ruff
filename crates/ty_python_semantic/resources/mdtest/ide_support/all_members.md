@@ -59,17 +59,20 @@ understood as being available:
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class Base:
     base_class_attr: int = 1
 
     def f_base(self):
         self.base_instance_attr: str = "Base"
 
+
 class Intermediate(Base):
     intermediate_attr: int = 2
 
     def f_intermediate(self):
         self.intermediate_instance_attr: str = "Intermediate"
+
 
 class C(Intermediate):
     class_attr: int = 3
@@ -88,6 +91,7 @@ class C(Intermediate):
     @staticmethod
     def static_method() -> int:
         return 1
+
 
 static_assert(has_member(C(), "base_class_attr"))
 static_assert(has_member(C(), "intermediate_attr"))
@@ -120,14 +124,17 @@ Class-level attributes can also be accessed through the class itself:
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class Base:
     base_attr: int = 1
+
 
 class C(Base):
     class_attr: str = "c"
 
     def f(self):
         self.instance_attr = True
+
 
 static_assert(has_member(C, "class_attr"))
 static_assert(has_member(C, "base_attr"))
@@ -148,22 +155,27 @@ accessible:
 class MetaBase(type):
     meta_base_attr = 1
 
+
 class Meta(MetaBase):
     meta_attr = 2
 
+
 class D(Base, metaclass=Meta):
     class_attr = 3
+
 
 static_assert(has_member(D, "meta_base_attr"))
 static_assert(has_member(D, "meta_attr"))
 static_assert(has_member(D, "base_attr"))
 static_assert(has_member(D, "class_attr"))
 
+
 def _(x: type[D]):
     static_assert(has_member(x, "meta_base_attr"))
     static_assert(has_member(x, "meta_attr"))
     static_assert(has_member(x, "base_attr"))
     static_assert(has_member(x, "class_attr"))
+
 
 def _[T: D](x: type[T]):
     static_assert(has_member(x, "meta_base_attr"))
@@ -180,8 +192,10 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
+
 class C(Generic[T]):
     base_attr: T
+
 
 static_assert(has_member(C[int], "base_attr"))
 static_assert(has_member(C[int](), "base_attr"))
@@ -193,9 +207,12 @@ Generic classes can also have metaclasses:
 class Meta(type):
     FOO = 42
 
+
 class E(Generic[T], metaclass=Meta): ...
 
+
 static_assert(has_member(E[int], "FOO"))
+
 
 def f(x: type[E[str]]):
     static_assert(has_member(x, "FOO"))
@@ -208,6 +225,7 @@ def f(x: type[E[str]]):
 ```py
 from typing import Any
 from ty_extensions import has_member, static_assert
+
 
 def f(x: type[Any]):
     static_assert(has_member(x, "__base__"))
@@ -233,8 +251,10 @@ static_assert(has_member("a", "startswith"))
 static_assert(has_member(b"a", "__buffer__"))
 static_assert(has_member(3.14, "is_integer"))
 
+
 def _(literal_string: LiteralString):
     static_assert(has_member(literal_string, "startswith"))
+
 
 static_assert(has_member(("some", "tuple", 1, 2), "count"))
 
@@ -248,9 +268,11 @@ static_assert(has_member("a".startswith, "__doc__"))
 from ty_extensions import has_member, static_assert
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 static_assert(has_member(Answer, "NO"))
 static_assert(has_member(Answer, "YES"))
@@ -263,13 +285,16 @@ static_assert(has_member(Answer, "__members__"))
 from ty_extensions import has_member, static_assert
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     age: int | None
 
+
 static_assert(not has_member(Person, "name"))
 static_assert(has_member(Person, "keys"))
 static_assert(has_member(Person, "__total__"))
+
 
 def _(person: Person):
     static_assert(not has_member(person, "name"))
@@ -280,6 +305,7 @@ def _(person: Person):
     static_assert(not has_member(type(person), "name"))
     static_assert(not has_member(type(person), "__total__"))
     static_assert(has_member(type(person), "keys"))
+
 
 def _(t_person: type[Person]):
     static_assert(not has_member(t_person, "name"))
@@ -293,9 +319,11 @@ def _(t_person: type[Person]):
 from ty_extensions import has_member, static_assert
 from typing import NamedTuple, Generic, TypeVar
 
+
 class Person(NamedTuple):
     id: int
     name: str
+
 
 static_assert(has_member(Person, "id"))
 static_assert(has_member(Person, "name"))
@@ -303,6 +331,7 @@ static_assert(has_member(Person, "name"))
 static_assert(has_member(Person, "_make"))
 static_assert(has_member(Person, "_asdict"))
 static_assert(has_member(Person, "_replace"))
+
 
 def _(person: Person):
     static_assert(has_member(person, "id"))
@@ -312,6 +341,7 @@ def _(person: Person):
     static_assert(has_member(person, "_asdict"))
     static_assert(has_member(person, "_replace"))
 
+
 def _(t_person: type[Person]):
     static_assert(has_member(t_person, "id"))
     static_assert(has_member(t_person, "name"))
@@ -320,16 +350,20 @@ def _(t_person: type[Person]):
     static_assert(has_member(t_person, "_asdict"))
     static_assert(has_member(t_person, "_replace"))
 
+
 T = TypeVar("T")
+
 
 class Box(NamedTuple, Generic[T]):
     item: T
+
 
 static_assert(has_member(Box, "item"))
 
 static_assert(has_member(Box, "_make"))
 static_assert(has_member(Box, "_asdict"))
 static_assert(has_member(Box, "_replace"))
+
 
 def _(box: Box[int]):
     static_assert(has_member(box, "item"))
@@ -347,13 +381,16 @@ the union.
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class A:
     on_both: int = 1
     only_on_a: str = "a"
 
+
 class B:
     on_both: int = 2
     only_on_b: str = "b"
+
 
 def f(union: A | B):
     static_assert(has_member(union, "on_both"))
@@ -368,17 +405,21 @@ items on the intersection of the non-`Any` elements:
 from typing import Any
 from ty_extensions import has_member, static_assert
 
+
 class A:
     on_both: int = 1
     only_on_a: str = "a"
+
 
 class B:
     on_both: int = 2
     only_on_b: str = "b"
 
+
 def f(union: Any | A):
     static_assert(has_member(union, "on_both"))
     static_assert(has_member(union, "only_on_a"))
+
 
 def g(union: Any | A | B):
     static_assert(has_member(union, "on_both"))
@@ -393,13 +434,16 @@ unioned with `Any`:
 from typing import Any
 from ty_extensions import Intersection, has_member, static_assert
 
+
 class A:
     on_both: int = 1
     only_on_a: str = "a"
 
+
 class B:
     on_both: int = 2
     only_on_b: str = "b"
+
 
 def f(x: Intersection[Any, A] | B):
     static_assert(has_member(x, "on_both"))
@@ -417,13 +461,16 @@ the elements:
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class A:
     on_both: int = 1
     only_on_a: str = "a"
 
+
 class B:
     on_both: int = 2
     only_on_b: str = "b"
+
 
 def f(intersection: object):
     if isinstance(intersection, A):
@@ -440,11 +487,13 @@ It also works when negative types are introduced:
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class A:
     on_all: int = 1
     only_on_a: str = "a"
     only_on_ab: str = "a"
     only_on_ac: str = "a"
+
 
 class B:
     on_all: int = 2
@@ -452,11 +501,13 @@ class B:
     only_on_ab: str = "b"
     only_on_bc: str = "b"
 
+
 class C:
     on_all: int = 3
     only_on_c: str = "c"
     only_on_ac: str = "c"
     only_on_bc: str = "c"
+
 
 def f(intersection: object):
     if isinstance(intersection, A):
@@ -627,6 +678,7 @@ Dynamically added members cannot be accessed:
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class C:
     static_attr = 1
 
@@ -635,6 +687,7 @@ class C:
 
     def __getattr__(self, name: str) -> str:
         return "a"
+
 
 c = C()
 c.dynamic_attr = "a"
@@ -658,10 +711,12 @@ python-version = "3.9"
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
+
 @dataclass
 class Person:
     age: int
     name: str
+
 
 static_assert(has_member(Person, "name"))
 static_assert(has_member(Person, "age"))
@@ -723,9 +778,11 @@ def _(person: Person):
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
+
 @dataclass(init=False, repr=False, eq=False)
 class C:
     x: int
+
 
 static_assert(has_member(C, "__init__"))
 static_assert(has_member(C, "__repr__"))
@@ -745,14 +802,17 @@ When `order=True` is set, comparison dunder methods become available:
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
+
 @dataclass(order=True)
 class C:
     x: int
+
 
 static_assert(has_member(C, "__lt__"))
 static_assert(has_member(C, "__le__"))
 static_assert(has_member(C, "__gt__"))
 static_assert(has_member(C, "__ge__"))
+
 
 def _(c: C):
     static_assert(has_member(c, "__lt__"))
@@ -769,9 +829,11 @@ When `slots=True`, the corresponding dunder attribute becomes available:
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
+
 @dataclass(slots=True)
 class C:
     x: int
+
 
 static_assert(has_member(C, "__slots__"))
 static_assert(has_member(C(1), "__slots__"))
@@ -790,9 +852,11 @@ python-version = "3.11"
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
+
 @dataclass(slots=True, weakref_slot=True)
 class C:
     x: int
+
 
 static_assert(has_member(C, "__weakref__"))
 static_assert(has_member(C(1), "__weakref__"))
@@ -811,11 +875,14 @@ python-version = "3.13"
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
+
 @dataclass
 class C:
     x: int
 
+
 static_assert(has_member(C, "__replace__"))
+
 
 def _(c: C):
     static_assert(has_member(c, "__replace__"))
@@ -834,11 +901,14 @@ python-version = "3.10"
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
+
 @dataclass
 class C:
     x: int
 
+
 static_assert(has_member(C, "__match_args__"))
+
 
 def _(c: C):
     static_assert(has_member(c, "__match_args__"))
@@ -855,10 +925,12 @@ python-version = "3.9"
 from dataclasses import dataclass
 from ty_extensions import static_assert, has_member
 
+
 # TODO: these parameters don't exist on Python 3.9;
 # we should emit a diagnostic (or two)
 @dataclass(slots=True, weakref_slot=True)
 class F: ...
+
 
 static_assert(not has_member(F, "__slots__"))
 static_assert(not has_member(F, "__match_args__"))
@@ -878,14 +950,17 @@ inherited from their base classes on the class object:
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class Base:
     base_attr: int = 1
 
     def base_method(self) -> str:
         return "hello"
 
+
 class Mixin:
     mixin_attr: str = "mixin"
+
 
 # Dynamic class with a single base
 DynamicSingle = type("DynamicSingle", (Base,), {})
@@ -936,11 +1011,14 @@ Dynamic classes inheriting from classes with custom metaclasses get metaclass me
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class MyMeta(type):
     meta_attr: str = "meta"
 
+
 class Base(metaclass=MyMeta):
     base_attr: int = 1
+
 
 Dynamic = type("Dynamic", (Base,), {})
 
@@ -954,8 +1032,10 @@ However, instances of dynamic classes currently do not expose members for autoco
 ```py
 from ty_extensions import has_member, static_assert
 
+
 class Base:
     base_attr: int = 1
+
 
 DynamicSingle = type("DynamicSingle", (Base,), {})
 instance = DynamicSingle()

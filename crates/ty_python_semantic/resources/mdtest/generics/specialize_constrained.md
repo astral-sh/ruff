@@ -60,12 +60,19 @@ If a typevar has an upper bound, then it must specialize to a type that is a sub
 from typing import final, Never
 from ty_extensions import ConstraintSet, generic_context
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 @final
 class Unrelated: ...
+
 
 def bounded[T: Base]():
     # revealed: ty_extensions.Specialization[T@bounded = Base]
@@ -96,6 +103,7 @@ that makes the test succeed.
 ```py
 from typing import Any
 
+
 def bounded_by_gradual[T: Any]():
     # TODO: revealed: ty_extensions.Specialization[T@bounded_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@bounded_by_gradual = object]
@@ -114,6 +122,7 @@ def bounded_by_gradual[T: Any]():
 
     # revealed: ty_extensions.Specialization[T@bounded_by_gradual = Unrelated]
     reveal_type(generic_context(bounded_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Unrelated)))
+
 
 def bounded_by_gradual_list[T: list[Any]]():
     # revealed: ty_extensions.Specialization[T@bounded_by_gradual_list = Top[list[Any]]]
@@ -153,12 +162,19 @@ information at the moment.
 from typing import final, Never
 from ty_extensions import ConstraintSet, generic_context
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 @final
 class Unrelated: ...
+
 
 def constrained[T: (Base, Unrelated)]():
     # revealed: None
@@ -388,12 +404,19 @@ the other.
 from typing import final, Never
 from ty_extensions import ConstraintSet, generic_context
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 @final
 class Unrelated: ...
+
 
 # fmt: off
 
@@ -422,6 +445,7 @@ must be specialized to `list[T]`, but it cannot affect what `T` is specialized t
 ```py
 from typing import Never
 from ty_extensions import ConstraintSet, generic_context
+
 
 def mentions[T, U]():
     # (T@mentions ≤ int) ∧ (U@mentions = list[T@mentions])

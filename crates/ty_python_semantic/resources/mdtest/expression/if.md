@@ -30,6 +30,7 @@ The test inside an if expression should not affect code outside of the expressio
 ```py
 from typing import Literal
 
+
 def _(flag: bool):
     x: Literal[42, "hello"] = 42 if flag else "hello"
 

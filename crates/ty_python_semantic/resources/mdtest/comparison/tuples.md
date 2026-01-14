@@ -152,12 +152,24 @@ of the dunder methods.)
 ```py
 from __future__ import annotations
 
+
 class EqReturnType: ...
+
+
 class NeReturnType: ...
+
+
 class LtReturnType: ...
+
+
 class LeReturnType: ...
+
+
 class GtReturnType: ...
+
+
 class GeReturnType: ...
+
 
 class A:
     def __eq__(self, o: object) -> EqReturnType:  # error: [invalid-method-override]
@@ -177,6 +189,7 @@ class A:
 
     def __ge__(self, o: A) -> GeReturnType:
         return GeReturnType()
+
 
 a = (A(), A())
 
@@ -198,11 +211,14 @@ reveal_type(b <= c)  # revealed: Literal[True]
 reveal_type(b > c)  # revealed: Literal[False]
 reveal_type(b >= c)  # revealed: Literal[False]
 
+
 class LtReturnTypeOnB: ...
+
 
 class B:
     def __lt__(self, o: B) -> LtReturnTypeOnB:
         return LtReturnTypeOnB()
+
 
 reveal_type((A(), B()) < (A(), B()))  # revealed: LtReturnType | LtReturnTypeOnB | Literal[False]
 ```
@@ -262,6 +278,7 @@ comparison can clearly conclude before encountering an error, the error should n
 ```py
 def _(n: int, s: str):
     class A: ...
+
     # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `A`"
     A() < A()
     # error: [unsupported-operator] "Operator `<=` is not supported between two objects of type `A`"
@@ -466,12 +483,14 @@ def compute_chained_comparison():
 class NotBoolable:
     __bool__: int = 5
 
+
 class Comparable:
     def __lt__(self, other) -> NotBoolable:
         return NotBoolable()
 
     def __gt__(self, other) -> NotBoolable:
         return NotBoolable()
+
 
 a = (1, Comparable())
 b = (1, Comparable())
@@ -494,10 +513,12 @@ pair of elements at equivalent positions cannot be converted to a `bool`:
 class NotBoolable:
     __bool__: None = None
 
+
 class A:
     # error: [invalid-method-override]
     def __eq__(self, other) -> NotBoolable:
         return NotBoolable()
+
 
 # error: [unsupported-bool-conversion]
 (A(),) == (A(),)
@@ -509,8 +530,10 @@ class A:
 from __future__ import annotations
 from typing import NamedTuple
 
+
 class Node(NamedTuple):
     parent: Node | None
+
 
 def _(n: Node):
     reveal_type(n.parent is n)  # revealed: bool

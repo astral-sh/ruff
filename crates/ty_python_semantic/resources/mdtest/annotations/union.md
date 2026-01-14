@@ -15,6 +15,7 @@ a4: Union[Union[bytes, str]]
 a5: Union[int]
 a6: Union[()]
 
+
 def f():
     # revealed: int | str
     reveal_type(a)
@@ -55,6 +56,7 @@ from typing_extensions import Union
 
 a: Union[int, str]
 
+
 def f():
     # revealed: int | str
     reveal_type(a)
@@ -64,6 +66,7 @@ def f():
 
 ```py
 from typing import Union
+
 
 # error: [invalid-type-form] "`typing.Union` requires at least one argument when used in a type expression"
 def f(x: Union) -> None:
@@ -79,6 +82,7 @@ python-version = "3.10"
 
 ```py
 X = int | str
+
 
 def f(y: X):
     reveal_type(y)  # revealed: int | str

@@ -7,7 +7,9 @@
 ```py
 from typing import Type
 
+
 class A: ...
+
 
 def _(c: Type, d: Type[A]):
     reveal_type(c)  # revealed: type
@@ -25,7 +27,9 @@ not a class.
 from typing import Type
 from ty_extensions import reveal_mro
 
+
 class C(Type): ...
+
 
 # Runtime value: `(C, type, typing.Generic, object)`
 # TODO: Add `Generic` to the MRO

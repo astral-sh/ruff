@@ -14,9 +14,11 @@ dependencies = ["pydantic==2.12.2"]
 ```py
 from pydantic import BaseModel
 
+
 class User(BaseModel):
     id: int
     name: str
+
 
 reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str) -> None
 
@@ -33,10 +35,12 @@ invalid_user = User(id=2)
 ```py
 from pydantic import BaseModel, Field
 
+
 class Product(BaseModel):
     id: int = Field(init=False)
     name: str = Field(..., kw_only=False, min_length=1)
     internal_price_cent: int = Field(..., gt=0, alias="price_cent")
+
 
 reveal_type(Product.__init__)  # revealed: (self: Product, name: str = ..., *, price_cent: int = ...) -> None
 

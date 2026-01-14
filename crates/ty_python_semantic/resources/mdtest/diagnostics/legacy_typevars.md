@@ -102,8 +102,10 @@ T = TypeVar("T", covariant=True, contravariant=True)
 ```py
 from typing_extensions import TypeVar
 
+
 def cond() -> bool:
     return True
+
 
 # error: [invalid-legacy-type-variable]
 T = TypeVar("T", covariant=cond())

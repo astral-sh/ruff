@@ -20,9 +20,11 @@ T = TypeVar("T")
 # TODO: error
 x: T
 
+
 class C:
     # TODO: error
     x: T
+
 
 def f() -> None:
     # TODO: error
@@ -42,11 +44,14 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
+
 def f1(x: T) -> T:
     return x
 
+
 def f2(x: T) -> T:
     return x
+
 
 f1(1)
 f2("a")
@@ -63,6 +68,7 @@ to a different type each time.
 ```py
 def f[T](x: T) -> T:
     return x
+
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f("a"))  # revealed: Literal["a"]
@@ -81,6 +87,7 @@ class C[T]:
     def m2(self, x: T) -> T:
         return x
 
+
 c: C[int] = C[int]()
 c.m1(1)
 c.m2(1)
@@ -97,9 +104,11 @@ descriptor protocol, which is how `self` parameters are bound to instance method
 ```py
 from inspect import getattr_static
 
+
 class C[T]:
     def f(self, x: T) -> str:
         return "a"
+
 
 reveal_type(getattr_static(C[int], "f"))  # revealed: def f(self, x: int) -> str
 reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
@@ -121,8 +130,10 @@ reveal_type(bound_method(1))  # revealed: str
 C[int].f(1)  # error: [missing-argument]
 reveal_type(C[int].f(C[int](), 1))  # revealed: str
 
+
 class D[U](C[U]):
     pass
+
 
 reveal_type(D[int]().f)  # revealed: bound method D[int].f(x: int) -> str
 ```
@@ -138,9 +149,11 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 S = TypeVar("S")
 
+
 class Legacy(Generic[T]):
     def m(self, x: T, y: S) -> S:
         return y
+
 
 legacy: Legacy[int] = Legacy[int]()
 reveal_type(legacy.m(1, "string"))  # revealed: Literal["string"]
@@ -167,6 +180,7 @@ class C[T]:
     def m[S](self, x: T, y: S) -> S:
         return y
 
+
 c: C[int] = C()
 reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
@@ -184,10 +198,12 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 S = TypeVar("S")
 
+
 def f(x: T) -> None:
     x: list[T] = []
     # TODO: invalid-assignment error
     y: list[S] = []
+
 
 class C(Generic[T]):
     # TODO: error: cannot use S if it's not in the current generic context
@@ -208,10 +224,12 @@ from typing import TypeVar
 
 S = TypeVar("S")
 
+
 def f[T](x: T) -> None:
     x: list[T] = []
     # TODO: invalid assignment error
     y: list[S] = []
+
 
 class C[T]:
     # TODO: error: cannot use S if it's not in the current generic context
@@ -267,10 +285,13 @@ class C[T]:
 ```py
 from typing import Iterable
 
+
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
+
     # error: [invalid-generic-class]
     class Bad1[T]: ...
+
     # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
@@ -282,10 +303,13 @@ def f[T](x: T, y: T) -> None:
 ```py
 from typing import Iterable
 
+
 class C[T]:
     class Ok1[S]: ...
+
     # error: [invalid-generic-class]
     class Bad1[T]: ...
+
     # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
@@ -298,29 +322,37 @@ class C[_T](
     C
 ): ...
 
+
 # `D` in `list[D]` is resolved to be a type variable of class `D`.
 class D[D](list[D]): ...
 
+
 # error: [unresolved-reference] "Name `E` used when not defined"
 if E:
+
     class E[_T](
         # error: [unresolved-reference] "Name `E` used when not defined"
         E
     ): ...
 
+
 # error: [unresolved-reference] "Name `F` used when not defined"
 F
 
+
 # error: [unresolved-reference] "Name `F` used when not defined"
 class F[_T](F): ...
+
 
 def foo():
     class G[_T](
         # error: [unresolved-reference] "Name `G` used when not defined"
         G
     ): ...
+
     # error: [unresolved-reference] "Name `H` used when not defined"
     if H:
+
         class H[_T](
             # error: [unresolved-reference] "Name `H` used when not defined"
             H
@@ -341,6 +373,7 @@ class C[T]:
         bad: list[T] = []
 
     class Inner[S]: ...
+
     ok2: Inner[T]
 ```
 
@@ -357,9 +390,11 @@ from ty_extensions import into_callable
 T = TypeVar("T")
 S = TypeVar("S")
 
+
 class Foo(Generic[T]):
     def bar(self, x: T, y: S) -> tuple[T, S]:
         raise NotImplementedError
+
 
 def f(x: type[Foo[T]]) -> T:
     # revealed: [S](self, x: T@f, y: S) -> tuple[T@f, S]

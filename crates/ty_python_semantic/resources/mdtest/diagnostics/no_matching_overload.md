@@ -7,12 +7,14 @@
 ```py
 from typing import overload
 
+
 @overload
 def f(x: int) -> int: ...
 @overload
 def f(x: str) -> str: ...
 def f(x: int | str) -> int | str:
     return x
+
 
 f(b"foo")  # error: [no-matching-overload]
 ```
@@ -27,7 +29,9 @@ Which in turn makes snapshotting a bit annoying, since the output can depend on 
 ```py
 from typing import overload
 
+
 class Foo: ...
+
 
 @overload
 def foo(a: int, b: int, c: int): ...
@@ -73,6 +77,7 @@ def foo(a: str, b: float, c: float): ...
 def foo(a: float, b: float, c: float): ...
 def foo(a, b, c): ...
 
+
 foo(Foo(), Foo())  # error: [no-matching-overload]
 ```
 
@@ -84,7 +89,9 @@ cut off the list in the diagnostic and emit a message stating the number of omit
 ```py
 from typing import overload
 
+
 class Foo: ...
+
 
 @overload
 def foo(a: int, b: int, c: int): ...
@@ -210,6 +217,7 @@ def foo(a: float, b: float, c: bool): ...
 def foo(a: bool, b: float, c: float): ...
 def foo(a, b, c): ...
 
+
 foo(Foo(), Foo())  # error: [no-matching-overload]
 ```
 
@@ -217,6 +225,7 @@ foo(Foo(), Foo())  # error: [no-matching-overload]
 
 ```py
 from typing import overload
+
 
 @overload
 def f(
@@ -276,6 +285,7 @@ def f(
 ) -> int | str:
     return 0
 
+
 f(b"foo")  # error: [no-matching-overload]
 ```
 
@@ -284,6 +294,7 @@ f(b"foo")  # error: [no-matching-overload]
 ```py
 from typing import overload
 
+
 class Foo:
     @overload
     def bar(self, x: int) -> int: ...
@@ -291,6 +302,7 @@ class Foo:
     def bar(self, x: str) -> str: ...
     def bar(self, x: int | str) -> int | str:
         return x
+
 
 foo = Foo()
 foo.bar(b"wat")  # error: [no-matching-overload]

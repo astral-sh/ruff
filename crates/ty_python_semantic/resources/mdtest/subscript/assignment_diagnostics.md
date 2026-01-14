@@ -39,8 +39,10 @@ config[0] = 3  # error: [invalid-assignment]
 ```py
 from typing import TypedDict
 
+
 class Config(TypedDict):
     retries: int
+
 
 def _(config: Config) -> None:
     config["retries"] = "three"  # error: [invalid-assignment]
@@ -51,8 +53,10 @@ def _(config: Config) -> None:
 ```py
 from typing import TypedDict
 
+
 class Config(TypedDict):
     retries: int
+
 
 def _(config: Config) -> None:
     config[0] = 3  # error: [invalid-key]
@@ -63,8 +67,10 @@ def _(config: Config) -> None:
 ```py
 from typing import TypedDict
 
+
 class Config(TypedDict):
     retries: int
+
 
 def _(config: Config) -> None:
     config["Retries"] = 30.0  # error: [invalid-key]
@@ -76,6 +82,7 @@ def _(config: Config) -> None:
 class ReadOnlyDict:
     def __getitem__(self, key: str) -> int:
         return 42
+
 
 config = ReadOnlyDict()
 config["retries"] = 3  # error: [invalid-assignment]
@@ -93,13 +100,16 @@ def _(config: dict[str, int] | None) -> None:
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     phone_number: str
 
+
 class Animal(TypedDict):
     name: str
     legs: int
+
 
 def _(being: Person | Animal) -> None:
     being["legs"] = 4  # error: [invalid-key]
@@ -110,13 +120,16 @@ def _(being: Person | Animal) -> None:
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     phone_number: str
 
+
 class Animal(TypedDict):
     name: str
     legs: int
+
 
 def _(being: Person | Animal) -> None:
     # error: [invalid-key]

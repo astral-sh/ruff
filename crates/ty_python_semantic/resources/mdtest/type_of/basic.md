@@ -5,6 +5,7 @@
 ```py
 class A: ...
 
+
 def _(c: type[A]):
     reveal_type(c)  # revealed: type[A]
 ```
@@ -14,6 +15,7 @@ def _(c: type[A]):
 ```py
 class A:
     class B: ...
+
 
 def f(c: type[A.B]):
     reveal_type(c)  # revealed: type[B]
@@ -26,6 +28,7 @@ class A:
     class B:
         class C: ...
 
+
 def f(c: type[A.B.C]):
     reveal_type(c)  # revealed: type[C]
 ```
@@ -34,6 +37,7 @@ def f(c: type[A.B.C]):
 
 ```py
 from a import A
+
 
 def f(c: type[A]):
     reveal_type(c)  # revealed: type[A]
@@ -49,6 +53,7 @@ class A: ...
 
 ```py
 import a
+
 
 def f(c: type[a.B]):
     reveal_type(c)  # revealed: type[B]
@@ -66,6 +71,7 @@ class B: ...
 
 ```py
 import a.b
+
 
 def f(c: type[a.b.C]):
     reveal_type(c)  # revealed: type[C]
@@ -86,11 +92,15 @@ class C: ...
 
 ```py
 class BasicUser: ...
+
+
 class ProUser: ...
+
 
 class A:
     class B:
         class C: ...
+
 
 def _(u: type[BasicUser | ProUser | A.B.C]):
     # revealed: type[BasicUser] | type[ProUser] | type[C]
@@ -102,12 +112,17 @@ def _(u: type[BasicUser | ProUser | A.B.C]):
 ```py
 from typing import Union
 
+
 class BasicUser: ...
+
+
 class ProUser: ...
+
 
 class A:
     class B:
         class C: ...
+
 
 def f(a: type[Union[BasicUser, ProUser, A.B.C]], b: type[Union[str]], c: type[Union[BasicUser, Union[ProUser, A.B.C]]]):
     reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
@@ -120,12 +135,17 @@ def f(a: type[Union[BasicUser, ProUser, A.B.C]], b: type[Union[str]], c: type[Un
 ```py
 from typing import Union
 
+
 class BasicUser: ...
+
+
 class ProUser: ...
+
 
 class A:
     class B:
         class C: ...
+
 
 def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Union[ProUser, A.B.C | str]]]):
     reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
@@ -136,7 +156,10 @@ def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Unio
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 # error: [invalid-type-form]
 _: type[A, B]
@@ -147,7 +170,9 @@ _: type[A, B]
 ```py
 from ty_extensions import reveal_mro
 
+
 class Foo(type[int]): ...
+
 
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, <class 'type'>, <class 'object'>)
 ```
@@ -168,12 +193,15 @@ from types import EllipsisType
 from typing import final
 from enum import Enum
 
+
 @final
 class Foo: ...
+
 
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 def _(x: type[Foo], y: type[EllipsisType], z: type[Answer]):
     reveal_type(x)  # revealed: <class 'Foo'>
@@ -192,30 +220,39 @@ python-version = "3.12"
 from typing import final, Any
 from ty_extensions import is_assignable_to, is_subtype_of, is_disjoint_from, static_assert
 
+
 class Biv[T]: ...
+
 
 class Cov[T]:
     def pop(self) -> T:
         raise NotImplementedError
 
+
 class Contra[T]:
     def push(self, value: T) -> None:
         pass
 
+
 class Inv[T]:
     x: T
+
 
 @final
 class BivSub[T](Biv[T]): ...
 
+
 @final
 class CovSub[T](Cov[T]): ...
+
 
 @final
 class ContraSub[T](Contra[T]): ...
 
+
 @final
 class InvSub[T](Inv[T]): ...
+
 
 def _[T, U]():
     static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[U]]))
@@ -230,6 +267,7 @@ def _[T, U]():
 
     static_assert(not is_subtype_of(type[InvSub[T]], type[InvSub[U]]))
     static_assert(not is_disjoint_from(type[InvSub[U]], type[InvSub[T]]))
+
 
 def _():
     static_assert(is_subtype_of(type[BivSub[bool]], type[BivSub[int]]))
@@ -256,6 +294,7 @@ def _():
     # TODO: These are disjoint.
     static_assert(not is_disjoint_from(type[InvSub[bool]], type[InvSub[int]]))
 
+
 def _[T]():
     static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[Any]]))
     static_assert(is_subtype_of(type[BivSub[Any]], type[BivSub[T]]))
@@ -280,6 +319,7 @@ def _[T]():
     static_assert(is_assignable_to(type[InvSub[T]], type[InvSub[Any]]))
     static_assert(is_assignable_to(type[InvSub[Any]], type[InvSub[T]]))
     static_assert(not is_disjoint_from(type[InvSub[T]], type[InvSub[Any]]))
+
 
 def _[T, U]():
     static_assert(is_subtype_of(type[BivSub[T]], type[Biv[T]]))
@@ -306,6 +346,7 @@ def _[T, U]():
     static_assert(not is_disjoint_from(type[InvSub[U]], type[Inv[T]]))
     static_assert(not is_disjoint_from(type[InvSub[U]], type[Inv[U]]))
 
+
 def _():
     static_assert(is_subtype_of(type[BivSub[bool]], type[Biv[int]]))
     static_assert(is_subtype_of(type[BivSub[int]], type[Biv[bool]]))
@@ -328,6 +369,7 @@ def _():
     static_assert(not is_disjoint_from(type[InvSub[bool]], type[Inv[int]]))
     # TODO: These are disjoint.
     static_assert(not is_disjoint_from(type[InvSub[int]], type[Inv[bool]]))
+
 
 def _[T]():
     static_assert(is_subtype_of(type[BivSub[T]], type[Biv[Any]]))

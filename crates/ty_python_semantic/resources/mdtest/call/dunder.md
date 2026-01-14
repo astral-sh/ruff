@@ -16,9 +16,11 @@ as the `instance` argument to `__get__`. A desugared version of `obj[key]` is ro
 ```py
 from typing import Any
 
+
 def find_name_in_mro(typ: type, name: str) -> Any:
     # See implementation in https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
     pass
+
 
 def getitem_desugared(obj: object, key: object) -> object:
     getitem_callable = find_name_in_mro(type(obj), "__getitem__")
@@ -40,8 +42,10 @@ class Meta(type):
     def __getitem__(cls, key: int) -> str:
         return str(key)
 
+
 class DunderOnMetaclass(metaclass=Meta):
     pass
+
 
 reveal_type(DunderOnMetaclass[0])  # revealed: str
 ```
@@ -52,6 +56,7 @@ If the dunder method is only present on the class itself, it will not be called:
 class ClassWithNormalDunder:
     def __getitem__(self, key: int) -> str:
         return str(key)
+
 
 # error: [not-subscriptable]
 ClassWithNormalDunder[0]
@@ -68,6 +73,7 @@ class ClassWithNormalDunder:
     def __getitem__(self, key: int) -> str:
         return str(key)
 
+
 class_with_normal_dunder = ClassWithNormalDunder()
 
 reveal_type(class_with_normal_dunder[0])  # revealed: str
@@ -79,9 +85,11 @@ Which can be demonstrated by trying to attach a dunder method to an instance, wh
 def external_getitem(instance, key: int) -> str:
     return str(key)
 
+
 class ThisFails:
     def __init__(self):
         self.__getitem__ = external_getitem
+
 
 this_fails = ThisFails()
 
@@ -101,8 +109,10 @@ The instance-level method is also not called when the class-level method is pres
 def external_getitem1(instance, key) -> str:
     return "a"
 
+
 def external_getitem2(key) -> int:
     return 1
+
 
 def _(flag: bool):
     class ThisFails:
@@ -129,8 +139,10 @@ Class-level annotations with no value assigned are considered to be accessible o
 ```py
 from typing import Callable
 
+
 class C:
     __call__: Callable[..., None]
+
 
 C()()
 
@@ -142,9 +154,11 @@ And of course the same is true if we have only an implicit assignment inside a m
 ```py
 from typing import Callable
 
+
 class C:
     def __init__(self):
         self.__call__ = lambda *a, **kw: None
+
 
 # error: [call-non-callable]
 C()()
@@ -162,8 +176,10 @@ class SomeCallable:
     def __call__(self, key: int) -> str:
         return str(key)
 
+
 class ClassWithNonMethodDunder:
     __getitem__: SomeCallable = SomeCallable()
+
 
 class_with_callable_dunder = ClassWithNonMethodDunder()
 
@@ -178,16 +194,20 @@ that the `instance` argument is on object of type `ClassWithDescriptorDunder`:
 ```py
 from __future__ import annotations
 
+
 class SomeCallable:
     def __call__(self, key: int) -> str:
         return str(key)
+
 
 class Descriptor:
     def __get__(self, instance: ClassWithDescriptorDunder, owner: type[ClassWithDescriptorDunder]) -> SomeCallable:
         return SomeCallable()
 
+
 class ClassWithDescriptorDunder:
     __getitem__: Descriptor = Descriptor()
+
 
 class_with_descriptor_dunder = ClassWithDescriptorDunder()
 
@@ -208,6 +228,7 @@ class C:
         # error: [invalid-assignment]
         self.__getitem__ = None
 
+
 # This is still fine, and simply calls the `__getitem__` method on the class
 reveal_type(C()[0])  # revealed: str
 ```
@@ -218,9 +239,12 @@ reveal_type(C()[0])  # revealed: str
 def _(flag: bool):
     class C:
         if flag:
+
             def __getitem__(self, key: int) -> str:
                 return str(key)
+
         else:
+
             def __getitem__(self, key: int) -> bytes:
                 return bytes()
 
@@ -228,11 +252,13 @@ def _(flag: bool):
     reveal_type(c[0])  # revealed: str | bytes
 
     if flag:
+
         class D:
             def __getitem__(self, key: int) -> str:
                 return str(key)
 
     else:
+
         class D:
             def __getitem__(self, key: int) -> bytes:
                 return bytes()
@@ -250,13 +276,16 @@ regular method calls.
 def external_getitem(instance, key: int) -> str:
     return str(key)
 
+
 class NotSubscriptable1:
     def __init__(self, value: int):
         self.__getitem__ = external_getitem
 
+
 class NotSubscriptable2:
     def __init__(self, value: int):
         self.__getitem__ = external_getitem
+
 
 def _(union: NotSubscriptable1 | NotSubscriptable2):
     # error: [not-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
@@ -270,6 +299,7 @@ def _(union: NotSubscriptable1 | NotSubscriptable2):
 def _(flag: bool):
     class C:
         if flag:
+
             def __getitem__(self, key: int) -> str:
                 return str(key)
 

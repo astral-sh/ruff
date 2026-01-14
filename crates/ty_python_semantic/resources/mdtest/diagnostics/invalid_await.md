@@ -19,6 +19,7 @@ This diagnostic also points to the class definition if available.
 class MissingAwait:
     pass
 
+
 async def main() -> None:
     await MissingAwait()  # error: [invalid-await]
 ```
@@ -30,10 +31,13 @@ This diagnostic also points to the method definition if available.
 ```py
 from datetime import datetime
 
+
 class PossiblyUnbound:
     if datetime.today().weekday() == 0:
+
         def __await__(self):
             yield
+
 
 async def main() -> None:
     await PossiblyUnbound()  # error: [invalid-await]
@@ -50,6 +54,7 @@ class InvalidAwaitArgs:
     def __await__(self, value: int):
         yield value
 
+
 async def main() -> None:
     await InvalidAwaitArgs()  # error: [invalid-await]
 ```
@@ -62,6 +67,7 @@ awaitable.
 ```py
 class NonCallableAwait:
     __await__ = 42
+
 
 async def main() -> None:
     await NonCallableAwait()  # error: [invalid-await]
@@ -77,6 +83,7 @@ class InvalidAwaitReturn:
     def __await__(self) -> int:
         return 5
 
+
 async def main() -> None:
     await InvalidAwaitReturn()  # error: [invalid-await]
 ```
@@ -90,15 +97,18 @@ instance to be awaitable. In this specific case, no specific function definition
 import typing
 from datetime import datetime
 
+
 class UnawaitableUnion:
     if datetime.today().weekday() == 6:
 
         def __await__(self) -> typing.Generator[typing.Any, None, None]:
             yield
+
     else:
 
         def __await__(self) -> int:
             return 5
+
 
 async def main() -> None:
     await UnawaitableUnion()  # error: [invalid-await]

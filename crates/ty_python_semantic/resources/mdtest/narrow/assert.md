@@ -25,6 +25,7 @@ def _(x: bool, y: bool):
 ```py
 from typing import Literal
 
+
 def _(x: Literal[1, 2, 3], y: Literal[1, 2, 3]):
     assert x is 2
     reveal_type(x)  # revealed: Literal[2]
@@ -44,6 +45,7 @@ def _(x: int | str):
 
 ```py
 from typing import Literal
+
 
 def _(x: Literal[1, 2, 3], y: Literal[1, 2, 3]):
     assert x in (1, 2)
@@ -73,6 +75,7 @@ def one(x: int | None):
 
     # error: [unresolved-reference]
     reveal_type(y)  # revealed: Unknown
+
 
 def two(x: int | None, y: int | None):
     assert x is None, (y := 42) * reveal_type(y)  # revealed: Literal[42]
@@ -107,6 +110,7 @@ reveal_type(y)  # revealed: Unknown
 def one(x: int | None):
     assert (y := x), reveal_type(y)  # revealed: (int & ~AlwaysTruthy) | None
     reveal_type(y)  # revealed: int & ~AlwaysFalsy
+
 
 def two(x: int | None):
     assert isinstance((y := x), int), reveal_type(y)  # revealed: None

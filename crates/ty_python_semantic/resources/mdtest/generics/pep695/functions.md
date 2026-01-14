@@ -15,6 +15,7 @@ If you're only using a typevar for a single parameter, you don't need the typeva
 def typevar_not_needed[T](x: T) -> None:
     pass
 
+
 # TODO: error, should be (x: int)
 def bounded_typevar_not_needed[T: int](x: T) -> None:
     pass
@@ -52,6 +53,7 @@ is bound to at each call site.
 def f[T](x: T) -> T:
     return x
 
+
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(1.0))  # revealed: float
 reveal_type(f(True))  # revealed: Literal[True]
@@ -71,48 +73,64 @@ from typing import Protocol, TypeVar
 
 S = TypeVar("S")
 
+
 class CanIndex(Protocol[S]):
     def __getitem__(self, index: int, /) -> S: ...
 
+
 class ExplicitlyImplements[T](CanIndex[T]): ...
+
+
 class SubProtocol[T](CanIndex[T], Protocol): ...
+
 
 def takes_in_list[T](x: list[T]) -> list[T]:
     return x
 
+
 def takes_in_protocol[T](x: CanIndex[T]) -> T:
     return x[0]
+
 
 def deep_list(x: list[str]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[str]
     # TODO: revealed: str
     reveal_type(takes_in_protocol(x))  # revealed: Unknown
 
+
 def deeper_list(x: list[set[str]]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[set[str]]
     # TODO: revealed: set[str]
     reveal_type(takes_in_protocol(x))  # revealed: Unknown
 
+
 def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
+
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
+
 def deep_subprotocol(x: SubProtocol[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
+
 
 def deeper_subprotocol(x: SubProtocol[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
+
 def itself(x: CanIndex[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
+
 
 def deep_itself(x: CanIndex[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
+
 def takes_in_type[T](x: type[T]) -> type[T]:
     return x
+
 
 reveal_type(takes_in_type(int))  # revealed: type[int]
 ```
@@ -121,7 +139,10 @@ This also works when passing in arguments that are subclasses of the parameter t
 
 ```py
 class Sub(list[int]): ...
+
+
 class GenericSub[T](list[T]): ...
+
 
 reveal_type(takes_in_list(Sub()))  # revealed: list[int]
 # TODO: revealed: int
@@ -131,8 +152,12 @@ reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
 # TODO: revealed: str
 reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
 
+
 class ExplicitSub(ExplicitlyImplements[int]): ...
+
+
 class ExplicitGenericSub[T](ExplicitlyImplements[T]): ...
+
 
 reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
@@ -144,31 +169,40 @@ reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 def takes_mixed_tuple_suffix[T](x: tuple[int, bytes, *tuple[str, ...], T, int]) -> T:
     return x[-2]
 
+
 def takes_mixed_tuple_prefix[T](x: tuple[int, T, *tuple[str, ...], bool, int]) -> T:
     return x[1]
+
 
 def _(x: tuple[int, bytes, *tuple[str, ...], bool, int]):
     reveal_type(takes_mixed_tuple_suffix(x))  # revealed: bool
     reveal_type(takes_mixed_tuple_prefix(x))  # revealed: bytes
 
+
 reveal_type(takes_mixed_tuple_suffix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Literal[True]
 reveal_type(takes_mixed_tuple_prefix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Literal[b"foo"]
+
 
 def takes_fixed_tuple[T](x: tuple[T, int]) -> T:
     return x[0]
 
+
 def _(x: tuple[str, int]):
     reveal_type(takes_fixed_tuple(x))  # revealed: str
 
+
 reveal_type(takes_fixed_tuple((True, 42)))  # revealed: Literal[True]
+
 
 def takes_homogeneous_tuple[T](x: tuple[T, ...]) -> T:
     return x[0]
+
 
 def _(x: tuple[str, int], y: tuple[bool, ...], z: tuple[int, str, *tuple[range, ...], bytes]):
     reveal_type(takes_homogeneous_tuple(x))  # revealed: str | int
     reveal_type(takes_homogeneous_tuple(y))  # revealed: bool
     reveal_type(takes_homogeneous_tuple(z))  # revealed: int | str | range | bytes
+
 
 reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
 reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
@@ -181,8 +215,10 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 ```py
 from typing_extensions import reveal_type
 
+
 def f[T: int](x: T) -> T:
     return x
+
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
@@ -197,8 +233,10 @@ reveal_type(f("string"))  # revealed: Unknown
 ```py
 from typing_extensions import reveal_type
 
+
 def f[T: (int, None)](x: T) -> T:
     return x
+
 
 reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
@@ -227,6 +265,7 @@ return value is not guaranteed to be compatible for all `T: int`.
 def good_return[T: int](x: T) -> T:
     return x
 
+
 def bad_return[T: int](x: T) -> T:
     # error: [invalid-return-type] "Return type does not match returned value: expected `T@bad_return`, found `int`"
     return x + 1
@@ -243,6 +282,7 @@ def different_types[T, S](cond: bool, t: T, s: S) -> T:
     else:
         # error: [invalid-return-type] "Return type does not match returned value: expected `T@different_types`, found `S@different_types`"
         return s
+
 
 def same_types[T](cond: bool, t1: T, t2: T) -> T:
     if cond:
@@ -283,6 +323,7 @@ parameters simultaneously.
 def two_params[T](x: T, y: T) -> T:
     return x
 
+
 reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
@@ -296,9 +337,11 @@ def union_param[T](x: T | None) -> T:
         raise ValueError
     return x
 
+
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
 reveal_type(union_param(None))  # revealed: Unknown
+
 
 def _(x: int | None):
     reveal_type(union_param(x))  # revealed: int
@@ -307,6 +350,7 @@ def _(x: int | None):
 ```py
 def union_and_nonunion_params[T](x: T | int, y: T) -> T:
     return y
+
 
 reveal_type(union_and_nonunion_params(1, "a"))  # revealed: Literal["a"]
 reveal_type(union_and_nonunion_params("a", "a"))  # revealed: Literal["a"]
@@ -321,20 +365,26 @@ This also works if the typevar has a bound:
 def accepts_t_or_int[T_str: str](x: T_str | int) -> T_str:
     raise NotImplementedError
 
+
 reveal_type(accepts_t_or_int("a"))  # revealed: Literal["a"]
 reveal_type(accepts_t_or_int(1))  # revealed: Unknown
 
+
 class Unrelated: ...
+
 
 # error: [invalid-argument-type] "Argument type `Unrelated` does not satisfy upper bound `str` of type variable `T_str`"
 reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
 
+
 def accepts_t_or_list_of_t[T: str](x: T | list[T]) -> T:
     raise NotImplementedError
+
 
 reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
 # error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T`"
 reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
+
 
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
@@ -351,6 +401,7 @@ would also be a valid solution:
 def tuple_param[T, S](x: T | S, y: tuple[T, S]) -> tuple[T, S]:
     return y
 
+
 reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
@@ -362,11 +413,14 @@ the actual argument even for non-final classes.
 class P[T]:
     x: T  # invariant
 
+
 class Q[T]:
     x: T  # invariant
 
+
 def extract_t[T](x: P[T] | Q[T]) -> T:
     raise NotImplementedError
+
 
 reveal_type(extract_t(P[int]()))  # revealed: int
 reveal_type(extract_t(Q[str]()))  # revealed: str
@@ -385,6 +439,7 @@ This also works when different union elements have different typevars:
 def extract_both[T, S](x: P[T] | Q[S]) -> tuple[T, S]:
     raise NotImplementedError
 
+
 reveal_type(extract_both(P[int]()))  # revealed: tuple[int, Unknown]
 reveal_type(extract_both(Q[str]()))  # revealed: tuple[Unknown, str]
 ```
@@ -395,8 +450,10 @@ Inference also works when passing subclasses of the generic classes in the union
 class SubP[T](P[T]):
     pass
 
+
 class SubQ[T](Q[T]):
     pass
+
 
 reveal_type(extract_t(SubP[int]()))  # revealed: int
 reveal_type(extract_t(SubQ[str]()))  # revealed: str
@@ -413,6 +470,7 @@ both types in a call to `extract_both`:
 class PandQ(P[int], Q[str]):
     pass
 
+
 # TODO: Ideally, we would return `Unknown` here.
 # error: [invalid-argument-type]
 reveal_type(extract_t(PandQ()))  # revealed: int | str
@@ -426,6 +484,7 @@ types:
 ```py
 def extract_optional_t[T](x: None | P[T]) -> T:
     raise NotImplementedError
+
 
 reveal_type(extract_optional_t(None))  # revealed: Unknown
 reveal_type(extract_optional_t(P[int]()))  # revealed: int
@@ -445,10 +504,13 @@ element that is more precise:
 class Base[T]:
     x: T
 
+
 class Sub[T](Base[T]): ...
+
 
 def f[T](t: Base[T] | Sub[T | None]) -> T:
     raise NotImplementedError
+
 
 reveal_type(f(Base[int]()))  # revealed: int
 # TODO: Should ideally be `str`
@@ -462,8 +524,10 @@ typevar bound, we do not emit a specialization error:
 class P[T]:
     value: T
 
+
 def f[I: int, S: str](t: P[I] | P[S]) -> tuple[I, S]:
     raise NotImplementedError
+
 
 reveal_type(f(P[int]()))  # revealed: tuple[int, Unknown]
 reveal_type(f(P[str]()))  # revealed: tuple[Unknown, str]
@@ -485,8 +549,10 @@ type variable, we do not confuse the two; `T@f` and `T@g` have separate types in
 def f[T](x: T) -> tuple[T, int]:
     return (x, 1)
 
+
 def g[T](x: T) -> T | None:
     return x
+
 
 reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
@@ -497,14 +563,18 @@ reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```py
 from typing import Callable
 
+
 def invoke[A, B](fn: Callable[[A], B], value: A) -> B:
     return fn(value)
+
 
 def identity[T](x: T) -> T:
     return x
 
+
 def head[T](xs: list[T]) -> T:
     return xs[0]
+
 
 reveal_type(invoke(identity, 1))  # revealed: Literal[1]
 
@@ -520,31 +590,45 @@ Protocol types can be used as TypeVar bounds, just like nominal types.
 from typing import Any, Protocol
 from ty_extensions import static_assert, is_assignable_to
 
+
 class SupportsClose(Protocol):
     def close(self) -> None: ...
 
+
 class ClosableFullyStaticProtocol(Protocol):
     x: int
+
     def close(self) -> None: ...
+
 
 class ClosableNonFullyStaticProtocol(Protocol):
     x: Any
+
     def close(self) -> None: ...
+
 
 class ClosableFullyStaticNominal:
     x: int
+
     def close(self) -> None: ...
+
 
 class ClosableNonFullyStaticNominal:
     x: int
+
     def close(self) -> None: ...
 
+
 class NotClosableProtocol(Protocol): ...
+
+
 class NotClosableNominal: ...
+
 
 def close_and_return[T: SupportsClose](x: T) -> T:
     x.close()
     return x
+
 
 def f(
     a: SupportsClose,
@@ -577,16 +661,20 @@ decorator "hides" the function type from outside callers.
 ```py
 from typing import cast, Any, Callable
 
+
 def opaque_decorator(f: Any) -> Any:
     return f
 
+
 def transparent_decorator[F: Callable[..., Any]](f: F) -> F:
     return f
+
 
 @opaque_decorator
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]
     reveal_type(cast(T, t))  # revealed: T@decorated
+
 
 @transparent_decorator
 def decorated[T](t: T) -> None:
@@ -599,11 +687,14 @@ def decorated[T](t: T) -> None:
 ```py
 class A: ...
 
+
 class B[T: A]:
     x: T
 
+
 def f[T: A](c: T | None):
     return None
+
 
 def g[T: A](b: B[T]):
     return f(b.x)  # Fine
@@ -615,12 +706,15 @@ def g[T: A](b: B[T]):
 def takes_in_union[T](t: T | None) -> T:
     raise NotImplementedError
 
+
 def takes_in_bigger_union[T](t: T | int | None) -> T:
     raise NotImplementedError
+
 
 def _(x: str | None) -> None:
     reveal_type(takes_in_union(x))  # revealed: str
     reveal_type(takes_in_bigger_union(x))  # revealed: str
+
 
 def _(x: str | int | None) -> None:
     reveal_type(takes_in_union(x))  # revealed: str | int
@@ -634,6 +728,7 @@ the fact that it only appears in the function's type annotations as part of a un
 ```py
 def f[T: (str, bytes)](suffix: T | None, prefix: T | None):
     return None
+
 
 def g(x: str):
     f(prefix=x, suffix=".tar.gz")
@@ -654,10 +749,12 @@ def _(x: list[int], y: dict[int, int]):
 ```py
 from typing import overload
 
+
 def outer[T](t: T) -> None:
     def inner[T](t: T) -> None: ...
 
     inner(t)
+
 
 @overload
 def overloaded_outer() -> None: ...
@@ -669,9 +766,11 @@ def overloaded_outer[T](t: T | None = None) -> None:
     if t is not None:
         inner(t)
 
+
 def outer[T](t: T) -> None:
     def inner[S](inner_t: T, s: S) -> tuple[T, S]:
         return inner_t, s
+
     reveal_type(inner(t, 1))  # revealed: tuple[T@outer, Literal[1]]
 
     inner("wrong", 1)  # error: [invalid-argument-type]
@@ -686,15 +785,18 @@ TypeVar if the TypeVar's upper bound is a type with a precise tuple spec:
 from dataclasses import dataclass
 from typing import NamedTuple, Final
 
+
 def f[T: tuple[int, str]](x: T) -> T:
     a, b = x
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: str
     return x
 
+
 @dataclass
 class Team[T: tuple[int, str]]:
     employees: list[T]
+
 
 def x[T: tuple[int, str]](team: Team[T]) -> Team[T]:
     age, name = team.employees[0]
@@ -702,12 +804,17 @@ def x[T: tuple[int, str]](team: Team[T]) -> Team[T]:
     reveal_type(name)  # revealed: str
     return team
 
+
 class Age(int): ...
+
+
 class Name(str): ...
+
 
 class Employee(NamedTuple):
     age: Age
     name: Name
+
 
 EMPLOYEES: Final = (Employee(name=Name("alice"), age=Age(42)),)
 team = Team(employees=list(EMPLOYEES))
@@ -725,12 +832,14 @@ When a generic method uses a PEP 695 generic context, an implict or explicit ann
 ```py
 from typing import Self
 
+
 class C:
     def explicit_self[T](self: Self, x: T) -> tuple[Self, T]:
         return self, x
 
     def implicit_self[T](self, x: T) -> tuple[Self, T]:
         return self, x
+
 
 def _(x: int):
     reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
@@ -742,6 +851,7 @@ def _(x: int):
 
 ```py
 from ty_extensions import Not
+
 
 def f[T](x: T, y: Not[T]) -> T:
     x = y  # error: [invalid-assignment]
@@ -760,11 +870,14 @@ specializations of a generic function.
 from typing import Any, Callable, NoReturn, overload, Self
 from ty_extensions import generic_context, into_callable
 
+
 def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
     return callable
 
+
 def returns_int() -> int:
     raise NotImplementedError
+
 
 # revealed: () -> int
 reveal_type(into_callable(returns_int))
@@ -773,7 +886,9 @@ reveal_type(accepts_callable(returns_int))
 # revealed: int
 reveal_type(accepts_callable(returns_int)())
 
+
 class ClassWithoutConstructor: ...
+
 
 # revealed: () -> ClassWithoutConstructor
 reveal_type(into_callable(ClassWithoutConstructor))
@@ -782,9 +897,11 @@ reveal_type(accepts_callable(ClassWithoutConstructor))
 # revealed: ClassWithoutConstructor
 reveal_type(accepts_callable(ClassWithoutConstructor)())
 
+
 class ClassWithNew:
     def __new__(cls, *args, **kwargs) -> Self:
         raise NotImplementedError
+
 
 # revealed: (...) -> ClassWithNew
 reveal_type(into_callable(ClassWithNew))
@@ -793,8 +910,10 @@ reveal_type(accepts_callable(ClassWithNew))
 # revealed: ClassWithNew
 reveal_type(accepts_callable(ClassWithNew)())
 
+
 class ClassWithInit:
     def __init__(self) -> None: ...
+
 
 # revealed: () -> ClassWithInit
 reveal_type(into_callable(ClassWithInit))
@@ -803,11 +922,13 @@ reveal_type(accepts_callable(ClassWithInit))
 # revealed: ClassWithInit
 reveal_type(accepts_callable(ClassWithInit)())
 
+
 class ClassWithNewAndInit:
     def __new__(cls, *args, **kwargs) -> Self:
         raise NotImplementedError
 
     def __init__(self, x: int) -> None: ...
+
 
 # TODO: We do not currently solve a common behavioral supertype for the two solutions of P.
 # revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
@@ -818,13 +939,16 @@ reveal_type(accepts_callable(ClassWithNewAndInit))
 # revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)())
 
+
 class Meta(type):
     def __call__(cls, *args: Any, **kwargs: Any) -> NoReturn:
         raise NotImplementedError
 
+
 class ClassWithNoReturnMetatype(metaclass=Meta):
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         raise NotImplementedError
+
 
 # TODO: The return types here are wrong, because we end up creating a constraint (Never ≤ R), which
 # we confuse with "R has no lower bound".
@@ -837,7 +961,9 @@ reveal_type(accepts_callable(ClassWithNoReturnMetatype))
 # revealed: Unknown
 reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
 
+
 class Proxy: ...
+
 
 class ClassWithIgnoredInit:
     def __new__(cls) -> Proxy:
@@ -845,12 +971,14 @@ class ClassWithIgnoredInit:
 
     def __init__(self, x: int) -> None: ...
 
+
 # revealed: () -> Proxy
 reveal_type(into_callable(ClassWithIgnoredInit))
 # revealed: () -> Proxy
 reveal_type(accepts_callable(ClassWithIgnoredInit))
 # revealed: Proxy
 reveal_type(accepts_callable(ClassWithIgnoredInit)())
+
 
 class ClassWithOverloadedInit[T]:
     t: T  # invariant
@@ -860,6 +988,7 @@ class ClassWithOverloadedInit[T]:
     @overload
     def __init__(self: "ClassWithOverloadedInit[str]", x: str) -> None: ...
     def __init__(self, x: int | str) -> None: ...
+
 
 # TODO: The old solver cannot handle this overloaded constructor. The ideal solution is that we
 # would solve **P once, and map it to the entire overloaded signature of the constructor. This
@@ -879,11 +1008,13 @@ reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
 
+
 class GenericClass[T]:
     t: T  # invariant
 
     def __new__(cls, x: list[T], y: list[T]) -> Self:
         raise NotImplementedError
+
 
 def _(x: list[str]):
     # TODO: This fails because we are not propagating GenericClass's generic context into the
@@ -919,24 +1050,41 @@ bound more than once, since we know the extra copies cannot affect the result.
 ```py
 from typing import Callable, Generic, TypeVar, Union
 
+
 class M1: ...
+
+
 class M2: ...
+
+
 class M3: ...
+
+
 class M4: ...
+
+
 class M5: ...
+
+
 class M6: ...
+
+
 class M7: ...
+
 
 Msg = Union[M1, M2, M3, M4, M5, M6, M7]
 
 T = TypeVar("T")
 U_co = TypeVar("U_co", covariant=True)
 
+
 class Stream(Generic[T]):
     def apply(self, func: Callable[["Stream[T]"], "Stream[U_co]"]) -> "Stream[U_co]":
         return func(self)
 
+
 TMsg = TypeVar("TMsg", bound=Msg)
+
 
 class Builder(Generic[TMsg]):
     def build(self) -> Stream[TMsg]:
@@ -966,6 +1114,7 @@ regression test.
 
 ```py
 from functools import reduce
+
 
 def _(keys: list[str]):
     # TODO: revealed: int

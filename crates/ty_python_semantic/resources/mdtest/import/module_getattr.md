@@ -51,6 +51,7 @@ reveal_type(mixed_module.dynamic_attr)  # revealed: str
 ```py
 explicit_attr = "explicit"
 
+
 def __getattr__(name: str) -> str:
     return "dynamic"
 ```
@@ -130,6 +131,7 @@ reveal_type(unknown_attr)  # revealed: Unknown
 
 ```py
 from typing import Literal
+
 
 def __getattr__(name: Literal["known_attr"]) -> int:
     return 3

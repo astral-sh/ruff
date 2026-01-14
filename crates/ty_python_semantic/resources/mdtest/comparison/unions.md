@@ -75,6 +75,7 @@ back to `bool` for the result type instead of trying to infer something more pre
 ```py
 from typing import Literal
 
+
 def _(
     x: list[int] | Literal[1],
     y: list[int] | Literal[1],

@@ -21,8 +21,10 @@ reveal_type(x)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(y)  # revealed: Unknown
 
+
 def cond() -> bool:
     return True
+
 
 b = 1
 if cond():
@@ -42,16 +44,20 @@ reveal_type(c)  # revealed: Literal[2]
 
 d = [1, 2, 3]
 
+
 def delete():
     del d  # error: [unresolved-reference] "Name `d` used when not defined"
 
+
 delete()
 reveal_type(d)  # revealed: list[Unknown | int]
+
 
 def delete_element():
     # When the `del` target isn't a name, it doesn't force local resolution.
     del d[0]
     print(d)
+
 
 def delete_global():
     global d
@@ -60,9 +66,11 @@ def delete_global():
     # be careful about false positives if `d` got reinitialized somehow in between the two `del`s.
     del d
 
+
 delete_global()
 # Again, the variable should have been removed, but we don't check it.
 reveal_type(d)  # revealed: list[Unknown | int]
+
 
 def delete_nonlocal():
     e = 2
@@ -86,6 +94,7 @@ local error:
 ```py
 x = 1
 
+
 def foo():
     print(x)  # error: [unresolved-reference] "Name `x` used when not defined"
     if False:
@@ -104,11 +113,14 @@ However, with `global x` in `foo`, `print(x)` in `bar` resolves in the global sc
 ```py
 x = 1
 
+
 def foo():
     global x
+
     def bar():
         # allowed, refers to `x` in the global scope
         reveal_type(x)  # revealed: Literal[1]
+
     bar()
     del x  # allowed, deletes `x` in the global scope (though we don't track that)
 ```
@@ -119,11 +131,14 @@ refer to:
 ```py
 def enclosing():
     x = 2
+
     def foo():
         nonlocal x
+
         def bar():
             # allowed, refers to `x` in `enclosing`
             reveal_type(x)  # revealed: Literal[2]
+
         bar()
         del x  # allowed, deletes `x` in `enclosing` (though we don't track that)
 ```
@@ -140,6 +155,7 @@ assignment, and the attribute type will be the originally declared type.
 ```py
 class C:
     x: int = 1
+
 
 c = C()
 del c.x
@@ -159,6 +175,7 @@ reveal_type(c.x)  # revealed: int
 ```py
 class C:
     x: int = 1
+
 
 c = C()
 reveal_type(c.x)  # revealed: int
@@ -202,16 +219,20 @@ from typing import Protocol, TypeVar
 
 KT = TypeVar("KT")
 
+
 class CanDelItem(Protocol[KT]):
     def __delitem__(self, k: KT, /) -> None: ...
+
 
 def f(x: CanDelItem[int], k: int):
     # This should be valid - the object has __delitem__
     del x[k]
 
+
 class OnlyDelItem:
     def __delitem__(self, key: int) -> None:
         pass
+
 
 d = OnlyDelItem()
 del d[0]  # OK
@@ -228,6 +249,7 @@ A class that only defines `__getitem__` (without `__delitem__`) should not suppo
 class OnlyGetItem:
     def __getitem__(self, key: int) -> str:
         return "value"
+
 
 g = OnlyGetItem()
 reveal_type(g[0])  # revealed: str
@@ -247,17 +269,21 @@ a valid instance of that TypedDict type. However, deleting `NotRequired` keys (o
 ```py
 from typing_extensions import TypedDict, NotRequired
 
+
 class Movie(TypedDict):
     name: str
     year: int
+
 
 class PartialMovie(TypedDict, total=False):
     name: str
     year: int
 
+
 class MixedMovie(TypedDict):
     name: str
     year: NotRequired[int]
+
 
 m: Movie = {"name": "Blade Runner", "year": 1982}
 p: PartialMovie = {"name": "Test"}

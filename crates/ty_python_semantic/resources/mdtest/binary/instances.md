@@ -53,7 +53,9 @@ class A:
     def __or__(self, other) -> "A":
         return self
 
+
 class B: ...
+
 
 reveal_type(A() + B())  # revealed: A
 reveal_type(A() - B())  # revealed: A
@@ -115,7 +117,9 @@ class A:
     def __ror__(self, other) -> "A":
         return self
 
+
 class B: ...
+
 
 reveal_type(B() + A())  # revealed: A
 reveal_type(B() - A())  # revealed: A
@@ -144,7 +148,9 @@ class A:
     def __rsub__(self, other) -> int:
         return 1
 
+
 class B: ...
+
 
 reveal_type(A() + B())  # revealed: int
 reveal_type(B() - A())  # revealed: int
@@ -160,11 +166,14 @@ class A:
     def __add__(self, other: "B") -> int:
         return 42
 
+
 class B:
     def __radd__(self, other: "A") -> str:
         return "foo"
 
+
 reveal_type(A() + B())  # revealed:  int
+
 
 # Edge case: C is a subtype of C, *but* if the two sides are of *equal* types,
 # the lhs *still* takes precedence
@@ -174,6 +183,7 @@ class C:
 
     def __radd__(self, other: "C") -> str:
         return "foo"
+
 
 reveal_type(C() + C())  # revealed: int
 ```
@@ -191,16 +201,21 @@ class A:
     def __radd__(self, other) -> str:
         return "foo"
 
+
 class MyString(str): ...
+
 
 class B(A):
     def __radd__(self, other) -> MyString:
         return MyString()
 
+
 reveal_type(A() + B())  # revealed: MyString
+
 
 # N.B. Still a subtype of `A`, even though `A` does not appear directly in the class's `__bases__`
 class C(B): ...
+
 
 reveal_type(A() + C())  # revealed: MyString
 ```
@@ -218,7 +233,9 @@ class A:
     def __radd__(self, other) -> int:
         return 42
 
+
 class B(A): ...
+
 
 reveal_type(A() + B())  # revealed: str
 ```
@@ -240,9 +257,11 @@ class A:
     def __sub__(self, other: "A") -> "A":
         return A()
 
+
 class B:
     def __rsub__(self, other: A) -> "B":
         return B()
+
 
 reveal_type(A() - B())  # revealed: B
 ```
@@ -256,8 +275,10 @@ class A:
     def __call__(self, other) -> int:
         return 42
 
+
 class B:
     __add__ = A()
+
 
 reveal_type(B() + B())  # revealed: Unknown | int
 ```
@@ -268,6 +289,7 @@ the callable is declared:
 ```py
 class B2:
     __add__: A = A()
+
 
 reveal_type(B2() + B2())  # revealed: int
 ```
@@ -287,6 +309,7 @@ reveal_type(3.14 + 3j)  # revealed: int | float | complex
 reveal_type(42 + 4.2)  # revealed: int | float
 reveal_type(3 + 3j)  # revealed: int | float | complex
 
+
 def _(x: bool, y: int):
     reveal_type(x + y)  # revealed: int
     reveal_type(4.2 + x)  # revealed: int | float
@@ -305,6 +328,7 @@ class A:
 
     def __radd__(self, other) -> "A":
         return self
+
 
 reveal_type(A() + 1)  # revealed: A
 reveal_type(1 + A())  # revealed: A
@@ -341,11 +365,14 @@ from does_not_exist import Foo  # error: [unresolved-import]
 
 reveal_type(Foo)  # revealed: Unknown
 
+
 class X:
     def __add__(self, other: object) -> int:
         return 42
 
+
 class Y(Foo): ...
+
 
 # TODO: Should be `int | Unknown`; see above discussion.
 reveal_type(X() + Y())  # revealed: int
@@ -358,6 +385,7 @@ reveal_type(X() + Y())  # revealed: int
 ```py
 class NotBoolable:
     __bool__: int = 3
+
 
 a = NotBoolable()
 
@@ -372,6 +400,7 @@ When operating on class objects, the corresponding dunder methods are looked up 
 ```py
 from __future__ import annotations
 
+
 class Meta(type):
     def __add__(self, other: Meta) -> int:
         return 1
@@ -382,8 +411,12 @@ class Meta(type):
     def __getitem__(self, key: int) -> str:
         return "a"
 
+
 class A(metaclass=Meta): ...
+
+
 class B(metaclass=Meta): ...
+
 
 reveal_type(A + B)  # revealed: int
 # error: [unsupported-operator] "Operator `-` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
@@ -408,9 +441,11 @@ The magic method must exist on the class, not just on the instance:
 def add_impl(self, other) -> int:
     return 1
 
+
 class A:
     def __init__(self):
         self.__add__ = add_impl
+
 
 # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `A`"
 # revealed: Unknown
@@ -421,6 +456,7 @@ reveal_type(A() + A())
 
 ```py
 class A: ...
+
 
 # error: [unsupported-operator]
 # revealed: Unknown
@@ -436,11 +472,14 @@ class A:
     def __add__(self, other) -> int:
         return 1
 
+
 class B:
     def __radd__(self, other) -> int:
         return 1
 
+
 class C: ...
+
 
 # error: [unsupported-operator]
 # revealed: Unknown
@@ -462,6 +501,7 @@ the unreflected dunder of the left-hand operand. For context, see
 class Foo:
     def __radd__(self, other: "Foo") -> "Foo":
         return self
+
 
 # error: [unsupported-operator]
 # revealed: Unknown

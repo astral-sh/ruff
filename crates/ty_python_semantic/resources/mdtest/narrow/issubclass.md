@@ -50,9 +50,16 @@ def _(flag1: bool, flag2: bool):
 
 ```py
 class Base: ...
+
+
 class Derived1(Base): ...
+
+
 class Derived2(Base): ...
+
+
 class Unrelated: ...
+
 
 def _(flag1: bool, flag2: bool, flag3: bool):
     t1 = Derived1 if flag1 else Derived2
@@ -82,7 +89,10 @@ def _(flag1: bool, flag2: bool, flag3: bool):
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 def _(t: type[object]):
     if issubclass(t, A):
@@ -105,6 +115,7 @@ python-version = "3.10"
 ```py
 from types import NoneType
 
+
 def _(flag: bool):
     t = int if flag else NoneType
 
@@ -121,6 +132,7 @@ def _(flag: bool):
 
 ```py
 class Unrelated: ...
+
 
 def _(flag1: bool, flag2: bool):
     t = int if flag1 else str if flag2 else bytes
@@ -211,6 +223,7 @@ IntOrStr = Union[int, str]
 
 reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 
+
 def f(x: type[int | str | bytes | range]):
     if issubclass(x, IntOrStr):
         reveal_type(x)  # revealed: type[int] | type[str]
@@ -233,9 +246,11 @@ always succeeds:
 ```py
 from typing import final
 
+
 @final
 class GenericFinal[T]:
     x: T  # invariant
+
 
 def f(x: type[GenericFinal]):
     reveal_type(x)  # revealed: <class 'GenericFinal[Unknown]'>
@@ -252,6 +267,7 @@ This also works if the typevar has an upper bound:
 @final
 class BoundedGenericFinal[T: int]:
     x: T  # invariant
+
 
 def g(x: type[BoundedGenericFinal]):
     reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown]'>
@@ -273,6 +289,7 @@ to `issubclass`:
 
 ```py
 class A: ...
+
 
 t = object()
 
@@ -301,8 +318,10 @@ if issubclass(t, int):
 def issubclass(c, ci):
     return True
 
+
 def flag() -> bool:
     return True
+
 
 t = int if flag() else str
 if issubclass(t, int):
@@ -314,8 +333,10 @@ if issubclass(t, int):
 ```py
 issubclass_alias = issubclass
 
+
 def flag() -> bool:
     return True
+
 
 t = int if flag() else str
 if issubclass_alias(t, int):
@@ -327,8 +348,10 @@ if issubclass_alias(t, int):
 ```py
 from builtins import issubclass as imported_issubclass
 
+
 def flag() -> bool:
     return True
+
 
 t = int if flag() else str
 if imported_issubclass(t, int):
@@ -340,8 +363,10 @@ if imported_issubclass(t, int):
 ```py
 from typing import Any
 
+
 def flag() -> bool:
     return True
+
 
 t = int if flag() else str
 
@@ -365,6 +390,7 @@ if issubclass(t, Any):
 ```py
 def flag() -> bool:
     return True
+
 
 t = int if flag() else str
 
@@ -390,12 +416,19 @@ known to be impossible due to the fact that `Meta1` is marked as `@final`.
 ```py
 from typing import final
 
+
 @final
 class Meta1(type): ...
 
+
 class Meta2(type): ...
+
+
 class UsesMeta1(metaclass=Meta1): ...
+
+
 class UsesMeta2(metaclass=Meta2): ...
+
 
 def _(x: type[UsesMeta1], y: type[UsesMeta2]):
     if issubclass(x, y):
@@ -424,13 +457,17 @@ python-version = "3.12"
 from typing import Any, ClassVar
 from ty_extensions import Intersection
 
+
 class Foo: ...
+
 
 class Bar:
     attribute: ClassVar[int]
 
+
 class Baz:
     attribute: ClassVar[str]
+
 
 def f(x: type[Foo], y: Intersection[type[Bar], type[Baz]], z: type[Any]):
     if issubclass(x, y):
@@ -455,12 +492,14 @@ from typing import TypeVar
 
 T = TypeVar("T", bound=type[Bar])
 
+
 def h_old_syntax(x: type[Foo], y: T) -> T:
     if issubclass(x, y):
         reveal_type(x)  # revealed: type[Foo] & type[Bar]
         reveal_type(x.attribute)  # revealed: int
 
     return y
+
 
 def h[U: type[Bar | Baz]](x: type[Foo], y: U) -> U:
     if issubclass(x, y):
@@ -475,10 +514,18 @@ Or even a tuple of tuple of typevars that have intersection bounds...
 ```py
 from ty_extensions import Intersection
 
+
 class Spam: ...
+
+
 class Eggs: ...
+
+
 class Ham: ...
+
+
 class Mushrooms: ...
+
 
 def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](x: type[Foo], y: T, z: U) -> tuple[T, U]:
     if issubclass(x, (y, (z, Mushrooms))):

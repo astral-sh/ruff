@@ -10,9 +10,11 @@ Consider the following example:
 ```py
 import inspect
 
+
 class Descriptor:
     def __get__(self, instance, owner) -> str:
         return "a"
+
 
 class C:
     normal: int = 1
@@ -70,6 +72,7 @@ class D:
     def __init__(self) -> None:
         self.instance_attr: int = 1
 
+
 reveal_type(inspect.getattr_static(D(), "instance_attr"))  # revealed: int
 ```
 
@@ -79,7 +82,9 @@ And attributes on metaclasses can be accessed when probing the class:
 class Meta(type):
     attr: int = 1
 
+
 class E(metaclass=Meta): ...
+
 
 reveal_type(inspect.getattr_static(E, "attr"))  # revealed: int
 ```
@@ -98,8 +103,10 @@ back to `Any`:
 ```py
 import inspect
 
+
 class C:
     x: int = 1
+
 
 def _(attr_name: str):
     reveal_type(inspect.getattr_static(C(), attr_name))  # revealed: Any
@@ -127,6 +134,7 @@ inspect.getattr_static(C(), "x", "default-arg", "one too many")
 ```py
 import inspect
 
+
 def _(flag: bool):
     class C:
         if flag:
@@ -140,6 +148,7 @@ def _(flag: bool):
 ```py
 import inspect
 from typing import Any
+
 
 def _(a: Any, tuple_of_any: tuple[Any]):
     reveal_type(inspect.getattr_static(a, "x", "default"))  # revealed: Any | Literal["default"]

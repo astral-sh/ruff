@@ -13,6 +13,7 @@ These can be set on instances and on class objects.
 class C:
     attr: int = 0
 
+
 instance = C()
 instance.attr = 1  # fine
 instance.attr = "wrong"  # error: [invalid-assignment]
@@ -31,6 +32,7 @@ class C:
     def __init__(self):
         self.attr: int = 0
 
+
 instance = C()
 instance.attr = 1  # fine
 instance.attr = "wrong"  # error: [invalid-assignment]
@@ -46,8 +48,10 @@ diagnostic that mentions that the attribute is only available on class objects.
 ```py
 from typing import ClassVar
 
+
 class C:
     attr: ClassVar[int] = 0
+
 
 C.attr = 1  # fine
 C.attr = "wrong"  # error: [invalid-assignment]
@@ -62,6 +66,7 @@ When trying to set an attribute that is not defined, we also emit errors:
 
 ```py
 class C: ...
+
 
 C.non_existent = 1  # error: [unresolved-attribute]
 
@@ -97,8 +102,10 @@ class Descriptor:
     def __set__(self, instance: object, value: int) -> None:
         pass
 
+
 class C:
     attr: Descriptor = Descriptor()
+
 
 instance = C()
 instance.attr = 1  # fine
@@ -114,8 +121,10 @@ class WrongDescriptor:
     def __set__(self, instance: object, value: int, extra: int) -> None:
         pass
 
+
 class C:
     attr: WrongDescriptor = WrongDescriptor()
+
 
 instance = C()
 
@@ -128,10 +137,12 @@ instance.attr = 1  # error: [invalid-assignment]
 ```py
 def _(flag: bool) -> None:
     if flag:
+
         class C1:
             attr: int = 0
 
     else:
+
         class C1:
             attr: str = ""
 

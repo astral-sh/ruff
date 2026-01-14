@@ -18,6 +18,7 @@ python-version = "3.10"
 async def elements(n):
     yield n
 
+
 async def f():
     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)"
     return {n: [x async for x in elements(n)] for n in range(3)}
@@ -38,9 +39,11 @@ correctly in the `SemanticSyntaxContext` trait:
 async def f():
     [x for x in [1]] and [x async for x in elements(1)]
 
+
 async def f():
     def g():
         pass
+
     [x async for x in elements(1)]
 ```
 
@@ -56,6 +59,7 @@ python-version = "3.11"
 ```py
 async def elements(n):
     yield n
+
 
 async def f():
     return {n: [x async for x in elements(n)] for n in range(3)}
@@ -81,6 +85,7 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
+
 
 # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
 # error: [invalid-syntax] "named expression cannot be used within a type annotation"
@@ -114,6 +119,7 @@ python-version = "3.10"
 class Point:
     pass
 
+
 obj = Point()
 match obj:
     # error: [invalid-syntax] "attribute name `x` repeated in class pattern"
@@ -126,6 +132,7 @@ match obj:
 ```py
 class C:
     def __await__(self): ...
+
 
 # error: [invalid-syntax] "`return` statement outside of a function"
 return
@@ -140,9 +147,11 @@ yield from []
 # error: [invalid-syntax] "`await` outside of an asynchronous function"
 await C()
 
+
 def f():
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
     await C()
+
 
 (await cor async for cor in f())  # ok
 (await cor for cor in f())  # ok
@@ -154,6 +163,7 @@ Generators are evaluated lazily, so `await` is allowed, even outside of a functi
 ```py
 async def g():
     yield 1
+
 
 (x async for x in g())
 ```
@@ -209,6 +219,7 @@ python-version = "3.12"
 class C[T, T]:
     pass
 
+
 # error: [invalid-syntax] "duplicate type parameter"
 def f[X, Y, X]():
     pass
@@ -223,9 +234,11 @@ def func():
     # error: [invalid-syntax] "Starred expression cannot be used here"
     return *[1, 2, 3]
 
+
 def gen():
     # error: [invalid-syntax] "Starred expression cannot be used here"
     yield * [1, 2, 3]
+
 
 # error: [invalid-syntax] "Starred expression cannot be used here"
 for *x in range(10):
@@ -287,9 +300,11 @@ python-version = "3.12"
 # error: [invalid-syntax] "cannot assign to `__debug__`"
 __debug__ = False
 
+
 # error: [invalid-syntax] "cannot assign to `__debug__`"
 def process(__debug__):
     pass
+
 
 # error: [invalid-syntax] "cannot assign to `__debug__`"
 class Generic[__debug__]:
@@ -311,15 +326,18 @@ def _():
     # error: [invalid-syntax] "yield expression cannot be used within a TypeVar bound"
     type X[T: (yield 1)] = int
 
+
 def _():
     # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
     # error: [invalid-syntax] "yield expression cannot be used within a type alias"
     type Y = (yield 1)
 
+
 # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
 # error: [invalid-syntax] "named expression cannot be used within a generic definition"
 def f[T](x: int) -> (y := 3):
     return x
+
 
 def _():
     # error: [invalid-syntax] "yield expression cannot be used within a generic definition"
@@ -334,6 +352,7 @@ This error includes `await`, `async for`, `async with`, and `async` comprehensio
 ```py
 async def elements(n):
     yield n
+
 
 def _():
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
@@ -353,6 +372,7 @@ def _():
 
 ```py
 x: int
+
 
 def f():
     x = 1
@@ -388,16 +408,20 @@ for x in range(42):
 ```py
 a = None
 
+
 def f(a):
     global a  # error: [invalid-syntax]
+
 
 def g(a):
     if True:
         global a  # error: [invalid-syntax]
 
+
 def h(a):
     def inner():
         global a
+
 
 def i(a):
     try:
@@ -405,14 +429,17 @@ def i(a):
     except Exception:
         pass
 
+
 def f(a):
     a = 1
     global a  # error: [invalid-syntax]
+
 
 def f(a):
     a = 1
     a = 2
     global a  # error: [invalid-syntax]
+
 
 def f(a):
     class Inner:

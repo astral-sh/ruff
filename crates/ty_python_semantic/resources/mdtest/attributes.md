@@ -23,6 +23,7 @@ class C:
         if flag:
             self.possibly_undeclared_unbound: str = "possibly set in __init__"
 
+
 c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
@@ -82,6 +83,7 @@ class C:
     def __init__(self) -> None:
         self.declared_and_bound = "value set in __init__"
 
+
 c_instance = C()
 
 reveal_type(c_instance.declared_and_bound)  # revealed: str | None
@@ -105,6 +107,7 @@ the Python ecosystem:
 ```py
 class C:
     only_declared: str
+
 
 c_instance = C()
 
@@ -139,6 +142,7 @@ class C:
         if flag:
             self.bound_in_body_and_init = "a"
 
+
 c_instance = C(True)
 
 reveal_type(c_instance.only_declared_in_body)  # revealed: str | None
@@ -171,6 +175,7 @@ class C:
         self.declared_only: bytes
         self.declared_and_bound: bool = True
 
+
 c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
@@ -200,8 +205,10 @@ attribute, that should be an error.
 def get_int() -> int:
     return 0
 
+
 def get_str() -> str:
     return "a"
+
 
 class C:
     z: int
@@ -219,6 +226,7 @@ class C:
         # TODO: this redeclaration should be an error
         self.z: str = "a"
 
+
 c_instance = C()
 
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
@@ -233,6 +241,7 @@ class C:
     def __init__(self) -> None:
         self.a = self.b = 1
 
+
 c_instance = C()
 
 reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
@@ -246,10 +255,12 @@ class Weird:
     def __iadd__(self, other: None) -> str:
         return "a"
 
+
 class C:
     def __init__(self) -> None:
         self.w = Weird()
         self.w += None
+
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
 # infer `Unknown | str` here (`Weird` is not a possible type for the `w` attribute).
@@ -262,6 +273,7 @@ reveal_type(C().w)  # revealed: Unknown | Weird
 def returns_tuple() -> tuple[int, str]:
     return (1, "a")
 
+
 class C:
     a1, b1 = (1, "a")
     c1, d1 = returns_tuple()
@@ -269,6 +281,7 @@ class C:
     def __init__(self) -> None:
         self.a2, self.b2 = (1, "a")
         self.c2, self.d2 = returns_tuple()
+
 
 c_instance = C()
 
@@ -292,6 +305,7 @@ class C:
     def __init__(self) -> None:
         self.a, *self.b = (1, 2, 3)
 
+
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
 reveal_type(c_instance.b)  # revealed: Unknown | list[Literal[2, 3]]
@@ -304,11 +318,14 @@ class TupleIterator:
     def __next__(self) -> tuple[int, str]:
         return (1, "a")
 
+
 class TupleIterable:
     def __iter__(self) -> TupleIterator:
         return TupleIterator()
 
+
 class NonIterable: ...
+
 
 class C:
     def __init__(self):
@@ -321,6 +338,7 @@ class C:
         # TODO: We should emit a diagnostic here
         for self.z in NonIterable():
             pass
+
 
 reveal_type(C().x)  # revealed: Unknown | int
 reveal_type(C().y)  # revealed: Unknown | str
@@ -336,10 +354,12 @@ class ContextManager:
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
 
+
 class C:
     def __init__(self) -> None:
         with ContextManager() as self.x:
             pass
+
 
 c_instance = C()
 
@@ -356,10 +376,12 @@ class ContextManager:
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
 
+
 class C:
     def __init__(self) -> None:
         with ContextManager() as (self.x, self.y):
             pass
+
 
 c_instance = C()
 
@@ -379,9 +401,11 @@ class TupleIterator:
     def __next__(self) -> tuple[int, str]:
         return (1, "a")
 
+
 class TupleIterable:
     def __iter__(self) -> TupleIterator:
         return TupleIterator()
+
 
 class C:
     def __init__(self) -> None:
@@ -391,8 +415,10 @@ class C:
         [[... for self.f in range(3)] for _ in range(3)]
         [[... for self.g in range(3)] for self in [D()]]
 
+
 class D:
     g: int
+
 
 c_instance = C()
 
@@ -423,6 +449,7 @@ class C:
         [... for self.a in [1]]
         [[... for self.b in [1]] for _ in [1]]
 
+
 c_instance = C()
 
 reveal_type(c_instance.a)  # revealed: Unknown | int
@@ -441,7 +468,9 @@ class C:
         def g():
             # error: [unresolved-attribute]
             [... for self.b in [1]]
+
         g()
+
 
 c_instance = C()
 
@@ -461,6 +490,7 @@ class C:
         class D:
             [[... for self.a in [1]] for _ in [1]]
 
+
 reveal_type(C().a)  # revealed: Unknown | int
 ```
 
@@ -473,15 +503,19 @@ defined:
 def flag() -> bool:
     return True
 
+
 class C:
     def f(self) -> None:
         if flag():
             self.a1: str | None = "a"
             self.b1 = 1
+
     if flag():
+
         def f(self) -> None:
             self.a2: str | None = "a"
             self.b2 = 1
+
 
 c_instance = C()
 
@@ -500,6 +534,7 @@ class C:
     def __init__(this) -> None:
         this.declared_and_bound: str | None = "a"
 
+
 reveal_type(C().declared_and_bound)  # revealed: str | None
 ```
 
@@ -510,6 +545,7 @@ class C:
     def __init__(self) -> None:
         this = self
         this.declared_and_bound: str | None = "a"
+
 
 # This would ideally be `str | None`, but mypy/pyright don't support this either,
 # so `Unknown` + a diagnostic is also fine.
@@ -523,10 +559,12 @@ reveal_type(C().declared_and_bound)  # revealed: Unknown
 class Other:
     x: int
 
+
 class C:
     @staticmethod
     def f(other: Other) -> None:
         other.x = 1
+
 
 # error: [unresolved-attribute]
 reveal_type(C.x)  # revealed: Unknown
@@ -538,10 +576,12 @@ reveal_type(C().x)  # revealed: Unknown
 
 my_staticmethod = staticmethod
 
+
 class D:
     @my_staticmethod
     def f(other: Other) -> None:
         other.x = 1
+
 
 # error: [unresolved-attribute]
 reveal_type(D.x)  # revealed: Unknown
@@ -556,10 +596,12 @@ If `staticmethod` is something else, that should not influence the behavior:
 def staticmethod(f):
     return f
 
+
 class C:
     @staticmethod
     def f(self) -> None:
         self.x = 1
+
 
 reveal_type(C().x)  # revealed: Unknown | Literal[1]
 ```
@@ -569,13 +611,16 @@ And if `staticmethod` is fully qualified, that should also be recognized:
 ```py
 import builtins
 
+
 class Other:
     x: int
+
 
 class C:
     @builtins.staticmethod
     def f(other: Other) -> None:
         other.x = 1
+
 
 # error: [unresolved-attribute]
 reveal_type(C.x)  # revealed: Unknown
@@ -595,6 +640,7 @@ class C:
         # that need proper type inference.
         if (2 + 3) < 4:
             self.x: str = "a"
+
 
 # TODO: this would ideally raise an `unresolved-attribute` error
 reveal_type(C().x)  # revealed: str
@@ -621,11 +667,14 @@ class C:
 
     def set_c(self, c: str) -> None:
         self.c = c
+
     if False:
+
         def set_e(self, e: str) -> None:
             # TODO: Should not emit this diagnostic
             # error: [unresolved-attribute]
             self.e = e
+
 
 # TODO: this would ideally be `Unknown | Literal[1]`
 reveal_type(C(True).a)  # revealed: Unknown | Literal[1, "a"]
@@ -653,8 +702,10 @@ class C:
         # This is because, it is not possible to access a partially-initialized object by normal means.
         self.y = 2
 
+
 reveal_type(C(False).x)  # revealed: Unknown | Literal[1]
 reveal_type(C(False).y)  # revealed: Unknown | Literal[2]
+
 
 class C:
     def __init__(self, b: bytes) -> None:
@@ -667,8 +718,10 @@ class C:
 
         self.s = s
 
+
 reveal_type(C(b"abc").b)  # revealed: Unknown | bytes
 reveal_type(C(b"abc").s)  # revealed: Unknown | str
+
 
 class C:
     def __init__(self, iter) -> None:
@@ -680,6 +733,7 @@ class C:
         # The for-loop may not stop,
         # but we consider the subsequent attributes to be definitely-bound.
         self.y = 2
+
 
 reveal_type(C([]).x)  # revealed: Unknown | Literal[1]
 reveal_type(C([]).y)  # revealed: Unknown | Literal[2]
@@ -707,6 +761,7 @@ For more details, see the [typing spec on `ClassVar`].
 ```py
 from typing import ClassVar
 
+
 class C:
     pure_class_variable1: ClassVar[str] = "value in class body"
     pure_class_variable2: ClassVar = 1
@@ -714,6 +769,7 @@ class C:
     def method(self):
         # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `Self@method`"
         self.pure_class_variable1 = "value set through instance"
+
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
@@ -734,8 +790,10 @@ C.pure_class_variable1 = "overwritten on class"
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `pure_class_variable1` of type `str`"
 C.pure_class_variable1 = 1
 
+
 class Subclass(C):
     pure_class_variable1: ClassVar[str] = "overwritten on subclass"
+
 
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
@@ -746,11 +804,13 @@ If a class variable is additionally qualified as `Final`, we do not union with `
 ```py
 from typing import Final
 
+
 class D:
     final1: Final[ClassVar] = 1
     final2: ClassVar[Final] = 1
     final3: ClassVar[Final[int]] = 1
     final4: Final[ClassVar[int]] = 1
+
 
 reveal_type(D.final1)  # revealed: Literal[1]
 reveal_type(D.final2)  # revealed: Literal[1]
@@ -768,6 +828,7 @@ class C:
     @classmethod
     def class_method(cls):
         cls.pure_class_variable = "value set in class method"
+
 
 # for a more realistic example, let's actually call the method
 C.class_method()
@@ -801,6 +862,7 @@ class C:
     def instance_method(self):
         self.variable_with_class_default1 = "value set in instance method"
 
+
 reveal_type(C.variable_with_class_default1)  # revealed: str
 
 reveal_type(C.variable_with_class_default2)  # revealed: Unknown | Literal[1]
@@ -831,14 +893,17 @@ called (the descriptor protocol is not invoked for instance variables).
 ```py
 from typing import ClassVar
 
+
 class Descriptor:
     def __get__(self, instance, owner) -> int:
         return 42
+
 
 class C:
     a: ClassVar[Descriptor]
     b: Descriptor = Descriptor()
     c: ClassVar[Descriptor] = Descriptor()
+
 
 reveal_type(C().a)  # revealed: int
 reveal_type(C().b)  # revealed: int
@@ -871,6 +936,7 @@ class Base:
         self.pure_overwritten_in_subclass_method: str = "value in base"
 
         self.pure_undeclared = "base"
+
 
 class Intermediate(Base):
     # Redeclaring base class attributes with the *same *type is fine:
@@ -918,7 +984,9 @@ class Intermediate(Base):
 
         self.pure_undeclared = "intermediate"
 
+
 class Derived(Intermediate): ...
+
 
 reveal_type(Derived.attribute)  # revealed: int | None
 reveal_type(Derived().attribute)  # revealed: int | None
@@ -978,10 +1046,13 @@ object first, i.e. on the metaclass:
 ```py
 from typing import Literal
 
+
 class Meta1:
     attr: Literal["metaclass value"] = "metaclass value"
 
+
 class C1(metaclass=Meta1): ...
+
 
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
 ```
@@ -994,8 +1065,10 @@ instead (see the [descriptor protocol tests] for data/non-data descriptor attrib
 class Meta2:
     attr: str = "metaclass value"
 
+
 class C2(metaclass=Meta2):
     attr: Literal["class value"] = "class value"
+
 
 reveal_type(C2.attr)  # revealed: Literal["class value"]
 ```
@@ -1029,6 +1102,7 @@ def _(flag: bool):
             attr1: str = "metaclass value"
 
     class C4(metaclass=Meta4): ...
+
     # error: [possibly-missing-attribute]
     reveal_type(C4.attr1)  # revealed: str
 ```
@@ -1104,6 +1178,7 @@ In a classmethod, if the name matches a class attribute, we suggest `cls.`.
 ```py
 from typing import ClassVar
 
+
 class Foo:
     x: ClassVar[int] = 42
 
@@ -1159,6 +1234,7 @@ in the sub-diagnostic.
 ```py
 from typing import ClassVar
 
+
 class Foo:
     x: ClassVar[int] = 42
 
@@ -1173,6 +1249,7 @@ the first parameter is keyword-only:
 
 ```py
 from typing import ClassVar
+
 
 class Foo:
     x: ClassVar[int] = 42
@@ -1195,11 +1272,13 @@ infer those union types accordingly:
 ```py
 def _(flag: bool):
     if flag:
+
         class C1:
             x = 1
             y: int = 1
 
     else:
+
         class C1:
             x = 2
             y: int | str = "b"
@@ -1229,16 +1308,19 @@ def _(flag: bool):
     C2.y = "problematic"
 
     if flag:
+
         class Meta3(type):
             x = 5
             y: int = 5
 
     else:
+
         class Meta3(type):
             x = 6
             y: int | str = "f"
 
     class C3(metaclass=Meta3): ...
+
     reveal_type(C3.x)  # revealed: Unknown | Literal[5, 6]
     reveal_type(C3.y)  # revealed: int | str
 
@@ -1257,6 +1339,7 @@ def _(flag: bool):
             y: int | str = "h"
 
     class C4(metaclass=Meta4): ...
+
     reveal_type(C4.x)  # revealed: Unknown | Literal[7, 8]
     reveal_type(C4.y)  # revealed: int | str
 
@@ -1336,6 +1419,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
 ```py
 from typing import Any
+
 
 def _(flag: bool):
     class Base:
@@ -1455,7 +1539,9 @@ If the symbol is unbound in all elements of the union, we detect that:
 ```py
 def _(flag: bool):
     class C1: ...
+
     class C2: ...
+
     C = C1 if flag else C2
 
     # error: [unresolved-attribute] "Object of type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
@@ -1475,8 +1561,12 @@ def _(flag: bool):
 class A:
     X = "foo"
 
+
 class B(A): ...
+
+
 class C(B): ...
+
 
 reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
 
@@ -1488,18 +1578,29 @@ C.X = "bar"
 ```py
 from ty_extensions import reveal_mro
 
+
 class O: ...
+
 
 class F(O):
     X = 56
 
+
 class E(O):
     X = 42
 
+
 class D(O): ...
+
+
 class C(D, F): ...
+
+
 class B(E, D): ...
+
+
 class A(B, C): ...
+
 
 # revealed: (<class 'A'>, <class 'B'>, <class 'E'>, <class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>)
 reveal_mro(A)
@@ -1517,15 +1618,19 @@ A.X = 100
 ```py
 from ty_extensions import Intersection
 
+
 class A:
     x: int = 1
 
+
 class B: ...
+
 
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.x)  # revealed: int
 
     a_and_b.x = 2
+
 
 # Same for class objects
 def _(a_and_b: Intersection[type[A], type[B]]):
@@ -1539,19 +1644,28 @@ def _(a_and_b: Intersection[type[A], type[B]]):
 ```py
 from ty_extensions import Intersection
 
+
 class P: ...
+
+
 class Q: ...
+
+
 class R(P, Q): ...
+
 
 class A:
     x: P = P()
 
+
 class B:
     x: Q = Q()
+
 
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.x)  # revealed: P & Q
     a_and_b.x = R()
+
 
 # Same for class objects
 def _(a_and_b: Intersection[type[A], type[B]]):
@@ -1567,6 +1681,7 @@ which is equivalent to `object & ~P`:
 ```py
 class P: ...
 
+
 def _(obj: object):
     if not isinstance(obj, P):
         reveal_type(obj)  # revealed: ~P
@@ -1579,9 +1694,15 @@ def _(obj: object):
 ```py
 from ty_extensions import Intersection
 
+
 class P: ...
+
+
 class Q: ...
+
+
 class R(P, Q): ...
+
 
 def _(flag: bool):
     class A1:
@@ -1596,6 +1717,7 @@ def _(flag: bool):
 
         # error: [possibly-missing-attribute]
         a_and_b.x = R()
+
     # Same for class objects
     def inner1_class(a_and_b: Intersection[type[A1], type[B1]]):
         # error: [possibly-missing-attribute]
@@ -1618,6 +1740,7 @@ def _(flag: bool):
         # handling in `validate_attribute_assignment` for this
         # error: [possibly-missing-attribute]
         a_and_b.x = R()
+
     # Same for class objects
     def inner2_class(a_and_b: Intersection[type[A2], type[B1]]):
         reveal_type(a_and_b.x)  # revealed: P & Q
@@ -1636,6 +1759,7 @@ def _(flag: bool):
 
         # error: [possibly-missing-attribute]
         a_and_b.x = R()
+
     # Same for class objects
     def inner3_class(a_and_b: Intersection[type[A3], type[B3]]):
         # error: [possibly-missing-attribute]
@@ -1645,6 +1769,7 @@ def _(flag: bool):
         a_and_b.x = R()
 
     class A4: ...
+
     class B4: ...
 
     def inner4(a_and_b: Intersection[A4, B4]):
@@ -1653,6 +1778,7 @@ def _(flag: bool):
 
         # error: [invalid-assignment]
         a_and_b.x = R()
+
     # Same for class objects
     def inner4_class(a_and_b: Intersection[type[A4], type[B4]]):
         # error: [unresolved-attribute]
@@ -1667,16 +1793,22 @@ def _(flag: bool):
 ```py
 from ty_extensions import Intersection
 
+
 class P: ...
+
+
 class Q: ...
+
 
 class A:
     def __init__(self):
         self.x: P = P()
 
+
 class B:
     def __init__(self):
         self.x: Q = Q()
+
 
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.x)  # revealed: P & Q
@@ -1692,7 +1824,9 @@ from this that attribute access on `Any` resolves to `Any` if the attribute does
 ```py
 from typing import Any
 
+
 class Foo(Any): ...
+
 
 reveal_type(Foo.bar)  # revealed: Any
 reveal_type(Foo.__repr__)  # revealed: (def __repr__(self) -> str) & Any
@@ -1704,11 +1838,16 @@ Similar principles apply if `Any` appears in the middle of an inheritance hierar
 from typing import ClassVar, Literal
 from ty_extensions import reveal_mro
 
+
 class A:
     x: ClassVar[Literal[1]] = 1
 
+
 class B(Any): ...
+
+
 class C(B, A): ...
+
 
 reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, Any, <class 'A'>, <class 'object'>)
 reveal_type(C.x)  # revealed: Literal[1] & Any
@@ -1724,10 +1863,13 @@ for unknown attributes. Consider the following `CustomGetAttr` class:
 ```py
 from typing import Literal
 
+
 def flag() -> bool:
     return True
 
+
 class GetAttrReturnType: ...
+
 
 class CustomGetAttr:
     class_attr: int = 1
@@ -1789,9 +1931,11 @@ we only consider the attribute access to be valid if the accessed attribute is o
 ```py
 from typing import Literal
 
+
 class Date:
     def __getattr__(self, name: Literal["day", "month", "year"]) -> int:
         return 0
+
 
 date = Date()
 
@@ -1810,6 +1954,7 @@ A standard library example of a class with a custom `__getattr__` method is `arg
 ```py
 import argparse
 
+
 def _(ns: argparse.Namespace):
     reveal_type(ns.whatever)  # revealed: Any
 ```
@@ -1825,10 +1970,13 @@ behavior matches other type checkers such as mypy and pyright.
 ```py
 from typing import Any
 
+
 class Foo:
     x: str
+
     def __getattribute__(self, attr: str) -> Any:
         return 42
+
 
 reveal_type(Foo().x)  # revealed: str
 reveal_type(Foo().y)  # revealed: Any
@@ -1854,6 +2002,7 @@ class C:
     def __getattr__(self, name: str) -> str:
         return "a"
 
+
 c = C()
 
 reveal_type(c.x)  # revealed: int
@@ -1865,10 +2014,12 @@ Like all dunder methods, `__getattribute__` is not looked up on instances:
 def external_getattribute(name) -> int:
     return 1
 
+
 class ThisFails:
     def __init__(self):
         # error: [invalid-assignment]
         self.__getattribute__ = external_getattribute
+
 
 # error: [unresolved-attribute]
 ThisFails().x
@@ -1903,10 +2054,12 @@ we only consider the attribute assignment to be valid if the assigned attribute 
 ```py
 from typing import Literal
 
+
 class Date:
     # error: [invalid-method-override]
     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
         pass
+
 
 date = Date()
 date.day = 8
@@ -1925,11 +2078,13 @@ on instances of that class:
 ```py
 from typing_extensions import Never
 
+
 class Frozen:
     existing: int = 1
 
     def __setattr__(self, name, value) -> Never:
         raise AttributeError("Attributes cannot be modified")
+
 
 instance = Frozen()
 instance.non_existing = 2  # error: [invalid-assignment] "Cannot assign to unresolved attribute `non_existing` on type `Frozen`"
@@ -1953,6 +2108,7 @@ of type `Never`):
 
 ```py
 from typing_extensions import Never, Any
+
 
 def _(n: Never):
     reveal_type(n.__setattr__)  # revealed: Never
@@ -1978,13 +2134,17 @@ If a `__setattr__` method is only partially bound, the behavior is still the sam
 ```py
 from typing_extensions import Never
 
+
 def flag() -> bool:
     return True
 
+
 class Frozen:
     if flag():
+
         def __setattr__(self, name, value) -> Never:
             raise AttributeError("Attributes cannot be modified")
+
 
 instance = Frozen()
 instance.non_existing = 2  # error: [invalid-assignment]
@@ -1997,6 +2157,7 @@ A standard library example of a class with a custom `__setattr__` method is `arg
 
 ```py
 import argparse
+
 
 def _(ns: argparse.Namespace):
     ns.whatever = 42
@@ -2015,14 +2176,18 @@ PyTorch, where `__setattr__` may have a narrow type signature but forwards to
 ```py
 from typing import Union
 
+
 class Tensor: ...
+
 
 class Module:
     def __setattr__(self, name: str, value: Union[Tensor, "Module"]) -> None:
         super().__setattr__(name, value)
 
+
 class MyModule(Module):
     some_param: int  # Explicit attribute with type `int`
+
 
 def use_module(m: MyModule, param: int) -> None:
     # This is allowed because `some_param` is explicitly defined with type `int`,
@@ -2043,11 +2208,13 @@ blocked, even if the value type doesn't match `__setattr__`'s parameter type.
 ```py
 from typing import NoReturn
 
+
 class Immutable:
     x: float
 
     def __setattr__(self, name: str, value: int) -> NoReturn:
         raise AttributeError("Immutable")
+
 
 def _(obj: Immutable) -> None:
     # Even though `"foo"` doesn't match `__setattr__`'s `value: int` parameter,
@@ -2087,6 +2254,7 @@ reveal_type(d.__class__)  # revealed: <class 'bool'>
 e = (42, 42)
 reveal_type(e.__class__)  # revealed: type[tuple[Literal[42], Literal[42]]]
 
+
 def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]
     reveal_type(type(a))  # revealed: type[int]
@@ -2103,9 +2271,12 @@ def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     # All we know is that the metaclass must be a (non-strict) subclass of `type`.
     reveal_type(d.__class__)  # revealed: type[type]
 
+
 reveal_type(f.__class__)  # revealed: <class 'FunctionType'>
 
+
 class Foo: ...
+
 
 reveal_type(Foo.__class__)  # revealed: <class 'type'>
 ```
@@ -2188,6 +2359,7 @@ global_symbol: str = "a"
 import mod1
 import mod2
 
+
 def _(flag: bool):
     if flag:
         mod = mod1
@@ -2209,6 +2381,7 @@ functions are instances of that class:
 
 ```py
 def f(): ...
+
 
 reveal_type(f.__defaults__)  # revealed: tuple[Any, ...] | None
 reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
@@ -2281,9 +2454,11 @@ reveal_type(b"foo".endswith)
 class Other:
     x: int = 1
 
+
 class C:
     def __init__(self, other: Other) -> None:
         other.x = 1
+
 
 def f(c: C):
     # error: [unresolved-attribute]
@@ -2304,6 +2479,7 @@ class Outer:
             def __init__(self):
                 self.x: str = "a"
 
+
 reveal_type(Outer().x)  # revealed: int
 
 # error: [unresolved-attribute]
@@ -2318,11 +2494,13 @@ reveal_type(Outer.Middle.Inner().x)  # revealed: str
 class Other:
     x: int = 1
 
+
 class C:
     def __init__(self) -> None:
         # Redeclaration of self. `self` does not refer to the instance anymore.
         self: Other = Other()
         self.x: int = 1
+
 
 # TODO: this should be an error
 C().x
@@ -2334,11 +2512,14 @@ C().x
 class Other:
     x: str = "a"
 
+
 class C:
     def __init__(self) -> None:
         def nested_function(self: Other):
             self.x = "b"
+
         self.x: int = 1
+
 
 reveal_type(C().x)  # revealed: int
 ```
@@ -2350,7 +2531,9 @@ class C:
     def __init__(self) -> None:
         def set_attribute(value: str):
             self.x: str = value
+
         set_attribute("a")
+
 
 # TODO: ideally, this would be `str`. Mypy supports this, pyright does not.
 # error: [unresolved-attribute]
@@ -2363,6 +2546,7 @@ Arbitrary attributes can be accessed on `Never` without emitting any errors:
 
 ```py
 from typing_extensions import Never
+
 
 def f(never: Never):
     reveal_type(never.arbitrary_attribute)  # revealed: Never
@@ -2383,6 +2567,7 @@ class C:
     def copy(self, other: "C"):
         self.x = other.x
 
+
 reveal_type(C().x)  # revealed: Unknown | Literal[1]
 ```
 
@@ -2392,6 +2577,7 @@ If the only assignment to a name is cyclic, we just infer `Unknown` for that att
 class D:
     def copy(self, other: "D"):
         self.x = other.x
+
 
 reveal_type(D().x)  # revealed: Unknown
 ```
@@ -2407,7 +2593,9 @@ class E:
     def copy(self, other: "E"):
         self.x = other.x
 
+
 reveal_type(E().x)  # revealed: int
+
 
 class F:
     def __init__(self):
@@ -2416,11 +2604,14 @@ class F:
     def copy(self, other: "F"):
         self.x: int = other.x
 
+
 reveal_type(F().x)  # revealed: int
+
 
 class G:
     def copy(self, other: "G"):
         self.x: int = other.x
+
 
 reveal_type(G().x)  # revealed: int
 ```
@@ -2435,21 +2626,26 @@ class A:
     def copy(self, other: "B"):
         self.x = other.x
 
+
 class B:
     def copy(self, other: "A"):
         self.x = other.x
 
+
 reveal_type(B().x)  # revealed: Unknown | Literal[1]
 reveal_type(A().x)  # revealed: Unknown | Literal[1]
+
 
 class Base:
     def flip(self) -> "Sub":
         return Sub()
 
+
 class Sub(Base):
     # error: [invalid-method-override]
     def flip(self) -> "Base":
         return Base()
+
 
 class C2:
     def __init__(self, x: Sub):
@@ -2458,7 +2654,9 @@ class C2:
     def replace_with(self, other: "C2"):
         self.x = other.x.flip()
 
+
 reveal_type(C2(Sub()).x)  # revealed: Unknown | Base
+
 
 class C3:
     def __init__(self, x: Sub):
@@ -2466,6 +2664,7 @@ class C3:
 
     def replace_with(self, other: "C3"):
         self.x = [self.x[0].flip()]
+
 
 # TODO: should be `Unknown | list[Unknown | Sub] | list[Unknown | Base]`
 reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Unknown | Sub] | list[Divergent]
@@ -2519,6 +2718,7 @@ class ManyCycles:
         reveal_type(self.x6)  # revealed: Unknown | int
         reveal_type(self.x7)  # revealed: Unknown | int
 
+
 class ManyCycles2:
     def __init__(self: "ManyCycles2"):
         self.x1 = [0]
@@ -2561,8 +2761,10 @@ test for <https://github.com/astral-sh/ty/issues/692>:
 ```py
 from typing import Literal
 
+
 def check(x) -> Literal[False]:
     return False
+
 
 class Toggle:
     def __init__(self: "Toggle"):
@@ -2570,6 +2772,7 @@ class Toggle:
             self.x: Literal[True] = True
         if check(self.y):
             self.y = True
+
 
 reveal_type(Toggle().x)  # revealed: Literal[True]
 reveal_type(Toggle().y)  # revealed:  Unknown | Literal[True]
@@ -2586,6 +2789,7 @@ class Counter:
     def increment(self: "Counter"):
         self.count = self.count + 1
 
+
 reveal_type(Counter().count)  # revealed: Unknown | int
 ```
 
@@ -2599,7 +2803,9 @@ class NestedLists:
     def f(self: "NestedLists"):
         self.x = [self.x]
 
+
 reveal_type(NestedLists().x)  # revealed: Unknown | Literal[1] | list[Divergent]
+
 
 class NestedMixed:
     def f(self: "NestedMixed"):
@@ -2607,6 +2813,7 @@ class NestedMixed:
 
     def g(self: "NestedMixed"):
         self.x = {self.x}
+
 
 reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent]
 ```
@@ -2618,12 +2825,15 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
+
 def make_list(value: T) -> list[T]:
     return [value]
+
 
 class NestedLists2:
     def f(self: "NestedLists2"):
         self.x = make_list(self.x)
+
 
 reveal_type(NestedLists2().x)  # revealed: Unknown | list[Divergent]
 ```
@@ -2648,6 +2858,7 @@ class C:
     a_slice: slice = slice(1)
     a_type: type = int
     a_none: None = None
+
 
 reveal_type(C.a_int)  # revealed: int
 reveal_type(C.a_str)  # revealed: str
@@ -2681,6 +2892,7 @@ class C:
         self.x: int = 1
         return t
 
+
 reveal_type(C().x)  # revealed: int
 ```
 
@@ -2694,10 +2906,12 @@ gradual guarantee, because the unknown decorator *could* be an alias for `builti
 # error: [unresolved-import]
 from unknown_library import unknown_decorator
 
+
 class C:
     @unknown_decorator
     def f(self):
         self.x: int = 1
+
 
 reveal_type(C.x)  # revealed: int
 reveal_type(C().x)  # revealed: int
@@ -2710,9 +2924,11 @@ import enum
 
 reveal_type(enum.Enum.__members__)  # revealed: MappingProxyType[str, Enum]
 
+
 class Answer(enum.Enum):
     NO = 0
     YES = 1
+
 
 reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
 reveal_type(Answer.NO.value)  # revealed: Literal[0]
@@ -2731,6 +2947,7 @@ class C:
     def f(self, other: "C"):
         self.x = (other.x, 1)
 
+
 reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 reveal_type(C().x[0])  # revealed: Unknown | Divergent
 ```
@@ -2742,12 +2959,15 @@ from typing import TypeVar, Literal
 
 T = TypeVar("T")
 
+
 def make_tuple(x: T) -> tuple[T, Literal[1]]:
     return (x, 1)
+
 
 class D:
     def f(self, other: "D"):
         self.x = make_tuple(other.x)
+
 
 reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
@@ -2758,9 +2978,11 @@ The tuple type may also expand exponentially "in breadth":
 def duplicate(x: T) -> tuple[T, T]:
     return (x, x)
 
+
 class E:
     def f(self: "E"):
         self.x = duplicate(self.x)
+
 
 reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, Divergent]
 ```
@@ -2771,9 +2993,11 @@ And it also works for homogeneous tuples:
 def make_homogeneous_tuple(x: T) -> tuple[T, ...]:
     return (x, x)
 
+
 class F:
     def f(self, other: "F"):
         self.x = make_homogeneous_tuple(other.x)
+
 
 reveal_type(F().x)  # revealed: Unknown | tuple[Divergent, ...]
 ```
@@ -2844,6 +3068,7 @@ python-version = "3.14"
 
 ```py
 from typing import Callable
+
 
 def f(x: Callable):
     x.__name__  # error: [unresolved-attribute]

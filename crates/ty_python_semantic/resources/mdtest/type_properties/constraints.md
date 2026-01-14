@@ -36,12 +36,19 @@ upper bound.
 from typing import Any, final, Never, Sequence
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 @final
 class Unrelated: ...
+
 
 def _[T]() -> None:
     # (Sub ≤ T@_ ≤ Super)
@@ -128,12 +135,19 @@ strict subtype of the lower bound, a strict supertype of the upper bound, or inc
 from typing import Any, final, Never, Sequence
 from ty_extensions import ConstraintSet, Not, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 @final
 class Unrelated: ...
+
 
 def _[T]() -> None:
     # ¬(Sub ≤ T@_ ≤ Super)
@@ -226,8 +240,13 @@ cases, we can simplify the result of an intersection.
 ```py
 from ty_extensions import ConstraintSet
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
 ```
 
@@ -249,13 +268,22 @@ The intersection of two ranges is where the ranges "overlap".
 from typing import final
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class SubSub(Sub): ...
+
 
 @final
 class Unrelated: ...
+
 
 def _[T]() -> None:
     constraints = ConstraintSet.range(SubSub, T, Base) & ConstraintSet.range(Sub, T, Super)
@@ -291,8 +319,10 @@ satisfy their intersection `T ≤ Base & Other`, and vice versa.
 from typing import Never
 from ty_extensions import Intersection
 
+
 # This is not final, so it's possible for a subclass to inherit from both Base and Other.
 class Other: ...
+
 
 def upper_bounds[T]():
     # (T@upper_bounds ≤ Base & Other)
@@ -325,10 +355,18 @@ the intersection as removing the hole from the range constraint.
 from typing import final, Never
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class SubSub(Sub): ...
+
 
 @final
 class Unrelated: ...
@@ -379,13 +417,22 @@ smaller constraint. For negated ranges, the smaller constraint is the one with t
 from typing import final
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class SubSub(Sub): ...
+
 
 @final
 class Unrelated: ...
+
 
 def _[T]() -> None:
     constraints = ~ConstraintSet.range(SubSub, T, Super) & ~ConstraintSet.range(Sub, T, Base)
@@ -437,8 +484,13 @@ can simplify the result of an union.
 ```py
 from ty_extensions import ConstraintSet
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
 ```
 
@@ -461,13 +513,22 @@ bounds.
 from typing import final
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class SubSub(Sub): ...
+
 
 @final
 class Unrelated: ...
+
 
 def _[T]() -> None:
     constraints = ConstraintSet.range(SubSub, T, Super) | ConstraintSet.range(Sub, T, Base)
@@ -515,8 +576,10 @@ that satisfies the union constraint satisfies the union type.
 ```py
 from typing import Never
 
+
 # This is not final, so it's possible for a subclass to inherit from both Base and Other.
 class Other: ...
+
 
 def union[T]():
     # (T@union ≤ Base | Other)
@@ -565,10 +628,18 @@ the union as filling part of the hole with the types from the range constraint.
 from typing import final, Never
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class SubSub(Sub): ...
+
 
 @final
 class Unrelated: ...
@@ -618,13 +689,22 @@ The union of two negated ranges has a hole where the ranges "overlap".
 from typing import final
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class SubSub(Sub): ...
+
 
 @final
 class Unrelated: ...
+
 
 def _[T]() -> None:
     constraints = ~ConstraintSet.range(SubSub, T, Base) | ~ConstraintSet.range(Sub, T, Super)
@@ -660,9 +740,15 @@ def _[T]() -> None:
 from typing import Never
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 def _[T]() -> None:
     # ¬(Sub ≤ T@_ ≤ Base)
@@ -689,10 +775,13 @@ def _[T]() -> None:
 from typing import final, Never
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Base: ...
+
 
 @final
 class Unrelated: ...
+
 
 def _[T, U]() -> None:
     # ¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base)
@@ -727,11 +816,13 @@ enforce an arbitrary ordering on typevars, and always place the constraint on th
 from typing import Never
 from ty_extensions import ConstraintSet, static_assert
 
+
 def f[S, T]():
     # (S@f ≤ T@f)
     c1 = ConstraintSet.range(Never, S, T)
     c2 = ConstraintSet.range(S, T, object)
     static_assert(c1 == c2)
+
 
 def f[T, S]():
     # (S@f ≤ T@f)
@@ -749,6 +840,7 @@ def f[S, T]():
     c1 = ConstraintSet.range(T, S, T)
     c2 = ConstraintSet.range(S, T, S)
     static_assert(c1 == c2)
+
 
 def f[T, S]():
     # (S@f = T@f)
@@ -781,6 +873,7 @@ set.
 from typing import Never
 from ty_extensions import ConstraintSet, Intersection, static_assert
 
+
 def f[T]():
     c1 = ConstraintSet.range(Never, T, str | int)
     c2 = ConstraintSet.range(Never, T, int | str)
@@ -801,6 +894,7 @@ static types.)
 ```py
 from typing import Never
 from ty_extensions import ConstraintSet, static_assert
+
 
 def same_typevar[T]():
     constraints = ConstraintSet.range(Never, T, T)
@@ -823,6 +917,7 @@ as shown above.)
 ```py
 from ty_extensions import Intersection
 
+
 def same_typevar[T]():
     constraints = ConstraintSet.range(Never, T, T | None)
     expected = ConstraintSet.range(Never, T, object)
@@ -842,6 +937,7 @@ constraint set can never be satisfied, since every type is disjoint with its neg
 
 ```py
 from ty_extensions import Not
+
 
 def same_typevar[T]():
     constraints = ConstraintSet.range(Intersection[Not[T], None], T, object)

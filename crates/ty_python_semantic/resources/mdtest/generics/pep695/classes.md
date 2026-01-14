@@ -13,12 +13,24 @@ At its simplest, to define a generic class using PEP 695 syntax, you add a list 
 ```py
 from ty_extensions import generic_context, reveal_mro
 
+
 class SingleTypevar[T]: ...
+
+
 class MultipleTypevars[T, S]: ...
+
+
 class SingleParamSpec[**P]: ...
+
+
 class TypeVarAndParamSpec[T, **P]: ...
+
+
 class SingleTypeVarTuple[*Ts]: ...
+
+
 class TypeVarAndTypeVarTuple[T, *Ts]: ...
+
 
 # revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
@@ -50,8 +62,13 @@ your base classes.
 
 ```py
 class InheritedGeneric[U, V](MultipleTypevars[U, V]): ...
+
+
 class InheritedGenericPartiallySpecialized[U](MultipleTypevars[U, int]): ...
+
+
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
+
 
 # revealed: ty_extensions.GenericContext[U@InheritedGeneric, V@InheritedGeneric]
 reveal_type(generic_context(InheritedGeneric))
@@ -68,6 +85,7 @@ the inheriting class generic.
 ```py
 class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
 
+
 # revealed: None
 reveal_type(generic_context(InheritedGenericDefaultSpecialization))
 ```
@@ -79,14 +97,18 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
+
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 class BothGenericSyntaxes[U](Generic[T]): ...
 
+
 reveal_mro(BothGenericSyntaxes)  # revealed: (<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>)
+
 
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 # error: [invalid-base] "Cannot inherit from plain `Generic`"
 class DoublyInvalid[T](Generic): ...
+
 
 reveal_mro(DoublyInvalid)  # revealed: (<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>)
 ```
@@ -96,21 +118,30 @@ Generic classes implicitly inherit from `Generic`:
 ```py
 class Foo[T]: ...
 
+
 # revealed: (<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>)
 reveal_mro(Foo)
 # revealed: (<class 'Foo[int]'>, typing.Generic, <class 'object'>)
 reveal_mro(Foo[int])
 
+
 class A: ...
+
+
 class Bar[T](A): ...
+
 
 # revealed: (<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>)
 reveal_mro(Bar)
 # revealed: (<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>)
 reveal_mro(Bar[int])
 
+
 class B: ...
+
+
 class Baz[T](A, B): ...
+
 
 # revealed: (<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>)
 reveal_mro(Baz)
@@ -125,8 +156,10 @@ The type parameter can be specified explicitly:
 ```py
 from typing import Literal
 
+
 class C[T]:
     x: T
+
 
 reveal_type(C[int]())  # revealed: C[int]
 reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
@@ -143,8 +176,13 @@ If the type variable has an upper bound, the specialized type must satisfy that 
 
 ```py
 class Bounded[T: int]: ...
+
+
 class BoundedByUnion[T: int | str]: ...
+
+
 class IntSubclass(int): ...
+
 
 reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
@@ -165,6 +203,7 @@ If the type variable is constrained, the specialized type must satisfy those con
 
 ```py
 class Constrained[T: (int, str)]: ...
+
 
 reveal_type(Constrained[int]())  # revealed: Constrained[int]
 
@@ -187,6 +226,7 @@ If the type variable has a default, it can be omitted:
 ```py
 class WithDefault[T, U = int]: ...
 
+
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 ```
@@ -203,6 +243,7 @@ satisfy the type variable's upper bound or constraints:
 ```py
 class Bounded[T: str]:
     x: T
+
 
 class Constrained[U: (int, bytes)]:
     x: U
@@ -225,6 +266,7 @@ We can infer the type parameter from a type context:
 class C[T]:
     x: T
 
+
 c: C[int] = C()
 # TODO: revealed: C[int]
 reveal_type(c)  # revealed: C[Unknown]
@@ -242,6 +284,7 @@ specific type, we infer the typevar's default type:
 
 ```py
 class D[T = int]: ...
+
 
 reveal_type(D())  # revealed: D[int]
 ```
@@ -266,11 +309,13 @@ signatures don't count towards variance).
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T]:
     x: T
 
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
+
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
@@ -288,10 +333,12 @@ wrong_innards: C[int] = C("five")
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T]:
     x: T
 
     def __init__(self, x: T) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
@@ -309,6 +356,7 @@ wrong_innards: C[int] = C("five")
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T]:
     x: T
 
@@ -316,6 +364,7 @@ class C[T]:
         return object.__new__(cls)
 
     def __init__(self, x: T) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
@@ -333,6 +382,7 @@ wrong_innards: C[int] = C("five")
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T]:
     x: T
 
@@ -340,6 +390,7 @@ class C[T]:
         return object.__new__(cls)
 
     def __init__(self, x: T) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
@@ -351,6 +402,7 @@ reveal_type(C(1))  # revealed: C[int]
 # error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
+
 class D[T]:
     x: T
 
@@ -358,6 +410,7 @@ class D[T]:
         return object.__new__(cls)
 
     def __init__(self, *args, **kwargs) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[T@D]
 reveal_type(generic_context(D))
@@ -378,12 +431,15 @@ to specialize the class.
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T, U]:
     def __new__(cls, *args, **kwargs) -> "C[T, U]":
         return object.__new__(cls)
 
+
 class D[V](C[V, int]):
     def __init__(self, x: V) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[V@D]
 reveal_type(generic_context(D))
@@ -398,11 +454,14 @@ reveal_type(D(1))  # revealed: D[Literal[1]]
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T, U]:
     def __init__(self, t: T, u: U) -> None: ...
 
+
 class D[T, U](C[T, U]):
     pass
+
 
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
@@ -420,8 +479,10 @@ This is a specific example of the above, since it was reported specifically by a
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class D[T, U](dict[T, U]):
     pass
+
 
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
@@ -440,7 +501,9 @@ context. But from the user's point of view, this is another example of the above
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T, U](tuple[T, U]): ...
+
 
 # revealed: ty_extensions.GenericContext[T@C, U@C]
 reveal_type(generic_context(C))
@@ -458,8 +521,10 @@ This test is taken from the
 ```py
 from typing import Sequence, Never
 
+
 def test_seq[T](x: Sequence[T]) -> Sequence[T]:
     return x
+
 
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
     reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
@@ -472,10 +537,12 @@ def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: t
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T]:
     x: T
 
     def __init__[S](self, x: T, y: S) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
@@ -497,6 +564,7 @@ from __future__ import annotations
 from typing import overload
 from ty_extensions import generic_context, into_callable
 
+
 class C[T]:
     # we need to use the type variable or else the class is bivariant in T, and
     # specializations become meaningless
@@ -511,6 +579,7 @@ class C[T]:
     @overload
     def __init__(self, x: int) -> None: ...
     def __init__(self, x: str | bytes | int) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
@@ -537,12 +606,14 @@ C[None]("string")  # error: [no-matching-overload]
 C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 
+
 class D[T, U]:
     @overload
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
     def __init__(self, t: T, u: U) -> None: ...
     def __init__(self, *args) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
@@ -560,9 +631,11 @@ reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
 from dataclasses import dataclass
 from ty_extensions import generic_context, into_callable
 
+
 @dataclass
 class A[T]:
     x: T
+
 
 # revealed: ty_extensions.GenericContext[T@A]
 reveal_type(generic_context(A))
@@ -577,7 +650,9 @@ reveal_type(A(x=1))  # revealed: A[int]
 ```py
 from ty_extensions import generic_context, into_callable
 
+
 class C[T, U = T]: ...
+
 
 # revealed: ty_extensions.GenericContext[T@C, U@C]
 reveal_type(generic_context(C))
@@ -586,8 +661,10 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C())  # revealed: C[Unknown, Unknown]
 
+
 class D[T, U = T]:
     def __init__(self) -> None: ...
+
 
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
@@ -606,9 +683,15 @@ propagate through:
 class Parent[T]:
     x: T
 
+
 class Child[U](Parent[U]): ...
+
+
 class Grandchild[V](Child[V]): ...
+
+
 class Greatgrandchild[W](Child[W]): ...
+
 
 reveal_type(Parent[int]().x)  # revealed: int
 reveal_type(Child[int]().x)  # revealed: int
@@ -625,17 +708,20 @@ scope for the method.
 ```py
 from ty_extensions import generic_context
 
+
 class C[T]:
     def method(self, u: int) -> int:
         return u
 
     def generic_method[U](self, t: T, u: U) -> U:
         return u
+
     # error: [unresolved-reference]
     def cannot_use_outside_of_method(self, u: U): ...
 
     # TODO: error
     def cannot_shadow_class_typevar[T](self, t: T): ...
+
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
@@ -668,6 +754,7 @@ class.
 ```py
 class LinkedList[T]: ...
 
+
 class C[T, U]:
     x: T
     y: U
@@ -680,6 +767,7 @@ class C[T, U]:
 
     def method3(self) -> LinkedList[T]:
         return LinkedList[T]()
+
 
 c = C[int, str]()
 reveal_type(c.x)  # revealed: int
@@ -694,6 +782,7 @@ When a method is overloaded, the specialization is applied to all overloads.
 ```py
 from typing import overload
 
+
 class WithOverloadedMethod[T]:
     @overload
     def method(self, x: T) -> T: ...
@@ -701,6 +790,7 @@ class WithOverloadedMethod[T]:
     def method[S](self, x: S) -> S | T: ...
     def method[S](self, x: S | T) -> S | T:
         return x
+
 
 # revealed: Overload[(self, x: int) -> int, [S](self, x: S) -> S | int]
 reveal_type(WithOverloadedMethod[int].method)
@@ -717,8 +807,10 @@ Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars
 class C[S: T, T]:
     pass
 
+
 class D[S: X]:
     pass
+
 
 X = int
 ```
@@ -747,7 +839,10 @@ A similar case can work in a non-stub file, if forward references are stringifie
 
 ```py
 class Base[T]: ...
+
+
 class Sub(Base["Sub"]): ...
+
 
 reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
@@ -758,6 +853,7 @@ In a non-stub file, without stringified forward references, this raises a `NameE
 
 ```py
 class Base[T]: ...
+
 
 # error: [unresolved-reference]
 class Sub(Base[Sub]): ...
@@ -809,14 +905,17 @@ from __future__ import annotations
 from typing import Protocol
 from ty_extensions import generic_context
 
+
 class A[S, R](Protocol):
     def get(self, s: S) -> R: ...
     def set(self, s: S, r: R) -> S: ...
     def merge[R2](self, other: A[S, R2]) -> A[S, tuple[R, R2]]: ...
 
+
 class Impl[S, R](A[S, R]):
     def foo(self, s: S) -> S:
         return self.set(s, self.get(s))
+
 
 reveal_type(generic_context(A.get))  # revealed: ty_extensions.GenericContext[Self@get]
 reveal_type(generic_context(A.merge))  # revealed: ty_extensions.GenericContext[Self@merge, R2@merge]

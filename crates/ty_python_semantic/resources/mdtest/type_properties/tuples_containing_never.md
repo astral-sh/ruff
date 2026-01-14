@@ -20,6 +20,7 @@ static_assert(is_equivalent_to(Never, tuple[int, Never, str]))
 static_assert(is_equivalent_to(Never, tuple[int, tuple[str, Never]]))
 static_assert(is_equivalent_to(Never, tuple[tuple[str, Never], int]))
 
+
 def _(x: tuple[Never], y: tuple[int, Never], z: tuple[Never, int]):
     reveal_type(x)  # revealed: Never
     reveal_type(y)  # revealed: Never

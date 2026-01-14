@@ -13,6 +13,7 @@ sub-diagnostic for each element would probably be too verbose for it to be worth
 def f(a, b, c=42): ...
 def g(a, b): ...
 
+
 class Foo:
     def method(self, a, b): ...
 ```
@@ -24,8 +25,10 @@ from module import f, g, Foo
 
 f(a=1, b=2, c=3, d=42)  # error: [unknown-argument]
 
+
 def coinflip() -> bool:
     return True
+
 
 h = f if coinflip() else g
 

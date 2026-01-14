@@ -12,6 +12,7 @@ class A:
     def __init__(self):
         self.z = None
 
+
 a = A()
 a.x = 0
 a.y = 0
@@ -21,6 +22,7 @@ reveal_type(a.x)  # revealed: Literal[0]
 reveal_type(a.y)  # revealed: Literal[0]
 reveal_type(a.z)  # revealed: Literal[0]
 
+
 # Make sure that we infer the narrowed type for eager
 # scopes (class, comprehension) and the non-narrowed
 # public type for lazy scopes (function)
@@ -29,14 +31,17 @@ class _:
     reveal_type(a.y)  # revealed: Literal[0]
     reveal_type(a.z)  # revealed: Literal[0]
 
+
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(a.y) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(a.z) for _ in range(1)]  # revealed: Literal[0]
+
 
 def _():
     reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
+
 
 if False:
     a = A()
@@ -57,14 +62,17 @@ reveal_type(a.x)  # revealed: Literal[0]
 reveal_type(a.y)  # revealed: Literal[0]
 reveal_type(a.z)  # revealed: Literal[0]
 
+
 class _:
     a = A()
     reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
+
 def cond() -> bool:
     return True
+
 
 class _:
     if False:
@@ -79,6 +87,7 @@ class _:
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
+
 class _:
     a = A()
 
@@ -86,6 +95,7 @@ class _:
         reveal_type(a.x)  # revealed: int | None
         reveal_type(a.y)  # revealed: Unknown | None
         reveal_type(a.z)  # revealed: Unknown | None
+
 
 a = A()
 # error: [unresolved-attribute]
@@ -104,15 +114,19 @@ reveal_type(does.nt.exist)  # revealed: Unknown
 ```py
 class D: ...
 
+
 class C:
     d: D | None = None
+
 
 class B:
     c1: C | None = None
     c2: C | None = None
 
+
 class A:
     b: B | None = None
+
 
 a = A()
 a.b = B()
@@ -156,6 +170,7 @@ class C:
     def x(self, value: int) -> None:
         self._x = abs(value)
 
+
 c = C()
 c.x = -1
 # Don't infer `c.x` to be `Literal[-1]`
@@ -172,8 +187,10 @@ class Descriptor:
     def __set__(self, instance: object, value: int) -> None:
         pass
 
+
 class C:
     desc: Descriptor = Descriptor()
+
 
 c = C()
 c.desc = -1
@@ -214,6 +231,7 @@ reveal_type(b[0])  # revealed: Literal[0]
 reveal_type(dd[0])  # revealed: Literal[0]
 reveal_type(cm[0])  # revealed: Literal[0]
 
+
 class C:
     reveal_type(l[0])  # revealed: Literal[0]
     reveal_type(d[0])  # revealed: Literal[0]
@@ -221,11 +239,13 @@ class C:
     reveal_type(dd[0])  # revealed: Literal[0]
     reveal_type(cm[0])  # revealed: Literal[0]
 
+
 [reveal_type(l[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(d[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(b[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(dd[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(cm[0]) for _ in range(1)]  # revealed: Literal[0]
+
 
 def _():
     reveal_type(l[0])  # revealed: int | None
@@ -234,9 +254,11 @@ def _():
     reveal_type(dd[0])  # revealed: int
     reveal_type(cm[0])  # revealed: int
 
+
 class D(TypedDict):
     x: int
     label: str
+
 
 td = D(x=1, label="a")
 td["x"] = 0
@@ -270,6 +292,7 @@ class C:
         else:
             self.l[index] = str(value)
 
+
 c = C()
 c[0] = 0
 reveal_type(c[0])  # revealed: str
@@ -281,8 +304,10 @@ reveal_type(c[0])  # revealed: str
 class A:
     x: list[int | None] = []
 
+
 class B:
     a: A | None = None
+
 
 b = B()
 b.a = A()
@@ -290,8 +315,10 @@ b.a.x[0] = 0
 
 reveal_type(b.a.x[0])  # revealed: Literal[0]
 
+
 class C:
     reveal_type(b.a.x[0])  # revealed: Literal[0]
+
 
 def _():
     # error: [possibly-missing-attribute]
@@ -307,6 +334,7 @@ def _():
 class C:
     x: int | None
     l: list[int]
+
 
 def f(c: C, s: str):
     c.x = s  # error: [invalid-assignment]

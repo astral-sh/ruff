@@ -24,9 +24,11 @@ builtin type with the conditionally-defined type:
 def flag() -> bool:
     return True
 
+
 if flag():
     abs = 1
     chr: int = 1
+
 
 def _():
     # TODO: Should ideally be `Literal[1] | (def abs(x: SupportsAbs[_T], /) -> _T)`

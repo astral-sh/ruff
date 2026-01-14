@@ -7,6 +7,7 @@
 ```py
 class C: ...
 
+
 C = 1  # error: [invalid-assignment]
 ```
 
@@ -14,6 +15,7 @@ C = 1  # error: [invalid-assignment]
 
 ```py
 def f(): ...
+
 
 f = 1  # error: [invalid-assignment]
 ```

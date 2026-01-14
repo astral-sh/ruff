@@ -13,15 +13,18 @@ class, or metaclass is a `dataclass`-like construct.
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 def my_dataclass[T](cls: type[T]) -> type[T]:
     # modify cls
     return cls
 
+
 @my_dataclass
 class Person:
     name: str
     age: int | None = None
+
 
 Person("Alice", 20)
 Person("Bob", None)
@@ -38,17 +41,21 @@ If we want our `dataclass`-like decorator to also take parameters, that is also 
 ```py
 from typing_extensions import dataclass_transform, Callable
 
+
 @dataclass_transform()
 def versioned_class[T](*, version: int = 1):
     def decorator(cls):
         # modify cls
         return cls
+
     return decorator
+
 
 @versioned_class(version=2)
 class Person:
     name: str
     age: int | None = None
+
 
 Person("Alice", 20)
 
@@ -60,6 +67,7 @@ We properly type-check the arguments to the decorator:
 
 ```py
 from typing_extensions import dataclass_transform, Callable
+
 
 # error: [invalid-argument-type]
 @versioned_class(version="a string")
@@ -77,15 +85,18 @@ The examples from this section are straight from the Python documentation on
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 def create_model[T](cls: type[T]) -> type[T]:
     ...
     return cls
 
+
 @create_model
 class CustomerModel:
     id: int
     name: str
+
 
 CustomerModel(id=1, name="Test")
 ```
@@ -95,14 +106,18 @@ CustomerModel(id=1, name="Test")
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 class ModelMeta(type): ...
 
+
 class ModelBase(metaclass=ModelMeta): ...
+
 
 class CustomerModel(ModelBase):
     id: int
     name: str
+
 
 CustomerModel(id=1, name="Test")
 
@@ -115,12 +130,15 @@ CustomerModel()
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 class ModelBase: ...
+
 
 class CustomerModel(ModelBase):
     id: int
     name: str
+
 
 CustomerModel(id=1, name="Test")
 ```
@@ -140,51 +158,66 @@ This can be overwritten using the `order` argument to the custom decorator:
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 def normal(*, order: bool = False):
     raise NotImplementedError
+
 
 @dataclass_transform(order_default=False)
 def order_default_false(*, order: bool = False):
     raise NotImplementedError
 
+
 @dataclass_transform(order_default=True)
 def order_default_true(*, order: bool = True):
     raise NotImplementedError
+
 
 @normal
 class Normal:
     inner: int
 
+
 Normal(1) < Normal(2)  # error: [unsupported-operator]
+
 
 @normal(order=True)
 class NormalOverwritten:
     inner: int
 
+
 reveal_type(NormalOverwritten(1) < NormalOverwritten(2))  # revealed: bool
+
 
 @order_default_false
 class OrderFalse:
     inner: int
 
+
 OrderFalse(1) < OrderFalse(2)  # error: [unsupported-operator]
+
 
 @order_default_false(order=True)
 class OrderFalseOverwritten:
     inner: int
 
+
 reveal_type(OrderFalseOverwritten(1) < OrderFalseOverwritten(2))  # revealed: bool
+
 
 @order_default_true
 class OrderTrue:
     inner: int
 
+
 reveal_type(OrderTrue(1) < OrderTrue(2))  # revealed: bool
+
 
 @order_default_true(order=False)
 class OrderTrueOverwritten:
     inner: int
+
 
 # error: [unsupported-operator]
 OrderTrueOverwritten(1) < OrderTrueOverwritten(2)
@@ -196,10 +229,13 @@ This also works for metaclass-based transformers:
 @dataclass_transform(order_default=True)
 class OrderedModelMeta(type): ...
 
+
 class OrderedModel(metaclass=OrderedModelMeta): ...
+
 
 class TestWithMeta(OrderedModel):
     inner: int
+
 
 reveal_type(TestWithMeta(1) < TestWithMeta(2))  # revealed: bool
 ```
@@ -210,8 +246,10 @@ And for base-class-based transformers:
 @dataclass_transform(order_default=True)
 class OrderedModelBase: ...
 
+
 class TestWithBase(OrderedModelBase):
     inner: int
+
 
 reveal_type(TestWithBase(1) < TestWithBase(2))  # revealed: bool
 ```
@@ -224,11 +262,13 @@ When provided, sets the default value for the `kw_only` parameter of `field()`.
 from typing import dataclass_transform
 from dataclasses import field
 
+
 @dataclass_transform(kw_only_default=True)
 def create_model(*, kw_only: bool = True): ...
 @create_model()
 class A:
     name: str
+
 
 a = A(name="Harry")
 # error: [missing-argument]
@@ -244,6 +284,7 @@ class CustomerModel:
     id: int
     name: str
 
+
 c = CustomerModel(1, "Harry")
 ```
 
@@ -253,10 +294,13 @@ This also works for metaclass-based transformers:
 @dataclass_transform(kw_only_default=True)
 class ModelMeta(type): ...
 
+
 class ModelBase(metaclass=ModelMeta): ...
+
 
 class TestMeta(ModelBase):
     name: str
+
 
 reveal_type(TestMeta.__init__)  # revealed: (self: TestMeta, *, name: str) -> None
 ```
@@ -267,8 +311,10 @@ And for base-class-based transformers:
 @dataclass_transform(kw_only_default=True)
 class ModelBase: ...
 
+
 class TestBase(ModelBase):
     name: str
+
 
 reveal_type(TestBase.__init__)  # revealed: (self: TestBase, *, name: str) -> None
 ```
@@ -280,11 +326,13 @@ When provided, sets the default value for the `frozen` parameter of `field()`.
 ```py
 from typing import dataclass_transform
 
+
 @dataclass_transform(frozen_default=True)
 def create_model(*, frozen: bool = True): ...
 @create_model()
 class ImmutableModel:
     name: str
+
 
 i = ImmutableModel(name="test")
 i.name = "new"  # error: [invalid-assignment]
@@ -297,6 +345,7 @@ Again, this can be overridden by setting `frozen=False` when applying the decora
 class MutableModel:
     name: str
 
+
 m = MutableModel(name="test")
 m.name = "new"  # No error
 ```
@@ -307,10 +356,13 @@ This also works for metaclass-based transformers:
 @dataclass_transform(frozen_default=True)
 class ModelMeta(type): ...
 
+
 class ModelBase(metaclass=ModelMeta): ...
+
 
 class TestMeta(ModelBase):
     name: str
+
 
 t = TestMeta(name="test")
 t.name = "new"  # error: [invalid-assignment]
@@ -322,8 +374,10 @@ And for base-class-based transformers:
 @dataclass_transform(frozen_default=True)
 class ModelBase: ...
 
+
 class TestMeta(ModelBase):
     name: str
+
 
 t = TestMeta(name="test")
 
@@ -337,12 +391,14 @@ Combining several of these parameters also works as expected:
 ```py
 from typing import dataclass_transform
 
+
 @dataclass_transform(eq_default=True, order_default=False, kw_only_default=True, frozen_default=True)
 def create_model(*, eq: bool = True, order: bool = False, kw_only: bool = True, frozen: bool = True): ...
 @create_model(eq=False, order=True, kw_only=False, frozen=False)
 class OverridesAllParametersModel:
     name: str
     age: int
+
 
 # Positional arguments are allowed:
 model = OverridesAllParametersModel("test", 25)
@@ -365,20 +421,24 @@ from `order=False` (default) to `order=True`:
 ```py
 from typing import dataclass_transform
 
+
 @dataclass_transform(frozen_default=True)
 def default_frozen_model(*, frozen: bool = True, order: bool = False): ...
 @default_frozen_model()
 class Frozen:
     name: str
 
+
 f = Frozen(name="test")
 f.name = "new"  # error: [invalid-assignment]
 
 Frozen(name="A") < Frozen(name="B")  # error: [unsupported-operator]
 
+
 @default_frozen_model(frozen=False, order=True)
 class Mutable:
     name: str
+
 
 m = Mutable(name="test")
 m.name = "new"  # No error
@@ -390,6 +450,7 @@ reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
 
 ```py
 from typing import dataclass_transform
+
 
 @dataclass_transform(frozen_default=True)
 class DefaultFrozenMeta(type):
@@ -403,18 +464,23 @@ class DefaultFrozenMeta(type):
         order: bool = False,
     ): ...
 
+
 class DefaultFrozenModel(metaclass=DefaultFrozenMeta): ...
+
 
 class Frozen(DefaultFrozenModel):
     name: str
+
 
 f = Frozen(name="test")
 f.name = "new"  # error: [invalid-assignment]
 
 Frozen(name="A") < Frozen(name="B")  # error: [unsupported-operator]
 
+
 class Mutable(DefaultFrozenModel, frozen=False, order=True):
     name: str
+
 
 m = Mutable(name="test")
 # TODO: This should not be an error. In order to support this, we need to implement the precise `frozen` semantics of
@@ -429,6 +495,7 @@ reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
 ```py
 from typing import dataclass_transform
 
+
 @dataclass_transform(frozen_default=True)
 class DefaultFrozenModel:
     def __init_subclass__(
@@ -438,16 +505,20 @@ class DefaultFrozenModel:
         order: bool = False,
     ): ...
 
+
 class Frozen(DefaultFrozenModel):
     name: str
+
 
 f = Frozen(name="test")
 f.name = "new"  # error: [invalid-assignment]
 
 Frozen(name="A") < Frozen(name="B")  # error: [unsupported-operator]
 
+
 class Mutable(DefaultFrozenModel, frozen=False, order=True):
     name: str
+
 
 m = Mutable(name="test")
 m.name = "new"  # No error
@@ -467,19 +538,24 @@ from typing_extensions import dataclass_transform, TypeVar, Callable
 
 T = TypeVar("T", bound=type)
 
+
 @dataclass_transform()
 def fancy_model(*, slots: bool = False) -> Callable[[T], T]:
     raise NotImplementedError
+
 
 @fancy_model()
 class NoSlots:
     name: str
 
+
 NoSlots.__slots__  # error: [unresolved-attribute]
+
 
 @fancy_model(slots=True)
 class WithSlots:
     name: str
+
 
 reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
 ```
@@ -489,22 +565,28 @@ reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 class FancyMeta(type):
     def __new__(cls, name, bases, namespace, *, slots: bool = False):
         ...
         return super().__new__(cls, name, bases, namespace)
 
+
 class FancyBase(metaclass=FancyMeta): ...
+
 
 class NoSlots(FancyBase):
     name: str
 
+
 # error: [unresolved-attribute]
 NoSlots.__slots__
 
+
 class WithSlots(FancyBase, slots=True):
     name: str
+
 
 reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
 ```
@@ -514,19 +596,24 @@ reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 class FancyBase:
     def __init_subclass__(cls, *, slots: bool = False):
         ...
         super().__init_subclass__()
 
+
 class NoSlots(FancyBase):
     name: str
 
+
 NoSlots.__slots__  # error: [unresolved-attribute]
+
 
 class WithSlots(FancyBase, slots=True):
     name: str
+
 
 reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
 ```
@@ -545,17 +632,20 @@ checkers do not seem to support this either.
 ```py
 from typing_extensions import dataclass_transform, Any
 
+
 def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
 @dataclass_transform(field_specifiers=(fancy_field,))
 def fancy_model[T](cls: type[T]) -> type[T]:
     ...
     return cls
 
+
 @fancy_model
 class Person:
     id: int = fancy_field(init=False)
     internal_name: str = fancy_field(alias="name")
     age: int | None = fancy_field(kw_only=True)
+
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 
@@ -571,6 +661,7 @@ reveal_type(alice.age)  # revealed: int | None
 ```py
 from typing_extensions import dataclass_transform, Any
 
+
 def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
 @dataclass_transform(field_specifiers=(fancy_field,))
 class FancyMeta(type):
@@ -578,12 +669,15 @@ class FancyMeta(type):
         ...
         return super().__new__(cls, name, bases, namespace)
 
+
 class FancyBase(metaclass=FancyMeta): ...
+
 
 class Person(FancyBase):
     id: int = fancy_field(init=False)
     internal_name: str = fancy_field(alias="name")
     age: int | None = fancy_field(kw_only=True)
+
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 
@@ -599,6 +693,7 @@ reveal_type(alice.age)  # revealed: int | None
 ```py
 from typing_extensions import dataclass_transform, Any
 
+
 def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
 @dataclass_transform(field_specifiers=(fancy_field,))
 class FancyBase:
@@ -606,10 +701,12 @@ class FancyBase:
         ...
         super().__init_subclass__()
 
+
 class Person(FancyBase):
     id: int = fancy_field(init=False)
     internal_name: str = fancy_field(alias="name")
     age: int | None = fancy_field(kw_only=True)
+
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 
@@ -627,16 +724,19 @@ Field specifiers can have default arguments that should be respected:
 ```py
 from typing_extensions import dataclass_transform, Any
 
+
 def fancy_field(*, init: bool = False) -> Any: ...
 @dataclass_transform(field_specifiers=(fancy_field,))
 def fancy_model[T](cls: type[T]) -> type[T]:
     ...
     return cls
 
+
 @fancy_model
 class Person:
     id: int = fancy_field()
     name: str = fancy_field(init=True)
+
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str) -> None
 
@@ -655,10 +755,12 @@ correctly when passed via `**kwargs` for all three kinds of transformers.
 from typing import Any
 from typing_extensions import dataclass_transform
 
+
 def field(**kwargs: Any) -> Any: ...
 @dataclass_transform(field_specifiers=(field,))
 def create_model[T](cls: type[T]) -> type[T]:
     return cls
+
 
 @create_model
 class Person:
@@ -668,6 +770,7 @@ class Person:
     tags: list[str] = field(default_factory=list)
     email: str = field(kw_only=True)
     internal_notes: str = field(alias="notes")
+
 
 # revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
 reveal_type(Person.__init__)
@@ -682,11 +785,14 @@ Person("Bob", email="bob@example.com", notes="other notes")
 from typing import Any
 from typing_extensions import dataclass_transform
 
+
 def field(**kwargs: Any) -> Any: ...
 @dataclass_transform(field_specifiers=(field,))
 class ModelMeta(type): ...
 
+
 class ModelBase(metaclass=ModelMeta): ...
+
 
 class Person(ModelBase):
     id: int = field(init=False)
@@ -695,6 +801,7 @@ class Person(ModelBase):
     tags: list[str] = field(default_factory=list)
     email: str = field(kw_only=True)
     internal_notes: str = field(alias="notes")
+
 
 # revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
 reveal_type(Person.__init__)
@@ -709,9 +816,11 @@ Person("Bob", email="bob@example.com", notes="other notes")
 from typing import Any
 from typing_extensions import dataclass_transform
 
+
 def field(**kwargs: Any) -> Any: ...
 @dataclass_transform(field_specifiers=(field,))
 class ModelBase: ...
+
 
 class Person(ModelBase):
     id: int = field(init=False)
@@ -720,6 +829,7 @@ class Person(ModelBase):
     tags: list[str] = field(default_factory=list)
     email: str = field(kw_only=True)
     internal_notes: str = field(alias="notes")
+
 
 # revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
 reveal_type(Person.__init__)
@@ -736,10 +846,12 @@ the synthesized `__init__` method.
 ```py
 from typing_extensions import dataclass_transform, Any
 
+
 def field_with_alias(*, alias: str | None = None, kw_only: bool = False) -> Any: ...
 @dataclass_transform(field_specifiers=(field_with_alias,))
 def model[T](cls: type[T]) -> type[T]:
     return cls
+
 
 @model
 class Person:
@@ -785,6 +897,7 @@ p = Person(name="Alice", internal_age=30)
 ```py
 from typing_extensions import dataclass_transform, overload, Any
 
+
 @overload
 def fancy_field(*, init: bool = True) -> Any: ...
 @overload
@@ -795,11 +908,13 @@ def fancy_model[T](cls: type[T]) -> type[T]:
     ...
     return cls
 
+
 @fancy_model
 class Person:
     id: int = fancy_field(init=False)
     name: str = fancy_field()
     age: int | None = fancy_field(kw_only=True)
+
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
@@ -812,17 +927,20 @@ Make sure that models are only affected by the field specifiers of their own tra
 from typing_extensions import dataclass_transform, Any
 from dataclasses import field
 
+
 def outer_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
 @dataclass_transform(field_specifiers=(outer_field,))
 def outer_model[T](cls: type[T]) -> type[T]:
     # ...
     return cls
 
+
 def inner_field(*, init: bool = True, kw_only: bool = False) -> Any: ...
 @dataclass_transform(field_specifiers=(inner_field,))
 def inner_model[T](cls: type[T]) -> type[T]:
     # ...
     return cls
+
 
 @outer_model
 class Outer:
@@ -833,6 +951,7 @@ class Outer:
 
     outer_a: int = outer_field(init=False)
     outer_b: str = inner_field(init=False)
+
 
 reveal_type(Outer.__init__)  # revealed: (self: Outer, outer_b: str = ...) -> None
 reveal_type(Outer.Inner.__init__)  # revealed: (self: Inner, inner_b: str = ...) -> None
@@ -850,6 +969,7 @@ from typing_extensions import dataclass_transform, TypeVar, Callable, overload
 
 T = TypeVar("T", bound=type)
 
+
 @overload
 def versioned_class(
     cls: T,
@@ -869,13 +989,16 @@ def versioned_class(
 ) -> T | Callable[[T], T]:
     raise NotImplementedError
 
+
 @versioned_class
 class D1:
     x: str
 
+
 @versioned_class(version=2)
 class D2:
     x: str
+
 
 D1("a")
 D2("a")
@@ -891,6 +1014,7 @@ from typing_extensions import dataclass_transform, TypeVar, Callable, overload
 
 T = TypeVar("T", bound=type)
 
+
 @overload
 @dataclass_transform()
 def versioned_class(
@@ -910,13 +1034,16 @@ def versioned_class(
 ) -> T | Callable[[T], T]:
     raise NotImplementedError
 
+
 @versioned_class
 class D1:
     x: str
 
+
 @versioned_class(version=2)
 class D2:
     x: str
+
 
 D1("a")
 D2("a")
@@ -937,16 +1064,20 @@ sure that we recognize all fields in a hierarchy like this:
 from dataclasses import dataclass
 from typing import dataclass_transform
 
+
 @dataclass_transform()
 class ModelMeta(type):
     pass
 
+
 class Sensor(metaclass=ModelMeta):
     key: int
+
 
 @dataclass(frozen=True, kw_only=True)
 class TemperatureSensor(Sensor):
     name: str
+
 
 t = TemperatureSensor(key=1, name="Temperature Sensor")
 reveal_type(t.key)  # revealed: int
@@ -965,14 +1096,17 @@ enables use of `dataclasses.fields`, `dataclasses.asdict`, `dataclasses.replace`
 from dataclasses import fields, asdict, replace, Field
 from typing import dataclass_transform, Any
 
+
 @dataclass_transform()
 def create_model[T](cls: type[T]) -> type[T]:
     return cls
+
 
 @create_model
 class Person:
     name: str
     age: int
+
 
 p = Person("Alice", 30)
 
@@ -990,14 +1124,18 @@ reveal_type(replace(p, name="Bob"))  # revealed: Person
 from dataclasses import fields, asdict, replace, Field
 from typing import dataclass_transform, Any
 
+
 @dataclass_transform()
 class ModelMeta(type): ...
 
+
 class ModelBase(metaclass=ModelMeta): ...
+
 
 class Person(ModelBase):
     name: str
     age: int
+
 
 p = Person("Alice", 30)
 
@@ -1015,12 +1153,15 @@ reveal_type(replace(p, name="Bob"))  # revealed: Person
 from dataclasses import fields, asdict, replace, Field
 from typing import dataclass_transform, Any
 
+
 @dataclass_transform()
 class ModelBase: ...
+
 
 class Person(ModelBase):
     name: str
     age: int
+
 
 p = Person("Alice", 30)
 
@@ -1042,12 +1183,15 @@ When a function decorated with `@dataclass_transform()` is called directly with 
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 def my_dataclass[T](cls: type[T]) -> type[T]:
     return cls
 
+
 class A:
     x: int
+
 
 B = my_dataclass(A)
 
@@ -1061,12 +1205,15 @@ B(1)
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 def my_dataclass[T](cls: type[T], *, order: bool = False) -> type[T]:
     return cls
 
+
 class A:
     x: int
+
 
 B = my_dataclass(A, order=True)
 
@@ -1083,6 +1230,7 @@ decorator), calling it with a class should return the class type.
 ```py
 from typing_extensions import dataclass_transform, Callable, overload
 
+
 @overload
 @dataclass_transform()
 def my_dataclass[T](cls: type[T]) -> type[T]: ...
@@ -1091,8 +1239,10 @@ def my_dataclass[T]() -> Callable[[type[T]], type[T]]: ...
 def my_dataclass[T](cls: type[T] | None = None) -> type[T] | Callable[[type[T]], type[T]]:
     raise NotImplementedError
 
+
 class A:
     x: int
+
 
 B = my_dataclass(A)
 
@@ -1109,12 +1259,15 @@ specialization should be preserved.
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 def my_dataclass[T](cls: type[T]) -> type[T]:
     return cls
 
+
 class A[T]:
     x: T
+
 
 B = my_dataclass(A[int])
 
@@ -1132,21 +1285,27 @@ class, not to the parameter class.
 ```py
 from typing_extensions import dataclass_transform
 
+
 @dataclass_transform()
 def hydrated_dataclass[T](target: type[T], *, frozen: bool = False):
     def decorator[U](cls: type[U]) -> type[U]:
         return cls
+
     return decorator
+
 
 class Target:
     pass
 
+
 decorator = hydrated_dataclass(Target)
 reveal_type(decorator)  # revealed: <decorator produced by dataclass-like function>
+
 
 @hydrated_dataclass(Target)
 class Model:
     x: int
+
 
 # Model should be a dataclass-like class with x as a field
 Model(x=1)

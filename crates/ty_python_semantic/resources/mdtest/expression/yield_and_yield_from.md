@@ -8,6 +8,7 @@ The type of a `yield` expression is the "send" type of the generator function. T
 ```py
 from typing import Generator
 
+
 def inner_generator() -> Generator[int, bytes, str]:
     yield 1
     yield 2
@@ -17,6 +18,7 @@ def inner_generator() -> Generator[int, bytes, str]:
     reveal_type(x)  # revealed: @Todo(yield expressions)
 
     return "done"
+
 
 def outer_generator():
     result = yield from inner_generator()
@@ -33,6 +35,7 @@ from typing import Generator, TypeVar, Generic
 
 T = TypeVar("T")
 
+
 class OnceIterator(Generic[T]):
     def __init__(self, value: T):
         self.value = value
@@ -45,6 +48,7 @@ class OnceIterator(Generic[T]):
         self.returned = True
         return self.value
 
+
 class Once(Generic[T]):
     def __init__(self, value: T):
         self.value = value
@@ -52,8 +56,10 @@ class Once(Generic[T]):
     def __iter__(self) -> OnceIterator[T]:
         return OnceIterator(self.value)
 
+
 for x in Once("a"):
     reveal_type(x)  # revealed: str
+
 
 def generator() -> Generator:
     result = yield from Once("a")
@@ -77,6 +83,7 @@ def generator() -> Generator:
 ```py
 from types import GeneratorType
 
+
 def inner_generator() -> GeneratorType[int, bytes, str]:
     yield 1
     yield 2
@@ -86,6 +93,7 @@ def inner_generator() -> GeneratorType[int, bytes, str]:
     reveal_type(x)  # revealed: @Todo(yield expressions)
 
     return "done"
+
 
 def outer_generator():
     result = yield from inner_generator()
@@ -99,6 +107,7 @@ def outer_generator():
 ```py
 from typing import Generator
 
+
 def generator() -> Generator:
     yield from 42  # error: [not-iterable] "Object of type `Literal[42]` is not iterable"
 ```
@@ -107,6 +116,7 @@ def generator() -> Generator:
 
 ```py
 from typing import Generator
+
 
 # TODO: This should be an error. Claims to yield `int`, but yields `str`.
 def invalid_generator() -> Generator[int, None, None]:
@@ -118,9 +128,11 @@ def invalid_generator() -> Generator[int, None, None]:
 ```py
 from typing import Generator
 
+
 # TODO: should emit an error (does not return `str`)
 def invalid_generator1() -> Generator[int, None, str]:
     yield 1
+
 
 # TODO: should emit an error (does not return `int`)
 def invalid_generator2() -> Generator[int, None, None]:

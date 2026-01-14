@@ -5,15 +5,24 @@
 ```py
 class A: ...
 
+
 class B:
     __slots__ = ()
+
 
 class C:
     __slots__ = ("lorem", "ipsum")
 
+
 class AB(A, B): ...  # fine
+
+
 class AC(A, C): ...  # fine
+
+
 class BC(B, C): ...  # fine
+
+
 class ABC(A, B, C): ...  # fine
 ```
 
@@ -25,8 +34,10 @@ class ABC(A, B, C): ...  # fine
 class A:
     __slots__ = ("a", "b")
 
+
 class B:
     __slots__ = ("c", "d")
+
 
 class C(  # error: [instance-layout-conflict]
     A,
@@ -40,8 +51,10 @@ class C(  # error: [instance-layout-conflict]
 class A:
     __slots__ = ("a", "b")
 
+
 class B:
     __slots__ = ("a", "b")
+
 
 class C(  # error: [instance-layout-conflict]
     A,
@@ -55,8 +68,10 @@ class C(  # error: [instance-layout-conflict]
 class A:
     __slots__ = "abc"
 
+
 class B:
     __slots__ = ("abc",)
+
 
 class AB(  # error: [instance-layout-conflict]
     A,
@@ -69,21 +84,27 @@ class AB(  # error: [instance-layout-conflict]
 ```py
 from dataclasses import dataclass
 
+
 @dataclass(slots=True)
 class F: ...
+
 
 @dataclass(slots=True)
 class G: ...
 
+
 class H(F, G): ...  # fine because both classes have empty `__slots__`
+
 
 @dataclass(slots=True)
 class I:
     x: int
 
+
 @dataclass(slots=True)
 class J:
     y: int
+
 
 class K(I, J): ...  # error: [instance-layout-conflict]
 ```
@@ -96,14 +117,18 @@ TODO: Emit diagnostics
 class NonString1:
     __slots__ = 42
 
+
 class NonString2:
     __slots__ = b"ar"
+
 
 class NonIdentifier1:
     __slots__ = "42"
 
+
 class NonIdentifier2:
     __slots__ = ("lorem", "42")
+
 
 class NonIdentifier3:
     __slots__ = (e for e in ("lorem", "42"))
@@ -115,12 +140,17 @@ class NonIdentifier3:
 class A:
     __slots__ = ("a", "b")
 
+
 class B(A): ...
+
 
 class C:
     __slots__ = ("c", "d")
 
+
 class D(C): ...
+
+
 class E(  # error: [instance-layout-conflict]
     B,
     D,
@@ -133,9 +163,16 @@ class E(  # error: [instance-layout-conflict]
 class A:
     __slots__ = ("a", "b")
 
+
 class B(A): ...
+
+
 class C(A): ...
+
+
 class D(B, A): ...  # fine
+
+
 class E(B, C, A): ...  # fine
 ```
 
@@ -146,10 +183,13 @@ class A:
     __slots__ = ()
     __slots__ += ("a", "b")
 
+
 reveal_type(A.__slots__)  # revealed: tuple[Literal["a", "b"], ...]
+
 
 class B:
     __slots__ = ("c", "d")
+
 
 # TODO: ideally this would trigger `[instance-layout-conflict]`
 # (but it's also not high-priority)
@@ -165,8 +205,10 @@ We do not emit false positives on classes with empty `__slots__` definitions, ev
 class Foo:
     __slots__: tuple[str, ...] = ()
 
+
 class Bar:
     __slots__: tuple[str, ...] = ()
+
 
 class Baz(Foo, Bar): ...  # fine
 ```
@@ -238,8 +280,10 @@ other:
 class A:
     __slots__ = ("a",)
 
+
 class B(A):
     __slots__ = ("b",)
+
 
 class C(B, A): ...  # fine
 ```
@@ -250,11 +294,17 @@ The same principle, but a more complex example:
 class AA:
     __slots__ = ("a",)
 
+
 class BB(AA):
     __slots__ = ("b",)
 
+
 class CC(BB): ...
+
+
 class DD(AA): ...
+
+
 class FF(CC, DD): ...  # fine
 ```
 
@@ -298,8 +348,10 @@ def _(flag: bool):
 class A:
     __slots__ = ["a", "b"]  # This is treated as "dynamic"
 
+
 class B:
     __slots__ = ("c", "d")
+
 
 # False negative: [incompatible-slots]
 class C(A, B): ...
@@ -320,6 +372,7 @@ class A:
 
     # Modifying `__slots__` from within the class body is fine:
     __slots__ = ("a", "b")
+
 
 # No `Unknown` here:
 reveal_type(A.__slots__)  # revealed: tuple[Literal["a"], Literal["b"]]

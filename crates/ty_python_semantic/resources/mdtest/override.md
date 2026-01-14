@@ -228,23 +228,30 @@ class Foo:
 ```py
 from typing_extensions import override
 
+
 def coinflip() -> bool:
     return False
 
+
 class Parent:
     if coinflip():
+
         def method1(self) -> None: ...
         def method2(self) -> None: ...
 
     if coinflip():
+
         def method3(self) -> None: ...
         def method4(self) -> None: ...
+
     else:
+
         def method3(self) -> None: ...
         def method4(self) -> None: ...
 
     def method5(self) -> None: ...
     def method6(self) -> None: ...
+
 
 class Child(Parent):
     @override
@@ -253,35 +260,47 @@ class Child(Parent):
     def method2(self) -> None: ...
 
     if coinflip():
+
         @override
         def method3(self) -> None: ...
 
     if coinflip():
+
         @override
         def method4(self) -> None: ...
+
     else:
+
         @override
         def method4(self) -> None: ...
 
     if coinflip():
+
         @override
         def method5(self) -> None: ...
 
     if coinflip():
+
         @override
         def method6(self) -> None: ...
+
     else:
+
         @override
         def method6(self) -> None: ...
 
     if coinflip():
+
         @override
         def method7(self) -> None: ...  # error: [invalid-explicit-override]
 
     if coinflip():
+
         @override
         def method8(self) -> None: ...  # error: [invalid-explicit-override]
+
     else:
+
         @override
         def method8(self) -> None: ...
 ```
@@ -296,13 +315,18 @@ necessarily be the first definition of the symbol overall:
 ```py
 from typing_extensions import override, overload
 
+
 def coinflip() -> bool:
     return True
 
+
 class Foo:
     if coinflip():
+
         def method(self, x): ...
+
     elif coinflip():
+
         @overload
         def method(self, x: str) -> str: ...
         @overload
@@ -310,7 +334,9 @@ class Foo:
         @override
         def method(self, x: str | int) -> str | int:  # error: [invalid-explicit-override]
             return x
+
     elif coinflip():
+
         @override
         def method(self, x): ...
 ```
@@ -361,14 +387,19 @@ python-version = "3.10"
 import sys
 from typing_extensions import override, overload
 
+
 class Parent:
     if sys.version_info >= (3, 10):
+
         def foo(self) -> None: ...
         def foooo(self) -> None: ...
+
     else:
+
         def bar(self) -> None: ...
         def baz(self) -> None: ...
         def spam(self) -> None: ...
+
 
 class Child(Parent):
     @override
@@ -380,10 +411,12 @@ class Child(Parent):
     def bar(self) -> None: ...  # error: [invalid-explicit-override]
 
     if sys.version_info >= (3, 10):
+
         @override
         def foooo(self) -> None: ...
         @override
         def baz(self) -> None: ...  # error: [invalid-explicit-override]
+
     else:
         # This doesn't override any reachable definitions,
         # but the subclass definition also isn't a reachable definition
@@ -403,6 +436,7 @@ though we also emit `invalid-overload` on these methods.
 
 ```py
 from typing_extensions import override, overload
+
 
 class Spam:
     @overload
@@ -508,12 +542,17 @@ class Foo:
 from typing_extensions import Any, override
 from does_not_exist import SomethingUnknown  # error: [unresolved-import]
 
+
 class Parent1(Any): ...
+
+
 class Parent2(SomethingUnknown): ...
+
 
 class Child1(Parent1):
     @override
     def bar(self): ...  # fine
+
 
 class Child2(Parent2):
     @override

@@ -15,6 +15,7 @@ reveal_type(open("", "rb"))  # revealed: BufferedReader[_BufferedReaderStream]
 with open("foo.pickle", "rb") as f:
     x = pickle.load(f)  # fine
 
+
 def _(mode: str):
     reveal_type(open("", mode))  # revealed: IO[Any]
 ```

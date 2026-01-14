@@ -239,9 +239,11 @@ python-version = "3.12"
 ```py
 from typing import Any
 
+
 class X[T]:
     def __init__(self, value: T):
         self.value = value
+
 
 x1: X[int] = X(1)
 reveal_type(x1)  # revealed: X[int]
@@ -252,12 +254,15 @@ reveal_type(x2)  # revealed: X[int | None]
 x3: X[int | None] | None = X(1)
 reveal_type(x3)  # revealed: X[int | None]
 
+
 def _[T](x1: X[T]):
     x2: X[T | int] = X(x1.value)
     reveal_type(x2)  # revealed: X[T@_ | int]
 
+
 x4: X[Any] = X(1)
 reveal_type(x4)  # revealed: X[Any]
+
 
 def _(flag: bool):
     x5: X[int | None] = X(1) if flag else X(2)
@@ -267,9 +272,11 @@ def _(flag: bool):
 ```py
 from dataclasses import dataclass
 
+
 @dataclass
 class Y[T]:
     value: T
+
 
 y1 = Y(value=1)
 reveal_type(y1)  # revealed: Y[int]
@@ -284,6 +291,7 @@ class Z[T]:
 
     def __new__(cls, value: T):
         return super().__new__(cls)
+
 
 z1 = Z(1)
 reveal_type(z1)  # revealed: Z[int]
@@ -352,7 +360,9 @@ from __future__ import annotations
 
 x: Foo
 
+
 class Foo: ...
+
 
 x = Foo()
 reveal_type(x)  # revealed: Foo
@@ -379,7 +389,9 @@ python-version = "3.14"
 ```py
 x: Foo
 
+
 class Foo: ...
+
 
 x = Foo()
 reveal_type(x)  # revealed: Foo
@@ -404,8 +416,10 @@ python-version = "3.12"
 ```py
 from typing import Literal, Sequence
 
+
 def f[T](x: T) -> list[T]:
     return [x]
+
 
 x1 = f("a")
 reveal_type(x1)  # revealed: list[str]
@@ -428,8 +442,10 @@ x6: list[int] = f("a")
 # error: [invalid-assignment] "Object of type `list[str]` is not assignable to `tuple[int]`"
 x7: tuple[int] = f("a")
 
+
 def f2[T: int](x: T) -> T:
     return x
+
 
 x8: int = f2(True)
 reveal_type(x8)  # revealed: Literal[True]
@@ -453,11 +469,14 @@ A function's arguments are also inferred using the type context:
 ```py
 from typing import TypedDict
 
+
 class TD(TypedDict):
     x: int
 
+
 def f[T](x: list[T]) -> T:
     return x[0]
+
 
 a: TD = f([{"x": 0}, {"x": 1}])
 reveal_type(a)  # revealed: TD
@@ -483,11 +502,14 @@ But not in a way that leads to assignability errors:
 ```py
 from typing import TypedDict, Any
 
+
 class TD(TypedDict, total=False):
     x: str
 
+
 class TD2(TypedDict):
     x: str
+
 
 def f(self, dt: dict[str, Any], key: str):
     x1: TD = dt.get(key, {})
@@ -525,14 +547,18 @@ python-version = "3.14"
 ```py
 from typing import Any
 
+
 def f[T](x: T) -> list[T]:
     return [x]
+
 
 def f2[T](x: T) -> list[T] | None:
     return [x]
 
+
 def f3[T](x: T) -> list[T] | dict[T, T]:
     return [x]
+
 
 a = f(1)
 reveal_type(a)  # revealed: list[int]
@@ -564,28 +590,36 @@ We only prefer the declared type if it is in non-covariant position.
 class Bivariant[T]:
     pass
 
+
 class Covariant[T]:
     def pop(self) -> T:
         raise NotImplementedError
+
 
 class Contravariant[T]:
     def push(self, value: T) -> None:
         pass
 
+
 class Invariant[T]:
     x: T
+
 
 def bivariant[T](x: T) -> Bivariant[T]:
     return Bivariant()
 
+
 def covariant[T](x: T) -> Covariant[T]:
     return Covariant()
+
 
 def contravariant[T](x: T) -> Contravariant[T]:
     return Contravariant()
 
+
 def invariant[T](x: T) -> Invariant[T]:
     return Invariant()
+
 
 x1 = bivariant(1)
 x2 = covariant(1)
@@ -613,6 +647,7 @@ class X[T]:
     def __init__(self: X[None]): ...
     def pop(self) -> T:
         raise NotImplementedError
+
 
 x1: X[int | None] = X()
 reveal_type(x1)  # revealed: X[None]
@@ -650,15 +685,19 @@ reveal_type(x5)  # revealed: list[Iterable[Any]]
 x6: Iterable[list[Any]] = [[1, 2, 3]]
 reveal_type(x6)  # revealed: list[list[Any]]
 
+
 class X[T]:
     value: T
 
     def __init__(self, value: T): ...
 
+
 class A[T](X[T]): ...
+
 
 def a[T](value: T) -> A[T]:
     return A(value)
+
 
 x7: A[object] = A(1)
 reveal_type(x7)  # revealed: A[object]
@@ -672,8 +711,10 @@ reveal_type(x9)  # revealed: A[object]
 x10: X[object] | None = a(1)
 reveal_type(x10)  # revealed: A[object]
 
+
 def f[T](x: T) -> list[list[T]]:
     return [[x]]
+
 
 x11: Sequence[Sequence[Any]] = f(1)
 reveal_type(x11)  # revealed: list[list[int]]
@@ -695,27 +736,34 @@ python-version = "3.12"
 ```py
 from typing import reveal_type, TypedDict
 
+
 def identity[T](x: T) -> T:
     return x
+
 
 def _(narrow: dict[str, str], target: list[str] | dict[str, str] | None):
     target = identity(narrow)
     reveal_type(target)  # revealed: dict[str, str]
 
+
 def _(narrow: list[str], target: list[str] | dict[str, str] | None):
     target = identity(narrow)
     reveal_type(target)  # revealed: list[str]
+
 
 def _(narrow: list[str] | dict[str, str], target: list[str] | dict[str, str] | None):
     target = identity(narrow)
     reveal_type(target)  # revealed: list[str] | dict[str, str]
 
+
 class TD(TypedDict):
     x: int
+
 
 def _(target: list[TD] | dict[str, TD] | None):
     target = identity([{"x": 1}])
     reveal_type(target)  # revealed: list[TD]
+
 
 def _(target: list[TD] | dict[str, TD] | None):
     target = identity({"x": {"x": 1}})
@@ -733,8 +781,10 @@ python-version = "3.12"
 def identity[T](x: T) -> T:
     return x
 
+
 def lst[T](x: T) -> list[T]:
     return [x]
+
 
 def _(i: int):
     a: int | None = i
@@ -765,8 +815,10 @@ def _(i: int):
     reveal_type(b)  # revealed: list[Unknown]
     reveal_type(c)  # revealed: list[Unknown]
 
+
 def f[T](x: list[T]) -> T:
     return x[0]
+
 
 def _(a: int, b: str, c: int | str):
     x1: int = f(lst(a))

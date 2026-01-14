@@ -11,8 +11,12 @@ python-version = "3.11"
 from types import FunctionType
 from ty_extensions import Not, AlwaysTruthy, is_subtype_of, static_assert, is_disjoint_from
 
+
 class Meta(type): ...
+
+
 class F(metaclass=Meta): ...
+
 
 static_assert(not is_subtype_of(tuple[FunctionType, type[F]], Not[tuple[*tuple[AlwaysTruthy, ...], Meta]]))
 static_assert(not is_subtype_of(Not[tuple[*tuple[AlwaysTruthy, ...], Meta]], tuple[FunctionType, type[F]]))

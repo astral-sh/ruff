@@ -12,6 +12,7 @@ simplify to just the original callable type.
 ```py
 from typing import Any, Callable
 
+
 def f(x: Callable[..., Any] | None):
     if callable(x):
         # The intersection simplifies because `(...) -> Any` is a subtype of
@@ -28,12 +29,14 @@ def f(x: Callable[..., Any] | None):
 ```py
 from typing import Any, Callable
 
+
 def g(x: Callable[[int], str] | None):
     if callable(x):
         # All callables are subtypes of `Top[(...) -> object]`, so the intersection simplifies.
         reveal_type(x)  # revealed: (int, /) -> str
     else:
         reveal_type(x)  # revealed: None
+
 
 def h(x: Callable[..., int] | None):
     if callable(x):
@@ -62,6 +65,7 @@ be valid.
 ```py
 import typing as t
 
+
 def call_with_args(y: object, a: int, b: str) -> object:
     if isinstance(y, t.Callable):
         # error: [call-top-callable]
@@ -77,8 +81,10 @@ narrowed.
 ```py
 from typing import Any
 
+
 class Foo:
     func: Any | None
+
 
 def f(foo: Foo):
     first = getattr(foo, "func", None)
@@ -107,8 +113,10 @@ static_assert(is_assignable_to(Top[Callable[..., bool]], Callable[..., int]))
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+
 def wrap(f: F) -> F:
     return f
+
 
 def f(x: object):
     if callable(x):

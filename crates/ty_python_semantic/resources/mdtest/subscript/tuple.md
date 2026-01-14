@@ -29,14 +29,26 @@ Precise types for index operations are also inferred for tuple subclasses:
 
 ```py
 class I0: ...
+
+
 class I1: ...
+
+
 class I2: ...
+
+
 class I3: ...
+
+
 class I5: ...
+
+
 class HeterogeneousSubclass0(tuple[()]): ...
+
 
 # revealed: Overload[(self, index: SupportsIndex, /) -> Never, (self, index: slice[Any, Any, Any], /) -> tuple[()]]
 reveal_type(HeterogeneousSubclass0.__getitem__)
+
 
 def f0(h0: HeterogeneousSubclass0, i: int):
     # error: [index-out-of-bounds]
@@ -48,10 +60,13 @@ def f0(h0: HeterogeneousSubclass0, i: int):
 
     reveal_type(h0[i])  # revealed: Never
 
+
 class HeterogeneousSubclass1(tuple[I0]): ...
+
 
 # revealed: Overload[(self, index: SupportsIndex, /) -> I0, (self, index: slice[Any, Any, Any], /) -> tuple[I0, ...]]
 reveal_type(HeterogeneousSubclass1.__getitem__)
+
 
 def f0(h1: HeterogeneousSubclass1, i: int):
     reveal_type(h1[0])  # revealed: I0
@@ -60,12 +75,15 @@ def f0(h1: HeterogeneousSubclass1, i: int):
     reveal_type(h1[-1])  # revealed: I0
     reveal_type(h1[i])  # revealed: I0
 
+
 # Element at index 2 is deliberately the same as the element at index 1,
 # to illustrate that the `__getitem__` overloads for these two indices are combined
 class HeterogeneousSubclass4(tuple[I0, I1, I0, I3]): ...
 
+
 # revealed: Overload[(self, index: Literal[-4, -2, 0, 2], /) -> I0, (self, index: Literal[-3, 1], /) -> I1, (self, index: Literal[-1, 3], /) -> I3, (self, index: SupportsIndex, /) -> I0 | I1 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I3, ...]]
 reveal_type(HeterogeneousSubclass4.__getitem__)
+
 
 def f(h4: HeterogeneousSubclass4, i: int):
     reveal_type(h4[0])  # revealed: I0
@@ -78,10 +96,13 @@ def f(h4: HeterogeneousSubclass4, i: int):
     reveal_type(h4[-4])  # revealed: I0
     reveal_type(h4[i])  # revealed: I0 | I1 | I3
 
+
 class MixedSubclass(tuple[I0, *tuple[I1, ...], I2, I3, I2, I5]): ...
+
 
 # revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[-5], /) -> I1 | I0, (self, index: Literal[-1], /) -> I5, (self, index: Literal[1], /) -> I1 | I2, (self, index: Literal[-4, -2], /) -> I2, (self, index: Literal[2, 3], /) -> I1 | I2 | I3, (self, index: Literal[-3], /) -> I3, (self, index: Literal[4], /) -> I1 | I2 | I3 | I5, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3 | I5, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3 | I5, ...]]
 reveal_type(MixedSubclass.__getitem__)
+
 
 def g(m: MixedSubclass, i: int):
     reveal_type(m[0])  # revealed: I0
@@ -102,10 +123,13 @@ def g(m: MixedSubclass, i: int):
 
     reveal_type(m[i])  # revealed: I0 | I1 | I2 | I3 | I5
 
+
 class MixedSubclass2(tuple[I0, I1, *tuple[I2, ...], I3]): ...
+
 
 # revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[-2], /) -> I2 | I1, (self, index: Literal[1], /) -> I1, (self, index: Literal[-3], /) -> I2 | I1 | I0, (self, index: Literal[-1], /) -> I3, (self, index: Literal[2], /) -> I2 | I3, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3, ...]]
 reveal_type(MixedSubclass2.__getitem__)
+
 
 def g(m: MixedSubclass2, i: int):
     reveal_type(m[0])  # revealed: I0
@@ -160,12 +184,16 @@ tuples are naturally understood as being subtypes of protocols that have precise
 from typing import Protocol, Literal
 from ty_extensions import static_assert, is_subtype_of
 
+
 class IntFromZeroSubscript(Protocol):
     def __getitem__(self, index: Literal[0], /) -> int: ...
 
+
 static_assert(is_subtype_of(tuple[int, str], IntFromZeroSubscript))
 
+
 class TupleSubclass(tuple[int, str]): ...
+
 
 static_assert(is_subtype_of(TupleSubclass, IntFromZeroSubscript))
 ```
@@ -221,11 +249,21 @@ def _(m: int, n: int):
     tuple_slice = t[m:n]
     reveal_type(tuple_slice)  # revealed: tuple[Literal[1, "a", b"b"] | None, ...]
 
+
 class I0: ...
+
+
 class I1: ...
+
+
 class I2: ...
+
+
 class I3: ...
+
+
 class HeterogeneousTupleSubclass(tuple[I0, I1, I2, I3]): ...
+
 
 def __(t: HeterogeneousTupleSubclass, m: int, n: int):
     reveal_type(t[0:0])  # revealed: tuple[()]
@@ -284,6 +322,7 @@ python-version = "3.11"
 ```py
 from typing import Literal
 
+
 def homogeneous(t: tuple[str, ...]) -> None:
     reveal_type(t[0])  # revealed: str
     reveal_type(t[1])  # revealed: str
@@ -294,6 +333,7 @@ def homogeneous(t: tuple[str, ...]) -> None:
     reveal_type(t[-2])  # revealed: str
     reveal_type(t[-3])  # revealed: str
     reveal_type(t[-4])  # revealed: str
+
 
 def mixed(t: tuple[Literal[1], Literal[2], Literal[3], *tuple[str, ...], Literal[8], Literal[9], Literal[10]]) -> None:
     reveal_type(t[0])  # revealed: Literal[1]
@@ -323,6 +363,7 @@ def _(a: tuple, b: tuple[int], c: tuple[int, str], d: tuple[int, ...]) -> None:
     reveal_type(c)  # revealed: tuple[int, str]
     reveal_type(d)  # revealed: tuple[int, ...]
 
+
 reveal_type(tuple)  # revealed: <class 'tuple'>
 reveal_type(tuple[int])  # revealed: <class 'tuple[int]'>
 reveal_type(tuple[int, str])  # revealed: <class 'tuple[int, str]'>
@@ -331,6 +372,7 @@ reveal_type(tuple[int, ...])  # revealed: <class 'tuple[int, ...]'>
 
 ```py
 from typing import Any
+
 
 def _(a: type[tuple], b: type[tuple[int]], c: type[tuple[int, ...]], d: type[tuple[Any, ...]]) -> None:
     reveal_type(a)  # revealed: type[tuple[Unknown, ...]]
@@ -349,12 +391,16 @@ python-version = "3.9"
 ```py
 from ty_extensions import reveal_mro
 
+
 class A(tuple[int, str]): ...
+
 
 # revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 
+
 class C(tuple): ...
+
 
 # revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(C)
@@ -369,7 +415,9 @@ reveal_mro(C)
 ```py
 from typing import Any, Tuple
 
+
 class A: ...
+
 
 def _(c: Tuple, d: Tuple[int, A], e: Tuple[Any, ...]):
     reveal_type(c)  # revealed: tuple[Unknown, ...]
@@ -391,12 +439,16 @@ python-version = "3.9"
 from typing import Tuple
 from ty_extensions import reveal_mro
 
+
 class A(Tuple[int, str]): ...
+
 
 # revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 
+
 class C(Tuple): ...
+
 
 # revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(C)
@@ -407,6 +459,7 @@ reveal_mro(C)
 ```py
 def test(val: tuple[str] | tuple[int]):
     reveal_type(val[0])  # revealed: str | int
+
 
 def test2(val: tuple[str, None] | list[int | float]):
     reveal_type(val[0])  # revealed: str | int | float
@@ -425,8 +478,12 @@ def test3(val: tuple[str] | tuple[int] | int):
 ```py
 from ty_extensions import Intersection
 
+
 class Foo: ...
+
+
 class Bar: ...
+
 
 def test4(val: Intersection[tuple[Foo], tuple[Bar]]):
     # TODO: should be `Foo & Bar`

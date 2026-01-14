@@ -7,7 +7,9 @@ accomplished using an intersection with a synthesized protocol:
 from typing import final
 from typing_extensions import LiteralString
 
+
 class NonFinalClass: ...
+
 
 def _(obj: NonFinalClass):
     if hasattr(obj, "spam"):
@@ -32,6 +34,7 @@ a `spam` attribute, so the type is narrowed to `Never`:
 @final
 class FinalClass: ...
 
+
 def _(obj: FinalClass):
     if hasattr(obj, "spam"):
         reveal_type(obj)  # revealed: Never
@@ -51,6 +54,7 @@ change the type. `<Protocol with members 'spam'>` is a supertype of `WithSpam`, 
 class WithSpam:
     spam: int = 42
 
+
 def _(obj: WithSpam):
     if hasattr(obj, "spam"):
         reveal_type(obj)  # revealed: WithSpam
@@ -66,9 +70,11 @@ the attribute exists. Here, no `possibly-missing-attribute` error is emitted in 
 def returns_bool() -> bool:
     return False
 
+
 class MaybeWithSpam:
     if returns_bool():
         spam: int = 42
+
 
 def _(obj: MaybeWithSpam):
     # error: [possibly-missing-attribute]

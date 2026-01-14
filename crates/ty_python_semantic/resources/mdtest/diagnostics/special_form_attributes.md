@@ -7,6 +7,7 @@ from typing_extensions import Any, Final, LiteralString, Self
 
 X = Any
 
+
 class Foo:
     X: Final = LiteralString
     a: int
@@ -15,6 +16,7 @@ class Foo:
     class Bar:
         def __init__(self):
             self.y: Final = LiteralString
+
 
 X.foo  # error: [unresolved-attribute]
 X.aaaaooooooo  # error: [unresolved-attribute]

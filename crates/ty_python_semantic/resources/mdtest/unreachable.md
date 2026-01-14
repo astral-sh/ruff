@@ -23,11 +23,13 @@ def f1():
     # TODO: we should mark this as unreachable
     print("unreachable")
 
+
 def f2():
     raise Exception()
 
     # TODO: we should mark this as unreachable
     print("unreachable")
+
 
 def f3():
     while True:
@@ -35,6 +37,7 @@ def f3():
 
         # TODO: we should mark this as unreachable
         print("unreachable")
+
 
 def f4():
     for _ in range(10):
@@ -66,12 +69,14 @@ def f1():
         # TODO: we should mark this as unreachable
         print("unreachable")
 
+
 def f2():
     if True:
         return
 
     # TODO: we should mark this as unreachable
     print("unreachable")
+
 
 def f3():
     if False:
@@ -93,8 +98,10 @@ after the call to that function unreachable.
 ```py
 from typing_extensions import NoReturn
 
+
 def always_raises() -> NoReturn:
     raise Exception()
+
 
 def f():
     always_raises()
@@ -251,6 +258,7 @@ def outer():
 
     def inner():
         reveal_type(x)  # revealed: Literal[1]
+
     while True:
         pass
 ```
@@ -263,8 +271,10 @@ from typing import Literal
 FEATURE_X_ACTIVATED: Literal[False] = False
 
 if FEATURE_X_ACTIVATED:
+
     def feature_x():
         print("Performing 'X'")
+
 
 def f():
     if FEATURE_X_ACTIVATED:
@@ -335,6 +345,7 @@ The same works for ternary expressions:
 
 ```py
 class ExceptionGroupPolyfill: ...
+
 
 MyExceptionGroup1 = ExceptionGroup if sys.version_info >= (3, 11) else ExceptionGroupPolyfill
 MyExceptionGroup1 = ExceptionGroupPolyfill if sys.version_info < (3, 11) else ExceptionGroup
@@ -409,6 +420,7 @@ conceivable that this could be improved, but is not a priority for now.
 ```py
 if False:
     does_not_exist
+
 
 def f():
     return
@@ -517,6 +529,7 @@ them:
 if False:
     1 + "a"  # error: [unsupported-operator]
 
+
 def f():
     return
 
@@ -548,6 +561,7 @@ This is also supported for function calls, attribute accesses, etc.:
 from typing import Literal
 
 if False:
+
     def f(x: int): ...
     def g(*, a: int, b: int): ...
 
@@ -560,6 +574,7 @@ if False:
 
     number: Literal[1] = 1
 else:
+
     def f(x: str): ...
     def g(*, a: int): ...
 
@@ -567,6 +582,7 @@ else:
         x: str = "a"
 
     class D: ...
+
     number: Literal[0] = 0
 
 if False:
@@ -603,6 +619,7 @@ import sys
 if sys.version_info >= (3, 14):
     raise RuntimeError("this library doesn't support 3.14 yet!!!")
 
+
 class AwesomeAPI: ...
 ```
 
@@ -610,6 +627,7 @@ class AwesomeAPI: ...
 
 ```py
 import module
+
 
 def f(x: module.AwesomeAPI): ...  # error: [invalid-type-form]
 ```

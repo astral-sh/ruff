@@ -11,9 +11,11 @@ class A:
     class B:
         pass
 
+
 class C:
     class B:
         pass
+
 
 a: A.B = C.B()  # error: [invalid-assignment] "Object of type `test.C.B` is not assignable to `test.A.B`"
 ```
@@ -25,6 +27,7 @@ a: A.B = C.B()  # error: [invalid-assignment] "Object of type `test.C.B` is not 
 ```py
 class B:
     pass
+
 
 def f(b: B):
     class B:
@@ -41,6 +44,7 @@ import a
 import b
 
 df: a.DataFrame = b.DataFrame()  # error: [invalid-assignment] "Object of type `b.DataFrame` is not assignable to `a.DataFrame`"
+
 
 def _(dfs: list[b.DataFrame]):
     # error: [invalid-assignment] "Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`"
@@ -68,6 +72,7 @@ class DataFrame:
 ```py
 from .foo import MyClass
 
+
 def make_MyClass() -> MyClass:
     return MyClass()
 ```
@@ -82,6 +87,7 @@ class MyClass: ...
 
 ```py
 class MyClass: ...
+
 
 def get_MyClass() -> MyClass:
     from . import make_MyClass
@@ -105,6 +111,7 @@ s: status_a.Status = status_b.Status.ACTIVE
 ```py
 from enum import Enum
 
+
 class Status(Enum):
     ACTIVE = 1
     INACTIVE = 2
@@ -114,6 +121,7 @@ class Status(Enum):
 
 ```py
 from enum import Enum
+
 
 class Status(Enum):
     ACTIVE = "active"
@@ -127,15 +135,18 @@ class Status(Enum):
 ```py
 from enum import Enum
 
+
 class A:
     class B(Enum):
         ACTIVE = "active"
         INACTIVE = "inactive"
 
+
 class C:
     class B(Enum):
         ACTIVE = "active"
         INACTIVE = "inactive"
+
 
 # error: [invalid-assignment] "Object of type `Literal[test.C.B.ACTIVE]` is not assignable to `test.A.B`"
 a: A.B = C.B.ACTIVE
@@ -182,6 +193,7 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
+
 class Container(Generic[T]):
     pass
 ```
@@ -192,6 +204,7 @@ class Container(Generic[T]):
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
+
 
 class Container(Generic[T]):
     pass
@@ -208,8 +221,10 @@ from typing import Protocol, TypeVar
 
 T_co = TypeVar("T_co", covariant=True)
 
+
 class Iterator(Protocol[T_co]):
     def __nexxt__(self) -> T_co: ...
+
 
 def bad() -> Iterator[str]:
     raise NotImplementedError
@@ -219,6 +234,7 @@ def bad() -> Iterator[str]:
 
 ```py
 from typing import Iterator
+
 
 def f() -> Iterator[str]:
     import bad
@@ -234,6 +250,7 @@ from typing import Protocol
 import proto_a
 import proto_b
 
+
 def _(drawable_b: proto_b.Drawable):
     # error: [invalid-assignment] "Object of type `proto_b.Drawable` is not assignable to `proto_a.Drawable`"
     drawable: proto_a.Drawable = drawable_b
@@ -244,6 +261,7 @@ def _(drawable_b: proto_b.Drawable):
 ```py
 from typing import Protocol
 
+
 class Drawable(Protocol):
     def draw(self) -> None: ...
 ```
@@ -252,6 +270,7 @@ class Drawable(Protocol):
 
 ```py
 from typing import Protocol
+
 
 class Drawable(Protocol):
     def draw(self) -> int: ...
@@ -264,6 +283,7 @@ from typing import TypedDict
 import dict_a
 import dict_b
 
+
 def _(b_person: dict_b.Person):
     # error: [invalid-assignment] "Object of type `dict_b.Person` is not assignable to `dict_a.Person`"
     person_var: dict_a.Person = b_person
@@ -274,6 +294,7 @@ def _(b_person: dict_b.Person):
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
 ```
@@ -282,6 +303,7 @@ class Person(TypedDict):
 
 ```py
 from typing import TypedDict
+
 
 class Person(TypedDict):
     name: bytes
@@ -297,6 +319,7 @@ class Model: ...
 
 ```py
 class Model: ...
+
 
 def get_models_tuple() -> tuple[Model]:
     from module import Model

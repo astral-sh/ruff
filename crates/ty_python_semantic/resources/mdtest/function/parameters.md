@@ -13,6 +13,7 @@ a dictionary from strings to its annotated type.
 ```py
 from typing import Literal
 
+
 def f(a, b: int, c=1, d: int = 2, /, e=3, f: Literal[4] = 4, *args: object, g=5, h: Literal[6] = 6, **kwargs: str):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: int
@@ -43,6 +44,7 @@ If there is an annotation, we respect it fully and don't union in the default va
 ```py
 from typing import Any
 
+
 def f(x: Any = 1):
     reveal_type(x)  # revealed: Any
 ```
@@ -57,8 +59,10 @@ fall back to inferring the annotated type, ignoring the default value type.
 def f(x: int = "foo"):
     reveal_type(x)  # revealed: int
 
+
 # The check is assignable-to, not subtype-of, so this is fine:
 from typing import Any
+
 
 def g(x: Any = "foo"):
     reveal_type(x)  # revealed: Any
@@ -76,9 +80,11 @@ python-version = "3.12"
 ```py
 from typing import Protocol
 
+
 class Foo(Protocol):
     def x(self, y: bool = ...): ...
     def y[T](self, y: T = ...) -> T: ...
+
 
 class GenericFoo[T](Protocol):
     def x(self, y: bool = ...) -> T: ...
@@ -88,6 +94,7 @@ class GenericFoo[T](Protocol):
 
 ```py
 from abc import abstractmethod
+
 
 class Bar:
     @abstractmethod
@@ -100,6 +107,7 @@ class Bar:
 
 ```py
 from typing import overload
+
 
 @overload
 def x(y: None = ...) -> None: ...

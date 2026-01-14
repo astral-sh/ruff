@@ -12,34 +12,44 @@ P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
 R_co = TypeVar("R_co", covariant=True)
 
+
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
     return args
+
 
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
     reveal_type(args)  # revealed: P@i.args
     reveal_type(kwargs)  # revealed: P@i.kwargs
     return callback(42, *args, **kwargs)
 
+
 class Foo:
     def method(self, x: Self):
         reveal_type(x)  # revealed: Self@method
+
 
 def ex2(msg: str):
     def wrapper(fn: Callable[P, R_co]) -> Callable[P, R_co]:
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> R_co:
             print(msg)
             return fn(*args, **kwargs)
+
         return wrapped
+
     return wrapper
+
 
 def ex3(msg: str):
     P = ParamSpec("P")
+
     def wrapper(fn: Callable[P, R_co]) -> Callable[P, R_co]:
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> R_co:
             print(msg)
             return fn(*args, **kwargs)
+
         return wrapped
+
     return wrapper
 ```
 
@@ -49,6 +59,7 @@ One thing that is supported is error messages for using special forms in type ex
 
 ```py
 from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec, Generic
+
 
 def _(
     a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
@@ -77,13 +88,27 @@ from typing import Callable
 from typing_extensions import Self, Unpack, TypeGuard, TypeIs, Concatenate, Generic
 from ty_extensions import reveal_mro
 
+
 class A(Self): ...  # error: [invalid-base]
+
+
 class B(Unpack): ...  # error: [invalid-base]
+
+
 class C(TypeGuard): ...  # error: [invalid-base]
+
+
 class D(TypeIs): ...  # error: [invalid-base]
+
+
 class E(Concatenate): ...  # error: [invalid-base]
+
+
 class F(Callable): ...
+
+
 class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
+
 
 reveal_mro(F)  # revealed: (<class 'F'>, @Todo(Support for Callable as a base class), <class 'object'>)
 ```
@@ -104,6 +129,7 @@ T = TypeVar("T")
 
 # error: [invalid-type-form] "Special form `typing.TypeAlias` expected no type parameter"
 X: TypeAlias[T] = int
+
 
 class Foo[T]:
     # error: [invalid-type-form] "Special form `typing.Self` expected no type parameter"

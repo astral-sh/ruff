@@ -19,13 +19,16 @@ Here, we give a few examples of values that belong to these types:
 from ty_extensions import AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Literal
 
+
 class CustomAlwaysTruthyType:
     def __bool__(self) -> Literal[True]:
         return True
 
+
 class CustomAlwaysFalsyType:
     def __bool__(self) -> Literal[False]:
         return False
+
 
 at: AlwaysTruthy
 at = True
@@ -79,12 +82,15 @@ static_assert(is_disjoint_from(AlwaysTruthy, AmbiguousTruthiness))
 static_assert(is_disjoint_from(AlwaysFalsy, AmbiguousTruthiness))
 static_assert(not is_disjoint_from(Truthy, Falsy))
 
+
 class CustomAmbiguousTruthinessType:
     def __bool__(self) -> bool:
         return choice((True, False))
 
+
 def maybe_empty_list() -> list[int]:
     return choice(([], [1, 2, 3]))
+
 
 reveal_type(bool(maybe_empty_list()))  # revealed: bool
 reveal_type(bool(CustomAmbiguousTruthinessType()))  # revealed: bool

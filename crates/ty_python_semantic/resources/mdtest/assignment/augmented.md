@@ -23,13 +23,16 @@ class C:
     def __isub__(self, other: int) -> str:
         return "Hello, world!"
 
+
 x = C()
 x -= 1
 reveal_type(x)  # revealed: str
 
+
 class C:
     def __iadd__(self, other: str) -> int:
         return 1
+
 
 x = C()
 x += "Hello"
@@ -45,6 +48,7 @@ class C:
     def __isub__(self, other: str) -> int:
         return 42
 
+
 x = C()
 # error: [unsupported-operator] "Operator `-=` is not supported between objects of type `C` and `Literal[1]`"
 x -= 1
@@ -58,9 +62,12 @@ reveal_type(x)  # revealed: int
 def _(flag: bool):
     class Foo:
         if flag:
+
             def __iadd__(self, other: int) -> str:
                 return "Hello, world!"
+
         else:
+
             def __iadd__(self, other: int) -> int:
                 return 42
 
@@ -76,6 +83,7 @@ def _(flag: bool):
 def _(flag: bool):
     class Foo:
         if flag:
+
             def __iadd__(self, other: str) -> int:
                 return 42
 
@@ -94,7 +102,9 @@ def _(flag: bool):
     class Foo:
         def __add__(self, other: str) -> str:
             return "Hello, world!"
+
         if flag:
+
             def __iadd__(self, other: str) -> int:
                 return 42
 
@@ -111,7 +121,9 @@ def _(flag1: bool, flag2: bool):
     class Foo:
         def __add__(self, other: int) -> str:
             return "Hello, world!"
+
         if flag1:
+
             def __iadd__(self, other: int) -> int:
                 return 42
 
@@ -148,7 +160,9 @@ def f(flag: bool, flag2: bool):
     class Foo:
         def __add__(self, other: int) -> str:
             return "Hello, world!"
+
         if flag:
+
             def __iadd__(self, other: int) -> int:
                 return 42
 
@@ -175,7 +189,9 @@ class Meta(type):
     def __iadd__(cls, other: int) -> str:
         return ""
 
+
 class C(metaclass=Meta): ...
+
 
 cls = C
 cls += 1

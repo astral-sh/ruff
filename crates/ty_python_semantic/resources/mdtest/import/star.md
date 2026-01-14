@@ -166,11 +166,15 @@ for G in [1]:
 for (H := 4).whatever in [2]:  # error: [unresolved-attribute]
     ...
 
+
 class I: ...
+
 
 def J(): ...
 
+
 type K = int
+
 
 class ContextManagerThatMightNotRunToCompletion:
     def __enter__(self) -> "ContextManagerThatMightNotRunToCompletion":
@@ -179,11 +183,14 @@ class ContextManagerThatMightNotRunToCompletion:
     def __exit__(self, *args) -> typing.Literal[True]:
         return True
 
+
 with ContextManagerThatMightNotRunToCompletion() as L:
     U = ...
 
+
 def get_object() -> object:
     pass
+
 
 match get_object():
     case {"something": M}:
@@ -211,8 +218,10 @@ match 12345:
     case T:
         ...
 
+
 def boolean_condition() -> bool:
     return True
+
 
 if boolean_condition():
     V = ...
@@ -303,8 +312,10 @@ match 42:
     case I:
         ...
 
+
 def boolean_condition() -> bool:
     return True
+
 
 if boolean_condition():
     J = ...
@@ -312,12 +323,14 @@ if boolean_condition():
 while boolean_condition():
     K = ...
 
+
 class ContextManagerThatMightNotRunToCompletion:
     def __enter__(self) -> "ContextManagerThatMightNotRunToCompletion":
         return self
 
     def __exit__(self, *args) -> Literal[True]:
         return True
+
 
 with ContextManagerThatMightNotRunToCompletion():
     L = ...
@@ -373,8 +386,10 @@ match 42:
     case I:
         ...
 
+
 def boolean_condition() -> bool:
     return True
+
 
 if boolean_condition():
     J = ...
@@ -382,12 +397,14 @@ if boolean_condition():
 while boolean_condition():
     K = ...
 
+
 class ContextManagerThatMightNotRunToCompletion:
     def __enter__(self) -> "ContextManagerThatMightNotRunToCompletion":
         return self
 
     def __exit__(self, *args) -> Literal[True]:
         return True
+
 
 with ContextManagerThatMightNotRunToCompletion():
     L = ...
@@ -436,9 +453,11 @@ class Iterator:
     def __next__(self) -> int:
         return 42
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 [a for a in Iterable()]
 {b for b in Iterable()}
@@ -720,6 +739,7 @@ reveal_type(Y)  # revealed: Unknown
 # Thus this still reveals `Literal[True]`.
 reveal_type(Z)  # revealed: Literal[True]
 
+
 # Make sure that reachability constraints are also correctly applied
 # for nonlocal lookups:
 def _():
@@ -772,6 +792,7 @@ the `*` import occurs.
 def coinflip() -> bool:
     return True
 
+
 if coinflip():
     A = 1
     B = 2
@@ -804,6 +825,7 @@ A = 1
 def coinflip() -> bool:
     return True
 
+
 if coinflip():
     from exporter import *
 
@@ -826,8 +848,10 @@ import sys
 if sys.version_info >= (3, 12):
     A: bool = True
 
+
 def coinflip() -> bool:
     return True
+
 
 if coinflip():
     B: bool = True
@@ -1055,8 +1079,10 @@ user that we cannot statically determine the elements of `__all__`.
 def f() -> str:
     return "f"
 
+
 def g() -> int:
     return 42
+
 
 # TODO we should emit a warning here for the dynamically constructed `__all__` member.
 __all__ = [f()]
@@ -1316,6 +1342,7 @@ def f():
 
     g = True
 
+
 f()
 ```
 
@@ -1355,8 +1382,10 @@ class C:
 ```py
 from common import C
 
+
 def flag() -> bool:
     return True
+
 
 should_be_imported: C = C()
 

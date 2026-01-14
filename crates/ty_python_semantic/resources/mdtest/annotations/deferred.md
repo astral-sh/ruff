@@ -23,10 +23,13 @@ In (regular) source files, annotations are *not* deferred. This also tests that 
 ```py
 from __future__ import with_statement as annotations
 
+
 # error: [unresolved-reference]
 def get_foo() -> Foo: ...
 
+
 class Foo: ...
+
 
 reveal_type(get_foo())  # revealed: Unknown
 ```
@@ -38,10 +41,13 @@ If `__future__.annotations` is imported, annotations *are* deferred.
 ```py
 from __future__ import annotations
 
+
 def get_foo() -> Foo:
     return Foo()
 
+
 class Foo: ...
+
 
 reveal_type(get_foo())  # revealed: Foo
 ```
@@ -55,6 +61,7 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
+
 
 class Foo:
     this: Foo
@@ -77,9 +84,11 @@ class Foo:
 
         def f(self, x: Foo):
             return self
+
         # error: [unresolved-reference]
         def g(self) -> Bar:
             return self
+
         # error: [unresolved-reference]
         def h[T: Bar](self):
             pass
@@ -108,6 +117,7 @@ class Foo:
     def h[T: Bar]():
         # error: [unresolved-reference]
         return Bar()
+
     type Baz = Foo
 ```
 
@@ -132,6 +142,7 @@ class Foo:
     # error: [unresolved-reference]
     def f(self, x: Foo):
         reveal_type(x)  # revealed: Unknown
+
     # error: [unresolved-reference]
     def g(self) -> Foo:
         _: Foo = self
@@ -145,9 +156,11 @@ class Foo:
         # error: [unresolved-reference]
         def f(self, x: Foo):
             return self
+
         # error: [unresolved-reference]
         def g(self) -> Bar:
             return self
+
         # error: [unresolved-reference]
         def h[T: Bar](self):
             pass
@@ -176,7 +189,9 @@ class Foo:
     def h[T: Bar]():
         # error: [unresolved-reference]
         return Bar()
+
     type Qux = Foo
+
 
 def _():
     class C:
@@ -192,8 +207,10 @@ def _():
 ```py
 from __future__ import annotations
 
+
 class A(B):  # error: [unresolved-reference]
     pass
+
 
 class B:
     pass
@@ -214,6 +231,7 @@ class B: ...
 # error: [unresolved-reference]
 def f(mode: int = ParseMode.test):
     pass
+
 
 class ParseMode:
     test = 1
@@ -246,6 +264,7 @@ def f(mode: int = NeverDefined.test): ...
 class Foo(metaclass=SomeMeta):
     pass
 
+
 class SomeMeta(type):
     pass
 ```
@@ -274,6 +293,7 @@ class Foo(metaclass=NeverDefined): ...
 ```py
 # error: [unresolved-reference]
 f = lambda x=Foo(): x
+
 
 class Foo:
     pass

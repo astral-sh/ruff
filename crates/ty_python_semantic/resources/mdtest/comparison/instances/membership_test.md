@@ -19,6 +19,7 @@ class A:
     def __contains__(self, item: str) -> bool:
         return True
 
+
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
 # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[42]` and `A`"
@@ -37,9 +38,11 @@ class StringIterator:
     def __next__(self) -> str:
         return "foo"
 
+
 class A:
     def __iter__(self) -> StringIterator:
         return StringIterator()
+
 
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
@@ -59,6 +62,7 @@ class A:
     def __getitem__(self, key: int) -> str:
         return "foo"
 
+
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
 reveal_type(42 in A())  # revealed: bool
@@ -75,6 +79,7 @@ class A:
     def __contains__(self, item: str) -> str:
         return "foo"
 
+
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
 ```
@@ -86,13 +91,16 @@ reveal_type("hello" not in A())  # revealed: bool
 ```py
 from typing import Literal
 
+
 class AlwaysTrue:
     def __contains__(self, item: int) -> Literal[1]:
         return 1
 
+
 class AlwaysFalse:
     def __contains__(self, item: int) -> Literal[""]:
         return ""
+
 
 reveal_type(42 in AlwaysTrue())  # revealed: Literal[True]
 reveal_type(42 not in AlwaysTrue())  # revealed: Literal[False]
@@ -108,12 +116,18 @@ doesn't result in a fallback to `__iter__` or `__getitem__`:
 
 ```py
 class CheckContains: ...
+
+
 class CheckIter: ...
+
+
 class CheckGetItem: ...
+
 
 class CheckIterIterator:
     def __next__(self) -> CheckIter:
         return CheckIter()
+
 
 class A:
     def __contains__(self, item: CheckContains) -> bool:
@@ -125,6 +139,7 @@ class A:
     def __getitem__(self, key: int) -> CheckGetItem:
         return CheckGetItem()
 
+
 reveal_type(CheckContains() in A())  # revealed: bool
 
 # error: [unsupported-operator] "Operator `in` is not supported between objects of type `CheckIter` and `A`"
@@ -132,12 +147,14 @@ reveal_type(CheckIter() in A())  # revealed: bool
 # error: [unsupported-operator] "Operator `in` is not supported between objects of type `CheckGetItem` and `A`"
 reveal_type(CheckGetItem() in A())  # revealed: bool
 
+
 class B:
     def __iter__(self) -> CheckIterIterator:
         return CheckIterIterator()
 
     def __getitem__(self, key: int) -> CheckGetItem:
         return CheckGetItem()
+
 
 reveal_type(CheckIter() in B())  # revealed: bool
 # Always use `__iter__`, regardless of iterated type; there's no NotImplemented
@@ -154,6 +171,7 @@ not supported and should trigger a diagnostic.
 class A:
     def __getitem__(self, key: str) -> str:
         return "foo"
+
 
 # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[42]` and `A`"
 reveal_type(42 in A())  # revealed: bool
@@ -193,9 +211,11 @@ It may also be more appropriate to use `unsupported-operator` as the error code.
 class NotBoolable:
     __bool__: int = 3
 
+
 class WithContains:
     def __contains__(self, item) -> NotBoolable:
         return NotBoolable()
+
 
 # error: [unsupported-bool-conversion]
 10 in WithContains()

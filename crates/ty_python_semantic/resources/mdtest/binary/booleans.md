@@ -109,6 +109,7 @@ def _(a: bool):
 ```py
 import random
 
+
 def _(a: bool):
     def lhs_is_int(x: int):
         reveal_type(x | a)  # revealed: int

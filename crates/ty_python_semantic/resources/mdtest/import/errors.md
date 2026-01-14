@@ -69,12 +69,16 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
 ```py
 from ty_extensions import reveal_mro
 
+
 class A: ...
+
 
 reveal_mro(A)  # revealed: (<class 'A'>, <class 'object'>)
 import b
 
+
 class C(b.B): ...
+
 
 reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>)
 ```
@@ -85,7 +89,9 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'objec
 from ty_extensions import reveal_mro
 from a import A
 
+
 class B(A): ...
+
 
 reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, <class 'object'>)
 ```

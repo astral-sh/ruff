@@ -8,15 +8,19 @@ types, we can infer that the result for the intersection type is also true/false
 ```py
 from typing import Literal
 
+
 class Base:
     def __gt__(self, other) -> bool:
         return False
+
 
 class Child1(Base):
     def __eq__(self, other) -> Literal[True]:
         return True
 
+
 class Child2(Base): ...
+
 
 def _(x: Base):
     c1 = Child1()
@@ -95,6 +99,7 @@ def _(x: int):
 ```py
 class A: ...
 
+
 def _(o: object):
     a = A()
     n = None
@@ -116,7 +121,10 @@ intersection type:
 
 ```py
 class NonContainer1: ...
+
+
 class NonContainer2: ...
+
 
 def _(x: object):
     if isinstance(x, NonContainer1):
@@ -134,6 +142,7 @@ the operator:
 class Container:
     def __contains__(self, x) -> bool:
         return False
+
 
 def _(x: object):
     if isinstance(x, NonContainer1):
@@ -167,7 +176,9 @@ class Container:
     def __contains__(self, x) -> bool:
         return False
 
+
 class NonContainer: ...
+
 
 def _(x: object):
     if isinstance(x, Container):

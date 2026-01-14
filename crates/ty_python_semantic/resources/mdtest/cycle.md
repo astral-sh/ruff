@@ -7,9 +7,11 @@ Deferred annotations can result in cycles in resolving a function signature:
 ```py
 from __future__ import annotations
 
+
 # error: [invalid-type-form]
 def f(x: f):
     pass
+
 
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
@@ -26,6 +28,7 @@ class Point:
 
     def replace_with(self, other: "Point") -> None:
         self.x, self.y = other.x, other.y
+
 
 p = Point()
 reveal_type(p.x)  # revealed: Unknown | int
@@ -44,14 +47,17 @@ from typing import Union, TypeAliasType, Sequence, Mapping
 
 A = list["A" | None]
 
+
 def f(x: A):
     # TODO: should be `list[A | None]`?
     reveal_type(x)  # revealed: list[Divergent]
     # TODO: should be `A | None`?
     reveal_type(x[0])  # revealed: Divergent
 
+
 JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
+
 
 def _(x: JSONValue):
     # TODO: should be `JSONValue`
@@ -64,6 +70,7 @@ def _(x: JSONValue):
 from typing import Generic, TypeVar
 
 B = TypeVar("B", bound="Base")
+
 
 class Base(Generic[B]):
     pass
@@ -86,24 +93,28 @@ class C:
     def f(self: "C"):
         def inner_a(positional=self.a):
             return
+
         self.a = inner_a
         # revealed: def inner_a(positional=...) -> Unknown
         reveal_type(inner_a)
 
         def inner_b(*, kw_only=self.b):
             return
+
         self.b = inner_b
         # revealed: def inner_b(*, kw_only=...) -> Unknown
         reveal_type(inner_b)
 
         def inner_c(positional_only=self.c, /):
             return
+
         self.c = inner_c
         # revealed: def inner_c(positional_only=..., /) -> Unknown
         reveal_type(inner_c)
 
         def inner_d(*, kw_only=self.d):
             return
+
         self.d = inner_d
         # revealed: def inner_d(*, kw_only=...) -> Unknown
         reveal_type(inner_d)
@@ -116,6 +127,7 @@ class D:
     def f(self: "D"):
         # error: [invalid-parameter-default] "Default value of type `Unknown | (def inner_a(a: int = ...) -> Unknown)` is not assignable to annotated parameter type `int`"
         def inner_a(a: int = self.a): ...
+
         self.a = inner_a
 ```
 
@@ -152,6 +164,7 @@ class Cyclic:
     def update(self):
         if isinstance(self.data, str):
             self.data = {"url": self.data}
+
 
 # revealed: Unknown | str | dict[Unknown, Unknown] | dict[Unknown | str, Unknown | str]
 reveal_type(Cyclic("").data)

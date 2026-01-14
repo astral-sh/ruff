@@ -10,8 +10,10 @@ classes. Uses of these items should subsequently produce a warning.
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated("use OtherClass")
 def myfunc(x: int): ...
+
 
 myfunc(1)  # error: [deprecated] "use OtherClass"
 ```
@@ -19,8 +21,10 @@ myfunc(1)  # error: [deprecated] "use OtherClass"
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated("use BetterClass")
 class MyClass: ...
+
 
 MyClass()  # error: [deprecated] "use BetterClass"
 ```
@@ -28,11 +32,13 @@ MyClass()  # error: [deprecated] "use BetterClass"
 ```py
 from typing_extensions import deprecated
 
+
 class MyClass:
     @deprecated("use something else")
     def afunc(): ...
     @deprecated("don't use this!")
     def amethod(self): ...
+
 
 MyClass.afunc()  # error: [deprecated] "use something else"
 MyClass().amethod()  # error: [deprecated] "don't use this!"
@@ -59,8 +65,10 @@ runtime behavior.
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated  # error: [invalid-argument-type] "LiteralString"
 def invalid_deco(): ...
+
 
 invalid_deco()  # error: [missing-argument]
 ```
@@ -68,8 +76,10 @@ invalid_deco()  # error: [missing-argument]
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated()  # error: [missing-argument] "message"
 def invalid_deco(): ...
+
 
 invalid_deco()
 ```
@@ -82,8 +92,10 @@ from typing_extensions import deprecated
 
 x = "message"
 
+
 @deprecated(x)
 def invalid_deco(): ...
+
 
 invalid_deco()  # error: [deprecated] "message"
 ```
@@ -93,11 +105,14 @@ However sufficiently opaque LiteralStrings we can't resolve, and so we lose the 
 ```py
 from typing_extensions import deprecated, LiteralString
 
+
 def opaque() -> LiteralString:
     return "message"
 
+
 @deprecated(opaque())
 def valid_deco(): ...
+
 
 valid_deco()  # error: [deprecated]
 ```
@@ -108,11 +123,14 @@ LiteralString, so we can/should emit a diagnostic for this:
 ```py
 from typing_extensions import deprecated
 
+
 def opaque() -> str:
     return "message"
 
+
 @deprecated(opaque())  # error: [invalid-argument-type] "LiteralString"
 def dubious_deco(): ...
+
 
 dubious_deco()
 ```
@@ -122,8 +140,10 @@ Although we have no use for the other arguments, we should still error if they'r
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated("some message", dsfsdf="whatever")  # error: [unknown-argument] "dsfsdf"
 def invalid_deco(): ...
+
 
 invalid_deco()
 ```
@@ -133,8 +153,10 @@ And we should always handle correct ones fine.
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated("some message", category=DeprecationWarning, stacklevel=1)
 def valid_deco(): ...
+
 
 valid_deco()  # error: [deprecated] "some message"
 ```
@@ -155,10 +177,12 @@ python-version = "3.13"
 import warnings
 import typing_extensions
 
+
 @warnings.deprecated("nope")
 def func1(): ...
 @typing_extensions.deprecated("nada")
 def func2(): ...
+
 
 func1()  # error: [deprecated] "nope"
 func2()  # error: [deprecated] "nada"
@@ -176,8 +200,10 @@ shouldn't produce a warning.
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated("Use OtherType instead")
 class DeprType: ...
+
 
 @deprecated("Use other_func instead")
 def depr_func(): ...
@@ -194,7 +220,9 @@ from module import DeprType, depr_func
 DeprType()  # error: [deprecated] "Use OtherType instead"
 depr_func()  # error: [deprecated] "Use other_func instead"
 
+
 def higher_order(x): ...
+
 
 # TODO: these diagnostics ideally shouldn't fire since we warn on the import
 higher_order(DeprType)  # error: [deprecated] "Use OtherType instead"
@@ -215,8 +243,10 @@ a warning.
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated("Use OtherType instead")
 class DeprType: ...
+
 
 @deprecated("Use other_func instead")
 def depr_func(): ...
@@ -230,7 +260,9 @@ import module
 module.DeprType()  # error: [deprecated] "Use OtherType instead"
 module.depr_func()  # error: [deprecated] "Use other_func instead"
 
+
 def higher_order(x): ...
+
 
 higher_order(module.DeprType)  # error: [deprecated] "Use OtherType instead"
 higher_order(module.depr_func)  # error: [deprecated] "Use other_func instead"
@@ -248,8 +280,10 @@ If the items are instead star-imported, then the actual uses should warn.
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated("Use OtherType instead")
 class DeprType: ...
+
 
 @deprecated("Use other_func instead")
 def depr_func(): ...
@@ -263,7 +297,9 @@ from module import *
 DeprType()  # error: [deprecated] "Use OtherType instead"
 depr_func()  # error: [deprecated] "Use other_func instead"
 
+
 def higher_order(x): ...
+
 
 higher_order(DeprType)  # error: [deprecated] "Use OtherType instead"
 higher_order(depr_func)  # error: [deprecated] "Use other_func instead"
@@ -281,11 +317,14 @@ redundant and annoying.
 ```py
 from typing_extensions import deprecated
 
+
 @deprecated("Use OtherType instead")
 class DeprType: ...
 
+
 @deprecated("Use other_func instead")
 def depr_func(): ...
+
 
 alias_func = depr_func  # error: [deprecated] "Use other_func instead"
 AliasClass = DeprType  # error: [deprecated] "Use OtherType instead"
@@ -303,6 +342,7 @@ diagnostic.
 ```py
 from typing_extensions import deprecated
 
+
 class MyInt:
     def __init__(self, val):
         self.val = val
@@ -310,6 +350,7 @@ class MyInt:
     @deprecated("MyInt `+` support is broken")
     def __add__(self, other):
         return MyInt(self.val + other.val)
+
 
 x = MyInt(1)
 y = MyInt(2)
@@ -324,6 +365,7 @@ Overloads can be deprecated, but only trigger warnings when invoked.
 from typing_extensions import deprecated
 from typing_extensions import overload
 
+
 @overload
 @deprecated("strings are no longer supported")
 def f(x: str): ...
@@ -331,6 +373,7 @@ def f(x: str): ...
 def f(x: int): ...
 def f(x):
     print(x)
+
 
 f(1)
 f("hello")  # TODO: error: [deprecated] "strings are no longer supported"
@@ -342,6 +385,7 @@ If the actual impl is deprecated, the deprecation always fires.
 from typing_extensions import deprecated
 from typing_extensions import overload
 
+
 @overload
 def f(x: str): ...
 @overload
@@ -349,6 +393,7 @@ def f(x: int): ...
 @deprecated("unusable")
 def f(x):
     print(x)
+
 
 f(1)  # error: [deprecated] "unusable"
 f("hello")  # error: [deprecated] "unusable"

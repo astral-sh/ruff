@@ -8,6 +8,7 @@ This file contains tests for non-fully-static `type[]` types, such as `type[Any]
 ```py
 from typing import Any
 
+
 def f(x: type[Any], y: type[str]):
     reveal_type(x)  # revealed: type[Any]
     # TODO: could be `<object.__repr__ type> & Any`
@@ -17,7 +18,9 @@ def f(x: type[Any], y: type[str]):
     a: type[str] = x
     b: type[Any] = y
 
+
 class A: ...
+
 
 x: type[Any] = object
 x: type[Any] = type
@@ -37,7 +40,9 @@ def f(x: type):
     reveal_type(x)  # revealed: type
     reveal_type(x.__repr__)  # revealed: bound method type.__repr__() -> str
 
+
 class A: ...
+
 
 x: type = object
 x: type = type
@@ -52,7 +57,9 @@ def f(x: type[object]):
     reveal_type(x)  # revealed: type
     reveal_type(x.__repr__)  # revealed: bound method type.__repr__() -> str
 
+
 class A: ...
+
 
 x: type[object] = object
 x: type[object] = type
@@ -72,6 +79,7 @@ from does_not_exist import SomethingUnknown  # error: [unresolved-import]
 
 reveal_type(SomethingUnknown)  # revealed: Unknown
 
+
 def test(x: Any, y: SomethingUnknown):
     reveal_type(x.__class__)  # revealed: type[Any]
     reveal_type(x.__class__.__class__.__class__.__class__)  # revealed: type[Any]
@@ -89,12 +97,14 @@ from does_not_exist import SomethingUnknown  # error: [unresolved-import]
 has_unknown_type = SomethingUnknown.__class__
 reveal_type(has_unknown_type)  # revealed: type[Unknown]
 
+
 def test(x: type[str], y: type[Any]):
     """Both `type[Any]` and `type[Unknown]` are assignable to all `type[]` types"""
     a: type[Any] = x
     b: type[str] = y
     c: type[Any] = has_unknown_type
     d: type[str] = has_unknown_type
+
 
 def test2(a: type[Any]):
     """`type[Any]` and `type[Unknown]` are also assignable to all instances of `type` subclasses"""

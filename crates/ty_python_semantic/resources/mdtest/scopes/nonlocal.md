@@ -5,6 +5,7 @@
 ```py
 def f():
     x = 1
+
     def g():
         reveal_type(x)  # revealed: Literal[1]
 ```
@@ -14,6 +15,7 @@ def f():
 ```py
 def f():
     x = 1
+
     def g():
         def h():
             reveal_type(x)  # revealed: Literal[1]
@@ -27,6 +29,7 @@ def f():
 
     class C:
         x = 2
+
         def g():
             reveal_type(x)  # revealed: Literal[1]
 ```
@@ -36,10 +39,12 @@ def f():
 ```py
 def f():
     x: int = 1
+
     def g():
         # TODO: This example should actually be an unbound variable error. However to avoid false
         # positives, we'd need to analyze `nonlocal x` statements in other inner functions.
         x: str
+
         def h():
             reveal_type(x)  # revealed: str
 ```
@@ -53,10 +58,13 @@ whether the variable is bound in that scope:
 ```py
 x: int = 1
 
+
 def f():
     x: str = "hello"
+
     def g():
         global x
+
         def h():
             # allowed: this loads the global `x` variable due to the `global` declaration in the immediate enclosing scope
             y: int = x
@@ -70,6 +78,7 @@ enclosing scopes. This example isn't a type error, because the inner `x` shadows
 ```py
 def f():
     x: int = 1
+
     def g():
         x = "hello"  # allowed
 ```
@@ -79,6 +88,7 @@ With `nonlocal` it is a type error, because `x` refers to the same place in both
 ```py
 def f():
     x: int = 1
+
     def g():
         nonlocal x
         x = "hello"  # error: [invalid-assignment] "Object of type `Literal["hello"]` is not assignable to `int`"
@@ -118,6 +128,7 @@ sibling scopes, child scopes, second-cousin-once-removed scopes, etc:
 ```py
 def a():
     x = 1
+
     def b():
         nonlocal x
         x = 2
@@ -126,6 +137,7 @@ def a():
         def d():
             nonlocal x
             x = 3
+
         # TODO: This should include 2 and 3.
         reveal_type(x)  # revealed: Literal[1]
 ```
@@ -138,6 +150,7 @@ binding, rather than to `x = 1` in `f`'s scope:
 ```py
 def f():
     x = 1
+
     def g():
         if x == 1:  # error: [unresolved-reference] "Name `x` used when not defined"
             x = 2
@@ -149,6 +162,7 @@ scope):
 ```py
 def f():
     x = 1
+
     def g():
         nonlocal x
         if x == 1:
@@ -161,17 +175,22 @@ For the same reason, using the `+=` operator in an inner scope is an error witho
 ```py
 def f():
     x = 1
+
     def g():
         x += 1  # error: [unresolved-reference] "Name `x` used when not defined"
 
+
 def f():
     x = 1
+
     def g():
         x = 1
         x += 1  # allowed, but doesn't affect the outer scope
 
+
 def f():
     x = 1
+
     def g():
         nonlocal x
         x += 1  # allowed, and affects the outer scope
@@ -186,8 +205,10 @@ def f():
     def g():
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 
+
 def f():
     x = 1
+
     def g():
         nonlocal x, y  # error: [invalid-syntax] "no binding for nonlocal `y` found"
 ```
@@ -197,18 +218,23 @@ A global `x` doesn't work. The target must be in a function-like scope:
 ```py
 x = 1
 
+
 def f():
     def g():
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 
+
 def f():
     global x
+
     def g():
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
+
 
 def f():
     # A *use* of `x` in an enclosing scope isn't good enough. There needs to be a binding.
     print(x)
+
     def g():
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 ```
@@ -218,6 +244,7 @@ A class-scoped `x` also doesn't work:
 ```py
 class Foo:
     x = 1
+
     @staticmethod
     def f():
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
@@ -245,8 +272,10 @@ def f():
 ```py
 def f():
     x = 1
+
     def g():
         x = 2
+
         def h():
             nonlocal x
             reveal_type(x)  # revealed: Literal[2]
@@ -259,8 +288,10 @@ Multiple `nonlocal` statements can "chain" through nested scopes:
 ```py
 def f():
     x = 1
+
     def g():
         nonlocal x
+
         def h():
             nonlocal x
             reveal_type(x)  # revealed: Literal[1]
@@ -271,8 +302,10 @@ And the `nonlocal` chain can skip over a scope that doesn't bind the variable:
 ```py
 def f1():
     x = 1
+
     def f2():
         nonlocal x
+
         def f3():
             # No binding; this scope gets skipped.
             def f4():
@@ -285,10 +318,13 @@ But a `global` statement breaks the chain:
 ```py
 x = 1
 
+
 def f():
     x = 2
+
     def g():
         global x
+
         def h():
             nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 ```
@@ -298,6 +334,7 @@ def f():
 ```py
 def f():
     x: int
+
     def g():
         nonlocal x
         x = "string"  # error: [invalid-assignment] "Object of type `Literal["string"]` is not assignable to `int`"
@@ -310,6 +347,7 @@ def f():
 x: bool = True
 y: bool = True
 z: bool = True
+
 
 def f1():
     # Local definitions of `x`, `y`, and `z`.
@@ -352,8 +390,10 @@ affected by `g`:
 ```py
 def f():
     x = 1
+
     def g():
         reveal_type(x)  # revealed: Literal[1]
+
     reveal_type(x)  # revealed: Literal[1]
 ```
 
@@ -363,11 +403,13 @@ regardless of whether `g` actually writes to `x`. With a write:
 ```py
 def f():
     x = 1
+
     def g():
         nonlocal x
         reveal_type(x)  # revealed: Literal[1]
         x += 1
         reveal_type(x)  # revealed: Literal[2]
+
     # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```
@@ -377,9 +419,11 @@ Without a write:
 ```py
 def f():
     x = 1
+
     def g():
         nonlocal x
         reveal_type(x)  # revealed: Literal[1]
+
     # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```
@@ -389,6 +433,7 @@ def f():
 ```py
 def f():
     x: int = 1
+
     def g():
         nonlocal x
         x: str = "foo"  # error: [invalid-syntax] "annotated name `x` can't be nonlocal"
@@ -401,6 +446,7 @@ Using a name prior to its `nonlocal` declaration in the same scope is a syntax e
 ```py
 def f():
     x = 1
+
     def g():
         x = 2
         nonlocal x  # error: [invalid-syntax] "name `x` is used prior to nonlocal declaration"
@@ -412,13 +458,16 @@ of them come after the usage:
 ```py
 def f():
     x = 1
+
     def g():
         nonlocal x
         x = 2
         nonlocal x  # error: [invalid-syntax] "name `x` is used prior to nonlocal declaration"
 
+
 def f():
     x = 1
+
     def g():
         nonlocal x
         nonlocal x
@@ -434,6 +483,7 @@ def f():
     def g():
         # This is allowed, because of the subsequent definition of `x`.
         nonlocal x
+
     x = 1
 ```
 
@@ -442,6 +492,7 @@ def f():
 ```py
 def foo():
     x: int = 1
+
     def bar():
         if isinstance(x, str):
             reveal_type(x)  # revealed: Never

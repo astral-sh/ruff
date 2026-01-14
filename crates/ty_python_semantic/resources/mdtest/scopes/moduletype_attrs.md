@@ -27,8 +27,10 @@ from builtins import __builtins__ as __bi__
 
 reveal_type(__bi__)  # revealed: Any
 
+
 class X:
     reveal_type(__name__)  # revealed: str
+
 
 def foo():
     reveal_type(__name__)  # revealed: str
@@ -80,6 +82,7 @@ reveal_type(module.__spec__)  # revealed: ModuleSpec | None
 # error: [unresolved-attribute]
 reveal_type(module.__warningregistry__)  # revealed: Unknown
 
+
 def nested_scope():
     global __loader__
     reveal_type(__loader__)  # revealed: LoaderProtocol | None
@@ -128,6 +131,7 @@ import types
 
 reveal_type(types.ModuleType.__getattr__)  # revealed: def __getattr__(self, name: str) -> Any
 
+
 def f(module: types.ModuleType):
     reveal_type(module.__getattr__)  # revealed: bound method ModuleType.__getattr__(name: str) -> Any
 
@@ -168,8 +172,10 @@ conditionally defined type:
 ```py
 __file__ = "foo"
 
+
 def returns_bool() -> bool:
     return True
+
 
 if returns_bool():
     __name__ = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
@@ -186,8 +192,10 @@ The same is true if the name is annotated:
 # error: [invalid-declaration] "Cannot shadow implicit global attribute `__file__` with declaration of type `int`"
 __file__: int = 42
 
+
 def returns_bool() -> bool:
     return True
+
 
 if returns_bool():
     # error: [invalid-declaration] "Cannot shadow implicit global attribute `__name__` with declaration of type `int`"

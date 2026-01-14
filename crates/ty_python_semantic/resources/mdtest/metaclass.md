@@ -3,6 +3,7 @@
 ```py
 class M(type): ...
 
+
 reveal_type(M.__class__)  # revealed: <class 'type'>
 ```
 
@@ -22,7 +23,10 @@ reveal_type(type.__class__)  # revealed: <class 'type'>
 
 ```py
 class M(type): ...
+
+
 class B(metaclass=M): ...
+
 
 reveal_type(B.__class__)  # revealed: <class 'M'>
 ```
@@ -34,7 +38,10 @@ arguments as `type.__new__`) isn't a valid metaclass.
 
 ```py
 class M: ...
+
+
 class A(metaclass=M): ...
+
 
 # TODO: emit a diagnostic for the invalid metaclass
 reveal_type(A.__class__)  # revealed: <class 'M'>
@@ -47,8 +54,13 @@ metaclass.
 
 ```py
 class M(type): ...
+
+
 class A(metaclass=M): ...
+
+
 class B(A): ...
+
 
 reveal_type(B.__class__)  # revealed: <class 'M'>
 ```
@@ -64,9 +76,16 @@ python-version = "3.13"
 
 ```py
 class M(type): ...
+
+
 class A[T](metaclass=M): ...
+
+
 class B(A): ...
+
+
 class C(A[int]): ...
+
 
 reveal_type(B.__class__)  # revealed: <class 'M'>
 reveal_type(C.__class__)  # revealed: <class 'M'>
@@ -80,12 +99,20 @@ subclass or the class itself.)
 
 ```py
 class M1(type): ...
+
+
 class M2(type): ...
+
+
 class A(metaclass=M1): ...
+
+
 class B(metaclass=M2): ...
+
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`C`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class C(A, B): ...
+
 
 reveal_type(C.__class__)  # revealed: type[Unknown]
 ```
@@ -98,11 +125,17 @@ subclass or the class itself.)
 
 ```py
 class M1(type): ...
+
+
 class M2(type): ...
+
+
 class A(metaclass=M1): ...
+
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`B`) must be a subclass of the metaclasses of all its bases, but `M2` (metaclass of `B`) and `M1` (metaclass of base class `A`) have no subclass relationship"
 class B(A, metaclass=M2): ...
+
 
 reveal_type(B.__class__)  # revealed: type[Unknown]
 ```
@@ -113,9 +146,16 @@ A class has two explicit bases, both of which have the same metaclass.
 
 ```py
 class M(type): ...
+
+
 class A(metaclass=M): ...
+
+
 class B(metaclass=M): ...
+
+
 class C(A, B): ...
+
 
 reveal_type(C.__class__)  # revealed: <class 'M'>
 ```
@@ -126,10 +166,19 @@ A class has an explicit base with a custom metaclass. That metaclass itself has 
 
 ```py
 class M1(type): ...
+
+
 class M2(type, metaclass=M1): ...
+
+
 class M3(M2): ...
+
+
 class A(metaclass=M3): ...
+
+
 class B(A): ...
+
 
 reveal_type(A.__class__)  # revealed: <class 'M3'>
 ```
@@ -138,15 +187,29 @@ reveal_type(A.__class__)  # revealed: <class 'M3'>
 
 ```py
 class M(type): ...
+
+
 class M1(M): ...
+
+
 class M2(M): ...
+
+
 class M12(M1, M2): ...
+
+
 class A(metaclass=M1): ...
+
+
 class B(metaclass=M2): ...
+
+
 class C(metaclass=M12): ...
+
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`D`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class D(A, B, C): ...
+
 
 reveal_type(D.__class__)  # revealed: type[Unknown]
 ```
@@ -156,14 +219,22 @@ reveal_type(D.__class__)  # revealed: type[Unknown]
 ```py
 from nonexistent_module import UnknownClass  # error: [unresolved-import]
 
+
 class C(UnknownClass): ...
+
 
 # TODO: should be `type[type] & Unknown`
 reveal_type(C.__class__)  # revealed: <class 'type'>
 
+
 class M(type): ...
+
+
 class A(metaclass=M): ...
+
+
 class B(A, UnknownClass): ...
+
 
 # TODO: should be `type[M] & Unknown`
 reveal_type(B.__class__)  # revealed: <class 'M'>
@@ -173,8 +244,13 @@ reveal_type(B.__class__)  # revealed: <class 'M'>
 
 ```py
 class M(type): ...
+
+
 class A(metaclass=M): ...
+
+
 class B(A, A): ...  # error: [duplicate-base] "Duplicate base class `A`"
+
 
 reveal_type(B.__class__)  # revealed: <class 'M'>
 ```
@@ -188,32 +264,41 @@ When a class has an explicit `metaclass` that is not a class, but is a callable 
 def f(*args, **kwargs) -> int:
     return 1
 
+
 class A(metaclass=f): ...
+
 
 # TODO: Should be `int`
 reveal_type(A)  # revealed: <class 'A'>
 reveal_type(A.__class__)  # revealed: type[int]
 
+
 def _(n: int):
     # error: [invalid-metaclass]
     class B(metaclass=n): ...
+
     # TODO: Should be `Unknown`
     reveal_type(B)  # revealed: <class 'B'>
     reveal_type(B.__class__)  # revealed: type[Unknown]
+
 
 def _(flag: bool):
     m = f if flag else 42
 
     # error: [invalid-metaclass]
     class C(metaclass=m): ...
+
     # TODO: Should be `int | Unknown`
     reveal_type(C)  # revealed: <class 'C'>
     reveal_type(C.__class__)  # revealed: type[Unknown]
 
+
 class SignatureMismatch: ...
+
 
 # TODO: Emit a diagnostic
 class D(metaclass=SignatureMismatch): ...
+
 
 # TODO: Should be `Unknown`
 reveal_type(D)  # revealed: <class 'D'>
@@ -242,7 +327,10 @@ python-version = "3.12"
 
 ```py
 class M(type): ...
+
+
 class A[T: str](metaclass=M): ...
+
 
 reveal_type(A.__class__)  # revealed: <class 'M'>
 ```
@@ -251,13 +339,21 @@ reveal_type(A.__class__)  # revealed: <class 'M'>
 
 ```py
 class Foo(type): ...
+
+
 class Bar(type, metaclass=Foo): ...
+
+
 class Baz(type, metaclass=Bar): ...
+
+
 class Spam(metaclass=Baz): ...
+
 
 reveal_type(Spam.__class__)  # revealed: <class 'Baz'>
 reveal_type(Spam.__class__.__class__)  # revealed: <class 'Bar'>
 reveal_type(Spam.__class__.__class__.__class__)  # revealed: <class 'Foo'>
+
 
 def test(x: Spam):
     reveal_type(x.__class__)  # revealed: type[Spam]

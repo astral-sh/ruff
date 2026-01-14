@@ -47,9 +47,13 @@ def _(flag1: bool, flag2: bool):
 
 ```py
 class Foo: ...
+
+
 class Bar: ...
 
+
 def f() -> Foo | Bar | None: ...
+
 
 if isinstance(x := f(), Foo):
     reveal_type(x)  # revealed: Foo

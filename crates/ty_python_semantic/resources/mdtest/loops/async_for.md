@@ -44,6 +44,7 @@ async def foo():
 ```py
 class NotAsyncIterable: ...
 
+
 async def foo():
     # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
     async for x in NotAsyncIterable():
@@ -72,9 +73,11 @@ async def foo():
 ```py
 class NoAnext: ...
 
+
 class AsyncIterable:
     def __aiter__(self) -> NoAnext:
         return NoAnext()
+
 
 async def foo():
     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
@@ -88,6 +91,7 @@ async def foo():
 async def foo(flag: bool):
     class PossiblyUnboundAnext:
         if flag:
+
             async def __anext__(self) -> int:
                 return 42
 
@@ -110,6 +114,7 @@ async def foo(flag: bool):
 
     class PossiblyUnboundAiter:
         if flag:
+
             def __aiter__(self) -> AsyncIterable:
                 return AsyncIterable()
 
@@ -125,9 +130,11 @@ class AsyncIterator:
     async def __anext__(self) -> int:
         return 42
 
+
 class AsyncIterable:
     def __aiter__(self, arg: int) -> AsyncIterator:  # wrong
         return AsyncIterator()
+
 
 async def foo():
     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
@@ -142,9 +149,11 @@ class AsyncIterator:
     async def __anext__(self, arg: int) -> int:  # wrong
         return 42
 
+
 class AsyncIterable:
     def __aiter__(self) -> AsyncIterator:
         return AsyncIterator()
+
 
 async def foo():
     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"

@@ -10,6 +10,7 @@ from typing import Any
 x: Any = 1
 x = "foo"
 
+
 def f():
     reveal_type(x)  # revealed: Any
 ```
@@ -24,6 +25,7 @@ from typing import Any as RenamedAny
 x: RenamedAny = 1
 x = "foo"
 
+
 def f():
     reveal_type(x)  # revealed: Any
 ```
@@ -36,10 +38,13 @@ isn't a spelling of the Any type.
 ```py
 class Any: ...
 
+
 x: Any
+
 
 def f():
     reveal_type(x)  # revealed: Any
+
 
 # This verifies that we're not accidentally seeing typing.Any, since str is assignable
 # to that but not to our locally defined class.
@@ -58,7 +63,9 @@ allowed, even when the unknown superclass is `int`. The assignment to `y` should
 from typing import Any
 from ty_extensions import reveal_mro
 
+
 class SubclassOfAny(Any): ...
+
 
 reveal_mro(SubclassOfAny)  # revealed: (<class 'SubclassOfAny'>, Any, <class 'object'>)
 
@@ -72,13 +79,17 @@ possibly be a subclass of `FinalClass`:
 ```py
 from typing import final
 
+
 @final
 class FinalClass: ...
 
+
 f: FinalClass = SubclassOfAny()  # error: [invalid-assignment]
+
 
 @final
 class OtherFinalClass: ...
+
 
 f: FinalClass | OtherFinalClass = SubclassOfAny()  # error: [invalid-assignment]
 ```
@@ -88,32 +99,43 @@ A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` 
 ```py
 from typing import Callable, Any, Protocol
 
+
 def takes_callable1(f: Callable):
     f()
 
+
 takes_callable1(SubclassOfAny())
+
 
 def takes_callable2(f: Callable[[int], None]):
     f(1)
 
+
 takes_callable2(SubclassOfAny())
+
 
 class CallbackProtocol(Protocol):
     def __call__(self, x: int, /) -> None: ...
 
+
 def takes_callback_proto(f: CallbackProtocol):
     f(1)
 
+
 takes_callback_proto(SubclassOfAny())
+
 
 class OtherProtocol(Protocol):
     x: int
+
     @property
     def foo(self) -> bytes: ...
     @foo.setter
     def foo(self, x: str) -> None: ...
 
+
 def takes_other_protocol(f: OtherProtocol): ...
+
 
 takes_other_protocol(SubclassOfAny())
 ```
@@ -123,8 +145,10 @@ A subclass of `Any` cannot be assigned to literal types, since those cannot be s
 ```py
 from typing import Any, Literal
 
+
 class MockAny(Any):
     pass
+
 
 x: Literal[1] = MockAny()  # error: [invalid-assignment]
 ```
@@ -160,6 +184,7 @@ static_assert(is_assignable_to(TypeOf[Any], type))
 
 ```py
 from typing import Any
+
 
 # error: [invalid-type-form] "Special form `typing.Any` expected no type parameter"
 def f(x: Any[int]):

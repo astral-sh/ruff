@@ -11,7 +11,9 @@ type is a subtype of `Never`, except for `Never` itself or type variables with u
 from ty_extensions import static_assert, is_subtype_of
 from typing_extensions import Never, TypeVar
 
+
 class C: ...
+
 
 static_assert(is_subtype_of(Never, int))
 static_assert(is_subtype_of(Never, object))
@@ -21,6 +23,7 @@ static_assert(is_subtype_of(Never, Never))
 static_assert(not is_subtype_of(int, Never))
 
 T = TypeVar("T", bound=Never)
+
 
 def _(t: T):
     static_assert(is_subtype_of(T, Never))
@@ -41,8 +44,10 @@ static_assert(is_assignable_to(Never, object))
 static_assert(is_assignable_to(Never, Any))
 static_assert(is_assignable_to(Never, Never))
 
+
 def raise_error() -> Never:
     raise Exception("...")
+
 
 def f(divisor: int) -> None:
     x: float = (1 / divisor) if divisor != 0 else raise_error()
@@ -57,17 +62,21 @@ it calls itself recursively. All of these functions "Never" return control back 
 ```py
 from typing_extensions import Never
 
+
 def raises_unconditionally() -> Never:
     raise Exception("This function always raises an exception")
+
 
 def exits_unconditionally() -> Never:
     import sys
 
     return sys.exit(1)
 
+
 def loops_forever() -> Never:
     while True:
         pass
+
 
 def recursive_never() -> Never:
     return recursive_never()
@@ -90,7 +99,9 @@ it is disjoint from every other type:
 from ty_extensions import static_assert, is_disjoint_from
 from typing_extensions import Never
 
+
 class C: ...
+
 
 static_assert(is_disjoint_from(Never, int))
 static_assert(is_disjoint_from(Never, object))
@@ -106,8 +117,12 @@ static_assert(is_disjoint_from(Never, Never))
 from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 
+
 class P: ...
+
+
 class Q: ...
+
 
 static_assert(is_equivalent_to(P | Never | Q | None, P | Q | None))
 ```
@@ -120,8 +135,12 @@ Intersecting with `Never` results in `Never`:
 from ty_extensions import static_assert, is_equivalent_to, Intersection
 from typing_extensions import Never
 
+
 class P: ...
+
+
 class Q: ...
+
 
 static_assert(is_equivalent_to(Intersection[P, Never, Q], Never))
 ```

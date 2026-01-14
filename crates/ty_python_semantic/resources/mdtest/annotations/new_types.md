@@ -9,6 +9,7 @@ from typing_extensions import NewType
 
 UserId = NewType("UserId", int)
 
+
 def _(user_id: UserId):
     reveal_type(user_id)  # revealed: UserId
 ```
@@ -38,9 +39,11 @@ Foo(Bar(Foo(42)))  # allowed: `Bar` is a subtype of `int`.
 Foo(True)  # allowed: `bool` is a subtype of `int`.
 Foo("forty-two")  # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `Literal["forty-two"]`"
 
+
 def f(_: int): ...
 def g(_: Foo): ...
 def h(_: Bar): ...
+
 
 f(42)
 f(Foo(42))
@@ -60,10 +63,13 @@ h(Bar(Foo(42)))
 ```py
 from typing_extensions import NewType
 
+
 class Foo:
     foo_member: str = "hello"
+
     def foo_method(self) -> int:
         return 42
+
 
 Bar = NewType("Bar", Foo)
 Baz = NewType("Baz", Bar)
@@ -88,15 +94,20 @@ from ty_extensions import CallableTypeOf
 
 Foo = NewType("Foo", int)
 
+
 def _(obj: CallableTypeOf[Foo]):
     reveal_type(obj)  # revealed: (int, /) -> Foo
 
+
 def f(_: Callable[[int], Foo]): ...
+
 
 f(Foo)
 map(Foo, [1, 2, 3])
 
+
 def g(_: Callable[[str], Foo]): ...
+
 
 g(Foo)  # error: [invalid-argument-type]
 ```
@@ -112,18 +123,22 @@ i = N(42)
 
 y: Callable[..., Any] = i  # error: [invalid-assignment] "Object of type `N` is not assignable to `(...) -> Any`"
 
+
 # error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `N`"
 def f(x: CallableTypeOf[i]):
     reveal_type(x)  # revealed: Unknown
+
 
 class SomethingCallable:
     def __call__(self, a: str) -> bytes:
         raise NotImplementedError
 
+
 N2 = NewType("N2", SomethingCallable)
 j = N2(SomethingCallable())
 
 z: Callable[[str], bytes] = j  # fine
+
 
 def g(x: CallableTypeOf[j]):
     reveal_type(x)  # revealed: (a: str) -> bytes
@@ -133,6 +148,7 @@ def g(x: CallableTypeOf[j]):
 
 ```py
 from typing_extensions import NewType
+
 
 def _(name: str) -> None:
     _ = NewType(name, int)  # error: [invalid-newtype] "The first argument to `NewType` must be a string literal"
@@ -204,6 +220,7 @@ class Bar:
 
     def __contains__(self, key: Foo) -> bool:
         return True
+
 
 reveal_type(Foo(42) + Bar())  # revealed: Foo
 reveal_type(Bar() + Foo(42))  # revealed: Foo
@@ -279,11 +296,15 @@ type:
 ```py
 from collections.abc import Callable
 
+
 def f(_: Callable[[int | float], Foo]): ...
+
 
 f(Foo)
 
+
 def g(_: Callable[[int | float | complex], Bar]): ...
+
 
 g(Bar)
 ```
@@ -320,6 +341,7 @@ class Bing:
 
     def __contains__(self, key: Foo) -> bool:
         return True
+
 
 reveal_type(Foo(3.14) + Bing())  # revealed: Foo
 reveal_type(Bing() + Foo(42))  # revealed: Foo
@@ -439,6 +461,7 @@ from typing import NewType
 
 N = NewType("N", int)
 
+
 def f(x: N):
     reveal_type(isinstance(x, int))  # revealed: Literal[True]
 ```
@@ -470,6 +493,7 @@ from typing import NewType
 
 X = NewType("X", int)
 
+
 class Foo(X): ...  # error: [invalid-base]
 ```
 
@@ -481,11 +505,14 @@ class Foo(X): ...  # error: [invalid-base]
 from enum import Enum
 from typing import NewType
 
+
 class Foo(Enum):
     X = 0
     Y = 1
 
+
 N = NewType("N", Foo)
+
 
 def f(x: N):
     match x:
@@ -530,13 +557,17 @@ reveal_type(Bar(42))  # revealed: Bar
 ```py
 from typing import NewType, Protocol, TypedDict
 
+
 class Id(Protocol):
     code: int
 
+
 UserId = NewType("UserId", Id)  # error: [invalid-newtype]
+
 
 class Foo(TypedDict):
     a: int
+
 
 Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
 ```
@@ -578,11 +609,15 @@ from stub import N, A
 
 n = N(A())  # fine
 
+
 def f(x: A): ...
+
 
 f(n)  # fine
 
+
 class Invalid: ...
+
 
 bad = N(Invalid())  # error: [invalid-argument-type]
 ```

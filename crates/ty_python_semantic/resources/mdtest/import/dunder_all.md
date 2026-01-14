@@ -13,6 +13,8 @@ NOTE: This file only includes the usage of `__all__` for named-imports i.e.,
 
 ```py
 class A: ...
+
+
 class B: ...
 ```
 
@@ -36,15 +38,23 @@ from the local scope of a function or class.
 ```py
 __all__ = ["A"]
 
+
 def foo():
     __all__.append("B")
+
 
 class Foo:
     __all__ += ["C"]
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 foo()
 ```
@@ -70,7 +80,10 @@ According to the [specification], the following idioms are supported:
 ```py
 __all__ = ["A", "B"]
 
+
 class A: ...
+
+
 class B: ...
 ```
 
@@ -79,7 +92,10 @@ class B: ...
 ```py
 __all__: list[str] = ["C", "D"]
 
+
 class C: ...
+
+
 class D: ...
 ```
 
@@ -104,12 +120,19 @@ reveal_type(dunder_all_names(exporter_annotated))
 ```py
 __all__ = ["A", "B"]
 
+
 class A: ...
+
+
 class B: ...
+
 
 __all__ = ["C", "D"]
 
+
 class C: ...
+
+
 class D: ...
 ```
 
@@ -118,11 +141,16 @@ class D: ...
 ```py
 __all__ = ["X"]
 
+
 class X: ...
+
 
 __all__: list[str] = ["Y", "Z"]
 
+
 class Y: ...
+
+
 class Z: ...
 ```
 
@@ -147,7 +175,10 @@ reveal_type(dunder_all_names(exporter_annotated))
 ```py
 __all__ = ("A", "B")
 
+
 class A: ...
+
+
 class B: ...
 ```
 
@@ -156,7 +187,10 @@ class B: ...
 ```py
 __all__: tuple[str, ...] = ("C", "D")
 
+
 class C: ...
+
+
 class D: ...
 ```
 
@@ -181,12 +215,19 @@ reveal_type(dunder_all_names(exporter_annotated))
 ```py
 __all__ = ("A", "B")
 
+
 class A: ...
+
+
 class B: ...
+
 
 __all__ = ("C", "D")
 
+
 class C: ...
+
+
 class D: ...
 ```
 
@@ -195,11 +236,16 @@ class D: ...
 ```py
 __all__ = ("X",)
 
+
 class X: ...
+
 
 __all__: tuple[str, ...] = ("Y", "Z")
 
+
 class Y: ...
+
+
 class Z: ...
 ```
 
@@ -224,7 +270,10 @@ reveal_type(dunder_all_names(exporter_annotated))
 ```py
 __all__ = ["A", "B"]
 
+
 class A: ...
+
+
 class B: ...
 ```
 
@@ -237,7 +286,10 @@ __all__ = []
 __all__ += ["C", "D"]
 __all__ += subexporter.__all__
 
+
 class C: ...
+
+
 class D: ...
 ```
 
@@ -305,7 +357,10 @@ reveal_type(dunder_all_names(module))  # revealed: tuple[Literal["bar"], Literal
 ```py
 __all__ = ["A", "B"]
 
+
 class A: ...
+
+
 class B: ...
 ```
 
@@ -320,7 +375,10 @@ __all__.extend(("E", "F"))
 __all__.extend({"G", "H"})
 __all__.extend(subexporter.__all__)
 
+
 class C: ...
+
+
 class D: ...
 ```
 
@@ -342,7 +400,10 @@ reveal_type(dunder_all_names(exporter))
 __all__ = ["A"]
 __all__.append("B")
 
+
 class A: ...
+
+
 class B: ...
 ```
 
@@ -368,7 +429,10 @@ __all__.remove("A")
 # TODO: This raises `ValueError` at runtime, maybe we should raise a diagnostic as well?
 __all__.remove("C")
 
+
 class A: ...
+
+
 class B: ...
 ```
 
@@ -394,8 +458,13 @@ __all__.append("B")
 __all__.extend(["C"])
 __all__.remove("B")
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
 ```
 
@@ -407,6 +476,7 @@ import subexporter
 __all__ = []
 __all__ += ["D"]
 __all__ += subexporter.__all__
+
 
 class D: ...
 ```
@@ -433,7 +503,10 @@ Idioms that are not mentioned in the [specification] are not recognized by `ty` 
 ```py
 __all__ = ["A", "B"]
 
+
 class A: ...
+
+
 class B: ...
 ```
 
@@ -479,7 +552,10 @@ __all__.pop()
 # TODO: warning diagnostic
 __all__ = {"C", "D"}
 
+
 class C: ...
+
+
 class D: ...
 ```
 
@@ -503,7 +579,10 @@ defined for that module. This is also to avoid false positives.
 ```py
 __all__ = ("A", "B")
 
+
 class A: ...
+
+
 class B: ...
 ```
 
@@ -518,6 +597,7 @@ reveal_type(dunder_all_names(subexporter))
 
 # TODO: warning diagnostic
 __all__ = ("C", *subexporter.__all__)
+
 
 class C: ...
 ```
@@ -555,15 +635,20 @@ elif sys.version_info >= (3, 11):
 else:
     __all__ += ["Python310"]
 
+
 class AllVersion: ...
 
+
 if sys.version_info >= (3, 12):
+
     class Python312: ...
 
 elif sys.version_info >= (3, 11):
+
     class Python311: ...
 
 else:
+
     class Python310: ...
 ```
 
@@ -598,15 +683,20 @@ elif sys.version_info >= (3, 11):
 else:
     __all__ += ["Python310"]
 
+
 class AllVersion: ...
 
+
 if sys.version_info >= (3, 12):
+
     class Python312: ...
 
 elif sys.version_info >= (3, 11):
+
     class Python311: ...
 
 else:
+
     class Python310: ...
 ```
 
@@ -641,15 +731,20 @@ elif sys.version_info >= (3, 11):
 else:
     __all__ += ["Python310"]
 
+
 class AllVersion: ...
 
+
 if sys.version_info >= (3, 12):
+
     class Python312: ...
 
 elif sys.version_info >= (3, 11):
+
     class Python311: ...
 
 else:
+
     class Python310: ...
 ```
 
@@ -686,15 +781,22 @@ if sys.version_info >= (3, 11):
 if sys.version_info >= (3, 10):
     __all__ += ["Python310"]
 
+
 class AllVersion: ...
 
+
 if sys.version_info >= (3, 12):
+
     class Python312: ...
 
+
 if sys.version_info >= (3, 11):
+
     class Python311: ...
 
+
 if sys.version_info >= (3, 10):
+
     class Python310: ...
 ```
 
@@ -719,6 +821,7 @@ reveal_type(dunder_all_names(exporter))
 ```py
 __all__ = ["A"]
 
+
 class A: ...
 ```
 
@@ -739,6 +842,7 @@ reveal_type(dunder_all_names(exporter))
 ```py
 __all__ = ["A"]
 
+
 class A: ...
 ```
 
@@ -748,6 +852,7 @@ class A: ...
 from subexporter import __all__
 
 __all__.append("B")
+
 
 class B: ...
 ```
@@ -775,6 +880,7 @@ module.
 ```py
 __all__ = ["A", "__all__"]
 
+
 class A: ...
 ```
 
@@ -787,6 +893,7 @@ from subexporter import *
 reveal_type(__all__)  # revealed: list[Unknown | str]
 
 __all__.append("B")
+
 
 class B: ...
 ```
@@ -811,6 +918,7 @@ reveal_type(dunder_all_names(exporter))
 ```py
 __all__ = ["A"]
 
+
 class A: ...
 ```
 
@@ -824,6 +932,7 @@ reveal_type(__all__)  # revealed: Unknown
 
 # error: [unresolved-reference]
 __all__.append("B")
+
 
 class B: ...
 ```

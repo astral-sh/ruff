@@ -10,6 +10,7 @@
 ```py
 from typing import no_type_check
 
+
 @no_type_check
 def test() -> int:
     return a + 5
@@ -19,6 +20,7 @@ def test() -> int:
 
 ```py
 from typing import no_type_check
+
 
 @no_type_check
 def test() -> int:
@@ -30,6 +32,7 @@ def test() -> int:
 
 ```py
 from typing import no_type_check
+
 
 @no_type_check
 def test() -> int:
@@ -44,6 +47,7 @@ Don't suppress diagnostics for decorators appearing before the `no_type_check` d
 
 ```py
 from typing import no_type_check
+
 
 @unknown_decorator  # error: [unresolved-reference]
 @no_type_check
@@ -63,6 +67,7 @@ the discussion on the
 ```py
 from typing import no_type_check
 
+
 @no_type_check
 @unknown_decorator
 def test() -> int:
@@ -76,6 +81,7 @@ def test() -> int:
 ```py
 from typing import no_type_check
 
+
 @no_type_check
 def test(a: int = "test"):
     return x + 5
@@ -85,6 +91,7 @@ def test(a: int = "test"):
 
 ```py
 from typing import no_type_check
+
 
 @no_type_check
 def test() -> Undefined:
@@ -104,6 +111,7 @@ class.
 ```py
 from typing import no_type_check
 
+
 @no_type_check
 class Test:
     def test(self):
@@ -114,6 +122,7 @@ class Test:
 
 ```py
 from typing import no_type_check
+
 
 @no_type_check
 def test():

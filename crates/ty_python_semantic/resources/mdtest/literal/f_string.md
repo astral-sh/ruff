@@ -5,6 +5,7 @@
 ```py
 from typing_extensions import Literal
 
+
 def _(x: Literal[0], y: str, z: Literal[False]):
     reveal_type(f"hello")  # revealed: Literal["hello"]
     reveal_type(f"h {x}")  # revealed: Literal["h 0"]

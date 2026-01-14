@@ -10,8 +10,12 @@ The type `Not[T]` is the complement of the type `T`. It describes the set of all
 ```py
 from ty_extensions import Not, static_assert, is_disjoint_from
 
+
 class T: ...
+
+
 class S(T): ...
+
 
 static_assert(is_disjoint_from(Not[T], T))
 static_assert(is_disjoint_from(Not[T], S))
@@ -25,7 +29,9 @@ to `object`:
 ```py
 from ty_extensions import Not, static_assert, is_equivalent_to
 
+
 class T: ...
+
 
 static_assert(is_equivalent_to(T | Not[T], object))
 ```
@@ -37,8 +43,12 @@ If `S <: T`, then `Not[T] <: Not[S]`:, similar to how negation in logic reverses
 ```py
 from ty_extensions import Not, static_assert, is_subtype_of
 
+
 class T: ...
+
+
 class S(T): ...
+
 
 static_assert(is_subtype_of(S, T))
 static_assert(is_subtype_of(Not[T], Not[S]))
@@ -52,8 +62,12 @@ Assignability relationships are similarly reversed:
 from ty_extensions import Not, Intersection, static_assert, is_assignable_to
 from typing import Any
 
+
 class T: ...
+
+
 class S(T): ...
+
 
 static_assert(is_assignable_to(S, T))
 static_assert(is_assignable_to(Not[T], Not[S]))
@@ -71,11 +85,14 @@ If two types `P` and `Q` are disjoint, then `P` must be a subtype of `Not[Q]`, a
 from ty_extensions import Not, static_assert, is_subtype_of, is_disjoint_from
 from typing import final
 
+
 @final
 class P: ...
 
+
 @final
 class Q: ...
+
 
 static_assert(is_disjoint_from(P, Q))
 
@@ -91,7 +108,10 @@ set-theoretic types:
 ```py
 from ty_extensions import Not, static_assert, is_equivalent_to, Intersection
 
+
 class P: ...
+
+
 class Q: ...
 ```
 

@@ -22,6 +22,7 @@ A bare `Callable` without any type arguments:
 ```py
 from typing import Callable
 
+
 def _(c: Callable):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -32,6 +33,7 @@ When it's not a list:
 
 ```py
 from typing import Callable
+
 
 # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
 def _(c: Callable[int, str]):
@@ -62,6 +64,7 @@ Using a parameter list:
 
 ```py
 from typing import Callable
+
 
 # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int, str]]):
@@ -111,6 +114,7 @@ which argument corresponds to either the parameters or the return type.
 ```py
 from typing import Callable
 
+
 # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int], str, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -151,6 +155,7 @@ def _(c: Callable[
 ```py
 from typing import Callable
 
+
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
 def _(c: Callable[[int], [str]]):
     reveal_type(c)  # revealed: (int, /) -> Unknown
@@ -180,6 +185,7 @@ A simple `Callable` with multiple parameters and a return type:
 ```py
 from typing import Callable
 
+
 def _(c: Callable[[int, str], int]):
     reveal_type(c)  # revealed: (int, str, /) -> int
 ```
@@ -188,6 +194,7 @@ def _(c: Callable[[int, str], int]):
 
 ```py
 from typing import Callable, Union
+
 
 def _(
     c: Callable[[Union[int, str]], int] | None,
@@ -205,7 +212,9 @@ def _(
 from typing import Callable, Union
 from ty_extensions import Intersection, Not
 
+
 class Foo: ...
+
 
 def _(
     c: Intersection[Callable[[Union[int, str]], int], int],
@@ -226,6 +235,7 @@ A nested `Callable` as one of the parameter types:
 ```py
 from typing import Callable
 
+
 def _(c: Callable[[Callable[[int], str]], int]):
     reveal_type(c)  # revealed: ((int, /) -> str, /) -> int
 ```
@@ -245,6 +255,7 @@ is a [gradual form] indicating that the type is consistent with any input signat
 ```py
 from typing import Callable
 
+
 def gradual_form(c: Callable[..., str]):
     reveal_type(c)  # revealed: (...) -> str
 ```
@@ -255,6 +266,7 @@ Using `Concatenate` as the first argument to `Callable`:
 
 ```py
 from typing_extensions import Callable, Concatenate
+
 
 def _(c: Callable[Concatenate[int, str, ...], int]):
     # TODO: Should reveal the correct signature
@@ -306,6 +318,7 @@ Using a `ParamSpec` in a `Callable` annotation:
 ```py
 from typing_extensions import Callable
 
+
 def _[**P1](c: Callable[P1, int]):
     reveal_type(P1.args)  # revealed: P1@_.args
     reveal_type(P1.kwargs)  # revealed: P1@_.kwargs
@@ -320,6 +333,7 @@ from typing_extensions import ParamSpec
 
 P2 = ParamSpec("P2")
 
+
 def _(c: Callable[P2, int]):
     reveal_type(c)  # revealed: (**P2@_) -> int
 ```
@@ -333,6 +347,7 @@ from typing_extensions import Callable, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 
+
 def _(c: Callable[[int, *Ts], int]):
     # TODO: Should reveal the correct signature
     reveal_type(c)  # revealed: (...) -> int
@@ -343,6 +358,7 @@ And, using the legacy syntax using `Unpack`:
 ```py
 from typing_extensions import Unpack
 
+
 def _(c: Callable[[int, Unpack[Ts]], int]):
     # TODO: Should reveal the correct signature
     reveal_type(c)  # revealed: (...) -> int
@@ -352,6 +368,7 @@ def _(c: Callable[[int, Unpack[Ts]], int]):
 
 ```py
 from typing import Callable
+
 
 def _(c: Callable[[int], int]):
     reveal_type(c.__init__)  # revealed: bound method object.__init__() -> None
@@ -379,6 +396,7 @@ class MyCallable:
     def __call__(self) -> None:
         pass
 
+
 f_wrong(MyCallable())  # raises `AttributeError` at runtime
 ```
 
@@ -387,6 +405,7 @@ of the attribute first:
 
 ```py
 from inspect import getattr_static
+
 
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
@@ -414,12 +433,15 @@ def f_okay(c: Callable[[], None]):
 ```py
 from ty_extensions import into_callable
 
+
 class Base:
     def __init__(self) -> None:
         pass
 
+
 class A(Base):
     pass
+
 
 # revealed: () -> A
 reveal_type(into_callable(A))

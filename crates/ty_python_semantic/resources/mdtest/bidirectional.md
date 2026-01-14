@@ -18,8 +18,10 @@ python-version = "3.12"
 ```py
 from typing import Literal
 
+
 def list1[T](x: T) -> list[T]:
     return [x]
+
 
 l1: list[Literal[1]] = list1(1)
 reveal_type(l1)  # revealed: list[Literal[1]]
@@ -30,6 +32,7 @@ reveal_type(l2)  # revealed: list[int]
 l3: list[int | str] | None = list1(1)
 reveal_type(l3)  # revealed: list[int | str]
 
+
 def _(l: list[int] | None = None):
     l1 = l or list()
     reveal_type(l1)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
@@ -38,8 +41,10 @@ def _(l: list[int] | None = None):
     # it would be better if this were `list[int]`? (https://github.com/astral-sh/ty/issues/136)
     reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
+
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
+
 
 l5: int | list[int] = f(1, True)
 
@@ -55,8 +60,10 @@ reveal_type(b)  # revealed: list[list[int]]
 ```py
 from typing import TypedDict
 
+
 class TD(TypedDict):
     x: int
+
 
 d1 = {"x": 1}
 d2: TD = {"x": 1}
@@ -69,8 +76,10 @@ reveal_type(d2)  # revealed: TD
 reveal_type(d3)  # revealed: dict[str, int]
 reveal_type(d4)  # revealed: TD
 
+
 def _() -> TD:
     return {"x": 1}
+
 
 def _() -> TD:
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
@@ -88,11 +97,14 @@ python-version = "3.12"
 ```py
 from typing import overload, Callable
 
+
 def list1[T](x: T) -> list[T]:
     return [x]
 
+
 def get_data() -> dict | None:
     return {}
+
 
 def wrap_data() -> list[dict]:
     if not (res := get_data()):
@@ -103,14 +115,17 @@ def wrap_data() -> list[dict]:
     # by bidirectional type inference using the annotated return type, and the type of `res` is not used.
     return list1(res)
 
+
 def wrap_data2() -> list[dict] | None:
     if not (res := get_data()):
         return None
     reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
     return list1(res)
 
+
 def deco[T](func: Callable[[], T]) -> Callable[[], T]:
     return func
+
 
 def outer() -> Callable[[], list[dict]]:
     @deco
@@ -119,7 +134,9 @@ def outer() -> Callable[[], list[dict]]:
             return list1({})
         reveal_type(list1(res))  # revealed: list[dict[Unknown, Unknown] & ~AlwaysFalsy]
         return list1(res)
+
     return inner
+
 
 @overload
 def f(x: int) -> list[int]: ...
@@ -132,14 +149,18 @@ def f(x: int | str) -> list[int] | list[str]:
     else:
         return list1(x)
 
+
 reveal_type(f(1))  # revealed: list[int]
 reveal_type(f("a"))  # revealed: list[str]
+
 
 async def g() -> list[int | str]:
     return list1(1)
 
+
 def h[T](x: T, cond: bool) -> T | list[T]:
     return i(x, cond)
+
 
 def i[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
@@ -160,6 +181,7 @@ Function parameter annotations:
 ```py
 def b(x: list[Literal[1]]): ...
 
+
 b([1])
 ```
 
@@ -169,6 +191,7 @@ Bound method parameter annotations:
 class C:
     def __init__(self, x: list[Literal[1]]): ...
     def foo(self, x: list[Literal[1]]): ...
+
 
 C([1]).foo([1])
 ```
@@ -186,6 +209,7 @@ Declared attribute types:
 class E:
     a: list[Literal[1]]
     b: list[Literal[1]]
+
 
 def _(e: E):
     e.a = [1]
@@ -211,6 +235,7 @@ Both meta and class/instance attribute annotations are used as type context:
 ```py
 from typing import Literal, Any
 
+
 class DataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> list[Literal[1]]:
         return []
@@ -218,8 +243,10 @@ class DataDescriptor:
     def __set__(self, instance: object, value: list[Literal[1]]) -> None:
         pass
 
+
 def lst[T](x: T) -> list[T]:
     return [x]
+
 
 def _(flag: bool):
     class Meta(type):
@@ -242,14 +269,18 @@ For union targets, each element of the union is considered as a separate type co
 ```py
 from typing import Literal
 
+
 class X:
     x: list[int | str]
+
 
 class Y:
     x: list[int | None]
 
+
 def lst[T](x: T) -> list[T]:
     return [x]
+
 
 def _(xy: X | Y):
     xy.x = lst(1)
@@ -269,11 +300,13 @@ calls:
 def f[T](x: T) -> list[T]:
     return [x]
 
+
 class A:
     def __new__(cls, value: list[int | str]):
         return super().__new__(cls, value)
 
     def __init__(self, value: list[int | None]): ...
+
 
 A(f(1))
 
@@ -295,6 +328,7 @@ The type context is propagated through both branches of conditional expressions:
 def f[T](x: T) -> list[T]:
     raise NotImplementedError
 
+
 def _(flag: bool):
     x1 = f(1) if flag else f(2)
     reveal_type(x1)  # revealed: list[int]
@@ -310,18 +344,23 @@ The key and value parameters types are used as type context for `__setitem__` du
 ```py
 from typing import TypedDict
 
+
 class Bar(TypedDict):
     baz: float
+
 
 def _(x: dict[str, Bar]):
     x["foo"] = reveal_type({"baz": 2})  # revealed: Bar
 
+
 class X:
     def __setitem__(self, key: Bar, value: Bar): ...
+
 
 def _(x: X):
     # revealed: Bar
     x[reveal_type({"baz": 1})] = reveal_type({"baz": 2})  # revealed: Bar
+
 
 # TODO: Support type context with union subscripting.
 def _(x: X | dict[Bar, Bar]):
@@ -344,6 +383,7 @@ Diagnostics unrelated to the type-context are only reported once:
 ```py
 def f[T](x: T) -> list[T]:
     return [x]
+
 
 def a(x: list[bool], y: list[bool]): ...
 def b(x: list[int], y: list[int]): ...
@@ -385,11 +425,14 @@ def _(a: object, b: object, flag: bool):
 ```py
 from typing import TypedDict
 
+
 class TD(TypedDict):
     y: int
 
+
 class X:
     td: TD
+
 
 def _(x: X, flag: bool):
     if flag:

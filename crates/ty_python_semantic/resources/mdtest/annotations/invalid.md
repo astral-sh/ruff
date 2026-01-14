@@ -9,7 +9,9 @@ import typing
 from ty_extensions import AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Literal, Never
 
+
 class A: ...
+
 
 def _(
     a: type[int],
@@ -49,12 +51,14 @@ def _(
         reveal_type(i_)  # revealed: Unknown
         reveal_type(j_)  # revealed: Unknown
 
+
 # Inspired by the conformance test suite at
 # https://github.com/python/typing/blob/d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc/conformance/tests/aliases_implicit.py#L88-L122
 B = [x for x in range(42)]
 C = {x for x in range(42)}
 D = {x: y for x, y in enumerate(range(42))}
 E = (x for x in range(42))
+
 
 def _(
     b: B,  # error: [invalid-type-form]
@@ -74,10 +78,12 @@ def _(
 def bar() -> None:
     return None
 
+
 def outer_sync():  # `yield` from is only valid syntax inside a synchronous function
     def _(
         a: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
     ): ...
+
 
 async def baz(): ...
 async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
@@ -120,12 +126,14 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         reveal_type(p)  # revealed: int | Unknown
         reveal_type(q)  # revealed: Unknown
 
+
 class Mat:
     def __init__(self, value: int):
         self.value = value
 
     def __matmul__(self, other) -> int:
         return 42
+
 
 def invalid_binary_operators(
     a: "1" + "2",  # error: [invalid-type-form] "Invalid binary operator `+` in type annotation"
@@ -186,9 +194,11 @@ def _(
     reveal_type(h)  # revealed: Unknown
     reveal_type(i)  # revealed: Unknown
 
+
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `list[int]`?"
 class name_0[name_2: [int]]:
     pass
+
 
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
 # error: [invalid-type-form] "Dict literals are not allowed in type expressions"
@@ -211,6 +221,7 @@ for this case:
 ```py
 import datetime
 
+
 def f(x: datetime): ...  # error: [invalid-type-form]
 ```
 
@@ -224,6 +235,7 @@ class Image: ...
 
 ```py
 from PIL import Image
+
 
 def g(x: Image): ...  # error: [invalid-type-form]
 ```

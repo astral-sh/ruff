@@ -16,9 +16,11 @@ the first argument:
 from ty_extensions import CallableTypeOf
 from typing import Callable
 
+
 class C1:
     def method(self: C1, x: int) -> str:
         return str(x)
+
 
 def _(
     accessed_on_class: CallableTypeOf[C1.method],
@@ -37,8 +39,10 @@ class NonDescriptorCallable2:
     def __call__(self, c2: C2, x: int) -> str:
         return str(x)
 
+
 class C2:
     non_descriptor_callable: NonDescriptorCallable2 = NonDescriptorCallable2()
+
 
 def _(
     accessed_on_class: CallableTypeOf[C2.non_descriptor_callable],
@@ -55,9 +59,11 @@ class NonDescriptorCallable3:
     def __call__(self, c3: C3, x: int) -> str:
         return str(x)
 
+
 class C3:
     def method(self: C3, x: int) -> str:
         return str(x)
+
     non_descriptor_callable: NonDescriptorCallable3 = NonDescriptorCallable3()
 
     callable_m: Callable[[C3, int], str] = method
@@ -113,8 +119,10 @@ intention that it shouldn't influence the method's descriptor behavior. For exam
 ```py
 from typing import Callable
 
+
 def memoize[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     raise NotImplementedError
+
 
 class C1:
     def method(self, x: int) -> str:
@@ -123,6 +131,7 @@ class C1:
     @memoize
     def method_decorated(self, x: int) -> str:
         return str(x)
+
 
 C1().method(1)
 
@@ -135,10 +144,12 @@ This also works with an argumentless `Callable` annotation:
 def memoize2(f: Callable) -> Callable:
     raise NotImplementedError
 
+
 class C2:
     @memoize2
     def method_decorated(self, x: int) -> str:
         return str(x)
+
 
 C2().method_decorated(1)
 ```
@@ -148,13 +159,16 @@ And with unions of `Callable` types:
 ```py
 from typing import Callable
 
+
 def expand(f: Callable[[C3, int], int]) -> Callable[[C3, int], int] | Callable[[C3, int], str]:
     raise NotImplementedError
+
 
 class C3:
     @expand
     def method_decorated(self, x: int) -> int:
         return x
+
 
 reveal_type(C3().method_decorated(1))  # revealed: int | str
 ```
@@ -167,10 +181,13 @@ but here we emit errors:
 def memoize3(f: Callable[[C4, int], str]) -> Callable[[C4, int], str]:
     raise NotImplementedError
 
+
 class C4:
     def method(self, x: int) -> str:
         return str(x)
+
     method_decorated = memoize3(method)
+
 
 # error: [missing-argument]
 # error: [invalid-argument-type]
@@ -194,11 +211,14 @@ class SquareCalculator:
     def __call__(self, x: float) -> int:
         return self.post_process(x * x)
 
+
 def square_then(c: Callable[[float], int]) -> Callable[[float], int]:
     return SquareCalculator(c)
 
+
 class Calculator:
     square_then_round = square_then(round)
+
 
 reveal_type(Calculator().square_then_round(3.14))  # revealed: Unknown | int
 ```
@@ -212,11 +232,14 @@ example. We generally treat dunder attributes as bound-method descriptors since 
 ```py
 from typing import Callable
 
+
 def pow_impl(tensor: Tensor, exponent: int) -> Tensor:
     raise NotImplementedError
 
+
 class Tensor:
     __pow__: Callable[[Tensor, int], Tensor] = pow_impl
+
 
 Tensor() ** 2
 ```
@@ -229,8 +252,10 @@ treat it as a bound-method descriptor:
 def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
     raise NotImplementedError
 
+
 class Matrix:
     __lt__ = make_comparison_operator("lt")
+
 
 Matrix() < Matrix()
 ```
@@ -245,13 +270,16 @@ function-like:
 ```py
 from typing import Callable
 
+
 def my_lossy_decorator(fn: Callable[..., int]) -> Callable[..., int]:
     return fn
+
 
 class MyClass:
     @my_lossy_decorator
     def method(self) -> int:
         return 42
+
 
 reveal_type(MyClass().method)  # revealed: (...) -> int
 reveal_type(MyClass().method.__name__)  # revealed: str
@@ -267,8 +295,10 @@ behavior.
 ```py
 from typing import Callable
 
+
 def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return func
+
 
 class C:
     @callable_identity
@@ -280,6 +310,7 @@ class C:
     @callable_identity
     def f2(cls, x: int) -> str:
         return "a"
+
 
 # error: [too-many-positional-arguments]
 # error: [invalid-argument-type]
@@ -303,17 +334,21 @@ The callable type of a type object is not function-like.
 from typing import ClassVar
 from ty_extensions import CallableTypeOf
 
+
 class WithNew:
     def __new__(self, x: int) -> WithNew:
         return super().__new__(WithNew)
+
 
 class WithInit:
     def __init__(self, x: int) -> None:
         pass
 
+
 class C:
     with_new: ClassVar[CallableTypeOf[WithNew]]
     with_init: ClassVar[CallableTypeOf[WithInit]]
+
 
 C.with_new(1)
 C().with_new(1)

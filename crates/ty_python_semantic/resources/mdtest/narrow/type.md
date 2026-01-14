@@ -5,11 +5,16 @@
 ```py
 from typing import final
 
+
 class A: ...
+
+
 class B: ...
+
 
 @final
 class C: ...
+
 
 def _(x: A | B, y: A | C):
     if type(x) is A:
@@ -43,11 +48,16 @@ def _(x: A | B, y: A | C):
 ```py
 from typing import final
 
+
 class A: ...
+
+
 class B: ...
+
 
 @final
 class C: ...
+
 
 def _(x: A | B, y: A | C):
     if type(x) is not A:
@@ -85,6 +95,7 @@ def f(x: list[int] | None):
     else:
         reveal_type(x)  # revealed: list[int]
 
+
 # frozenset is covariant
 def g(x: frozenset[bytes] | None):
     if type(x) is frozenset:
@@ -96,6 +107,7 @@ def g(x: frozenset[bytes] | None):
         reveal_type(x)  # revealed: frozenset[bytes] | None
     else:
         reveal_type(x)  # revealed: frozenset[bytes]
+
 
 def h(x: object):
     if type(x) is list:
@@ -123,7 +135,10 @@ python-version = "3.12"
 
 ```py
 class A[T]: ...
+
+
 class B: ...
+
 
 def f(x: A[int] | B):
     if type(x) is A[int]:
@@ -172,8 +187,12 @@ class IsEqualToEverything(type):
     def __eq__(cls, other):
         return True
 
+
 class A(metaclass=IsEqualToEverything): ...
+
+
 class B(metaclass=IsEqualToEverything): ...
+
 
 def _(x: A | B, y: object):
     if type(x) == A:
@@ -192,10 +211,14 @@ def _(x: A | B, y: object):
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 def type(x):
     return int
+
 
 def _(x: A | B):
     if type(x) is A:
@@ -235,7 +258,10 @@ def _(x: str | int):
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 def _(x: A | B):
     alias_for_type = type
@@ -258,7 +284,10 @@ class.
 
 ```py
 class A[T = int]: ...
+
+
 class B: ...
+
 
 def _[T](x: A | B):
     if type(x) is A[str]:
@@ -282,7 +311,10 @@ def _(val):
 
 ```py
 class Base: ...
+
+
 class Derived(Base): ...
+
 
 def _(x: Base):
     if type(x) is Base:

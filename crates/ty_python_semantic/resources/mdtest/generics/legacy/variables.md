@@ -117,6 +117,7 @@ T = TypeVar("T")
 ImplicitPositive = T
 Positive: TypeAlias = T
 
+
 def _(
     # error: [invalid-type-form] "A type variable itself cannot be specialized"
     a: T[int],
@@ -169,12 +170,15 @@ T = TypeVar("T")
 U = TypeVar("U", default=T)
 V = TypeVar("V", default=Union[T, U])
 
+
 class Valid(Generic[T, U, V]): ...
+
 
 reveal_type(Valid())  # revealed: Valid[Unknown, Unknown, Unknown]
 reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
 reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
 reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
+
 
 # TODO: error, default value for U isn't available in the generic context
 class Invalid(Generic[U]): ...
@@ -267,8 +271,10 @@ T = TypeVar("T", covariant=True, contravariant=True)
 ```py
 from typing_extensions import TypeVar
 
+
 def cond() -> bool:
     return True
+
 
 # error: [invalid-legacy-type-variable]
 T = TypeVar("T", covariant=cond())
@@ -394,6 +400,7 @@ from typing import Callable, TypeVar
 
 T = TypeVar("T", bound=Callable[[], int])
 
+
 def bound(f: T):
     reveal_type(f)  # revealed: T@bound
     reveal_type(f())  # revealed: int
@@ -403,6 +410,7 @@ Same with a constrained typevar, as long as all constraints are callable:
 
 ```py
 T = TypeVar("T", Callable[[], int], Callable[[], str])
+
 
 def constrained(f: T):
     reveal_type(f)  # revealed: T@constrained
@@ -418,20 +426,27 @@ from typing import TypeVar
 
 T_normal = TypeVar("T_normal")
 
+
 def normal(x: T_normal):
     reveal_type(type(x))  # revealed: type[T_normal@normal]
 
+
 T_bound_object = TypeVar("T_bound_object", bound=object)
+
 
 def bound_object(x: T_bound_object):
     reveal_type(type(x))  # revealed: type[T_bound_object@bound_object]
 
+
 T_bound_int = TypeVar("T_bound_int", bound=int)
+
 
 def bound_int(x: T_bound_int):
     reveal_type(type(x))  # revealed: type[T_bound_int@bound_int]
 
+
 T_constrained = TypeVar("T_constrained", int, str)
+
 
 def constrained(x: T_constrained):
     reveal_type(type(x))  # revealed: type[T_constrained@constrained]
@@ -465,8 +480,10 @@ from typing import TypeVar, Generic
 
 T = TypeVar("T", bound=list["G"])
 
+
 class G(Generic[T]):
     x: T
+
 
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
@@ -479,8 +496,10 @@ from typing import TypeVar, Generic
 # error: [invalid-type-arguments]
 T = TypeVar("T", bound="Node[int]")
 
+
 class Node(Generic[T]):
     pass
+
 
 # error: [invalid-type-arguments]
 def _(n: Node[str]):
@@ -503,9 +522,11 @@ from typing import Generic, TypeVar
 T = TypeVar("T")
 U = TypeVar("U", default=T)
 
+
 class C(Generic[T, U]):
     x: T
     y: U
+
 
 reveal_type(C[int, str]().x)  # revealed: int
 reveal_type(C[int, str]().y)  # revealed: str
@@ -515,8 +536,10 @@ reveal_type(C[int]().y)  # revealed: int
 # TODO: error
 V = TypeVar("V", default="V")
 
+
 class D(Generic[V]):
     x: V
+
 
 reveal_type(D().x)  # revealed: Unknown
 ```
@@ -535,9 +558,11 @@ from typing import Generic, TypeVar
 
 _DataT = TypeVar("_DataT", bound=int, default=int)
 
+
 class Event(Generic[_DataT]):
     def __init__(self, data: _DataT) -> None:
         self.data = data
+
 
 def async_fire_internal(event_data: _DataT):
     event: Event[_DataT] | None = None

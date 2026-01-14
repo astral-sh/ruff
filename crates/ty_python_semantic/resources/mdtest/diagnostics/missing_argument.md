@@ -13,6 +13,7 @@ too verbose for it to be worth it.
 def f(a, b=42): ...
 def g(a, b): ...
 
+
 class Foo:
     def method(self, a): ...
 ```
@@ -24,8 +25,10 @@ from module import f, g, Foo
 
 f()  # error: [missing-argument]
 
+
 def coinflip() -> bool:
     return True
+
 
 h = f if coinflip() else g
 

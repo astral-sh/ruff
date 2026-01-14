@@ -34,8 +34,10 @@ reveal_type(d)  # revealed: dict[Unknown | str, Unknown | int]
 def a(_: int) -> int:
     return 0
 
+
 def b(_: int) -> int:
     return 1
+
 
 x = {1: a, 2: b}
 reveal_type(x)  # revealed: dict[Unknown | int, Unknown | ((_: int) -> int)]

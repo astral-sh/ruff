@@ -28,8 +28,12 @@ def _(flag: bool):
 def get_object() -> object:
     return object()
 
+
 class A: ...
+
+
 class B: ...
+
 
 x = get_object()
 
@@ -50,11 +54,14 @@ reveal_type(x)  # revealed: object
 def get_object() -> object:
     return object()
 
+
 class A:
     def y() -> int:
         return 1
 
+
 class B: ...
+
 
 x = get_object()
 
@@ -79,9 +86,11 @@ python-version = "3.12"
 ```py
 from typing import assert_never
 
+
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
+
 
 def f(x: Covariant[int]):
     match x:
@@ -104,10 +113,12 @@ python-version = "3.12"
 ```py
 from typing import assert_never, final
 
+
 @final
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
+
 
 def f(x: Covariant[int]):
     match x:
@@ -129,12 +140,14 @@ from typing import Any
 
 X = Any
 
+
 def f(obj: object):
     match obj:
         case int():
             reveal_type(obj)  # revealed: int
         case X():
             reveal_type(obj)  # revealed: Any & ~int
+
 
 def g(obj: object, Y: Any):
     match obj:
@@ -153,6 +166,7 @@ Consider the following example.
 
 ```py
 from typing import Literal
+
 
 def _(x: Literal["foo"] | int):
     match x:
@@ -176,8 +190,10 @@ More examples follow.
 ```py
 from typing import Literal
 
+
 class C:
     pass
+
 
 def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
     match x:
@@ -200,8 +216,10 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
 ```py
 from typing import Literal
 
+
 class C:
     pass
+
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
@@ -219,10 +237,12 @@ def _(x: Literal["foo", b"bar"] | int):
 from typing import Literal
 from enum import Enum
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
+
 
 def _(color: Color):
     match color:
@@ -241,9 +261,15 @@ def _(color: Color):
         case _:
             reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: A | B | C):
     match x:
@@ -272,6 +298,7 @@ def _(x: A | B | C):
 ```py
 from typing import Literal
 
+
 def _(x: Literal["foo", b"bar"] | int):
     match x:
         case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo"] | int
@@ -287,6 +314,7 @@ def _(x: Literal["foo", b"bar"] | int):
 ```py
 def get_object() -> object:
     return object()
+
 
 x = get_object()
 
@@ -310,6 +338,7 @@ reveal_type(x)  # revealed: object
 ```py
 def get_object() -> object:
     return object()
+
 
 x = get_object()
 
@@ -338,6 +367,7 @@ to return `self` in the `assert_yes` method below:
 ```py
 from enum import Enum
 from typing_extensions import Self, assert_never
+
 
 class Answer(Enum):
     NO = 0
@@ -368,6 +398,7 @@ class Answer(Enum):
                 reveal_type(self)  # revealed: Self@assert_yes & ~Literal[Answer.YES]
                 raise ValueError("Answer is not YES")
 
+
 Answer.YES.is_yes()
 
 try:
@@ -383,9 +414,15 @@ Narrow unions of tuples based on literal tag elements in `match` statements:
 ```py
 from typing import Literal
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
     match x[0]:
@@ -399,6 +436,7 @@ def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
         case _:
             reveal_type(x)  # revealed: Never
 
+
 # With int literals
 def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
     match x[0]:
@@ -409,6 +447,7 @@ def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
         case _:
             reveal_type(x)  # revealed: Never
 
+
 # With bytes literals
 def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
     match x[0]:
@@ -418,6 +457,7 @@ def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
             reveal_type(x)  # revealed: tuple[Literal[b"b"], B]
         case _:
             reveal_type(x)  # revealed: Never
+
 
 # Using index 1 instead of 0
 def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):

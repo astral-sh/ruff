@@ -8,6 +8,7 @@
 def coinflip() -> bool:
     return True
 
+
 if coinflip():
     y = 3
 
@@ -36,6 +37,7 @@ reveal_type(y)  # revealed: Literal[3]
 ```py
 def coinflip() -> bool:
     return True
+
 
 if coinflip():
     y: int = 3
@@ -70,6 +72,7 @@ Importing a possibly undeclared name still gives us its declared type:
 def coinflip() -> bool:
     return True
 
+
 if coinflip():
     x: int
 ```
@@ -94,9 +97,11 @@ def f(): ...
 def coinflip() -> bool:
     return True
 
+
 if coinflip():
     from c import f
 else:
+
     def f(): ...
 ```
 
@@ -123,6 +128,7 @@ x: int
 ```py
 def coinflip() -> bool:
     return True
+
 
 if coinflip():
     from c import x

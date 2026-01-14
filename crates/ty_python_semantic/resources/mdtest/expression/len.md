@@ -64,9 +64,16 @@ Tuple subclasses:
 
 ```py
 class EmptyTupleSubclass(tuple[()]): ...
+
+
 class Length1TupleSubclass(tuple[int]): ...
+
+
 class Length2TupleSubclass(tuple[int, str]): ...
+
+
 class UnknownLengthTupleSubclass(tuple[int, ...]): ...
+
 
 reveal_type(len(EmptyTupleSubclass()))  # revealed: Literal[0]
 reveal_type(len(Length1TupleSubclass((1,))))  # revealed: Literal[1]
@@ -76,9 +83,11 @@ reveal_type(len(UnknownLengthTupleSubclass((1, 2, 3))))  # revealed: int
 reveal_type(tuple[int, int].__len__)  # revealed: (self: tuple[int, int], /) -> Literal[2]
 reveal_type(tuple[int, ...].__len__)  # revealed: (self: tuple[int, ...], /) -> int
 
+
 def f(x: tuple[int, int], y: tuple[int, ...]):
     reveal_type(x.__len__)  # revealed: () -> Literal[2]
     reveal_type(y.__len__)  # revealed: () -> int
+
 
 reveal_type(EmptyTupleSubclass.__len__)  # revealed: (self: tuple[()], /) -> Literal[0]
 reveal_type(EmptyTupleSubclass().__len__)  # revealed: () -> Literal[0]
@@ -91,15 +100,19 @@ If `__len__` is overridden, we use the overridden return type:
 ```py
 from typing import Literal
 
+
 class UnknownLengthSubclassWithDunderLenOverridden(tuple[int, ...]):
     def __len__(self) -> Literal[42]:
         return 42
 
+
 reveal_type(len(UnknownLengthSubclassWithDunderLenOverridden()))  # revealed: Literal[42]
+
 
 class FixedLengthSubclassWithDunderLenOverridden(tuple[int]):
     def __len__(self) -> Literal[42]:  # error: [invalid-method-override]
         return 42
+
 
 reveal_type(len(FixedLengthSubclassWithDunderLenOverridden((1,))))  # revealed: Literal[42]
 ```
@@ -135,29 +148,36 @@ The returned value of `__len__` is implicitly and recursively converted to `int`
 ```py
 from typing import Literal
 
+
 class Zero:
     def __len__(self) -> Literal[0]:
         return 0
+
 
 class ZeroOrOne:
     def __len__(self) -> Literal[0, 1]:
         return 0
 
+
 class ZeroOrTrue:
     def __len__(self) -> Literal[0, True]:
         return 0
+
 
 class OneOrFalse:
     def __len__(self) -> Literal[1] | Literal[False]:
         return 1
 
+
 class OneOrFoo:
     def __len__(self) -> Literal[1, "foo"]:
         return 1
 
+
 class ZeroOrStr:
     def __len__(self) -> Literal[0] | str:
         return 0
+
 
 reveal_type(len(Zero()))  # revealed: Literal[0]
 reveal_type(len(ZeroOrOne()))  # revealed: Literal[0, 1]
@@ -176,13 +196,16 @@ reveal_type(len(ZeroOrStr()))  # revealed: int
 ```py
 from typing import Literal
 
+
 class LiteralTrue:
     def __len__(self) -> Literal[True]:
         return True
 
+
 class LiteralFalse:
     def __len__(self) -> Literal[False]:
         return False
+
 
 reveal_type(len(LiteralTrue()))  # revealed: Literal[1]
 reveal_type(len(LiteralFalse()))  # revealed: Literal[0]
@@ -193,9 +216,11 @@ reveal_type(len(LiteralFalse()))  # revealed: Literal[0]
 ```py
 from typing import Literal
 
+
 class Negative:
     def __len__(self) -> Literal[-1]:
         return -1
+
 
 # TODO: Emit a diagnostic
 reveal_type(len(Negative()))  # revealed: int
@@ -206,13 +231,16 @@ reveal_type(len(Negative()))  # revealed: int
 ```py
 from typing import Literal
 
+
 class SecondOptionalArgument:
     def __len__(self, v: int = 0) -> Literal[0]:
         return 0
 
+
 class SecondRequiredArgument:
     def __len__(self, v: int) -> Literal[1]:
         return 1
+
 
 # this is fine: the call succeeds at runtime since the second argument is optional
 reveal_type(len(SecondOptionalArgument()))  # revealed: Literal[0]
@@ -225,6 +253,7 @@ reveal_type(len(SecondRequiredArgument()))  # revealed: int
 
 ```py
 class NoDunderLen: ...
+
 
 # error: [invalid-argument-type]
 reveal_type(len(NoDunderLen()))  # revealed: int

@@ -11,6 +11,7 @@ Similarly, in `and` expressions, the right-hand side is evaluated only if the le
 ```py
 def _(flag: bool):
     class A: ...
+
     x: A | None = A() if flag else None
 
     isinstance(x, A) or reveal_type(x)  # revealed: None
@@ -23,16 +24,20 @@ def _(flag: bool):
 ```py
 from typing import final
 
+
 def _(flag: bool):
     class A: ...
+
     x: A | None = A() if flag else None
 
     isinstance(x, A) and reveal_type(x)  # revealed: A
     x is None and reveal_type(x)  # revealed: None
     reveal_type(x)  # revealed: A | None
 
+
 @final
 class FinalClass: ...
+
 
 # We know that no subclass of `FinalClass` can exist,
 # therefore no subtype of `FinalClass` can define `__bool__`
@@ -46,6 +51,7 @@ reveal_type(FinalClass() and None)  # revealed: None
 ```py
 def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
     class A: ...
+
     x: A | None = A() if flag1 else None
 
     flag2 and isinstance(x, A) and reveal_type(x)  # revealed: A
@@ -58,6 +64,7 @@ def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
 ```py
 def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
     class A: ...
+
     x: A | None = A() if flag1 else None
 
     flag2 or isinstance(x, A) or reveal_type(x)  # revealed: None
@@ -70,8 +77,10 @@ def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
 ```py
 from typing import Literal
 
+
 def _(flag1: bool, flag2: bool):
     class A: ...
+
     x: A | None | Literal[1] = A() if flag1 else None if flag2 else 1
 
     x is None or isinstance(x, A) or reveal_type(x)  # revealed: Literal[1]
@@ -82,8 +91,10 @@ def _(flag1: bool, flag2: bool):
 ```py
 from typing import Literal
 
+
 def _(flag1: bool, flag2: bool):
     class A: ...
+
     x: A | None | Literal[1] = A() if flag1 else None if flag2 else 1
 
     isinstance(x, A) or x is not None and reveal_type(x)  # revealed: Literal[1]

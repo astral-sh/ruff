@@ -12,6 +12,7 @@ An annotation of `float` means `int | float`, so `int` is assignable to it:
 def takes_float(x: float):
     pass
 
+
 def passes_int_to_float(x: int):
     # no error!
     takes_float(x)
@@ -31,9 +32,11 @@ It doesn't work the other way around:
 def takes_int(x: int):
     pass
 
+
 def passes_float_to_int(x: float):
     # error: [invalid-argument-type]
     takes_int(x)
+
 
 def assigns_float_to_int(x: float):
     # error: [invalid-assignment]
@@ -57,21 +60,26 @@ to it (but not the other way around):
 def takes_complex(x: complex):
     pass
 
+
 def passes_to_complex(x: float, y: int):
     # no errors!
     takes_complex(x)
     takes_complex(y)
+
 
 def assigns_to_complex(x: float, y: int):
     # no errors!
     a: complex = x
     b: complex = y
 
+
 def takes_int(x: int):
     pass
 
+
 def takes_float(x: float):
     pass
+
 
 def passes_complex(x: complex):
     # error: [invalid-argument-type]
@@ -79,11 +87,13 @@ def passes_complex(x: complex):
     # error: [invalid-argument-type]
     takes_float(x)
 
+
 def assigns_complex(x: complex):
     # error: [invalid-assignment]
     y: int = x
     # error: [invalid-assignment]
     z: float = x
+
 
 def f(x: complex):
     reveal_type(x)  # revealed: int | float | complex
@@ -97,6 +107,7 @@ be narrowed to `int` or `float`:
 ```py
 from typing_extensions import assert_type
 from ty_extensions import JustFloat
+
 
 def f(x: complex):
     reveal_type(x)  # revealed: int | float | complex

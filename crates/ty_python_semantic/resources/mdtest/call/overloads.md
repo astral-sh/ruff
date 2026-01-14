@@ -174,6 +174,7 @@ def f(x: C) -> C: ...
 ```py
 from overloaded import A, B, C, f
 
+
 def _(ab: A | B, ac: A | C, bc: B | C):
     reveal_type(f(ab))  # revealed: A | B
     reveal_type(f(*(ab,)))  # revealed: A | B
@@ -213,12 +214,14 @@ def f(x: B, y: D) -> D: ...
 ```py
 from overloaded import A, B, C, D, f
 
+
 def _(a_b: A | B):
     reveal_type(f(a_b, C()))  # revealed: A | C
     reveal_type(f(*(a_b, C())))  # revealed: A | C
 
     reveal_type(f(a_b, D()))  # revealed: B | D
     reveal_type(f(*(a_b, D())))  # revealed: B | D
+
 
 # But, if it doesn't, it should expand the second argument and try again:
 def _(a_b: A | B, c_d: C | D):
@@ -251,6 +254,7 @@ def f(x: B, y: D) -> D: ...
 
 ```py
 from overloaded import A, B, C, D, f
+
 
 def _(a: A, bc: B | C, cd: C | D):
     # This also tests that partial matching works correctly as the argument type expansion results
@@ -285,6 +289,7 @@ def f(x: _T) -> _T: ...
 ```py
 from overloaded import A, f
 
+
 def _(x: int, y: A | int):
     reveal_type(f(x))  # revealed: int
     reveal_type(f(*(x,)))  # revealed: int
@@ -317,6 +322,7 @@ def f[T](x: T) -> T: ...
 ```py
 from overloaded import B, f
 
+
 def _(x: int, y: B | int):
     reveal_type(f(x))  # revealed: int
     reveal_type(f(*(x,)))  # revealed: int
@@ -343,6 +349,7 @@ def f(x: Literal[False]) -> F: ...
 
 ```py
 from overloaded import f
+
 
 def _(flag: bool):
     reveal_type(f(True))  # revealed: T
@@ -380,6 +387,7 @@ def f(x: tuple[B, int], y: tuple[int, Literal[False]]) -> D: ...
 ```py
 from overloaded import A, B, f
 
+
 def _(x: tuple[A | B, int], y: tuple[int, bool]):
     reveal_type(f(x, y))  # revealed: A | B | C | D
     reveal_type(f(*(x, y)))  # revealed: A | B | C | D
@@ -406,6 +414,7 @@ def f(x: type[B]) -> B: ...
 
 ```py
 from overloaded import A, B, f
+
 
 def _(x: type[A | B]):
     reveal_type(x)  # revealed: type[A] | type[B]
@@ -444,6 +453,7 @@ def f(x: Literal[SomeEnum.C]) -> C: ...
 ```py
 from typing import Literal
 from overloaded import SomeEnum, A, B, C, f
+
 
 def _(x: SomeEnum, y: Literal[SomeEnum.A, SomeEnum.C]):
     reveal_type(f(SomeEnum.A))  # revealed: A
@@ -498,6 +508,7 @@ reveal_type(f(b=0))  # revealed: OnlyBSpecified
 
 f(a=0, b=0)  # error: [no-matching-overload]
 
+
 def _(missing: Literal[Missing.Value], missing_or_present: Literal[Missing.Value] | int):
     reveal_type(f(a=missing, b=missing))  # revealed: BothMissing
     reveal_type(f(a=missing))  # revealed: BothMissing
@@ -546,6 +557,7 @@ def f(x: MyEnumSubclass) -> MyEnumSubclass: ...
 ```py
 from overloaded import MyEnumSubclass, ActualEnum, f
 
+
 def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
     reveal_type(f(actual_enum))  # revealed: Both
     reveal_type(f(*(actual_enum,)))  # revealed: Both
@@ -583,6 +595,7 @@ def f(x: B) -> B: ...
 
 ```py
 from overloaded import A, B, C, D, f
+
 
 def _(ab: A | B, ac: A | C, cd: C | D):
     reveal_type(f(ab))  # revealed: A | B
@@ -643,6 +656,7 @@ class Foo:
 ```py
 from overloaded import A, B, C, Foo, f
 from typing_extensions import Any, reveal_type
+
 
 def _(ab: A | B, a: int | Any):
     reveal_type(f(a1=a, a2=a, a3=a))  # revealed: C
@@ -731,6 +745,7 @@ def _(ab: A | B, a: int | Any):
             a30=a,
         )
     )
+
 
 def _(foo: Foo, ab: A | B, a: int | Any):
     reveal_type(foo.f(a1=a, a2=a, a3=a))  # revealed: C
@@ -843,6 +858,7 @@ def f(x: B, /, **kwargs: int) -> B: ...
 from overloaded import A, B, f
 from typing_extensions import reveal_type
 
+
 def _(a: int | None):
     reveal_type(
         # error: [no-matching-overload]
@@ -906,16 +922,19 @@ from overloaded import f
 
 # Test all of the above with a number of different splatted argument types
 
+
 def _(t: tuple[int, str]) -> None:
     # This correctly produces an error because the first element of the union has a precise arity of
     # 2, which matches the first overload, but the second element of the tuple doesn't match the
     # second parameter type, yielding an `invalid-argument-type` error.
     f(*t)  # error: [invalid-argument-type]
 
+
 def _(t: tuple[int, str, int]) -> None:
     # This correctly produces no error because the first element of the union has a precise arity of
     # 3, which matches the second overload.
     f(*t)
+
 
 def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     # This produces an error because the expansion produces two argument lists: `[*tuple[int, str]]`
@@ -954,6 +973,7 @@ def f(*args: int) -> int: ...
 ```py
 from overloaded import f
 
+
 def _(x1: int, x2: int, args: list[int]):
     reveal_type(f(x1))  # revealed: tuple[int]
     reveal_type(f(x1, x2))  # revealed: tuple[int, int]
@@ -986,6 +1006,7 @@ def f(x1: int, *args: int) -> tuple[int, ...]: ...
 ```py
 from overloaded import f
 
+
 def _(x1: int, x2: int, args1: list[int], args2: tuple[int, *tuple[int, ...]]):
     reveal_type(f(x1, x2))  # revealed: tuple[int, int]
     reveal_type(f(*(x1, x2)))  # revealed: tuple[int, int]
@@ -1012,6 +1033,7 @@ def f(**kwargs: int) -> int: ...
 
 ```py
 from overloaded import f
+
 
 def _(x1: int, x2: int, kwargs: dict[str, int]):
     reveal_type(f(x1=x1))  # revealed: int
@@ -1044,9 +1066,11 @@ def f(**kwargs: int) -> tuple[int, ...]: ...
 from typing import TypedDict
 from overloaded import f
 
+
 class Foo(TypedDict):
     x: int
     y: int
+
 
 def _(foo: Foo, kwargs: dict[str, int]):
     reveal_type(f(**foo))  # revealed: tuple[int, int]
@@ -1089,6 +1113,7 @@ from overloaded import f
 reveal_type(f(1))  # revealed: str
 reveal_type(f(*(1,)))  # revealed: str
 
+
 def _(list_int: list[int], list_any: list[Any]):
     reveal_type(f(list_int))  # revealed: int
     reveal_type(f(*(list_int,)))  # revealed: int
@@ -1123,6 +1148,7 @@ from overloaded import f
 # Anything other than `list` should match the last overload
 reveal_type(f(1))  # revealed: str
 reveal_type(f(*(1,)))  # revealed: str
+
 
 def _(list_int: list[int], list_any: list[Any]):
     # All materializations of `list[int]` are assignable to `list[int]`, so it matches the first
@@ -1166,6 +1192,7 @@ reveal_type(f(*((1, "b"),)))  # revealed: int
 reveal_type(f((1, 2)))  # revealed: int
 reveal_type(f(*((1, 2),)))  # revealed: int
 
+
 def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, Any]):
     # All materializations are assignable to first overload, so second and third overloads are
     # eliminated
@@ -1206,6 +1233,7 @@ class Foo:
 from module import Foo
 from typing_extensions import LiteralString
 
+
 def f(a: Foo, b: list[str], c: list[LiteralString], e):
     reveal_type(e)  # revealed: Unknown
     reveal_type(a.join(b))  # revealed: str
@@ -1244,6 +1272,7 @@ def f(x: list[Any], y: tuple[Any, Any]) -> B: ...
 from typing import Any
 
 from overloaded import A, f
+
 
 def _(list_int: list[int], list_any: list[Any], int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, Any]):
     # All materializations of both argument types are assignable to the first overload, so the
@@ -1293,6 +1322,7 @@ from typing_extensions import LiteralString
 
 from overloaded import f
 
+
 def _(literal: LiteralString, string: str, any: Any):
     reveal_type(f(literal))  # revealed: LiteralString
     reveal_type(f(*(literal,)))  # revealed: LiteralString
@@ -1331,6 +1361,7 @@ from typing import Any
 
 from overloaded import f
 
+
 def _(list_int: list[int], list_str: list[str], list_any: list[Any], any: Any):
     reveal_type(f(list_int))  # revealed: A
     reveal_type(f(*(list_int,)))  # revealed: A
@@ -1364,6 +1395,7 @@ def f(x: str, y: _T) -> _T: ...
 from typing import Any
 
 from overloaded import f
+
 
 def _(integer: int, string: str, any: Any, list_any: list[Any]):
     reveal_type(f(integer, string))  # revealed: int
@@ -1407,10 +1439,12 @@ from typing import Any
 
 from overloaded import A, B
 
+
 def _(a_int: A[int], a_str: A[str], a_any: A[Any]):
     reveal_type(a_int.method())  # revealed: int
     reveal_type(a_str.method())  # revealed: int
     reveal_type(a_any.method())  # revealed: int
+
 
 def _(b_int: B[int], b_str: B[str], b_any: B[Any]):
     reveal_type(b_int.method())  # revealed: int
@@ -1457,6 +1491,7 @@ def f4(x: Any, y: Any, *, z: str) -> B: ...
 from typing import Any
 
 from overloaded import f1, f2, f3, f4
+
 
 def _(arg: list[Any]):
     # Matches both overload and the return types are equivalent
@@ -1520,9 +1555,11 @@ reveal_type(f1(1))  # revealed: tuple[Literal[1]]
 reveal_type(f1(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f1(1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 
+
 def _(args1: list[int], args2: list[Any]):
     reveal_type(f1(*args1))  # revealed: tuple[Any, ...]
     reveal_type(f1(*args2))  # revealed: tuple[Any, ...]
+
 
 reveal_type(f2())  # revealed: tuple[Any, ...]
 reveal_type(f2(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
@@ -1574,6 +1611,7 @@ from typing import Any
 
 from overloaded import f
 
+
 def _(any: Any):
     reveal_type(f(any, flag=True))  # revealed: int
     reveal_type(f(*(any,), flag=True))  # revealed: int
@@ -1602,6 +1640,7 @@ from typing import Any, Literal
 
 from overloaded import f
 
+
 def _(any: Any):
     reveal_type(f(any, flag=True))  # revealed: int
     reveal_type(f(*(any,), flag=True))  # revealed: int
@@ -1609,8 +1648,10 @@ def _(any: Any):
     reveal_type(f(any, flag=False))  # revealed: str
     reveal_type(f(*(any,), flag=False))  # revealed: str
 
+
 def _(args: tuple[Any, Literal[True]]):
     reveal_type(f(*args))  # revealed: int
+
 
 def _(args: tuple[Any, Literal[False]]):
     reveal_type(f(*args))  # revealed: str
@@ -1656,6 +1697,7 @@ from typing import Any
 
 from overloaded import A, B, f
 
+
 def _(arg: tuple[A | B, Any]):
     reveal_type(f(arg))  # revealed: A | B
     reveal_type(f(*(arg,)))  # revealed: A | B
@@ -1691,6 +1733,7 @@ from typing import Any
 
 from overloaded import A, B, C, f
 
+
 def _(arg: tuple[A | B, Any]):
     reveal_type(f(arg))  # revealed: A | Unknown
     reveal_type(f(*(arg,)))  # revealed: A | Unknown
@@ -1725,6 +1768,7 @@ from typing import Any
 
 from overloaded import A, B, C, f
 
+
 def _(arg: tuple[A | B, Any]):
     reveal_type(f(arg))  # revealed: Unknown
     reveal_type(f(*(arg,)))  # revealed: Unknown
@@ -1742,8 +1786,10 @@ Type inference accounts for parameter type annotations across all overloads.
 ```py
 from typing import TypedDict, overload
 
+
 class T(TypedDict):
     x: int
+
 
 @overload
 def f(a: list[T], b: int) -> int: ...
@@ -1752,8 +1798,10 @@ def f(a: list[dict[str, int]], b: str) -> str: ...
 def f(a: list[dict[str, int]] | list[T], b: int | str) -> int | str:
     return 1
 
+
 def int_or_str() -> int | str:
     return 1
+
 
 x = f([{"x": 1}], int_or_str())
 reveal_type(x)  # revealed: int | str
@@ -1767,8 +1815,10 @@ Non-matching overloads do not produce diagnostics:
 ```py
 from typing import TypedDict, overload
 
+
 class T(TypedDict):
     x: int
+
 
 @overload
 def f(a: T, b: int) -> int: ...
@@ -1777,6 +1827,7 @@ def f(a: dict[str, int], b: str) -> str: ...
 def f(a: T | dict[str, int], b: int | str) -> int | str:
     return 1
 
+
 x = f({"y": 1}, "a")
 reveal_type(x)  # revealed: str
 ```
@@ -1784,11 +1835,13 @@ reveal_type(x)  # revealed: str
 ```py
 from typing import SupportsRound, overload
 
+
 @overload
 def takes_str_or_float(x: str): ...
 @overload
 def takes_str_or_float(x: float): ...
 def takes_str_or_float(x: float | str): ...
+
 
 takes_str_or_float(round(1.0))
 ```

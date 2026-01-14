@@ -4,7 +4,10 @@
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 def _(x: A | B):
     if isinstance(x, A) and isinstance(x, B):
@@ -17,7 +20,10 @@ def _(x: A | B):
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 def _(flag: bool, x: A | B):
     if isinstance(x, A) and flag:
@@ -37,7 +43,10 @@ def _(flag: bool, x: A | B):
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 def _(x: A | B):
     if isinstance(x, A) and True:
@@ -74,7 +83,10 @@ def _(x: A | B):
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 def _(x: A | B, y: A | B):
     if isinstance(x, A) and isinstance(y, B):
@@ -93,8 +105,13 @@ def _(x: A | B, y: A | B):
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: A | B | C):
     if isinstance(x, A) or isinstance(x, B):
@@ -107,8 +124,13 @@ def _(x: A | B | C):
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(flag: bool, x: A | B | C):
     if isinstance(x, A) or isinstance(x, B) or flag:
@@ -121,8 +143,13 @@ def _(flag: bool, x: A | B | C):
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: A | B | C, y: A | B | C):
     if isinstance(x, A) or isinstance(y, A):
@@ -147,8 +174,13 @@ def _(x: A | B | C, y: A | B | C):
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: A | B | C):
     if isinstance(x, B) and not isinstance(x, C):
@@ -162,8 +194,13 @@ def _(x: A | B | C):
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: A | B | C):
     if isinstance(x, B) or not isinstance(x, C):
@@ -176,8 +213,13 @@ def _(x: A | B | C):
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: A | B | C):
     if isinstance(x, A) or (isinstance(x, B) and not isinstance(x, C)):
@@ -191,8 +233,13 @@ def _(x: A | B | C):
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: A | B | C):
     if isinstance(x, A) and (isinstance(x, B) or not isinstance(x, C)):
@@ -229,6 +276,7 @@ def _(x: str | None, y: str | None):
 ```py
 def f() -> bool:
     return True
+
 
 if x := f():
     reveal_type(x)  # revealed: Literal[True]

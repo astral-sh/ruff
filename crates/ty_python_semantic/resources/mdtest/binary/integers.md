@@ -16,6 +16,7 @@ reveal_type(7 ^ 2)  # revealed: Literal[5]
 # error: [unsupported-operator] "Operator `+` is not supported between objects of type `Literal[2]` and `Literal["f"]`"
 reveal_type(2 + "f")  # revealed: Unknown
 
+
 def lhs(x: int):
     reveal_type(x + 1)  # revealed: int
     reveal_type(x - 4)  # revealed: int
@@ -24,6 +25,7 @@ def lhs(x: int):
     reveal_type(x / 3)  # revealed: int | float
     reveal_type(x % 3)  # revealed: int
 
+
 def rhs(x: int):
     reveal_type(2 + x)  # revealed: int
     reveal_type(3 - x)  # revealed: int
@@ -31,6 +33,7 @@ def rhs(x: int):
     reveal_type(-3 // x)  # revealed: int
     reveal_type(-3 / x)  # revealed: int | float
     reveal_type(5 % x)  # revealed: int
+
 
 def both(x: int):
     reveal_type(x + x)  # revealed: int
@@ -51,6 +54,7 @@ largest_u32 = 4_294_967_295
 reveal_type(2**2)  # revealed: Literal[4]
 reveal_type(1 ** (largest_u32 + 1))  # revealed: int
 reveal_type(2**largest_u32)  # revealed: int
+
 
 def variable(x: int):
     reveal_type(x**2)  # revealed: int
@@ -134,7 +138,9 @@ bool(1) / False
 # error: "Cannot divide object of type `float` by zero"
 reveal_type(1.0 / 0)  # revealed: int | float
 
+
 class MyInt(int): ...
+
 
 # No error for a subclass of int
 reveal_type(MyInt(3) / 0)  # revealed: int | float

@@ -9,5 +9,6 @@ class MySequence:
     def __getitem__(self, s: slice) -> int:
         return 0
 
+
 MySequence()[0:1:0]  # No error
 ```

@@ -11,8 +11,10 @@ valid type for use in a type expression:
 ```py
 MyInt = int
 
+
 def f(x: MyInt):
     reveal_type(x)  # revealed: int
+
 
 f(1)
 ```
@@ -22,8 +24,10 @@ f(1)
 ```py
 MyNone = None
 
+
 def g(x: MyNone):
     reveal_type(x)  # revealed: None
+
 
 g(None)
 ```
@@ -116,6 +120,7 @@ reveal_type(IntOrTypeVar)  # revealed: <types.UnionType special-form 'int | T@In
 reveal_type(TypeVarOrNone)  # revealed: <types.UnionType special-form 'T@TypeVarOrNone | None'>
 reveal_type(NoneOrTypeVar)  # revealed: <types.UnionType special-form 'None | T@NoneOrTypeVar'>
 
+
 def _(
     int_or_str: IntOrStr,
     int_or_str_or_bytes1: IntOrStrOrBytes1,
@@ -206,6 +211,7 @@ ListOfIntOrListOfInt = list[int] | list[int]
 reveal_type(IntOrInt)  # revealed: <class 'int'>
 reveal_type(ListOfIntOrListOfInt)  # revealed: <class 'list[int]'>
 
+
 def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
     reveal_type(int_or_int)  # revealed: int
     reveal_type(list_of_int_or_list_of_int)  # revealed: list[int]
@@ -226,6 +232,7 @@ IntOrOne = int | 1  # error: [unsupported-operator]
 
 reveal_type(IntOrOne)  # revealed: Unknown
 
+
 def _(int_or_one: IntOrOne):
     reveal_type(int_or_one)  # revealed: Unknown
 ```
@@ -236,9 +243,11 @@ as a type expression:
 ```py
 from types import UnionType
 
+
 def f(SomeUnionType: UnionType):
     # error: [invalid-type-form] "Variable of type `UnionType` is not allowed in a type expression"
     some_union: SomeUnionType
+
 
 f(int | str)
 ```
@@ -253,15 +262,19 @@ class Foo:
     def __or__(self, other) -> str:
         return "foo"
 
+
 reveal_type(Foo() | int)  # revealed: str
 reveal_type(Foo() | list[int])  # revealed: str
+
 
 class Bar:
     def __ror__(self, other) -> str:
         return "bar"
 
+
 reveal_type(int | Bar())  # revealed: str
 reveal_type(list[int] | Bar())  # revealed: str
+
 
 class Invalid:
     def __or__(self, other: "Invalid") -> str:
@@ -269,6 +282,7 @@ class Invalid:
 
     def __ror__(self, other: "Invalid") -> str:
         return "Invalid"
+
 
 # error: [unsupported-operator]
 reveal_type(int | Invalid())  # revealed: Unknown
@@ -287,8 +301,12 @@ class Meta(type):
     def __or__(self, other) -> str:
         return "Meta"
 
+
 class Foo(metaclass=Meta): ...
+
+
 class Bar(metaclass=Meta): ...
+
 
 X = Foo | Bar
 
@@ -297,8 +315,10 @@ X = Foo | Bar
 # `X` is still a valid type alias
 reveal_type(X)  # revealed: <types.UnionType special-form 'Foo | Bar'>
 
+
 def f(obj: X):
     reveal_type(obj)  # revealed: Foo | Bar
+
 
 # We do respect the metaclass `__or__` if it's used between a class and a non-class, however:
 
@@ -307,6 +327,7 @@ reveal_type(Y)  # revealed: str
 
 Z = Bar | 56
 reveal_type(Z)  # revealed: str
+
 
 def g(
     arg1: Y,  # error: [invalid-type-form]
@@ -341,6 +362,7 @@ from bar import GLOBAL_CONSTANT
 reveal_type(GLOBAL_CONSTANT)  # revealed: int | str
 
 if TYPE_CHECKING:
+
     class ItsQuiteCloudyInManchester:
         X = int | str
 
@@ -356,7 +378,9 @@ if TYPE_CHECKING:
         # TODO: should be `int | str`
         reveal_type(obj)  # revealed: Unknown
 
+
 Y = list["int | str"]
+
 
 def g(obj: Y):
     reveal_type(obj)  # revealed: list[int | str]
@@ -403,6 +427,7 @@ reveal_type(AnnotatedType)  # revealed: <special-form 'typing.Annotated[T@Annota
 reveal_type(TransparentAlias)  # revealed: TypeVar
 reveal_type(MyOptional)  # revealed: <types.UnionType special-form 'T@MyOptional | None'>
 
+
 def _(
     list_of_ints: MyList[int],
     dict_str_to_int: MyDict[str, int],
@@ -439,6 +464,7 @@ DictStrTo = MyDict[str, U]
 
 reveal_type(DictStrTo)  # revealed: <class 'dict[str, U@DictStrTo]'>
 
+
 def _(
     dict_str_to_int: DictStrTo[int],
 ):
@@ -464,6 +490,7 @@ reveal_type(ListOrTupleOfInts)  # revealed: <types.UnionType special-form 'list[
 reveal_type(AnnotatedInt)  # revealed: <special-form 'typing.Annotated[int, <metadata>]'>
 reveal_type(SubclassOfInt)  # revealed: <special-form 'type[int]'>
 reveal_type(CallableIntToStr)  # revealed: <typing.Callable special-form '(int, /) -> str'>
+
 
 def _(
     ints_or_none: IntsOrNone,
@@ -497,6 +524,7 @@ TypeOrList = MyType[B] | MyList[B]
 reveal_type(MyOtherList)  # revealed: <class 'list[T@MyOtherList]'>
 reveal_type(MyOtherType)  # revealed: <special-form 'type[T@MyOtherType]'>
 reveal_type(TypeOrList)  # revealed: <types.UnionType special-form 'type[B@TypeOrList] | list[B@TypeOrList]'>
+
 
 def _(
     list_of_ints: MyOtherList[int],
@@ -545,6 +573,7 @@ T_default = TypeVar("T_default", default=int)
 
 MyListWithDefault = list[T_default]
 
+
 def _(
     list_of_str: MyListWithDefault[str],
     list_of_int: MyListWithDefault,
@@ -563,18 +592,23 @@ def _(
 from typing_extensions import Generic
 from ty_extensions import reveal_mro
 
+
 class GenericBase(Generic[T]):
     pass
 
+
 ConcreteBase = GenericBase[int]
+
 
 class Derived1(ConcreteBase):
     pass
+
 
 # revealed: (<class 'Derived1'>, <class 'GenericBase[int]'>, typing.Generic, <class 'object'>)
 reveal_mro(Derived1)
 
 GenericBaseAlias = GenericBase[T]
+
 
 class Derived2(GenericBaseAlias[int]):
     pass
@@ -600,6 +634,7 @@ MyList = list[T]
 from my_types import MyList
 import my_types as mt
 
+
 def _(
     list_of_ints1: MyList[int],
     list_of_ints2: mt.MyList[int],
@@ -622,6 +657,7 @@ from typing_extensions import TypeVar
 T = TypeVar("T")
 
 MyList = list[T]
+
 
 def _(
     list_of_ints: "MyList[int]",
@@ -646,6 +682,7 @@ V = TypeVar("V")
 X = tuple[T, *tuple[U, ...], V]
 Y = X[T, tuple[int, str, U], bytes]
 
+
 def g(obj: Y[bool, range]):
     reveal_type(obj)  # revealed: tuple[bool, *tuple[tuple[int, str, range], ...], bytes]
 ```
@@ -664,78 +701,102 @@ from typing import Protocol, TypeVar, TypedDict
 
 ListOfInts = list[int]
 
+
 # error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[int]'>` is already specialized"
 def _(doubly_specialized: ListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
+
 
 type ListOfInts2 = list[int]
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
 DoublySpecialized = ListOfInts2[int]
 
+
 def _(doubly_specialized: DoublySpecialized):
     reveal_type(doubly_specialized)  # revealed: Unknown
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[int]'>` is already specialized"
 List = list[int][int]
 
+
 def _(doubly_specialized: List):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
+
 Tuple = tuple[int, str]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'tuple[int, str]'>` is already specialized"
 def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
+
 T = TypeVar("T")
+
 
 class LegacyProto(Protocol[T]):
     pass
 
+
 LegacyProtoInt = LegacyProto[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'LegacyProto[int]'>` is already specialized"
 def _(doubly_specialized: LegacyProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
+
 class Proto[T](Protocol):
     pass
 
+
 ProtoInt = Proto[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'Proto[int]'>` is already specialized"
 def _(doubly_specialized: ProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
+
 # TODO: TypedDict is just a function object at runtime, we should emit an error
 class LegacyDict(TypedDict[T]):
     x: T
 
+
 # TODO: should be a `not-subscriptable` error
 LegacyDictInt = LegacyDict[int]
+
 
 # TODO: should be a `not-subscriptable` error
 def _(doubly_specialized: LegacyDictInt[int]):
     # TODO: should be `Unknown`
     reveal_type(doubly_specialized)  # revealed: @Todo(Inference of subscript on special form)
 
+
 class Dict[T](TypedDict):
     x: T
 
+
 DictInt = Dict[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'Dict[int]'>` is already specialized"
 def _(doubly_specialized: DictInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
+
 Union = list[str] | list[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type: `<types.UnionType special-form 'list[str] | list[int]'>` is already specialized"
 def _(doubly_specialized: Union[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
+
 type MyListAlias[T] = list[T]
 MyListOfInts = MyListAlias[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
 def _(doubly_specialized: MyListOfInts[int]):
@@ -754,6 +815,7 @@ U = TypeVar("U")
 MyList = list[T]
 MyDict = dict[T, U]
 
+
 def _(
     # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
     list_too_many_args: MyList[int, str],
@@ -771,8 +833,10 @@ from ty_extensions import TypeOf
 
 IntOrStr = int | str
 
+
 def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
+
 
 def _(
     # error: [not-subscriptable] "Cannot subscript non-generic type"
@@ -786,6 +850,7 @@ Similarly, if you try to specialize a union type without a binding context, we e
 ```py
 # error: [not-subscriptable] "Cannot subscript non-generic type"
 x: (list[T] | set[T])[int]
+
 
 def _():
     # TODO: `list[Unknown] | set[Unknown]` might be better
@@ -804,6 +869,7 @@ from typing_extensions import TypeVar
 T = TypeVar("T")
 
 MyAlias = list[T]
+
 
 def outer():
     MyAlias = set[T]
@@ -829,6 +895,7 @@ if False:
 else:
     MyAlias2 = set[T]
 
+
 def _(
     x1: MyAlias1[int],
     x2: MyAlias2[int],
@@ -846,13 +913,16 @@ from typing_extensions import TypeVar
 
 T = TypeVar("T")
 
+
 def flag() -> bool:
     return True
+
 
 if flag():
     MyAlias = list[T]
 else:
     MyAlias = set[T]
+
 
 # It is questionable whether this should be supported or not. It might also be reasonable to
 # emit an error here (e.g. "Invalid subscript of object of type `<class 'list[T@MyAlias]'> |
@@ -879,12 +949,15 @@ BytesLiteral = Literal[b"b"]
 BoolLiteral = Literal[True]
 MixedLiterals = Literal[1, "a", True, None]
 
+
 class Color(Enum):
     RED = 0
     GREEN = 1
     BLUE = 2
 
+
 EnumLiteral = Literal[Color.RED]
+
 
 def _(
     int_literal1: IntLiteral1,
@@ -916,8 +989,10 @@ LiteralInt = Literal[int]
 
 reveal_type(LiteralInt)  # revealed: Unknown
 
+
 def _(weird: LiteralInt):
     reveal_type(weird)  # revealed: Unknown
+
 
 # error: [invalid-type-form] "`Literal[26]` is not a generic class"
 def _(weird: IntLiteral1[int]):
@@ -933,6 +1008,7 @@ from typing import Annotated
 
 MyAnnotatedInt = Annotated[int, "some metadata", 1, 2, 3]
 
+
 def _(annotated_int: MyAnnotatedInt):
     reveal_type(annotated_int)  # revealed: int
 ```
@@ -946,8 +1022,10 @@ T = TypeVar("T")
 
 Deprecated = Annotated[T, "deprecated attribute"]
 
+
 class C:
     old: Deprecated[int]
+
 
 reveal_type(C().old)  # revealed: int
 ```
@@ -958,6 +1036,7 @@ still use the first element as the type, when used in annotations:
 ```py
 # error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
 WronglyAnnotatedInt = Annotated[int]
+
 
 def _(wrongly_annotated_int: WronglyAnnotatedInt):
     reveal_type(wrongly_annotated_int)  # revealed: int
@@ -976,6 +1055,7 @@ MyOptionalInt = Optional[int]
 
 reveal_type(MyOptionalInt)  # revealed: <types.UnionType special-form 'int | None'>
 
+
 def _(optional_int: MyOptionalInt):
     reveal_type(optional_int)  # revealed: int | None
 ```
@@ -986,6 +1066,7 @@ A special case is `Optional[None]`, which is equivalent to `None`:
 JustNone = Optional[None]
 
 reveal_type(JustNone)  # revealed: None
+
 
 def _(just_none: JustNone):
     reveal_type(just_none)  # revealed: None
@@ -1011,6 +1092,7 @@ reveal_type(MyLiteralString)  # revealed: <special-form 'typing.LiteralString'>
 reveal_type(MyNoReturn)  # revealed: <special-form 'typing.NoReturn'>
 reveal_type(MyNever)  # revealed: <special-form 'typing.Never'>
 
+
 def _(
     ls: MyLiteralString,
     nr: MyNoReturn,
@@ -1033,6 +1115,7 @@ SingleInt = Tuple[int]
 Ints = Tuple[int, ...]
 EmptyTuple = Tuple[()]
 
+
 def _(int_and_str: IntAndStr, single_int: SingleInt, ints: Ints, empty_tuple: EmptyTuple):
     reveal_type(int_and_str)  # revealed: tuple[int, str]
     reveal_type(single_int)  # revealed: tuple[int]
@@ -1047,6 +1130,7 @@ from typing import Tuple
 
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 Invalid = Tuple[int, 1]
+
 
 def _(invalid: Invalid):
     reveal_type(invalid)  # revealed: tuple[int, Unknown]
@@ -1065,6 +1149,7 @@ IntOrStrOrBytes = Union[int, Union[str, bytes]]
 reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 reveal_type(IntOrStrOrBytes)  # revealed: <types.UnionType special-form 'int | str | bytes'>
 
+
 def _(
     int_or_str: IntOrStr,
     int_or_str_or_bytes: IntOrStrOrBytes,
@@ -1080,6 +1165,7 @@ JustInt = Union[int]
 
 reveal_type(JustInt)  # revealed: <class 'int'>
 
+
 def _(just_int: JustInt):
     reveal_type(just_int)  # revealed: int
 ```
@@ -1093,6 +1179,7 @@ EmptyUnion = Union[()]
 
 reveal_type(EmptyUnion)  # revealed: <types.UnionType special-form 'Never'>
 
+
 def _(empty: EmptyUnion):
     reveal_type(empty)  # revealed: Never
 ```
@@ -1102,6 +1189,7 @@ Other invalid uses are also caught:
 ```py
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 Invalid = Union[str, 1]
+
 
 def _(
     invalid: Invalid,
@@ -1120,12 +1208,19 @@ from typing import Any, Union, Protocol, TypeVar, Generic
 
 T = TypeVar("T")
 
+
 class A: ...
+
+
 class B: ...
+
+
 class G(Generic[T]): ...
+
 
 class P(Protocol):
     def method(self) -> None: ...
+
 
 SubclassOfA = type[A]
 SubclassOfAny = type[Any]
@@ -1144,6 +1239,7 @@ reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A]
 reveal_type(SubclassOfG)  # revealed: <special-form 'type[G[Unknown]]'>
 reveal_type(SubclassOfGInt)  # revealed: <special-form 'type[G[int]]'>
 reveal_type(SubclassOfP)  # revealed: <special-form 'type[P]'>
+
 
 def _(
     subclass_of_a: SubclassOfA,
@@ -1184,8 +1280,12 @@ Using `type[]` with a union type alias distributes the `type[]` over the union e
 ```py
 from typing import Union
 
+
 class C: ...
+
+
 class D: ...
+
 
 UnionAlias1 = C | D
 UnionAlias2 = Union[C, D]
@@ -1195,6 +1295,7 @@ SubclassOfUnionAlias2 = type[UnionAlias2]
 
 reveal_type(SubclassOfUnionAlias1)  # revealed: <special-form 'type[C | D]'>
 reveal_type(SubclassOfUnionAlias2)  # revealed: <special-form 'type[C | D]'>
+
 
 def _(
     subclass_of_union_alias1: SubclassOfUnionAlias1,
@@ -1218,6 +1319,7 @@ InvalidSubclassOf1 = type[1]
 # TODO: This should be an error
 InvalidSubclassOfLiteral = type[Literal[42]]
 
+
 def _(
     invalid_subclass_of_1: InvalidSubclassOf1,
     invalid_subclass_of_literal: InvalidSubclassOfLiteral,
@@ -1236,12 +1338,19 @@ from typing import Any, Union, Protocol, TypeVar, Generic, Type
 
 T = TypeVar("T")
 
+
 class A: ...
+
+
 class B: ...
+
+
 class G(Generic[T]): ...
+
 
 class P(Protocol):
     def method(self) -> None: ...
+
 
 SubclassOfA = Type[A]
 SubclassOfAny = Type[Any]
@@ -1260,6 +1369,7 @@ reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A]
 reveal_type(SubclassOfG)  # revealed: <special-form 'type[G[Unknown]]'>
 reveal_type(SubclassOfGInt)  # revealed: <special-form 'type[G[int]]'>
 reveal_type(SubclassOfP)  # revealed: <special-form 'type[P]'>
+
 
 def _(
     subclass_of_a: SubclassOfA,
@@ -1329,6 +1439,7 @@ reveal_type(MyDefaultDict)  # revealed: <class 'defaultdict[str, int]'>
 reveal_type(MyDeque)  # revealed: <class 'deque[str]'>
 reveal_type(MyOrderedDict)  # revealed: <class 'OrderedDict[str, int]'>
 
+
 def _(
     my_list: MyList,
     my_set: MySet,
@@ -1394,6 +1505,7 @@ reveal_type(DefaultDictOrNone)  # revealed: <types.UnionType special-form 'defau
 reveal_type(DequeOrNone)  # revealed: <types.UnionType special-form 'deque[str] | None'>
 reveal_type(OrderedDictOrNone)  # revealed: <types.UnionType special-form 'OrderedDict[str, int] | None'>
 
+
 def _(
     none_or_list: NoneOrList,
     none_or_set: NoneOrSet,
@@ -1458,6 +1570,7 @@ DictTooFewArgs = Dict[str]
 # error: [invalid-type-form] "`typing.Dict` requires exactly two arguments, got 3"
 DictTooManyArgs = Dict[str, int, float]
 
+
 def _(
     invalid_list: InvalidList,
     list_too_many_args: ListTooManyArgs,
@@ -1489,6 +1602,7 @@ reveal_type(CallableNoArgs)  # revealed: <typing.Callable special-form '() -> No
 reveal_type(BasicCallable)  # revealed: <typing.Callable special-form '(int, str, /) -> bytes'>
 reveal_type(GradualCallable)  # revealed: <typing.Callable special-form '(...) -> str'>
 
+
 def _(
     callable_no_args: CallableNoArgs,
     basic_callable: BasicCallable,
@@ -1504,6 +1618,7 @@ Nested callables work as expected:
 ```py
 TakesCallable = Callable[[Callable[[int], str]], bytes]
 ReturnsCallable = Callable[[int], Callable[[str], bytes]]
+
 
 def _(takes_callable: TakesCallable, returns_callable: ReturnsCallable):
     reveal_type(takes_callable)  # revealed: ((int, /) -> str, /) -> bytes
@@ -1521,6 +1636,7 @@ InvalidCallable2 = Callable[int, str]
 
 reveal_type(InvalidCallable1)  # revealed: <typing.Callable special-form '(...) -> Unknown'>
 reveal_type(InvalidCallable2)  # revealed: <typing.Callable special-form '(...) -> Unknown'>
+
 
 def _(invalid_callable1: InvalidCallable1, invalid_callable2: InvalidCallable2):
     reveal_type(invalid_callable1)  # revealed: (...) -> Unknown
@@ -1541,13 +1657,16 @@ errors:
 ```py
 AliasForStr = "str"
 
+
 # error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a type expression"
 def _(s: AliasForStr):
     reveal_type(s)  # revealed: Unknown
 
+
 IntOrStr = int | "str"  # error: [unsupported-operator]
 
 reveal_type(IntOrStr)  # revealed: Unknown
+
 
 def _(int_or_str: IntOrStr):
     reveal_type(int_or_str)  # revealed: Unknown
@@ -1567,7 +1686,9 @@ DictStrToStyle = Dict[str, "Style"]
 AnnotatedStyle = Annotated["Style", "metadata"]
 CallableStyleToStyle = Callable[["Style"], "Style"]
 
+
 class Style: ...
+
 
 def _(
     list_of_ints1: ListOfInts1,
@@ -1596,6 +1717,7 @@ from typing import Union
 
 Recursive = list[Union["Recursive", None]]
 
+
 def _(r: Recursive):
     reveal_type(r)  # revealed: list[Divergent]
 ```
@@ -1616,6 +1738,7 @@ RecursiveDict1 = dict[str, "RecursiveDict1" | None]
 RecursiveDict2 = Dict[str, "RecursiveDict2" | None]
 RecursiveDict3 = dict["RecursiveDict3", int]
 RecursiveDict4 = Dict["RecursiveDict4", int]
+
 
 def _(
     recursive_list1: RecursiveList1,
@@ -1642,6 +1765,7 @@ T = TypeVar("T")
 
 NestedDict = dict[str, "NestedDict[T] | T"]
 NestedList = list["NestedList[T] | None"]
+
 
 def _(
     nested_dict_int: NestedDict[int],

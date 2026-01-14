@@ -13,8 +13,10 @@ python-version = "3.12"
 def f1() -> int:
     return 0
 
+
 def f2(name: str) -> int:
     return 0
+
 
 def _(flag: bool):
     if flag:
@@ -37,8 +39,10 @@ the end user.)
 def f1(a: int) -> int:
     return 0
 
+
 def f2(name: str) -> int:
     return 0
+
 
 def _(flag: bool):
     if flag:
@@ -61,17 +65,22 @@ just ensuring that we get test coverage for each of the possible diagnostic mess
 from inspect import getattr_static
 from typing import overload
 
+
 def f1() -> int:
     return 0
+
 
 def f2(name: str) -> int:
     return 0
 
+
 def f3(a: int, b: int) -> int:
     return 0
 
+
 def f4[T: str](x: T) -> int:
     return 0
+
 
 @overload
 def f5() -> None: ...
@@ -80,6 +89,7 @@ def f5(x: str) -> str: ...
 def f5(x: str | None = None) -> str | None:
     return x
 
+
 @overload
 def f6() -> None: ...
 @overload
@@ -87,9 +97,11 @@ def f6(x: str, y: str) -> str: ...
 def f6(x: str | None = None, y: str | None = None) -> str | None:
     return x + y if x and y else None
 
+
 def _(n: int):
     class PossiblyNotCallable:
         if n == 0:
+
             def __call__(self) -> int:
                 return 0
 
@@ -126,8 +138,10 @@ def _(n: int):
 def any(*args, **kwargs) -> int:
     return 0
 
+
 def f1(name: str) -> int:
     return 0
+
 
 def _(n: int):
     if n == 0:
@@ -147,15 +161,28 @@ therefore truncate the long expected union type to avoid overwhelming output.
 ```py
 from typing import Literal, Union
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
+
 class D: ...
+
+
 class E: ...
+
+
 class F: ...
+
 
 def f1(x: Union[Literal[1, 2, 3, 4, 5, 6, 7, 8], A, B, C, D, E, F]) -> int:
     return 0
+
 
 def _(n: int):
     x = n

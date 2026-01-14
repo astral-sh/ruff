@@ -8,6 +8,7 @@ reveal_type(() + (1, 2))  # revealed: tuple[Literal[1, 2], ...]
 reveal_type((1, 2) + ())  # revealed: tuple[Literal[1, 2], ...]
 reveal_type(() + ())  # revealed: tuple[()]
 
+
 def _(x: tuple[int, str], y: tuple[None, tuple[int]]):
     reveal_type(x + y)  # revealed: tuple[int | str | None | tuple[int], ...]
     reveal_type(y + x)  # revealed: tuple[None | tuple[int] | int | str, ...]
@@ -37,6 +38,7 @@ OneTwo = tuple[Literal[1], Literal[2]]
 ThreeFour = tuple[Literal[3], Literal[4]]
 IntTuple = tuple[int, ...]
 StrTuple = tuple[str, ...]
+
 
 def _(one_two: OneTwo, x: IntTuple, y: StrTuple, three_four: ThreeFour):
     reveal_type(x + x)  # revealed: tuple[int, ...]

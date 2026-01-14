@@ -7,6 +7,7 @@ This test suite covers certain basic properties and simplification strategies fo
 ```py
 from typing import Literal
 
+
 def _(u1: int | str, u2: Literal[0] | Literal[1]) -> None:
     reveal_type(u1)  # revealed: int | str
     reveal_type(u2)  # revealed: Literal[0, 1]
@@ -28,9 +29,11 @@ and so we eagerly simplify it away. `NoReturn` is equivalent to `Never`.
 ```py
 from typing_extensions import Never, NoReturn
 
+
 def never(u1: int | Never, u2: int | Never | str) -> None:
     reveal_type(u1)  # revealed: int
     reveal_type(u2)  # revealed:  int | str
+
 
 def noreturn(u1: int | NoReturn, u2: int | NoReturn | str) -> None:
     reveal_type(u1)  # revealed: int
@@ -43,6 +46,7 @@ Unions with `object` can be simplified to `object`:
 
 ```py
 from typing_extensions import Never, Any
+
 
 def _(
     u1: int | object,
@@ -67,6 +71,7 @@ def _(
 ```py
 from typing import Literal
 
+
 def _(
     u1: (int | str) | bytes,
     u2: int | (str | bytes),
@@ -84,6 +89,7 @@ The type `S | T` can be simplified to `T` if `S` is a subtype of `T`:
 ```py
 from typing_extensions import Literal, LiteralString
 
+
 def _(
     u1: str | LiteralString, u2: LiteralString | str, u3: Literal["a"] | str | LiteralString, u4: str | bytes | LiteralString
 ) -> None:
@@ -99,6 +105,7 @@ The union `Literal[True] | Literal[False]` is exactly equivalent to `bool`:
 
 ```py
 from typing import Literal
+
 
 def _(
     u1: Literal[True, False],
@@ -121,10 +128,12 @@ from enum import Enum
 from typing import Literal, Any
 from ty_extensions import Intersection
 
+
 class Color(Enum):
     RED = "red"
     GREEN = "green"
     BLUE = "blue"
+
 
 def _(
     u1: Literal[Color.RED, Color.GREEN],
@@ -141,6 +150,7 @@ def _(
     reveal_type(u5)  # revealed: Color
     reveal_type(u6)  # revealed: Color
 
+
 def _(
     u1: Intersection[Literal[Color.RED], Any] | Literal[Color.RED],
     u2: Literal[Color.RED] | Intersection[Literal[Color.RED], Any],
@@ -153,6 +163,7 @@ def _(
 
 ```py
 from ty_extensions import Unknown
+
 
 def _(u1: Unknown | str, u2: str | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -167,6 +178,7 @@ union are still redundant:
 ```py
 from ty_extensions import Unknown
 
+
 def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknown | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
     reveal_type(u2)  # revealed: Unknown | str
@@ -180,6 +192,7 @@ Simplifications still apply when `Unknown` is present.
 ```py
 from ty_extensions import Unknown
 
+
 def _(u1: int | Unknown | bool) -> None:
     reveal_type(u1)  # revealed: int | Unknown
 ```
@@ -191,8 +204,12 @@ We can simplify unions of intersections:
 ```py
 from ty_extensions import Intersection, Not
 
+
 class P: ...
+
+
 class Q: ...
+
 
 def _(
     i1: Intersection[P, Q] | Intersection[P, Q],
@@ -216,6 +233,7 @@ from ty_extensions import AlwaysTruthy, AlwaysFalsy, is_equivalent_to, static_as
 type strings = Literal["foo", ""]
 type ints = Literal[0, 1]
 type bytes = Literal[b"foo", b""]
+
 
 def _(
     strings_or_truthy: strings | AlwaysTruthy,
@@ -248,6 +266,7 @@ def _(
 
     reveal_type(bytes_or_falsy)  # revealed: Literal[b"foo"] | AlwaysFalsy
     reveal_type(falsy_or_bytes)  # revealed: AlwaysFalsy | Literal[b"foo"]
+
 
 type SA = Union[Literal[""], AlwaysTruthy, Literal["foo"]]
 static_assert(is_equivalent_to(SA, Literal[""] | AlwaysTruthy))
@@ -284,23 +303,28 @@ type SB = Intersection[Literal[""], Any]
 type SC = SA | SB
 type SD = SB | SA
 
+
 def _(c: SC, d: SD):
     reveal_type(c)  # revealed: Literal[""]
     reveal_type(d)  # revealed: Literal[""]
+
 
 type IA = Literal[0]
 type IB = Intersection[Literal[0], Any]
 type IC = IA | IB
 type ID = IB | IA
 
+
 def _(c: IC, d: ID):
     reveal_type(c)  # revealed: Literal[0]
     reveal_type(d)  # revealed: Literal[0]
+
 
 type BA = Literal[b""]
 type BB = Intersection[Literal[b""], Any]
 type BC = BA | BB
 type BD = BB | BA
+
 
 def _(c: BC, d: BD):
     reveal_type(c)  # revealed: Literal[b""]
@@ -315,6 +339,7 @@ element, never to the fixed-length element (`tuple[()] | tuple[Any, ...]` -> `tu
 
 ```py
 from typing import Any
+
 
 def f(
     a: tuple[()] | tuple[int, ...],
@@ -346,17 +371,22 @@ python-version = "3.12"
 ```py
 from typing import Any
 
+
 class Bivariant[T]: ...
+
 
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
 
+
 class Contravariant[T]:
     def receive(self, input: T) -> None: ...
 
+
 class Invariant[T]:
     mutable_attribute: T
+
 
 def _(
     a: Bivariant[Any] | Bivariant[Any | str],

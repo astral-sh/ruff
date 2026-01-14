@@ -13,8 +13,12 @@ class Yes:
     def __invert__(self) -> int:
         return 17
 
+
 class Sub(Yes): ...
+
+
 class No: ...
+
 
 reveal_type(+Yes())  # revealed: bool
 reveal_type(-Yes())  # revealed: str
@@ -49,8 +53,12 @@ class Yes:
     def __invert__(self) -> int:
         return 17
 
+
 class Sub(Yes): ...
+
+
 class No: ...
+
 
 # error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'Yes'>`"
 reveal_type(+Yes)  # revealed: Unknown
@@ -80,6 +88,7 @@ reveal_type(~No)  # revealed: Unknown
 def f():
     pass
 
+
 # error: [unsupported-operator] "Unary operator `+` is not supported for object of type `def f() -> Unknown`"
 reveal_type(+f)  # revealed: Unknown
 # error: [unsupported-operator] "Unary operator `-` is not supported for object of type `def f() -> Unknown`"
@@ -101,17 +110,24 @@ class Yes:
     def __invert__(self) -> int:
         return 17
 
+
 class Sub(Yes): ...
+
+
 class No: ...
+
 
 def yes() -> type[Yes]:
     return Yes
 
+
 def sub() -> type[Sub]:
     return Sub
 
+
 def no() -> type[No]:
     return No
+
 
 # error: [unsupported-operator] "Unary operator `+` is not supported for object of type `type[Yes]`"
 reveal_type(+yes())  # revealed: Unknown
@@ -148,9 +164,15 @@ class Meta(type):
     def __invert__(self) -> int:
         return 17
 
+
 class Yes(metaclass=Meta): ...
+
+
 class Sub(Yes): ...
+
+
 class No: ...
+
 
 reveal_type(+Yes)  # revealed: bool
 reveal_type(-Yes)  # revealed: str

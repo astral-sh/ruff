@@ -122,6 +122,7 @@ def _(flag: bool, flag2: bool):
 def check(x: int) -> bool:
     return bool(x)
 
+
 if check(x := 1):
     x = 2
 elif check(x := 3):
@@ -135,6 +136,7 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 ```py
 def check(x) -> bool:
     return bool(x)
+
 
 def _(flag: bool):
     x = 1 if flag else None
@@ -153,6 +155,7 @@ def _(flag: bool):
 ```py
 class NotBoolable:
     __bool__: int = 3
+
 
 # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 if NotBoolable():

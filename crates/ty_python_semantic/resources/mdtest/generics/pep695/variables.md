@@ -38,6 +38,7 @@ def f[T = int]():
     reveal_type(T.__bound__)  # revealed: None
     reveal_type(T.__constraints__)  # revealed: tuple[()]
 
+
 def g[S]():
     reveal_type(S.__default__)  # revealed: NoDefault
 ```
@@ -52,10 +53,12 @@ python-version = "3.13"
 ```py
 class Valid[T, U = T, V = T | U]: ...
 
+
 reveal_type(Valid())  # revealed: Valid[Unknown, Unknown, Unknown]
 reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
 reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
 reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
+
 
 # error: [unresolved-reference]
 class Invalid[S = T]: ...
@@ -70,6 +73,7 @@ def f[T: int]():
     reveal_type(T.__bound__)  # revealed: int
     reveal_type(T.__constraints__)  # revealed: tuple[()]
 
+
 def g[S]():
     reveal_type(S.__bound__)  # revealed: None
 ```
@@ -82,6 +86,7 @@ def f[T: (int, str)]():
     reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__constraints__)  # revealed: tuple[int, str]
     reveal_type(T.__bound__)  # revealed: None
+
 
 def g[S]():
     reveal_type(S.__constraints__)  # revealed: tuple[()]
@@ -105,6 +110,7 @@ A type variable itself cannot be explicitly specialized; the result of the speci
 
 ```py
 type Positive[T] = T
+
 
 def _[T](
     # error: [invalid-type-form] "A type variable itself cannot be specialized"
@@ -132,6 +138,7 @@ different uses of the same typevar.
 def f[T](x: T, y: T) -> None:
     reveal_type(x)  # revealed: T@f
 
+
 class C[T]:
     def m(self, x: T) -> None:
         reveal_type(x)  # revealed: T@C
@@ -151,10 +158,18 @@ specialization. Thus, the typevar is a subtype of itself and of `object`, but no
 ```py
 from ty_extensions import is_assignable_to, is_subtype_of, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class Unrelated: ...
+
 
 def unbounded_unconstrained[T, U](t: T, u: U) -> None:
     static_assert(is_assignable_to(T, T))
@@ -190,6 +205,7 @@ is a final class, since the typevar can still be specialized to `Never`.)
 from typing import Any
 from typing_extensions import final
 
+
 def bounded[T: Super](t: T) -> None:
     static_assert(is_assignable_to(T, Any))
     static_assert(is_assignable_to(Any, T))
@@ -204,6 +220,7 @@ def bounded[T: Super](t: T) -> None:
     static_assert(not is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Sub, T))
+
 
 def bounded_by_gradual[T: Any](t: T) -> None:
     static_assert(is_assignable_to(T, Any))
@@ -220,8 +237,10 @@ def bounded_by_gradual[T: Any](t: T) -> None:
     static_assert(not is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(Sub, T))
 
+
 @final
 class FinalClass: ...
+
 
 def bounded_final[T: FinalClass](t: T) -> None:
     static_assert(is_assignable_to(T, Any))
@@ -248,6 +267,7 @@ def two_bounded[T: Super, U: Super](t: T, u: U) -> None:
     static_assert(not is_subtype_of(T, U))
     static_assert(not is_subtype_of(U, T))
 
+
 def two_final_bounded[T: FinalClass, U: FinalClass](t: T, u: U) -> None:
     static_assert(not is_assignable_to(T, U))
     static_assert(not is_assignable_to(U, T))
@@ -262,6 +282,7 @@ intersection of all of its constraints is a subtype of the typevar.
 
 ```py
 from ty_extensions import Intersection
+
 
 def constrained[T: (Base, Unrelated)](t: T) -> None:
     static_assert(not is_assignable_to(T, Super))
@@ -291,6 +312,7 @@ def constrained[T: (Base, Unrelated)](t: T) -> None:
     static_assert(not is_subtype_of(Unrelated, T))
     static_assert(not is_subtype_of(Super | Unrelated, T))
     static_assert(is_subtype_of(Intersection[Base, Unrelated], T))
+
 
 def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
     static_assert(is_assignable_to(T, Super))
@@ -341,8 +363,10 @@ def two_constrained[T: (int, str), U: (int, str)](t: T, u: U) -> None:
     static_assert(not is_subtype_of(T, U))
     static_assert(not is_subtype_of(U, T))
 
+
 @final
 class AnotherFinalClass: ...
+
 
 def two_final_constrained[T: (FinalClass, AnotherFinalClass), U: (FinalClass, AnotherFinalClass)](t: T, u: U) -> None:
     static_assert(not is_assignable_to(T, U))
@@ -379,7 +403,9 @@ And an intersection of a typevar with another type is always a subtype of the Ty
 ```py
 from ty_extensions import Intersection, Not, is_disjoint_from
 
+
 class A: ...
+
 
 def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     static_assert(is_assignable_to(Intersection[T, Unrelated], T))
@@ -404,11 +430,14 @@ that final class.)
 from typing import final
 from ty_extensions import is_equivalent_to, static_assert
 
+
 @final
 class FinalClass: ...
 
+
 @final
 class SecondFinalClass: ...
+
 
 def f[A, B, C: FinalClass, D: FinalClass, E: (FinalClass, SecondFinalClass), F: (FinalClass, SecondFinalClass)]():
     static_assert(is_equivalent_to(A, A))
@@ -456,6 +485,7 @@ non-singleton type.
 ```py
 from ty_extensions import is_singleton, is_single_valued, static_assert
 
+
 def unbounded_unconstrained[T](t: T) -> None:
     static_assert(not is_singleton(T))
     static_assert(not is_single_valued(T))
@@ -476,12 +506,15 @@ specialize a constrained typevar to a subtype of a constraint.)
 ```py
 from typing_extensions import Literal
 
+
 def constrained_non_singletons[T: (int, str)](t: T) -> None:
     static_assert(not is_singleton(T))
     static_assert(not is_single_valued(T))
 
+
 def constrained_singletons[T: (Literal[True], Literal[False])](t: T) -> None:
     static_assert(is_singleton(T))
+
 
 def constrained_single_valued[T: (Literal[True], tuple[()])](t: T) -> None:
     static_assert(is_single_valued(T))
@@ -495,10 +528,18 @@ there is no guarantee what type the typevar will be specialized to.
 ```py
 from typing import Any
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class Unrelated: ...
+
 
 def unbounded_unconstrained[T](t: T) -> None:
     def _(x: T | Super) -> None:
@@ -571,10 +612,18 @@ since there is no guarantee what type the typevar will be specialized to.
 from ty_extensions import Intersection
 from typing import Any
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
+
 class Unrelated: ...
+
 
 def unbounded_unconstrained[T](t: T) -> None:
     def _(x: Intersection[T, Super]) -> None:
@@ -657,6 +706,7 @@ this is modeled internally as an intersection with a negation.
 ```py
 from ty_extensions import Not
 
+
 def remove_constraint[T: (int, str, bool)](t: T) -> None:
     def _(x: Intersection[T, Not[int]]) -> None:
         reveal_type(x)  # revealed: str
@@ -684,6 +734,7 @@ of) itself.
 ```py
 from ty_extensions import is_assignable_to, is_subtype_of, Not, static_assert
 
+
 def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_assignable_to(Intersection[T, None], T))
     static_assert(is_assignable_to(Intersection[T, Not[None]], T))
@@ -698,8 +749,13 @@ We can use narrowing expressions to eliminate some of the possibilities of a con
 
 ```py
 class P: ...
+
+
 class Q: ...
+
+
 class R: ...
+
 
 def f[T: (P, Q)](t: T) -> None:
     if isinstance(t, P):
@@ -715,6 +771,7 @@ def f[T: (P, Q)](t: T) -> None:
     else:
         reveal_type(t)  # revealed: P & ~Q
         p: P = t
+
 
 def g[T: (P, Q, R)](t: T) -> None:
     if isinstance(t, P):
@@ -759,6 +816,7 @@ A typevar bound to a Callable type is callable:
 ```py
 from typing import Callable
 
+
 def bound[T: Callable[[], int]](f: T):
     reveal_type(f)  # revealed: T@bound
     reveal_type(f())  # revealed: int
@@ -780,11 +838,14 @@ The meta-type of a typevar is `type[T]`.
 def normal[T](x: T):
     reveal_type(type(x))  # revealed: type[T@normal]
 
+
 def bound_object[T: object](x: T):
     reveal_type(type(x))  # revealed: type[T@bound_object]
 
+
 def bound_int[T: int](x: T):
     reveal_type(type(x))  # revealed: type[T@bound_int]
+
 
 def constrained[T: (int, str)](x: T):
     reveal_type(type(x))  # revealed: type[T@constrained]
@@ -799,47 +860,59 @@ A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 ```py
 from typing import Any
 
+
 # TODO: error
 def f[S, T: list[S]](x: S, y: T) -> S | T:
     return x or y
+
 
 # TODO: error
 class C[S, T: list[S]]:
     x: S
     y: T
 
+
 reveal_type(C[int, list[Any]]().x)  # revealed: int
 reveal_type(C[int, list[Any]]().y)  # revealed: list[Any]
+
 
 # TODO: error
 def g[T: list[T]](x: T) -> T:
     return x
 
+
 # TODO: error
 class D[T: list[T]]:
     x: T
 
+
 reveal_type(D[list[Any]]().x)  # revealed: list[Any]
+
 
 # TODO: error
 def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
     return x or y
+
 
 # TODO: error
 class E[S, T: (list[S], str)]:
     x: S
     y: T
 
+
 reveal_type(E[int, str]().x)  # revealed: int
 reveal_type(E[int, str]().y)  # revealed: str
+
 
 # TODO: error
 def i[T: (list[T], str)](x: T) -> T:
     return x
 
+
 # TODO: error
 class F[T: (list[T], str)]:
     x: T
+
 
 reveal_type(F[list[Any]]().x)  # revealed: list[Any]
 ```
@@ -850,6 +923,7 @@ However, they are lazily evaluated and can cyclically refer to their own type:
 class G[T: list[G]]:
     x: T
 
+
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
 
@@ -859,6 +933,7 @@ An invalid specialization in a recursive bound doesn't cause a panic:
 # error: [invalid-type-arguments]
 class Node[T: "Node[int]"]:
     pass
+
 
 # error: [invalid-type-arguments]
 def _(n: Node[str]):
@@ -874,14 +949,17 @@ class C[T, U = T]:
     x: T
     y: U
 
+
 reveal_type(C[int, str]().x)  # revealed: int
 reveal_type(C[int, str]().y)  # revealed: str
 reveal_type(C[int]().x)  # revealed: int
 reveal_type(C[int]().y)  # revealed: int
 
+
 # TODO: error
 class D[T = T]:
     x: T
+
 
 reveal_type(D().x)  # revealed: Unknown
 ```

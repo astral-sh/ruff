@@ -14,6 +14,7 @@ python-version = "3.13"
 ```py
 from typing import Self
 
+
 class Shape:
     def set_scale(self: Self, scale: float) -> Self:
         reveal_type(self)  # revealed: Self@set_scale
@@ -26,20 +27,25 @@ class Shape:
         def inner() -> Self:
             reveal_type(self)  # revealed: Self@nested_func
             return self
+
         return inner()
 
     def nested_func_without_enclosing_binding(self):
         def inner(x: Self):
             reveal_type(x)  # revealed: Self@nested_func_without_enclosing_binding
+
         inner(self)
+
 
 reveal_type(Shape().nested_type())  # revealed: list[Shape]
 reveal_type(Shape().nested_func())  # revealed: Shape
+
 
 class Circle(Shape):
     def set_scale(self: Self, scale: float) -> Self:
         reveal_type(self)  # revealed: Self@set_scale
         return self
+
 
 class Outer:
     class Inner:
@@ -61,6 +67,7 @@ python-version = "3.12"
 
 ```py
 from typing import Self
+
 
 class A:
     def __init__(self):
@@ -103,6 +110,7 @@ class A:
     @staticmethod
     def a_staticmethod(x: int): ...
 
+
 a = A()
 
 reveal_type(a.implicit_self())  # revealed: A
@@ -123,8 +131,10 @@ Passing `self` implicitly also verifies the type:
 ```py
 from typing import Never, Callable
 
+
 class Strange:
     def can_not_be_called(self: Never) -> None: ...
+
 
 # error: [invalid-argument-type] "Argument to bound method `can_not_be_called` is incorrect: Expected `Never`, found `Strange`"
 Strange().can_not_be_called()
@@ -146,6 +156,7 @@ The name `self` is not special in any way.
 ```py
 def some_decorator[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     return f
+
 
 class B:
     def name_does_not_matter(this) -> Self:
@@ -184,11 +195,13 @@ class B:
     @some_decorator
     def decorated_static_method(self):
         reveal_type(self)  # revealed: Unknown
+
     # TODO: On Python <3.10, this should ideally be rejected, because `staticmethod` objects were not callable.
     @some_decorator
     @staticmethod
     def decorated_static_method_2(self):
         reveal_type(self)  # revealed: Unknown
+
 
 reveal_type(B().name_does_not_matter())  # revealed: B
 reveal_type(B().positional_only(1))  # revealed: B
@@ -196,6 +209,7 @@ reveal_type(B().keyword_only(x=1))  # revealed: B
 reveal_type(B().decorated_method())  # revealed: B
 
 reveal_type(B().a_property)  # revealed: B
+
 
 async def _():
     reveal_type(await B().async_method())  # revealed: B
@@ -208,11 +222,13 @@ from typing import Self, Generic, TypeVar
 
 T = TypeVar("T")
 
+
 class G(Generic[T]):
     def id(self) -> Self:
         reveal_type(self)  # revealed: Self@id
 
         return self
+
 
 reveal_type(G[int]().id())  # revealed: G[int]
 reveal_type(G[str]().id())  # revealed: G[str]
@@ -224,14 +240,17 @@ Free functions and nested functions do not use implicit `Self`:
 def not_a_method(self):
     reveal_type(self)  # revealed: Unknown
 
+
 # error: [invalid-type-form]
 def does_not_return_self(self) -> Self:
     return self
+
 
 class C:
     def outer(self) -> None:
         def inner(self):
             reveal_type(self)  # revealed: Unknown
+
 
 reveal_type(not_a_method)  # revealed: def not_a_method(self) -> Unknown
 ```
@@ -248,14 +267,17 @@ affect that subtitution. If we blindly substitute all occurrences of `Self`, we 
 ```py
 from typing import Self
 
+
 class Foo[T]:
     def foo(self: Self) -> T:
         raise NotImplementedError
+
 
 class Bar:
     def bar(self: Self, x: Foo[Self]):
         # revealed: bound method Foo[Self@bar].foo() -> Self@bar
         reveal_type(x.foo)
+
 
 def f[U: Bar](x: Foo[U]):
     # revealed: bound method Foo[U@f].foo() -> U@f
@@ -272,9 +294,11 @@ python-version = "3.10"
 ```py
 from typing_extensions import Self
 
+
 class C:
     def method(self: Self) -> Self:
         return self
+
 
 reveal_type(C().method())  # revealed: C
 ```
@@ -286,6 +310,7 @@ reveal_type(C().method())  # revealed: C
 ```py
 from typing import Self
 
+
 class Shape:
     def foo(self: Self) -> Self:
         return self
@@ -295,7 +320,9 @@ class Shape:
         reveal_type(cls)  # revealed: type[Self@bar]
         return cls()
 
+
 class Circle(Shape): ...
+
 
 reveal_type(Shape().foo())  # revealed: Shape
 reveal_type(Shape.bar())  # revealed: Shape
@@ -309,6 +336,7 @@ reveal_type(Circle.bar())  # revealed: Circle
 ```py
 from typing import Self
 
+
 class Shape:
     def foo(self) -> Self:
         return self
@@ -318,7 +346,9 @@ class Shape:
         reveal_type(cls)  # revealed: type[Self@bar]
         return cls()
 
+
 class Circle(Shape): ...
+
 
 reveal_type(Shape().foo())  # revealed: Shape
 reveal_type(Shape.bar())  # revealed: Shape
@@ -331,6 +361,7 @@ reveal_type(Circle.bar())  # revealed: Circle
 
 ```py
 from typing import Self
+
 
 class GenericShape[T]:
     def foo(self) -> Self:
@@ -346,7 +377,9 @@ class GenericShape[T]:
         reveal_type(cls)  # revealed: type[Self@baz]
         return cls()
 
+
 class GenericCircle[T](GenericShape[T]): ...
+
 
 reveal_type(GenericShape().foo())  # revealed: GenericShape[Unknown]
 reveal_type(GenericShape.bar())  # revealed: GenericShape[Unknown]
@@ -369,15 +402,18 @@ the return type should be the child's `Self` type variable, not the concrete chi
 ```py
 from typing import Self
 
+
 class Parent:
     def copy(self) -> Self:
         return self
+
 
 class Child(Parent):
     def copy(self) -> Self:
         result = super().copy()
         reveal_type(result)  # revealed: Self@copy
         return result
+
 
 # When called on concrete types, Self is substituted correctly.
 reveal_type(Child().copy())  # revealed: Child
@@ -388,10 +424,12 @@ The same applies to classmethods with `Self` return types:
 ```py
 from typing import Self
 
+
 class Parent:
     @classmethod
     def create(cls) -> Self:
         return cls()
+
 
 class Child(Parent):
     @classmethod
@@ -399,6 +437,7 @@ class Child(Parent):
         result = super().create()
         reveal_type(result)  # revealed: Self@create
         return result
+
 
 # When called on concrete types, Self is substituted correctly.
 reveal_type(Child.create())  # revealed: Child
@@ -412,6 +451,7 @@ TODO: The use of `Self` to annotate the `next_node` attribute should be
 ```py
 from typing import Self
 
+
 class LinkedList:
     value: int
     next_node: Self
@@ -421,6 +461,7 @@ class LinkedList:
         # TODO: no error
         # error: [invalid-return-type]
         return self.next_node
+
 
 reveal_type(LinkedList().next())  # revealed: LinkedList
 ```
@@ -432,8 +473,10 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
+
 class C(Generic[T]):
     foo: T
+
     def method(self) -> None:
         reveal_type(self)  # revealed: Self@method
         reveal_type(self.foo)  # revealed: T@C
@@ -446,10 +489,13 @@ from typing import Self, Generic, TypeVar
 
 T = TypeVar("T")
 
+
 class Container(Generic[T]):
     value: T
+
     def set_value(self: Self, value: T) -> Self:
         return self
+
 
 int_container: Container[int] = Container[int]()
 reveal_type(int_container)  # revealed: Container[int]
@@ -466,7 +512,9 @@ a type that satisfies a bound.
 ```py
 from typing import NewType
 
+
 class Base: ...
+
 
 class C[T: Base]:
     x: T
@@ -474,17 +522,20 @@ class C[T: Base]:
     def g(self) -> None:
         pass
 
+
 # Calling a method on a specialized instance should not produce an error
 C[Base]().g()
 
 # Test with a NewType bound
 K = NewType("K", int)
 
+
 class D[T: K]:
     x: T
 
     def h(self) -> None:
         pass
+
 
 # Calling a method on a specialized instance should not produce an error
 D[K]().h()
@@ -499,6 +550,7 @@ TODO: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
 ```py
 from typing import Self
 
+
 class Shape:
     def union(self: Self, other: Self | None):
         reveal_type(other)  # revealed: Self@union | None
@@ -512,9 +564,11 @@ This is a regression test for <https://github.com/astral-sh/ty/issues/1156>.
 ```py
 from typing import Self
 
+
 class Container[T = bytes]:
     def __init__(self: Self, data: T | None = None) -> None:
         self.data = data
+
 
 reveal_type(Container())  # revealed: Container[bytes]
 reveal_type(Container(1))  # revealed: Container[int]
@@ -527,19 +581,24 @@ reveal_type(Container(b"a"))  # revealed: Container[bytes]
 ```py
 from typing import Self, TypeVar, Generic
 
+
 class Container[T = bytes]:
     def method(self) -> Self:
         return self
+
 
 def _(c: Container[str], d: Container):
     reveal_type(c.method())  # revealed: Container[str]
     reveal_type(d.method())  # revealed: Container[bytes]
 
+
 T = TypeVar("T", default=bytes)
+
 
 class LegacyContainer(Generic[T]):
     def method(self) -> Self:
         return self
+
 
 def _(c: LegacyContainer[str], d: LegacyContainer):
     reveal_type(c.method())  # revealed: LegacyContainer[str]
@@ -555,11 +614,14 @@ from typing import Self, Generic, TypeVar
 
 T = TypeVar("T")
 
+
 # error: [invalid-type-form]
 def x(s: Self): ...
 
+
 # error: [invalid-type-form]
 b: Self
+
 
 # TODO: "Self" cannot be used in a function with a `self` or `cls` parameter that has a type annotation other than "Self"
 class Foo:
@@ -578,10 +640,13 @@ class Foo:
         # error: [invalid-return-type]
         return Foo()
 
+
 class Bar(Generic[T]): ...
+
 
 # error: [invalid-type-form]
 class Baz(Bar[Self]): ...
+
 
 class MyMetaclass(type):
     # TODO: reject the Self usage. because self cannot be used within a metaclass.
@@ -604,8 +669,10 @@ from __future__ import annotations
 
 from typing import final
 
+
 @final
 class Disjoint: ...
+
 
 class Explicit:
     # TODO: We could emit a warning if the annotated type of `self` is disjoint from `Explicit`
@@ -615,14 +682,17 @@ class Explicit:
     def forward(self: Explicit) -> None:
         reveal_type(self)  # revealed: Explicit
 
+
 # error: [invalid-argument-type] "Argument to bound method `bad` is incorrect: Expected `Disjoint`, found `Explicit`"
 Explicit().bad()
 
 Explicit().forward()
 
+
 class ExplicitGeneric[T]:
     def special(self: ExplicitGeneric[int]) -> None:
         reveal_type(self)  # revealed: ExplicitGeneric[int]
+
 
 ExplicitGeneric[int]().special()
 
@@ -638,6 +708,7 @@ specific type of the bound parameter.
 ```py
 from typing import Self
 
+
 class C:
     def instance_method(self, other: Self) -> Self:
         return self
@@ -646,12 +717,15 @@ class C:
     def class_method(cls) -> Self:
         return cls()
 
+
 # revealed: bound method C.instance_method(other: C) -> C
 reveal_type(C().instance_method)
 # revealed: bound method <class 'C'>.class_method() -> C
 reveal_type(C.class_method)
 
+
 class D(C): ...
+
 
 # revealed: bound method D.instance_method(other: D) -> D
 reveal_type(D().instance_method)
@@ -666,12 +740,15 @@ bound at `C.f`.
 from typing import Self
 from ty_extensions import generic_context
 
+
 class C[T]():
     def f(self: Self):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
+
         # revealed: None
         reveal_type(generic_context(b))
+
 
 # revealed: ty_extensions.GenericContext[Self@f]
 reveal_type(generic_context(C.f))
@@ -684,12 +761,15 @@ Even if the `Self` annotation appears first in the nested function, it is the me
 from typing import Self
 from ty_extensions import generic_context
 
+
 class C:
     def f(self: "C"):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
+
         # revealed: None
         reveal_type(generic_context(b))
+
 
 # revealed: None
 reveal_type(generic_context(C.f))
@@ -702,8 +782,10 @@ This makes sure that we don't bind `self` if it's not a positional parameter:
 ```py
 from ty_extensions import CallableTypeOf
 
+
 class C:
     def method(*args, **kwargs) -> None: ...
+
 
 def _(c: CallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None

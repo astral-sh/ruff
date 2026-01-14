@@ -11,6 +11,7 @@ from typing_extensions import Final, ReadOnly, TypedDict
 X: Final = 42
 Y: Final[int] = 42
 
+
 class Bar(TypedDict):
     z: ReadOnly[bytes]
 ```
@@ -21,6 +22,7 @@ One thing that is supported is error messages for using type qualifiers in type 
 
 ```py
 from typing_extensions import Final, ClassVar, Required, NotRequired, ReadOnly
+
 
 def _(
     # error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
@@ -42,7 +44,12 @@ You can't inherit from a type qualifier.
 ```py
 from typing_extensions import Final, ClassVar, Required, NotRequired, ReadOnly
 
+
 class A(Final): ...  # error: [invalid-base]
+
+
 class B(ClassVar): ...  # error: [invalid-base]
+
+
 class C(ReadOnly): ...  # error: [invalid-base]
 ```

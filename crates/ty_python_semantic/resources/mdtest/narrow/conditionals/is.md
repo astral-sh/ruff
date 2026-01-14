@@ -19,6 +19,7 @@ def _(flag: bool):
 ```py
 def _(flag: bool):
     class A: ...
+
     x = A()
     y = x if flag else None
 
@@ -70,9 +71,11 @@ def _(flag1: bool, flag2: bool):
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 def _(answer: Answer):
     if answer is Answer.NO:
@@ -80,8 +83,10 @@ def _(answer: Answer):
     else:
         reveal_type(answer)  # revealed: Literal[Answer.YES]
 
+
 class Single(Enum):
     VALUE = 1
+
 
 def _(x: Single | int):
     if x is Single.VALUE:
@@ -99,6 +104,7 @@ python-version = "3.10"
 
 ```py
 from types import EllipsisType
+
 
 def _(x: int | EllipsisType):
     if x is ...:
@@ -131,7 +137,9 @@ def _(flag: bool):
 ```py
 from typing import Literal
 
+
 def f() -> Literal[1, 2] | None: ...
+
 
 if (x := f()) is None:
     reveal_type(x)  # revealed: None

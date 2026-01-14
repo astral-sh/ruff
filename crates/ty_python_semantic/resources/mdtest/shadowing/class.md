@@ -5,6 +5,7 @@
 ```py
 class C: ...
 
+
 C = 1  # error: [invalid-assignment]
 ```
 
@@ -14,6 +15,7 @@ No diagnostic is raised in the case of explicit shadowing:
 
 ```py
 class C: ...
+
 
 C: int = 1
 ```

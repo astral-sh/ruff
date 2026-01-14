@@ -14,6 +14,7 @@ The intersection with `~AlwaysFalsy` simplifies to just the non-empty literal.
 ```py
 from typing import Literal
 
+
 def _(x: Literal["foo", ""]):
     if len(x):
         reveal_type(x)  # revealed: Literal["foo"]
@@ -25,6 +26,7 @@ def _(x: Literal["foo", ""]):
 
 ```py
 from typing import Literal
+
 
 def _(x: Literal[b"foo", b""]):
     if len(x):
@@ -42,6 +44,7 @@ python-version = "3.11"
 
 ```py
 from typing import LiteralString
+
 
 def _(x: LiteralString):
     if len(x):
@@ -68,6 +71,7 @@ def _(x: tuple[int, ...]):
 ```py
 from typing import Literal
 
+
 def _(x: Literal["foo", ""] | tuple[int, ...]):
     if len(x):
         reveal_type(x)  # revealed: Literal["foo"] | (tuple[int, ...] & ~AlwaysFalsy)
@@ -84,12 +88,14 @@ types, and the truthiness of the `__len__` return type is consistent with the tr
 ```py
 from typing import Literal
 
+
 class Foo:
     def __bool__(self) -> Literal[True]:
         return True
 
     def __len__(self) -> Literal[42]:
         return 42
+
 
 class Bar:
     def __bool__(self) -> Literal[False]:
@@ -98,6 +104,7 @@ class Bar:
     def __len__(self) -> Literal[0]:
         return 0
 
+
 class Inconsistent1:
     def __bool__(self) -> Literal[True]:
         return True
@@ -105,12 +112,14 @@ class Inconsistent1:
     def __len__(self) -> Literal[0]:
         return 0
 
+
 class Inconsistent2:
     def __bool__(self) -> Literal[False]:
         return False
 
     def __len__(self) -> Literal[42]:
         return 42
+
 
 def f(
     a: Foo | list[int],
@@ -169,6 +178,7 @@ def not_narrowed_str(x: str):
         # No narrowing because `str` could be subclassed with a custom `__bool__`
         reveal_type(x)  # revealed: str
 
+
 def not_narrowed_list(x: list[int]):
     if len(x):
         # No narrowing because `list` could be subclassed with a custom `__bool__`
@@ -182,6 +192,7 @@ leaving the non-narrowable parts unchanged:
 
 ```py
 from typing import Literal
+
 
 def _(x: Literal["foo", ""] | list[int]):
     if len(x):

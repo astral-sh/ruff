@@ -47,6 +47,7 @@ def _(x: bool):
     else:
         reveal_type(x)  # revealed: Literal[False]
 
+
 def _(x: bool):
     if x == False:
         reveal_type(x)  # revealed: Literal[False]
@@ -59,9 +60,11 @@ def _(x: bool):
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 def _(answer: Answer):
     if answer != Answer.NO:
@@ -69,14 +72,17 @@ def _(answer: Answer):
     else:
         reveal_type(answer)  # revealed: Literal[Answer.NO]
 
+
 def _(answer: Answer):
     if answer == Answer.NO:
         reveal_type(answer)  # revealed: Literal[Answer.NO]
     else:
         reveal_type(answer)  # revealed: Literal[Answer.YES]
 
+
 class Single(Enum):
     VALUE = 1
+
 
 def _(x: Single | int):
     if x != Single.VALUE:
@@ -84,6 +90,7 @@ def _(x: Single | int):
     else:
         # `int` is not eliminated here because there could be subclasses of `int` with custom `__eq__`/`__ne__` methods
         reveal_type(x)  # revealed: Single | int
+
 
 def _(x: Single | int):
     if x == Single.VALUE:
@@ -97,12 +104,14 @@ This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__`
 ```py
 from enum import Enum
 
+
 class AmbiguousEnum(Enum):
     NO = 0
     YES = 1
 
     def __ne__(self, other) -> bool:
         return True
+
 
 def _(answer: AmbiguousEnum):
     if answer != AmbiguousEnum.NO:
@@ -116,13 +125,16 @@ Similar if that method is inherited from a base class:
 ```py
 from enum import Enum
 
+
 class Mixin:
     def __eq__(self, other) -> bool:
         return True
 
+
 class AmbiguousEnum(Mixin, Enum):
     NO = 0
     YES = 1
+
 
 def _(answer: AmbiguousEnum):
     if answer == AmbiguousEnum.NO:
@@ -146,7 +158,9 @@ def _(flag: bool):
 ```py
 def _(flag: bool):
     class A: ...
+
     class B: ...
+
     C = A if flag else B
 
     if C != A:
@@ -198,8 +212,10 @@ def _(flag1: bool, flag2: bool, a: int):
 ```py
 from typing import Literal
 
+
 def f() -> Literal[1, 2, 3]:
     return 1
+
 
 if (x := f()) != 1:
     reveal_type(x)  # revealed: Literal[2, 3]
@@ -212,6 +228,7 @@ else:
 ```py
 from typing import Any
 
+
 def _(x: Any | None, y: Any | None):
     if x != 1:
         reveal_type(x)  # revealed: (Any & ~Literal[1]) | None
@@ -223,6 +240,7 @@ def _(x: Any | None, y: Any | None):
 
 ```py
 from typing import Literal
+
 
 def _(b: bool, i: Literal[1, 2]):
     if b == 1:
@@ -251,6 +269,7 @@ def _(b: bool, i: Literal[1, 2]):
 ```py
 from typing_extensions import Literal, LiteralString, Any
 
+
 def _(s: LiteralString | None, t: LiteralString | Any):
     if s == "foo":
         reveal_type(s)  # revealed: Literal["foo"]
@@ -270,6 +289,7 @@ tuples. So they are excluded from the narrowed type when comparing to non-tuple 
 
 ```py
 from typing import Literal
+
 
 def _(x: Literal["a", "b"] | tuple[int, int]):
     if x == "a":

@@ -9,8 +9,10 @@ We support type narrowing for attributes and subscripts.
 ```py
 from ty_extensions import Unknown
 
+
 class C:
     x: int | None = None
+
 
 c = C()
 
@@ -33,24 +35,31 @@ if c.x is None:
 
 reveal_type(c.x)  # revealed: int
 
+
 class _:
     reveal_type(c.x)  # revealed: int
 
+
 c = C()
+
 
 class _:
     if c.x is None:
         c.x = 1
     reveal_type(c.x)  # revealed: int
 
+
 # TODO: should be `int`
 reveal_type(c.x)  # revealed: int | None
+
 
 class D:
     x = None
 
+
 def unknown() -> Unknown:
     return 1
+
 
 d = D()
 reveal_type(d.x)  # revealed: Unknown | None
@@ -59,12 +68,15 @@ reveal_type(d.x)  # revealed: Literal[1]
 d.x = unknown()
 reveal_type(d.x)  # revealed: Unknown
 
+
 class E:
     x: int | None = None
+
 
 e = E()
 
 if e.x is not None:
+
     class _:
         reveal_type(e.x)  # revealed: int
 ```
@@ -103,6 +115,7 @@ reveal_type(c.x)  # revealed: int | None
 class C:
     value: str | None
 
+
 def foo(c: C):
     # The truthiness check `c.value` narrows to `str & ~AlwaysFalsy`.
     # The subsequent `len(c.value)` doesn't narrow further since `str` is not narrowable by len().
@@ -136,6 +149,7 @@ class C[T]:
         self.x = x
         self.y = x
 
+
 def f(a: int | None):
     c = C(a)
     reveal_type(c.x)  # revealed: int | None
@@ -145,6 +159,7 @@ def f(a: int | None):
         # In this case, it may seem like we can narrow it down to `int`,
         # but different values ​​may be reassigned to `x` and `y` in another place.
         reveal_type(c.y)  # revealed: int | None
+
 
 def g[T](c: C[T]):
     reveal_type(c.x)  # revealed: T@g
@@ -170,6 +185,7 @@ class C:
         self.x: int | None = None
         self.y: int | None = None
 
+
 c = C()
 reveal_type(c.x)  # revealed: int | None
 if c.x is not None:
@@ -177,8 +193,10 @@ if c.x is not None:
     reveal_type(c.y)  # revealed: int | None
 
 if c.x is not None:
+
     def _():
         reveal_type(c.x)  # revealed: int | None
+
 
 def _():
     if c.x is not None:
@@ -220,6 +238,7 @@ def _(t1: tuple[int | None, int | None], t2: tuple[int, int] | tuple[None, None]
     else:
         reveal_type(t2)  # revealed: tuple[int, int]
 
+
 def _(t3: tuple[int, str] | tuple[None, None] | tuple[bool, bytes]):
     # Narrow to tuples where first element is not None
     if t3[0] is not None:
@@ -229,11 +248,13 @@ def _(t3: tuple[int, str] | tuple[None, None] | tuple[bool, bytes]):
     if t3[0] is None:
         reveal_type(t3)  # revealed: tuple[None, None]
 
+
 def _(t4: tuple[bool, int] | tuple[bool, str]):
     # Both tuples have bool at index 0, which is not disjoint from True,
     # so neither gets filtered out when checking `is True`
     if t4[0] is True:
         reveal_type(t4)  # revealed: tuple[bool, int] | tuple[bool, str]
+
 
 def _(t5: tuple[int, None] | tuple[None, int]):
     # Narrow on second element (index 1)
@@ -246,11 +267,13 @@ def _(t5: tuple[int, None] | tuple[None, int]):
     if t5[-1] is None:
         reveal_type(t5)  # revealed: tuple[int, None]
 
+
 def _(t6: tuple[int, ...] | tuple[None, None]):
     # Variadic tuple at index 0 has element type `int` (not a union),
     # so `tuple[None, None]` gets filtered out
     if t6[0] is not None:
         reveal_type(t6)  # revealed: tuple[int, ...]
+
 
 def _(t6b: tuple[int, ...] | tuple[None, ...]):
     # Both variadic: `int` is disjoint from None, `None` is not disjoint from None
@@ -259,6 +282,7 @@ def _(t6b: tuple[int, ...] | tuple[None, ...]):
     else:
         reveal_type(t6b)  # revealed: tuple[None, ...]
 
+
 def _(t7: tuple[int, int] | tuple[None, None]):
     # Index out of range for both tuples - no narrowing, but errors are emitted
     # error: [index-out-of-bounds] "Index 5 is out of bounds for tuple `tuple[int, int]` with length 2"
@@ -266,11 +290,13 @@ def _(t7: tuple[int, int] | tuple[None, None]):
     if t7[5] is not None:
         reveal_type(t7)  # revealed: tuple[int, int] | tuple[None, None]
 
+
 def _(t8: tuple[int, int, int] | tuple[None, None]):
     # Index in range for first tuple but out of range for second
     # error: [index-out-of-bounds] "Index 2 is out of bounds for tuple `tuple[None, None]` with length 2"
     if t8[2] is not None:
         reveal_type(t8)  # revealed: tuple[int, int, int] | tuple[None, None]
+
 
 def _(t9: tuple[int | None, str] | tuple[str, int]):
     # When the element type is a union (like `int | None`), we can't filter
@@ -286,9 +312,15 @@ Narrow unions of tuples based on literal tag elements using `==` comparison:
 ```py
 from typing import Literal
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
     if x[0] == "tag1":
@@ -299,11 +331,13 @@ def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
         reveal_type(x[1])  # revealed: B
         reveal_type(x[2])  # revealed: C
 
+
 def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
     if x[0] != "tag1":
         reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
     else:
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+
 
 # With int literals
 def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
@@ -312,12 +346,14 @@ def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
     else:
         reveal_type(x)  # revealed: tuple[Literal[2], B]
 
+
 # With bytes literals
 def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
     if x[0] == b"a":
         reveal_type(x)  # revealed: tuple[Literal[b"a"], A]
     else:
         reveal_type(x)  # revealed: tuple[Literal[b"b"], B]
+
 
 # Multiple tuple variants
 def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B] | tuple[Literal["c"], C]):
@@ -327,6 +363,7 @@ def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B] | tuple[Literal["c"], C
         reveal_type(x)  # revealed: tuple[Literal["b"], B]
     else:
         reveal_type(x)  # revealed: tuple[Literal["c"], C]
+
 
 # Using index 1 instead of 0
 def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
@@ -390,9 +427,11 @@ class C:
     def __init__(self):
         self.x: tuple[int | None, int | None] = (None, None)
 
+
 class D:
     def __init__(self):
         self.c: tuple[C] | None = None
+
 
 d = D()
 if d.c is not None and d.c[0].x[0] is not None:

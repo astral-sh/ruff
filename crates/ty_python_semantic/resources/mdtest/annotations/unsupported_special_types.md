@@ -14,5 +14,6 @@ MyTypedDict = typing.TypedDict("MyTypedDict", {"foo": int})
 MyNamedTuple1 = typing.NamedTuple("MyNamedTuple1", [("foo", int)])
 MyNamedTuple2 = collections.namedtuple("MyNamedTuple2", ["foo"])
 
+
 def f(a: MyEnum, b: MyTypedDict, c: MyNamedTuple1, d: MyNamedTuple2): ...
 ```

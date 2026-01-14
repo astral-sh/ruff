@@ -28,14 +28,18 @@ cast(str)
 # error: [too-many-positional-arguments] "Too many positional arguments to function `cast`: expected 2, got 3"
 cast(str, b"ar", "foo")
 
+
 def function_returning_int() -> int:
     return 10
+
 
 # error: [redundant-cast] "Value is already of type `int`"
 cast(int, function_returning_int())
 
+
 def function_returning_any() -> Any:
     return "blah"
+
 
 # error: [redundant-cast] "Value is already of type `Any`"
 cast(Any, function_returning_any())
@@ -46,6 +50,7 @@ diagnostics.
 
 ```py
 from typing import Callable
+
 
 def f(x: Callable[[dict[str, int]], None], y: tuple[dict[str, int]]):
     a = cast(Callable[[list[bytes]], None], x)
@@ -64,6 +69,7 @@ the gradual guarantee and leads to cascading errors when an object is inferred a
 
 ```py
 from ty_extensions import Unknown
+
 
 def f(x: Any, y: Unknown, z: Any | str | int):
     a = cast(dict[str, Any], x)

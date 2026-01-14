@@ -62,9 +62,11 @@ Enum literals:
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 def _(answer: Answer):
     if answer is not Answer.NO:
@@ -74,8 +76,10 @@ def _(answer: Answer):
 
     reveal_type(answer)  # revealed: Answer
 
+
 class Single(Enum):
     VALUE = 1
+
 
 def _(x: Single | int):
     if x is not Single.VALUE:
@@ -104,6 +108,7 @@ else:
 ```py
 def _(flag: bool):
     class A: ...
+
     x = A()
     y = x if flag else None
 
@@ -142,6 +147,7 @@ def _(x_flag: bool, y_flag: bool):
 
 ```py
 def f() -> int | str | None: ...
+
 
 if (x := f()) is not None:
     reveal_type(x)  # revealed: int | str

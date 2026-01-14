@@ -110,6 +110,7 @@ Also, `int` can be subclassed, and instances of that subclass are also subtypes 
 class CustomInt(int):
     pass
 
+
 static_assert(is_subtype_of(CustomInt, int))
 ```
 
@@ -196,9 +197,11 @@ from typing import Literal, assert_type
 
 type Nat = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
+
 def pythagorean_triples(a: Nat, b: Nat, c: Nat):
     # Answer is `bool`, because solutions do exist (3² + 4² = 5²)
     assert_type(a**2 + b**2 == c**2, bool)
+
 
 def fermats_last_theorem(a: Nat, b: Nat, c: Nat):
     # Answer is `Literal[False]`, because no solutions exist
@@ -223,6 +226,7 @@ This can be used for type-narrowing:
 
 ```py
 from typing_extensions import Literal, assert_type
+
 
 def f(x: Literal[0, 1, 54365]):
     if x:

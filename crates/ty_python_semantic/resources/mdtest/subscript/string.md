@@ -19,6 +19,7 @@ reveal_type(a)  # revealed: Unknown
 b = s[-8]  # error: [index-out-of-bounds] "Index -8 is out of bounds for string `Literal["abcde"]` with length 5"
 reveal_type(b)  # revealed: Unknown
 
+
 def _(n: int):
     a = "abcde"[n]
     reveal_type(a)  # revealed: LiteralString

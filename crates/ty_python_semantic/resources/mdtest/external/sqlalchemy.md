@@ -16,14 +16,17 @@ This test makes sure that ty understands SQLAlchemy's `dataclass_transform` setu
 ```py
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+
 class Base(DeclarativeBase):
     pass
+
 
 class User(Base):
     __tablename__ = "user"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     internal_name: Mapped[str] = mapped_column(alias="name")
+
 
 user = User(name="John Doe")
 reveal_type(user.id)  # revealed: int
@@ -60,6 +63,7 @@ And define a simple model:
 ```py
 class Base(DeclarativeBase):
     pass
+
 
 class User(Base):
     __tablename__ = "users"
@@ -173,14 +177,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, Integer, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+
 class Base(DeclarativeBase):
     pass
+
 
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(Text)
+
 
 async def test_async(session: AsyncSession):
     stmt = select(User).where(User.name == "Alice")

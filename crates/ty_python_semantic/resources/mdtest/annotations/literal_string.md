@@ -16,6 +16,7 @@ from typing_extensions import LiteralString
 
 x: LiteralString
 
+
 def f():
     reveal_type(x)  # revealed: LiteralString
 ```
@@ -54,6 +55,7 @@ Subclassing `LiteralString` leads to a runtime error.
 ```py
 from typing_extensions import LiteralString
 
+
 class C(LiteralString): ...  # error: [invalid-base]
 ```
 
@@ -91,6 +93,7 @@ vice versa.
 
 ```py
 from typing_extensions import Literal, LiteralString
+
 
 def _(flag: bool):
     foo_1: Literal["foo"] = "foo"
@@ -145,6 +148,7 @@ python-version = "3.11"
 from typing import LiteralString
 
 x: LiteralString = "foo"
+
 
 def f():
     reveal_type(x)  # revealed: LiteralString

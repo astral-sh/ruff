@@ -33,6 +33,7 @@ completing. The type of `x` at the beginning of the `except` suite in this examp
 def could_raise_returns_str() -> str:
     return "foo"
 
+
 x = 1
 
 try:
@@ -74,6 +75,7 @@ control-flow analysis.
 def could_raise_returns_str() -> str:
     return "foo"
 
+
 x = 1
 
 try:
@@ -101,6 +103,7 @@ The inferred type of `x` at this point is the union of the types at the end of t
 ```py
 def could_raise_returns_str() -> str:
     return "foo"
+
 
 x = 1
 
@@ -133,6 +136,7 @@ the `except` suite:
 ```py
 def could_raise_returns_str() -> str:
     return "foo"
+
 
 x = 1
 
@@ -190,6 +194,7 @@ type of `x` at the end of the example is therefore `Literal[2]`:
 def could_raise_returns_str() -> str:
     return "foo"
 
+
 x = 1
 
 try:
@@ -242,17 +247,25 @@ suites:
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 def could_raise_returns_A() -> A:
     return A()
 
+
 def could_raise_returns_B() -> B:
     return B()
 
+
 def could_raise_returns_C() -> C:
     return C()
+
 
 x = 1
 
@@ -305,13 +318,18 @@ An example with multiple `except` branches and a `finally` branch:
 
 ```py
 class D: ...
+
+
 class E: ...
+
 
 def could_raise_returns_D() -> D:
     return D()
 
+
 def could_raise_returns_E() -> E:
     return E()
+
 
 x = 1
 
@@ -346,25 +364,39 @@ an exception raised *there*.
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
+
 class D: ...
+
+
 class E: ...
+
 
 def could_raise_returns_A() -> A:
     return A()
 
+
 def could_raise_returns_B() -> B:
     return B()
+
 
 def could_raise_returns_C() -> C:
     return C()
 
+
 def could_raise_returns_D() -> D:
     return D()
 
+
 def could_raise_returns_E() -> E:
     return E()
+
 
 x = 1
 
@@ -395,13 +427,18 @@ The same again, this time with multiple `except` branches:
 
 ```py
 class F: ...
+
+
 class G: ...
+
 
 def could_raise_returns_F() -> F:
     return F()
 
+
 def could_raise_returns_G() -> G:
     return G()
+
 
 x = 1
 
@@ -446,49 +483,81 @@ jumping out of that suite prior to the suite running to completion.
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
+
 class D: ...
+
+
 class E: ...
+
+
 class F: ...
+
+
 class G: ...
+
+
 class H: ...
+
+
 class I: ...
+
+
 class J: ...
+
+
 class K: ...
+
 
 def could_raise_returns_A() -> A:
     return A()
 
+
 def could_raise_returns_B() -> B:
     return B()
+
 
 def could_raise_returns_C() -> C:
     return C()
 
+
 def could_raise_returns_D() -> D:
     return D()
+
 
 def could_raise_returns_E() -> E:
     return E()
 
+
 def could_raise_returns_F() -> F:
     return F()
+
 
 def could_raise_returns_G() -> G:
     return G()
 
+
 def could_raise_returns_H() -> H:
     return H()
+
 
 def could_raise_returns_I() -> I:
     return I()
 
+
 def could_raise_returns_J() -> J:
     return J()
 
+
 def could_raise_returns_K() -> K:
     return K()
+
 
 x = 1
 
@@ -549,25 +618,39 @@ in the outer scope:
 
 ```py
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
+
 class D: ...
+
+
 class E: ...
+
 
 def could_raise_returns_A() -> A:
     return A()
 
+
 def could_raise_returns_B() -> B:
     return B()
+
 
 def could_raise_returns_C() -> C:
     return C()
 
+
 def could_raise_returns_D() -> D:
     return D()
 
+
 def could_raise_returns_E() -> E:
     return E()
+
 
 x = 1
 
@@ -590,6 +673,7 @@ try:
             # TODO: should be `A | B | C | D`
             reveal_type(x)  # revealed: B | D
         reveal_type(x)  # revealed: B | D
+
     x = foo
     reveal_type(x)  # revealed: def foo(param=...) -> Unknown
 except:

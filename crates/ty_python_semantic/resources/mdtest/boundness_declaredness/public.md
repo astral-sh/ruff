@@ -39,13 +39,16 @@ If a symbol has a declared type (`int`), we use that even if there is a more pre
 ```py
 from typing import Any
 
+
 def any() -> Any: ...
+
 
 class Public:
     a: int = 1
     b: str = 2  # error: [invalid-assignment]
     c: Any = 3
     d: int = any()
+
 
 reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: str
@@ -60,9 +63,11 @@ If a symbol is declared and *possibly* unbound, we trust the declared type witho
 ```py
 from typing import Any
 
+
 def any() -> Any: ...
 def flag() -> bool:
     return True
+
 
 class Public:
     a: int
@@ -75,6 +80,7 @@ class Public:
         b = 2  # error: [invalid-assignment]
         c = 3
         d = any()
+
 
 reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: str
@@ -90,9 +96,11 @@ is available somehow and simply use the declared type.
 ```py
 from typing import Any
 
+
 class Public:
     a: int
     b: Any
+
 
 reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: Any
@@ -108,9 +116,11 @@ inferred types:
 ```py
 from typing import Any
 
+
 def any() -> Any: ...
 def flag() -> bool:
     return True
+
 
 class Public:
     a = 1
@@ -122,6 +132,7 @@ class Public:
         b: Any
         c: str  # error: [invalid-declaration]
         d: int
+
 
 reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: Literal[2] | Any
@@ -143,8 +154,10 @@ error for both `a` and `b`:
 ```py
 from typing import Any
 
+
 def flag() -> bool:
     return True
+
 
 class Public:
     if flag():
@@ -152,6 +165,7 @@ class Public:
         b = 2
     else:
         b: str
+
 
 # error: [possibly-missing-attribute]
 reveal_type(Public.a)  # revealed: Literal[1] | Any
@@ -173,9 +187,11 @@ seems inconsistent when compared to the case just above.
 def flag() -> bool:
     return True
 
+
 class Public:
     if flag():
         a: int
+
 
 # TODO: this should raise an error. Once we fix this, update the section description and the table
 # on top of this document.
@@ -202,6 +218,7 @@ class Public:
     # Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
     b: SomeUnknownName = 1  # error: [unresolved-reference]
 
+
 reveal_type(Public.a)  # revealed: Unknown | Literal[1]
 reveal_type(Public.b)  # revealed: Unknown
 
@@ -218,10 +235,12 @@ inconsistent when compared to the "possibly-undeclared-and-possibly-unbound" cas
 def flag() -> bool:
     return True
 
+
 class Public:
     if flag:
         a = 1
         b: SomeUnknownName = 1  # error: [unresolved-reference]
+
 
 # TODO: these should raise an error. Once we fix this, update the section description and the table
 # on top of this document.
@@ -240,6 +259,7 @@ If a symbol is undeclared *and* unbound, we infer `Unknown` and raise an error.
 class Public:
     if False:
         a: int = 1
+
 
 # error: [unresolved-attribute]
 reveal_type(Public.a)  # revealed: Unknown

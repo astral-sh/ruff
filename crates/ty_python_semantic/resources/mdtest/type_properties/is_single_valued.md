@@ -16,8 +16,12 @@ static_assert(is_single_valued(Literal[b"abc"]))
 static_assert(is_single_valued(tuple[()]))
 static_assert(is_single_valued(tuple[Literal[True], Literal[1]]))
 
+
 class EmptyTupleSubclass(tuple[()]): ...
+
+
 class HeterogeneousTupleSubclass(tuple[Literal[True], Literal[1]]): ...
+
 
 # N.B. this follows from the fact that `EmptyTupleSubclass` is a subtype of `tuple[()]`,
 # and any property recognised for `tuple[()]` should therefore also be recognised for
@@ -37,15 +41,19 @@ static_assert(not is_single_valued(Literal[1, 2]))
 
 static_assert(not is_single_valued(tuple[None, int]))
 
+
 class MultiValuedHeterogeneousTupleSubclass(tuple[None, int]): ...
+
 
 static_assert(not is_single_valued(MultiValuedHeterogeneousTupleSubclass))
 
 static_assert(not is_single_valued(Callable[..., None]))
 static_assert(not is_single_valued(Callable[[int, str], None]))
 
+
 class A:
     def method(self): ...
+
 
 static_assert(is_single_valued(TypeOf[A().method]))
 static_assert(is_single_valued(TypeOf[types.FunctionType.__get__]))
@@ -60,12 +68,15 @@ literal type might not compare equal to itself.
 from ty_extensions import is_single_valued, static_assert, TypeOf
 from enum import Enum
 
+
 class NormalEnum(Enum):
     NO = 0
     YES = 1
 
+
 class SingleValuedEnum(Enum):
     VALUE = 1
+
 
 class ComparesEqualEnum(Enum):
     NO = 0
@@ -74,12 +85,14 @@ class ComparesEqualEnum(Enum):
     def __eq__(self, other: object) -> Literal[True]:
         return True
 
+
 class CustomEqEnum(Enum):
     NO = 0
     YES = 1
 
     def __eq__(self, other: object) -> bool:
         return False
+
 
 class CustomNeEnum(Enum):
     NO = 0
@@ -88,13 +101,16 @@ class CustomNeEnum(Enum):
     def __ne__(self, other: object) -> bool:
         return False
 
+
 class StrEnum(str, Enum):
     A = "a"
     B = "b"
 
+
 class IntEnum(int, Enum):
     A = 1
     B = 2
+
 
 static_assert(is_single_valued(Literal[NormalEnum.NO]))
 static_assert(is_single_valued(Literal[NormalEnum.YES]))

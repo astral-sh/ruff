@@ -15,6 +15,7 @@ def f(x: str):
 ```py
 def f(): ...
 
+
 f = 1  # error: [invalid-assignment]
 ```
 
@@ -22,6 +23,7 @@ f = 1  # error: [invalid-assignment]
 
 ```py
 def f(): ...
+
 
 f: int = 1
 ```
@@ -35,19 +37,25 @@ non-`def` declaration, without error.
 f = 1
 reveal_type(f)  # revealed: Literal[1]
 
+
 def f(): ...
+
 
 reveal_type(f)  # revealed: def f() -> Unknown
 
+
 def f(x: int) -> int:
     raise NotImplementedError
+
 
 reveal_type(f)  # revealed: def f(x: int) -> int
 
 f: int = 1
 reveal_type(f)  # revealed: Literal[1]
 
+
 def f(): ...
+
 
 reveal_type(f)  # revealed: def f() -> Unknown
 ```

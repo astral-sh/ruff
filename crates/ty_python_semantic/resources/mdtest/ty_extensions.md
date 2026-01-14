@@ -18,10 +18,12 @@ directly.
 from typing import Literal
 from ty_extensions import Not, static_assert
 
+
 def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
     reveal_type(n1)  # revealed: ~int
     reveal_type(n2)  # revealed: int
     reveal_type(n3)  # revealed: ~int
+
 
 # error: "Special form `ty_extensions.Not` expected exactly 1 type argument, got 2"
 n: Not[int, str]
@@ -29,6 +31,7 @@ n: Not[int, str]
 o: Not[()]
 
 p: Not[(int,)]
+
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
     # TODO: `bool` is not incorrect, but these would ideally be `Literal[True]` and `Literal[False]`
@@ -55,24 +58,36 @@ python-version = "3.12"
 from ty_extensions import Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Literal, Never
 
+
 class S: ...
+
+
 class T: ...
+
 
 def x(x1: Intersection[S, T], x2: Intersection[S, Not[T]]) -> None:
     reveal_type(x1)  # revealed: S & T
     reveal_type(x2)  # revealed: S & ~T
+
 
 def y(y1: Intersection[int, object], y2: Intersection[int, bool], y3: Intersection[int, Never]) -> None:
     reveal_type(y1)  # revealed: int
     reveal_type(y2)  # revealed: bool
     reveal_type(y3)  # revealed: Never
 
+
 def z(z1: Intersection[int, Not[Literal[1]], Not[Literal[2]]]) -> None:
     reveal_type(z1)  # revealed: int & ~Literal[1] & ~Literal[2]
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 type ABC = Intersection[A, B, C]
 
@@ -80,7 +95,9 @@ static_assert(is_subtype_of(ABC, A))
 static_assert(is_subtype_of(ABC, B))
 static_assert(is_subtype_of(ABC, C))
 
+
 class D: ...
+
 
 static_assert(not is_subtype_of(ABC, D))
 ```
@@ -96,6 +113,7 @@ from ty_extensions import Unknown, static_assert, is_assignable_to, reveal_mro
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
 
+
 def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None:
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: tuple[str, Unknown]
@@ -106,6 +124,7 @@ def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None
 
 ```py
 class C(Unknown): ...
+
 
 # revealed: (<class 'C'>, Unknown, <class 'object'>)
 reveal_mro(C)
@@ -132,9 +151,11 @@ static_assert(is_subtype_of(Literal[False], AlwaysFalsy))
 static_assert(not is_subtype_of(int, AlwaysFalsy))
 static_assert(not is_subtype_of(str, AlwaysFalsy))
 
+
 def _(t: AlwaysTruthy, f: AlwaysFalsy):
     reveal_type(t)  # revealed: AlwaysTruthy
     reveal_type(f)  # revealed: AlwaysFalsy
+
 
 def f(
     a: AlwaysTruthy[int],  # error: [invalid-type-form]
@@ -186,6 +207,7 @@ Static assertions can be used to enforce narrowing constraints:
 ```py
 from ty_extensions import static_assert
 
+
 def f(x: int | None) -> None:
     if x is not None:
         static_assert(x is not None)
@@ -233,9 +255,11 @@ static_assert(2 * 3 == 7)
 # error: "Static assertion error: argument of type `bool` has an ambiguous static truthiness"
 static_assert(int(2.0 * 3.0) == 6)
 
+
 class InvalidBoolDunder:
     def __bool__(self) -> int:
         return 1
+
 
 # error: [unsupported-bool-conversion]  "Boolean conversion is not supported for type `InvalidBoolDunder`"
 static_assert(InvalidBoolDunder())
@@ -326,9 +350,15 @@ static_assert(is_subtype_of(bool, int | str))
 static_assert(is_subtype_of(str, int | str))
 static_assert(not is_subtype_of(bytes, int | str))
 
+
 class Base: ...
+
+
 class Derived(Base): ...
+
+
 class Unrelated: ...
+
 
 static_assert(is_subtype_of(Derived, Base))
 static_assert(not is_subtype_of(Base, Derived))
@@ -404,7 +434,10 @@ static_assert(is_subtype_of(str, type[str]))
 # Correct, returns True:
 static_assert(is_subtype_of(TypeOf[str], type[str]))
 
+
 class Base: ...
+
+
 class Derived(Base): ...
 ```
 
@@ -419,8 +452,10 @@ def type_of_annotation() -> None:
     s1: type[Base] = Base
     s2: type[Base] = Derived  # no error here
 
+
 # error: "Special form `ty_extensions.TypeOf` expected exactly 1 type argument, got 3"
 t: TypeOf[int, str, bytes]
+
 
 # error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a type expression"
 def f(x: TypeOf) -> None:
@@ -438,14 +473,18 @@ It accepts a single type parameter which is expected to be a callable object.
 ```py
 from ty_extensions import CallableTypeOf
 
+
 def f1():
     return
+
 
 def f2() -> int:
     return 1
 
+
 def f3(x: int, y: str) -> None:
     return
+
 
 # error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly 1 type argument, got 2"
 c1: CallableTypeOf[f1, f2]
@@ -456,9 +495,11 @@ c2: CallableTypeOf["foo"]
 # error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
 c20: CallableTypeOf[("foo",)]
 
+
 # error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a type expression"
 def f(x: CallableTypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
+
 
 c3: CallableTypeOf[(f3,)]
 
@@ -470,6 +511,7 @@ Using it in annotation to reveal the signature of the callable object:
 
 ```py
 from typing_extensions import Self
+
 
 class Foo:
     def __init__(self, x: int) -> None:
@@ -484,6 +526,7 @@ class Foo:
     @classmethod
     def class_method(cls, x: int) -> Self:
         return cls(x)
+
 
 def _(
     c1: CallableTypeOf[f1],

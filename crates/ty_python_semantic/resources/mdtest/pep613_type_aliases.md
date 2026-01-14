@@ -14,6 +14,7 @@ from typing import TypeAlias
 
 IntOrStr: TypeAlias = int | str
 
+
 def _(x: IntOrStr):
     reveal_type(x)  # revealed: int | str
 ```
@@ -24,6 +25,7 @@ def _(x: IntOrStr):
 import typing
 
 IntOrStr: typing.TypeAlias = int | str
+
 
 def _(x: IntOrStr):
     reveal_type(x)  # revealed: int | str
@@ -54,7 +56,9 @@ from ty_extensions import is_subtype_of, static_assert
 
 MyList: TypeAlias = list["int"]
 
+
 class Foo(MyList): ...
+
 
 static_assert(is_subtype_of(Foo, list[int]))
 ```
@@ -65,6 +69,7 @@ static_assert(is_subtype_of(Foo, list[int]))
 from typing import TypeAlias
 
 MyList: TypeAlias = "list[int]"
+
 
 # error: [invalid-base] "Invalid class base with type `str`"
 class Foo(MyList): ...
@@ -81,6 +86,7 @@ from nonexistent import unknown_type  # error: [unresolved-import]
 
 MyAlias: TypeAlias = int | unknown_type | str
 
+
 def _(x: MyAlias):
     reveal_type(x)  # revealed: int | Unknown | str
 ```
@@ -91,6 +97,7 @@ def _(x: MyAlias):
 from typing import TypeAlias, Callable
 
 MyAlias: TypeAlias = int | Callable[[str], int]
+
 
 def _(x: MyAlias):
     reveal_type(x)  # revealed: int | ((str, /) -> int)
@@ -115,6 +122,7 @@ ListOrSet: TypeAlias = list[T] | set[T]
 reveal_type(MyList)  # revealed: <class 'list[T]'>
 reveal_type(ListOrSet)  # revealed: <types.UnionType special-form 'list[T] | set[T]'>
 
+
 def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
     reveal_type(list_of_int)  # revealed: list[int]
     reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
@@ -131,6 +139,7 @@ U = TypeVar("U")
 TotallyStringifiedPEP613: TypeAlias = "dict[T, U]"
 TotallyStringifiedPartiallySpecialized: TypeAlias = "TotallyStringifiedPEP613[U, int]"
 
+
 def f(x: "TotallyStringifiedPartiallySpecialized[str]"):
     reveal_type(x)  # revealed: @Todo(Generic stringified PEP-613 type alias)
 ```
@@ -144,6 +153,7 @@ T = TypeVar("T")
 
 Alias1: TypeAlias = list[T] | set[T]
 MyAlias: TypeAlias = int | Alias1[str]
+
 
 def _(x: MyAlias):
     reveal_type(x)  # revealed: int | list[str] | set[str]
@@ -163,6 +173,7 @@ T = TypeVar("T")
 
 MyAlias1: TypeAlias = UnknownClass[T] | None
 
+
 def _(a: MyAlias1[int]):
     reveal_type(a)  # revealed: Unknown | None
 ```
@@ -174,6 +185,7 @@ U = TypeVar("U")
 V = TypeVar("V")
 
 MyAlias2: TypeAlias = UnknownClass[T, U, V] | int
+
 
 def _(a: MyAlias2[int, str, bytes]):
     reveal_type(a)  # revealed: Unknown | int
@@ -195,6 +207,7 @@ We can also reference these type aliases from other type aliases:
 ```py
 MyAlias3: TypeAlias = MyAlias1[str] | MyAlias2[int, str, bytes]
 
+
 def _(c: MyAlias3):
     reveal_type(c)  # revealed: Unknown | None | int
 ```
@@ -206,9 +219,11 @@ from typing_extensions import Callable, Concatenate, TypeAliasType
 
 MyAlias4: TypeAlias = Callable[Concatenate[dict[str, T], ...], list[U]]
 
+
 def _(c: MyAlias4[int, str]):
     # TODO: should be (int, / ...) -> str
     reveal_type(c)  # revealed: Unknown
+
 
 T = TypeVar("T")
 
@@ -216,9 +231,11 @@ MyList = TypeAliasType("MyList", list[T], type_params=(T,))
 
 MyAlias5 = Callable[[MyList[T]], int]
 
+
 def _(c: MyAlias5[int]):
     # TODO: should be (list[int], /) -> int
     reveal_type(c)  # revealed: (Unknown, /) -> int
+
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -227,17 +244,22 @@ MyDict = TypeAliasType("MyDict", dict[K, V], type_params=(K, V))
 
 MyAlias6 = Callable[[MyDict[K, V]], int]
 
+
 def _(c: MyAlias6[str, bytes]):
     # TODO: should be (dict[str, bytes], /) -> int
     reveal_type(c)  # revealed: (Unknown, /) -> int
 
+
 ListOrDict: TypeAlias = MyList[T] | dict[str, T]
+
 
 def _(x: ListOrDict[int]):
     # TODO: should be list[int] | dict[str, int]
     reveal_type(x)  # revealed: Unknown | dict[str, int]
 
+
 MyAlias7: TypeAlias = Callable[Concatenate[T, ...], None]
+
 
 def _(c: MyAlias7[int]):
     # TODO: should be (int, / ...) -> None
@@ -259,6 +281,7 @@ MyAlias: TypeAlias = int | str
 ```py
 from alias import MyAlias
 
+
 def _(x: MyAlias):
     reveal_type(x)  # revealed: int | str
 ```
@@ -269,6 +292,7 @@ def _(x: MyAlias):
 from typing import TypeAlias
 
 IntOrStr: TypeAlias = "int | str"
+
 
 def _(x: IntOrStr):
     reveal_type(x)  # revealed: int | str
@@ -282,31 +306,39 @@ from types import UnionType
 
 RecursiveTuple: TypeAlias = tuple[int | "RecursiveTuple", str]
 
+
 def _(rec: RecursiveTuple):
     # TODO should be `tuple[int | RecursiveTuple, str]`
     reveal_type(rec)  # revealed: tuple[Divergent, str]
 
+
 RecursiveHomogeneousTuple: TypeAlias = tuple[int | "RecursiveHomogeneousTuple", ...]
+
 
 def _(rec: RecursiveHomogeneousTuple):
     # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
     reveal_type(rec)  # revealed: tuple[Divergent, ...]
 
+
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
 reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
+
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
     reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
     return isinstance(obj, classinfo)
 
+
 K = TypeVar("K")
 V = TypeVar("V")
 NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
+
 def _(nested: NestedDict[str, int]):
     # TODO should be `dict[str, int | NestedDict[str, int]]`
     reveal_type(nested)  # revealed: dict[@Todo(specialized recursive generic type alias), Divergent]
+
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
@@ -335,6 +367,7 @@ except ImportError:
 
 MyAlias: TypeAlias = int
 
+
 def _(x: MyAlias):
     reveal_type(x)  # revealed: int
 ```
@@ -360,12 +393,16 @@ class B: ...
 ```py
 import stub
 
+
 def f(x: stub.MyAlias): ...
+
 
 f(stub.A())
 f(stub.B())
 
+
 class Unrelated: ...
+
 
 # error: [invalid-argument-type]
 f(Unrelated())
@@ -379,9 +416,11 @@ context is an error.
 ```py
 from typing import TypeAlias
 
+
 # error: [invalid-type-form]
 def _(x: TypeAlias):
     reveal_type(x)  # revealed: Unknown
+
 
 # error: [invalid-type-form]
 y: list[TypeAlias] = []

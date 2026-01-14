@@ -9,8 +9,10 @@ The definition of `typing.overload` in typeshed is an identity function.
 ```py
 from typing import overload
 
+
 def foo(x: int) -> int:
     return x
+
 
 reveal_type(foo)  # revealed: def foo(x: int) -> int
 bar = overload(foo)
@@ -22,6 +24,7 @@ reveal_type(bar)  # revealed: def foo(x: int) -> int
 ```py
 from typing import overload
 
+
 @overload
 def add() -> None: ...
 @overload
@@ -30,6 +33,7 @@ def add(x: int) -> int: ...
 def add(x: int, y: int) -> int: ...
 def add(x: int | None = None, y: int | None = None) -> int | None:
     return (x or 0) + (y or 0)
+
 
 reveal_type(add)  # revealed: Overload[() -> None, (x: int) -> int, (x: int, y: int) -> int]
 reveal_type(add())  # revealed: None
@@ -47,6 +51,7 @@ An overloaded function is overriding another overloaded function:
 ```py
 from typing import overload
 
+
 @overload
 def foo() -> None: ...
 @overload
@@ -54,9 +59,11 @@ def foo(x: int) -> int: ...
 def foo(x: int | None = None) -> int | None:
     return x
 
+
 reveal_type(foo)  # revealed: Overload[() -> None, (x: int) -> int]
 reveal_type(foo())  # revealed: None
 reveal_type(foo(1))  # revealed: int
+
 
 @overload
 def foo() -> None: ...
@@ -64,6 +71,7 @@ def foo() -> None: ...
 def foo(x: str) -> str: ...
 def foo(x: str | None = None) -> str | None:
     return x
+
 
 reveal_type(foo)  # revealed: Overload[() -> None, (x: str) -> str]
 reveal_type(foo())  # revealed: None
@@ -76,6 +84,7 @@ A non-overloaded function is overriding an overloaded function:
 def foo(x: int) -> int:
     return x
 
+
 reveal_type(foo)  # revealed: def foo(x: int) -> int
 ```
 
@@ -84,12 +93,14 @@ An overloaded function is overriding a non-overloaded function:
 ```py
 reveal_type(foo)  # revealed: def foo(x: int) -> int
 
+
 @overload
 def foo() -> None: ...
 @overload
 def foo(x: bytes) -> bytes: ...
 def foo(x: bytes | None = None) -> bytes | None:
     return x
+
 
 reveal_type(foo)  # revealed: Overload[() -> None, (x: bytes) -> bytes]
 reveal_type(foo())  # revealed: None
@@ -101,6 +112,7 @@ reveal_type(foo(b""))  # revealed: bytes
 ```py
 from typing_extensions import Self, overload
 
+
 class Foo1:
     @overload
     def method(self) -> None: ...
@@ -109,10 +121,12 @@ class Foo1:
     def method(self, x: int | None = None) -> int | None:
         return x
 
+
 foo1 = Foo1()
 reveal_type(foo1.method)  # revealed: Overload[() -> None, (x: int) -> int]
 reveal_type(foo1.method())  # revealed: None
 reveal_type(foo1.method(1))  # revealed: int
+
 
 class Foo2:
     @overload
@@ -122,10 +136,12 @@ class Foo2:
     def method(self, x: str | None = None) -> str | None:
         return x
 
+
 foo2 = Foo2()
 reveal_type(foo2.method)  # revealed: Overload[() -> None, (x: str) -> str]
 reveal_type(foo2.method())  # revealed: None
 reveal_type(foo2.method(""))  # revealed: str
+
 
 class Foo3:
     @overload
@@ -134,6 +150,7 @@ class Foo3:
     def takes_self_or_int(self: Self, x: int) -> int: ...
     def takes_self_or_int(self: Self, x: Self | int) -> Self | int:
         return x
+
 
 foo3 = Foo3()
 reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
@@ -145,6 +162,7 @@ reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ```py
 from typing import overload
 
+
 class Foo:
     @overload
     def __init__(self) -> None: ...
@@ -152,6 +170,7 @@ class Foo:
     def __init__(self, x: int) -> None: ...
     def __init__(self, x: int | None = None) -> None:
         self.x = x
+
 
 foo = Foo()
 reveal_type(foo)  # revealed: Foo
@@ -180,16 +199,19 @@ import sys
 from typing import overload
 
 if sys.version_info < (3, 10):
+
     def func(x: int) -> int:
         return x
 
 elif sys.version_info <= (3, 12):
+
     @overload
     def func() -> None: ...
     @overload
     def func(x: int) -> int: ...
     def func(x: int | None = None) -> int | None:
         return x
+
 
 reveal_type(func)  # revealed: def func(x: int) -> int
 func()  # error: [missing-argument]
@@ -207,16 +229,19 @@ import sys
 from typing import overload
 
 if sys.version_info < (3, 10):
+
     def func(x: int) -> int:
         return x
 
 elif sys.version_info <= (3, 12):
+
     @overload
     def func() -> None: ...
     @overload
     def func(x: int) -> int: ...
     def func(x: int | None = None) -> int | None:
         return x
+
 
 reveal_type(func)  # revealed: Overload[() -> None, (x: int) -> int]
 reveal_type(func())  # revealed: None
@@ -304,12 +329,14 @@ For an overloaded generic function, it's not necessary for all overloads to be g
 ```py
 from typing import overload
 
+
 @overload
 def func() -> None: ...
 @overload
 def func[T](x: T) -> T: ...
 def func[T](x: T | None = None) -> T | None:
     return x
+
 
 reveal_type(func)  # revealed: Overload[() -> None, [T](x: T) -> T]
 reveal_type(func())  # revealed: None
@@ -328,8 +355,10 @@ At least two `@overload`-decorated definitions must be present.
 ```py
 from typing import overload
 
+
 @overload
 def func(x: int) -> int: ...
+
 
 # error: [invalid-overload]
 def func(x: int | str) -> int | str:
@@ -356,11 +385,13 @@ non-`@overload`-decorated definition (for the same function/method).
 ```py
 from typing import overload
 
+
 @overload
 def func(x: int) -> int: ...
 @overload
 # error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: str) -> str: ...
+
 
 class Foo:
     @overload
@@ -390,6 +421,7 @@ Overload definitions within protocols are exempt from this check.
 ```py
 from typing import Protocol, overload
 
+
 class Foo(Protocol):
     @overload
     def f(self, x: int) -> int: ...
@@ -404,6 +436,7 @@ Overload definitions within abstract base classes are exempt from this check.
 ```py
 from abc import ABC, abstractmethod
 from typing import overload
+
 
 class AbstractFoo(ABC):
     @overload
@@ -420,7 +453,9 @@ from it.
 ```py
 from abc import ABCMeta
 
+
 class CustomAbstractMetaclass(ABCMeta): ...
+
 
 class Fine(metaclass=CustomAbstractMetaclass):
     @overload
@@ -429,6 +464,7 @@ class Fine(metaclass=CustomAbstractMetaclass):
     @overload
     @abstractmethod
     def f(self, x: str) -> str: ...
+
 
 class Foo:
     @overload
@@ -451,6 +487,7 @@ class PartialFoo1(ABC):
     # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 
+
 class PartialFoo(ABC):
     @overload
     def f(self, x: int) -> int: ...
@@ -470,6 +507,7 @@ an `if TYPE_CHECKING` block:
 from typing import overload, TYPE_CHECKING
 
 if TYPE_CHECKING:
+
     @overload
     def a() -> str: ...
     @overload
@@ -481,24 +519,33 @@ if TYPE_CHECKING:
         @overload
         def method(self, x: int) -> int: ...
 
+
 class G:
     if TYPE_CHECKING:
+
         @overload
         def method(self) -> None: ...
         @overload
         def method(self, x: int) -> int: ...
 
+
 if TYPE_CHECKING:
+
     @overload
     def b() -> str: ...
 
+
 if TYPE_CHECKING:
+
     @overload
     def b(x: int) -> int: ...
 
+
 if TYPE_CHECKING:
+
     @overload
     def c() -> None: ...
+
 
 # not all overloads are in a `TYPE_CHECKING` block, so this is an error
 @overload
@@ -518,21 +565,25 @@ on the part of the user. We emit a warning-level diagnostic to alert them of thi
 ```py
 from typing import overload
 
+
 @overload
 def x(y: int) -> int: ...
 @overload
 def x(y: str) -> str:
     """Docstring"""
 
+
 @overload
 def x(y: bytes) -> bytes:
     pass
+
 
 @overload
 def x(y: memoryview) -> memoryview:
     """More docs"""
     pass
     ...
+
 
 def x(y):
     return y
@@ -545,11 +596,13 @@ Anything else, however, will trigger the lint:
 def foo(x: int) -> int:
     return x  # error: [useless-overload-body]
 
+
 @overload
 def foo(x: str) -> None:
     """Docstring"""
     pass
     print("oh no, a string")  # error: [useless-overload-body]
+
 
 def foo(x):
     return x
@@ -566,6 +619,7 @@ similarly decorated. The implementation, if present, must also have a consistent
 from __future__ import annotations
 
 from typing import overload
+
 
 class CheckStaticMethod:
     @overload
@@ -593,6 +647,7 @@ class CheckStaticMethod:
     @overload
     @staticmethod
     def method3(x: str) -> str: ...
+
     # error: [invalid-overload]
     def method3(x: int | str) -> int | str:
         return x
@@ -618,6 +673,7 @@ The same rules apply for `@classmethod` as for [`@staticmethod`](#staticmethod).
 from __future__ import annotations
 
 from typing import overload
+
 
 class CheckClassMethod:
     def __init__(self, x: int) -> None:
@@ -653,6 +709,7 @@ class CheckClassMethod:
     @overload
     @classmethod
     def try_from3(cls, x: str) -> None: ...
+
     # error: [invalid-overload]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
@@ -683,6 +740,7 @@ only to the overload implementation if it is present.
 ```py
 from typing_extensions import final, overload
 
+
 class Foo:
     @overload
     def method1(self, x: int) -> int: ...
@@ -697,6 +755,7 @@ class Foo:
     def method2(self, x: int) -> int: ...
     @overload
     def method2(self, x: str) -> str: ...
+
     # error: [invalid-overload]
     def method2(self, x: int | str) -> int | str:
         return x
@@ -706,6 +765,7 @@ class Foo:
     @overload
     @final
     def method3(self, x: str) -> str: ...
+
     # error: [invalid-overload]
     def method3(self, x: int | str) -> int | str:
         return x
@@ -741,6 +801,7 @@ The same rules apply for `@override` as for [`@final`](#final).
 ```py
 from typing_extensions import overload, override
 
+
 class Base:
     @overload
     def method(self, x: int) -> int: ...
@@ -748,6 +809,7 @@ class Base:
     def method(self, x: str) -> str: ...
     def method(self, x: int | str) -> int | str:
         return x
+
 
 class Sub1(Base):
     @overload
@@ -758,15 +820,18 @@ class Sub1(Base):
     def method(self, x: int | str) -> int | str:
         return x
 
+
 class Sub2(Base):
     @overload
     def method(self, x: int) -> int: ...
     @overload
     @override
     def method(self, x: str) -> str: ...
+
     # error: [invalid-overload]
     def method(self, x: int | str) -> int | str:
         return x
+
 
 class Sub3(Base):
     @overload
@@ -774,6 +839,7 @@ class Sub3(Base):
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
+
     # error: [invalid-overload]
     def method(self, x: int | str) -> int | str:
         return x

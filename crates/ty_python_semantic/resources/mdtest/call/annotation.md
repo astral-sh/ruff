@@ -3,8 +3,10 @@
 ```py
 from typing import Callable
 
+
 def _(c: Callable[[], int]):
     reveal_type(c())  # revealed: int
+
 
 def _(c: Callable[[int, str], int]):
     reveal_type(c(1, "a"))  # revealed: int

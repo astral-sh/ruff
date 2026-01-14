@@ -10,10 +10,13 @@ class Multiplier:
     def __call__(self, number: int) -> int:
         return number * self.factor
 
+
 a = Multiplier(2)(3)
 reveal_type(a)  # revealed: int
 
+
 class Unit: ...
+
 
 b = Unit()(3.0)  # error: "Object of type `Unit` is not callable"
 reveal_type(b)  # revealed: Unknown
@@ -25,6 +28,7 @@ reveal_type(b)  # revealed: Unknown
 def _(flag: bool):
     class PossiblyNotCallable:
         if flag:
+
             def __call__(self) -> int:
                 return 1
 
@@ -38,6 +42,7 @@ def _(flag: bool):
 ```py
 def _(flag: bool):
     if flag:
+
         class PossiblyUnbound:
             def __call__(self) -> int:
                 return 1
@@ -53,6 +58,7 @@ def _(flag: bool):
 class NonCallable:
     __call__ = 1
 
+
 a = NonCallable()
 # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
 reveal_type(a())  # revealed: Unknown
@@ -66,6 +72,7 @@ def _(flag: bool):
         if flag:
             __call__ = 1
         else:
+
             def __call__(self) -> int:
                 return 1
 
@@ -83,6 +90,7 @@ class C:
     def __call__(self, x: int) -> int:
         return 1
 
+
 c = C()
 
 # error: 15 [invalid-argument-type] "Argument to bound method `__call__` is incorrect: Expected `int`, found `Literal["foo"]`"
@@ -96,6 +104,7 @@ class C:
     # TODO this definition should also be an error; `C` must be assignable to type of `self`
     def __call__(self: int) -> int:
         return 1
+
 
 c = C()
 
@@ -111,6 +120,7 @@ reveal_type(c())  # revealed: int
 def outer(cond1: bool):
     class Test:
         if cond1:
+
             def __call__(self): ...
 
     class Other:

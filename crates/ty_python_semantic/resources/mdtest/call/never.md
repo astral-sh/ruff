@@ -5,6 +5,7 @@ The type `Never` is callable with an arbitrary set of arguments. The result is a
 ```py
 from typing_extensions import Never
 
+
 def f(never: Never):
     reveal_type(never())  # revealed: Never
     reveal_type(never(1))  # revealed: Never

@@ -4,9 +4,11 @@
 from typing_extensions import Literal, LiteralString
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 def _(
     a: Literal[1],

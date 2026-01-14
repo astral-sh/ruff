@@ -20,11 +20,21 @@ assignable to `T`. Two equivalent types are subtypes of each other:
 ```py
 from ty_extensions import static_assert, is_assignable_to
 
+
 class Parent: ...
+
+
 class Child1(Parent): ...
+
+
 class Child2(Parent): ...
+
+
 class Grandchild(Child1, Child2): ...
+
+
 class Unrelated: ...
+
 
 static_assert(is_assignable_to(int, int))
 static_assert(is_assignable_to(Parent, Parent))
@@ -136,9 +146,11 @@ from ty_extensions import static_assert, is_assignable_to
 from typing_extensions import Literal
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 static_assert(is_assignable_to(Literal[Answer.YES], Literal[Answer.YES]))
 static_assert(is_assignable_to(Literal[Answer.YES], Answer))
@@ -147,8 +159,10 @@ static_assert(is_assignable_to(Answer, Literal[Answer.YES, Answer.NO]))
 
 static_assert(not is_assignable_to(Literal[Answer.YES], Literal[Answer.NO]))
 
+
 class Single(Enum):
     VALUE = 1
+
 
 static_assert(is_assignable_to(Literal[Single.VALUE], Single))
 static_assert(is_assignable_to(Single, Literal[Single.VALUE]))
@@ -219,25 +233,34 @@ static_assert(is_assignable_to(type[Any], type[Unknown]))
 static_assert(not is_assignable_to(object, type[Any]))
 static_assert(not is_assignable_to(str, type[Any]))
 
+
 class Meta(type): ...
+
 
 static_assert(is_assignable_to(type[Any], Meta))
 static_assert(is_assignable_to(type[Unknown], Meta))
 static_assert(is_assignable_to(Meta, type[Any]))
 static_assert(is_assignable_to(Meta, type[Unknown]))
 
+
 def _(x: Any):
     class AnyMeta(metaclass=x): ...
+
     static_assert(is_assignable_to(type[AnyMeta], type))
     static_assert(is_assignable_to(type[AnyMeta], type[object]))
     static_assert(is_assignable_to(type[AnyMeta], type[Any]))
+
 
 from typing import TypeVar, Generic, Any
 
 T_co = TypeVar("T_co", covariant=True)
 
+
 class Foo(Generic[T_co]): ...
+
+
 class Bar(Foo[T_co], Generic[T_co]): ...
+
 
 static_assert(is_assignable_to(TypeOf[Bar[int]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar[bool]], type[Foo[int]]))
@@ -272,9 +295,12 @@ to `type`:
 from typing import Any
 from ty_extensions import is_assignable_to, static_assert, TypeOf
 
+
 def test(x: Any):
     class Foo(x): ...
+
     class Bar(Any): ...
+
     static_assert(is_assignable_to(TypeOf[Foo], Any))
     static_assert(is_assignable_to(TypeOf[Foo], type))
     static_assert(is_assignable_to(TypeOf[Foo], type[int]))
@@ -299,15 +325,19 @@ Instances of classes that inherit `Any` are assignable to any non-final type.
 from ty_extensions import is_assignable_to, static_assert
 from typing_extensions import Any, final
 
+
 class InheritsAny(Any):
     pass
+
 
 class Arbitrary:
     pass
 
+
 @final
 class FinalClass:
     pass
+
 
 static_assert(is_assignable_to(InheritsAny, Arbitrary))
 static_assert(is_assignable_to(InheritsAny, Any))
@@ -660,11 +690,21 @@ static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] |
 from ty_extensions import static_assert, is_assignable_to, Intersection, Not, AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Any, Literal, final, LiteralString
 
+
 class Parent: ...
+
+
 class Child1(Parent): ...
+
+
 class Child2(Parent): ...
+
+
 class Grandchild(Child1, Child2): ...
+
+
 class Unrelated: ...
+
 
 static_assert(is_assignable_to(Intersection[Child1, Child2], Child1))
 static_assert(is_assignable_to(Intersection[Child1, Child2], Child2))
@@ -752,8 +792,10 @@ from typing import Callable
 # `Callable[..., Unknown]` has explicit Unknown return type
 static_assert(is_assignable_to(Intersection[Not[type], Not[Callable[..., Unknown]]], Not[type]))
 
+
 # Function with no return annotation (has implicit Unknown return type internally)
 def no_return_annotation(*args, **kwargs): ...
+
 
 # `CallableTypeOf[no_return_annotation]` has `returns: None` internally (no annotation)
 static_assert(is_assignable_to(Intersection[Not[type], Not[CallableTypeOf[no_return_annotation]]], Not[type]))
@@ -958,6 +1000,7 @@ def keyword_only(*, a: int, b: int) -> None: ...
 def keyword_variadic(**kwargs: int) -> None: ...
 def mixed(a: int, /, b: int, *args: int, c: int, **kwargs: int) -> None: ...
 
+
 static_assert(is_assignable_to(CallableTypeOf[positional_only], Callable[..., None]))
 static_assert(is_assignable_to(CallableTypeOf[positional_or_keyword], Callable[..., None]))
 static_assert(is_assignable_to(CallableTypeOf[variadic], Callable[..., None]))
@@ -976,6 +1019,7 @@ def keyword_only(*, a, b) -> None: ...
 def keyword_variadic(**kwargs) -> None: ...
 def mixed(a, /, b, *args, c, **kwargs) -> None: ...
 
+
 static_assert(is_assignable_to(CallableTypeOf[positional_only], Callable[..., None]))
 static_assert(is_assignable_to(CallableTypeOf[positional_or_keyword], Callable[..., None]))
 static_assert(is_assignable_to(CallableTypeOf[variadic], Callable[..., None]))
@@ -989,11 +1033,14 @@ static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
 ```py
 from typing import Any, Callable
 
+
 def f(x: Any) -> str:
     return ""
 
+
 def g(x: Any) -> int:
     return 1
+
 
 c: Callable[[Any], str] = f
 
@@ -1008,6 +1055,7 @@ A function with no explicit return type should be assignable to a callable with 
 def h():
     return
 
+
 c: Callable[[], Any] = h
 ```
 
@@ -1016,6 +1064,7 @@ And, similarly for parameters with no annotations:
 ```py
 def i(a, b, /) -> None:
     return
+
 
 c: Callable[[Any, Any], None] = i
 ```
@@ -1028,8 +1077,10 @@ parameter type.
 def variadic_without_annotation(*args, **kwargs):
     return
 
+
 def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
     return
+
 
 c: Callable[..., Any] = variadic_without_annotation
 c: Callable[..., Any] = variadic_with_annotation
@@ -1040,12 +1091,14 @@ c: Callable[..., Any] = variadic_with_annotation
 ```py
 from typing import Any, Callable
 
+
 class A:
     def f(self, x: Any) -> str:
         return ""
 
     def g(self, x: Any) -> int:
         return 1
+
 
 c: Callable[[Any], str] = A().f
 
@@ -1066,10 +1119,13 @@ c: Callable[[str], Any] = int
 # error: [invalid-assignment]
 c: Callable[[str], Any] = object
 
+
 class A:
     def __init__(self, x: int) -> None: ...
 
+
 a: Callable[[int], A] = A
+
 
 class C:
     def __new__(cls, *args, **kwargs) -> "C":
@@ -1077,13 +1133,18 @@ class C:
 
     def __init__(self, x: int) -> None: ...
 
+
 c: Callable[[int], C] = C
+
 
 def f(a: Callable[..., Any], b: Callable[[Any], Any]): ...
 
+
 f(tuple, tuple)
 
+
 def g(a: Callable[[Any, Any], Any]): ...
+
 
 # error: [invalid-argument-type] "Argument to function `g` is incorrect: Expected `(Any, Any, /) -> Any`, found `<class 'tuple'>`"
 g(tuple)
@@ -1099,16 +1160,20 @@ python-version = "3.12"
 ```py
 from typing import Callable
 
+
 class B[T]:
     def __init__(self, x: T) -> None: ...
 
+
 b: Callable[[int], B[int]] = B[int]
+
 
 class C[T]:
     def __new__(cls, *args, **kwargs) -> "C[T]":
         return super().__new__(cls)
 
     def __init__(self, x: T) -> None: ...
+
 
 c: Callable[[int], C[int]] = C[int]
 ```
@@ -1150,12 +1215,15 @@ c: Callable[[int], str] = overloaded
 from typing import Callable, Any
 from ty_extensions import static_assert, is_assignable_to
 
+
 class TakesAny:
     def __call__(self, a: Any) -> str:
         return ""
 
+
 class ReturnsAny:
     def __call__(self, a: str) -> Any: ...
+
 
 static_assert(is_assignable_to(TakesAny, Callable[[int], str]))
 static_assert(not is_assignable_to(TakesAny, Callable[[int], int]))
@@ -1165,7 +1233,9 @@ static_assert(not is_assignable_to(ReturnsAny, Callable[[int], int]))
 
 from functools import partial
 
+
 def f(x: int, y: str) -> None: ...
+
 
 c1: Callable[[int], None] = partial(f, y="a")
 ```
@@ -1184,27 +1254,40 @@ from ty_extensions import static_assert, is_assignable_to
 T = TypeVar("T")
 P = ParamSpec("P")
 
+
 class Foo[T]:
     def __call__(self): ...
+
 
 class FooLegacy(Generic[T]):
     def __call__(self): ...
 
+
 class Bar[T, **P]:
     def __call__(self): ...
 
+
 class BarLegacy(Generic[T, P]):
     def __call__(self): ...
+
 
 static_assert(is_assignable_to(Foo, Callable[..., Any]))
 static_assert(is_assignable_to(FooLegacy, Callable[..., Any]))
 static_assert(is_assignable_to(Bar, Callable[..., Any]))
 static_assert(is_assignable_to(BarLegacy, Callable[..., Any]))
 
+
 class Spam[T]: ...
+
+
 class SpamLegacy(Generic[T]): ...
+
+
 class Eggs[T, **P]: ...
+
+
 class EggsLegacy(Generic[T, P]): ...
+
 
 static_assert(not is_assignable_to(Spam, Callable[..., Any]))
 static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))
@@ -1223,11 +1306,14 @@ from __future__ import annotations
 from typing import Callable
 from ty_extensions import static_assert, is_assignable_to
 
+
 def call_impl(a: A, x: int) -> str:
     return ""
 
+
 class A:
     __call__: Callable[[A, int], str] = call_impl
+
 
 static_assert(is_assignable_to(A, Callable[[int], str]))
 static_assert(not is_assignable_to(A, Callable[[int], int]))
@@ -1242,12 +1328,15 @@ reveal_type(A()(1))  # revealed: str
 from typing import Callable
 from ty_extensions import static_assert, is_assignable_to
 
+
 class A:
     def __init__(self, x: int) -> None: ...
+
 
 class B:
     def __new__(cls, x: str) -> "B":
         return super().__new__(cls)
+
 
 static_assert(is_assignable_to(type[A], Callable[[int], A]))
 static_assert(not is_assignable_to(type[A], Callable[[str], A]))
@@ -1276,8 +1365,10 @@ the generic callable.)
 from typing import Callable
 from ty_extensions import CallableTypeOf, TypeOf, is_assignable_to, static_assert
 
+
 def identity[T](t: T) -> T:
     return t
+
 
 static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
 static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
@@ -1328,12 +1419,19 @@ from ty_extensions import static_assert, is_assignable_to
 
 InvariantTypeVar = TypeVar("InvariantTypeVar")
 
+
 class Foo(Generic[InvariantTypeVar]):
     x: InvariantTypeVar
 
+
 class A: ...
+
+
 class B(A): ...
+
+
 class C: ...
+
 
 static_assert(is_assignable_to(Foo[A], Foo[B | Any]))
 static_assert(is_assignable_to(Foo[B | Any], Foo[A]))
@@ -1342,20 +1440,26 @@ static_assert(is_assignable_to(Foo[Foo[A | C]], Foo[Foo[Any]]))
 static_assert(is_assignable_to(Foo[tuple[A]], Foo[tuple[Any] | tuple[B]]))
 static_assert(is_assignable_to(Foo[tuple[Any] | tuple[B]], Foo[tuple[A]]))
 
+
 def f(obj: Foo[A]):
     g(obj)
+
 
 def g(obj: Foo[B | Any]):
     f(obj)
 
+
 def f2(obj: Foo[Foo[Any]]):
     g2(obj)
+
 
 def g2(obj: Foo[Foo[A | C]]):
     f2(obj)
 
+
 def f3(obj: Foo[tuple[Any] | tuple[B]]):
     g3(obj)
+
 
 def g3(obj: Foo[tuple[A]]):
     f3(obj)
@@ -1367,8 +1471,10 @@ def g3(obj: Foo[tuple[A]]):
 from typing import final
 from ty_extensions import static_assert, is_assignable_to, TypeOf
 
+
 class GenericClass[T]:
     x: T  # invariant
+
 
 static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass]))
 static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass]))
@@ -1376,17 +1482,21 @@ static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass[int]]))
 static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass[int]]))
 static_assert(not is_assignable_to(TypeOf[GenericClass[str]], type[GenericClass[int]]))
 
+
 class GenericClassIntBound[T: int]:
     x: T  # invariant
+
 
 static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
 static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
 static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
 static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
 
+
 @final
 class GenericFinalClass[T]:
     x: T  # invariant
+
 
 static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass]))
 static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
@@ -1417,6 +1527,7 @@ from ty_extensions import TypeOf, static_assert, is_assignable_to, Unknown
 from typing import ParamSpec, Mapping, Callable, Any
 
 P = ParamSpec("P")
+
 
 def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     static_assert(is_assignable_to(TypeOf[args], tuple[Any, ...]))

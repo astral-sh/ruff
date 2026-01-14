@@ -6,6 +6,7 @@
 from typing_extensions import Literal, LiteralString
 from ty_extensions import AlwaysFalsy, AlwaysTruthy
 
+
 def _(
     a: Literal[1],
     b: Literal[-1],
@@ -21,6 +22,7 @@ def _(
     reveal_type(bool(e))  # revealed: Literal[True]
     reveal_type(bool(f))  # revealed: Literal[True]
 
+
 def _(
     a: tuple[()],
     b: Literal[0],
@@ -35,6 +37,7 @@ def _(
     reveal_type(bool(d))  # revealed: Literal[False]
     reveal_type(bool(e))  # revealed: Literal[False]
     reveal_type(bool(f))  # revealed: Literal[False]
+
 
 def _(
     a: str,
@@ -58,6 +61,7 @@ Checks that we don't get into a cycle if someone sets their `__bool__` method to
 class BoolIsBool:
     __bool__ = bool
 
+
 reveal_type(bool(BoolIsBool()))  # revealed: bool
 ```
 
@@ -67,11 +71,13 @@ reveal_type(bool(BoolIsBool()))  # revealed: bool
 def flag() -> bool:
     return True
 
+
 class Boom:
     if flag():
         __bool__ = bool
     else:
         __bool__ = int
+
 
 reveal_type(bool(Boom()))  # revealed: bool
 ```
@@ -81,13 +87,17 @@ reveal_type(bool(Boom()))  # revealed: bool
 ```py
 from typing import Literal
 
+
 def flag() -> bool:
     return True
 
+
 class PossiblyUnboundTrue:
     if flag():
+
         def __bool__(self) -> Literal[True]:
             return True
+
 
 reveal_type(bool(PossiblyUnboundTrue()))  # revealed: bool
 ```
@@ -126,6 +136,7 @@ static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
 ```py
 from typing import Callable
 
+
 def f(x: Callable, y: Callable[[int], str]):
     reveal_type(bool(x))  # revealed: bool
     reveal_type(bool(y))  # revealed: bool
@@ -136,8 +147,10 @@ But certain callable single-valued types are known to be always truthy:
 ```py
 from types import FunctionType
 
+
 class A:
     def method(self): ...
+
 
 reveal_type(bool(A().method))  # revealed: Literal[True]
 reveal_type(bool(f.__get__))  # revealed: Literal[True]
@@ -150,9 +163,11 @@ reveal_type(bool(FunctionType.__get__))  # revealed: Literal[True]
 from enum import Enum
 from typing import Literal
 
+
 class NormalEnum(Enum):
     NO = 0
     YES = 1
+
 
 class FalsyEnum(Enum):
     NO = 0
@@ -161,6 +176,7 @@ class FalsyEnum(Enum):
     def __bool__(self) -> Literal[False]:
         return False
 
+
 class AmbiguousEnum(Enum):
     NO = 0
     YES = 1
@@ -168,13 +184,16 @@ class AmbiguousEnum(Enum):
     def __bool__(self) -> bool:
         return self is AmbiguousEnum.YES
 
+
 class AmbiguousBase(Enum):
     def __bool__(self) -> bool:
         return True
 
+
 class AmbiguousEnum2(AmbiguousBase):
     NO = 0
     YES = 1
+
 
 class CustomLenEnum(Enum):
     NO = 0
@@ -182,6 +201,7 @@ class CustomLenEnum(Enum):
 
     def __len__(self):
         return 0
+
 
 reveal_type(bool(NormalEnum.NO))  # revealed: Literal[True]
 reveal_type(bool(NormalEnum.YES))  # revealed: Literal[True]
@@ -216,39 +236,49 @@ items, and `closed=True` is used.
 ```py
 from typing_extensions import TypedDict, Literal, NotRequired
 
+
 class Normal(TypedDict):
     a: str
     b: int
+
 
 def _(n: Normal) -> None:
     # Could be `Literal[True]`
     reveal_type(bool(n))  # revealed: bool
 
+
 class OnlyFalsyItems(TypedDict):
     wrong: Literal[False]
+
 
 def _(n: OnlyFalsyItems) -> None:
     # Could be `Literal[True]` (it does not matter if all items are falsy)
     reveal_type(bool(n))  # revealed: bool
 
+
 class Empty(TypedDict):
     pass
+
 
 def _(e: Empty) -> None:
     # This should be `bool`. `Literal[False]` would be wrong, as `Empty` can be subclassed.
     reveal_type(bool(e))  # revealed: bool
 
+
 class AllKeysOptional(TypedDict, total=False):
     a: str
     b: int
+
 
 def _(a: AllKeysOptional) -> None:
     # This should be `bool`. `Literal[True]` would be wrong as `{}` is a valid value.
     reveal_type(bool(a))  # revealed: bool
 
+
 class AllKeysNotRequired(TypedDict):
     a: NotRequired[str]
     b: NotRequired[int]
+
 
 def _(a: AllKeysNotRequired) -> None:
     # This should be `bool`. `Literal[True]` would be wrong as `{}` is a valid value.

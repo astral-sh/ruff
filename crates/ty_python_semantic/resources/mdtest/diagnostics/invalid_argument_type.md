@@ -11,6 +11,7 @@ to the invalid argument.
 def foo(x: int) -> int:
     return x * x
 
+
 foo("hello")  # error: [invalid-argument-type]
 ```
 
@@ -21,6 +22,7 @@ This is like the basic test, except we put the call site above the function defi
 ```py
 def bar():
     foo("hello")  # error: [invalid-argument-type]
+
 
 def foo(x: int) -> int:
     return x * x
@@ -52,6 +54,7 @@ This checks that a diagnostic renders reasonably when there are multiple paramet
 def foo(x: int, y: int, z: int) -> int:
     return x * y * z
 
+
 foo(1, "hello", 3)  # error: [invalid-argument-type]
 ```
 
@@ -68,6 +71,7 @@ def foo(
 ) -> int:
     return x * y * z
 
+
 foo(1, "hello", 3)  # error: [invalid-argument-type]
 ```
 
@@ -79,6 +83,7 @@ invalid argument types.
 ```py
 def foo(x: int, y: int, z: int) -> int:
     return x * y * z
+
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
@@ -114,6 +119,7 @@ Tests a function definition with only positional parameters.
 def foo(x: int, y: int, z: int, /) -> int:
     return x * y * z
 
+
 foo(1, "hello", 3)  # error: [invalid-argument-type]
 ```
 
@@ -124,6 +130,7 @@ Tests a function definition with variadic arguments.
 ```py
 def foo(*numbers: int) -> int:
     return len(numbers)
+
 
 foo(1, 2, 3, "hello", 5)  # error: [invalid-argument-type]
 ```
@@ -136,6 +143,7 @@ Tests a function definition with keyword-only arguments.
 def foo(x: int, y: int, *, z: int = 0) -> int:
     return x * y * z
 
+
 foo(1, 2, z="hello")  # error: [invalid-argument-type]
 ```
 
@@ -147,6 +155,7 @@ Tests a function definition with keyword-only arguments.
 def foo(x: int, y: int, z: int = 0) -> int:
     return x * y * z
 
+
 foo(1, 2, "hello")  # error: [invalid-argument-type]
 ```
 
@@ -155,6 +164,7 @@ foo(1, 2, "hello")  # error: [invalid-argument-type]
 ```py
 def foo(**numbers: int) -> int:
     return len(numbers)
+
 
 foo(a=1, b=2, c=3, d="hello", e=5)  # error: [invalid-argument-type]
 ```
@@ -167,6 +177,7 @@ Tests a function definition with multiple different kinds of arguments.
 def foo(x: int, /, y: int, *, z: int = 0) -> int:
     return x * y * z
 
+
 foo(1, 2, z="hello")  # error: [invalid-argument-type]
 ```
 
@@ -178,6 +189,7 @@ Tests a function call with synthetic arguments.
 class C:
     def __call__(self, x: int) -> int:
         return 1
+
 
 c = C()
 c("wrong")  # error: [invalid-argument-type]
@@ -192,6 +204,7 @@ class C:
     def square(self, x: int) -> int:
         return x * x
 
+
 c = C()
 c.square("hello")  # error: [invalid-argument-type]
 ```
@@ -203,6 +216,7 @@ c.square("hello")  # error: [invalid-argument-type]
 ```py
 class Foo: ...
 
+
 def needs_a_foo(x: Foo): ...
 ```
 
@@ -211,7 +225,9 @@ def needs_a_foo(x: Foo): ...
 ```py
 from module import needs_a_foo
 
+
 class Foo: ...
+
 
 needs_a_foo(Foo())  # error: [invalid-argument-type]
 ```
@@ -230,6 +246,7 @@ python-version = "3.12"
 ```py
 class Foo: ...
 
+
 def needs_a_foo(x: Foo): ...
 ```
 
@@ -238,7 +255,9 @@ def needs_a_foo(x: Foo): ...
 ```py
 from module import needs_a_foo
 
+
 class Foo: ...
+
 
 def f[T: Foo](x: T) -> T:
     needs_a_foo(x)  # error: [invalid-argument-type]

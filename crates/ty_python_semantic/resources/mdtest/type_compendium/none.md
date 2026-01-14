@@ -31,7 +31,9 @@ The type `Optional[T]` is an alias for `T | None` (or `Union[T, None]`):
 from ty_extensions import static_assert, is_equivalent_to
 from typing import Optional, Union
 
+
 class T: ...
+
 
 static_assert(is_equivalent_to(Optional[T], T | None))
 static_assert(is_equivalent_to(Optional[T], Union[T, None]))
@@ -44,7 +46,9 @@ Just like for other singleton types, we support type narrowing using `is` or `is
 ```py
 from typing_extensions import assert_type
 
+
 class T: ...
+
 
 def f(x: T | None):
     if x is None:

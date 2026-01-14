@@ -16,12 +16,24 @@ most common case involves implementing these methods for the same type:
 ```py
 from __future__ import annotations
 
+
 class EqReturnType: ...
+
+
 class NeReturnType: ...
+
+
 class LtReturnType: ...
+
+
 class LeReturnType: ...
+
+
 class GtReturnType: ...
+
+
 class GeReturnType: ...
+
 
 class A:
     def __eq__(self, other: A) -> EqReturnType:  # error: [invalid-method-override]
@@ -42,6 +54,7 @@ class A:
     def __ge__(self, other: A) -> GeReturnType:
         return GeReturnType()
 
+
 reveal_type(A() == A())  # revealed: EqReturnType
 reveal_type(A() != A())  # revealed: NeReturnType
 reveal_type(A() < A())  # revealed: LtReturnType
@@ -58,12 +71,24 @@ type:
 ```py
 from __future__ import annotations
 
+
 class EqReturnType: ...
+
+
 class NeReturnType: ...
+
+
 class LtReturnType: ...
+
+
 class LeReturnType: ...
+
+
 class GtReturnType: ...
+
+
 class GeReturnType: ...
+
 
 class A:
     def __eq__(self, other: B) -> EqReturnType:  # error: [invalid-method-override]
@@ -84,7 +109,9 @@ class A:
     def __ge__(self, other: B) -> GeReturnType:
         return GeReturnType()
 
+
 class B: ...
+
 
 reveal_type(A() == B())  # revealed: EqReturnType
 reveal_type(A() != B())  # revealed: NeReturnType
@@ -103,12 +130,24 @@ these methods will be ignored here because they require a mismatched operand typ
 ```py
 from __future__ import annotations
 
+
 class EqReturnType: ...
+
+
 class NeReturnType: ...
+
+
 class LtReturnType: ...
+
+
 class LeReturnType: ...
+
+
 class GtReturnType: ...
+
+
 class GeReturnType: ...
+
 
 class A:
     def __eq__(self, other: B) -> EqReturnType:  # error: [invalid-method-override]
@@ -129,7 +168,9 @@ class A:
     def __ge__(self, other: B) -> GeReturnType:
         return GeReturnType()
 
+
 class Unrelated: ...
+
 
 class B:
     def __eq__(self, other: Unrelated) -> B:  # error: [invalid-method-override]
@@ -137,6 +178,7 @@ class B:
 
     def __ne__(self, other: Unrelated) -> B:  # error: [invalid-method-override]
         return B()
+
 
 # Because `object.__eq__` and `object.__ne__` accept `object` in typeshed,
 # this can only happen with an invalid override of these methods,
@@ -150,12 +192,14 @@ reveal_type(B() <= A())  # revealed: GeReturnType
 reveal_type(B() > A())  # revealed: LtReturnType
 reveal_type(B() >= A())  # revealed: LeReturnType
 
+
 class C:
     def __gt__(self, other: C) -> EqReturnType:
         return EqReturnType()
 
     def __ge__(self, other: C) -> NeReturnType:
         return NeReturnType()
+
 
 reveal_type(C() < C())  # revealed: EqReturnType
 reveal_type(C() <= C())  # revealed: NeReturnType
@@ -170,12 +214,24 @@ than `A`.
 ```py
 from __future__ import annotations
 
+
 class EqReturnType: ...
+
+
 class NeReturnType: ...
+
+
 class LtReturnType: ...
+
+
 class LeReturnType: ...
+
+
 class GtReturnType: ...
+
+
 class GeReturnType: ...
+
 
 class A:
     def __eq__(self, other: A) -> A:  # error: [invalid-method-override]
@@ -196,6 +252,7 @@ class A:
     def __ge__(self, other: A) -> A:
         return A()
 
+
 class B(A):
     def __eq__(self, other: A) -> EqReturnType:  # error: [invalid-method-override]
         return EqReturnType()
@@ -215,6 +272,7 @@ class B(A):
     def __ge__(self, other: A) -> GeReturnType:  # error: [invalid-method-override]
         return GeReturnType()
 
+
 reveal_type(A() == B())  # revealed: EqReturnType
 reveal_type(A() != B())  # revealed: NeReturnType
 
@@ -233,6 +291,7 @@ method has an mismatched type to operand, the comparison will fall back to the l
 ```py
 from __future__ import annotations
 
+
 class A:
     def __lt__(self, other: A) -> A:
         return A()
@@ -240,12 +299,14 @@ class A:
     def __gt__(self, other: A) -> A:
         return A()
 
+
 class B(A):
     def __lt__(self, other: int) -> B:  # error: [invalid-method-override]
         return B()
 
     def __gt__(self, other: int) -> B:  # error: [invalid-method-override]
         return B()
+
 
 reveal_type(A() < B())  # revealed: A
 reveal_type(A() > B())  # revealed: A
@@ -268,11 +329,14 @@ from does_not_exist import Foo  # error: [unresolved-import]
 
 reveal_type(Foo)  # revealed: Unknown
 
+
 class X:
     def __lt__(self, other: object) -> int:
         return 42
 
+
 class Y(Foo): ...
+
 
 # TODO: Should be `int | Unknown`; see above discussion.
 reveal_type(X() < Y())  # revealed: int
@@ -288,12 +352,14 @@ Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#ob
 ```py
 from __future__ import annotations
 
+
 class A:
     def __eq__(self, other: int) -> A:  # error: [invalid-method-override]
         return A()
 
     def __ne__(self, other: int) -> A:  # error: [invalid-method-override]
         return A()
+
 
 reveal_type(A() == A())  # revealed: bool
 reveal_type(A() != A())  # revealed: bool
@@ -303,6 +369,7 @@ reveal_type(A() != A())  # revealed: bool
 
 ```py
 class A: ...
+
 
 reveal_type(A() == object())  # revealed: bool
 reveal_type(A() != object())  # revealed: bool
@@ -336,6 +403,7 @@ reveal_type(1 > 2j)  # revealed: Unknown
 # error: [unsupported-operator] "Operator `>=` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 >= 2j)  # revealed: Unknown
 
+
 def f(x: bool, y: int):
     reveal_type(x < y)  # revealed: bool
     reveal_type(y < x)  # revealed: bool
@@ -354,12 +422,14 @@ element) of a chained comparison.
 class NotBoolable:
     __bool__: int = 3
 
+
 class Comparable:
     def __lt__(self, item) -> NotBoolable:
         return NotBoolable()
 
     def __gt__(self, item) -> NotBoolable:
         return NotBoolable()
+
 
 # error: [unsupported-bool-conversion]
 10 < Comparable() < 20
@@ -374,13 +444,16 @@ Comparable() < Comparable()  # fine
 ```py
 from typing import Literal
 
+
 class AlwaysTrue:
     def __call__(self, other: object) -> Literal[True]:
         return True
 
+
 class A:
     __eq__: AlwaysTrue = AlwaysTrue()
     __lt__: AlwaysTrue = AlwaysTrue()
+
 
 reveal_type(A() == A())  # revealed: Literal[True]
 reveal_type(A() < A())  # revealed: Literal[True]

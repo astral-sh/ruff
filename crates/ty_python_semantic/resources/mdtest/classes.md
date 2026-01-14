@@ -17,8 +17,12 @@ from ty_extensions import reveal_mro
 
 A = int
 
+
 class G[T]: ...
+
+
 class C(A, G["B"]): ...
+
 
 A = str
 B = bytes
@@ -33,13 +37,21 @@ These are currently not supported, but ideally we would support them in some lim
 ```py
 from ty_extensions import reveal_mro
 
+
 class A: ...
+
+
 class B: ...
+
+
 class C: ...
+
 
 bases = (A, B, C)
 
+
 class Foo(*bases): ...
+
 
 # revealed: (<class 'Foo'>, @Todo(StarredExpression), <class 'object'>)
 reveal_mro(Foo)

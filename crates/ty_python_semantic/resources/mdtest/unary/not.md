@@ -13,6 +13,7 @@ reveal_type(not not None)  # revealed: Literal[False]
 def f():
     return 1
 
+
 reveal_type(not f)  # revealed: Literal[False]
 # TODO Unknown should not be part of the type of typing.reveal_type
 # reveal_type(not reveal_type)  revealed: Literal[False]
@@ -127,41 +128,52 @@ truthiness.
 ```py
 from typing import Literal
 
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True
 
+
 # revealed: Literal[False]
 reveal_type(not AlwaysTrue())
+
 
 class AlwaysFalse:
     def __bool__(self) -> Literal[False]:
         return False
 
+
 # revealed: Literal[True]
 reveal_type(not AlwaysFalse())
+
 
 # At runtime, no `__bool__` and no `__len__` means truthy, but we can't rely on that, because
 # a subclass could add a `__bool__` method.
 class NoBoolMethod: ...
 
+
 # revealed: bool
 reveal_type(not NoBoolMethod())
+
 
 # And we can't rely on `__len__` for the same reason: a subclass could add `__bool__`.
 class LenZero:
     def __len__(self) -> Literal[0]:
         return 0
 
+
 # revealed: bool
 reveal_type(not LenZero())
+
 
 class LenNonZero:
     def __len__(self) -> Literal[1]:
         return 1
 
+
 # revealed: bool
 reveal_type(not LenNonZero())
+
 
 class WithBothLenAndBool1:
     def __bool__(self) -> Literal[False]:
@@ -170,8 +182,10 @@ class WithBothLenAndBool1:
     def __len__(self) -> Literal[2]:
         return 2
 
+
 # revealed: Literal[True]
 reveal_type(not WithBothLenAndBool1())
+
 
 class WithBothLenAndBool2:
     def __bool__(self) -> Literal[True]:
@@ -180,25 +194,32 @@ class WithBothLenAndBool2:
     def __len__(self) -> Literal[0]:
         return 0
 
+
 # revealed: Literal[False]
 reveal_type(not WithBothLenAndBool2())
+
 
 class MethodBoolInvalid:
     def __bool__(self) -> int:
         return 0
 
+
 # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `MethodBoolInvalid`"
 # revealed: bool
 reveal_type(not MethodBoolInvalid())
+
 
 # Don't trust a possibly-unbound `__bool__` method:
 def get_flag() -> bool:
     return True
 
+
 class PossiblyUnboundBool:
     if get_flag():
+
         def __bool__(self) -> Literal[False]:
             return False
+
 
 # revealed: bool
 reveal_type(not PossiblyUnboundBool())
@@ -211,6 +232,7 @@ reveal_type(not PossiblyUnboundBool())
 ```py
 class NotBoolable:
     __bool__: int = 3
+
 
 # error: [unsupported-bool-conversion]
 not NotBoolable()

@@ -12,6 +12,7 @@ When a class defines `__eq__` and `__lt__`, the decorator synthesizes `__le__`, 
 ```py
 from functools import total_ordering
 
+
 @total_ordering
 class Student:
     def __init__(self, grade: int):
@@ -24,6 +25,7 @@ class Student:
 
     def __lt__(self, other: "Student") -> bool:
         return self.grade < other.grade
+
 
 s1 = Student(85)
 s2 = Student(90)
@@ -47,6 +49,7 @@ other than the class itself:
 ```py
 from functools import total_ordering
 
+
 @total_ordering
 class Comparable:
     def __init__(self, value: int):
@@ -65,6 +68,7 @@ class Comparable:
         if isinstance(other, int):
             return self.value < other
         return NotImplemented
+
 
 a = Comparable(10)
 b = Comparable(20)
@@ -88,6 +92,7 @@ overridden.
 ```py
 from functools import total_ordering
 
+
 @total_ordering
 class MultiSig:
     def __init__(self, value: int):
@@ -95,12 +100,15 @@ class MultiSig:
 
     def __eq__(self, other: object) -> bool:
         return True
+
     # __lt__ accepts `object` (highest priority, used as root)
     def __lt__(self, other: object) -> bool:
         return True
+
     # __gt__ only accepts `MultiSig` (not overridden by decorator)
     def __gt__(self, other: "MultiSig") -> bool:
         return True
+
 
 a = MultiSig(10)
 b = MultiSig(20)
@@ -125,6 +133,7 @@ all overloads:
 from functools import total_ordering
 from typing import overload
 
+
 @total_ordering
 class Flexible:
     def __init__(self, value: int):
@@ -141,6 +150,7 @@ class Flexible:
         if isinstance(other, Flexible):
             return self.value < other.value
         return self.value < other
+
 
 a = Flexible(10)
 b = Flexible(20)
@@ -165,6 +175,7 @@ When a class defines `__eq__` and `__gt__`, the decorator synthesizes `__lt__`, 
 ```py
 from functools import total_ordering
 
+
 @total_ordering
 class Priority:
     def __init__(self, level: int):
@@ -177,6 +188,7 @@ class Priority:
 
     def __gt__(self, other: "Priority") -> bool:
         return self.level > other.level
+
 
 p1 = Priority(1)
 p2 = Priority(2)
@@ -199,6 +211,7 @@ A class only needs to define a single comparison method. The `__eq__` method can
 ```py
 from functools import total_ordering
 
+
 @total_ordering
 class Score:
     def __init__(self, value: int):
@@ -206,6 +219,7 @@ class Score:
 
     def __lt__(self, other: "Score") -> bool:
         return self.value < other.value
+
 
 s1 = Score(85)
 s2 = Score(90)
@@ -226,9 +240,11 @@ The decorator also works when the ordering method is inherited from a superclass
 ```py
 from functools import total_ordering
 
+
 class Base:
     def __lt__(self, other: "Base") -> bool:
         return True
+
 
 @total_ordering
 class Child(Base):
@@ -236,6 +252,7 @@ class Child(Base):
         if not isinstance(other, Child):
             return NotImplemented
         return True
+
 
 c1 = Child()
 c2 = Child()
@@ -256,15 +273,18 @@ over the locally-defined `__gt__`:
 from functools import total_ordering
 from typing import Literal
 
+
 class Base:
     def __lt__(self, other: "Base") -> Literal[True]:
         return True
+
 
 @total_ordering
 class Child(Base):
     # __gt__ is defined locally, but __lt__ (inherited) takes precedence
     def __gt__(self, other: "Child") -> Literal[False]:
         return False
+
 
 c1 = Child()
 c2 = Child()
@@ -290,6 +310,7 @@ We use a narrower return type (`Literal[True]`) to verify that the explicit meth
 from functools import total_ordering
 from typing import Literal
 
+
 @total_ordering
 class Temperature:
     def __init__(self, celsius: float):
@@ -300,6 +321,7 @@ class Temperature:
 
     def __gt__(self, other: "Temperature") -> Literal[True]:
         return True
+
 
 t1 = Temperature(20.0)
 t2 = Temperature(25.0)
@@ -321,6 +343,7 @@ The decorator works with `@dataclass`:
 from dataclasses import dataclass
 from functools import total_ordering
 
+
 @total_ordering
 @dataclass
 class Point:
@@ -329,6 +352,7 @@ class Point:
 
     def __lt__(self, other: "Point") -> bool:
         return (self.x, self.y) < (other.x, other.y)
+
 
 p1 = Point(1, 2)
 p2 = Point(3, 4)
@@ -353,10 +377,12 @@ a diagnostic is emitted at the decorator site:
 ```py
 from functools import total_ordering
 
+
 @total_ordering  # error: [invalid-total-ordering]
 class NoOrdering:
     def __eq__(self, other: object) -> bool:
         return True
+
 
 n1 = NoOrdering()
 n2 = NoOrdering()
@@ -383,6 +409,7 @@ class NoDecorator:
 
     def __lt__(self, other: "NoDecorator") -> bool:
         return self.value < other.value
+
 
 n1 = NoDecorator(1)
 n2 = NoDecorator(2)
@@ -416,6 +443,7 @@ simplifies to `int`:
 ```py
 from functools import total_ordering
 
+
 @total_ordering
 class IntReturn:
     def __init__(self, value: int):
@@ -428,6 +456,7 @@ class IntReturn:
 
     def __lt__(self, other: "IntReturn") -> int:
         return self.value - other.value
+
 
 a = IntReturn(10)
 b = IntReturn(20)
@@ -447,6 +476,7 @@ When the root method returns a type that is not a supertype of `bool`, the union
 ```py
 from functools import total_ordering
 
+
 @total_ordering
 class StrReturn:
     def __init__(self, value: str):
@@ -459,6 +489,7 @@ class StrReturn:
 
     def __lt__(self, other: "StrReturn") -> str:
         return self.value
+
 
 a = StrReturn("a")
 b = StrReturn("b")
@@ -480,9 +511,11 @@ performed:
 ```py
 from functools import total_ordering
 
+
 class NoOrderingMethod:
     def __eq__(self, other: object) -> bool:
         return True
+
 
 # error: [invalid-total-ordering]
 InvalidOrderedClass = total_ordering(NoOrderingMethod)
@@ -493,12 +526,14 @@ When the class does define an ordering method, no error is emitted:
 ```py
 from functools import total_ordering
 
+
 class HasOrderingMethod:
     def __eq__(self, other: object) -> bool:
         return True
 
     def __lt__(self, other: "HasOrderingMethod") -> bool:
         return True
+
 
 # No error (class defines `__lt__`).
 ValidOrderedClass = total_ordering(HasOrderingMethod)
@@ -512,8 +547,10 @@ When `total_ordering` is called on a class created with `type()`, the same valid
 ```py
 from functools import total_ordering
 
+
 def lt_impl(self, other) -> bool:
     return True
+
 
 # No error: the functional class defines `__lt__` in its namespace
 ValidFunctional = total_ordering(type("ValidFunctional", (), {"__lt__": lt_impl}))
@@ -531,20 +568,25 @@ correctly detects it:
 ```py
 from functools import total_ordering
 
+
 def lt_impl(self, other) -> bool:
     return True
+
 
 def eq_impl(self, other) -> bool:
     return True
 
+
 # Functional class with __lt__ method
 OrderedBase = type("OrderedBase", (), {"__lt__": lt_impl})
+
 
 # A class inheriting from OrderedBase gets the ordering method
 @total_ordering
 class Ordered(OrderedBase):
     def __eq__(self, other: object) -> bool:
         return True
+
 
 o1 = Ordered()
 o2 = Ordered()
@@ -566,6 +608,7 @@ from functools import total_ordering
 # Dynamic class without ordering methods (invalid for @total_ordering)
 NoOrderBase = type("NoOrderBase", (), {})
 
+
 @total_ordering  # error: [invalid-total-ordering]
 class NoOrder(NoOrderBase):
     def __eq__(self, other: object) -> bool:
@@ -581,6 +624,7 @@ passed to `@total_ordering`:
 ```py
 from functools import total_ordering
 from typing import Any
+
 
 def f(ns: dict[str, Any]):
     # Dynamic class with dynamic namespace - might have ordering methods

@@ -12,6 +12,7 @@ For more details on the semantics of pure class variables, see [this test](../at
 import typing
 from typing import ClassVar, Annotated
 
+
 class C:
     a: ClassVar[int] = 1
     b: Annotated[ClassVar[int], "the annotation for b"] = 1
@@ -19,6 +20,7 @@ class C:
     d: ClassVar = 1
     e: "ClassVar[int]" = 1
     f: typing.ClassVar = 1
+
 
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
@@ -74,14 +76,17 @@ intersecting them. This means that we consider `a` to be a `ClassVar` here:
 ```py
 from typing import ClassVar
 
+
 def flag() -> bool:
     return True
+
 
 class C:
     if flag():
         a: ClassVar[int] = 1
     else:
         a: str
+
 
 reveal_type(C.a)  # revealed: int | str
 
@@ -95,6 +100,7 @@ c.a = 2
 
 ```py
 from typing import ClassVar
+
 
 class C:
     # error: [invalid-type-form] "Type qualifier `typing.ClassVar` expected exactly 1 argument, got 2"
@@ -110,9 +116,11 @@ and emit a proper error rather than crashing (see
 ```py
 from typing import ClassVar
 
+
 class C:
     # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
     x: ClassVar[(),]
+
 
 # error: [invalid-attribute-access] "Cannot assign to ClassVar `x` from an instance of type `C`"
 C().x = 42
@@ -125,9 +133,11 @@ This also applies when the trailing comma is inside the brackets (see
 ```py
 from typing import ClassVar
 
+
 class D:
     # A trailing comma here doesn't change the meaning; it's still one argument.
     a: ClassVar[int,] = 1
+
 
 reveal_type(D.a)  # revealed: int
 ```
@@ -136,6 +146,7 @@ reveal_type(D.a)  # revealed: int
 
 ```py
 from typing import ClassVar
+
 
 class C:
     # error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
@@ -159,6 +170,7 @@ from ty_extensions import reveal_mro
 # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
 x: ClassVar[int] = 1
 
+
 class C:
     def __init__(self) -> None:
         # error: [invalid-type-form] "`ClassVar` annotations are not allowed for non-name targets"
@@ -167,24 +179,30 @@ class C:
         # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
         y: ClassVar[int] = 1
 
+
 # error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
 def f(x: ClassVar[int]) -> None:
     pass
+
 
 # error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
 def f[T](x: ClassVar[T]) -> T:
     return x
 
+
 # error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
 def f() -> ClassVar[int]:
     return 1
+
 
 # error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
 def f[T](x: T) -> ClassVar[T]:
     return x
 
+
 # TODO: this should be an error
 class Foo(ClassVar[tuple[int]]): ...
+
 
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
 # revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)

@@ -11,7 +11,10 @@ python-version = "3.10"
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 reveal_type(A | B)  # revealed: <types.UnionType special-form 'A | B'>
 ```
@@ -25,7 +28,10 @@ python-version = "3.9"
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 # error: "Operator `|` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
 reveal_type(A | B)  # revealed: Unknown
@@ -40,15 +46,22 @@ python-version = "3.12"
 
 ```py
 class A: ...
+
+
 class B: ...
+
 
 def _(sub_a: type[A], sub_b: type[B]):
     reveal_type(A | sub_b)  # revealed: <types.UnionType special-form>
     reveal_type(sub_a | B)  # revealed: <types.UnionType special-form>
     reveal_type(sub_a | sub_b)  # revealed: <types.UnionType special-form>
 
+
 class C[T]: ...
+
+
 class D[T]: ...
+
 
 reveal_type(C | D)  # revealed: <types.UnionType special-form 'C[Unknown] | D[Unknown]'>
 

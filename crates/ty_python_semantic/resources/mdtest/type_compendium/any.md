@@ -11,7 +11,9 @@ type, which means that it represents an *unknown* set of runtime values.
 from ty_extensions import static_assert, is_assignable_to
 from typing_extensions import Never, Any
 
+
 class C: ...
+
 
 static_assert(is_assignable_to(C, Any))
 static_assert(is_assignable_to(Any, C))
@@ -47,9 +49,15 @@ from typing_extensions import Any
 
 # A class hierarchy Small <: Medium <: Big
 
+
 class Big: ...
+
+
 class Medium(Big): ...
+
+
 class Small(Medium): ...
+
 
 static_assert(is_assignable_to(Any | Medium, Big))
 static_assert(is_assignable_to(Any | Medium, Medium))
@@ -76,9 +84,15 @@ type with *upper bound* `T`:
 from ty_extensions import static_assert, is_assignable_to, Intersection, is_equivalent_to
 from typing import Any
 
+
 class Big: ...
+
+
 class Medium(Big): ...
+
+
 class Small(Medium): ...
+
 
 static_assert(is_assignable_to(Small, Intersection[Any, Medium]))
 static_assert(is_assignable_to(Medium, Intersection[Any, Medium]))

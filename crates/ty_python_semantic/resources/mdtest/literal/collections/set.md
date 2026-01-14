@@ -18,8 +18,10 @@ reveal_type({(1, 2), (3, 4)})  # revealed: set[Unknown | tuple[int, int]]
 def a(_: int) -> int:
     return 0
 
+
 def b(_: int) -> int:
     return 1
+
 
 x = {a, b}
 reveal_type(x)  # revealed: set[Unknown | ((_: int) -> int)]

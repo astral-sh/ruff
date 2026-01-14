@@ -8,18 +8,29 @@ Don't do this:
 import typing_extensions
 from typing import final
 
+
 @final
 class A: ...
 
+
 class B(A): ...  # error: 9 [subclass-of-final-class] "Class `B` cannot inherit from final class `A`"
+
 
 @typing_extensions.final
 class C: ...
 
+
 class D(C): ...  # error: [subclass-of-final-class]
+
+
 class E: ...
+
+
 class F: ...
+
+
 class G: ...
+
 
 # fmt: off
 class H(
@@ -175,6 +186,7 @@ class Baz(Foo):
 ```py
 from typing import final
 
+
 class Foo:
     @final
     def f(self): ...
@@ -184,6 +196,7 @@ class Foo:
 
 ```py
 import module1
+
 
 class Foo(module1.Foo):
     def f(self): ...  # error: [override-of-final-method]
@@ -257,6 +270,7 @@ class ChildOfBad(Bad):
 ```py
 from typing import overload, final
 
+
 class Good:
     @overload
     def f(self, x: str) -> str: ...
@@ -265,6 +279,7 @@ class Good:
     @final
     def f(self, x: int | str) -> int | str:
         return x
+
 
 class ChildOfGood(Good):
     @overload
@@ -275,6 +290,7 @@ class ChildOfGood(Good):
     # error: [override-of-final-method]
     def f(self, x: int | str) -> int | str:
         return x
+
 
 class Bad:
     @overload
@@ -317,6 +333,7 @@ class Bad:
     def i(self, x: int | str) -> int | str:
         return x
 
+
 class ChildOfBad(Bad):
     # TODO: these should all cause us to emit Liskov violations as well
     f = None  # error: [override-of-final-method]
@@ -343,12 +360,15 @@ type qualifier as travelling *across* scopes.
 ```py
 from typing import final
 
+
 class A:
     @final
     def method(self) -> None: ...
 
+
 class B:
     method = A.method
+
 
 class C(B):
     def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
@@ -359,9 +379,11 @@ class C(B):
 ```py
 from typing import final
 
+
 class A:
     @final
     def __init__(self) -> None: ...
+
 
 class B(A):
     def __init__(self) -> None: ...  # error: [override-of-final-method]
@@ -376,13 +398,16 @@ class B(A):
 ```py
 from typing import final
 
+
 class A:
     @final
     def f(self): ...
 
+
 class B(A):
     @final
     def f(self): ...  # error: [override-of-final-method]
+
 
 class C(B):
     @final
@@ -395,6 +420,7 @@ class C(B):
 ```py
 from typing import final, Final
 
+
 @final
 @final
 @final
@@ -409,6 +435,7 @@ class A:
     @final
     def method(self): ...
 
+
 @final
 @final
 @final
@@ -417,8 +444,10 @@ class A:
 class B:
     method: Final = A.method
 
+
 class C(A):  # error: [subclass-of-final-class]
     def method(self): ...  # error: [override-of-final-method]
+
 
 class D(B):  # error: [subclass-of-final-class]
     # TODO: we should emit a diagnostic here
@@ -430,9 +459,11 @@ class D(B):  # error: [subclass-of-final-class]
 ```py
 from typing import final, Any
 
+
 class Parent:
     @final
     def method(self) -> None: ...
+
 
 class Child(Parent):
     def __init__(self) -> None:
@@ -446,36 +477,53 @@ class Child(Parent):
 ```py
 from typing import final
 
+
 def coinflip() -> bool:
     return False
 
+
 class A:
     if coinflip():
+
         @final
         def method1(self) -> None: ...
+
     else:
+
         def method1(self) -> None: ...
 
     if coinflip():
+
         def method2(self) -> None: ...
+
     else:
+
         @final
         def method2(self) -> None: ...
 
     if coinflip():
+
         @final
         def method3(self) -> None: ...
+
     else:
+
         @final
         def method3(self) -> None: ...
 
     if coinflip():
+
         def method4(self) -> None: ...
+
     elif coinflip():
+
         @final
         def method4(self) -> None: ...
+
     else:
+
         def method4(self) -> None: ...
+
 
 class B(A):
     def method1(self) -> None: ...  # error: [override-of-final-method]
@@ -490,19 +538,26 @@ class B(A):
     method4 = 42
     unrelated = 56  # fmt: skip
 
+
 # Possible overrides of possibly `@final` methods...
 class C(A):
     if coinflip():
+
         def method1(self) -> None: ...  # error: [override-of-final-method]
+
     else:
         pass
 
     if coinflip():
+
         def method2(self) -> None: ...  # error: [override-of-final-method]
+
     else:
+
         def method2(self) -> None: ...
 
     if coinflip():
+
         def method3(self) -> None: ...  # error: [override-of-final-method]
 
     # TODO: we should emit Liskov violations here too:
@@ -523,21 +578,26 @@ python-version = "3.10"
 import sys
 from typing_extensions import final
 
+
 class Parent:
     if sys.version_info >= (3, 10):
+
         @final
         def foo(self) -> None: ...
         @final
         def foooo(self) -> None: ...
         @final
         def baaaaar(self) -> None: ...
+
     else:
+
         @final
         def bar(self) -> None: ...
         @final
         def baz(self) -> None: ...
         @final
         def spam(self) -> None: ...
+
 
 class Child(Parent):
     def foo(self) -> None: ...  # error: [override-of-final-method]
@@ -547,8 +607,10 @@ class Child(Parent):
     def bar(self) -> None: ...
 
     if sys.version_info >= (3, 10):
+
         def foooo(self) -> None: ...  # error: [override-of-final-method]
         def baz(self) -> None: ...
+
     else:
         # Fine because this doesn't override any reachable definitions
         def foooo(self) -> None: ...

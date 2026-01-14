@@ -13,8 +13,10 @@ of the decorator (which does not necessarily need to be a callable type):
 def custom_decorator(f) -> int:
     return 1
 
+
 @custom_decorator
 def f(x): ...
+
 
 reveal_type(f)  # revealed: int
 ```
@@ -26,12 +28,15 @@ More commonly, a decorator returns a modified callable type:
 ```py
 from typing import Callable
 
+
 def ensure_positive(wrapped: Callable[[int], bool]) -> Callable[[int], bool]:
     return lambda x: wrapped(x) and x > 0
+
 
 @ensure_positive
 def even(x: int) -> bool:
     return x % 2 == 0
+
 
 reveal_type(even)  # revealed: (int, /) -> bool
 reveal_type(even(4))  # revealed: bool
@@ -45,14 +50,18 @@ arguments:
 ```py
 from typing import Callable
 
+
 def ensure_larger_than(lower_bound: int) -> Callable[[Callable[[int], bool]], Callable[[int], bool]]:
     def decorator(wrapped: Callable[[int], bool]) -> Callable[[int], bool]:
         return lambda x: wrapped(x) and x >= lower_bound
+
     return decorator
+
 
 @ensure_larger_than(10)
 def even(x: int) -> bool:
     return x % 2 == 0
+
 
 reveal_type(even)  # revealed: (int, /) -> bool
 reveal_type(even(14))  # revealed: bool
@@ -67,16 +76,20 @@ meaning that the decorator closest to the function definition is applied first:
 def maps_to_str(f) -> str:
     return "a"
 
+
 def maps_to_int(f) -> int:
     return 1
 
+
 def maps_to_bytes(f) -> bytes:
     return b"a"
+
 
 @maps_to_str
 @maps_to_int
 @maps_to_bytes
 def f(x): ...
+
 
 reveal_type(f)  # revealed: str
 ```
@@ -97,9 +110,11 @@ class accept_strings:
     def __call__(self, x: str | int) -> bool:
         return self.f(int(x))
 
+
 @accept_strings
 def even(x: int) -> bool:
     return x > 0
+
 
 reveal_type(even)  # revealed: accept_strings
 reveal_type(even.custom_attribute)  # revealed: str
@@ -121,16 +136,20 @@ implemented using `functools.wraps`.
 from typing import Callable
 from functools import wraps
 
+
 def custom_decorator(f) -> Callable[[int], str]:
     @wraps(f)
     def wrapper(*args, **kwargs):
         print("Calling decorated function")
         return f(*args, **kwargs)
+
     return wrapper
+
 
 @custom_decorator
 def f(x: int) -> str:
     return str(x)
+
 
 reveal_type(f)  # revealed: (int, /) -> str
 ```
@@ -140,9 +159,11 @@ reveal_type(f)  # revealed: (int, /) -> str
 ```py
 from functools import cache
 
+
 @cache
 def f(x: int) -> int:
     return x**2
+
 
 # revealed: _lru_cache_wrapper[int]
 reveal_type(f)
@@ -157,6 +178,7 @@ reveal_type(f(1))
 def g(x: int) -> str:
     return "a"
 
+
 # TODO: This should be `Literal[g]` or `(int, /) -> str`
 reveal_type(g)  # revealed: Unknown
 ```
@@ -170,6 +192,7 @@ reveal_type(g)  # revealed: Unknown
 @unknown_decorator
 def f(x): ...
 
+
 reveal_type(f)  # revealed: Unknown
 ```
 
@@ -180,6 +203,7 @@ reveal_type(f)  # revealed: Unknown
 @(1 + "a")
 def f(x): ...
 
+
 reveal_type(f)  # revealed: Unknown
 ```
 
@@ -188,9 +212,11 @@ reveal_type(f)  # revealed: Unknown
 ```py
 non_callable = 1
 
+
 # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
 @non_callable
 def f(x): ...
+
 
 reveal_type(f)  # revealed: Unknown
 ```
@@ -206,9 +232,11 @@ first argument:
 def wrong_signature(f: int) -> str:
     return "a"
 
+
 # error: [invalid-argument-type] "Argument to function `wrong_signature` is incorrect: Expected `int`, found `def f(x) -> Unknown`"
 @wrong_signature
 def f(x): ...
+
 
 reveal_type(f)  # revealed: str
 ```
@@ -221,14 +249,18 @@ Decorators need to be callable with a single argument. If they are not, we emit 
 def takes_two_arguments(f, g) -> str:
     return "a"
 
+
 # error: [missing-argument] "No argument provided for required parameter `g` of function `takes_two_arguments`"
 @takes_two_arguments
 def f(x): ...
 
+
 reveal_type(f)  # revealed: str
+
 
 def takes_no_argument() -> str:
     return "a"
+
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `takes_no_argument`: expected 0, got 1"
 @takes_no_argument
@@ -242,6 +274,7 @@ Class decorator calls are validated, emitting diagnostics for invalid arguments:
 ```py
 def takes_int(x: int) -> int:
     return x
+
 
 # error: [invalid-argument-type]
 @takes_int
@@ -262,9 +295,11 @@ A decorator can enforce type constraints on the class being decorated:
 def decorator(cls: type[int]) -> type[int]:
     return cls
 
+
 # error: [invalid-argument-type]
 @decorator
 class Baz: ...
+
 
 # TODO: the revealed type should ideally be `type[int]` (the decorator's return type)
 reveal_type(Baz)  # revealed: <class 'Baz'>

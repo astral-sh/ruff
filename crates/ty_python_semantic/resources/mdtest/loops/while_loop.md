@@ -50,6 +50,7 @@ def _(flag: bool, flag2: bool):
 def flag() -> bool:
     return True
 
+
 x = 1
 
 while flag():
@@ -122,6 +123,7 @@ def _(flag: bool, flag2: bool):
 ```py
 class NotBoolable:
     __bool__: int = 3
+
 
 # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 while NotBoolable():

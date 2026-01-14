@@ -14,9 +14,11 @@ dependencies = ["sqlmodel==0.0.27"]
 ```py
 from sqlmodel import SQLModel
 
+
 class User(SQLModel):
     id: int
     name: str
+
 
 user = User(id=1, name="John Doe")
 reveal_type(user.id)  # revealed: int

@@ -31,6 +31,7 @@ The dynamic type at the top-level is replaced with `object`.
 from typing import Any, Callable
 from ty_extensions import Unknown, Top
 
+
 def _(top_any: Top[Any], top_unknown: Top[Unknown]):
     reveal_type(top_any)  # revealed: object
     reveal_type(top_unknown)  # revealed: object
@@ -57,6 +58,7 @@ The dynamic type at the top-level is replaced with `Never`.
 ```py
 from typing import Any, Callable
 from ty_extensions import Unknown, Bottom
+
 
 def _(bottom_any: Bottom[Any], bottom_unknown: Bottom[Unknown]):
     reveal_type(bottom_any)  # revealed: Never
@@ -92,9 +94,11 @@ from typing import Any, Literal
 from ty_extensions import TypeOf, Bottom, Top, is_equivalent_to, static_assert
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 static_assert(is_equivalent_to(Top[int], int))
 static_assert(is_equivalent_to(Bottom[int], int))
@@ -121,8 +125,10 @@ signature might have `Any` in it. (TODO: this is probably not right.)
 ```py
 def function(x: Any) -> None: ...
 
+
 class A:
     def method(self, x: Any) -> None: ...
+
 
 def _(
     top_func: Top[TypeOf[function]],
@@ -153,6 +159,7 @@ from ty_extensions import TypeOf, Unknown, Bottom, Top
 
 type C1 = Callable[[Any, Unknown], Any]
 
+
 def _(top: Top[C1], bottom: Bottom[C1]) -> None:
     reveal_type(top)  # revealed: (Never, Never, /) -> object
     reveal_type(bottom)  # revealed: (object, object, /) -> Never
@@ -162,6 +169,7 @@ The parameter types in a callable inherits the contravariant position.
 
 ```py
 type C2 = Callable[[int, tuple[int | Any]], tuple[Any]]
+
 
 def _(top: Top[C2], bottom: Bottom[C2]) -> None:
     reveal_type(top)  # revealed: (int, tuple[int], /) -> tuple[object]
@@ -174,6 +182,7 @@ flipped to covariant, invariant remains invariant.
 
 ```py
 type C3 = Callable[[Any, Callable[[Unknown], Any]], Callable[[Any, int], Any]]
+
 
 def _(top: Top[C3], bottom: Bottom[C3]) -> None:
     # revealed: (Never, (object, /) -> Never, /) -> (Never, int, /) -> object
@@ -201,6 +210,7 @@ from ty_extensions import Bottom, Top, is_equivalent_to, is_subtype_of, static_a
 
 type GradualCallable = Callable[..., Any]
 
+
 def _(top: Top[GradualCallable], bottom: Bottom[GradualCallable]) -> None:
     # The top materialization keeps the gradual parameters wrapped
     reveal_type(top)  # revealed: Top[(...) -> object]
@@ -208,10 +218,12 @@ def _(top: Top[GradualCallable], bottom: Bottom[GradualCallable]) -> None:
     # The bottom materialization simplifies to the fully static bottom callable
     reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> Never
 
+
 # The bottom materialization of a gradual callable is a subtype of (and supertype of)
 # a protocol with `__call__(self, *args: object, **kwargs: object) -> Never`
 class EquivalentToBottom(Protocol):
     def __call__(self, *args: object, **kwargs: object) -> Never: ...
+
 
 static_assert(is_subtype_of(EquivalentToBottom, Bottom[Callable[..., Never]]))
 static_assert(is_subtype_of(Bottom[Callable[..., Never]], EquivalentToBottom))
@@ -230,6 +242,7 @@ Gradual parameters can be top- and bottom-materialized even if the return type i
 ```py
 type GradualParams = Callable[..., int]
 
+
 def _(top: Top[GradualParams], bottom: Bottom[GradualParams]) -> None:
     reveal_type(top)  # revealed: Top[(...) -> int]
 
@@ -242,12 +255,14 @@ Materializing an overloaded callable materializes each overload separately.
 from typing import overload
 from ty_extensions import CallableTypeOf
 
+
 @overload
 def f(x: int) -> Any: ...
 @overload
 def f(*args: Any, **kwargs: Any) -> str: ...
 def f(*args: object, **kwargs: object) -> object:
     pass
+
 
 def _(top: Top[CallableTypeOf[f]], bottom: Bottom[CallableTypeOf[f]]):
     reveal_type(top)  # revealed: Overload[(x: int) -> object, Top[(...) -> str]]
@@ -260,6 +275,7 @@ The top callable can be represented in a `ParamSpec`:
 def takes_paramspec[**P](f: Callable[P, None]) -> Callable[P, None]:
     return f
 
+
 def _(top: Top[Callable[..., None]]):
     revealed = takes_paramspec(top)
     reveal_type(revealed)  # revealed: Top[(...) -> None]
@@ -270,9 +286,11 @@ The top callable is not a subtype of `(*object, **object) -> object`:
 ```py
 type TopCallable = Top[Callable[..., Any]]
 
+
 @staticmethod
 def takes_objects(*args: object, **kwargs: object) -> object:
     pass
+
 
 static_assert(not is_subtype_of(TopCallable, CallableTypeOf[takes_objects]))
 ```
@@ -309,6 +327,7 @@ from ty_extensions import TypeOf
 
 type C = Callable[[tuple[Any, int], tuple[str, Unknown]], None]
 
+
 def _(top: Top[C], bottom: Bottom[C]) -> None:
     reveal_type(top)  # revealed: (Never, Never, /) -> None
     reveal_type(bottom)  # revealed: (tuple[object, int], tuple[str, object], /) -> None
@@ -320,6 +339,7 @@ And, similarly for an invariant position.
 type LTAnyInt = list[tuple[Any, int]]
 type LTStrUnknown = list[tuple[str, Unknown]]
 type LTAnyIntUnknown = list[tuple[Any, int, Unknown]]
+
 
 def _(
     top_ai: Top[LTAnyInt],
@@ -369,6 +389,7 @@ inherit the contravariant position.
 from typing import Callable
 from ty_extensions import TypeOf
 
+
 def _(callable: Callable[[Any | int, str | Unknown], None]) -> None:
     static_assert(is_equivalent_to(Top[TypeOf[callable]], Callable[[int, str], None]))
     static_assert(is_equivalent_to(Bottom[TypeOf[callable]], Callable[[object, object], None]))
@@ -411,9 +432,12 @@ static_assert(is_equivalent_to(Bottom[Intersection[Any, int]], Never))
 static_assert(is_equivalent_to(Top[Intersection[Any | int, tuple[str, Unknown]]], tuple[str, object]))
 static_assert(is_equivalent_to(Bottom[Intersection[Any | int, tuple[str, Unknown]]], Never))
 
+
 class Foo: ...
 
+
 static_assert(is_equivalent_to(Bottom[Intersection[Any | Foo, tuple[str]]], Intersection[Foo, tuple[str]]))
+
 
 def _(
     top: Top[Intersection[list[Any], list[int]]],
@@ -465,6 +489,7 @@ static_assert(is_equivalent_to(Bottom[type[Unknown]], Never))
 static_assert(is_equivalent_to(Top[type[int | Any]], type))
 static_assert(is_equivalent_to(Bottom[type[int | Any]], type[int]))
 
+
 # Here, `T` has an upper bound of `type`
 def _(top: Top[list[type[Any]]], bottom: Bottom[list[type[Any]]]):
     reveal_type(top)  # revealed: Top[list[type[Any]]]
@@ -482,11 +507,13 @@ python-version = "3.12"
 from typing import Any, Never, TypeVar
 from ty_extensions import Unknown, Bottom, Top, static_assert, is_subtype_of
 
+
 def bounded_by_gradual[T: Any](t: T) -> None:
     # Top materialization of `T: Any` is `T: object`
 
     # Bottom materialization of `T: Any` is `T: Never`
     static_assert(is_subtype_of(Bottom[T], Never))
+
 
 def constrained_by_gradual[T: (int, Any)](t: T) -> None:
     # Top materialization of `T: (int, Any)` is `T: (int, object)`
@@ -518,18 +545,23 @@ T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
 T_contra = TypeVar("T_contra", contravariant=True)
 
+
 class GenericInvariant(Generic[T]):
     pass
+
 
 class GenericCovariant(Generic[T_co]):
     pass
 
+
 class GenericContravariant(Generic[T_contra]):
     pass
+
 
 def _(top: Top[GenericInvariant[Any]], bottom: Bottom[GenericInvariant[Any]]):
     reveal_type(top)  # revealed: Top[GenericInvariant[Any]]
     reveal_type(bottom)  # revealed: Bottom[GenericInvariant[Any]]
+
 
 static_assert(is_equivalent_to(Top[GenericCovariant[Any]], GenericCovariant[object]))
 static_assert(is_equivalent_to(Bottom[GenericCovariant[Any]], GenericCovariant[Never]))
@@ -548,13 +580,16 @@ type InvariantCallable = Callable[[GenericInvariant[Any]], None]
 type CovariantCallable = Callable[[GenericCovariant[Any]], None]
 type ContravariantCallable = Callable[[GenericContravariant[Any]], None]
 
+
 def invariant(top: Top[InvariantCallable], bottom: Bottom[InvariantCallable]) -> None:
     reveal_type(top)  # revealed: (Bottom[GenericInvariant[Any]], /) -> None
     reveal_type(bottom)  # revealed: (Top[GenericInvariant[Any]], /) -> None
 
+
 def covariant(top: Top[CovariantCallable], bottom: Bottom[CovariantCallable]) -> None:
     reveal_type(top)  # revealed: (GenericCovariant[Never], /) -> None
     reveal_type(bottom)  # revealed: (GenericCovariant[object], /) -> None
+
 
 def contravariant(top: Top[ContravariantCallable], bottom: Bottom[ContravariantCallable]) -> None:
     reveal_type(top)  # revealed: (GenericContravariant[object], /) -> None
@@ -569,6 +604,7 @@ It is invalid to use them without a type argument.
 
 ```py
 from ty_extensions import Bottom, Top
+
 
 def _(
     just_top: Top,  # error: [invalid-type-form]
@@ -772,21 +808,27 @@ number of other covariant ABCs, but we'll use a synthetic example.
 from typing import Generic, TypeVar, Any
 from ty_extensions import static_assert, is_assignable_to, is_equivalent_to, Top
 
+
 class A:
     pass
+
 
 class B(A):
     pass
 
+
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
+
 
 class CovariantBase(Generic[T_co]):
     def get(self) -> T_co:
         raise NotImplementedError
 
+
 class InvariantChild(CovariantBase[T]):
     def push(self, obj: T) -> None: ...
+
 
 static_assert(is_assignable_to(InvariantChild[A], CovariantBase[A]))
 static_assert(is_assignable_to(InvariantChild[B], CovariantBase[A]))
@@ -811,6 +853,7 @@ python-version = "3.12"
 from ty_extensions import Top, Bottom
 from typing import Any
 
+
 class Invariant[T]:
     def get(self) -> T:
         raise NotImplementedError
@@ -818,6 +861,7 @@ class Invariant[T]:
     def push(self, obj: T) -> None: ...
 
     attr: T
+
 
 def capybara(top: Top[Invariant[Any]], bottom: Bottom[Invariant[Any]]) -> None:
     reveal_type(top.get)  # revealed: bound method Top[Invariant[Any]].get() -> object

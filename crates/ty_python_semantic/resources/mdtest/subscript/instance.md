@@ -7,6 +7,7 @@
 ```py
 class NotSubscriptable: ...
 
+
 a = NotSubscriptable()[0]  # error: [not-subscriptable]
 ```
 
@@ -15,6 +16,7 @@ a = NotSubscriptable()[0]  # error: [not-subscriptable]
 ```py
 class NotSubscriptable:
     __getitem__ = None
+
 
 # TODO: this would be more user-friendly if the `call-non-callable` diagnostic was
 # transformed into a `not-subscriptable` diagnostic with a subdiagnostic explaining
@@ -31,6 +33,7 @@ class Identity:
     def __getitem__(self, index: int) -> int:
         return index
 
+
 reveal_type(Identity()[0])  # revealed: int
 ```
 
@@ -40,9 +43,12 @@ reveal_type(Identity()[0])  # revealed: int
 def _(flag: bool):
     class Identity:
         if flag:
+
             def __getitem__(self, index: int) -> int:
                 return index
+
         else:
+
             def __getitem__(self, index: int) -> str:
                 return str(index)
 
@@ -56,6 +62,7 @@ class Identity:
     def __getitem__(self, index: int) -> int:
         return index
 
+
 a = Identity()
 # error: [invalid-argument-type] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` cannot be called with key of type `Literal["a"]` on object of type `Identity`"
 a["a"]
@@ -68,6 +75,7 @@ class NoGetitem:
     def __setitem__(self, index: int, value: int) -> None:
         pass
 
+
 a = NoGetitem()
 a[0] = 0
 ```
@@ -76,6 +84,7 @@ a[0] = 0
 
 ```py
 class NoSetitem: ...
+
 
 a = NoSetitem()
 a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem`"
@@ -86,6 +95,7 @@ a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem
 ```py
 class NoSetitem:
     __setitem__ = None
+
 
 a = NoSetitem()
 a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` may not be callable on object of type `NoSetitem`"
@@ -98,6 +108,7 @@ class Identity:
     def __setitem__(self, index: int, value: int) -> None:
         pass
 
+
 a = Identity()
 a[0] = 0
 ```
@@ -108,6 +119,7 @@ a[0] = 0
 class Identity:
     def __setitem__(self, index: int, value: int) -> None:
         pass
+
 
 a = Identity()
 # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal["a"]` and value of type `Literal[0]` on object of type `Identity`"

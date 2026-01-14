@@ -30,6 +30,7 @@ def f[T](t: T) -> T:
     # satisfied for _all_ valid specializations of T.
     return t
 
+
 # When invoking the function, T is inferable — we attempt to infer a specialization that is valid
 # for the particular arguments that are passed to the function. Assignability checks (in particular,
 # that the argument type is assignable to the parameter type) only need to succeed for _at least
@@ -52,12 +53,19 @@ type.
 from typing import final, Never
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 @final
 class Unrelated: ...
+
 
 def unbounded[T]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
@@ -98,12 +106,19 @@ for every type that satisfies the upper bound.
 from typing import final, Never
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 @final
 class Unrelated: ...
+
 
 def bounded[T: Base]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
@@ -151,6 +166,7 @@ the constraint set.
 
 ```py
 from typing import Any
+
 
 def bounded_by_gradual[T: Any]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
@@ -243,12 +259,19 @@ constraint set to be satisfied by all of those constraints.
 from typing import final, Never
 from ty_extensions import ConstraintSet, static_assert
 
+
 class Super: ...
+
+
 class Base(Super): ...
+
+
 class Sub(Base): ...
+
 
 @final
 class Unrelated: ...
+
 
 def constrained[T: (Base, Unrelated)]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
@@ -321,6 +344,7 @@ satisfy the constraint set.
 ```py
 from typing import Any
 
+
 def constrained_by_gradual[T: (Base, Any)]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
     static_assert(ConstraintSet.always().satisfied_by_all_typevars())
@@ -348,6 +372,7 @@ def constrained_by_gradual[T: (Base, Any)]():
     # If we choose Never as the materialization, then (T = Base) and (T = Never) are the only valid
     # specializations, both of which satisfy (T ≤ Base).
     static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
+
 
 def constrained_by_two_gradual[T: (Any, Any)]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
@@ -428,6 +453,7 @@ def constrained_by_gradual[T: (list[Base], list[Any])]():
     # position. (T = Never) will be a valid assignment no matter what, and that does not satisfy
     # (T ≤ list[Unrelated] ∧ T ≠ Never).
     static_assert(not constraints.satisfied_by_all_typevars())
+
 
 def constrained_by_two_gradual[T: (list[Any], list[Any])]():
     static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))

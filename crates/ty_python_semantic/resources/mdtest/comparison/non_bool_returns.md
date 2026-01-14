@@ -21,6 +21,7 @@ Walking through examples:
 ```py
 from __future__ import annotations
 
+
 class A:
     def __lt__(self, other) -> A:
         return self
@@ -28,13 +29,16 @@ class A:
     def __gt__(self, other) -> bool:
         return False
 
+
 class B:
     def __lt__(self, other) -> B:
         return self
 
+
 class C:
     def __lt__(self, other) -> C:
         return self
+
 
 x = A() < B() < C()
 reveal_type(x)  # revealed: (A & ~AlwaysTruthy) | B

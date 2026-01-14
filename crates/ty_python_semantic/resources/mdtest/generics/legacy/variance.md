@@ -25,18 +25,25 @@ get from the sequence is a valid `int`.
 from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
 from typing import Any, Generic, TypeVar
 
+
 class A: ...
+
+
 class B(A): ...
+
 
 T = TypeVar("T", covariant=True)
 U = TypeVar("U", covariant=True)
+
 
 class C(Generic[T]):
     def receive(self) -> T:
         raise ValueError
 
+
 class D(C[U]):
     pass
+
 
 static_assert(is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
@@ -106,17 +113,24 @@ that you pass into the consumer is a valid `int`.
 from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
 from typing import Any, Generic, TypeVar
 
+
 class A: ...
+
+
 class B(A): ...
+
 
 T = TypeVar("T", contravariant=True)
 U = TypeVar("U", contravariant=True)
 
+
 class C(Generic[T]):
     def send(self, value: T): ...
 
+
 class D(C[U]):
     pass
+
 
 static_assert(not is_assignable_to(C[B], C[A]))
 static_assert(is_assignable_to(C[A], C[B]))
@@ -183,10 +197,13 @@ from typing import Generic, TypeVar
 T = TypeVar("T", contravariant=True)
 T_int = TypeVar("T_int", bound=int)
 
+
 class Contra(Generic[T]): ...
+
 
 def f(x: Contra[T_int]) -> T_int:
     raise NotImplementedError
+
 
 def _(x: Contra[str]):
     reveal_type(f(x))  # revealed: Never
@@ -218,19 +235,26 @@ since we can't know in advance which of the allowed methods you'll want to use.
 from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
 from typing import Any, Generic, TypeVar
 
+
 class A: ...
+
+
 class B(A): ...
+
 
 T = TypeVar("T")
 U = TypeVar("U")
+
 
 class C(Generic[T]):
     def send(self, value: T): ...
     def receive(self) -> T:
         raise ValueError
 
+
 class D(C[U]):
     pass
+
 
 static_assert(not is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))

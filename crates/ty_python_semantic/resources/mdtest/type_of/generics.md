@@ -37,8 +37,12 @@ class A:
 
     def __init__(self, value: str): ...
 
+
 class B(A): ...
+
+
 class C: ...
+
 
 def upper_bound[T: A](x: type[T]) -> T:
     reveal_type(x)  # revealed: type[T@upper_bound]
@@ -46,6 +50,7 @@ def upper_bound[T: A](x: type[T]) -> T:
     reveal_type(x("hello"))  # revealed: T@upper_bound
 
     return x("hello")
+
 
 reveal_type(upper_bound(A))  # revealed: A
 reveal_type(upper_bound(B))  # revealed: B
@@ -64,6 +69,7 @@ def constrained[T: (int, str)](x: type[T]) -> T:
 
     return x("hello")
 
+
 reveal_type(constrained(int))  # revealed: int
 reveal_type(constrained(str))  # revealed: str
 
@@ -79,7 +85,10 @@ still be accessible:
 
 ```py
 class Replace: ...
+
+
 class Multiply: ...
+
 
 def union_bound[T: Replace | Multiply](x: type[T]) -> T:
     reveal_type(x)  # revealed: type[T@union_bound]
@@ -90,6 +99,7 @@ def union_bound[T: Replace | Multiply](x: type[T]) -> T:
 
     return x()
 
+
 reveal_type(union_bound(Replace))  # revealed: Replace
 reveal_type(union_bound(Multiply))  # revealed: Multiply
 ```
@@ -99,11 +109,14 @@ reveal_type(union_bound(Multiply))  # revealed: Multiply
 ```py
 from ty_extensions import Intersection, Unknown
 
+
 def _[T: int](x: type | type[T]):
     reveal_type(x())  # revealed: Any
 
+
 def _[T: int](x: type[int] | type[T]):
     reveal_type(x())  # revealed: int
+
 
 def _[T](x: type[int] | type[T]):
     reveal_type(x())  # revealed: int | T@_
@@ -114,7 +127,9 @@ def _[T](x: type[int] | type[T]):
 ```py
 from typing import TypeVar
 
+
 class A: ...
+
 
 def narrow_a[B: A](a: A, b: B):
     type_of_a = type(a)
@@ -134,6 +149,7 @@ def narrow_a[B: A](a: A, b: B):
 ```py
 from typing import Self
 
+
 class A:
     def copy(self: Self) -> Self:
         reveal_type(self.__class__)  # revealed: type[Self@copy]
@@ -149,8 +165,10 @@ A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`
 from typing import Any, Callable, Protocol
 from ty_extensions import is_assignable_to, is_subtype_of, is_disjoint_from, static_assert
 
+
 class Callback[T](Protocol):
     def __call__(self, *args, **kwargs) -> T: ...
+
 
 def _[T](_: T):
     static_assert(not is_subtype_of(type[T], T))
@@ -169,6 +187,7 @@ def _[T](_: T):
 
     static_assert(not is_assignable_to(type[T], Callback[int]))
     static_assert(not is_disjoint_from(type[T], Callback[int]))
+
 
 def _[T: int](_: T):
     static_assert(not is_subtype_of(type[T], T))
@@ -206,6 +225,7 @@ def _[T: int](_: T):
 
     static_assert(is_subtype_of(type[T], type[T] | type[float]))
     static_assert(not is_disjoint_from(type[T], type[T] | type[float]))
+
 
 def _[T: (int, str)](_: T):
     static_assert(not is_subtype_of(type[T], T))
@@ -245,6 +265,7 @@ def _[T: (int, str)](_: T):
     static_assert(not is_disjoint_from(type[T], type[int | str]))
     static_assert(not is_disjoint_from(type[T], type[int] | type[str]))
 
+
 def _[T: (int | str, int)](_: T):
     static_assert(is_subtype_of(type[int], type[T]))
     static_assert(not is_disjoint_from(type[int], type[T]))
@@ -257,6 +278,7 @@ class X[T]:
     def get(self) -> T:
         return self.value
 
+
 def _[T](x: X[type[T]]):
     reveal_type(x.get())  # revealed: type[T@_]
 ```
@@ -267,11 +289,14 @@ def _[T](x: X[type[T]]):
 def f1[T](x: type[T]) -> type[T]:
     return x
 
+
 reveal_type(f1(int))  # revealed: type[int]
 reveal_type(f1(object))  # revealed: type
 
+
 def f2[T](x: T) -> type[T]:
     return type(x)
+
 
 reveal_type(f2(int(1)))  # revealed: type[int]
 reveal_type(f2(object()))  # revealed: type
@@ -279,8 +304,10 @@ reveal_type(f2(object()))  # revealed: type
 # TODO: This should reveal `type[Literal[1]]`.
 reveal_type(f2(1))  # revealed: type[Unknown]
 
+
 def f3[T](x: type[T]) -> T:
     return x()
+
 
 reveal_type(f3(int))  # revealed: int
 reveal_type(f3(object))  # revealed: object
@@ -291,7 +318,9 @@ reveal_type(f3(object))  # revealed: object
 ```py
 from typing import Any
 
+
 class Foo[T]: ...
+
 
 # TODO: This should not error.
 # error: [invalid-parameter-default] "Default value of type `<class 'Foo'>` is not assignable to annotated parameter type `type[T@f]`"
@@ -308,11 +337,15 @@ python-version = "3.12"
 ```py
 from typing import Generic, TypeVar
 
+
 class Foo[T]: ...
+
 
 S = TypeVar("S")
 
+
 class Bar(Generic[S]): ...
+
 
 def _(x: Foo[int], y: Bar[str], z: list[bytes]):
     reveal_type(type(x))  # revealed: type[Foo[int]]
@@ -331,8 +364,10 @@ python-version = "3.12"
 class C[T]:
     pass
 
+
 class D[T]:
     pass
+
 
 var: type[C[int]] = C[int]
 var: type[C[int]] = D[int]  # error: [invalid-assignment] "Object of type `<class 'D[int]'>` is not assignable to `type[C[int]]`"
@@ -343,11 +378,14 @@ However, generic `Protocol` classes are still TODO:
 ```py
 from typing import Protocol
 
+
 class Proto[U](Protocol):
     def some_method(self): ...
 
+
 # TODO: should be error: [invalid-assignment]
 var: type[Proto[int]] = C[int]
+
 
 def _(p: type[Proto[int]]):
     reveal_type(p)  # revealed: type[@Todo(type[T] for protocols)]
@@ -366,15 +404,19 @@ An unspecialized generic final class object is assignable to its default-special
 ```py
 from typing import final
 
+
 @final
 class P[T]:
     x: T
 
+
 def expects_type_p(x: type[P]):
     pass
 
+
 def expects_type_p_of_int(x: type[P[int]]):
     pass
+
 
 # OK, the default specialization of `P` is assignable to `type[P[Unknown]]`
 expects_type_p(P)
@@ -399,14 +441,18 @@ because the default-specialization is no longer a forgiving `Unknown` type:
 class P[T = str]:
     x: T
 
+
 def expects_type_p(x: type[P]):
     pass
+
 
 def expects_type_p_of_int(x: type[P[int]]):
     pass
 
+
 def expects_type_p_of_str(x: type[P[str]]):
     pass
+
 
 # OK, the default specialization is now `P[str]`, but we have the default specialization on both
 # sides, so it is assignable.
@@ -430,8 +476,10 @@ This also works with `ParamSpec`:
 @final
 class C[**P]: ...
 
+
 def expects_type_c(f: type[C]): ...
 def expects_type_c_of_int_and_str(x: type[C[int, str]]): ...
+
 
 # OK, the unspecialized `C` is assignable to `type[C[...]]`
 expects_type_c(C)
@@ -458,9 +506,11 @@ And with a `ParamSpec` that has a default:
 @final
 class C[**P = [int, str]]: ...
 
+
 def expects_type_c_default(f: type[C]): ...
 def expects_type_c_default_of_int(f: type[C[int]]): ...
 def expects_type_c_default_of_int_str(f: type[C[int, str]]): ...
+
 
 expects_type_c_default(C)
 expects_type_c_default(C[int, str])

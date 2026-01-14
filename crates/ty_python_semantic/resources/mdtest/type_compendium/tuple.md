@@ -9,8 +9,12 @@ Cartesian product of sets.
 ```py
 from typing_extensions import assert_type
 
+
 class P: ...
+
+
 class Q: ...
+
 
 def _(p: P, q: Q):
     assert_type((p, q), tuple[P, Q])
@@ -36,9 +40,11 @@ reveal_type(tuple[int, *tuple[str, ...]]((1,)))  # revealed: tuple[int, *tuple[s
 reveal_type(().__class__())  # revealed: tuple[()]
 reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
+
 class LiskovUncompliantIterable(Iterable[int]):
     # TODO we should emit an error here about the Liskov violation
     __iter__ = None
+
 
 def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncompliantIterable):
     reveal_type(tuple(x))  # revealed: tuple[int, ...]
@@ -52,6 +58,7 @@ def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncom
     # inherits from `Iterable[int]`. Ultimately all bets are off when the Liskov Principle is
     # violated, though -- this test is really just to make sure we don't crash in this situation.
     reveal_type(tuple(bb))  # revealed: tuple[Unknown, ...]
+
 
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
@@ -72,6 +79,7 @@ reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
 # error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
 
+
 def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes, bool, bytes]):
     reveal_type(tuple(x))  # revealed: tuple[int, str] | tuple[bytes, bool]
     reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
@@ -89,11 +97,21 @@ python-version = "3.11"
 ```py
 from typing_extensions import Iterable, Never
 
+
 class UnspecializedTupleSubclass(tuple): ...
+
+
 class EmptyTupleSubclass(tuple[()]): ...
+
+
 class SingleElementTupleSubclass(tuple[int]): ...
+
+
 class VariadicTupleSubclass(tuple[int, ...]): ...
+
+
 class MixedTupleSubclass(tuple[int, *tuple[str, ...]]): ...
+
 
 reveal_type(UnspecializedTupleSubclass())  # revealed: UnspecializedTupleSubclass
 reveal_type(UnspecializedTupleSubclass(()))  # revealed: UnspecializedTupleSubclass
@@ -124,6 +142,7 @@ reveal_type(MixedTupleSubclass((1, b"foo")))  # revealed: MixedTupleSubclass
 
 # error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type(MixedTupleSubclass())  # revealed: MixedTupleSubclass
+
 
 def _(empty: EmptyTupleSubclass, single_element: SingleElementTupleSubclass, mixed: MixedTupleSubclass, x: tuple[int, int]):
     # error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[()]`, found `tuple[Literal[1], Literal[2]]`"
@@ -164,10 +183,18 @@ and `S2` is a subtype of `T2`, and similar for other lengths of tuples:
 ```py
 from ty_extensions import static_assert, is_subtype_of
 
+
 class T1: ...
+
+
 class S1(T1): ...
+
+
 class T2: ...
+
+
 class S2(T2): ...
+
 
 static_assert(is_subtype_of(tuple[S1], tuple[T1]))
 static_assert(not is_subtype_of(tuple[T1], tuple[S1]))
@@ -196,7 +223,9 @@ from ty_extensions import static_assert, is_singleton, is_subtype_of, is_equival
 
 static_assert(not is_singleton(tuple[()]))
 
+
 class AnotherEmptyTuple(tuple[()]): ...
+
 
 static_assert(not is_equivalent_to(AnotherEmptyTuple, tuple[()]))
 
@@ -265,6 +294,7 @@ def takes_zero_or_more(t: tuple[int, ...]) -> None: ...
 def takes_one_or_more(t: tuple[int, *tuple[int, ...]]) -> None: ...
 def takes_two_or_more(t: tuple[int, int, *tuple[int, ...]]) -> None: ...
 
+
 takes_zero_or_more(())
 takes_zero_or_more((1,))
 takes_zero_or_more((1, 2))
@@ -284,6 +314,7 @@ The required elements can also appear in the suffix of the mixed tuple type.
 def takes_one_or_more_suffix(t: tuple[*tuple[int, ...], int]) -> None: ...
 def takes_two_or_more_suffix(t: tuple[*tuple[int, ...], int, int]) -> None: ...
 def takes_two_or_more_mixed(t: tuple[int, *tuple[int, ...], int]) -> None: ...
+
 
 takes_one_or_more_suffix(())  # error: [invalid-argument-type]
 takes_one_or_more_suffix((1,))
@@ -351,14 +382,20 @@ contain elements `Q1, Q2` if either `P1` is disjoint from `Q1` or if `P2` is dis
 ```py
 from typing import final
 
+
 @final
 class F1: ...
+
 
 @final
 class F2: ...
 
+
 class N1: ...
+
+
 class N2: ...
+
 
 static_assert(is_disjoint_from(F1, F2))
 static_assert(not is_disjoint_from(N1, N2))
@@ -394,7 +431,9 @@ for the possibility of `tuple` to be subclassed
 ```py
 class C: ...
 
+
 static_assert(not is_disjoint_from(tuple[int, str], C))
+
 
 class CommonSubtype(tuple[int, str], C): ...
 ```
@@ -404,7 +443,10 @@ other heterogeneous tuples above:
 
 ```py
 class I1(tuple[F1, F2]): ...
+
+
 class I2(tuple[F2, F1]): ...
+
 
 # TODO
 # This is a subtype of both `tuple[F1, F2]` and `tuple[F2, F1]`, so those two heterogeneous tuples
@@ -489,6 +531,7 @@ class NotAlwaysTruthyTuple(tuple[int]):
     def __bool__(self) -> bool:
         return False
 
+
 t: tuple[int] = NotAlwaysTruthyTuple((1,))
 ```
 
@@ -501,6 +544,7 @@ from typing_extensions import Any, assert_type
 from ty_extensions import Unknown, is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
+
 
 def f(x: tuple, y: tuple[Unknown, ...]):
     reveal_type(x)  # revealed: tuple[Unknown, ...]
@@ -559,6 +603,7 @@ tup: Sequence[str] = (*{"foo": 42, "bar": 56},)
 
 # TODO: `tuple[str, str]` would be better, given the type annotation
 reveal_type(tup)  # revealed: tuple[Unknown | str, Unknown | str]
+
 
 def f(x: list[int]):
     reveal_type((42, 56, *x, 97))  # revealed: tuple[Literal[42], Literal[56], *tuple[int, ...], Literal[97]]

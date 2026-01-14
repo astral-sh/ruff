@@ -12,6 +12,7 @@ is retained after the loop.
 def next_item() -> int | None:
     return 1
 
+
 x = next_item()
 
 while x is not None:
@@ -26,6 +27,7 @@ reveal_type(x)  # revealed: None
 ```py
 def next_item() -> int | None:
     return 1
+
 
 x = next_item()
 
@@ -43,8 +45,10 @@ reveal_type(x)  # revealed: None
 ```py
 from typing import Literal
 
+
 def next_item() -> Literal[1, 2, 3]:
     raise NotImplementedError
+
 
 x = next_item()
 
@@ -65,6 +69,7 @@ while x != 1:
 ```py
 def next_item() -> int | None:
     return 1
+
 
 while True:
     x = next_item()

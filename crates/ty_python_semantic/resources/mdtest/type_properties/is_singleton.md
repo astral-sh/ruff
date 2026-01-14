@@ -9,12 +9,15 @@ from typing_extensions import Literal, Never, Callable
 from ty_extensions import is_singleton, static_assert
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
 
+
 class Single(Enum):
     VALUE = 1
+
 
 static_assert(is_singleton(None))
 static_assert(is_singleton(Literal[True]))
@@ -159,8 +162,10 @@ import types
 from typing import Callable
 from ty_extensions import static_assert, is_singleton, TypeOf
 
+
 class A:
     def method(self): ...
+
 
 static_assert(is_singleton(TypeOf[types.FunctionType.__get__]))
 

@@ -847,6 +847,7 @@ __all__ = ["funcmod"]
 ```py
 __all__ = ["funcmod"]
 
+
 def funcmod(x: int) -> int:
     return x
 ```
@@ -869,6 +870,7 @@ x = funcmod(1)
 from .funcmod import funcmod
 
 funcmod(1)
+
 
 def run():
     funcmod(2)
@@ -922,14 +924,17 @@ def run1():
 
     funcmod(1)
 
+
 def run2():
     from .funcmod import funcmod
 
     funcmod(2)
 
+
 def run3():
     # error: [unresolved-reference]
     funcmod(3)
+
 
 # error: [unresolved-reference]
 funcmod(4)
@@ -957,6 +962,7 @@ def run1():
     # error: [unresolved-reference]
     funcmod.funcmod(1)
 
+
 def run2():
     from .funcmod import other
 
@@ -964,9 +970,11 @@ def run2():
     # error: [unresolved-reference]
     funcmod.funcmod(2)
 
+
 def run3():
     # error: [unresolved-reference]
     funcmod.funcmod(3)
+
 
 # error: [unresolved-reference]
 funcmod.funcmod(4)
@@ -976,6 +984,7 @@ funcmod.funcmod(4)
 
 ```py
 other: int = 1
+
 
 def funcmod(x: int) -> int:
     return x
@@ -1038,6 +1047,7 @@ x = funcmod(1)
 
 ```py
 from .funcmod import other
+
 
 def funcmod(x: int) -> int:
     return x
@@ -1154,6 +1164,7 @@ from .funcmod import other
 ```py
 def other(x: int) -> int:
     return x
+
 
 def funcmod(x: int) -> int:
     return x

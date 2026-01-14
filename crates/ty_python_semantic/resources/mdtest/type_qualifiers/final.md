@@ -28,6 +28,7 @@ reveal_type(FINAL_C)  # revealed: Literal[1]
 reveal_type(FINAL_D)  # revealed: Literal[1]
 reveal_type(FINAL_D)  # revealed: Literal[1]
 
+
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: int
     reveal_type(FINAL_B)  # revealed: int
@@ -63,6 +64,7 @@ FINAL_A: Final = 1
 
 reveal_type(FINAL_A)  # revealed: Literal[1]
 
+
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: Literal[1]
 ```
@@ -80,6 +82,7 @@ reveal_type(FINAL_A)  # revealed: Literal[1]
 ```py
 from typing import Final
 
+
 class C:
     FINAL_A: Final[int] = 1
     FINAL_B: Final = 1
@@ -89,6 +92,7 @@ class C:
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
         self.FINAL_E = 1
+
 
 reveal_type(C.FINAL_A)  # revealed: int
 reveal_type(C.FINAL_B)  # revealed: Literal[1]
@@ -127,6 +131,7 @@ FINAL_D = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINA
 FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_E` is not allowed"
 FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
 
+
 def global_use():
     global FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_E, FINAL_F
     FINAL_A = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_A` is not allowed"
@@ -135,6 +140,7 @@ def global_use():
     FINAL_D = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_D` is not allowed"
     FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_E` is not allowed"
     FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
+
 
 def local_use():
     # These are not errors, because they refer to local variables
@@ -145,8 +151,10 @@ def local_use():
     FINAL_E = 2
     FINAL_F = 2
 
+
 def nonlocal_use():
     X: Final[int] = 1
+
     def inner():
         nonlocal X
         X = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `X` is not allowed: Reassignment of `Final` symbol"
@@ -172,9 +180,11 @@ Assignments to attributes qualified with `Final` are also not allowed:
 ```py
 from typing import Final
 
+
 class Meta(type):
     META_FINAL_A: Final[int] = 1
     META_FINAL_B: Final = 1
+
 
 class C(metaclass=Meta):
     CLASS_FINAL_A: Final[int] = 1
@@ -185,6 +195,7 @@ class C(metaclass=Meta):
         self.INSTANCE_FINAL_B: Final = 1
         self.INSTANCE_FINAL_C: Final[int]
         self.INSTANCE_FINAL_C = 1
+
 
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
 C.META_FINAL_A = 2
@@ -217,8 +228,10 @@ object, but that object itself may still be mutable:
 ```py
 from typing import Final
 
+
 class C:
     x: int = 1
+
 
 FINAL_C_INSTANCE: Final[C] = C()
 FINAL_C_INSTANCE.x = 2
@@ -234,10 +247,12 @@ When a symbol is qualified with `Final` in a class, it cannot be overridden in s
 ```py
 from typing import Final
 
+
 class Base:
     FINAL_A: Final[int] = 1
     FINAL_B: Final[int] = 1
     FINAL_C: Final = 1
+
 
 class Derived(Base):
     # TODO: This should be an error
@@ -271,6 +286,7 @@ LEGAL_C = 1
 LEGAL_D: Final
 LEGAL_D = 1
 
+
 class C:
     LEGAL_E: ClassVar[Final[int]] = 1
     LEGAL_F: Final[ClassVar[int]] = 1
@@ -281,23 +297,29 @@ class C:
         self.LEGAL_I: Final[int]
         self.LEGAL_I = 1
 
+
 # error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
 def f(ILLEGAL: Final[int]) -> None:
     pass
+
 
 # error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
 def f[T](ILLEGAL: Final[T]) -> T:
     return ILLEGAL
 
+
 # error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
 def f() -> Final[None]: ...
+
 
 # error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
 def f[T](x: T) -> Final[T]:
     return x
 
+
 # TODO: This should be an error
 class Foo(Final[tuple[int]]): ...
+
 
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
 # revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
@@ -311,6 +333,7 @@ attribute must be assigned only once, when the instance is created.
 
 ```py
 from typing import Final
+
 
 class C:
     def some_method(self):
@@ -334,6 +357,7 @@ for _ in range(10):
 
 ```py
 from typing import Final
+
 
 class C:
     # error: [invalid-type-form] "Type qualifier `typing.Final` expected exactly 1 argument, got 2"
@@ -363,6 +387,7 @@ from typing import Final
 
 # error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
 x: list[Final[int]] = []  # Error!
+
 
 class C:
     # error: [invalid-type-form]
@@ -397,6 +422,7 @@ NO_ASSIGNMENT_A: Final
 # TODO: This should be an error
 NO_ASSIGNMENT_B: Final[int]
 
+
 class C:
     # TODO: This should be an error
     NO_ASSIGNMENT_A: Final
@@ -422,6 +448,7 @@ python-version = "3.11"
 ```py
 from typing import Final, Self
 
+
 class ClassA:
     ID4: Final[int]  # OK because initialized in __init__
 
@@ -432,11 +459,13 @@ class ClassA:
         # error: [invalid-assignment] "Cannot assign to final attribute `ID4` on type `Self@other_method`"
         self.ID4 = 2  # Should still error outside __init__
 
+
 class ClassB:
     ID5: Final[int]
 
     def __init__(self):  # Without Self annotation
         self.ID5 = 1  # Should also be OK
+
 
 reveal_type(ClassA().ID4)  # revealed: int
 reveal_type(ClassB().ID5)  # revealed: int
@@ -451,6 +480,7 @@ assignment in `__init__` is not allowed if the attribute already has a value at 
 ```py
 from typing import Final
 
+
 # Case 1: Declared in class, assigned once in __init__ - ALLOWED
 class DeclaredAssignedInInit:
     attr1: Final[int]
@@ -458,9 +488,11 @@ class DeclaredAssignedInInit:
     def __init__(self):
         self.attr1 = 1  # OK: First and only assignment
 
+
 # Case 2: Declared and assigned in class body - ALLOWED (no __init__ assignment)
 class DeclaredAndAssignedInClass:
     attr2: Final[int] = 10
+
 
 # Case 3: Reassignment when already assigned in class body
 class ReassignmentFromClass:
@@ -469,6 +501,7 @@ class ReassignmentFromClass:
     def __init__(self):
         # error: [invalid-assignment]
         self.attr3 = 20  # Error: already assigned in class body
+
 
 # Case 4: Multiple assignments within __init__ itself
 # Per conformance suite and PEP 591, all assignments in __init__ are allowed
@@ -479,6 +512,7 @@ class MultipleAssignmentsInInit:
         self.attr4 = 1  # OK: Assignment in __init__
         self.attr4 = 2  # OK: Multiple assignments in __init__ are allowed
 
+
 class ConditionalAssignment:
     X: Final[int]
 
@@ -488,10 +522,12 @@ class ConditionalAssignment:
         else:
             self.X = 56  # OK: Multiple assignments in __init__ are allowed
 
+
 # Case 5: Declaration and assignment in __init__ - ALLOWED
 class DeclareAndAssignInInit:
     def __init__(self):
         self.attr5: Final[int] = 1  # OK: Declare and assign in __init__
+
 
 # Case 6: Assignment outside __init__ should still fail
 class AssignmentOutsideInit:
@@ -510,23 +546,28 @@ parameter (`self`).
 ```py
 from typing import Final
 
+
 class C:
     x: Final[int] = 100
+
 
 # Assignment from standalone function (even named __init__)
 def _(c: C):
     # error: [invalid-assignment] "Cannot assign to final attribute `x`"
     c.x = 1  # Error: Not in C.__init__
 
+
 def __init__(c: C):
     # error: [invalid-assignment] "Cannot assign to final attribute `x`"
     c.x = 1  # Error: Not a method
+
 
 # Assignment from another class's __init__
 class A:
     def __init__(self, c: C):
         # error: [invalid-assignment] "Cannot assign to final attribute `x`"
         c.x = 1  # Error: Not C's __init__
+
 
 # Assignment to non-self parameter in __init__
 class D:

@@ -83,6 +83,7 @@ When we access methods from derived classes, they will be bound to instances of 
 class D(C):
     pass
 
+
 reveal_type(D().f)  # revealed: bound method D.f(x: int) -> str
 ```
 
@@ -107,9 +108,11 @@ class Base:
     def method_on_base(self, x: int | None) -> str:
         return "a"
 
+
 class Derived(Base):
     def method_on_derived(self, x: bytes) -> tuple[int, str]:
         return (1, "a")
+
 
 reveal_type(Base().method_on_base(1))  # revealed: str
 reveal_type(Base.method_on_base(Base(), 1))  # revealed: str
@@ -159,6 +162,7 @@ reveal_type(b"abcde".startswith(b"abc"))  # revealed: bool
 ```py
 from typing_extensions import LiteralString
 
+
 def f(s: LiteralString) -> None:
     reveal_type(s.find("a"))  # revealed: int
 ```
@@ -175,13 +179,16 @@ def f(t: tuple[int, str]) -> None:
 ```py
 from typing import Any
 
+
 class A:
     def f(self) -> int:
         return 1
 
+
 class B:
     def f(self) -> str:
         return "a"
+
 
 def f(a_or_b: A | B, any_or_a: Any | A):
     reveal_type(a_or_b.f)  # revealed: (bound method A.f() -> int) | (bound method B.f() -> str)
@@ -216,13 +223,17 @@ class:
 from typing import Protocol, Literal
 from ty_extensions import AlwaysFalsy
 
+
 class Foo: ...
+
 
 class SupportsStr(Protocol):
     def __str__(self) -> str: ...
 
+
 class Falsy(Protocol):
     def __bool__(self) -> Literal[False]: ...
+
 
 def _(a: object, b: SupportsStr, c: Falsy, d: AlwaysFalsy, e: None, f: Foo | None):
     a.__str__()
@@ -253,9 +264,11 @@ Here, we test that this signature is enforced correctly:
 ```py
 from inspect import getattr_static
 
+
 class C:
     def f(self, x: int) -> str:
         return "a"
+
 
 method_wrapper = getattr_static(C, "f").__get__
 
@@ -298,12 +311,15 @@ the class itself. This also creates a bound method that is bound to the class ob
 ```py
 from __future__ import annotations
 
+
 class Meta(type):
     def f(cls, arg: int) -> str:
         return "a"
 
+
 class C(metaclass=Meta):
     pass
+
 
 reveal_type(C.f)  # revealed: bound method <class 'C'>.f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
@@ -321,9 +337,11 @@ A metaclass function can be shadowed by a method on the class:
 ```py
 from typing import Any, Literal
 
+
 class D(metaclass=Meta):
     def f(arg: int) -> Literal["a"]:
         return "a"
+
 
 reveal_type(D.f(1))  # revealed: Literal["a"]
 ```
@@ -334,10 +352,13 @@ If the class method is possibly missing, we union the return types:
 def flag() -> bool:
     return True
 
+
 class E(metaclass=Meta):
     if flag():
+
         def f(arg: int) -> Any:
             return "a"
+
 
 reveal_type(E.f(1))  # revealed: str | Any
 ```
@@ -352,10 +373,12 @@ the class object itself:
 ```py
 from __future__ import annotations
 
+
 class C:
     @classmethod
     def f(cls: type[C], x: int) -> str:
         return "a"
+
 
 reveal_type(C.f)  # revealed: bound method <class 'C'>.f(x: int) -> str
 reveal_type(C().f)  # revealed: bound method type[C].f(x: int) -> str
@@ -385,6 +408,7 @@ class D:
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass
 
+
 # error: [invalid-argument-type] "Argument to bound method `f` is incorrect: Expected `D`, found `<class 'D'>`"
 D.f()
 ```
@@ -394,6 +418,7 @@ When a class method is accessed on a derived class, it is bound to that derived 
 ```py
 class Derived(C):
     pass
+
 
 reveal_type(Derived.f)  # revealed: bound method <class 'Derived'>.f(x: int) -> str
 reveal_type(Derived().f)  # revealed: bound method type[Derived].f(x: int) -> str
@@ -410,9 +435,11 @@ currently don't model this explicitly:
 ```py
 from inspect import getattr_static
 
+
 class C:
     @classmethod
     def f(cls): ...
+
 
 reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
 # revealed: <method-wrapper '__get__' of function 'f'>
@@ -447,6 +474,7 @@ class method:
 def does_nothing[T](f: T) -> T:
     return f
 
+
 class C:
     @classmethod
     @does_nothing
@@ -457,6 +485,7 @@ class C:
     @classmethod
     def f2(cls, x: int) -> str:
         return "a"
+
 
 reveal_type(C.f1(1))  # revealed: str
 reveal_type(C().f1(1))  # revealed: str
@@ -475,13 +504,16 @@ from contextlib import contextmanager
 from typing import Iterator
 from typing_extensions import Self
 
+
 class Base:
     @classmethod
     @contextmanager
     def create(cls) -> Iterator[Self]:
         yield cls()
 
+
 class Child(Base): ...
+
 
 reveal_type(Base.create())  # revealed: _GeneratorContextManager[Base, None, None]
 with Base.create() as base:
@@ -515,8 +547,10 @@ class Base:
         super().__init_subclass__(**kwargs)
         cls.custom_attribute: int = 0
 
+
 class Derived(Base):
     pass
+
 
 reveal_type(Derived.custom_attribute)  # revealed: int
 ```
@@ -527,16 +561,24 @@ Subclasses must be constructed with arguments matching the required arguments of
 ```py
 class Empty: ...
 
+
 class RequiresArg:
     def __init_subclass__(cls, arg: int): ...
+
 
 class NoArg:
     def __init_subclass__(cls): ...
 
+
 # Single-base definitions
 class MissingArg(RequiresArg): ...  # error: [missing-argument]
+
+
 class InvalidType(RequiresArg, arg="foo"): ...  # error: [invalid-argument-type]
+
+
 class Valid(RequiresArg, arg=1): ...
+
 
 # error: [missing-argument]
 # error: [unknown-argument]
@@ -548,28 +590,53 @@ For multiple inheritance, the first resolved `__init_subclass__` method is used.
 ```py
 class Empty: ...
 
+
 class RequiresArg:
     def __init_subclass__(cls, arg: int): ...
+
 
 class NoArg:
     def __init_subclass__(cls): ...
 
+
 class Valid(NoArg, RequiresArg): ...
+
+
 class MissingArg(RequiresArg, NoArg): ...  # error: [missing-argument]
+
+
 class InvalidType(RequiresArg, NoArg, arg="foo"): ...  # error: [invalid-argument-type]
+
+
 class Valid(RequiresArg, NoArg, arg=1): ...
+
 
 # Ensure base class without __init_subclass__ is ignored
 class Valid(Empty, NoArg): ...
+
+
 class Valid(Empty, RequiresArg, NoArg, arg=1): ...
+
+
 class MissingArg(Empty, RequiresArg): ...  # error: [missing-argument]
+
+
 class MissingArg(Empty, RequiresArg, NoArg): ...  # error: [missing-argument]
+
+
 class InvalidType(Empty, RequiresArg, NoArg, arg="foo"): ...  # error: [invalid-argument-type]
+
 
 # Multiple inheritance with args
 class Base(Empty, RequiresArg, NoArg, arg=1): ...
+
+
 class Valid(Base, arg=1): ...
+
+
 class MissingArg(Base): ...  # error: [missing-argument]
+
+
 class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
 ```
 
@@ -578,22 +645,29 @@ Keyword splats are allowed if their type can be determined:
 ```py
 from typing import TypedDict
 
+
 class RequiresKwarg:
     def __init_subclass__(cls, arg: int): ...
+
 
 class WrongArg(TypedDict):
     kwarg: int
 
+
 class InvalidType(TypedDict):
     arg: str
 
+
 wrong_arg: WrongArg = {"kwarg": 5}
+
 
 # error: [missing-argument]
 # error: [unknown-argument]
 class MissingArg(RequiresKwarg, **wrong_arg): ...
 
+
 invalid_type: InvalidType = {"arg": "foo"}
+
 
 # error: [invalid-argument-type]
 class InvalidType(RequiresKwarg, **invalid_type): ...
@@ -604,19 +678,28 @@ So are generics:
 ```py
 from typing import Generic, TypeVar, Literal, overload
 
+
 class Base[T]:
     def __init_subclass__(cls, arg: T): ...
 
+
 class Valid(Base[int], arg=1): ...
+
+
 class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
+
 
 # Old generic syntax
 T = TypeVar("T")
 
+
 class Base(Generic[T]):
     def __init_subclass__(cls, arg: T) -> None: ...
 
+
 class Valid(Base[int], arg=1): ...
+
+
 class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
 ```
 
@@ -630,8 +713,13 @@ class Base:
     def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
     def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
 
+
 class Valid(Base, mode="a", arg=5): ...
+
+
 class Valid(Base, mode="b", arg="foo"): ...
+
+
 class InvalidType(Base, mode="b", arg=5): ...  # error: [no-matching-overload]
 ```
 
@@ -641,6 +729,7 @@ The `metaclass` keyword is ignored, as it has special meaning and is not passed 
 ```py
 class Base:
     def __init_subclass__(cls, arg: int): ...
+
 
 class Valid(Base, arg=5, metaclass=object): ...
 ```
@@ -655,10 +744,12 @@ true whether it's accessed on the class or on an instance of the class.
 ```py
 from __future__ import annotations
 
+
 class C:
     @staticmethod
     def f(x: int) -> str:
         return "a"
+
 
 reveal_type(C.f)  # revealed: def f(x: int) -> str
 reveal_type(C().f)  # revealed: def f(x: int) -> str
@@ -686,6 +777,7 @@ When a static method is accessed on a derived class, it behaves identically:
 class Derived(C):
     pass
 
+
 reveal_type(Derived.f)  # revealed: def f(x: int) -> str
 reveal_type(Derived().f)  # revealed: def f(x: int) -> str
 
@@ -697,6 +789,7 @@ reveal_type(Derived().f(1))  # revealed: str
 
 ```py
 from inspect import getattr_static
+
 
 class C:
     @staticmethod
@@ -733,8 +826,10 @@ static method:
 ```py
 from __future__ import annotations
 
+
 def does_nothing[T](f: T) -> T:
     return f
+
 
 class C:
     @staticmethod
@@ -746,6 +841,7 @@ class C:
     @staticmethod
     def f2(x: int) -> str:
         return "a"
+
 
 reveal_type(C.f1(1))  # revealed: str
 reveal_type(C().f1(1))  # revealed: str
@@ -760,6 +856,7 @@ bind `self`:
 from contextlib import contextmanager
 from collections.abc import Iterator
 
+
 class D:
     @staticmethod
     @contextmanager
@@ -770,6 +867,7 @@ class D:
         # Accessing via self should not bind self
         with self.ctx(10) as x:
             reveal_type(x)  # revealed: int
+
 
 # Accessing via class works
 reveal_type(D.ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
@@ -793,6 +891,7 @@ reveal_type(int.__new__)
 # revealed: Overload[[Self](cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
 reveal_type((42).__new__)
 
+
 class X:
     def __init__(self, val: int): ...
     def make_another(self) -> Self:
@@ -810,7 +909,9 @@ import types
 from typing import Callable
 from ty_extensions import static_assert, CallableTypeOf, is_assignable_to, TypeOf
 
+
 def f(obj: type) -> None: ...
+
 
 class MyClass:
     @property
@@ -819,6 +920,7 @@ class MyClass:
 
     @my_property.setter
     def my_property(self, value: int | str) -> None: ...
+
 
 static_assert(is_assignable_to(types.FunctionType, Callable))
 
@@ -870,6 +972,7 @@ static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
 # revealed: <method-wrapper 'startswith' of string 'foo'>
 reveal_type("foo".startswith)
 static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
+
 
 def _(
     a: CallableTypeOf[types.FunctionType.__get__],

@@ -3,9 +3,11 @@
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     NO = 0
     YES = 1
+
 
 reveal_type(Answer.NO == Answer.NO)  # revealed: Literal[True]
 reveal_type(Answer.NO == Answer.YES)  # revealed: Literal[False]

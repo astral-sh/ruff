@@ -5,6 +5,7 @@
 ```py
 from typing import Literal
 
+
 class Yes:
     def __add__(self, other) -> Literal["+"]:
         return "+"
@@ -45,8 +46,12 @@ class Yes:
     def __floordiv__(self, other) -> Literal["//"]:
         return "//"
 
+
 class Sub(Yes): ...
+
+
 class No: ...
+
 
 # Yes implements all of the dunder methods.
 reveal_type(Yes() + Yes())  # revealed: Literal["+"]
@@ -140,6 +145,7 @@ reveal_type(No() // Yes())  # revealed: Unknown
 ```py
 from typing import Literal
 
+
 class Yes:
     def __add__(self, other) -> Literal["+"]:
         return "+"
@@ -179,6 +185,7 @@ class Yes:
 
     def __floordiv__(self, other) -> Literal["//"]:
         return "//"
+
 
 class Sub(Yes):
     def __radd__(self, other) -> Literal["r+"]:
@@ -220,6 +227,7 @@ class Sub(Yes):
     def __rfloordiv__(self, other) -> Literal["r//"]:
         return "r//"
 
+
 class No:
     def __radd__(self, other) -> Literal["r+"]:
         return "r+"
@@ -259,6 +267,7 @@ class No:
 
     def __rfloordiv__(self, other) -> Literal["r//"]:
         return "r//"
+
 
 # Subclass reflected dunder methods take precedence over the superclass's regular dunders.
 reveal_type(Yes() + Sub())  # revealed: Literal["r+"]
@@ -302,12 +311,17 @@ class's type, i.e. `type`.)
 ```py
 from typing import Literal
 
+
 class Yes:
     def __add__(self, other) -> Literal["+"]:
         return "+"
 
+
 class Sub(Yes): ...
+
+
 class No: ...
+
 
 # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Yes'>`"
 reveal_type(Yes + Yes)  # revealed: Unknown
@@ -322,21 +336,29 @@ reveal_type(No + No)  # revealed: Unknown
 ```py
 from typing import Literal
 
+
 class Yes:
     def __add__(self, other) -> Literal["+"]:
         return "+"
 
+
 class Sub(Yes): ...
+
+
 class No: ...
+
 
 def yes() -> type[Yes]:
     return Yes
 
+
 def sub() -> type[Sub]:
     return Sub
 
+
 def no() -> type[No]:
     return No
+
 
 # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `type[Yes]`"
 reveal_type(yes() + yes())  # revealed: Unknown
@@ -351,6 +373,7 @@ reveal_type(no() + no())  # revealed: Unknown
 ```py
 def f():
     pass
+
 
 # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f + f)  # revealed: Unknown
@@ -398,7 +421,9 @@ class A: ...
 ```py
 import mod1
 
+
 class A: ...
+
 
 # error: [unsupported-operator] "Operator `+` is not supported between objects of type `mod2.A` and `mod1.A`"
 A() + mod1.A()

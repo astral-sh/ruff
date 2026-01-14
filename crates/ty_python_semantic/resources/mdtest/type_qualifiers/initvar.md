@@ -14,7 +14,9 @@ Consider the following dataclass example where the `db` attribute is annotated w
 ```py
 from dataclasses import InitVar, dataclass
 
+
 class Database: ...
+
 
 @dataclass(order=True)
 class Person:
@@ -60,12 +62,14 @@ and on instances:
 ```py
 from dataclasses import InitVar, dataclass
 
+
 @dataclass
 class Person:
     name: str
     age: int
 
     metadata: InitVar[str] = "default"
+
 
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = "default") -> None
 
@@ -85,6 +89,7 @@ case, we also allow the attribute to be accessed:
 ```py
 from dataclasses import InitVar, dataclass
 
+
 @dataclass
 class Person:
     name: str
@@ -92,6 +97,7 @@ class Person:
 
     def __post_init__(self, metadata: str) -> None:
         self.metadata = f"Person with name {self.name}"
+
 
 alice = Person("Alice", "metadata that will be overwritten")
 
@@ -107,6 +113,7 @@ reveal_type(alice.metadata)  # revealed: str
 ```py
 from dataclasses import InitVar, dataclass
 
+
 @dataclass
 class Wrong:
     x: InitVar[int, str]  # error: [invalid-type-form] "Type qualifier `InitVar` expected exactly 1 argument, got 2"
@@ -119,10 +126,12 @@ and emit a proper error rather than crashing (see
 ```py
 from dataclasses import InitVar, dataclass
 
+
 @dataclass
 class AlsoWrong:
     # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
     x: InitVar[(),]
+
 
 # revealed: (self: AlsoWrong, x: Unknown) -> None
 reveal_type(AlsoWrong.__init__)
@@ -149,15 +158,19 @@ from dataclasses import InitVar, dataclass
 # error: [invalid-type-form] "`InitVar` annotations are only allowed in class-body scopes"
 x: InitVar[int] = 1
 
+
 def f(x: InitVar[int]) -> None:  # error: [invalid-type-form] "`InitVar` is not allowed in function parameter annotations"
     pass
+
 
 def g() -> InitVar[int]:  # error: [invalid-type-form] "`InitVar` is not allowed in function return type annotations"
     return 1
 
+
 class C:
     # TODO: this would ideally be an error
     x: InitVar[int]
+
 
 @dataclass
 class D:

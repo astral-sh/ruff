@@ -35,6 +35,7 @@ def f(v: tuple[int, "str"]):
 def f(v: "Foo"):
     reveal_type(v)  # revealed: Foo
 
+
 class Foo: ...
 ```
 
@@ -52,6 +53,7 @@ def f(v: "Foo"):
 def f(v: int | "Foo"):
     reveal_type(v)  # revealed: int | Foo
 
+
 class Foo: ...
 ```
 
@@ -60,9 +62,11 @@ class Foo: ...
 ```py
 from typing import Literal
 
+
 def f1(v: Literal["Foo", "Bar"], w: 'Literal["Foo", "Bar"]'):
     reveal_type(v)  # revealed: Literal["Foo", "Bar"]
     reveal_type(w)  # revealed: Literal["Foo", "Bar"]
+
 
 class Foo: ...
 ```
@@ -104,6 +108,7 @@ def f1(
 ```py
 from typing import Literal
 
+
 def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]):
     reveal_type(v)  # revealed: Literal["a", "b", "de", "f", "g", "h", b"c"]
 ```
@@ -113,11 +118,13 @@ def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", "
 ```py
 MyType = int
 
+
 class Aliases:
     MyType = str
 
     forward: "MyType" = "value"
     not_forward: MyType = "value"
+
 
 reveal_type(Aliases.forward)  # revealed: str
 reveal_type(Aliases.not_forward)  # revealed: str
@@ -132,7 +139,9 @@ c: "Foo"
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Foo`"
 d: "Foo" = 1
 
+
 class Foo: ...
+
 
 c = Foo()
 
@@ -210,6 +219,7 @@ def valid(
 ):
     reveal_type(a1)  # revealed: int | str
     reveal_type(a2)  # revealed: int | str
+
 
 def invalid(
     # error: [invalid-syntax-in-forward-annotation]

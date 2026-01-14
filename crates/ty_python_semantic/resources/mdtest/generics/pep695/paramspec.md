@@ -47,8 +47,10 @@ The default value for a `ParamSpec` can be either a list of types, `...`, or ano
 def foo2[**P = ...]() -> None:
     reveal_type(P)  # revealed: ParamSpec
 
+
 def foo3[**P = [int, str]]() -> None:
     reveal_type(P)  # revealed: ParamSpec
+
 
 def foo4[**P, **Q = P]():
     reveal_type(P)  # revealed: ParamSpec
@@ -69,6 +71,7 @@ def foo[**P = int]() -> None:
 
 ```py
 from typing import ParamSpec, Callable, Concatenate
+
 
 def valid[**P](
     a1: Callable[P, int],
@@ -96,6 +99,7 @@ annotated types of `*args` and `**kwargs` respectively.
 ```py
 from typing import Callable
 
+
 def foo[**P](c: Callable[P, int]) -> None:
     def nested1(*args: P.args, **kwargs: P.kwargs) -> None: ...
 
@@ -122,6 +126,7 @@ def foo[**P](c: Callable[P, int]) -> None:
 
     # TODO: error
     def nested2(**kwargs: P.kwargs) -> None: ...
+
 
 class Foo[**P]:
     # TODO: error
@@ -168,6 +173,7 @@ of `tuple[P.args, ...]` and `dict[str, P.kwargs]`.
 ```py
 from typing import Callable
 
+
 def f[**P](func: Callable[P, int]) -> Callable[P, None]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
         reveal_type(args)  # revealed: P@f.args
@@ -186,6 +192,7 @@ def f[**P](func: Callable[P, int]) -> Callable[P, None]:
         reveal_type(func())  # revealed: int
         reveal_type(func(*args))  # revealed: int
         reveal_type(func(**kwargs))  # revealed: int
+
     return wrapper
 ```
 
@@ -197,6 +204,7 @@ are represented as a type variable that has an upper bound of `tuple[object, ...
 
 ```py
 from typing import Callable, Any
+
 
 def f[**P](func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     reveal_type(args + ("extra",))  # revealed: tuple[object, ...]
@@ -213,12 +221,15 @@ def f[**P](func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
 ```py
 from typing import Any, Callable, ParamSpec
 
+
 class OnlyParamSpec[**P1]:
     attr: Callable[P1, None]
+
 
 class TwoParamSpec[**P1, **P2]:
     attr1: Callable[P1, None]
     attr2: Callable[P2, None]
+
 
 class TypeVarAndParamSpec[T1, **P1]:
     attr: Callable[P1, T1]
@@ -232,8 +243,10 @@ reveal_type(OnlyParamSpec[[]]().attr)  # revealed: () -> None
 reveal_type(OnlyParamSpec[[int, str]]().attr)  # revealed: (int, str, /) -> None
 reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 
+
 def func[**P2](c: Callable[P2, None]):
     reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (**P2@func) -> None
+
 
 P2 = ParamSpec("P2")
 
@@ -316,8 +329,10 @@ reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
 ```py
 from typing import Callable, ParamSpec
 
+
 class ParamSpecWithDefault1[**P1 = [int, str]]:
     attr: Callable[P1, None]
+
 
 reveal_type(ParamSpecWithDefault1().attr)  # revealed: (int, str, /) -> None
 reveal_type(ParamSpecWithDefault1[int]().attr)  # revealed: (int, /) -> None
@@ -327,6 +342,7 @@ reveal_type(ParamSpecWithDefault1[int]().attr)  # revealed: (int, /) -> None
 class ParamSpecWithDefault2[**P1 = ...]:
     attr: Callable[P1, None]
 
+
 reveal_type(ParamSpecWithDefault2().attr)  # revealed: (...) -> None
 reveal_type(ParamSpecWithDefault2[int, str]().attr)  # revealed: (int, str, /) -> None
 ```
@@ -335,6 +351,7 @@ reveal_type(ParamSpecWithDefault2[int, str]().attr)  # revealed: (int, str, /) -
 class ParamSpecWithDefault3[**P1, **P2 = P1]:
     attr1: Callable[P1, None]
     attr2: Callable[P2, None]
+
 
 # `P1` hasn't been specialized, so it defaults to `...` gradual form
 p1 = ParamSpecWithDefault3()
@@ -349,9 +366,11 @@ p3 = ParamSpecWithDefault3[[int], [str]]()
 reveal_type(p3.attr1)  # revealed: (int, /) -> None
 reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
+
 class ParamSpecWithDefault4[**P1 = [int, str], **P2 = P1]:
     attr1: Callable[P1, None]
     attr2: Callable[P2, None]
+
 
 p1 = ParamSpecWithDefault4()
 reveal_type(p1.attr1)  # revealed: (int, str, /) -> None
@@ -366,6 +385,7 @@ reveal_type(p3.attr1)  # revealed: (int, /) -> None
 reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
 P2 = ParamSpec("P2")
+
 
 # TODO: error: paramspec is out of scope
 class ParamSpecWithDefault5[**P1 = P2]:
@@ -382,14 +402,18 @@ Most of these test cases are adopted from the
 ```py
 from typing import Callable
 
+
 def converter[**P](func: Callable[P, int]) -> Callable[P, bool]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> bool:
         func(*args, **kwargs)
         return True
+
     return wrapper
+
 
 def f1(x: int, y: str) -> int:
     return 1
+
 
 # This should preserve all the information about the parameters of `f1`
 f2 = converter(f1)
@@ -417,6 +441,7 @@ The `converter` function act as a decorator here:
 def f3(x: int, y: str) -> int:
     return 1
 
+
 reveal_type(f3)  # revealed: (x: int, y: str) -> bool
 
 reveal_type(f3(1, "a"))  # revealed: bool
@@ -435,11 +460,13 @@ f3("a", "b")
 ```py
 from typing import Callable
 
+
 def multiple[**P](func1: Callable[P, int], func2: Callable[P, int]) -> Callable[P, bool]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> bool:
         func1(*args, **kwargs)
         func2(*args, **kwargs)
         return True
+
     return wrapper
 ```
 
@@ -456,8 +483,10 @@ TODO: Currently, we don't do this
 def xy(x: int, y: str) -> int:
     return 1
 
+
 def yx(y: int, x: str) -> int:
     return 2
+
 
 reveal_type(multiple(xy, xy))  # revealed: (x: int, y: str) -> bool
 
@@ -467,11 +496,14 @@ reveal_type(multiple(xy, xy))  # revealed: (x: int, y: str) -> bool
 # error: [invalid-argument-type]
 reveal_type(multiple(xy, yx))  # revealed: (x: int, y: str) -> bool
 
+
 def keyword_only_with_default_1(*, x: int = 42) -> int:
     return 1
 
+
 def keyword_only_with_default_2(*, y: int = 42) -> int:
     return 2
+
 
 # The common supertype for two functions with only keyword-only parameters would be an empty
 # parameter list i.e., `()`
@@ -480,11 +512,14 @@ def keyword_only_with_default_2(*, y: int = 42) -> int:
 # revealed: (*, x: int = 42) -> bool
 reveal_type(multiple(keyword_only_with_default_1, keyword_only_with_default_2))
 
+
 def keyword_only1(*, x: int) -> int:
     return 1
 
+
 def keyword_only2(*, y: int) -> int:
     return 2
+
 
 # On the other hand, combining two functions with only keyword-only parameters does not have a
 # common supertype, so it should result in an error.
@@ -497,15 +532,18 @@ reveal_type(multiple(keyword_only1, keyword_only2))  # revealed: (*, x: int) -> 
 ```py
 from typing import Callable
 
+
 class C[**P]:
     f: Callable[P, int]
 
     def __init__(self, f: Callable[P, int]) -> None:
         self.f = f
 
+
 # Note that the return type must match exactly, since C is invariant on the return type of C.f.
 def f(x: int, y: str) -> int:
     return True
+
 
 c = C(f)
 reveal_type(c.f)  # revealed: (x: int, y: str) -> int
@@ -519,11 +557,14 @@ reveal_type(c.f)  # revealed: (x: int, y: str) -> int
 ```py
 from typing import Callable
 
+
 def foo1[**P1](func: Callable[P1, int], *args: P1.args, **kwargs: P1.kwargs) -> int:
     return func(*args, **kwargs)
 
+
 def foo1_with_extra_arg[**P1](func: Callable[P1, int], extra: str, *args: P1.args, **kwargs: P1.kwargs) -> int:
     return func(*args, **kwargs)
+
 
 def foo2[**P2](func: Callable[P2, int], *args: P2.args, **kwargs: P2.kwargs) -> None:
     foo1(func, *args, **kwargs)
@@ -543,6 +584,7 @@ which is then used to type the `ParamSpec` components used in `*args` and `**kwa
 ```py
 def f1(x: int, y: str) -> int:
     return 1
+
 
 foo1(f1, 1, "a")
 foo1(f1, x=1, y="a")
@@ -573,6 +615,7 @@ class Foo[**P]:
         self.args = args
         self.kwargs = kwargs
 
+
 def bar[**P](foo: Foo[P]) -> None:
     reveal_type(foo)  # revealed: Foo[P@bar]
     reveal_type(foo.args)  # revealed: Unknown | P@bar.args
@@ -585,6 +628,7 @@ unioned with `Unknown`, it shouldn't error here.
 ```py
 from typing import Callable
 
+
 def baz[**P](fn: Callable[P, None], foo: Foo[P]) -> None:
     fn(*foo.args, **foo.kwargs)
 ```
@@ -594,10 +638,12 @@ The `Unknown` can be eliminated by using annotating these attributes with `Final
 ```py
 from typing import Final
 
+
 class FooWithFinal[**P]:
     def __init__(self, *args: P.args, **kwargs: P.kwargs) -> None:
         self.args: Final = args
         self.kwargs: Final = kwargs
+
 
 def with_final[**P](foo: FooWithFinal[P]) -> None:
     reveal_type(foo)  # revealed: FooWithFinal[P@with_final]
@@ -612,6 +658,7 @@ class Foo[**P]:
     def method(self, *args: P.args, **kwargs: P.kwargs) -> str:
         return "hello"
 
+
 foo = Foo[int, str]()
 
 reveal_type(foo)  # revealed: Foo[(int, str, /)]
@@ -624,12 +671,15 @@ reveal_type(foo.method(1, "a"))  # revealed: str
 ```py
 from typing import Callable
 
+
 def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return func
+
 
 @callable_identity
 def f(env: dict) -> None:
     pass
+
 
 # revealed: (env: dict[Unknown, Unknown]) -> None
 reveal_type(f)
@@ -662,15 +712,20 @@ def str_str(x: str) -> str: ...
 from typing import Callable
 from overloaded import int_int, int_str, str_str
 
+
 def change_return_type[**P](f: Callable[P, int]) -> Callable[P, str]:
     def nested(*args: P.args, **kwargs: P.kwargs) -> str:
         return str(f(*args, **kwargs))
+
     return nested
+
 
 def with_parameters[**P](f: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> Callable[P, str]:
     def nested(*args: P.args, **kwargs: P.kwargs) -> str:
         return str(f(*args, **kwargs))
+
     return nested
+
 
 reveal_type(change_return_type(int_int))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
@@ -695,6 +750,7 @@ This is regression test for <https://github.com/astral-sh/ty/issues/2027>
 ```py
 from typing import Callable, Never, overload
 
+
 class Task[**P, R]:
     def __init__(self, func: Callable[P, R]) -> None:
         self.func = func
@@ -706,11 +762,14 @@ class Task[**P, R]:
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R | None:
         return self.func(*args, **kwargs)
 
+
 def returns_str(x: int) -> str:
     return str(x)
 
+
 def never_returns(x: int) -> Never:
     raise Exception()
+
 
 t1 = Task(returns_str)
 reveal_type(t1)  # revealed: Task[(x: int), str]
@@ -739,19 +798,23 @@ method overrides where both methods have their own `ParamSpec`.
 ```py
 from typing import Callable
 
+
 class Parent:
     def method[**P](self, callback: Callable[P, None]) -> Callable[P, None]:
         return callback
+
 
 class Child1(Parent):
     # This is a valid override: Q.args matches P.args, Q.kwargs matches P.kwargs
     def method[**Q](self, callback: Callable[Q, None]) -> Callable[Q, None]:
         return callback
 
+
 # Both signatures use ParamSpec, so they should be compatible
 def outer[**P](f: Callable[P, int]) -> Callable[P, int]:
     def inner[**Q](g: Callable[Q, int]) -> Callable[Q, int]:
         return g
+
     return inner(f)
 ```
 
@@ -759,6 +822,7 @@ We can explicitly mark it as an override using the `@override` decorator.
 
 ```py
 from typing import override
+
 
 class Child2(Parent):
     @override
@@ -773,6 +837,7 @@ assignable.
 
 ```py
 from typing import Callable
+
 
 class Container[**P]:
     def method(self, f: Callable[P, None]) -> Callable[P, None]:
@@ -792,11 +857,14 @@ from did not have an annotated return type.
 ```py
 from typing import Callable
 
+
 def infer_paramspec[**P](func: Callable[P, None]) -> Callable[P, None]:
     return func
 
+
 def f(x: int, y: str):
     pass
+
 
 reveal_type(infer_paramspec(f))  # revealed: (x: int, y: str) -> None
 ```

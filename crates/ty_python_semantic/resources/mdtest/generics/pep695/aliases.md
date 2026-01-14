@@ -53,6 +53,7 @@ from typing import Literal
 
 type C[T] = T
 
+
 def _(a: C[int], b: C[Literal[5]]):
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: Literal[5]
@@ -75,80 +76,106 @@ type B = ...
 # error: [not-subscriptable] "Cannot subscript non-generic type alias"
 reveal_type(B[int])  # revealed: Unknown
 
+
 # error: [not-subscriptable] "Cannot subscript non-generic type alias"
 def _(b: B[int]):
     reveal_type(b)  # revealed: Unknown
 
+
 type IntOrStr = int | str
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias"
 def _(c: IntOrStr[int]):
     reveal_type(c)  # revealed: Unknown
 
+
 type ListOfInts = list[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
 def _(l: ListOfInts[int]):
     reveal_type(l)  # revealed: Unknown
 
+
 type List[T] = list[T]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
+
 # error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
 type DoubleSpecialization[T] = list[T][T]
+
 
 def _(d: DoubleSpecialization[int]):
     reveal_type(d)  # revealed: Unknown
 
+
 type Tuple = tuple[int, str]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: `tuple[int, str]` is already specialized"
 def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
+
 T = TypeVar("T")
+
 
 class LegacyProto(Protocol[T]):
     pass
 
+
 type LegacyProtoInt = LegacyProto[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: `LegacyProto[int]` is already specialized"
 def _(x: LegacyProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
+
 class Proto[T](Protocol):
     pass
 
+
 type ProtoInt = Proto[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: `Proto[int]` is already specialized"
 def _(x: ProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
+
 # TODO: TypedDict is just a function object at runtime, we should emit an error
 class LegacyDict(TypedDict[T]):
     x: T
 
+
 type LegacyDictInt = LegacyDict[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias"
 def _(x: LegacyDictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
+
 class Dict[T](TypedDict):
     x: T
 
+
 type DictInt = Dict[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: `Dict[int]` is already specialized"
 def _(x: DictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
+
 type Union = list[str] | list[int]
+
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[str] | list[int]` is already specialized"
 def _(x: Union[int]):
@@ -161,7 +188,9 @@ If the type variable has an upper bound, the specialized type must satisfy that 
 type Bounded[T: int] = ...
 type BoundedByUnion[T: int | str] = ...
 
+
 class IntSubclass(int): ...
+
 
 reveal_type(Bounded[int])  # revealed: <type alias 'Bounded[int]'>
 reveal_type(Bounded[IntSubclass])  # revealed: <type alias 'Bounded[IntSubclass]'>
@@ -179,8 +208,10 @@ reveal_type(BoundedByUnion[int | str])  # revealed: <type alias 'BoundedByUnion[
 
 type TupleOfIntAndStr[T: int, U: str] = tuple[T, U]
 
+
 def _(x: TupleOfIntAndStr[int, str]):
     reveal_type(x)  # revealed: tuple[int, str]
+
 
 # error: [invalid-type-arguments] "Type `int` is not assignable to upper bound `str` of type variable `U@TupleOfIntAndStr`"
 def _(x: TupleOfIntAndStr[int, int]):
@@ -209,8 +240,10 @@ reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[Unknown]'
 
 type TupleOfIntOrStr[T: (int, str), U: (int, str)] = tuple[T, U]
 
+
 def _(x: TupleOfIntOrStr[int, str]):
     reveal_type(x)  # revealed: tuple[int, str]
+
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `U@TupleOfIntOrStr`"
 def _(x: TupleOfIntOrStr[int, object]):
@@ -231,6 +264,7 @@ If the type alias is not specialized explicitly, it is implicitly specialized to
 ```py
 type G[T] = list[T]
 
+
 def _(g: G):
     reveal_type(g)  # revealed: list[Unknown]
 ```
@@ -239,6 +273,7 @@ Unless a type default was provided:
 
 ```py
 type G[T = int] = list[T]
+
 
 def _(g: G):
     reveal_type(g)  # revealed: list[int]
@@ -264,6 +299,7 @@ Make sure we handle cycles correctly when computing the truthiness of a generic 
 ```py
 type X[T: X] = T
 
+
 def _(x: X):
     assert x
 ```
@@ -282,6 +318,7 @@ r4: RecursiveList[int] = ["a"]
 # TODO: this should be an error
 r5: RecursiveList[int] = [1, ["a"]]
 
+
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
         # TODO: should be `list[RecursiveList[int]]
@@ -299,6 +336,7 @@ assignable to each other.
 type RecursiveList2[T] = T | list[T | list[RecursiveList[T]]]
 # This is not structurally equivalent to RecursiveList[T].
 type RecursiveList3[T] = T | list[list[RecursiveList[T]]]
+
 
 def _(x: RecursiveList[int], y: RecursiveList2[int]):
     r1: RecursiveList2[int] = x
@@ -323,6 +361,7 @@ d2: DivergentList[int] = [1]
 d3: DivergentList[int] = ["a"]
 # TODO: this should be an error
 d4: DivergentList[int] = [[1]]
+
 
 def _(x: DivergentList[int]):
     d1: DivergentList[int] = [x]

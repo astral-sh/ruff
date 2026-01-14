@@ -6,6 +6,7 @@
 async def retrieve() -> int:
     return 42
 
+
 async def main():
     result = await retrieve()
 
@@ -19,8 +20,10 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
+
 async def persist(x: T) -> T:
     return x
+
 
 async def f(x: int):
     result = await persist(x)
@@ -36,8 +39,10 @@ async def f(x: int):
 import asyncio
 import concurrent.futures
 
+
 def blocking_function() -> int:
     return 42
+
 
 async def main():
     loop = asyncio.get_event_loop()
@@ -51,8 +56,10 @@ async def main():
 ```py
 import asyncio
 
+
 async def f() -> int:
     return 1
+
 
 async def main():
     task = asyncio.create_task(f())
@@ -67,8 +74,10 @@ async def main():
 ```py
 import asyncio
 
+
 async def task(name: str) -> int:
     return len(name)
+
 
 async def main():
     (a, b) = await asyncio.gather(
@@ -113,6 +122,7 @@ final type of the `await` expression, we retrieve that third argument of the `Ge
 ```py
 from typing import Generator
 
+
 def _():
     result = yield from retrieve().__await__()
     reveal_type(result)  # revealed: int
@@ -126,6 +136,7 @@ not just `Unknown`:
 ```py
 async def f():
     pass
+
 
 reveal_type(f())  # revealed: CoroutineType[Any, Any, Unknown]
 ```

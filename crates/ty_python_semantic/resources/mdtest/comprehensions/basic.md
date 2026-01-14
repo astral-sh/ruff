@@ -6,13 +6,16 @@
 # revealed: int
 [reveal_type(x) for x in range(3)]
 
+
 class Row:
     def __next__(self) -> range:
         return range(3)
 
+
 class Table:
     def __iter__(self) -> Row:
         return Row()
+
 
 # revealed: tuple[int, range]
 [reveal_type((cell, row)) for row in Table() for cell in row]
@@ -38,9 +41,11 @@ class Row:
     def __next__(self) -> range:
         return range(3)
 
+
 class Table:
     def __iter__(self) -> Row:
         return Row()
+
 
 # revealed: tuple[int, range]
 [[reveal_type((cell, row)) for cell in row] for row in Table()]
@@ -85,6 +90,7 @@ Starred expressions must be iterable
 ```py
 class NotIterable: ...
 
+
 # This is fine:
 x = [*range(3)]
 
@@ -101,9 +107,11 @@ class AsyncIterator:
     async def __anext__(self) -> int:
         return 42
 
+
 class AsyncIterable:
     def __aiter__(self) -> AsyncIterator:
         return AsyncIterator()
+
 
 async def _():
     # revealed: int
@@ -179,6 +187,7 @@ The type context is propagated down into the comprehension:
 ```py
 class Person(TypedDict):
     name: str
+
 
 # TODO: This should not error.
 # error: [invalid-assignment]

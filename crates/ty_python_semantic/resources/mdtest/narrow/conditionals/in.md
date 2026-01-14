@@ -21,6 +21,7 @@ def _(x: str):
 ```py
 from typing import Literal
 
+
 def _(x: Literal[1, 2, "a", "b", False, b"abc"]):
     if x in (1,):
         reveal_type(x)  # revealed: Literal[1]
@@ -55,6 +56,7 @@ def _(x: str):
 ```py
 from typing import Literal
 
+
 def _(x: Literal["a", "b", "c", "d"]):
     if x in "abc":
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
@@ -84,8 +86,10 @@ def _(x: Literal[1, "a", "b", "c", "d"]):
 ```py
 from typing import Literal
 
+
 def f() -> Literal[1, 2, 3]:
     return 1
+
 
 if (x := f()) in (1,):
     reveal_type(x)  # revealed: Literal[1]
@@ -97,6 +101,7 @@ else:
 
 ```py
 from typing import Literal
+
 
 def test(x: Literal["a", "b", "c"] | None | int = None):
     if x in ("a", "b"):
@@ -111,6 +116,7 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
 
 ```py
 from typing import Literal
+
 
 def test(x: Literal["a", "b", "c"] | None | int = None):
     if x not in ("a", "c"):
@@ -129,6 +135,7 @@ future:
 
 ```py
 from typing import Literal
+
 
 def f(x: Literal["abc", "def"]):
     if "a" in x:
@@ -155,6 +162,7 @@ def _(x: bool):
     else:
         reveal_type(x)  # revealed: Literal[False]
 
+
 def _(x: bool | str):
     if x in (False,):
         # `str` remains due to possible custom __eq__ methods on a subclass
@@ -168,11 +176,13 @@ def _(x: bool | str):
 ```py
 from typing_extensions import LiteralString
 
+
 def _(x: LiteralString):
     if x in ("a", "b", "c"):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
+
 
 def _(x: LiteralString | int):
     if x in ("a", "b", "c"):
@@ -186,10 +196,12 @@ def _(x: LiteralString | int):
 ```py
 from enum import Enum
 
+
 class Color(Enum):
     RED = "red"
     GREEN = "green"
     BLUE = "blue"
+
 
 def _(x: Color):
     if x in (Color.RED, Color.GREEN):
@@ -203,10 +215,12 @@ def _(x: Color):
 ```py
 from enum import Enum
 
+
 class Status(Enum):
     PENDING = 1
     APPROVED = 2
     REJECTED = 3
+
 
 def test(x: Status | int):
     if x in (Status.PENDING, Status.APPROVED):
@@ -224,6 +238,7 @@ tuples. So they are excluded from the narrowed type when disjoint from the RHS v
 
 ```py
 from typing import Literal
+
 
 def test(x: Literal["none", "auto", "required"] | tuple[list[str], Literal["auto", "required"]]):
     if x in ("auto", "required"):

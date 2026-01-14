@@ -16,11 +16,14 @@ a type annotation.
 from enum import Enum
 from typing import Literal, LiteralString
 
+
 class MyEnum(Enum):
     A = 1
 
+
 def promote[T](x: T) -> list[T]:
     return [x]
+
 
 def _(
     lit1: Literal["x"],
@@ -35,6 +38,7 @@ def _(
     reveal_type(promote(lit4))  # revealed: list[bytes]
     reveal_type(promote(lit5))  # revealed: list[MyEnum]
 
+
 reveal_type(promote(3.14))  # revealed: list[int | float]
 reveal_type(promote(3.14j))  # revealed: list[int | float | complex]
 ```
@@ -44,6 +48,7 @@ Function types are also promoted to their `Callable` form:
 ```py
 def lit6(_: int) -> int:
     return 0
+
 
 reveal_type(promote(lit6))  # revealed: list[(_: int) -> int]
 ```
@@ -74,20 +79,24 @@ function, or constructor of a generic class:
 class Bivariant[T]:
     def __init__(self, value: T): ...
 
+
 class Covariant[T]:
     def __init__(self, value: T): ...
     def pop(self) -> T:
         raise NotImplementedError
+
 
 class Contravariant[T]:
     def __init__(self, value: T): ...
     def push(self, value: T) -> None:
         pass
 
+
 class Invariant[T]:
     x: T
 
     def __init__(self, value: T): ...
+
 
 def f1[T](x: T) -> Bivariant[T] | None: ...
 def f2[T](x: T) -> Covariant[T] | None: ...
@@ -100,6 +109,7 @@ def f8[T](x: T) -> Invariant[T] | Covariant[T] | None: ...
 def f9[T](x: T) -> tuple[Invariant[T], Invariant[T]] | None: ...
 def f10[T, U](x: T, y: U) -> tuple[Invariant[T], Covariant[U]] | None: ...
 def f11[T, U](x: T, y: U) -> tuple[Invariant[Covariant[T] | None], Covariant[U]] | None: ...
+
 
 reveal_type(Bivariant(1))  # revealed: Bivariant[Literal[1]]
 reveal_type(Covariant(1))  # revealed: Covariant[Literal[1]]
@@ -130,16 +140,20 @@ position in an argument type, we respect the explicitly annotated argument, and 
 ```py
 from typing import Literal
 
+
 class Covariant[T]:
     def pop(self) -> T:
         raise NotImplementedError
+
 
 class Contravariant[T]:
     def push(self, value: T) -> None:
         pass
 
+
 class Invariant[T]:
     x: T
+
 
 def f1[T](x: T) -> Invariant[T] | None: ...
 def f2[T](x: Covariant[T]) -> Invariant[T] | None: ...
@@ -178,8 +192,10 @@ promotion:
 ```py
 from typing import Iterable
 
+
 class X[T]:
     def __init__(self, x: Iterable[T]): ...
+
 
 def _(x: list[Literal[1]]):
     reveal_type(X(x))  # revealed: X[Literal[1]]
@@ -190,11 +206,14 @@ def _(x: list[Literal[1]]):
 ```py
 from typing import Literal
 
+
 def promote[T](x: T) -> list[T]:
     return [x]
 
+
 def _(x: tuple[tuple[tuple[Literal[1]]]]):
     reveal_type(promote(x))  # revealed: list[tuple[tuple[tuple[int]]]]
+
 
 x1 = ([1, 2], [(3,), (4,)], ["5", "6"])
 reveal_type(x1)  # revealed: tuple[list[Unknown | int], list[Unknown | tuple[int]], list[Unknown | str]]
@@ -205,6 +224,7 @@ However, this promotion should not take place if the literal type appears in con
 ```py
 from typing import Callable, Literal
 
+
 def in_negated_position(non_zero_number: int):
     if non_zero_number == 0:
         raise ValueError()
@@ -213,10 +233,12 @@ def in_negated_position(non_zero_number: int):
 
     reveal_type([non_zero_number])  # revealed: list[Unknown | (int & ~Literal[0])]
 
+
 def in_parameter_position(callback: Callable[[Literal[1]], None]):
     reveal_type(callback)  # revealed: (Literal[1], /) -> None
 
     reveal_type([callback])  # revealed: list[Unknown | ((Literal[1], /) -> None)]
+
 
 def double_negation(callback: Callable[[Callable[[Literal[1]], None]], None]):
     reveal_type(callback)  # revealed: ((Literal[1], /) -> None, /) -> None
@@ -231,16 +253,20 @@ position:
 class Bivariant[T]:
     pass
 
+
 class Covariant[T]:
     def pop(self) -> T:
         raise NotImplementedError
+
 
 class Contravariant[T]:
     def push(self, value: T) -> None:
         pass
 
+
 class Invariant[T]:
     x: T
+
 
 def _(
     bivariant: Bivariant[Literal[1]],
@@ -263,18 +289,23 @@ Explicitly annotated `Literal` types will prevent literal promotion:
 from enum import Enum
 from typing_extensions import Literal, LiteralString
 
+
 class Color(Enum):
     RED = "red"
 
+
 type Y[T] = list[T]
+
 
 class X[T]:
     value: T
 
     def __init__(self, value: T): ...
 
+
 def x[T](x: T) -> X[T]:
     return X(x)
+
 
 x1: list[Literal[1]] = [1]
 reveal_type(x1)  # revealed: list[Literal[1]]
@@ -362,13 +393,17 @@ reveal_type(x2)  # revealed: list[Literal[1, 2, 3]]
 x3: Iterable[Literal[1, 2, 3]] = [1, 2, 3]
 reveal_type(x3)  # revealed: list[Literal[1, 2, 3]]
 
+
 class Sup1[T]:
     value: T
 
+
 class Sub1[T](Sup1[T]): ...
+
 
 def sub1[T](value: T) -> Sub1[T]:
     return Sub1()
+
 
 x4: Sub1[Literal[1]] = sub1(1)
 reveal_type(x4)  # revealed: Sub1[Literal[1]]
@@ -382,16 +417,21 @@ reveal_type(x6)  # revealed: Sub1[Literal[1]]
 x7: Sup1[Literal[1]] | None = sub1(1)
 reveal_type(x7)  # revealed: Sub1[Literal[1]]
 
+
 class Sup2A[T, U]:
     value: tuple[T, U]
+
 
 class Sup2B[T, U]:
     value: tuple[T, U]
 
+
 class Sub2[T, U](Sup2A[T, Any], Sup2B[Any, U]): ...
+
 
 def sub2[T, U](x: T, y: U) -> Sub2[T, U]:
     return Sub2()
+
 
 x8 = sub2(1, 2)
 reveal_type(x8)  # revealed: Sub2[int, int]

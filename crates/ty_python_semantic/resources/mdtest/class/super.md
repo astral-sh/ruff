@@ -28,17 +28,24 @@ python-version = "3.12"
 from __future__ import annotations
 from ty_extensions import reveal_mro
 
+
 class A:
     def a(self): ...
+
     aa: int = 1
+
 
 class B(A):
     def b(self): ...
+
     bb: int = 2
+
 
 class C(B):
     def c(self): ...
+
     cc: int = 3
+
 
 reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
@@ -68,18 +75,23 @@ synthesized `Protocol`s that cannot be upcast to, or interpreted as, a non-`obje
 import types
 from typing_extensions import Callable, TypeIs, Literal, NewType, TypedDict
 
+
 def f(): ...
+
 
 class Foo[T]:
     def method(self): ...
     @property
     def some_property(self): ...
 
+
 type Alias = int
+
 
 class SomeTypedDict(TypedDict):
     x: int
     y: bytes
+
 
 N = NewType("N", int)
 
@@ -100,8 +112,10 @@ reveal_type(super(object, Foo.some_property))
 # revealed: <super: <class 'object'>, int>
 reveal_type(super(object, N(42)))
 
+
 def g(x: object) -> TypeIs[list[object]]:
     return isinstance(x, list)
+
 
 def _(x: object, y: SomeTypedDict, z: Callable[[int, str], bool]):
     if hasattr(x, "bar"):
@@ -124,6 +138,7 @@ def _(x: object, y: SomeTypedDict, z: Callable[[int, str], bool]):
     # revealed: <super: <class 'object'>, dict[Literal["x", "y"], int | bytes]>
     reveal_type(super(object, y))
 
+
 # The first argument to `super()` must be an actual class object;
 # instances of `GenericAlias` are not accepted at runtime:
 #
@@ -138,6 +153,7 @@ reveal_type(super(list[int], []))
 class Super:
     def method(self) -> int:
         return 42
+
 
 class Sub(Super):
     def method(self: Sub) -> int:
@@ -161,10 +177,12 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
+
 class A:
     def __init__(self, a: int): ...
     @classmethod
     def f(cls): ...
+
 
 class B(A):
     def __init__(self, a: int):
@@ -177,6 +195,7 @@ class B(A):
         reveal_type(super())  # revealed: <super: <class 'B'>, type[Self@f]>
         super().f()
 
+
 super(B, B(42)).__init__(42)
 super(B, B).f()
 ```
@@ -187,6 +206,7 @@ Some examples with unusual annotations for `self` or `cls`:
 import enum
 from typing import Any, Self, Never, Protocol, Callable
 from ty_extensions import Intersection
+
 
 class BuilderMeta(type):
     def __new__(
@@ -200,6 +220,7 @@ class BuilderMeta(type):
         # revealed: Any
         return reveal_type(s.__new__(cls, name, bases, dct))
 
+
 class BuilderMeta2(type):
     def __new__(
         cls: type[BuilderMeta2],
@@ -210,6 +231,7 @@ class BuilderMeta2(type):
         # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
         s = reveal_type(super())
         return reveal_type(s.__new__(cls, name, bases, dct))  # revealed: BuilderMeta2
+
 
 class Foo[T]:
     x: T
@@ -265,12 +287,14 @@ class Foo[T]:
         # revealed: Unknown
         reveal_type(super())
         return self
+
     # TypeVar bounded by `type[Foo]` rather than `Foo`
     # TODO: Should error on signature - `self` is annotated as a class type, not an instance type
     def method11[S: type[Foo[int]]](self: S, other: S) -> S:
         # Delegates to the bound to resolve the super type
         reveal_type(super())  # revealed: <super: <class 'Foo'>, <class 'Foo[int]'>>
         return self
+
     # TypeVar bounded by `type[Foo]`, used in `type[T]` position
     # TODO: Should error on signature - `cls` would be `type[type[Foo[int]]]`, a metaclass
     # Delegates to `type[Unknown]` since `type[type[Foo[int]]]` can't be constructed
@@ -279,7 +303,9 @@ class Foo[T]:
         reveal_type(super())  # revealed: <super: <class 'Foo'>, Unknown>
         raise NotImplementedError
 
+
 type Alias = Bar
+
 
 class Bar:
     def method(self: Alias):
@@ -294,10 +320,12 @@ class Bar:
         # revealed: <super: <class 'Bar'>, Bar>
         reveal_type(super())
 
+
 class P(Protocol):
     def method(self: P):
         # revealed: <super: <class 'P'>, P>
         reveal_type(super())
+
 
 class E(enum.Enum):
     X = 1
@@ -318,7 +346,9 @@ a plain `super` instance and does not support name lookup via the MRO.
 class A:
     a: int = 42
 
+
 class B(A): ...
+
 
 reveal_type(super(B))  # revealed: super
 
@@ -335,7 +365,9 @@ successfully.
 class A:
     a: int = 3
 
+
 class B(A): ...
+
 
 reveal_type(super(B, B()).a)  # revealed: int
 # error: [invalid-assignment] "Cannot assign to attribute `a` on type `<super: <class 'B'>, B>`"
@@ -352,6 +384,7 @@ member, it should effectively behave like a dynamic type.
 ```py
 class A:
     a: int = 1
+
 
 def f(x):
     reveal_type(x)  # revealed: Unknown
@@ -370,6 +403,7 @@ def f(x):
 ```py
 from __future__ import annotations
 
+
 class A:
     def test(self):
         reveal_type(super())  # revealed: <super: <class 'A'>, Self@test>
@@ -384,6 +418,7 @@ class A:
 
             def inner(t: C):
                 reveal_type(super())  # revealed: <super: <class 'B'>, C>
+
             lambda x: reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
 ```
 
@@ -399,8 +434,10 @@ reveal_type(super(int, 3))  # revealed: <super: <class 'int'>, int>
 reveal_type(super(str, ""))  # revealed: <super: <class 'str'>, str>
 reveal_type(super(bytes, b""))  # revealed: <super: <class 'bytes'>, bytes>
 
+
 class E(Enum):
     X = 42
+
 
 reveal_type(super(E, E.X))  # revealed: <super: <class 'E'>, E>
 ```
@@ -424,7 +461,9 @@ class A:
     @classmethod
     def a2(cls): ...
 
+
 class B(A): ...
+
 
 # A.__dict__["a1"].__get__(B(), B)
 reveal_type(super(B, B()).a1)  # revealed: bound method B.a1() -> Unknown
@@ -445,13 +484,19 @@ super objects are combined into a union.
 ```py
 from ty_extensions import reveal_mro
 
+
 class A: ...
+
 
 class B:
     b: int = 42
 
+
 class C(A, B): ...
+
+
 class D(B, A): ...
+
 
 def f(x: C | D):
     reveal_mro(C)  # revealed: (<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>)
@@ -463,10 +508,12 @@ def f(x: C | D):
     # error: [possibly-missing-attribute] "Attribute `b` may be missing on object of type `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
+
 def f(flag: bool):
     x = str() if flag else str("hello")
     reveal_type(x)  # revealed: Literal["", "hello"]
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
+
 
 def f(x: int | str):
     # error: [invalid-super-argument] "`str` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, str)` call"
@@ -479,6 +526,7 @@ in all cases.
 ```py
 def f(flag: bool):
     if flag:
+
         class A:
             x = 1
             y: int = 1
@@ -486,13 +534,16 @@ def f(flag: bool):
             a: str = "hello"
 
         class B(A): ...
+
         s = super(B, B())
     else:
+
         class C:
             x = 2
             y: int | str = "test"
 
         class D(C): ...
+
         s = super(D, D())
 
     reveal_type(s)  # revealed: <super: <class 'B'>, B> | <super: <class 'D'>, D>
@@ -514,9 +565,11 @@ python-version = "3.12"
 ```py
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
+
 class A[T]:
     def f(self, a: T) -> T:
         return a
+
 
 class B[T](A[T]):
     def f(self, a: T) -> T:
@@ -535,9 +588,11 @@ from __future__ import annotations
 # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
 reveal_type(super())  # revealed: Unknown
 
+
 def f():
     # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
     super()
+
 
 # No first argument in its scope
 class A:
@@ -548,6 +603,7 @@ class A:
         def g():
             # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
             super()
+
         # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
         lambda: super()
 
@@ -575,6 +631,7 @@ runtime.
 import typing
 import collections
 
+
 def f(x: int):
     # error: [invalid-super-argument] "`int` is not a valid class"
     super(x, x)
@@ -582,6 +639,7 @@ def f(x: int):
     type IntAlias = int
     # error: [invalid-super-argument] "`TypeAliasType` is not a valid class"
     super(IntAlias, 0)
+
 
 # error: [invalid-super-argument] "`str` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, str)` call"
 # revealed: Unknown
@@ -591,8 +649,12 @@ reveal_type(super(int, str()))
 # revealed: Unknown
 reveal_type(super(int, str))
 
+
 class A: ...
+
+
 class B(A): ...
+
 
 # error: [invalid-super-argument] "`A` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, A)` call"
 # revealed: Unknown
@@ -624,6 +686,7 @@ reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
 # revealed: <super: <special-form 'typing.Generic'>, <class 'SupportsInt'>>
 reveal_type(super(typing.Generic, typing.SupportsInt))
 
+
 def _(x: type[typing.Any], y: typing.Any):
     reveal_type(super(x, y))  # revealed: <super: Any, Any>
 ```
@@ -636,11 +699,16 @@ def _(x: type[typing.Any], y: typing.Any):
 def coinflip() -> bool:
     return False
 
+
 def f():
     if coinflip():
+
         class A: ...
+
     else:
+
         class A: ...
+
     super(A, A())  # error: [invalid-super-argument]
 ```
 
@@ -651,15 +719,18 @@ Accessing instance members through `super()` is not allowed.
 ```py
 from __future__ import annotations
 
+
 class A:
     def __init__(self, a: int):
         self.a = a
+
 
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
         # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
         super().a
+
 
 # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
 super(B, B(42)).a
@@ -676,7 +747,9 @@ class A:
     def __getitem__(self, key: int) -> int:
         return 42
 
+
 class B(A): ...
+
 
 reveal_type(A()[0])  # revealed: int
 reveal_type(super(B, B()).__getitem__)  # revealed: bound method B.__getitem__(key: int) -> int
@@ -700,20 +773,25 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Self
 
+
 class Parent:
     def __init__(self, children: Mapping[str, Self] | None = None) -> None:
         self.children = children
+
 
 class Child(Parent):
     def __init__(self, children: Mapping[str, Child] | None = None) -> None:
         # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
         super().__init__(children)
 
+
 # The fix is to use `Self` consistently in the subclass:
+
 
 class Parent2:
     def __init__(self, children: Mapping[str, Self] | None = None) -> None:
         self.children = children
+
 
 class Child2(Parent2):
     def __init__(self, children: Mapping[str, Self] | None = None) -> None:
@@ -729,6 +807,7 @@ Protocol):
 from typing import Protocol, Generic, TypeVar
 
 _T_co = TypeVar("_T_co", covariant=True)
+
 
 class MyProtocol(Protocol, Generic[_T_co]):
     def __class_getitem__(cls, item):
