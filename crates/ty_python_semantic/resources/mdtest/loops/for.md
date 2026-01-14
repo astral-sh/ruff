@@ -954,21 +954,47 @@ for x in Bar:
 
 ## Iterating over an intersection with a TypeVar whose bound is a union
 
-When a TypeVar has a union bound where some elements are iterable and some are not, and the TypeVar
-is intersected with an iterable type (e.g., via `isinstance`), the iteration should use the iterable
-parts of the TypeVar's bound.
+When a TypeVar has a union bound and the TypeVar is intersected with an iterable type (e.g., via
+`isinstance`), we need to properly distribute the intersection over the union and simplify. This
+ensures that only the parts of the union compatible with the intersection are considered for
+iteration.
 
 ```toml
 [environment]
 python-version = "3.12"
 ```
 
+### TypeVar bound with non-iterable elements
+
+When the union contains non-iterable types (like `int`), those parts are disjoint from the tuple and
+simplify to `Never`, leaving only the iterable parts.
+
 ```py
 def f[T: tuple[int, ...] | int](x: T):
     if isinstance(x, tuple):
         reveal_type(x)  # revealed: T@f & tuple[object, ...]
         for item in x:
-            # The TypeVar T is constrained to tuple[int, ...] by the isinstance check,
-            # so iterating should give `int`, not `object`.
+            # The intersection `(tuple[int, ...] | int) & tuple[object, ...]` distributes to:
+            # `(tuple[int, ...] & tuple[object, ...]) | (int & tuple[object, ...])`
+            # which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
+            # so iterating gives `int`.
+            reveal_type(item)  # revealed: int
+```
+
+### TypeVar bound with all iterable but disjoint elements
+
+When the union contains types that are all iterable but some are disjoint from the intersection
+constraint, those parts should also simplify to `Never`.
+
+```py
+def g[T: tuple[int, ...] | list[str]](x: T):
+    if isinstance(x, tuple):
+        reveal_type(x)  # revealed: T@g & tuple[object, ...]
+        for item in x:
+            # The intersection `(tuple[int, ...] | list[str]) & tuple[object, ...]` distributes to:
+            # `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
+            # Since `list[str]` is disjoint from `tuple[object, ...]`, this simplifies to:
+            # `tuple[int, ...] | Never` = `tuple[int, ...]`
+            # so iterating gives `int`, NOT `int | str`.
             reveal_type(item)  # revealed: int
 ```
