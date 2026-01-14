@@ -102,6 +102,27 @@ impl Violation for FastApiNonAnnotatedDependency {
     }
 }
 
+#[derive(Debug)]
+enum AutofixSkipped {
+    EllipsisAfterDefault,
+    RequiredAfterOptional,
+    ImportError,
+}
+
+impl AutofixSkipped {
+    fn message(&self) -> &'static str {
+        match self {
+            Self::EllipsisAfterDefault => {
+                "Fix unavailable: Cannot convert required parameter (ellipsis) after optional parameter"
+            }
+            Self::RequiredAfterOptional => {
+                "Fix unavailable: Cannot convert required parameter after optional parameter"
+            }
+            Self::ImportError => "Fix unavailable: Could not resolve import for `Annotated`",
+        }
+    }
+}
+
 /// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
     checker: &Checker,
@@ -251,8 +272,10 @@ fn create_diagnostic(
         parameter.range,
     );
 
-    let try_generate_fix = || {
-        let (import_edit, binding) = importer.import(parameter.range.start())?;
+    let try_generate_fix = || -> Result<Fix, AutofixSkipped> {
+        let (import_edit, binding) = importer
+            .import(parameter.range.start())
+            .map_err(|_| AutofixSkipped::ImportError)?;
 
         // Each of these classes takes a single, optional default
         // argument, followed by kw-only arguments
@@ -284,7 +307,7 @@ fn create_diagnostic(
 
                 if is_default_argument_ellipsis && seen_default {
                     // For ellipsis after a parameter with default, can't remove the default
-                    return Ok(None);
+                    return Err(AutofixSkipped::EllipsisAfterDefault);
                 }
 
                 if !is_default_argument_ellipsis {
@@ -315,7 +338,7 @@ fn create_diagnostic(
             }
             _ => {
                 if seen_default {
-                    return Ok(None);
+                    return Err(AutofixSkipped::RequiredAfterOptional);
                 }
                 format!(
                     "{parameter_name}: {binding}[{annotation}, {default_}]",
@@ -326,17 +349,21 @@ fn create_diagnostic(
             }
         };
         let parameter_edit = Edit::range_replacement(content, parameter.range);
-        Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
+        Ok(Fix::unsafe_edits(import_edit, [parameter_edit]))
     };
 
     // make sure we set `seen_default` if we bail out of `try_generate_fix` early. we could
     // `match` on the result directly, but still calling `try_set_optional_fix` avoids
     // duplicating the debug logging here
-    let fix: anyhow::Result<Option<Fix>> = try_generate_fix();
-    if fix.is_err() {
-        seen_default = true;
+    match try_generate_fix() {
+        Ok(fix) => {
+            diagnostic.set_fix(fix);
+        }
+        Err(reason) => {
+            diagnostic.info(reason.message());
+            seen_default = true;
+        }
     }
-    diagnostic.try_set_optional_fix(|| fix);
 
     seen_default
 }

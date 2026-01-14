@@ -358,3 +358,4 @@ FAST002 FastAPI dependency without `Annotated`
 72 |     pass
    |
 help: Replace with `typing_extensions.Annotated`
+info: Fix unavailable: Cannot convert required parameter after optional parameter

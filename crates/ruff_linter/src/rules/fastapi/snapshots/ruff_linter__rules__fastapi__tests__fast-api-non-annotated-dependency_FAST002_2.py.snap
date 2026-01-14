@@ -273,6 +273,7 @@ FAST002 FastAPI dependency without `Annotated`
 85 |     another_optional_param: int = Query(42, description="Another optional"),
    |
 help: Replace with `typing.Annotated`
+info: Fix unavailable: Cannot convert required parameter (ellipsis) after optional parameter
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:85:5
