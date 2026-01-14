@@ -30,6 +30,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
   CONFORMANCE_SUITE_COMMIT: 9f6d8ced7cd1c8d92687a4e9c96d7716452e471e
+  PYTHON_VERSION: 3.12
 
 jobs:
   typing_conformance:
@@ -53,6 +54,10 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
+
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Rust toolchain
         run: rustup show
@@ -80,21 +85,15 @@ jobs:
           )
 
           (
-            cd typing/conformance/tests
+            echo "Creating comment with conformance comparison"
 
-            echo "Running ty on old commit (merge base)"
-            "$RUFF_DIR/ty-old" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/old-output.txt" 2>&1 || true
-
-            echo "Running ty on new commit"
-            "$RUFF_DIR/ty-new" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/new-output.txt" 2>&1 || true
+            python "${RUFF_DIR}/scripts/conformance.py" \
+             --old-ty "${RUFF_DIR}/ty-old" \
+             --new-ty "${RUFF_DIR}/ty-new" \
+             --tests-path "${GITHUB_WORKSPACE}/typing/conformance/tests/" \
+             --python-version "$PYTHON_VERSION" \
+             --output typing_conformance_diagnostics.diff
           )
-
-          if ! diff -u old-output.txt new-output.txt > typing_conformance_diagnostics.diff; then
-            echo "Differences found between base and PR"
-          else
-            echo "No differences found"
-            touch typing_conformance_diagnostics.diff
-          fi
 
           echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
 
