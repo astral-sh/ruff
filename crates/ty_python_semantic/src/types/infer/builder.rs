@@ -3814,67 +3814,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the type for a loop header definition.
     ///
-    /// Loop headers represent the fixed-point type of a place at loop entry. The type is computed
-    /// by widening the "seed" type (the type visible before the loop) to account for values that
-    /// could be assigned during loop iterations.
+    /// Loop headers represent the fixed-point type of a place at loop entry.
+    /// The type is the union of:
+    /// 1. The seed type (visible before the loop)
+    /// 2. Types from all bindings within the loop body
     fn infer_loop_header_definition(
         &mut self,
-        _loop_header: &LoopHeaderDefinitionKind,
+        loop_header: &LoopHeaderDefinitionKind,
         definition: Definition<'db>,
     ) {
         let db = self.db();
+        let module = self.module();
 
-        // Get bindings visible before this definition (seed bindings)
+        // Get seed type (visible before loop)
         let file_scope = self.scope().file_scope_id(db);
         let use_def = self.index.use_def_map(file_scope);
         let seed_bindings = use_def.bindings_at_definition(definition);
-
-        // Compute seed type from the bindings
         let seed_place = place_from_bindings(db, seed_bindings);
         let seed_ty = match seed_place.place {
             Place::Defined(defined) => defined.ty,
             Place::Undefined => Type::unknown(),
         };
 
-        // Widen the type for loop iteration
-        let widened_ty = self.widen_for_loop(seed_ty);
+        // Get the while loop body range
+        let while_stmt = loop_header.while_stmt(&module);
+        let body_range = while_stmt.body.first().map(|first| {
+            let last = while_stmt.body.last().unwrap();
+            ruff_text_size::TextRange::new(first.range().start(), last.range().end())
+        });
+
+        // Find all bindings for this place within the loop body and collect their types
+        let place = definition.place(db);
+        let mut all_types = vec![seed_ty];
+
+        if let Some(body_range) = body_range {
+            let all_bindings = use_def.reachable_bindings(place);
+
+            for binding_with_constraints in all_bindings {
+                let DefinitionState::Defined(binding) = binding_with_constraints.binding else {
+                    continue;
+                };
+
+                // Skip the loop header itself
+                if binding == definition {
+                    continue;
+                }
+
+                // Check if this binding is within the loop body
+                let binding_range = binding.kind(db).full_range(&module);
+                if body_range.contains_range(binding_range) {
+                    let binding_ty = binding_type(db, binding);
+                    all_types.push(binding_ty);
+                }
+            }
+        }
+
+        // Union all types together
+        let final_ty = UnionType::from_elements(db, all_types);
 
         self.bindings
-            .insert(definition, widened_ty, self.multi_inference_state);
-    }
-
-    /// Widen a type for loop iteration.
-    ///
-    /// For literals, this widens to their base type to handle cases where values
-    /// change across loop iterations:
-    /// ```python
-    /// i = 0
-    /// while ...:
-    ///     i += 1  # i could be any int after multiple iterations
-    /// ```
-    fn widen_for_loop(&self, ty: Type<'db>) -> Type<'db> {
-        let db = self.db();
-
-        match ty {
-            // Widen integer literals to int
-            Type::IntLiteral(_) => KnownClass::Int.to_instance(db),
-
-            // Widen string literals to LiteralString
-            Type::StringLiteral(_) => Type::LiteralString,
-
-            // Widen unions element-wise
-            Type::Union(union) => {
-                let widened_elements: Vec<_> = union
-                    .elements(db)
-                    .iter()
-                    .map(|&elem| self.widen_for_loop(elem))
-                    .collect();
-                UnionType::from_elements(db, widened_elements)
-            }
-
-            // For other types, keep as-is for now
-            _ => ty,
-        }
+            .insert(definition, final_ty, self.multi_inference_state);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
