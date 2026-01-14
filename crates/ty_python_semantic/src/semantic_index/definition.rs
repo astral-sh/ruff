@@ -286,7 +286,13 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     ParamSpec(&'ast ast::TypeParamParamSpec),
     TypeVarTuple(&'ast ast::TypeParamTypeVarTuple),
     /// A loop header definition for cyclic control flow analysis.
-    LoopHeader(&'ast ast::StmtWhile),
+    LoopHeader(LoopHeaderDefinitionNodeRef<'ast>),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct LoopHeaderDefinitionNodeRef<'ast> {
+    pub(crate) while_stmt: &'ast ast::StmtWhile,
+    pub(crate) place: ScopedPlaceId,
 }
 
 impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
@@ -337,8 +343,8 @@ impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_
     }
 }
 
-impl<'ast> From<&'ast ast::StmtWhile> for DefinitionNodeRef<'ast, '_> {
-    fn from(value: &'ast ast::StmtWhile) -> Self {
+impl<'ast> From<LoopHeaderDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: LoopHeaderDefinitionNodeRef<'ast>) -> Self {
         Self::LoopHeader(value)
     }
 }
@@ -627,8 +633,11 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::TypeVarTuple(node) => {
                 DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
             }
-            DefinitionNodeRef::LoopHeader(node) => {
-                DefinitionKind::LoopHeader(AstNodeRef::new(parsed, node))
+            DefinitionNodeRef::LoopHeader(LoopHeaderDefinitionNodeRef { while_stmt, place }) => {
+                DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
+                    while_stmt: AstNodeRef::new(parsed, while_stmt),
+                    place,
+                })
             }
         }
     }
@@ -694,7 +703,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::TypeVar(node) => node.into(),
             Self::ParamSpec(node) => node.into(),
             Self::TypeVarTuple(node) => node.into(),
-            Self::LoopHeader(node) => node.into(),
+            Self::LoopHeader(LoopHeaderDefinitionNodeRef { while_stmt, .. }) => while_stmt.into(),
         }
     }
 }
@@ -769,7 +778,23 @@ pub enum DefinitionKind<'db> {
     ///
     /// This is used to handle cyclic control flow in loops, where a variable's type at the
     /// start of an iteration depends on assignments from previous iterations.
-    LoopHeader(AstNodeRef<ast::StmtWhile>),
+    LoopHeader(LoopHeaderDefinitionKind),
+}
+
+/// Definition kind for a loop header entry.
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct LoopHeaderDefinitionKind {
+    /// The while statement that defines this loop.
+    while_stmt: AstNodeRef<ast::StmtWhile>,
+    /// The place being defined at the loop header.
+    /// Currently unused but stored for future use in more precise loop analysis.
+    place: ScopedPlaceId,
+}
+
+impl LoopHeaderDefinitionKind {
+    pub(crate) fn while_stmt<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtWhile {
+        self.while_stmt.node(module)
+    }
 }
 
 impl DefinitionKind<'_> {
@@ -853,7 +878,7 @@ impl DefinitionKind<'_> {
                 type_var_tuple.node(module).name.range()
             }
             // For loop headers, use the while statement's test expression range
-            DefinitionKind::LoopHeader(while_stmt) => while_stmt.node(module).test.range(),
+            DefinitionKind::LoopHeader(loop_header) => loop_header.while_stmt(module).test.range(),
         }
     }
 
@@ -900,7 +925,7 @@ impl DefinitionKind<'_> {
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
             // For loop headers, use the entire while statement range
-            DefinitionKind::LoopHeader(while_stmt) => while_stmt.node(module).range(),
+            DefinitionKind::LoopHeader(loop_header) => loop_header.while_stmt(module).range(),
         }
     }
 

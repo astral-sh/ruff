@@ -39,7 +39,7 @@ use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
-    ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
+    ForStmtDefinitionKind, LoopHeaderDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
@@ -1541,12 +1541,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::TypeVarTuple(node) => {
                 self.infer_typevartuple_definition(node.node(self.module()), definition);
             }
-            DefinitionKind::LoopHeader(_while_stmt) => {
-                // TODO: Implement proper loop header type inference
-                // This should union the seed bindings (pre-loop) with body bindings (end-of-loop)
-                // For now, store Unknown as a placeholder so the definition has a type.
-                self.bindings
-                    .insert(definition, Type::unknown(), self.multi_inference_state);
+            DefinitionKind::LoopHeader(loop_header) => {
+                self.infer_loop_header_definition(loop_header, definition);
             }
         }
     }
@@ -3814,6 +3810,71 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
         );
+    }
+
+    /// Infer the type for a loop header definition.
+    ///
+    /// Loop headers represent the fixed-point type of a place at loop entry. The type is computed
+    /// by widening the "seed" type (the type visible before the loop) to account for values that
+    /// could be assigned during loop iterations.
+    fn infer_loop_header_definition(
+        &mut self,
+        _loop_header: &LoopHeaderDefinitionKind,
+        definition: Definition<'db>,
+    ) {
+        let db = self.db();
+
+        // Get bindings visible before this definition (seed bindings)
+        let file_scope = self.scope().file_scope_id(db);
+        let use_def = self.index.use_def_map(file_scope);
+        let seed_bindings = use_def.bindings_at_definition(definition);
+
+        // Compute seed type from the bindings
+        let seed_place = place_from_bindings(db, seed_bindings);
+        let seed_ty = match seed_place.place {
+            Place::Defined(defined) => defined.ty,
+            Place::Undefined => Type::unknown(),
+        };
+
+        // Widen the type for loop iteration
+        let widened_ty = self.widen_for_loop(seed_ty);
+
+        self.bindings
+            .insert(definition, widened_ty, self.multi_inference_state);
+    }
+
+    /// Widen a type for loop iteration.
+    ///
+    /// For literals, this widens to their base type to handle cases where values
+    /// change across loop iterations:
+    /// ```python
+    /// i = 0
+    /// while ...:
+    ///     i += 1  # i could be any int after multiple iterations
+    /// ```
+    fn widen_for_loop(&self, ty: Type<'db>) -> Type<'db> {
+        let db = self.db();
+
+        match ty {
+            // Widen integer literals to int
+            Type::IntLiteral(_) => KnownClass::Int.to_instance(db),
+
+            // Widen string literals to LiteralString
+            Type::StringLiteral(_) => Type::LiteralString,
+
+            // Widen unions element-wise
+            Type::Union(union) => {
+                let widened_elements: Vec<_> = union
+                    .elements(db)
+                    .iter()
+                    .map(|&elem| self.widen_for_loop(elem))
+                    .collect();
+                UnionType::from_elements(db, widened_elements)
+            }
+
+            // For other types, keep as-is for now
+            _ => ty,
+        }
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
