@@ -78,6 +78,7 @@ pub(crate) fn format_imports(
     settings: &Settings,
     tokens: &Tokens,
 ) -> String {
+    let line_length = settings.line_length.unwrap_or(line_length);
     let trailer = &block.trailer;
     let block = annotate_imports(
         &block.imports,

@@ -2341,11 +2341,34 @@ pub struct IsortOptions {
     #[option(
         default = r#"false"#,
         value_type = "bool",
-        example = r#"
-            force-sort-within-sections = true
-        "#
+        example = r#"force-sort-within-sections = true"#
     )]
     pub force_sort_within_sections: Option<bool>,
+
+    /// Whether to sort imports lexicographically, which ignores case unless
+    /// [`case-sensitive`](#lint_isort_case-sensitive) is enabled.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"lexicographical = true"#
+    )]
+    pub lexicographical: Option<bool>,
+
+    /// Whether to group imports by package when sorting.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"group-by-package = true"#
+    )]
+    pub group_by_package: Option<bool>,
+
+    /// The line length to use for `isort` specifically.
+    #[option(
+        default = r#"null"#,
+        value_type = "int",
+        example = r#"line-length = 1000"#
+    )]
+    pub line_length: Option<LineLength>,
 
     /// Sort imports taking into account case sensitivity.
     ///
@@ -2862,6 +2885,8 @@ impl IsortOptions {
             combine_as_imports: self.combine_as_imports.unwrap_or(false),
             force_single_line: self.force_single_line.unwrap_or(false),
             force_sort_within_sections,
+            lexicographical: self.lexicographical.unwrap_or(false),
+            group_by_package: self.group_by_package.unwrap_or(false),
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
             detect_same_package: self.detect_same_package.unwrap_or(true),
@@ -2892,6 +2917,7 @@ impl IsortOptions {
             from_first,
             length_sort: self.length_sort.unwrap_or(false),
             length_sort_straight: self.length_sort_straight.unwrap_or(false),
+            line_length: self.line_length,
         })
     }
 }
