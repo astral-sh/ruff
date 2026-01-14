@@ -2140,11 +2140,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     node_index: _,
                 },
             ) => {
-                self.visit_expr(test);
-
                 let pre_loop = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
-                self.record_reachability_constraint(predicate);
 
                 // Collect all places assigned in the loop body.
                 // Loop headers are needed for all bindings to track values that could
@@ -2154,6 +2150,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // Create loop header definitions for each bound place.
                 // The loop header type will be the union of the seed type (before loop)
                 // and all types assigned in the loop body.
+                // These must be created BEFORE visiting the test expression so that
+                // uses in the test see the loop header bindings.
                 for place_expr in bound_places {
                     let place_id = self.add_place(place_expr);
                     let loop_header_ref = LoopHeaderDefinitionNodeRef {
@@ -2162,6 +2160,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     };
                     self.push_additional_definition(place_id, loop_header_ref);
                 }
+
+                // Visit the test expression AFTER creating loop headers so that
+                // variable uses in the test see the loop header type.
+                self.visit_expr(test);
+
+                let predicate = self.record_expression_narrowing_constraint(test);
+                self.record_reachability_constraint(predicate);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
