@@ -121,7 +121,7 @@ repos:
     hooks:
       - id: blacken-docs
         language: python # means renovate will also update `additional_dependencies`
-        args: ["--pyi", "--line-length", "130"]
+        args: ["--line-length", "130"]
         files: '^crates/.*/resources/mdtest/.*\.md'
         exclude: |
           (?x)^(
