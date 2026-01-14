@@ -4624,6 +4624,54 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Flatten typevars in a union or intersection by resolving them to their upper bounds
+    /// or constraints.
+    ///
+    /// This function is used to properly handle iteration over intersections containing
+    /// typevars with union bounds. For example, given `T & tuple[object, ...]` where
+    /// `T: tuple[int, ...] | list[str]`, this will:
+    /// 1. Replace `T` with `tuple[int, ...] | list[str]`.
+    /// 2. Rebuild through the intersection builder, which distributes to get:
+    ///    `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`.
+    /// 3. The builder simplifies each part (e.g., list is disjoint from `tuple`, which
+    ///    simplifies to `Never`).
+    /// 4. Final result: `tuple[int, ...]`.
+    ///
+    /// This only flattens typevars directly in unions and intersections; it does not descend
+    /// into generic types or other nested structures.
+    fn flatten_typevars(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.flatten_typevars(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    constraints.as_type(db).flatten_typevars(db)
+                }
+                // Unbounded typevar is effectively `object`.
+                None => Type::object(),
+            },
+            Type::Union(union) => {
+                // Flatten each element and rebuild through the union builder.
+                UnionType::from_elements(
+                    db,
+                    union.elements(db).iter().map(|e| e.flatten_typevars(db)),
+                )
+            }
+            Type::Intersection(intersection) => {
+                // Flatten each positive element and rebuild through the intersection builder.
+                let mut builder = IntersectionBuilder::new(db);
+                for pos in intersection.positive(db) {
+                    builder = builder.add_positive(pos.flatten_typevars(db));
+                }
+                for neg in intersection.negative(db) {
+                    builder = builder.add_negative(neg.flatten_typevars(db));
+                }
+                builder.build()
+            }
+            // Don't descend into other types; only flatten top-level typevars.
+            _ => self,
+        }
+    }
+
     /// Returns a tuple spec describing the elements that are produced when iterating over `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
@@ -4726,78 +4774,42 @@ impl<'db> Type<'db> {
                     }
                 }
                 Type::Intersection(intersection) => {
-                    // For intersections, we iterate over each positive element and intersect
-                    // the resulting element types. Negative elements don't affect iteration.
-                    // We only fail if all elements fail to iterate; as long as at least one
-                    // element can be iterated over, we can produce a result.
+                    // For intersections containing TypeVars with union bounds, we need to
+                    // flatten the TypeVars first. This distributes the intersection over
+                    // the union and simplifies, e.g.:
+                    // `T & tuple[object, ...]` where `T: tuple[int, ...] | list[str]`
+                    // becomes `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
+                    // which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
                     //
-                    // For TypeVars, we replace them with their upper bound for iteration
-                    // purposes. Once we are iterating, the fact that it's a TypeVar no
-                    // longer matters: all that matters is the upper bound.
+                    // After flattening, the result may be:
+                    // - An intersection (if no union-bound typevars, or they didn't simplify).
+                    // - A union of intersections (if distribution happened).
+                    // - A simpler type (if it fully simplified).
                     //
-                    // For unions in an intersection context, if some elements are not
-                    // iterable, we iterate only the iterable parts. This is sound because
-                    // the intersection constrains the type to the iterable parts.
-                    // For example, for `T & tuple[object, ...]` where `T: tuple[int, ...] | int`,
-                    // iterating should give `int` (from the `tuple[int, ...]` part of T's bound),
-                    // not `object` (from ignoring T entirely).
-                    let try_iterate_element =
-                        |element: Type<'db>| -> Option<Cow<'db, TupleSpec<'db>>> {
-                            // Replace TypeVar with its upper bound for iteration purposes.
-                            let element = if let Type::TypeVar(tvar) = element {
-                                match tvar.typevar(db).bound_or_constraints(db) {
-                                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
-                                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                        constraints.as_type(db)
-                                    }
-                                    None => return None,
-                                }
-                            } else {
-                                element
+                    // We then iterate over the flattened type.
+                    let flattened = ty.flatten_typevars(db);
+
+                    // If flattening didn't change anything, iterate the intersection directly.
+                    if flattened == ty {
+                        let mut specs_iter = intersection.positive_elements_or_object(db).filter_map(
+                            |element| element.try_iterate_with_mode(db, EvaluationMode::Sync).ok(),
+                        );
+                        let first_spec = specs_iter.next()?;
+                        let mut builder = TupleSpecBuilder::from(&*first_spec);
+                        for spec in specs_iter {
+                            // Two tuples cannot have incompatible specs unless the tuples themselves
+                            // are disjoint. `IntersectionBuilder` eagerly simplifies such
+                            // intersections to `Never`, so this should always return `Some`.
+                            let Some(intersected) = builder.intersect(db, &spec) else {
+                                return Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
                             };
-
-                            // Try normal iteration.
-                            if let Ok(spec) =
-                                element.try_iterate_with_mode(db, EvaluationMode::Sync)
-                            {
-                                return Some(spec);
-                            }
-
-                            // For unions, try iterating only the iterable parts.
-                            if let Type::Union(union) = element {
-                                let mut iterable_specs = union.elements(db).iter().filter_map(
-                                    |elem| {
-                                        elem.try_iterate_with_mode(db, EvaluationMode::Sync).ok()
-                                    },
-                                );
-
-                                if let Some(first) = iterable_specs.next() {
-                                    let mut builder = TupleSpecBuilder::from(&*first);
-                                    for spec in iterable_specs {
-                                        builder = builder.union(db, &spec);
-                                    }
-                                    return Some(Cow::Owned(builder.build()));
-                                }
-                            }
-
-                            None
-                        };
-
-                    let mut specs_iter = intersection
-                        .positive_elements_or_object(db)
-                        .filter_map(try_iterate_element);
-                    let first_spec = specs_iter.next()?;
-                    let mut builder = TupleSpecBuilder::from(&*first_spec);
-                    for spec in specs_iter {
-                        // Two tuples cannot have incompatible specs unless the tuples themselves
-                        // are disjoint. `IntersectionBuilder` eagerly simplifies such
-                        // intersections to `Never`, so this should always return `Some`.
-                        let Some(intersected) = builder.intersect(db, &spec) else {
-                            return Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
-                        };
-                        builder = intersected;
+                            builder = intersected;
+                        }
+                        return Some(Cow::Owned(builder.build()));
                     }
-                    Some(Cow::Owned(builder.build()))
+
+                    // Flattening changed the type; recursively iterate the flattened result.
+                    non_async_special_case(db, flattened)
                 }
                 // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
                 Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
