@@ -296,7 +296,45 @@ impl Index {
         }
     }
 
-    pub(super) fn open_text_document(&mut self, url: Url, document: TextDocument) {
+    pub(super) fn open_text_document(
+        &mut self,
+        url: Url,
+        document: TextDocument,
+        global: &GlobalClientSettings,
+        client: &Client,
+    ) {
+        // Check if we have settings for the given url, for example if we're
+        // opening a file outside of the existing workspaces.
+        // See https://github.com/astral-sh/ruff/issues/17944
+        let has_settings = match self.settings_for_url(&url) {
+            None => false,
+            Some(settings) => {
+                if let Ok(file_path) = url.to_file_path() {
+                    settings.ruff_settings.has_settings_for(&file_path)
+                } else {
+                    false
+                }
+            }
+        };
+
+        if !has_settings && let Ok(file_path) = url.to_file_path() {
+            // We want the URL of this file's containing directory. Assuming
+            // that `url` is a file, then we should always be able to get its
+            // parent, and we started with an `Url`, so should be fine to
+            // convert back and the `.unwrap`s are ok (if not ideal)
+            let url = Url::from_file_path(file_path.parent().unwrap()).unwrap();
+            tracing::debug!(
+                "No settings for '{}', so opening workspace folder '{url}'",
+                file_path.display()
+            );
+            if self
+                .open_workspace_folder(url.clone(), global, client)
+                .is_err()
+            {
+                tracing::warn!("Couldn't open workspace folder for '{url}'");
+            };
+        }
+
         self.documents
             .insert(url, DocumentController::new_text(document));
     }

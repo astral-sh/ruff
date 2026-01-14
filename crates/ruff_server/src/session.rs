@@ -157,8 +157,9 @@ impl Session {
 
     /// Registers a text document at the provided `url`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_text_document(&mut self, url: Url, document: TextDocument) {
-        self.index.open_text_document(url, document);
+    pub(crate) fn open_text_document(&mut self, url: Url, document: TextDocument, client: &Client) {
+        self.index
+            .open_text_document(url, document, &self.global_settings, client);
     }
 
     /// De-registers a document, specified by its key.

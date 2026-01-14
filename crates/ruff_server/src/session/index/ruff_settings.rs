@@ -385,6 +385,13 @@ impl RuffSettingsIndex {
             .clone()
     }
 
+    pub(super) fn has_settings_for(&self, document_path: &Path) -> bool {
+        self.index
+            .range(..document_path.to_path_buf())
+            .rfind(|(path, _)| document_path.starts_with(path))
+            .is_some()
+    }
+
     pub(super) fn fallback(&self) -> Arc<RuffSettings> {
         self.fallback.clone()
     }

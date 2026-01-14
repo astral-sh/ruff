@@ -28,7 +28,7 @@ impl super::SyncNotificationHandler for DidOpen {
     ) -> Result<()> {
         let document = TextDocument::new(text, version).with_language_id(&language_id);
 
-        session.open_text_document(uri.clone(), document);
+        session.open_text_document(uri.clone(), document, client);
 
         // Publish diagnostics if the client doesn't support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {
