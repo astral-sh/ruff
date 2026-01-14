@@ -683,6 +683,21 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
+            // Fast path: `object` is assignable to any inferable type variable with no upper bound
+            // (or with `object` as its upper bound), which is the common case for generic
+            // type parameters like `_T` in `Iterator[_T]`.
+            (Type::NominalInstance(source), Type::TypeVar(typevar))
+                if source.is_object()
+                    && typevar.is_inferable(db, inferable)
+                    && relation.is_assignability()
+                    && typevar
+                        .typevar(db)
+                        .upper_bound(db)
+                        .is_none_or(|bound| bound.is_object()) =>
+            {
+                ConstraintSet::from(true)
+            }
+
             // Fast path: `object` is not a subtype of any callable type, since not all objects
             // are callable.
             (Type::NominalInstance(source), Type::Callable(_)) if source.is_object() => {
