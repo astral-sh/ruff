@@ -185,42 +185,6 @@ def _(ab: A | B, ac: A | C, bc: B | C):
     reveal_type(f(*(ac,)))  # revealed: A | C
 ```
 
-### Expanding PEP 695 type alias
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-PEP 695 type aliases should be properly expanded during argument type expansion. This test ensures
-that `type X = A | B` is treated the same as a plain union `A | B` during overload resolution.
-
-`overloaded.pyi`:
-
-```pyi
-from typing import overload, Literal
-
-class Eager: ...
-class Lazy: ...
-
-@overload
-def evaluate(x: Eager, /, *, eager: bool = False) -> Eager: ...
-@overload
-def evaluate(x: Lazy, /, *, eager: Literal[False] = False) -> Lazy: ...
-@overload
-def evaluate(x: Lazy, /, *, eager: Literal[True]) -> Eager: ...
-```
-
-```py
-from overloaded import Eager, Lazy, evaluate
-
-type Array = Eager | Lazy
-
-def foo(x: Array, *, eager: bool) -> None:
-    # The type alias `Array` should be expanded to `Eager | Lazy` during overload resolution
-    reveal_type(evaluate(x, eager=eager))  # revealed: Eager | Lazy
-```
-
 ### Expanding first argument
 
 If the set of argument lists created by expanding the first argument evaluates successfully, the
@@ -594,6 +558,42 @@ def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
 
     reveal_type(f(my_enum_instance))  # revealed: MyEnumSubclass
     reveal_type(f(*(my_enum_instance,)))  # revealed: MyEnumSubclass
+```
+
+### Expanding PEP 695 type alias
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+PEP 695 type aliases should be properly expanded during argument type expansion. This test ensures
+that `type X = A | B` is treated the same as a plain union `A | B` during overload resolution.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload, Literal
+
+class Eager: ...
+class Lazy: ...
+
+@overload
+def evaluate(x: Eager, /, *, eager: bool = False) -> Eager: ...
+@overload
+def evaluate(x: Lazy, /, *, eager: Literal[False] = False) -> Lazy: ...
+@overload
+def evaluate(x: Lazy, /, *, eager: Literal[True]) -> Eager: ...
+```
+
+```py
+from overloaded import Eager, Lazy, evaluate
+
+type Array = Eager | Lazy
+
+def foo(x: Array, *, eager: bool) -> None:
+    # The type alias `Array` should be expanded to `Eager | Lazy` during overload resolution
+    reveal_type(evaluate(x, eager=eager))  # revealed: Eager | Lazy
 ```
 
 ### No matching overloads
