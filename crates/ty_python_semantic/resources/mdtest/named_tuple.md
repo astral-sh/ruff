@@ -173,7 +173,7 @@ static_assert(is_subtype_of(Url, tuple[str, int]))
 
 # Invalid type expressions in fields produce a diagnostic.
 invalid_fields = (("x", 42),)  # 42 is not a valid type
-# error: [invalid-type-form] "Invalid type `Literal[42]` in `NamedTuple` field type"
+# error: [invalid-type-form] "Object of type `Literal[42]` is not valid as a `NamedTuple` field type"
 InvalidNT = NamedTuple("InvalidNT", invalid_fields)
 reveal_type(InvalidNT)  # revealed: <class 'InvalidNT'>
 
@@ -567,8 +567,8 @@ Bad7 = NamedTuple("Bad7", ["a", "b"])
 reveal_type(Bad7)  # revealed: <class 'Bad7'>
 
 # Invalid field definitions: type is not a valid type expression (e.g., int literals)
-# error: [invalid-type-form] "Invalid type `Literal[123]` in `NamedTuple` field type"
-# error: [invalid-type-form] "Invalid type `Literal[456]` in `NamedTuple` field type"
+# error: [invalid-type-form] "Object of type `Literal[123]` is not valid as a `NamedTuple` field type"
+# error: [invalid-type-form] "Object of type `Literal[456]` is not valid as a `NamedTuple` field type"
 Bad8 = NamedTuple("Bad8", [("a", 123), ("b", 456)])
 reveal_type(Bad8)  # revealed: <class 'Bad8'>
 ```

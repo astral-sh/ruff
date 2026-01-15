@@ -6522,6 +6522,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let has_starred = args.iter().any(ast::Expr::is_starred_expr);
         let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
 
+        // Emit diagnostic for missing required arguments or unsupported variadic arguments.
+        // For `typing.NamedTuple`, emit a diagnostic since variadic arguments are not supported.
+        // For `collections.namedtuple`, silently fall back since it's more permissive at runtime.
+        if (has_starred || has_double_starred)
+            && kind.is_typing()
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, call_expr)
+        {
+            let arg_type = if has_starred && has_double_starred {
+                "Variadic positional and keyword arguments are"
+            } else if has_starred {
+                "Variadic positional arguments are"
+            } else {
+                "Variadic keyword arguments are"
+            };
+            builder.into_diagnostic(format_args!(
+                "{arg_type} not supported in `NamedTuple()` calls"
+            ));
+        }
+
         // Need at least typename and fields/field_names.
         let [name_arg, fields_arg, rest @ ..] = &**args else {
             for arg in args {
@@ -6530,30 +6549,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
             }
-            // Emit diagnostic for missing required arguments or unsupported variadic arguments.
-            if has_starred || has_double_starred {
-                // For `typing.NamedTuple`, emit a diagnostic since variadic arguments are not supported.
-                // For `collections.namedtuple`, silently fall back since it's more permissive at runtime.
-                match kind {
-                    NamedTupleKind::Typing => {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, call_expr)
-                        {
-                            let arg_type = if has_starred && has_double_starred {
-                                "Variadic positional and keyword arguments are"
-                            } else if has_starred {
-                                "Variadic positional arguments are"
-                            } else {
-                                "Variadic keyword arguments are"
-                            };
-                            builder.into_diagnostic(format_args!(
-                                "{arg_type} not supported in `NamedTuple()` calls"
-                            ));
-                        }
-                    }
-                    NamedTupleKind::Collections => {}
-                }
-            } else {
+
+            if !has_starred && !has_double_starred {
                 let fields_param = match kind {
                     NamedTupleKind::Typing => "fields",
                     NamedTupleKind::Collections => "field_names",
@@ -6585,27 +6582,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if has_starred || has_double_starred {
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
-            }
-            // For `typing.NamedTuple`, emit a diagnostic since variadic arguments are not supported.
-            // For `collections.namedtuple`, silently fall back since it's more permissive at runtime.
-            match kind {
-                NamedTupleKind::Typing => {
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, call_expr)
-                    {
-                        let arg_type = if has_starred && has_double_starred {
-                            "Variadic positional and keyword arguments are"
-                        } else if has_starred {
-                            "Variadic positional arguments are"
-                        } else {
-                            "Variadic keyword arguments are"
-                        };
-                        builder.into_diagnostic(format_args!(
-                            "{arg_type} not supported in `NamedTuple()` calls"
-                        ));
-                    }
-                }
-                NamedTupleKind::Collections => {}
             }
             return KnownClass::NamedTupleFallback.to_subclass_of(self.db());
         }
@@ -7017,7 +6993,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
                             {
                                 builder.into_diagnostic(format_args!(
-                                    "Invalid type `{}` in `NamedTuple` field type",
+                                    "Object of type `{}` is not valid as a `NamedTuple` field type",
                                     field_type.display(db)
                                 ));
                             }
@@ -7118,26 +7094,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Second element: field type (infer as type expression).
                 let field_type_expr = &field_spec_elts[1];
                 let field_value_ty = self.expression_type(field_type_expr);
-                let field_ty = match field_value_ty.in_type_expression(
-                    db,
-                    scope_id,
-                    typevar_binding_context,
-                ) {
-                    Ok(ty) => ty,
-                    Err(error) => {
+                let field_ty = field_value_ty
+                    .in_type_expression(db, scope_id, typevar_binding_context)
+                    .unwrap_or_else(|error| {
                         // Report diagnostic for invalid type expression.
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_TYPE_FORM, field_type_expr)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Invalid type `{}` in `NamedTuple` field type",
+                                "Object of type `{}` is not valid as a `NamedTuple` field type",
                                 field_value_ty.display(db)
                             ));
                         }
                         error.fallback_type
-                    }
-                };
+                    });
 
                 Some((field_name, field_ty, None))
             })
@@ -15612,6 +15583,10 @@ enum NamedTupleKind {
 impl NamedTupleKind {
     const fn is_collections(self) -> bool {
         matches!(self, Self::Collections)
+    }
+
+    const fn is_typing(self) -> bool {
+        matches!(self, Self::Typing)
     }
 
     fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
