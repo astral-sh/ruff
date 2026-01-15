@@ -92,3 +92,7 @@ from airflow.io import (
 get_fs()
 has_fs()
 Properties()
+
+# airflow.secrets.cache
+from airflow.secrets.cache import SecretCache
+SecretCache()

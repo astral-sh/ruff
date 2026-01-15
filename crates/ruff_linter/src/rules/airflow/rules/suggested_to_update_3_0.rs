@@ -85,13 +85,9 @@ impl Violation for Airflow3SuggestedUpdate {
                 module,
                 name,
                 version,
-                warning_message,
-            } => {
-                let warning = warning_message.unwrap_or("");
-                Some(format!(
-                    "`{name}` has been moved to `{module}` since Airflow 3.0 (with task-sdk {version}). {warning}"
-                ))
-            }
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0 (with apache-airflow-task-sdk>={version})."
+            )),
         }
     }
 }
