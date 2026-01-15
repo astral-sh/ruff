@@ -27,8 +27,8 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
-    SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeGuardLike, TypedDictType,
-    UnionType, WrapperDescriptorKind, visitor,
+    SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeGuardLike,
+    TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -2042,28 +2042,21 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             )
         }
 
-        fn is_subclass_of(ty: Type<'_>) -> bool {
-            matches!(ty, Type::SubclassOf(_))
+        let elements = self.ty.elements(self.db);
+        let mut condensed_types = vec![];
+        let mut subclass_of_types = vec![];
+
+        for element in elements.iter().copied() {
+            if is_condensable(element) {
+                condensed_types.push(element);
+            } else if let Type::SubclassOf(subclass_of) = element {
+                subclass_of_types.push(subclass_of);
+            }
         }
 
-        let elements = self.ty.elements(self.db);
-
-        let condensed_types = elements
-            .iter()
-            .copied()
-            .filter(|element| is_condensable(*element))
-            .collect::<Vec<_>>();
-
-        let subclass_of_types = elements
-            .iter()
-            .copied()
-            .filter(|element| is_subclass_of(*element))
-            .collect::<Vec<_>>();
-
-        let total_entries = usize::from(!condensed_types.is_empty()) + elements.len()
-            - condensed_types.len()
-            + usize::from(!subclass_of_types.is_empty())
-            - subclass_of_types.len();
+        let total_entries = elements.len() - condensed_types.len() - subclass_of_types.len()
+            + usize::from(!condensed_types.is_empty())
+            + usize::from(!subclass_of_types.is_empty());
 
         assert_ne!(total_entries, 0);
 
@@ -2091,7 +2084,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                         settings: self.settings.singleline(),
                     });
                 }
-            } else if is_subclass_of(*element) {
+            } else if element.is_subclass_of() {
                 if let Some(subclass_of_types) = subclass_of_types.take() {
                     displayed_entries += 1;
                     join.entry(&DisplaySubclassOfGroup {
@@ -2136,7 +2129,7 @@ impl fmt::Debug for DisplayUnionType<'_, '_> {
     }
 }
 struct DisplaySubclassOfGroup<'db> {
-    types: Vec<Type<'db>>,
+    types: Vec<SubclassOfType<'db>>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
@@ -2145,27 +2138,25 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
         f.write_str("type[")?;
         let total_entries = self.types.len();
         let display_limit =
-            GROUP_ITEM_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
+            UNION_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
         let mut join = f.join(" | ");
-        for ty in self.types.iter().take(display_limit) {
-            if let Type::SubclassOf(subclass_of) = ty {
-                match subclass_of.subclass_of() {
-                    SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                        join.entry(&class.display_with(self.db, self.settings.singleline()));
-                    }
-                    SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                        join.entry(&alias.display_with(self.db, self.settings.singleline()));
-                    }
-                    SubclassOfInner::Dynamic(dynamic) => {
-                        let rep = Type::Dynamic(dynamic)
-                            .representation(self.db, self.settings.singleline());
-                        join.entry(&rep);
-                    }
-                    SubclassOfInner::TypeVar(bound_typevar) => {
-                        let rep = Type::TypeVar(bound_typevar)
-                            .representation(self.db, self.settings.singleline());
-                        join.entry(&rep);
-                    }
+        for subclass_of in self.types.iter().take(display_limit) {
+            match subclass_of.subclass_of() {
+                SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
+                    join.entry(&class.display_with(self.db, self.settings.singleline()));
+                }
+                SubclassOfInner::Class(ClassType::Generic(alias)) => {
+                    join.entry(&alias.display_with(self.db, self.settings.singleline()));
+                }
+                SubclassOfInner::Dynamic(dynamic) => {
+                    let rep =
+                        Type::Dynamic(dynamic).representation(self.db, self.settings.singleline());
+                    join.entry(&rep);
+                }
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    let rep = Type::TypeVar(bound_typevar)
+                        .representation(self.db, self.settings.singleline());
+                    join.entry(&rep);
                 }
             }
         }
@@ -2196,7 +2187,7 @@ struct DisplayLiteralGroup<'db> {
     settings: DisplaySettings<'db>,
 }
 
-const GROUP_ITEM_POLICY: TruncationPolicy = TruncationPolicy {
+const LITERAL_POLICY: TruncationPolicy = TruncationPolicy {
     max: 7,
     max_when_elided: 5,
 };
@@ -2210,7 +2201,7 @@ impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
         let total_entries = self.literals.len();
 
         let display_limit =
-            GROUP_ITEM_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
+            LITERAL_POLICY.display_limit(total_entries, self.settings.preserve_full_unions);
 
         let mut join = f.join(", ");
 
