@@ -33,7 +33,7 @@ use ruff_text_size::TextRange;
 /// convert_to_utc(datetime.now())
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(preview_since = "0.14.12")]
 pub(crate) struct Airflow31Removal {
     deprecated: String,
     replacement: Replacement,
