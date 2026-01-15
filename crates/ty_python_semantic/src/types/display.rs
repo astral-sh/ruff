@@ -2128,11 +2128,13 @@ impl fmt::Debug for DisplayUnionType<'_, '_> {
         Display::fmt(self, f)
     }
 }
+
 struct DisplaySubclassOfGroup<'db> {
     types: Vec<SubclassOfType<'db>>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
+
 impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.write_str("type[")?;
