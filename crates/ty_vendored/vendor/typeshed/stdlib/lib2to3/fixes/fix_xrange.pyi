@@ -1,3 +1,4 @@
+"""Fixer that changes xrange(...) into range(...)."""
 from _typeshed import Incomplete, StrPath
 from typing import ClassVar, Literal
 
