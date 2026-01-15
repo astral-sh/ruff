@@ -449,7 +449,7 @@ impl<'a> SuppressionsBuilder<'a> {
                                 .iter()
                                 .find(|t| !t.kind().is_trivia())
                                 .is_some_and(|t| {
-                                    t.kind() == TokenKind::Dedent || t.kind() == TokenKind::Indent
+                                    matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
                                 })
                         {
                             self.pending.push(PendingSuppressionComment {
