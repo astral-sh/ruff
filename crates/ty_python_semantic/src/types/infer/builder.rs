@@ -101,7 +101,7 @@ use crate::types::diagnostic::{
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
-    is_implicit_classmethod, is_implicit_staticmethod,
+    is_implicit_classmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, LegacyGenericBase, SpecializationBuilder, bind_typevar,
@@ -2915,10 +2915,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_node = function_definition.node(self.module());
         let function_name = &function_node.name;
 
-        if is_implicit_staticmethod(function_name) {
-            return None;
-        }
-
         let mut is_classmethod = is_implicit_classmethod(function_name);
         let inference = infer_definition_types(db, method_definition);
         for decorator in &function_node.decorator_list {
@@ -2942,7 +2938,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_class_literal()?;
 
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
-        if is_classmethod {
+        if is_classmethod || function_name == "__new__" {
             typing_self
                 .map(|typing_self| SubclassOfType::from(db, SubclassOfInner::TypeVar(typing_self)))
         } else {
