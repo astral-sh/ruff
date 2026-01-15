@@ -1,10 +1,11 @@
 use compact_str::CompactString;
 use core::fmt;
+use itertools::Itertools;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_index::Indexer;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
@@ -152,6 +153,25 @@ pub struct Suppressions {
     errors: Vec<ParseError>,
 }
 
+#[derive(Debug)]
+struct SuppressionDiagnostic<'a> {
+    suppression: &'a Suppression,
+    invalid_codes: Vec<&'a str>,
+    disabled_codes: Vec<&'a str>,
+    unused_codes: Vec<&'a str>,
+}
+
+impl<'a> SuppressionDiagnostic<'a> {
+    fn new(suppression: &'a Suppression) -> Self {
+        Self {
+            suppression,
+            invalid_codes: Vec::new(),
+            disabled_codes: Vec::new(),
+            unused_codes: Vec::new(),
+        }
+    }
+}
+
 impl Suppressions {
     pub fn from_tokens(
         settings: &LinterSettings,
@@ -199,54 +219,34 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
+        let mut grouped_diagnostics: FxHashMap<TextRange, SuppressionDiagnostic> =
+            FxHashMap::default();
         let mut unmatched_ranges = FxHashSet::default();
         for suppression in &self.valid {
+            let key = suppression.comments.disable_comment().range;
+
             if !code_is_valid(&suppression.code, &context.settings().external) {
                 // InvalidRuleCode
-                if context.is_rule_enabled(Rule::InvalidRuleCode) {
-                    Suppressions::report_suppression(
-                        context,
-                        locator,
-                        suppression,
-                        true,
-                        InvalidRuleCode {
-                            rule_code: suppression.code.to_string(),
-                            kind: InvalidRuleCodeKind::Suppression,
-                            whole_comment: suppression.codes().len() == 1,
-                        },
-                    );
-                }
+                let entry = grouped_diagnostics
+                    .entry(key)
+                    .or_insert_with(|| SuppressionDiagnostic::new(suppression));
+                entry.invalid_codes.push(suppression.code.as_str());
             } else if !suppression.used.get() {
                 // UnusedNOQA
-                if context.is_rule_enabled(Rule::UnusedNOQA) {
-                    let Ok(rule) = Rule::from_code(
-                        get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
-                    ) else {
-                        continue; // "external" lint code, don't treat it as unused
-                    };
+                let Ok(rule) = Rule::from_code(
+                    get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
+                ) else {
+                    continue; // "external" lint code, don't treat it as unused
+                };
 
-                    let codes = if context.is_rule_enabled(rule) {
-                        UnusedCodes {
-                            unmatched: vec![suppression.code.to_string()],
-                            ..Default::default()
-                        }
-                    } else {
-                        UnusedCodes {
-                            disabled: vec![suppression.code.to_string()],
-                            ..Default::default()
-                        }
-                    };
+                let entry = grouped_diagnostics
+                    .entry(key)
+                    .or_insert_with(|| SuppressionDiagnostic::new(suppression));
 
-                    Suppressions::report_suppression(
-                        context,
-                        locator,
-                        suppression,
-                        false,
-                        UnusedNOQA {
-                            codes: Some(codes),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
-                    );
+                if context.is_rule_enabled(rule) {
+                    entry.unused_codes.push(suppression.code.as_str());
+                } else {
+                    entry.disabled_codes.push(suppression.code.as_str());
                 }
             } else if let DisableEnableComments::Disable(comment) = &suppression.comments {
                 // UnmatchedSuppressionComment
@@ -256,6 +256,55 @@ impl Suppressions {
                         comment.range,
                     );
                 }
+            }
+        }
+
+        for group in grouped_diagnostics.values() {
+            if !group.invalid_codes.is_empty() {
+                let mut codes = group.invalid_codes.clone();
+                Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &mut codes,
+                    true,
+                    InvalidRuleCode {
+                        rule_code: group
+                            .invalid_codes
+                            .iter()
+                            .map(ToString::to_string)
+                            .join(", "),
+                        kind: InvalidRuleCodeKind::Suppression,
+                        whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
+                    },
+                );
+            }
+            if !group.disabled_codes.is_empty() || !group.unused_codes.is_empty() {
+                let mut codes = group.disabled_codes.clone();
+                codes.extend(group.unused_codes.clone());
+                Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &mut codes,
+                    false,
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes {
+                            disabled: group
+                                .disabled_codes
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect_vec(),
+                            unmatched: group
+                                .unused_codes
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect_vec(),
+                            ..Default::default()
+                        }),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                );
             }
         }
 
@@ -289,39 +338,41 @@ impl Suppressions {
         }
     }
 
-    fn report_suppression<T: Violation>(
+    fn report_suppression_codes<T: Violation>(
         context: &LintContext,
         locator: &Locator,
         suppression: &Suppression,
+        codes: &mut Vec<&str>,
         highlight_only_code: bool,
         kind: T,
     ) {
         let disable_comment = suppression.comments.disable_comment();
-        let (range, edit) = Suppressions::delete_code_or_comment(
+        let (range, edit) = Suppressions::delete_codes_or_comment(
             locator,
-            suppression,
             disable_comment,
+            codes,
             highlight_only_code,
         );
-        let mut diagnostic = context.report_diagnostic(kind, range);
-        if let Some(enable_comment) = suppression.comments.enable_comment() {
-            let (enable_range, enable_range_edit) = Suppressions::delete_code_or_comment(
-                locator,
-                suppression,
-                enable_comment,
-                highlight_only_code,
-            );
-            diagnostic.secondary_annotation("", enable_range);
-            diagnostic.set_fix(Fix::safe_edits(edit, [enable_range_edit]));
-        } else {
-            diagnostic.set_fix(Fix::safe_edit(edit));
+        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(kind, range) {
+            if let Some(enable_comment) = suppression.comments.enable_comment() {
+                let (enable_range, enable_range_edit) = Suppressions::delete_codes_or_comment(
+                    locator,
+                    enable_comment,
+                    codes,
+                    highlight_only_code,
+                );
+                diagnostic.secondary_annotation("", enable_range);
+                diagnostic.set_fix(Fix::safe_edits(edit, [enable_range_edit]));
+            } else {
+                diagnostic.set_fix(Fix::safe_edit(edit));
+            }
         }
     }
 
-    fn delete_code_or_comment(
+    fn delete_codes_or_comment(
         locator: &Locator<'_>,
-        suppression: &Suppression,
         comment: &SuppressionComment,
+        codes: &mut Vec<&str>,
         highlight_only_code: bool,
     ) -> (TextRange, Edit) {
         let mut range = comment.range;
@@ -331,24 +382,30 @@ impl Suppressions {
             }
             delete_comment(comment.range, locator)
         } else {
-            let code_index = comment
+            let first = comment
                 .codes
-                .iter()
-                .position(|range| locator.slice(range) == suppression.code)
-                .unwrap();
-            range = comment.codes[code_index];
-            let code_range = if code_index < (comment.codes.len() - 1) {
-                TextRange::new(
-                    comment.codes[code_index].start(),
-                    comment.codes[code_index + 1].start(),
-                )
+                .first()
+                .expect("suppression comment without codes");
+            let last = comment
+                .codes
+                .last()
+                .expect("suppression comment without codes");
+            let code_range = TextRange::new(first.start(), last.end());
+            let remaining = comment
+                .codes_as_str(locator.contents())
+                .filter(|code| !codes.contains(code))
+                .collect_vec();
+
+            if remaining.is_empty() {
+                if highlight_only_code {
+                    range = code_range;
+                }
+                delete_comment(comment.range, locator)
             } else {
-                TextRange::new(
-                    comment.codes[code_index - 1].end(),
-                    comment.codes[code_index].end(),
-                )
-            };
-            Edit::range_deletion(code_range)
+                range = code_range;
+                let replacement = remaining.join(", ");
+                Edit::range_replacement(replacement, code_range)
+            }
         };
         (range, edit)
     }
@@ -505,7 +562,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 // record a combined range suppression from the matching comments
                 let combined_range =
                     TextRange::new(comment.comment.range.start(), other.comment.range.end());
-                for code in comment.comment.codes_as_str(self.source) {
+                for code in comment.comment.codes_as_str(self.source).dedup() {
                     self.valid.push(Suppression {
                         code: code.into(),
                         range: combined_range,
@@ -525,7 +582,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 // to the end of the current indentation level
                 let implicit_range =
                     TextRange::new(comment.comment.range.start(), dedent_range.end());
-                for code in comment.comment.codes_as_str(self.source) {
+                for code in comment.comment.codes_as_str(self.source).dedup() {
                     self.valid.push(Suppression {
                         code: code.into(),
                         range: implicit_range,
