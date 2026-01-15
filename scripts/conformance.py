@@ -10,6 +10,9 @@ links to the corresponding line in the conformance repository for each
 diagnostic. Otherwise, it will default to `main'.
 
 Examples:
+    # Compare an older version of ty to latest
+    %(prog)s --old-ty uvx ty@0.0.1a35
+
     # Compare two specific ty versions
     %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
 
@@ -109,11 +112,11 @@ class Positions:
 
 @dataclass(kw_only=True, slots=True)
 class Location:
-    path: str
+    path: Path
     positions: Positions
 
     def as_link(self) -> str:
-        file = os.path.basename(self.path)
+        file = self.path.name
         link = CONFORMANCE_URL.format(
             conformance_suite_commit=CONFORMANCE_SUITE_COMMIT,
             filename=file,
@@ -150,7 +153,7 @@ class Diagnostic:
             severity=dct["severity"],
             fingerprint=dct["fingerprint"],
             location=Location(
-                path=dct["location"]["path"],
+                path=Path(dct["location"]["path"]).resolve(),
                 positions=Positions(
                     begin=Position(
                         line=dct["location"]["positions"]["begin"]["line"],
@@ -168,7 +171,7 @@ class Diagnostic:
     @property
     def key(self) -> str:
         """Key to group diagnostics by path and beginning line."""
-        return f"{self.location.path}:{self.location.positions.begin.line}"
+        return f"{self.location.path.as_posix()}:{self.location.positions.begin.line}"
 
     @property
     def severity_for_display(self) -> str:
@@ -271,7 +274,7 @@ def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
                         severity="major",
                         fingerprint=None,
                         location=Location(
-                            path=file.as_posix(),
+                            path=file,
                             positions=Positions(
                                 begin=Position(
                                     line=idx,
@@ -431,7 +434,6 @@ def diff_format(
     *,
     greater_is_better: bool = True,
     neutral: bool = False,
-    is_percentage: bool = False,
 ):
     if diff == 0:
         return ""
@@ -464,6 +466,11 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
     old = compute_stats(grouped_diagnostics, source=Source.OLD)
     new = compute_stats(grouped_diagnostics, source=Source.NEW)
 
+    assert new.true_positives > 0, (
+        "Expected ty to have at least one true positive "
+        f"Sample of grouped diagnostics: {grouped_diagnostics[:5]}"
+    )
+
     precision_change = new.precision - old.precision
     recall_change = new.recall - old.recall
     true_pos_change = new.true_positives - old.true_positives
@@ -484,10 +491,8 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
     true_pos_diff = diff_format(true_pos_change, greater_is_better=True)
     false_pos_diff = diff_format(false_pos_change, greater_is_better=False)
     false_neg_diff = diff_format(false_neg_change, greater_is_better=False)
-    precision_diff = diff_format(
-        precision_change, greater_is_better=True, is_percentage=True
-    )
-    recall_diff = diff_format(recall_change, greater_is_better=True, is_percentage=True)
+    precision_diff = diff_format(precision_change, greater_is_better=True)
+    recall_diff = diff_format(recall_change, greater_is_better=True)
     total_diff = diff_format(total_change, neutral=True)
 
     table = dedent(
@@ -527,14 +532,14 @@ def parse_args():
     parser.add_argument(
         "--old-ty",
         nargs="+",
-        help="Command to run old version of ty (default: uvx ty@0.0.1a35)",
+        help="Command to run old version of ty",
     )
 
     parser.add_argument(
         "--new-ty",
         nargs="+",
         default=["uvx", "ty@latest"],
-        help="Command to run new version of ty (default: uvx ty@0.0.7)",
+        help="Command to run new version of ty (default: uvx ty@latest)",
     )
 
     parser.add_argument(
@@ -578,18 +583,20 @@ def parse_args():
 def main():
     args = parse_args()
 
-    expected = collect_expected_diagnostics(args.tests_path)
+    tests_path = args.tests_path.resolve().absolute()
+
+    expected = collect_expected_diagnostics(tests_path)
 
     old = collect_ty_diagnostics(
         ty_path=args.old_ty,
-        tests_path=str(args.tests_path),
+        tests_path=str(tests_path),
         source=Source.OLD,
         python_version=args.python_version,
     )
 
     new = collect_ty_diagnostics(
         ty_path=args.new_ty,
-        tests_path=str(args.tests_path),
+        tests_path=str(tests_path),
         source=Source.NEW,
         python_version=args.python_version,
     )
@@ -612,6 +619,7 @@ def main():
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
         print(f"Output written to {args.output}", file=sys.stderr)
+        print(rendered, file=sys.stderr)
     else:
         print(rendered)
 

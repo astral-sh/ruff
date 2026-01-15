@@ -14,6 +14,7 @@ on:
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
+      - "scripts/conformance.py"
       - ".github/workflows/typing_conformance.yaml"
       - ".github/workflows/typing_conformance_comment.yaml"
       - "Cargo.lock"
@@ -65,8 +66,6 @@ jobs:
       - name: Compute diagnostic diff
         shell: bash
         run: |
-          RUFF_DIR="$GITHUB_WORKSPACE/ruff"
-
           # Build the executable for the old and new commit
           (
             cd ruff
@@ -86,13 +85,15 @@ jobs:
 
           (
             echo "Creating comment with conformance comparison"
+            cd ruff
+            git switch - --detach
 
-            python "${RUFF_DIR}/scripts/conformance.py" \
-             --old-ty "${RUFF_DIR}/ty-old" \
-             --new-ty "${RUFF_DIR}/ty-new" \
+            python "./scripts/conformance.py" \
+             --old-ty "./ty-old" \
+             --new-ty "./ty-new" \
              --tests-path "${GITHUB_WORKSPACE}/typing/conformance/tests/" \
              --python-version "$PYTHON_VERSION" \
-             --output typing_conformance_diagnostics.diff
+             --output ../typing_conformance_diagnostics.diff
           )
 
           echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
