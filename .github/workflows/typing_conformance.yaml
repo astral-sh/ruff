@@ -96,8 +96,6 @@ jobs:
              --output ../typing_conformance_diagnostics.diff
           )
 
-          echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
-
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: Upload diff
@@ -105,11 +103,3 @@ jobs:
         with:
           name: typing_conformance_diagnostics_diff
           path: typing_conformance_diagnostics.diff
-
-      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
-      # Make sure to update the bot if you rename the artifact.
-      - name: Upload conformance suite commit
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: conformance-suite-commit
-          path: conformance-suite-commit
