@@ -12,6 +12,26 @@ def _(u1: int | str, u2: Literal[0] | Literal[1]) -> None:
     reveal_type(u2)  # revealed: Literal[0, 1]
 ```
 
+```py
+def _(u: type[int] | type[str]) -> None:
+    reveal_type(u)  # revealed: type[int | str]
+```
+
+```py
+def _() -> None:
+    class A:
+        pass
+
+    class B:
+        pass
+
+    class C:
+        pass
+
+    def _(u: type[A] | type[B] | type[C]) -> None:
+        reveal_type(u)  # revealed: type[A | B | C]
+```
+
 ## Duplicate elements are collapsed
 
 ```py

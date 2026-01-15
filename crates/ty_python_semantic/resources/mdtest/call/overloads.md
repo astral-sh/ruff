@@ -408,7 +408,7 @@ def f(x: type[B]) -> B: ...
 from overloaded import A, B, f
 
 def _(x: type[A | B]):
-    reveal_type(x)  # revealed: type[A] | type[B]
+    reveal_type(x)  # revealed: type[A | B]
     reveal_type(f(x))  # revealed: A | B
     reveal_type(f(*(x,)))  # revealed: A | B
 ```

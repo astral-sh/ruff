@@ -2094,8 +2094,8 @@ def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(b.__class__)  # revealed: <class 'str'>
     reveal_type(type(b))  # revealed: <class 'str'>
 
-    reveal_type(c.__class__)  # revealed: type[int] | type[str]
-    reveal_type(type(c))  # revealed: type[int] | type[str]
+    reveal_type(c.__class__)  # revealed: type[int | str]
+    reveal_type(type(c))  # revealed: type[int | str]
 
     # `type[type]`, a.k.a., either the class `type` or some subclass of `type`.
     # It would be incorrect to infer `Literal[type]` here,
