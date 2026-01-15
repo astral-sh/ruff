@@ -87,7 +87,8 @@ jobs:
 
           (
             echo "Creating comment with conformance comparison"
-
+            cd ruff
+            git checkout wld/conformance-bugfix
             python "${RUFF_DIR}/scripts/conformance.py" \
              --old-ty "${RUFF_DIR}/ty-old" \
              --new-ty "${RUFF_DIR}/ty-new" \
