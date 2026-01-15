@@ -92,13 +92,13 @@ class Classification(StrEnum):
     def into_title(self) -> str:
         match self:
             case Classification.TRUE_POSITIVE:
-                return "True positives added 🎉"
+                return "True positives added"
             case Classification.FALSE_POSITIVE:
-                return "False positives added 🫤"
+                return "False positives added"
             case Classification.TRUE_NEGATIVE:
-                return "False positives removed 🎉"
+                return "False positives removed"
             case Classification.FALSE_NEGATIVE:
-                return "True positives removed 🫤"
+                return "True positives removed"
 
 
 @dataclass(kw_only=True, slots=True)
