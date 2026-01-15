@@ -423,7 +423,8 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 mod tests {
     use crate::db::tests::setup_db;
     use crate::types::tuple::TupleType;
-    use crate::types::{KnownClass, Type, UnionType};
+    use crate::types::{KnownClass, ManualPEP695TypeAliasType, Type, TypeAliasType, UnionType};
+    use ruff_python_ast as ast;
 
     use super::expand_type;
 
@@ -437,6 +438,27 @@ mod tests {
         ];
         let union_type = UnionType::from_elements(&db, types);
         let expanded = expand_type(&db, union_type).unwrap();
+        assert_eq!(expanded.len(), types.len());
+        assert_eq!(expanded, types);
+    }
+
+    #[test]
+    fn expand_pep695_type_alias() {
+        let db = setup_db();
+        let types = [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::Str.to_instance(&db),
+            KnownClass::Bytes.to_instance(&db),
+        ];
+        let union_type = UnionType::from_elements(&db, types);
+        let alias_type =
+            Type::TypeAlias(TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                &db,
+                ast::name::Name::new_static("MyAlias"),
+                None,
+                union_type,
+            )));
+        let expanded = expand_type(&db, alias_type).unwrap();
         assert_eq!(expanded.len(), types.len());
         assert_eq!(expanded, types);
     }
