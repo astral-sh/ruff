@@ -70,9 +70,10 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::Range;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use itertools::Itertools;
+use parking_lot::Mutex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
@@ -2727,6 +2728,7 @@ impl<'db> ConstraintAssignment<'db> {
 #[derive(Clone, Debug, get_size2::GetSize)]
 struct SequentMap<'db> {
     node: InteriorNode<'db>,
+    #[get_size(size_fn = mutex_size)]
     inner: Arc<Mutex<SequentMapInner<'db>>>,
 }
 
@@ -3243,7 +3245,7 @@ impl<'db> SequentMap<'db> {
 
         impl Display for DisplaySequentMap<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let map = self.map.inner.lock().unwrap();
+                let map = self.map.inner.lock();
                 let mut first = true;
                 let mut maybe_write_prefix = |f: &mut std::fmt::Formatter<'_>| {
                     if first {
@@ -3303,6 +3305,13 @@ impl PartialEq for SequentMap<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.node == other.node
     }
+}
+
+fn mutex_size<T>(mutex: &Mutex<T>) -> usize
+where
+    T: get_size2::GetSize,
+{
+    T::get_heap_size(&mutex.lock())
 }
 
 #[expect(unsafe_code)]
@@ -3369,7 +3378,7 @@ impl<'db> PathAssignments<'db> {
         );
         let found_conflict = {
             let map = self.map.inner.clone();
-            let mut map = map.lock().unwrap();
+            let mut map = map.lock();
             self.add_assignment(db, &mut map, assignment, source_order)
         };
         let result = if found_conflict.is_err() {

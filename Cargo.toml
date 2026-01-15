@@ -132,6 +132,7 @@ mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
 notify = { version = "8.0.0" }
 ordermap = { version = "1.0.0" }
+parking_lot = { version = "0.12" }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
 pathdiff = { version = "0.2.1" }
