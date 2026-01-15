@@ -1123,39 +1123,38 @@ fn symbol_impl<'db>(
                 // Fall through to the looked up type
             }
         }
-    } else if name == "__file__" {
+    } else if name == "__file__"
+        && let Some(module) = file_to_module(db, scope.file(db))
+    {
         // We special-case `__file__` here because we know that for a successfully imported
-        // Python module, that hasn't been explicitly overridden it is always a string,
-        // even though typeshed says `str | None`.
+        // non-namespace-package Python module, that hasn't been explicitly overridden it
+        // is always a string, even though typeshed says `str | None`.
         //
-        // Cases where this doesn't hold:
-        //  - statically linked stdlib modules using C Extensions (e.g sys, itertools)
-        //    we do not handle this and will infer these as `str`, this matches other major
-        //    typecheckers
-        //  - namespace packages, `__file__` is None at runtime but we type
-        //    this as `Unknown` and emit a `unresolved-attribute`
-        if let Some(module) = file_to_module(db, scope.file(db))
-            && let Some(_f) = module.file(db)
-        {
-            match place.place {
-                Place::Defined(defined_place) => match defined_place.definedness {
-                    Definedness::AlwaysDefined => return place,
-                    Definedness::PossiblyUndefined => {
-                        let new_type = UnionType::from_elements(
-                            db,
-                            [defined_place.ty, KnownClass::Str.to_instance(db)],
-                        );
-                        let def_place = DefinedPlace::new(new_type)
-                            .with_definedness(Definedness::AlwaysDefined)
-                            .with_widening(defined_place.widening)
-                            .with_origin(defined_place.origin);
-                        return Place::Defined(def_place).into();
-                    }
-                },
-                Place::Undefined => {
-                    return Place::bound(KnownClass::Str.to_instance(db)).into();
+        // The case where this doesn't hold is a C-extension module (stdlib examples include
+        // `sys`, `itertools`, etc.). These may not have a `__file__` attribute at runtime
+        // at all, but that doesn't really affect the *type* of the attribute, just the
+        // *boundness*. There's no way for us to know right now whether a stub represents a
+        // C extension or not, so for now we do not attempt to detect this; we just infer
+        // `str` still. This matches other major.
+        let default_type = if module.file(db).is_some() {
+            KnownClass::Str.to_instance(db)
+        } else {
+            Type::none(db)
+        };
+
+        match place.place {
+            Place::Defined(defined_place) => match defined_place.definedness {
+                Definedness::AlwaysDefined => return place,
+                Definedness::PossiblyUndefined => {
+                    let new_type = UnionType::from_elements(db, [defined_place.ty, default_type]);
+                    let def_place = DefinedPlace::new(new_type)
+                        .with_definedness(Definedness::AlwaysDefined)
+                        .with_widening(defined_place.widening)
+                        .with_origin(defined_place.origin);
+                    return Place::Defined(def_place).into();
                 }
-            }
+            },
+            Place::Undefined => return Place::bound(default_type).into(),
         }
     }
 
