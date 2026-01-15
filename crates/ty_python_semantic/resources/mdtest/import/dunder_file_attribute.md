@@ -1,6 +1,6 @@
-# Import module `__file__` symbol behaviour
+# The `__file__` attribute on imported modules
 
-## Import successful
+## Module successfully resolved
 
 ```py
 from b import __file__ as module_path
@@ -40,7 +40,7 @@ __file__ = None
 ```pyi
 ```
 
-## Import failed
+## Module resolution failed
 
 ```py
 from bar import __file__ as module_path  # error: "Cannot resolve imported module `bar`"
