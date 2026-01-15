@@ -335,7 +335,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Lambda(lambda_expression) => {
-                self.infer_lambda_expression(lambda_expression);
+                self.infer_lambda_expression(lambda_expression, TypeContext::default());
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("`lambda` expressions are not allowed in type expressions"),
