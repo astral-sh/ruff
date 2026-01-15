@@ -2,11 +2,13 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:20:33
+  --> RUF069.py:20:23
    |
 19 | # Bad
 20 | __all__: list[str] = ["A", "B", "A"]
-   |                                 ^^^
+   |                       ---       ^^^ `A` duplicated here
+   |                       |
+   |                       previous occurrence of `A` here
 21 | __all__: typing.Any = ("A", "B", "B")
 22 | __all__ = ["A", "B", "A"]
    |
@@ -21,12 +23,14 @@ help: Remove duplicate entries from `__all__`
 23 | __all__ = ["A", "A", "B", "B"]
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:21:34
+  --> RUF069.py:21:29
    |
 19 | # Bad
 20 | __all__: list[str] = ["A", "B", "A"]
 21 | __all__: typing.Any = ("A", "B", "B")
-   |                                  ^^^
+   |                             ---  ^^^ `B` duplicated here
+   |                             |
+   |                             previous occurrence of `B` here
 22 | __all__ = ["A", "B", "A"]
 23 | __all__ = ["A", "A", "B", "B"]
    |
@@ -41,12 +45,14 @@ help: Remove duplicate entries from `__all__`
 24 | __all__ = [
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:22:22
+  --> RUF069.py:22:12
    |
 20 | __all__: list[str] = ["A", "B", "A"]
 21 | __all__: typing.Any = ("A", "B", "B")
 22 | __all__ = ["A", "B", "A"]
-   |                      ^^^
+   |            ---       ^^^ `A` duplicated here
+   |            |
+   |            previous occurrence of `A` here
 23 | __all__ = ["A", "A", "B", "B"]
 24 | __all__ = [
    |
@@ -61,12 +67,14 @@ help: Remove duplicate entries from `__all__`
 25 |     "A",
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:23:17
+  --> RUF069.py:23:12
    |
 21 | __all__: typing.Any = ("A", "B", "B")
 22 | __all__ = ["A", "B", "A"]
 23 | __all__ = ["A", "A", "B", "B"]
-   |                 ^^^
+   |            ---  ^^^ `A` duplicated here
+   |            |
+   |            previous occurrence of `A` here
 24 | __all__ = [
 25 |     "A",
    |
@@ -81,12 +89,14 @@ help: Remove duplicate entries from `__all__`
 26 |     "A",
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:23:27
+  --> RUF069.py:23:22
    |
 21 | __all__: typing.Any = ("A", "B", "B")
 22 | __all__ = ["A", "B", "A"]
 23 | __all__ = ["A", "A", "B", "B"]
-   |                           ^^^
+   |                      ---  ^^^ `B` duplicated here
+   |                      |
+   |                      previous occurrence of `B` here
 24 | __all__ = [
 25 |     "A",
    |
@@ -101,12 +111,14 @@ help: Remove duplicate entries from `__all__`
 26 |     "A",
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:26:5
+  --> RUF069.py:25:5
    |
+23 | __all__ = ["A", "A", "B", "B"]
 24 | __all__ = [
 25 |     "A",
+   |     --- previous occurrence of `A` here
 26 |     "A",
-   |     ^^^
+   |     ^^^ `A` duplicated here
 27 |     "B",
 28 |     "B"
    |
@@ -120,12 +132,14 @@ help: Remove duplicate entries from `__all__`
 28 | ]
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:28:5
+  --> RUF069.py:27:5
    |
+25 |     "A",
 26 |     "A",
 27 |     "B",
+   |     --- previous occurrence of `B` here
 28 |     "B"
-   |     ^^^
+   |     ^^^ `B` duplicated here
 29 | ]
 30 | __all__ += ["B", "B"]
    |
@@ -139,12 +153,14 @@ help: Remove duplicate entries from `__all__`
 29 | __all__ += ["B", "B"]
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:30:18
+  --> RUF069.py:30:13
    |
 28 |     "B"
 29 | ]
 30 | __all__ += ["B", "B"]
-   |                  ^^^
+   |             ---  ^^^ `B` duplicated here
+   |             |
+   |             previous occurrence of `B` here
 31 | __all__.extend(["B", "B"])
    |
 help: Remove duplicate entries from `__all__`
@@ -158,12 +174,14 @@ help: Remove duplicate entries from `__all__`
 33 | # Bad, unsafe
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:31:22
+  --> RUF069.py:31:17
    |
 29 | ]
 30 | __all__ += ["B", "B"]
 31 | __all__.extend(["B", "B"])
-   |                      ^^^
+   |                 ---  ^^^ `B` duplicated here
+   |                 |
+   |                 previous occurrence of `B` here
 32 |
 33 | # Bad, unsafe
    |
@@ -178,12 +196,14 @@ help: Remove duplicate entries from `__all__`
 34 | __all__ = [
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:36:5
+  --> RUF069.py:35:5
    |
+33 | # Bad, unsafe
 34 | __all__ = [
 35 |     "A",
+   |     --- previous occurrence of `A` here
 36 |     "A",
-   |     ^^^
+   |     ^^^ `A` duplicated here
 37 |     "B",
 38 |     # Comment
    |
@@ -197,12 +217,15 @@ help: Remove duplicate entries from `__all__`
 38 |     "B",  # 2
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:39:5
+  --> RUF069.py:37:5
    |
+35 |     "A",
+36 |     "A",
 37 |     "B",
+   |     --- previous occurrence of `B` here
 38 |     # Comment
 39 |     "B",  # 2
-   |     ^^^
+   |     ^^^ `B` duplicated here
 40 |     # 3
 41 | ]
    |

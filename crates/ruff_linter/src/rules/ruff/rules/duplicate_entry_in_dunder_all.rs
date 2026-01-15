@@ -1,4 +1,4 @@
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -143,7 +143,7 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
         return;
     }
 
-    let mut deduplicated_elts = FxHashSet::with_capacity_and_hasher(elts.len(), FxBuildHasher);
+    let mut deduplicated_elts = FxHashMap::with_capacity_and_hasher(elts.len(), FxBuildHasher);
     let source = checker.locator().contents();
 
     for (index, expr) in elts.iter().enumerate() {
@@ -153,8 +153,17 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
             continue;
         };
 
-        if !deduplicated_elts.insert(string_value.value.to_str()) {
+        let name = string_value.value.to_str();
+
+        if let Some(previous_expr) = deduplicated_elts.insert(name, expr) {
             let mut diagnostic = checker.report_diagnostic(DuplicateEntryInDunderAll, expr.range());
+
+            diagnostic.secondary_annotation(
+                format_args!("previous occurrence of `{name}` here"),
+                previous_expr,
+            );
+
+            diagnostic.set_primary_message(format_args!("`{name}` duplicated here"));
 
             diagnostic.try_set_fix(|| {
                 edits::remove_member(elts, index, source).map(|edit| {
@@ -163,7 +172,6 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
                     } else {
                         Applicability::Safe
                     };
-
                     Fix::applicable_edit(edit, applicability)
                 })
             });
