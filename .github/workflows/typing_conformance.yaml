@@ -66,8 +66,6 @@ jobs:
       - name: Compute diagnostic diff
         shell: bash
         run: |
-          RUFF_DIR="$GITHUB_WORKSPACE/ruff"
-
           # Build the executable for the old and new commit
           (
             cd ruff
