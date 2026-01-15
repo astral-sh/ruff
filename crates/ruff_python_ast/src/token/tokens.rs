@@ -193,6 +193,9 @@ impl Tokens {
     /// start of next token, the "before" slice will end just before the next token. The "after"
     /// slice will contain the rest of the tokens.
     ///
+    /// Note that the contents of the "after" slice may differ from the results of calling `after()`
+    /// directly, particularly when the given offset occurs on zero-width tokens like `Dedent`.
+    ///
     /// # Panics
     ///
     /// If the given offset is inside a token range at any point
@@ -576,5 +579,33 @@ mod tests {
         let (before, after) = tokens.split_at(offset);
         assert_eq!(before, tokens.before(offset));
         assert_eq!(after, tokens.after(offset));
+    }
+
+    #[test]
+    #[should_panic(expected = "Contents of after slice different when offset at dedent")]
+    fn tokens_split_at_matches_before_and_after_zero_length() {
+        let offset = TextSize::new(13);
+        let tokens = new_tokens(
+            [
+                (TokenKind::If, 0..2),
+                (TokenKind::Name, 3..4),
+                (TokenKind::Colon, 4..5),
+                (TokenKind::Newline, 5..6),
+                (TokenKind::Indent, 6..7),
+                (TokenKind::Pass, 7..11),
+                (TokenKind::Newline, 11..12),
+                (TokenKind::NonLogicalNewline, 12..13),
+                (TokenKind::Dedent, 13..13),
+                (TokenKind::Name, 13..14),
+                (TokenKind::Newline, 14..14),
+            ]
+            .into_iter(),
+        );
+        let (before, after) = tokens.split_at(offset);
+        assert_eq!(before, tokens.before(offset));
+        assert!(
+            after == tokens.after(offset),
+            "Contents of after slice different when offset at dedent"
+        );
     }
 }
