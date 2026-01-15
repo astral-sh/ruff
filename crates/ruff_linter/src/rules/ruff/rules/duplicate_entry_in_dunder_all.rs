@@ -10,7 +10,7 @@ use crate::fix::edits;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Detects and removes duplicate elements in `__all__` definitions.
+/// Detects duplicate elements in `__all__` definitions.
 ///
 /// ## Why is this bad?
 /// Duplicate elements in `__all__` serve no purpose and can indicate copy-paste errors or
@@ -154,20 +154,19 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
         };
 
         if !deduplicated_elts.insert(string_value.value.to_str()) {
-            let mut diagnostic = checker.report_diagnostic(DuplicateEntryInDunderAll, expr);
+            let mut diagnostic = checker.report_diagnostic(DuplicateEntryInDunderAll, expr.range());
 
-            match edits::remove_member(elts, index, source) {
-                Ok(edit) => {
+            diagnostic.try_set_fix(|| {
+                edits::remove_member(elts, index, source).map(|edit| {
                     let applicability = if checker.comment_ranges().intersects(edit.range()) {
                         Applicability::Unsafe
                     } else {
                         Applicability::Safe
                     };
 
-                    diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
-                }
-                Err(err) => log::debug!("Failed to create fix for {}: {}", diagnostic.name(), err),
-            }
+                    Fix::applicable_edit(edit, applicability)
+                })
+            });
         }
     }
 }
