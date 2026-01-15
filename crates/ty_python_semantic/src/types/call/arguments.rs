@@ -355,6 +355,7 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                 || enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
+        Type::TypeAlias(alias) => is_expandable_type(db, alias.value_type(db)),
         _ => false,
     }
 }
@@ -410,6 +411,8 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             None
         }
         Type::Union(union) => Some(union.elements(db).to_vec()),
+        // For type aliases, expand the underlying value type.
+        Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
         _ => None,
