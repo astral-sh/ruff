@@ -161,6 +161,21 @@ pub(crate) fn complex_annotation(checker: &Checker, function_def: &StmtFunctionD
             }
         }
     }
+
+    if let Some(return_annotation) = &function_def.returns {
+        let annoation_complexity =
+            get_annoation_complexity(&annoation_resolver, &return_annotation);
+        if annoation_complexity > max_complexity {
+            checker.report_diagnostic(
+                ComplexAnnotation {
+                    symbol_name: "return type".to_owned(),
+                    complexity_value: annoation_complexity,
+                    max_complexity_value: max_complexity,
+                },
+                return_annotation.range(),
+            );
+        }
+    }
 }
 
 #[cfg(test)]
