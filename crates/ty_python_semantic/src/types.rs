@@ -43,7 +43,7 @@ use crate::place::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::ScopeId;
+use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -131,11 +131,15 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
-        // TODO: Scopes that need type context, e.g., list comprehensions, are inferred during
-        // the inference of their outer scope, and so end up getting inferred a second time here
-        // without type context. This does not affect the type inferred in its outer scope, but
-        // is necessary as some IDE operations may be performed without type context, e.g.,
-        // hovering in the inner scope.
+        // Scopes that need type context, e.g., comprehensions, are inferred during
+        // the inference of their outer scope.
+        match scope_id.node(db) {
+            NodeWithScopeKind::ListComprehension(_)
+            | NodeWithScopeKind::SetComprehension(_)
+            | NodeWithScopeKind::DictComprehension(_) => continue,
+            _ => {}
+        }
+
         let result = infer_scope_types(db, scope_id, TypeContext::default());
 
         if let Some(scope_diagnostics) = result.diagnostics() {

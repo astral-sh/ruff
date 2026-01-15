@@ -10229,6 +10229,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, tcx);
 
+        // Comprehensions are skipped when checking all scopes, so this is our only chance
+        // to report diagnostics.
+        if let Some(scope_diagnostics) = inference.diagnostics() {
+            self.context.extend(scope_diagnostics);
+        }
+
         self.infer_comprehension_specialization(KnownClass::List, &[Some(elt)], inference, tcx)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
@@ -10257,6 +10263,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, tcx);
+
+        // Comprehensions are skipped when checking all scopes, so this is our only chance
+        // to report diagnostics.
+        if let Some(scope_diagnostics) = inference.diagnostics() {
+            self.context.extend(scope_diagnostics);
+        }
 
         self.infer_comprehension_specialization(KnownClass::Set, &[Some(elt)], inference, tcx)
             .unwrap_or_else(|| {
@@ -10287,6 +10299,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, tcx);
+
+        // Comprehensions are skipped when checking all scopes, so this is our only chance
+        // to report diagnostics.
+        if let Some(scope_diagnostics) = inference.diagnostics() {
+            self.context.extend(scope_diagnostics);
+        }
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,
