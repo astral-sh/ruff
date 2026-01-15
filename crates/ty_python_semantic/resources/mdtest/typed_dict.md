@@ -1617,6 +1617,53 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
+## Recursive functional `TypedDict`
+
+Functional `TypedDict`s can also be recursive, referencing themselves in field types:
+
+```py
+from __future__ import annotations
+from typing_extensions import TypedDict
+
+# Self-referencing TypedDict using functional syntax
+TreeNode = TypedDict("TreeNode", {"value": int, "left": TreeNode | None, "right": TreeNode | None})
+
+reveal_type(TreeNode)  # revealed: <class 'TreeNode'>
+
+leaf: TreeNode = {"value": 1, "left": None, "right": None}
+reveal_type(leaf["value"])  # revealed: int
+reveal_type(leaf["left"])  # revealed: TreeNode | None
+
+tree: TreeNode = {
+    "value": 10,
+    "left": {"value": 5, "left": None, "right": None},
+    "right": {"value": 15, "left": None, "right": None},
+}
+
+# error: [invalid-argument-type]
+bad_tree: TreeNode = {"value": 1, "left": "not a node", "right": None}
+```
+
+Recursive functional `TypedDict`s work with `Required` and `NotRequired`:
+
+```py
+from typing_extensions import Required, NotRequired
+
+LinkedList = TypedDict(
+    "LinkedList",
+    {"value": Required[int], "next": NotRequired[LinkedList | None]},
+    total=False,
+)
+
+# 'value' is required, 'next' is not required
+node1: LinkedList = {"value": 1}
+node2: LinkedList = {"value": 2, "next": node1}
+node3: LinkedList = {"value": 3, "next": {"value": 4, "next": None}}
+
+# error: [missing-typed-dict-key]
+bad_node: LinkedList = {"next": None}
+```
+
 ## Function/assignment syntax
 
 TypedDicts can be created using the functional syntax:
@@ -1691,6 +1738,52 @@ from typing_extensions import TypedDict
 
 # closed is accepted (no error)
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
+```
+
+## Function syntax with `extra_items`
+
+The `extra_items` keyword is accepted and validated as a type expression:
+
+```py
+from typing_extensions import TypedDict
+
+# extra_items is accepted (no error)
+MovieWithExtras = TypedDict("MovieWithExtras", {"name": str}, extra_items=bool)
+```
+
+## Function syntax with forward references
+
+Functional TypedDict supports forward references (string annotations):
+
+```py
+from typing_extensions import TypedDict, NotRequired
+
+class Director:
+    name: str
+
+# Forward reference to a class defined above
+MovieWithDirector = TypedDict("MovieWithDirector", {"title": str, "director": NotRequired["Director"]})
+
+movie: MovieWithDirector = {"title": "The Matrix"}
+reveal_type(movie)  # revealed: MovieWithDirector
+```
+
+## Deprecated keyword-argument syntax
+
+The deprecated keyword-argument syntax (fields as keyword arguments instead of a dict) is supported
+for backwards compatibility:
+
+```py
+from typing_extensions import TypedDict
+
+# Deprecated syntax: TypedDict("Name", field1=type1, field2=type2)
+Movie2 = TypedDict("Movie2", name=str, year=int)
+
+movie2: Movie2 = {"name": "Blade Runner", "year": 1982}
+reveal_type(movie2)  # revealed: Movie2
+
+# error: [invalid-argument-type]
+bad_movie: Movie2 = {"name": "Blade Runner", "year": "not an int"}
 ```
 
 ## Function syntax with invalid arguments

@@ -5585,6 +5585,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .is_some_and(|f| f.is_known(self.db(), KnownFunction::MakeDataclass))
                     {
                         self.infer_make_dataclass_call_expression(call_expr, Some(definition))
+                    } else if matches!(callable_type, Type::SpecialForm(SpecialFormType::TypedDict))
+                    {
+                        // Functional TypedDict: defer field type evaluation to support recursive types.
+                        self.deferred.insert(definition, self.multi_inference_state);
+                        self.infer_typeddict_call_expression(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -6151,7 +6156,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
-        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType.
+        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType,
+        // and field types for functional TypedDict.
         let ast::Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) = value
@@ -6168,6 +6174,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_newtype_assignment_deferred(arguments);
             return;
         }
+        // Check for functional TypedDict calls using SpecialFormType
+        if matches!(func_ty, Type::SpecialForm(SpecialFormType::TypedDict)) {
+            self.infer_functional_typeddict_deferred(arguments);
+            return;
+        }
         for arg in arguments.args.iter().skip(1) {
             self.infer_type_expression(arg);
         }
@@ -6182,6 +6193,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_paramspec_default(&default.value);
             } else {
                 self.infer_type_expression(&default.value);
+            }
+        }
+    }
+
+    /// Infer field types for functional `TypedDict` in deferred phase.
+    ///
+    /// This is called during `infer_deferred_types` to infer field types after the `TypedDict`
+    /// definition is complete. This enables support for recursive `TypedDict`s where field types
+    /// may reference the `TypedDict` being defined.
+    fn infer_functional_typeddict_deferred(&mut self, arguments: &ast::Arguments) {
+        // The second positional argument is the fields dict (if present).
+        if let Some(fields_arg) = arguments.args.get(1) {
+            self.infer_typeddict_field_types(fields_arg);
+        }
+
+        // Also handle deprecated keyword-argument syntax where fields are passed as kwargs.
+        for kw in &arguments.keywords {
+            if let Some(arg) = &kw.arg {
+                // Skip known parameters (total, closed, extra_items).
+                match arg.id.as_str() {
+                    "total" | "closed" | "extra_items" => continue,
+                    _ => {
+                        // This is a field definition - infer its type.
+                        self.infer_annotation_expression(
+                            &kw.value,
+                            DeferredExpressionState::Deferred,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Infer field types from a `TypedDict` fields dict argument.
+    fn infer_typeddict_field_types(&mut self, fields_arg: &ast::Expr) {
+        if let ast::Expr::Dict(dict_expr) = fields_arg {
+            for item in &dict_expr.items {
+                // Infer each value as an annotation expression with deferred state.
+                self.infer_annotation_expression(&item.value, DeferredExpressionState::Deferred);
             }
         }
     }
@@ -7634,21 +7684,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
         } = &call_expr.arguments;
 
-        // Need at least typename and fields.
-        let [name_arg, fields_arg, rest @ ..] = &**args else {
-            for arg in args {
-                self.infer_expression(arg, TypeContext::default());
+        // Need at least typename and fields (or fields via keyword arguments for deprecated syntax).
+        // The deprecated keyword-argument syntax is: `TypedDict("Name", field1=type1, field2=type2)`.
+        let (name_arg, fields_arg): (&ast::Expr, Option<&ast::Expr>) = match &**args {
+            [name_arg, fields_arg, ..] => (name_arg, Some(fields_arg)),
+            [name_arg] if !keywords.is_empty() => {
+                // Deprecated keyword-argument syntax: `TypedDict("Name", field1=type1, ...)`.
+                // We have just the typename, with fields as keyword arguments.
+                (name_arg, None)
             }
-            for kw in keywords {
-                self.infer_expression(&kw.value, TypeContext::default());
+            _ => {
+                // Not enough arguments to form a TypedDict.
+                for arg in args {
+                    self.infer_expression(arg, TypeContext::default());
+                }
+                for kw in keywords {
+                    self.infer_expression(&kw.value, TypeContext::default());
+                }
+                return KnownClass::TypedDictFallback.to_subclass_of(self.db());
             }
-            return KnownClass::TypedDictFallback.to_subclass_of(self.db());
         };
 
         let name_type = self.infer_expression(name_arg, TypeContext::default());
-        let fields_type = self.infer_expression(fields_arg, TypeContext::default());
 
-        for arg in rest {
+        // For the fields argument, we DON'T call infer_expression on it directly because:
+        // 1. The dict values are type annotations, not regular expressions
+        // 2. We need to handle forward references (including self-references) via annotation inference
+        // Instead, we extract fields directly from the AST in extract_typeddict_fields.
+        // We still need to get the fields_type for validation when it's not a dict literal.
+        let fields_type = fields_arg.and_then(|f| {
+            if matches!(f, ast::Expr::Dict(_)) {
+                // Dict literal - don't infer as value expression, will handle in extract_typeddict_fields
+                None
+            } else {
+                // Non-dict literal - infer to check type
+                Some(self.infer_expression(f, TypeContext::default()))
+            }
+        });
+
+        for arg in args.iter().skip(2) {
             self.infer_expression(arg, TypeContext::default());
         }
 
@@ -7663,10 +7737,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Check for excess positional arguments (only typename and fields are expected).
-        if !rest.is_empty() {
+        if args.len() > 2 {
             if let Some(builder) = self
                 .context
-                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &rest[0])
+                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &args[2])
             {
                 builder.into_diagnostic(format_args!(
                     "Too many positional arguments to function `TypedDict`: expected 2, got {}",
@@ -7675,17 +7749,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Infer keyword arguments: total is the only one we care about.
+        // Infer keyword arguments. Track `total` and collect deprecated-syntax field definitions.
         let mut total = true;
+        let deprecated_syntax = fields_arg.is_none();
+        let mut deprecated_fields: Vec<(Name, Option<bool>)> = Vec::new();
 
         for kw in keywords {
-            let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-
             let Some(arg) = &kw.arg else {
+                self.infer_expression(&kw.value, TypeContext::default());
                 continue;
             };
             match arg.id.as_str() {
                 "total" => {
+                    let kw_type = self.infer_expression(&kw.value, TypeContext::default());
                     // Validate that total is a bool.
                     if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
                         && let Some(builder) =
@@ -7709,6 +7785,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 "closed" => {
+                    let kw_type = self.infer_expression(&kw.value, TypeContext::default());
                     // closed is not yet supported, but we still validate the type.
                     if !kw_type.is_assignable_to(db, KnownClass::Bool.to_instance(db))
                         && let Some(builder) =
@@ -7723,11 +7800,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                unknown_kwarg => {
-                    if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
-                        builder.into_diagnostic(format_args!(
-                            "Argument `{unknown_kwarg}` does not match any known parameter of `TypedDict`",
-                        ));
+                "extra_items" => {
+                    // extra_items is not yet supported, but we validate the type expression.
+                    self.infer_type_expression(&kw.value);
+                }
+                field_name => {
+                    // For deprecated keyword-argument syntax, treat unknown kwargs as field definitions.
+                    if deprecated_syntax {
+                        // Extract explicit requiredness from AST without type inference.
+                        let explicit_required =
+                            self.extract_explicit_requiredness_from_ast(&kw.value);
+                        deprecated_fields.push((Name::new(field_name), explicit_required));
+                    } else {
+                        // Normal syntax - report unknown argument.
+                        self.infer_expression(&kw.value, TypeContext::default());
+                        if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
+                            builder.into_diagnostic(format_args!(
+                                "Argument `{field_name}` does not match any known parameter of `TypedDict`",
+                            ));
+                        }
                     }
                 }
             }
@@ -7752,9 +7843,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Name::new_static("<unknown>")
         };
 
-        // Extract fields from the dict argument.
-        let (fields, has_known_fields) =
-            self.extract_typeddict_fields(fields_arg, fields_type, total);
+        // Extract raw fields: from dict argument (normal syntax) or from keyword arguments (deprecated syntax).
+        // Field types are NOT evaluated here to support recursive TypedDicts.
+        let (raw_fields, has_known_fields) = if let Some(fields_arg) = fields_arg {
+            self.extract_raw_typeddict_fields(fields_arg, fields_type)
+        } else {
+            // Deprecated keyword-argument syntax: fields were collected from keyword arguments.
+            (deprecated_fields.into_boxed_slice(), true)
+        };
 
         let scope = self.scope();
 
@@ -7778,67 +7874,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        let typeddict = DynamicTypedDictLiteral::new(db, name, fields, has_known_fields, anchor);
+        let typeddict =
+            DynamicTypedDictLiteral::new(db, name, raw_fields, total, has_known_fields, anchor);
 
         Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
     }
 
-    /// Extract fields from a `TypedDict` fields dict argument.
+    /// Extract raw field information from a `TypedDict` fields dict argument.
     ///
-    /// The fields argument should be a dict literal mapping field names (`str`) to types.
-    /// Returns `(fields, has_known_fields)`.
-    #[expect(clippy::type_complexity)]
-    fn extract_typeddict_fields(
+    /// Returns field names and explicit requiredness WITHOUT evaluating field types.
+    /// Field types are computed lazily in `dynamic_typeddict_items` to support recursive
+    /// `TypedDict`s where field types may reference the `TypedDict` being defined.
+    ///
+    /// Returns `(raw_fields, has_known_fields)` where `raw_fields` contains (name, `explicit_required`).
+    #[allow(clippy::type_complexity)]
+    fn extract_raw_typeddict_fields(
         &mut self,
         fields_arg: &ast::Expr,
-        fields_type: Type<'db>,
-        total: bool,
-    ) -> (Box<[(Name, Type<'db>, bool)]>, bool) {
+        fields_type: Option<Type<'db>>,
+    ) -> (Box<[(Name, Option<bool>)]>, bool) {
         let db = self.db();
-        let scope_id = self.scope();
-        let typevar_binding_context = self.typevar_binding_context;
 
         // First try to extract from AST if it's a dict literal.
         if let ast::Expr::Dict(dict_expr) = fields_arg {
-            let fields: Option<Box<[_]>> = dict_expr
-                .items
-                .iter()
-                .map(|item| {
-                    let ast::DictItem { key, value } = item;
-                    // Key must be a string literal for the field name.
-                    let Some(key) = key else {
-                        return None; // Spread operator not supported
-                    };
+            let mut fields: Vec<(Name, Option<bool>)> = Vec::with_capacity(dict_expr.items.len());
+            let mut all_valid = true;
 
-                    // Extract field name directly from AST string literal.
-                    let name = match key {
-                        ast::Expr::StringLiteral(s) => Name::new(s.value.to_str()),
-                        _ => return None, // Key must be a string literal
-                    };
+            for item in &dict_expr.items {
+                let ast::DictItem { key, value } = item;
 
-                    // Value is the type annotation - get the type that was inferred.
-                    let value_type = self.expression_type(value);
+                // Key must be a string literal for the field name.
+                let Some(key) = key else {
+                    all_valid = false;
+                    continue; // Spread operator not supported
+                };
 
-                    // Check for Required/NotRequired wrappers
-                    let (field_ty, is_required) = self.extract_typeddict_field_requiredness(
-                        value,
-                        value_type,
-                        total,
-                        scope_id,
-                        typevar_binding_context,
-                    );
+                // Infer the key as a regular expression and extract the field name.
+                let key_ty = self.infer_expression(key, TypeContext::default());
+                let name = if let Some(s) = key_ty.as_string_literal() {
+                    Name::new(s.value(db))
+                } else {
+                    all_valid = false;
+                    continue; // Key must be a string literal
+                };
 
-                    Some((name, field_ty, is_required))
-                })
-                .collect();
+                // Extract explicit requiredness from AST without type inference.
+                // This is crucial for supporting recursive TypedDicts.
+                let explicit_required = self.extract_explicit_requiredness_from_ast(value);
 
-            if let Some(fields) = fields {
-                return (fields, true);
+                fields.push((name, explicit_required));
+            }
+
+            if all_valid {
+                return (fields.into_boxed_slice(), true);
             }
         }
 
         // Emit diagnostic if fields is not a dict literal.
-        if !fields_type.is_assignable_to(db, KnownClass::Dict.to_instance(db))
+        if let Some(fields_type) = fields_type
+            && !fields_type.is_assignable_to(db, KnownClass::Dict.to_instance(db))
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -7854,90 +7948,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         (Box::default(), false)
     }
 
-    /// Extract the requiredness of a `TypedDict` field, handling `Required`/`NotRequired` wrappers.
-    fn extract_typeddict_field_requiredness(
-        &self,
-        value_expr: &ast::Expr,
-        value_type: Type<'db>,
-        total: bool,
-        scope_id: ScopeId<'db>,
-        typevar_binding_context: Option<Definition<'db>>,
-    ) -> (Type<'db>, bool) {
-        let db = self.db();
-
-        // Check for bare Required or NotRequired (without subscript).
-        if let Type::SpecialForm(SpecialFormType::Required) = value_type {
-            return (Type::unknown(), true);
-        }
-        if let Type::SpecialForm(SpecialFormType::NotRequired) = value_type {
-            return (Type::unknown(), false);
-        }
-
-        // Check for subscripted Required[T] or NotRequired[T].
-        // These wrappers modify the requiredness of the field.
-        if let ast::Expr::Subscript(subscript) = value_expr {
-            let subscript_value_ty = self.expression_type(&subscript.value);
-            match subscript_value_ty {
-                Type::SpecialForm(SpecialFormType::Required) => {
-                    // Required[T] - extract T and mark as required.
-                    let inner_ty = self.expression_type(&subscript.slice);
-                    let resolved_ty =
-                        match inner_ty.in_type_expression(db, scope_id, typevar_binding_context) {
-                            Ok(ty) => ty,
-                            Err(error) => {
-                                if let Some(builder) =
-                                    self.context.report_lint(&INVALID_TYPE_FORM, value_expr)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Invalid type `{}` in `TypedDict` field type",
-                                        inner_ty.display(db)
-                                    ));
-                                }
-                                error.fallback_type
-                            }
-                        };
-                    return (resolved_ty, true);
-                }
-                Type::SpecialForm(SpecialFormType::NotRequired) => {
-                    // NotRequired[T] - extract T and mark as not required.
-                    let inner_ty = self.expression_type(&subscript.slice);
-                    let resolved_ty =
-                        match inner_ty.in_type_expression(db, scope_id, typevar_binding_context) {
-                            Ok(ty) => ty,
-                            Err(error) => {
-                                if let Some(builder) =
-                                    self.context.report_lint(&INVALID_TYPE_FORM, value_expr)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Invalid type `{}` in `TypedDict` field type",
-                                        inner_ty.display(db)
-                                    ));
-                                }
-                                error.fallback_type
-                            }
-                        };
-                    return (resolved_ty, false);
-                }
-                _ => {}
-            }
-        }
-
-        // Convert to type expression.
-        let resolved_ty = match value_type.in_type_expression(db, scope_id, typevar_binding_context)
-        {
-            Ok(ty) => ty,
-            Err(error) => {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value_expr) {
-                    builder.into_diagnostic(format_args!(
-                        "Invalid type `{}` in `TypedDict` field type",
-                        value_type.display(db)
-                    ));
-                }
-                error.fallback_type
-            }
+    /// Extract explicit requiredness from AST without type inference.
+    ///
+    /// This function checks if the expression is wrapped in `Required[...]` or `NotRequired[...]`
+    /// by examining the AST structure. It does NOT perform type inference, which is crucial for
+    /// supporting recursive `TypedDict`s where field types may reference the `TypedDict` being defined.
+    ///
+    /// Returns:
+    /// - `Some(true)` if explicitly wrapped in `Required[...]`
+    /// - `Some(false)` if explicitly wrapped in `NotRequired[...]`
+    /// - `None` if no explicit wrapper (should use `total` default)
+    #[allow(clippy::unused_self)]
+    fn extract_explicit_requiredness_from_ast(&self, expr: &ast::Expr) -> Option<bool> {
+        // Check if this is a subscript expression like Required[...] or NotRequired[...]
+        let ast::Expr::Subscript(subscript) = expr else {
+            return None;
         };
 
-        (resolved_ty, total)
+        // Check if the value is a name expression (Required or NotRequired)
+        let ast::Expr::Name(name) = &*subscript.value else {
+            // Could be an attribute like typing.Required, but we'll simplify for now
+            // and just check simple names
+            return None;
+        };
+
+        match name.id.as_str() {
+            "Required" => Some(true),
+            "NotRequired" => Some(false),
+            _ => None,
+        }
     }
 
     /// Extract fields from a `make_dataclass` fields argument.
@@ -16553,7 +16592,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
     /// necessarily guarantee that the passed-in value for `__setitem__` is stored and
     /// can be retrieved unmodified via `__getitem__`. Therefore, we currently only
     /// perform assignment-based narrowing on a few built-in classes (`list`, `dict`,
-    /// `bytesarray`, `TypedDict` and `collections` types) where we are confident that
+    /// `bytesarray`, `TypedDict`, and `collections` types) where we are confident that
     /// this kind of narrowing can be performed soundly. This is the same approach as
     /// pyright. TODO: Other standard library classes may also be considered safe. Also,
     /// subclasses of these safe classes that do not override `__getitem__/__setitem__`
