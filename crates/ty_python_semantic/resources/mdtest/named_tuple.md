@@ -1178,6 +1178,28 @@ class Baz(Bar):
     _whatever: str  # `Baz` is not a NamedTuple class, so this is fine
 ```
 
+The same validation applies to the functional `typing.NamedTuple` syntax:
+
+```py
+from typing import NamedTuple
+
+# error: [invalid-named-tuple] "Field name `_x` in `NamedTuple()` cannot start with an underscore"
+Underscore = NamedTuple("Underscore", [("_x", int), ("y", str)])
+reveal_type(Underscore)  # revealed: <class 'Underscore'>
+
+# error: [invalid-named-tuple] "Field name `class` in `NamedTuple()` cannot be a Python keyword"
+Keyword = NamedTuple("Keyword", [("x", int), ("class", str)])
+reveal_type(Keyword)  # revealed: <class 'Keyword'>
+
+# error: [invalid-named-tuple] "Duplicate field name `x` in `NamedTuple()`"
+Duplicate = NamedTuple("Duplicate", [("x", int), ("y", str), ("x", float)])
+reveal_type(Duplicate)  # revealed: <class 'Duplicate'>
+
+# error: [invalid-named-tuple] "Field name `not valid` in `NamedTuple()` is not a valid identifier"
+Invalid = NamedTuple("Invalid", [("not valid", int), ("ok", str)])
+reveal_type(Invalid)  # revealed: <class 'Invalid'>
+```
+
 ## Prohibited NamedTuple attributes
 
 `NamedTuple` classes have certain synthesized attributes that cannot be overwritten. Attempting to

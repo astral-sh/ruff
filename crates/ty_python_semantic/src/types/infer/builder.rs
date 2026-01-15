@@ -6700,6 +6700,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .extract_typing_namedtuple_fields(fields_arg, fields_type)
                         .or_else(|| self.extract_typing_namedtuple_fields_from_ast(fields_arg));
 
+                    // Validate field names if we have known fields.
+                    if let Some(ref fields) = fields {
+                        let field_names: Vec<_> =
+                            fields.iter().map(|(name, _, _)| name.clone()).collect();
+                        self.report_invalid_namedtuple_field_names(
+                            &field_names,
+                            fields_arg,
+                            NamedTupleKind::Typing,
+                        );
+                    }
+
                     // Emit diagnostic if the type is outright invalid (not an iterable).
                     if fields.is_none() {
                         let iterable_any =
@@ -6782,53 +6793,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // invalid names are automatically replaced with `_0`, `_1`, etc., so no
                         // diagnostic is needed.
                         if !rename {
-                            for (i, field_name) in field_names.iter().enumerate() {
-                                let name_str = field_name.as_str();
-
-                                if field_names[..i].iter().any(|f| f.as_str() == name_str)
-                                    && let Some(builder) =
-                                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Duplicate field name `{name_str}` in `namedtuple()`"
-                                    ));
-                                    diagnostic.set_primary_message(format_args!(
-                                        "Field `{name_str}` already defined; will raise `ValueError` at runtime"
-                                    ));
-                                }
-
-                                if name_str.starts_with('_')
-                                    && let Some(builder) =
-                                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Field name `{name_str}` in `namedtuple()` cannot start with an underscore"
-                                    ));
-                                    diagnostic.set_primary_message(format_args!(
-                                        "Will raise `ValueError` at runtime"
-                                    ));
-                                } else if is_keyword(name_str)
-                                    && let Some(builder) =
-                                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Field name `{name_str}` in `namedtuple()` cannot be a Python keyword"
-                                    ));
-                                    diagnostic.set_primary_message(format_args!(
-                                        "Will raise `ValueError` at runtime"
-                                    ));
-                                } else if !is_identifier(name_str)
-                                    && let Some(builder) =
-                                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Field name `{name_str}` in `namedtuple()` is not a valid identifier"
-                                    ));
-                                    diagnostic.set_primary_message(format_args!(
-                                        "Will raise `ValueError` at runtime"
-                                    ));
-                                }
-                            }
+                            self.report_invalid_namedtuple_field_names(
+                                &field_names,
+                                fields_arg,
+                                NamedTupleKind::Collections,
+                            );
                         } else {
                             // Apply rename logic.
                             let mut seen_names = FxHashSet::<&str>::default();
@@ -6960,6 +6929,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .collect();
 
         fields
+    }
+
+    /// Report diagnostics for invalid field names in a namedtuple definition.
+    fn report_invalid_namedtuple_field_names(
+        &self,
+        field_names: &[Name],
+        fields_arg: &ast::Expr,
+        kind: NamedTupleKind,
+    ) {
+        for (i, field_name) in field_names.iter().enumerate() {
+            let name_str = field_name.as_str();
+
+            // Check for duplicate field names.
+            if field_names[..i].iter().any(|f| f.as_str() == name_str)
+                && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Duplicate field name `{name_str}` in `{kind}()`"
+                ));
+                diagnostic.set_primary_message(format_args!(
+                    "Field `{name_str}` already defined; will raise `ValueError` at runtime"
+                ));
+            }
+
+            if name_str.starts_with('_')
+                && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Field name `{name_str}` in `{kind}()` cannot start with an underscore"
+                ));
+                diagnostic.set_primary_message("Will raise `ValueError` at runtime");
+            } else if is_keyword(name_str)
+                && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Field name `{name_str}` in `{kind}()` cannot be a Python keyword"
+                ));
+                diagnostic.set_primary_message("Will raise `ValueError` at runtime");
+            } else if !is_identifier(name_str)
+                && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Field name `{name_str}` in `{kind}()` is not a valid identifier"
+                ));
+                diagnostic.set_primary_message("Will raise `ValueError` at runtime");
+            }
+        }
     }
 
     /// Extract fields from a typing.NamedTuple fields argument by looking at the AST directly.
