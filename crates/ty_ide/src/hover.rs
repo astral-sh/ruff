@@ -4175,7 +4175,7 @@ def function():
         );
 
         // __file__ should be `str` when accessed within a module, not `str | None`
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         str
         ---------------------------------------------
         ```python

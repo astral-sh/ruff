@@ -2939,7 +2939,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @r"
+            @"
         (
             x=...,
             y: str = ...
@@ -2957,7 +2957,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @r"
+            @"
         (
             x,
             y,
@@ -2976,7 +2976,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @r"
+            @"
         (
             x,
             /,
@@ -2995,7 +2995,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @r"
+            @"
         (
             *,
             x,
@@ -3014,7 +3014,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @r"
+            @"
         (
             x,
             *,
@@ -3053,7 +3053,7 @@ mod tests {
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
-            @r"
+            @"
         (
             a,
             b: int,
