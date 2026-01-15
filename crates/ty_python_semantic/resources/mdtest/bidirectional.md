@@ -303,6 +303,34 @@ def _(flag: bool):
     reveal_type(x2)  # revealed: list[int | None]
 ```
 
+## Lambda expressions
+
+If a lambda expression is annotated as a `Callable` type, the body of the lambda is inferred with
+the annotated return type as type context, and the annotated parameter types are respected:
+
+```py
+from typing import Callable, TypedDict
+
+class Bar(TypedDict):
+    bar: int
+
+x1 = lambda x: {"bar": 1}
+reveal_type(x1)  # revealed: (x) -> dict[Unknown | str, Unknown | int]
+
+x2: Callable[[int], Bar] = lambda x: {"bar": 1}
+reveal_type(x2)  # revealed: (x: int) -> Bar
+
+# error: [missing-typed-dict-key] "Missing required key 'bar' in TypedDict `Bar` constructor"
+# error: [invalid-assignment] "Object of type `(x: int) -> dict[Unknown, Unknown]` is not assignable to `(int, /) -> Bar`"
+x3: Callable[[int], Bar] = lambda x: {}
+reveal_type(x3)  # revealed: (int, /) -> Bar
+
+# TODO: This should reveal `str`.
+# revealed: Unknown
+x4: Callable[[str], str] = lambda x: reveal_type(x)
+reveal_type(x4)  # revealed: (x: str) -> Unknown
+```
+
 ## Dunder Calls
 
 The key and value parameters types are used as type context for `__setitem__` dunder calls:

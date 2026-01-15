@@ -562,7 +562,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             NodeWithScopeKind::Function(function) => {
                 self.infer_function_body(function.node(self.module()));
             }
-            NodeWithScopeKind::Lambda(lambda) => self.infer_lambda_body(lambda.node(self.module())),
+            NodeWithScopeKind::Lambda(lambda) => {
+                self.infer_lambda_body(lambda.node(self.module()), tcx);
+            }
             NodeWithScopeKind::Class(class) => self.infer_class_body(class.node(self.module())),
             NodeWithScopeKind::ClassTypeParameters(class) => {
                 self.infer_class_type_params(class.node(self.module()));
@@ -9559,7 +9561,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
             ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
             ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
-            ast::Expr::Lambda(lambda_expression) => self.infer_lambda_expression(lambda_expression),
+            ast::Expr::Lambda(lambda_expression) => {
+                self.infer_lambda_expression(lambda_expression, tcx)
+            }
             ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
@@ -10699,11 +10703,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda) {
-        self.infer_expression(&lambda_expression.body, TypeContext::default());
+    fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda, tcx: TypeContext<'db>) {
+        self.infer_expression(&lambda_expression.body, tcx);
     }
 
-    fn infer_lambda_expression(&mut self, lambda_expression: &ast::ExprLambda) -> Type<'db> {
+    fn infer_lambda_expression(
+        &mut self,
+        lambda_expression: &ast::ExprLambda,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprLambda {
             range: _,
             node_index: _,
@@ -10714,6 +10722,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // In stub files, default values may reference names that are defined later in the file.
         let in_stub = self.in_stub();
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
+
+        let callable_tcx = if let Some(tcx) = tcx.annotation
+            && let Some(callable) = tcx
+                .filter_union(self.db(), Type::is_callable_type)
+                .as_callable()
+        {
+            let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
+                panic!("`Callable` type annotations cannot be overloaded");
+            };
+
+            Some(signature)
+        } else {
+            None
+        };
 
         let parameters = if let Some(parameters) = parameters {
             let positional_only = parameters
@@ -10759,25 +10781,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_ref()
                 .map(|param| Parameter::keyword_variadic(param.name().id.clone()));
 
-            Parameters::new(
-                self.db(),
-                positional_only
+            let parameters = positional_only
+                .into_iter()
+                .chain(positional_or_keyword)
+                .chain(variadic)
+                .chain(keyword_only)
+                .chain(keyword_variadic);
+
+            if let Some(signature) = callable_tcx {
+                let mut parameter_types = signature
+                    .parameters()
                     .into_iter()
-                    .chain(positional_or_keyword)
-                    .chain(variadic)
-                    .chain(keyword_only)
-                    .chain(keyword_variadic),
-            )
+                    .map(Parameter::annotated_type);
+
+                Parameters::new(
+                    self.db(),
+                    parameters.map(|parameter| {
+                        if let Some(annotated_type) = parameter_types.next() {
+                            parameter.with_annotated_type(annotated_type)
+                        } else {
+                            parameter
+                        }
+                    }),
+                )
+            } else {
+                Parameters::new(self.db(), parameters)
+            }
         } else {
             Parameters::empty()
         };
 
         self.deferred_state = previous_deferred_state;
 
-        // TODO: Useful inference of a lambda's return type will require a different approach,
-        // which does the inference of the body expression based on arguments at each call site,
-        // rather than eagerly computing a return type without knowing the argument types.
-        Type::function_like_callable(self.db(), Signature::new(parameters, Type::unknown()))
+        let Some(scope_id) = self
+            .index
+            .try_node_scope(NodeWithScopeRef::Lambda(lambda_expression))
+        else {
+            return Type::unknown();
+        };
+
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+
+        // If we have a direct `Callable` type context, we can infer the body with the annotated
+        // return type as type context.
+        let return_tcx = if let Some(signature) = callable_tcx {
+            match signature.return_ty {
+                Type::Dynamic(DynamicType::Unknown) => TypeContext::new(None),
+                _ => TypeContext::new(Some(signature.return_ty)),
+            }
+        } else {
+            // TODO: Useful inference of a lambda's return type will require a different approach,
+            // which does the inference of the body expression based on arguments at each call site,
+            // rather than eagerly computing a return type without knowing the argument types.
+            TypeContext::new(None)
+        };
+
+        let inference = infer_scope_types(self.db(), scope, return_tcx);
+        self.extend_scope(inference);
+
+        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
+        Type::function_like_callable(self.db(), Signature::new(parameters, return_ty))
     }
 
     fn infer_call_expression(
