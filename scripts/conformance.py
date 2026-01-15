@@ -70,8 +70,11 @@ CONFORMANCE_ERROR_PATTERN = re.compile(
     re.VERBOSE,
 )
 
-CONFORMANCE_URL = "https://github.com/python/typing/blob/{conformance_suite_commit}/conformance/tests/{filename}#L{line}"
 CONFORMANCE_SUITE_COMMIT = os.environ.get("CONFORMANCE_SUITE_COMMIT", "main")
+CONFORMANCE_DIR_WITH_README = (
+    f"https://github.com/python/typing/blob/{CONFORMANCE_SUITE_COMMIT}/conformance/"
+)
+CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "/tests/{filename}#L{line}"
 
 
 class Source(Flag):
@@ -89,13 +92,13 @@ class Classification(StrEnum):
     def into_title(self) -> str:
         match self:
             case Classification.TRUE_POSITIVE:
-                return "True positives added 🎉"
+                return "True positives added"
             case Classification.FALSE_POSITIVE:
-                return "False positives added 🫤"
+                return "False positives added"
             case Classification.TRUE_NEGATIVE:
-                return "False positives removed 🎉"
+                return "False positives removed"
             case Classification.FALSE_NEGATIVE:
-                return "True positives removed 🫤"
+                return "True positives removed"
 
 
 @dataclass(kw_only=True, slots=True)
@@ -415,7 +418,7 @@ def render_grouped_diagnostics(
     ):
         group = list(group)
 
-        lines.append(f"## {classification.into_title()}")
+        lines.append(f"### {classification.into_title()}")
         lines.extend(["", "<details>", ""])
 
         lines.extend(header)
@@ -478,6 +481,8 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
     false_neg_change = new.false_negatives - old.false_negatives
     total_change = new.total - old.total
 
+    base_header = f"[Typing conformance results]({CONFORMANCE_DIR_WITH_README})"
+
     if (
         precision_change == 0
         and recall_change == 0
@@ -486,7 +491,13 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
         and false_neg_change == 0
         and total_change == 0
     ):
-        return "## Typing conformance\n\nNo changes"
+        return dedent(
+            f"""
+            ## {base_header}
+
+            No changes detected ✅
+            """
+        )
 
     true_pos_diff = diff_format(true_pos_change, greater_is_better=True)
     false_pos_diff = diff_format(false_pos_change, greater_is_better=False)
@@ -495,9 +506,29 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
     recall_diff = diff_format(recall_change, greater_is_better=True)
     total_diff = diff_format(total_change, neutral=True)
 
-    table = dedent(
+    if (precision_change > 0 and recall_change >= 0) or (
+        recall_change > 0 and precision_change >= 0
+    ):
+        header = f"{base_header} improved 🎉"
+    elif (precision_change < 0 and recall_change <= 0) or (
+        recall_change < 0 and precision_change <= 0
+    ):
+        header = f"{base_header} regressed ❌"
+    else:
+        header = base_header
+
+    summary_paragraph = (
+        f"The percentage of diagnostics emitted that were expected errors "
+        f"{format_metric(precision_change, old.precision, new.precision)}. "
+        f"The percentage of expected errors that received a diagnostic "
+        f"{format_metric(recall_change, old.recall, new.recall)}."
+    )
+
+    return dedent(
         f"""
-        ## Typing Conformance
+        ## {header}
+
+        {summary_paragraph}
 
         ### Summary
 
@@ -512,15 +543,6 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
         """
     )
-
-    summary = (
-        f"The percentage of diagnostics emitted that were expected errors"
-        f" {format_metric(precision_change, old.precision, new.precision)},"
-        " and the percentage of expected errors that received a diagnostic"
-        f" {format_metric(recall_change, old.recall, new.recall)}."
-    )
-
-    return "\n".join([table, summary])
 
 
 def parse_args():
