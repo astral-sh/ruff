@@ -10,7 +10,28 @@ use crate::checkers::ast::Checker;
 /// Checks for type annotation which are complex.
 ///
 /// ## Why is this bad?
-/// TODO
+/// High type-annotation complexity is a symptom of a complex data structure using generic types.
+/// These are hard to comprehend and limit the invariants a type-checker can enforce.
+///
+/// ## Example
+///
+/// ```python
+/// def example_fn(complex_argument: dict[str, list[dict[str, str | int]]]) -> None: ...
+/// ```
+///
+/// Instead, create concrete data types where possible:
+///
+/// ```python
+/// from dataclasses import dataclass
+///
+/// @dataclass
+/// class Cat:
+///     name: str
+///     age: int
+///
+///
+/// def example_fn(complex_argument: dict[str, list[Cat]]) -> None: ...
+/// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.14.9")]
 pub(crate) struct ComplexAnnotation {
