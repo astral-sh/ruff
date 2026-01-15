@@ -3714,7 +3714,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
     }
 }
 
-fn report_unsupported_base(
+pub(crate) fn report_unsupported_base(
     context: &InferContext,
     base_node: &ast::Expr,
     base_type: Type,

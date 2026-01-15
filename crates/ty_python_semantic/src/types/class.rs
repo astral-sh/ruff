@@ -69,7 +69,7 @@ use crate::{
     },
 };
 use indexmap::IndexSet;
-use itertools::Itertools as _;
+use itertools::{Either, Itertools as _};
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -2454,12 +2454,16 @@ impl<'db> StaticClassLiteral<'db> {
                             .tuple_instance_spec(db)
                             .map(std::borrow::Cow::into_owned)
                         {
-                            return tuple.owned_elements().into_vec();
+                            return Either::Left(tuple.owned_elements().into_vec().into_iter());
                         }
                         // Otherwise, we can't statically determine the bases.
-                        vec![Type::unknown()]
+                        Either::Right(std::iter::once(Type::unknown()))
                     } else {
-                        vec![definition_expression_type(db, class_definition, base_node)]
+                        Either::Right(std::iter::once(definition_expression_type(
+                            db,
+                            class_definition,
+                            base_node,
+                        )))
                     }
                 })
                 .collect(),
