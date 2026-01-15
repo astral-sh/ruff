@@ -28,7 +28,7 @@ use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_python_ast as ast;
 use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
-use ruff_workspace::configuration::{Configuration, RuleSelection};
+use ruff_workspace::configuration::{Configuration, ExternalRuleSelection, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
@@ -469,6 +469,53 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
+    /// List configured external AST linters and exit.
+    #[arg(
+        long,
+        help_heading = "External linter options",
+        conflicts_with = "add_noqa"
+    )]
+    pub list_external_linters: bool,
+    /// Restrict linting to the given external linter IDs.
+    #[arg(
+        long = "select-external",
+        value_name = "LINTER",
+        action = clap::ArgAction::Append,
+        help_heading = "External linter options",
+    )]
+    pub select_external: Vec<String>,
+    /// Enable additional external linter IDs or rule codes without replacing existing selections.
+    #[arg(
+        long = "extend-select-external",
+        value_name = "LINTER",
+        action = clap::ArgAction::Append,
+        help_heading = "External linter options",
+    )]
+    pub extend_select_external: Vec<String>,
+    /// Disable the given external linter IDs or rule codes.
+    #[arg(
+        long = "ignore-external",
+        value_name = "LINTER",
+        action = clap::ArgAction::Append,
+        help_heading = "External linter options",
+    )]
+    pub ignore_external: Vec<String>,
+    /// Disable additional external linter IDs or rule codes without replacing existing ignores.
+    #[arg(
+        long = "extend-ignore-external",
+        value_name = "LINTER",
+        action = clap::ArgAction::Append,
+        help_heading = "External linter options",
+    )]
+    pub extend_ignore_external: Vec<String>,
+    /// Validate external linter definitions without running lint checks.
+    #[arg(
+        long = "verify-external-linters",
+        help_heading = "External linter options",
+        conflicts_with = "add_noqa",
+        conflicts_with = "list_external_linters"
+    )]
+    pub verify_external_linters: bool,
 }
 
 #[derive(Clone, Debug, clap::Parser)]
@@ -666,6 +713,14 @@ impl ConfigArguments {
         self.config_file.as_deref()
     }
 
+    pub(crate) fn has_cli_external_selection(&self) -> bool {
+        self.per_flag_overrides
+            .select_external
+            .as_ref()
+            .is_some_and(|selection| !selection.is_empty())
+            || !self.per_flag_overrides.extend_select_external.is_empty()
+    }
+
     fn from_cli_arguments(
         global_options: GlobalConfigArgs,
         per_flag_overrides: ExplicitConfigOverrides,
@@ -737,6 +792,70 @@ impl CheckCommand {
         self,
         global_options: GlobalConfigArgs,
     ) -> anyhow::Result<(CheckArguments, ConfigArguments)> {
+        if let Some(invalid) = self
+            .select_external
+            .iter()
+            .find(|selector| is_builtin_rule_selector(selector))
+        {
+            anyhow::bail!(
+                "Internal rule `{invalid}` cannot be enabled with `--select-external`; use `--select` instead."
+            );
+        }
+        if let Some(selector) = self.select.as_ref().and_then(|selectors| {
+            selectors.iter().find_map(|selector| {
+                if let RuleSelector::External { code } = selector {
+                    Some(code.as_ref().to_string())
+                } else {
+                    None
+                }
+            })
+        }) {
+            anyhow::bail!(
+                "External rule `{selector}` cannot be enabled with `--select`; use `--select-external` instead."
+            );
+        }
+        if let Some(selector) = self.extend_select.as_ref().and_then(|selectors| {
+            selectors.iter().find_map(|selector| {
+                if let RuleSelector::External { code } = selector {
+                    Some(code.as_ref().to_string())
+                } else {
+                    None
+                }
+            })
+        }) {
+            anyhow::bail!(
+                "External rule `{selector}` cannot be enabled with `--extend-select`; use `--extend-select-external` instead."
+            );
+        }
+        if let Some(invalid) = self
+            .extend_select_external
+            .iter()
+            .find(|selector| is_builtin_rule_selector(selector))
+        {
+            anyhow::bail!(
+                "Internal rule `{invalid}` cannot be enabled with `--extend-select-external`; use `--extend-select` instead."
+            );
+        }
+        if let Some(invalid) = self
+            .ignore_external
+            .iter()
+            .chain(self.extend_ignore_external.iter())
+            .find(|selector| is_builtin_rule_selector(selector))
+        {
+            anyhow::bail!(
+                "Internal rule `{invalid}` cannot be disabled with `--ignore-external`; use `--ignore` instead."
+            );
+        }
+
+        let select_external_override = if self.select_external.is_empty() {
+            None
+        } else {
+            Some(self.select_external.clone())
+        };
+        let extend_select_external_override = self.extend_select_external.clone();
+        let ignore_external_override = self.ignore_external.clone();
+        let extend_ignore_external_override = self.extend_ignore_external.clone();
+
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
             diff: self.diff,
@@ -748,6 +867,12 @@ impl CheckCommand {
             output_file: self.output_file,
             show_files: self.show_files,
             show_settings: self.show_settings,
+            list_external_linters: self.list_external_linters,
+            select_external: self.select_external,
+            extend_select_external: self.extend_select_external,
+            ignore_external: self.ignore_external,
+            extend_ignore_external: self.extend_ignore_external,
+            verify_external_linters: self.verify_external_linters,
             statistics: self.statistics,
             stdin_filename: self.stdin_filename,
             watch: self.watch,
@@ -781,6 +906,10 @@ impl CheckCommand {
             output_format: self.output_format,
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             extension: self.extension,
+            select_external: select_external_override,
+            extend_select_external: extend_select_external_override,
+            ignore_external: ignore_external_override,
+            extend_ignore_external: extend_ignore_external_override,
             ..ExplicitConfigOverrides::default()
         };
 
@@ -1083,6 +1212,12 @@ pub struct CheckArguments {
     pub output_file: Option<PathBuf>,
     pub show_files: bool,
     pub show_settings: bool,
+    pub list_external_linters: bool,
+    pub select_external: Vec<String>,
+    pub extend_select_external: Vec<String>,
+    pub ignore_external: Vec<String>,
+    pub extend_ignore_external: Vec<String>,
+    pub verify_external_linters: bool,
     pub statistics: bool,
     pub stdin_filename: Option<PathBuf>,
     pub watch: bool,
@@ -1347,6 +1482,10 @@ struct ExplicitConfigOverrides {
     detect_string_imports: Option<bool>,
     string_imports_min_dots: Option<usize>,
     type_checking_imports: Option<bool>,
+    select_external: Option<Vec<String>>,
+    extend_select_external: Vec<String>,
+    ignore_external: Vec<String>,
+    extend_ignore_external: Vec<String>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1440,9 +1579,31 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         if let Some(type_checking_imports) = &self.type_checking_imports {
             config.analyze.type_checking_imports = Some(*type_checking_imports);
         }
+        if self.select_external.is_some()
+            || !self.extend_select_external.is_empty()
+            || !self.ignore_external.is_empty()
+            || !self.extend_ignore_external.is_empty()
+        {
+            config
+                .lint
+                .external_rule_selections
+                .push(ExternalRuleSelection {
+                    select: self.select_external.clone(),
+                    extend_select: self.extend_select_external.clone(),
+                    ignore: self.ignore_external.clone(),
+                    extend_ignore: self.extend_ignore_external.clone(),
+                });
+        }
 
         config
     }
+}
+
+fn is_builtin_rule_selector(selector: &str) -> bool {
+    matches!(
+        RuleSelector::from_str(selector),
+        Ok(RuleSelector::Linter(_) | RuleSelector::Prefix { .. } | RuleSelector::Rule { .. })
+    )
 }
 
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
