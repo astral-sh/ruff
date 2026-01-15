@@ -421,8 +421,7 @@ impl<'a> SuppressionsBuilder<'a> {
 
                         indents.pop();
 
-                        if indents.is_empty() {
-                            // OR if self.pending is empty?
+                        if indents.is_empty() || self.pending.is_empty() {
                             continue 'comments;
                         }
                     }
