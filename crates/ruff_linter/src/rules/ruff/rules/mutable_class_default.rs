@@ -140,7 +140,7 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                             .is_some_and(|name| class_var_targets.contains(&name.id))
                 }) && is_mutable_expr(value, checker.semantic())
                 {
-                    // The `_fields_` property of a `ctypes.Structure` base class has it's
+                    // The `_fields_` property of a `ctypes.Structure` base class has its
                     // immutability enforced  by the base class itself which will throw an error if
                     // it's set a second time
                     // See: https://docs.python.org/3/library/ctypes.html#ctypes.Structure._fields_
