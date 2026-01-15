@@ -1098,6 +1098,18 @@ fn symbol_impl<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
+    let place = place_table(db, scope)
+        .symbol_id(name)
+        .map(|symbol| {
+            place_by_id(
+                db,
+                scope,
+                symbol.into(),
+                requires_explicit_reexport,
+                considered_definitions,
+            )
+        })
+        .unwrap_or_default();
 
     if name == "platform"
         && file_to_module(db, scope.file(db))
@@ -1111,20 +1123,43 @@ fn symbol_impl<'db>(
                 // Fall through to the looked up type
             }
         }
+    } else if name == "__file__"
+        && let Some(module) = file_to_module(db, scope.file(db))
+    {
+        // We special-case `__file__` here because we know that for a successfully imported
+        // non-namespace-package Python module, that hasn't been explicitly overridden it
+        // is always a string, even though typeshed says `str | None`. For a namespace package,
+        // meanwhile, it will always be `None`.
+        //
+        // Note that C-extension modules (stdlib examples include `sys`, `itertools`, etc.)
+        //  may not have a `__file__` attribute at runtime at all, but that doesn't really
+        // affect the *type* of the attribute, just the *boundness*. There's no way for us
+        // to know right now whether a stub represents a C extension or not, so for now we
+        // do not attempt to detect this; we just infer `str` still. This matches the
+        // behaviour of other major type checkers.
+        let default_type = if module.file(db).is_some() {
+            KnownClass::Str.to_instance(db)
+        } else {
+            Type::none(db)
+        };
+
+        match place.place {
+            Place::Defined(defined_place) => match defined_place.definedness {
+                Definedness::AlwaysDefined => return place,
+                Definedness::PossiblyUndefined => {
+                    let new_type = UnionType::from_elements(db, [defined_place.ty, default_type]);
+                    let def_place = DefinedPlace::new(new_type)
+                        .with_definedness(Definedness::AlwaysDefined)
+                        .with_widening(defined_place.widening)
+                        .with_origin(defined_place.origin);
+                    return Place::Defined(def_place).into();
+                }
+            },
+            Place::Undefined => return Place::bound(default_type).into(),
+        }
     }
 
-    place_table(db, scope)
-        .symbol_id(name)
-        .map(|symbol| {
-            place_by_id(
-                db,
-                scope,
-                symbol.into(),
-                requires_explicit_reexport,
-                considered_definitions,
-            )
-        })
-        .unwrap_or_default()
+    place
 }
 
 fn place_impl<'db>(

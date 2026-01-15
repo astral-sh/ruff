@@ -99,9 +99,14 @@ import typing
 reveal_type(typing.__name__)  # revealed: str
 reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ...) -> None
 
-# For a stub module, we don't know that `__file__` is a string (at runtime it may be entirely
-# unset, but we follow typeshed here):
-reveal_type(typing.__file__)  # revealed: str | None
+# Note that since the source for the `typing` module is a stub file,
+# we can't know for sure that it's not a C extension at runtime,
+# and C extensions don't necessarily have a `__file__` global attribute
+# at all (in which case this attribute access would fail). However, we
+# *do* know that `typing` is not a namespace package, so if `__file__`
+# does exist, it will be of type `str` (`__file__` is only `None` for
+# namespace packages).
+reveal_type(typing.__file__)  # revealed: str
 
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
