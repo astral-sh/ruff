@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+assertion_line: 58
 ---
 SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values())`
  --> SIM911.py:2:17
@@ -95,28 +96,54 @@ help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.
 39 | d = {}
 
 SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
-  --> SIM911.py:45:23
+  --> SIM911.py:47:23
    |
-43 |   flag_stars = {"USA": 50, "Slovenia": 3, "Panama": 2, "Australia": 6}
-44 |
-45 |   for country, stars in zip(
+45 |   flag_stars = {"USA": 50, "Slovenia": 3, "Panama": 2, "Australia": 6}
+46 |
+47 |   for country, stars in zip(
    |  _______________________^
-46 | |         flag_stars.keys(),
-47 | |         # text
-48 | |         flag_stars.values(),
-49 | | ):
+48 | |         flag_stars.keys(),
+49 | |         # text
+50 | |         flag_stars.values(),
+51 | | ):
    | |_^
-50 |       print(f"{country}'s flag has {stars} stars.")
+52 |       print(f"{country}'s flag has {stars} stars.")
    |
 help: Replace `zip(dict.keys(), dict.values())` with `dict.items()`
-42 | 
-43 | flag_stars = {"USA": 50, "Slovenia": 3, "Panama": 2, "Australia": 6}
-44 | 
+44 | # Fixes that delete comments should be marked as unsafe
+45 | flag_stars = {"USA": 50, "Slovenia": 3, "Panama": 2, "Australia": 6}
+46 | 
    - for country, stars in zip(
    -         flag_stars.keys(),
    -         # text
    -         flag_stars.values(),
    - ):
-45 + for country, stars in flag_stars.items():
-46 |     print(f"{country}'s flag has {stars} stars.")
+47 + for country, stars in flag_stars.items():
+48 |     print(f"{country}'s flag has {stars} stars.")
+49 | 
+50 | d = {}
+note: This is an unsafe fix and may change runtime behavior
+
+SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
+  --> SIM911.py:55:13
+   |
+54 |   d = {}
+55 |   for k, v in zip(
+   |  _____________^
+56 | |     d.keys(),  # comment
+57 | |     d.values()
+58 | | ):
+   | |_^
+59 |       ...
+   |
+help: Replace `zip(dict.keys(), dict.values())` with `dict.items()`
+52 |     print(f"{country}'s flag has {stars} stars.")
+53 | 
+54 | d = {}
+   - for k, v in zip(
+   -     d.keys(),  # comment
+   -     d.values()
+   - ):
+55 + for k, v in d.items():
+56 |     ...
 note: This is an unsafe fix and may change runtime behavior

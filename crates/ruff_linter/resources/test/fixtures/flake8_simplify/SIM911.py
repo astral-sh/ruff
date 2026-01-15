@@ -40,6 +40,8 @@ d = {}
 for country, stars in zip(d.keys(*x), d.values("hello")):...
 
 
+# Comment preservation tests (https://github.com/astral-sh/ruff/issues/18775)
+# Fixes that delete comments should be marked as unsafe
 flag_stars = {"USA": 50, "Slovenia": 3, "Panama": 2, "Australia": 6}
 
 for country, stars in zip(
@@ -48,3 +50,10 @@ for country, stars in zip(
         flag_stars.values(),
 ):
     print(f"{country}'s flag has {stars} stars.")
+
+d = {}
+for k, v in zip(
+    d.keys(),  # comment
+    d.values()
+):
+    ...

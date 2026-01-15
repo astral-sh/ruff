@@ -315,6 +315,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         expr.range(),
     );
 
+    // Mark the fix as unsafe if it would delete comments.
     let applicability = if checker.comment_ranges().intersects(expr.range()) {
         Applicability::Unsafe
     } else {

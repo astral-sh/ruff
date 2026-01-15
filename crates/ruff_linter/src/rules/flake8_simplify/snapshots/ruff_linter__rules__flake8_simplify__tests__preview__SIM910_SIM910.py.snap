@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+assertion_line: 78
 ---
 SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
  --> SIM910.py:2:1
@@ -246,27 +247,54 @@ help: Replace `ages.get(get_key(), None)` with `ages.get(get_key())`
 84 + age = ages.get(get_key())
 85 | 
 86 | 
-87 | age = ages.get(
+87 | # Comment preservation tests (https://github.com/astral-sh/ruff/issues/18775)
 
 SIM910 [*] Use `dict.get()` without default value
-  --> SIM910.py:87:7
+  --> SIM910.py:89:7
    |
-87 |   age = ages.get(
+87 |   # Comment preservation tests (https://github.com/astral-sh/ruff/issues/18775)
+88 |   # Fixes that delete comments should be marked as unsafe
+89 |   age = ages.get(
    |  _______^
-88 | |     "Cat",
-89 | |     # text
-90 | |     None,
-91 | | )
+90 | |     "Cat",
+91 | |     # text
+92 | |     None,
+93 | | )
    | |_^
+94 |
+95 |   ages = {"Tom": 23, "Maria": 23, "Dog": 11}
    |
 help: Remove default value
-84 | age = ages.get(get_key(), None)
-85 | 
 86 | 
+87 | # Comment preservation tests (https://github.com/astral-sh/ruff/issues/18775)
+88 | # Fixes that delete comments should be marked as unsafe
    - age = ages.get(
    -     "Cat",
    -     # text
    -     None,
    - )
-87 + age = ages.get("Cat")
+89 + age = ages.get("Cat")
+90 | 
+91 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+92 | age = ages.get(  # comment
+note: This is an unsafe fix and may change runtime behavior
+
+SIM910 [*] Use `dict.get()` without default value
+  --> SIM910.py:96:7
+   |
+95 |   ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+96 |   age = ages.get(  # comment
+   |  _______^
+97 | |     "Cat", None
+98 | | )
+   | |_^
+   |
+help: Remove default value
+93 | )
+94 | 
+95 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+   - age = ages.get(  # comment
+   -     "Cat", None
+   - )
+96 + age = ages.get("Cat")
 note: This is an unsafe fix and may change runtime behavior

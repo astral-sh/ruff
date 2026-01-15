@@ -127,6 +127,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
         expr.range(),
     );
 
+    // Mark the fix as unsafe if it would delete comments.
     let applicability = if checker.comment_ranges().intersects(expr.range()) {
         Applicability::Unsafe
     } else {

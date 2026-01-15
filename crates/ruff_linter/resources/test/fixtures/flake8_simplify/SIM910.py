@@ -84,8 +84,15 @@ ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 age = ages.get(get_key(), None)
 
 
+# Comment preservation tests (https://github.com/astral-sh/ruff/issues/18775)
+# Fixes that delete comments should be marked as unsafe
 age = ages.get(
     "Cat",
     # text
     None,
+)
+
+ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+age = ages.get(  # comment
+    "Cat", None
 )
