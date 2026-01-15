@@ -575,25 +575,24 @@ that `type X = A | B` is treated the same as a plain union `A | B` during overlo
 ```pyi
 from typing import overload, Literal
 
-class Eager: ...
-class Lazy: ...
+class A: ...
+class B: ...
 
 @overload
-def evaluate(x: Eager, /, *, eager: bool = False) -> Eager: ...
+def f(x: A) -> A: ...
 @overload
-def evaluate(x: Lazy, /, *, eager: Literal[False] = False) -> Lazy: ...
-@overload
-def evaluate(x: Lazy, /, *, eager: Literal[True]) -> Eager: ...
+def f(x: B) -> B: ...
 ```
 
 ```py
-from overloaded import Eager, Lazy, evaluate
+from overloaded import A, B, f
 
-type Array = Eager | Lazy
+type Alias = A | B
 
-def foo(x: Array, *, eager: bool) -> None:
-    # The type alias `Array` should be expanded to `Eager | Lazy` during overload resolution
-    reveal_type(evaluate(x, eager=eager))  # revealed: Eager | Lazy
+def _(x: Alias) -> None:
+    # The type alias `Alias` should be expanded to `A | B` during overload resolution
+    reveal_type(f(x))  # revealed: A | B
+    reveal_type(f(*(x,)))  # revealed: A | B
 ```
 
 ### No matching overloads
