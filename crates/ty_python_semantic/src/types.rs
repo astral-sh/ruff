@@ -3225,6 +3225,15 @@ impl<'db> Type<'db> {
                 Place::Undefined.into()
             }
 
+            // This case needs to come before the `no_instance_fallback` catch-all, so that we
+            // treat `NewType`s of `float` and `complex` as their special-case union base types.
+            // Otherwise we'll look up e.g. `__add__` with a `self` type bound to the `NewType`,
+            // which will fail to match e.g. `float.__add__` (because its `self` parameter is just
+            // `float` and not `int | float`).
+            Type::NewTypeInstance(new_type_instance) => new_type_instance
+                .concrete_base_type(db)
+                .member_lookup_with_policy(db, name, policy),
+
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
@@ -3284,7 +3293,6 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
-            | Type::NewTypeInstance(..)
             | Type::BooleanLiteral(..)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
