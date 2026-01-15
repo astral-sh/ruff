@@ -272,6 +272,23 @@ impl<'a> Resolver<'a> {
         std::iter::once(&self.pyproject_config.settings)
             .chain(self.settings.iter().map(|(settings, _)| settings))
     }
+
+    /// Return a mutable iterator over resolved [`Settings`] excluding the base configuration.
+    pub fn settings_mut(&mut self) -> impl Iterator<Item = &mut Settings> {
+        self.settings.iter_mut()
+    }
+
+    /// Apply a transformation to each resolved [`Settings`] (excluding the base configuration)
+    /// and return the [`Resolver`] for further use.
+    pub fn transform_settings<F>(mut self, mut f: F) -> Result<Self>
+    where
+        F: FnMut(&mut Settings) -> Result<()>,
+    {
+        for settings in &mut self.settings {
+            f(settings)?;
+        }
+        Ok(self)
+    }
 }
 
 /// A wrapper around `detect_package_root` to cache filesystem lookups.
