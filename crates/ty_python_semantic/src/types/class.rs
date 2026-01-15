@@ -31,6 +31,7 @@ use crate::types::mro::{DynamicMroError, Mro};
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
+use crate::types::typed_dict::dynamic_typed_dict_schema;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionBuilder, TypeContext, TypeMapping, UnionBuilder,
@@ -2158,6 +2159,9 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// ```
 ///
 /// The type of `Movie` would be `type[Movie]` where `Movie` is a `DynamicTypedDictLiteral`.
+///
+/// Field types are NOT stored here to support recursive TypedDicts. Instead, field types
+/// are computed lazily in `dynamic_typeddict_items` by re-reading the AST.
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DynamicTypedDictLiteral<'db> {
@@ -2165,10 +2169,21 @@ pub struct DynamicTypedDictLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    /// The fields as (name, type, is_required) tuples.
-    /// The third element indicates whether the field is required.
+    /// The raw field information: field names and explicit requiredness.
+    ///
+    /// The `Option<bool>` indicates explicit requiredness from `Required`/`NotRequired` wrappers:
+    /// - `Some(true)` = explicitly `Required[...]`
+    /// - `Some(false)` = explicitly `NotRequired[...]`
+    /// - `None` = no explicit wrapper, use `total` default
+    ///
+    /// Field types are computed lazily in `dynamic_typeddict_items` to support recursive
+    /// TypedDicts where field types may reference the TypedDict being defined.
     #[returns(ref)]
-    pub fields: Box<[(Name, Type<'db>, bool)]>,
+    pub raw_fields: Box<[(Name, Option<bool>)]>,
+
+    /// The default requiredness for fields without explicit `Required`/`NotRequired` wrapper.
+    /// This comes from the `total` keyword argument (default `True`).
+    pub total: bool,
 
     /// Whether the fields are known statically.
     ///
@@ -2190,7 +2205,7 @@ impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> DynamicTypedDictLiteral<'db> {
-    /// Returns the definition where this TypedDict is created, if it was assigned to a variable.
+    /// Returns the definition where this `TypedDict` is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => Some(definition),
@@ -2198,7 +2213,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         }
     }
 
-    /// Returns the scope in which this dynamic TypedDict was created.
+    /// Returns the scope in which this dynamic `TypedDict` was created.
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => definition.scope(db),
@@ -2206,12 +2221,12 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         }
     }
 
-    /// Returns an instance type for this dynamic TypedDict.
+    /// Returns an instance type for this dynamic `TypedDict`.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         Type::instance(db, ClassType::NonGeneric(self.into()))
     }
 
-    /// Returns the range of the TypedDict call expression.
+    /// Returns the range of the `TypedDict` call expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
         let file = scope.file(db);
@@ -2245,14 +2260,14 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         }
     }
 
-    /// Returns a [`Span`] pointing to the TypedDict call expression.
+    /// Returns a [`Span`] pointing to the `TypedDict` call expression.
     pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
-    /// Get the MRO for this TypedDict.
+    /// Get the MRO for this `TypedDict`.
     ///
-    /// TypedDict classes inherit from `dict` at runtime, so the MRO is:
+    /// `TypedDict` classes inherit from `dict` at runtime, so the MRO is:
     /// [self, dict, object]
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
@@ -2279,33 +2294,33 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         MroIterator::new(db, ClassLiteral::DynamicTypedDict(self), None)
     }
 
-    /// Get the metaclass of this TypedDict.
+    /// Get the metaclass of this `TypedDict`.
     ///
-    /// TypedDicts use `type` as their metaclass.
+    /// `TypedDict`s use `type` as their metaclass.
+    #[allow(clippy::unused_self)]
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         KnownClass::Type.to_class_literal(db)
     }
 
-    /// Look up an instance member defined directly on this TypedDict (not inherited).
+    /// Look up an instance member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         if !self.has_known_fields(db) {
             // When fields are unknown, return Any for any field lookup.
             return Member::definitely_declared(Type::any());
         }
 
-        // Look up the field by name.
-        for (field_name, field_ty, _is_required) in self.fields(db).as_ref() {
-            if field_name.as_str() == name {
-                // For TypedDict, field access via attribute is not the primary way
-                // to interact with them (dict indexing is), but we still allow it.
-                return Member::definitely_declared(*field_ty);
-            }
+        // Look up the field by name using the computed schema.
+        let schema = dynamic_typed_dict_schema(db, self);
+        if let Some(field) = schema.get(name) {
+            // For TypedDict, field access via attribute is not the primary way
+            // to interact with them (dict indexing is), but we still allow it.
+            return Member::definitely_declared(field.declared_ty);
         }
 
         Member::default()
     }
 
-    /// Look up a class-level member defined directly on this TypedDict (not inherited).
+    /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let instance_ty = self.to_instance(db);
 
@@ -2314,6 +2329,9 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             let signature = Signature::new(Parameters::gradual_form(), Type::none(db));
             return Member::definitely_declared(Type::function_like_callable(db, signature));
         }
+
+        // Get the computed schema for field lookups.
+        let schema = dynamic_typed_dict_schema(db, self);
 
         match name {
             "__init__" => {
@@ -2324,12 +2342,12 @@ impl<'db> DynamicTypedDictLiteral<'db> {
                         .with_annotated_type(instance_ty),
                 ];
 
-                for (field_name, field_ty, is_required) in self.fields(db).as_ref() {
-                    let mut param =
-                        Parameter::keyword_only(field_name.clone()).with_annotated_type(*field_ty);
-                    if !is_required {
+                for (field_name, field) in schema {
+                    let mut param = Parameter::keyword_only(field_name.clone())
+                        .with_annotated_type(field.declared_ty);
+                    if !field.is_required() {
                         // Optional fields have a default (conceptually the key being absent).
-                        param = param.with_default_type(*field_ty);
+                        param = param.with_default_type(field.declared_ty);
                     }
                     parameters.push(param);
                 }
@@ -2339,11 +2357,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             }
             "__required_keys__" => {
                 // frozenset of required key names
-                let required_keys: Box<[Type<'db>]> = self
-                    .fields(db)
+                let required_keys: Box<[Type<'db>]> = schema
                     .iter()
-                    .filter(|(_, _, is_required)| *is_required)
-                    .map(|(name, _, _)| Type::string_literal(db, name.as_str()))
+                    .filter(|(_, field)| field.is_required())
+                    .map(|(name, _)| Type::string_literal(db, name.as_str()))
                     .collect();
                 let union = UnionType::from_elements(db, required_keys.iter().copied());
                 Member::definitely_declared(
@@ -2352,11 +2369,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             }
             "__optional_keys__" => {
                 // frozenset of optional key names
-                let optional_keys: Box<[Type<'db>]> = self
-                    .fields(db)
+                let optional_keys: Box<[Type<'db>]> = schema
                     .iter()
-                    .filter(|(_, _, is_required)| !*is_required)
-                    .map(|(name, _, _)| Type::string_literal(db, name.as_str()))
+                    .filter(|(_, field)| !field.is_required())
+                    .map(|(name, _)| Type::string_literal(db, name.as_str()))
                     .collect();
                 let union = UnionType::from_elements(db, optional_keys.iter().copied());
                 Member::definitely_declared(
@@ -2365,7 +2381,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             }
             "__getitem__" => {
                 // __getitem__(self, key: Literal["name"]) -> type for each field
-                let overloads = self.fields(db).iter().map(|(field_name, field_ty, _)| {
+                let overloads = schema.iter().map(|(field_name, field)| {
                     let key_type = Type::string_literal(db, field_name.as_str());
                     Signature::new(
                         Parameters::new(
@@ -2377,7 +2393,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
                                     .with_annotated_type(key_type),
                             ],
                         ),
-                        *field_ty,
+                        field.declared_ty,
                     )
                 });
                 Member::definitely_declared(Type::Callable(CallableType::new(
@@ -2388,10 +2404,9 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             }
             "__setitem__" => {
                 // __setitem__(self, key: Literal["name"], value: type) -> None for each non-readonly field
-                let overloads: Vec<_> = self
-                    .fields(db)
+                let overloads: Vec<_> = schema
                     .iter()
-                    .map(|(field_name, field_ty, _)| {
+                    .map(|(field_name, field)| {
                         let key_type = Type::string_literal(db, field_name.as_str());
                         Signature::new(
                             Parameters::new(
@@ -2402,7 +2417,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
                                     Parameter::positional_only(Some(Name::new_static("key")))
                                         .with_annotated_type(key_type),
                                     Parameter::positional_only(Some(Name::new_static("value")))
-                                        .with_annotated_type(*field_ty),
+                                        .with_annotated_type(field.declared_ty),
                                 ],
                             ),
                             Type::none(db),
@@ -2439,11 +2454,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             }
             "__delitem__" => {
                 // __delitem__(self, key: Literal["name"]) -> None for each non-required field
-                let deletable: Vec<_> = self
-                    .fields(db)
+                let deletable: Vec<_> = schema
                     .iter()
-                    .filter(|(_, _, is_required)| !*is_required)
-                    .map(|(field_name, _, _)| {
+                    .filter(|(_, field)| !field.is_required())
+                    .map(|(field_name, _)| {
                         let key_type = Type::string_literal(db, field_name.as_str());
                         Signature::new(
                             Parameters::new(
@@ -2484,6 +2498,110 @@ impl<'db> DynamicTypedDictLiteral<'db> {
                         CallableTypeKind::FunctionLike,
                     )))
                 }
+            }
+            "get" => {
+                // get(key: Literal["name"]) -> type | None for each field
+                // get(key: Literal["name"], default: T) -> type | T for each field
+                let overloads = schema
+                    .iter()
+                    .flat_map(|(field_name, field)| {
+                        let key_type = Type::string_literal(db, field_name.as_str());
+
+                        // For a required key, `.get()` always returns the value type.
+                        // For a non-required key, `.get()` returns union with None/default.
+                        let get_sig = Signature::new(
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(key_type),
+                                ],
+                            ),
+                            if field.is_required() {
+                                field.declared_ty
+                            } else {
+                                UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
+                            },
+                        );
+
+                        let t_default = BoundTypeVarInstance::synthetic(
+                            db,
+                            Name::new_static("T"),
+                            TypeVarVariance::Covariant,
+                        );
+
+                        let get_with_default_sig = Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(key_type),
+                                    Parameter::positional_only(Some(Name::new_static("default")))
+                                        .with_annotated_type(Type::TypeVar(t_default)),
+                                ],
+                            ),
+                            if field.is_required() {
+                                field.declared_ty
+                            } else {
+                                UnionType::from_elements(
+                                    db,
+                                    [field.declared_ty, Type::TypeVar(t_default)],
+                                )
+                            },
+                        );
+
+                        [get_sig, get_with_default_sig]
+                    })
+                    // Fallback overloads for unknown keys
+                    .chain(std::iter::once(Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                            ],
+                        ),
+                        UnionType::from_elements(db, [Type::unknown(), Type::none(db)]),
+                    )))
+                    .chain(std::iter::once({
+                        let t_default = BoundTypeVarInstance::synthetic(
+                            db,
+                            Name::new_static("T"),
+                            TypeVarVariance::Covariant,
+                        );
+
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                    Parameter::positional_only(Some(Name::new_static("default")))
+                                        .with_annotated_type(Type::TypeVar(t_default)),
+                                ],
+                            ),
+                            UnionType::from_elements(
+                                db,
+                                [Type::unknown(), Type::TypeVar(t_default)],
+                            ),
+                        )
+                    }));
+
+                Member::definitely_declared(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    CallableTypeKind::FunctionLike,
+                )))
             }
             _ => Member::default(),
         }
