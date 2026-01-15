@@ -1,6 +1,6 @@
 use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprBinOp, StmtFunctionDef, name::QualifiedName};
+use ruff_python_ast::{Expr, ExprBinOp, StmtAnnAssign, StmtFunctionDef, name::QualifiedName};
 use ruff_python_parser::parse_expression;
 use ruff_text_size::Ranged;
 
@@ -157,8 +157,8 @@ where
     0
 }
 
-/// TAE002
-pub(crate) fn complex_annotation(checker: &Checker, function_def: &StmtFunctionDef) {
+/// TAE002 (on function)
+pub(crate) fn complex_annotation_function(checker: &Checker, function_def: &StmtFunctionDef) {
     let max_complexity = checker
         .settings()
         .flake8_annotation_complexity
@@ -196,6 +196,34 @@ pub(crate) fn complex_annotation(checker: &Checker, function_def: &StmtFunctionD
                 return_annotation.range(),
             );
         }
+    }
+}
+
+/// TAE002 (on assignment)
+pub(crate) fn complex_annotation_assignment(checker: &Checker, assign_stmt: &StmtAnnAssign) {
+    let max_complexity = checker
+        .settings()
+        .flake8_annotation_complexity
+        .max_annotation_complexity;
+
+    let annoation_resolver = CheckerAnnoationResolver { checker };
+
+    let annoation_complexity =
+        get_annoation_complexity(&annoation_resolver, &assign_stmt.annotation);
+    if annoation_complexity > max_complexity {
+        checker.report_diagnostic(
+            ComplexAnnotation {
+                symbol_name: assign_stmt
+                    .target
+                    .as_name_expr()
+                    .map(|x| x.id.as_str())
+                    .unwrap_or("")
+                    .to_owned(),
+                complexity_value: annoation_complexity,
+                max_complexity_value: max_complexity,
+            },
+            assign_stmt.range(),
+        );
     }
 }
 

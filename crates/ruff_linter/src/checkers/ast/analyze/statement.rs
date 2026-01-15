@@ -352,7 +352,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::property_without_return(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::ComplexAnnotation) {
-                flake8_annotation_complexity::rules::complex_annotation(checker, function_def);
+                flake8_annotation_complexity::rules::complex_annotation_function(
+                    checker,
+                    function_def,
+                );
             }
         }
         Stmt::Return(_) => {
@@ -1565,6 +1568,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.is_rule_enabled(Rule::RedundantFinalLiteral) {
                     flake8_pyi::rules::redundant_final_literal(checker, assign_stmt);
                 }
+            }
+            if checker.is_rule_enabled(Rule::ComplexAnnotation) {
+                flake8_annotation_complexity::rules::complex_annotation_assignment(
+                    checker,
+                    assign_stmt,
+                );
             }
         }
         Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
