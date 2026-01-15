@@ -1,6 +1,6 @@
 use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, StmtFunctionDef, name::QualifiedName};
+use ruff_python_ast::{Expr, ExprBinOp, StmtFunctionDef, name::QualifiedName};
 use ruff_python_parser::parse_expression;
 use ruff_text_size::Ranged;
 
@@ -73,6 +73,21 @@ impl<'checker, 'b> AnnotationResolver for CheckerAnnoationResolver<'checker, 'b>
     }
 }
 
+/// Flatterns a left-associative BinOp list into an iterator a vector of non-bin-op expressions.
+/// This is useful for flatterning PEP-604 Unions into a list of types.
+fn flattern_bin_op_expr<'a>(expr: &'a ExprBinOp) -> Vec<&'a Expr> {
+    let mut looking_at = expr;
+    let mut result: Vec<&Expr> = vec![&looking_at.right];
+
+    while let Some(expr) = looking_at.left.as_bin_op_expr() {
+        looking_at = expr;
+        result.push(&expr.right);
+    }
+    result.push(&looking_at.left);
+
+    result
+}
+
 fn get_annoation_complexity<'checker, 'expr>(
     annoation_resolver: &'checker impl AnnotationResolver,
     expr: &'expr Expr,
@@ -88,11 +103,22 @@ where
         }
     };
 
+    if let Some(expr_bin_op) = expr.as_bin_op_expr() {
+        return flattern_bin_op_expr(expr_bin_op)
+            .iter()
+            .map(|node| get_annoation_complexity(annoation_resolver, node))
+            .max()
+            .unwrap_or(0)
+            + 1;
+    }
+
     if let Some(expr) = expr.as_subscript_expr() {
         let type_params = &expr.slice;
 
         let inner_compleixty = match &**type_params {
-            Expr::Subscript(_) => get_annoation_complexity(annoation_resolver, type_params),
+            Expr::Subscript(_) | Expr::BinOp(_) => {
+                get_annoation_complexity(annoation_resolver, type_params)
+            }
             Expr::Tuple(expr_tuple) => expr_tuple
                 .elts
                 .iter()
@@ -167,16 +193,36 @@ mod tests {
     #[test_case(r"int", 0)]
     #[test_case(r"dict[str, Any]", 1)]
     #[test_case(r"dict[str, list[dict[str, str]]]", 3)]
-    #[test_case(r"dict[str, int | str | bool]", 1)]
+    #[test_case(r"dict[str, int | str | bool]", 2)]
     #[test_case(r"dict[str, Union[int, str, bool]]", 2)]
     #[test_case(r#""dict[str, list[list]]""#, 2)]
     #[test_case(r#"dict[str, "list[str]"]"#, 2)]
-    fn get_annoation_complexity_yields_expected_value(
+    #[test_case(r#"Union[a, b, c]"#, 1)]
+    #[test_case(r#"a | b | c"#, 1)]
+    #[test_case(r#"a | dict[str, str] | c"#, 2)]
+    #[test_case(r#"a | dict[str, str] | dict[str, str]"#, 2)]
+    #[test_case(r#"a | dict[str, str] | dict[str, list[str]]"#, 3)]
+    #[test_case(r#"list[Union[a, b, c]]"#, 2)]
+    #[test_case(r#"list[a | b | c]"#, 2)]
+    fn test_get_annoation_complexity_yields_expected_value(
         annotation: &str,
         expected_complexity: isize,
     ) {
         let expr = parse_expression(annotation).unwrap();
         let complexity = get_annoation_complexity(&FromTypingResolver {}, &expr.expr());
         assert_eq!(complexity, expected_complexity);
+    }
+
+    #[test]
+    fn test_flattern_bin_op_expr() {
+        let expr = parse_expression("hello | there | my | friend").unwrap();
+        let flatterned: Vec<_> = flattern_bin_op_expr(&expr.expr().as_bin_op_expr().unwrap())
+            .iter()
+            .flat_map(|node| node.as_name_expr().map(|x| x.id.as_str()))
+            .collect();
+
+        // Note: left-associativity reverses the expected liet
+        let expected = vec!["friend", "my", "there", "hello"];
+        assert_eq!(flatterned, expected);
     }
 }
