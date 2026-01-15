@@ -64,3 +64,12 @@ import logging
 
 x = 1
 logging.error(f"{x} -> %s", x)
+
+# Test cases for control characters in f-strings
+bar = "bar"
+logging.getLogger().error(f"Lorem ipsum \n {bar}")
+
+value = "test"
+logging.info(f"Tab\t{value}")
+
+logging.info(f"CR\r{value}")
