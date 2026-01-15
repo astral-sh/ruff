@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.13
+
+Released on 2026-01-15.
+
+This is a follow-up release to 0.14.12. Because of an issue publishing the WASM packages, there is no GitHub release or Git tag for 0.14.12, although the package was published to PyPI. The contents of the 0.14.13 release are identical to 0.14.12.
+
 ## 0.14.12
 
 Released on 2026-01-15.
