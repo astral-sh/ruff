@@ -1191,23 +1191,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             let rhs_ty = inference.expression_type(right);
             last_rhs_ty = Some(rhs_ty);
 
-            match left {
-                ast::Expr::Name(_)
-                | ast::Expr::Attribute(_)
-                | ast::Expr::Subscript(_)
-                | ast::Expr::Named(_) => {
-                    if let Some(left) = PlaceExpr::try_from_expr(left)
-                        && let Some(ty) =
-                            self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
-                    {
-                        let place = self.expect_place(&left);
-                        constraints.insert(place, NarrowingConstraint::intersection(ty));
-                    }
-                }
-                ast::Expr::Call(ast::ExprCall {
+            // Narrowing for:
+            // - `if type(x) is Y`
+            // - `if type(x) is not Y`
+            // - `if Y is type(x)`
+            // - `if Y is not type(x)`
+            if let (ast::Expr::Call(call), _, _, Type::ClassLiteral(class))
+            | (_, Type::ClassLiteral(class), ast::Expr::Call(call), _) =
+                (left, lhs_ty, right, rhs_ty)
+            {
+                let ast::ExprCall {
                     range: _,
                     node_index: _,
-                    func: callable,
+                    func,
                     arguments:
                         ast::Arguments {
                             args,
@@ -1215,71 +1211,82 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             range: _,
                             node_index: _,
                         },
-                }) if keywords.is_empty() => {
-                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
-                        continue;
-                    };
+                } = call;
 
-                    let target = match &**args {
-                        [first] => match PlaceExpr::try_from_expr(first) {
-                            Some(target) => target,
-                            None => continue,
-                        },
-                        _ => continue,
-                    };
+                // If this is `None`, it indicates that we cannot do `if type(x) is Y`
+                // narrowing: we can only do narrowing for `if type(x) is Y` and
+                // `if type(x) is not Y`, not for `if type(x) == Y` or `if type(x) != Y`.
+                let is_positive = match op {
+                    ast::CmpOp::Is => Some(is_positive),
+                    ast::CmpOp::IsNot => Some(!is_positive),
+                    _ => None,
+                };
 
-                    let is_positive = match op {
-                        ast::CmpOp::Is => is_positive,
-                        ast::CmpOp::IsNot => !is_positive,
-                        _ => continue,
-                    };
-
+                if let Some(is_positive) = is_positive
+                    && keywords.is_empty()
+                    && let [single_argument] = &**args
+                    && let Some(target) = PlaceExpr::try_from_expr(single_argument)
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
                     // if `Y` is a final class
-                    if !rhs_class.is_final(self.db) && !is_positive {
-                        continue;
-                    }
-
-                    let callable_type = inference.expression_type(&**callable);
-
-                    if callable_type
-                        .as_class_literal()
-                        .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
-                    {
-                        let place = self.expect_place(&target);
-                        constraints.insert(
-                            place,
-                            NarrowingConstraint::intersection(
-                                Type::instance(self.db, rhs_class.top_materialization(self.db))
-                                    .negate_if(self.db, !is_positive),
-                            ),
-                        );
-                    }
-                }
-                // For symmetric operators (==, !=, is, is not), if left is not a narrowable target,
-                // try to narrow the right operand instead by swapping the operands.
-                // E.g., `None != x` should narrow `x` the same way as `x != None`.
-                _ if matches!(
-                    op,
-                    ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot
-                ) && matches!(
-                    right,
-                    ast::Expr::Name(_)
-                        | ast::Expr::Attribute(_)
-                        | ast::Expr::Subscript(_)
-                        | ast::Expr::Named(_)
-                ) =>
+                    && (class.is_final(self.db) || is_positive)
+                    && let Type::ClassLiteral(called_class) = inference.expression_type(func)
+                    && called_class.is_known(self.db, KnownClass::Type)
                 {
-                    if let Some(right_place) = PlaceExpr::try_from_expr(right)
-                        // Swap lhs_ty and rhs_ty since we're narrowing the right operand
-                        && let Some(ty) =
-                            self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
-                    {
-                        let place = self.expect_place(&right_place);
-                        constraints.insert(place, NarrowingConstraint::intersection(ty));
-                    }
+                    let place = self.expect_place(&target);
+                    constraints.insert(
+                        place,
+                        NarrowingConstraint::intersection(
+                            Type::instance(self.db, class.top_materialization(self.db))
+                                .negate_if(self.db, !is_positive),
+                        ),
+                    );
+                    continue;
                 }
-                _ => {}
+            }
+
+            // Left-hand-side narrowing for:
+            // - `if x == y`
+            // - `if x != y`
+            // - `if x is y`
+            // - `if x is not y`
+            // - `if x in y`
+            // - `if x not in y`
+            //
+            // Right-hand side narrowing for:
+            // - `if y == x`
+            // - `if y != x`
+            // - `if y is x`
+            // - `if y is not x`
+            if let (
+                narrowable @ (ast::Expr::Name(_)
+                | ast::Expr::Attribute(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::Named(_)),
+                narrowable_type,
+                _,
+                other_type,
+            )
+            | (
+                _,
+                other_type,
+                narrowable @ (ast::Expr::Name(_)
+                | ast::Expr::Attribute(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::Named(_)),
+                narrowable_type,
+            ) = (left, lhs_ty, right, rhs_ty)
+            {
+                // The right-hand side can only be narrowed for a symmetric operator.
+                // `in` and `not in` are not symmetric.
+                if (narrowable == left || !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn))
+                    && let Some(narrowable) = PlaceExpr::try_from_expr(narrowable)
+                    && let Some(ty) =
+                        self.evaluate_expr_compare_op(narrowable_type, other_type, *op, is_positive)
+                {
+                    let place = self.expect_place(&narrowable);
+                    constraints.insert(place, NarrowingConstraint::intersection(ty));
+                    continue;
+                }
             }
         }
         Some(constraints)

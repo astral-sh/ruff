@@ -20,12 +20,22 @@ def _(x: A | B, y: A | C):
         # to infer the full union type:
         reveal_type(x)  # revealed: A | B
 
+    if A is type(x):
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: A | B
+
     if type(y) is C:
         reveal_type(y)  # revealed: C
     else:
         # here, however, inferring `A` is fine,
         # because `C` is `@final`: no subclass of `A`
         # and `C` could exist
+        reveal_type(y)  # revealed: A
+
+    if C is type(y):
+        reveal_type(y)  # revealed: C
+    else:
         reveal_type(y)  # revealed: A
 
     if type(y) is A:
@@ -35,6 +45,11 @@ def _(x: A | B, y: A | C):
         # in which case the `type(y) is A` call would evaluate
         # to `False` even if `y` was an instance of `A`,
         # so narrowing cannot occur
+        reveal_type(y)  # revealed: A | C
+
+    if A is type(y):
+        reveal_type(y)  # revealed: A
+    else:
         reveal_type(y)  # revealed: A | C
 ```
 
