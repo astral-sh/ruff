@@ -2,176 +2,217 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:19:33
+  --> RUF069.py:20:33
    |
-18 | # Bad
-19 | __all__: list[str] = ["A", "B", "A"]
+19 | # Bad
+20 | __all__: list[str] = ["A", "B", "A"]
    |                                 ^^^
-20 | __all__: typing.Any = ("A", "B", "B")
-21 | __all__ = ["A", "B", "A"]
+21 | __all__: typing.Any = ("A", "B", "B")
+22 | __all__ = ["A", "B", "A"]
    |
 help: Remove duplicate entries from `__all__`
-16 | __all__.extend(["A", "B"])
-17 | 
-18 | # Bad
+17 | __all__.extend(["A", "B"])
+18 | 
+19 | # Bad
    - __all__: list[str] = ["A", "B", "A"]
-19 + __all__: list[str] = ["A", "B"]
-20 | __all__: typing.Any = ("A", "B", "B")
-21 | __all__ = ["A", "B", "A"]
-22 | __all__ = ["A", "A", "B", "B"]
+20 + __all__: list[str] = ["A", "B"]
+21 | __all__: typing.Any = ("A", "B", "B")
+22 | __all__ = ["A", "B", "A"]
+23 | __all__ = ["A", "A", "B", "B"]
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:20:34
+  --> RUF069.py:21:34
    |
-18 | # Bad
-19 | __all__: list[str] = ["A", "B", "A"]
-20 | __all__: typing.Any = ("A", "B", "B")
+19 | # Bad
+20 | __all__: list[str] = ["A", "B", "A"]
+21 | __all__: typing.Any = ("A", "B", "B")
    |                                  ^^^
-21 | __all__ = ["A", "B", "A"]
-22 | __all__ = ["A", "A", "B", "B"]
+22 | __all__ = ["A", "B", "A"]
+23 | __all__ = ["A", "A", "B", "B"]
    |
 help: Remove duplicate entries from `__all__`
-17 | 
-18 | # Bad
-19 | __all__: list[str] = ["A", "B", "A"]
+18 | 
+19 | # Bad
+20 | __all__: list[str] = ["A", "B", "A"]
    - __all__: typing.Any = ("A", "B", "B")
-20 + __all__: typing.Any = ("A", "B")
-21 | __all__ = ["A", "B", "A"]
-22 | __all__ = ["A", "A", "B", "B"]
-23 | __all__ += ["B", "B"]
+21 + __all__: typing.Any = ("A", "B")
+22 | __all__ = ["A", "B", "A"]
+23 | __all__ = ["A", "A", "B", "B"]
+24 | __all__ = [
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:21:22
+  --> RUF069.py:22:22
    |
-19 | __all__: list[str] = ["A", "B", "A"]
-20 | __all__: typing.Any = ("A", "B", "B")
-21 | __all__ = ["A", "B", "A"]
+20 | __all__: list[str] = ["A", "B", "A"]
+21 | __all__: typing.Any = ("A", "B", "B")
+22 | __all__ = ["A", "B", "A"]
    |                      ^^^
-22 | __all__ = ["A", "A", "B", "B"]
-23 | __all__ += ["B", "B"]
+23 | __all__ = ["A", "A", "B", "B"]
+24 | __all__ = [
    |
 help: Remove duplicate entries from `__all__`
-18 | # Bad
-19 | __all__: list[str] = ["A", "B", "A"]
-20 | __all__: typing.Any = ("A", "B", "B")
+19 | # Bad
+20 | __all__: list[str] = ["A", "B", "A"]
+21 | __all__: typing.Any = ("A", "B", "B")
    - __all__ = ["A", "B", "A"]
-21 + __all__ = ["A", "B"]
-22 | __all__ = ["A", "A", "B", "B"]
-23 | __all__ += ["B", "B"]
-24 | __all__.extend(["B", "B"])
+22 + __all__ = ["A", "B"]
+23 | __all__ = ["A", "A", "B", "B"]
+24 | __all__ = [
+25 |     "A",
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:22:17
+  --> RUF069.py:23:17
    |
-20 | __all__: typing.Any = ("A", "B", "B")
-21 | __all__ = ["A", "B", "A"]
-22 | __all__ = ["A", "A", "B", "B"]
+21 | __all__: typing.Any = ("A", "B", "B")
+22 | __all__ = ["A", "B", "A"]
+23 | __all__ = ["A", "A", "B", "B"]
    |                 ^^^
-23 | __all__ += ["B", "B"]
-24 | __all__.extend(["B", "B"])
+24 | __all__ = [
+25 |     "A",
    |
 help: Remove duplicate entries from `__all__`
-19 | __all__: list[str] = ["A", "B", "A"]
-20 | __all__: typing.Any = ("A", "B", "B")
-21 | __all__ = ["A", "B", "A"]
+20 | __all__: list[str] = ["A", "B", "A"]
+21 | __all__: typing.Any = ("A", "B", "B")
+22 | __all__ = ["A", "B", "A"]
    - __all__ = ["A", "A", "B", "B"]
-22 + __all__ = ["A", "B", "B"]
-23 | __all__ += ["B", "B"]
-24 | __all__.extend(["B", "B"])
-25 | 
+23 + __all__ = ["A", "B", "B"]
+24 | __all__ = [
+25 |     "A",
+26 |     "A",
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:22:27
+  --> RUF069.py:23:27
    |
-20 | __all__: typing.Any = ("A", "B", "B")
-21 | __all__ = ["A", "B", "A"]
-22 | __all__ = ["A", "A", "B", "B"]
+21 | __all__: typing.Any = ("A", "B", "B")
+22 | __all__ = ["A", "B", "A"]
+23 | __all__ = ["A", "A", "B", "B"]
    |                           ^^^
-23 | __all__ += ["B", "B"]
-24 | __all__.extend(["B", "B"])
+24 | __all__ = [
+25 |     "A",
    |
 help: Remove duplicate entries from `__all__`
-19 | __all__: list[str] = ["A", "B", "A"]
-20 | __all__: typing.Any = ("A", "B", "B")
-21 | __all__ = ["A", "B", "A"]
+20 | __all__: list[str] = ["A", "B", "A"]
+21 | __all__: typing.Any = ("A", "B", "B")
+22 | __all__ = ["A", "B", "A"]
    - __all__ = ["A", "A", "B", "B"]
-22 + __all__ = ["A", "A", "B"]
-23 | __all__ += ["B", "B"]
-24 | __all__.extend(["B", "B"])
-25 | 
+23 + __all__ = ["A", "A", "B"]
+24 | __all__ = [
+25 |     "A",
+26 |     "A",
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:23:18
+  --> RUF069.py:26:5
    |
-21 | __all__ = ["A", "B", "A"]
-22 | __all__ = ["A", "A", "B", "B"]
-23 | __all__ += ["B", "B"]
-   |                  ^^^
-24 | __all__.extend(["B", "B"])
-   |
-help: Remove duplicate entries from `__all__`
-20 | __all__: typing.Any = ("A", "B", "B")
-21 | __all__ = ["A", "B", "A"]
-22 | __all__ = ["A", "A", "B", "B"]
-   - __all__ += ["B", "B"]
-23 + __all__ += ["B"]
-24 | __all__.extend(["B", "B"])
-25 | 
-26 | # Bad, unsafe
-
-RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:24:22
-   |
-22 | __all__ = ["A", "A", "B", "B"]
-23 | __all__ += ["B", "B"]
-24 | __all__.extend(["B", "B"])
-   |                      ^^^
-25 |
-26 | # Bad, unsafe
-   |
-help: Remove duplicate entries from `__all__`
-21 | __all__ = ["A", "B", "A"]
-22 | __all__ = ["A", "A", "B", "B"]
-23 | __all__ += ["B", "B"]
-   - __all__.extend(["B", "B"])
-24 + __all__.extend(["B"])
-25 | 
-26 | # Bad, unsafe
-27 | __all__ = [
-
-RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:29:5
-   |
-27 | __all__ = [
-28 |     "A",
-29 |     "A",
+24 | __all__ = [
+25 |     "A",
+26 |     "A",
    |     ^^^
-30 |     "B",
-31 |     # Comment
+27 |     "B",
+28 |     "B"
    |
 help: Remove duplicate entries from `__all__`
-26 | # Bad, unsafe
-27 | __all__ = [
-28 |     "A",
+23 | __all__ = ["A", "A", "B", "B"]
+24 | __all__ = [
+25 |     "A",
    -     "A",
-29 |     "B",
-30 |     # Comment
-31 |     "B",
+26 |     "B",
+27 |     "B"
+28 | ]
 
 RUF069 [*] `__all__` contains duplicate entries
-  --> RUF069.py:32:5
+  --> RUF069.py:28:5
    |
-30 |     "B",
-31 |     # Comment
-32 |     "B",
+26 |     "A",
+27 |     "B",
+28 |     "B"
    |     ^^^
-33 | ]
+29 | ]
+30 | __all__ += ["B", "B"]
    |
 help: Remove duplicate entries from `__all__`
-28 |     "A",
-29 |     "A",
-30 |     "B",
-   -     # Comment
+24 | __all__ = [
+25 |     "A",
+26 |     "A",
    -     "B",
-31 | ]
+27 |     "B"
+28 | ]
+29 | __all__ += ["B", "B"]
+
+RUF069 [*] `__all__` contains duplicate entries
+  --> RUF069.py:30:18
+   |
+28 |     "B"
+29 | ]
+30 | __all__ += ["B", "B"]
+   |                  ^^^
+31 | __all__.extend(["B", "B"])
+   |
+help: Remove duplicate entries from `__all__`
+27 |     "B",
+28 |     "B"
+29 | ]
+   - __all__ += ["B", "B"]
+30 + __all__ += ["B"]
+31 | __all__.extend(["B", "B"])
+32 | 
+33 | # Bad, unsafe
+
+RUF069 [*] `__all__` contains duplicate entries
+  --> RUF069.py:31:22
+   |
+29 | ]
+30 | __all__ += ["B", "B"]
+31 | __all__.extend(["B", "B"])
+   |                      ^^^
+32 |
+33 | # Bad, unsafe
+   |
+help: Remove duplicate entries from `__all__`
+28 |     "B"
+29 | ]
+30 | __all__ += ["B", "B"]
+   - __all__.extend(["B", "B"])
+31 + __all__.extend(["B"])
+32 | 
+33 | # Bad, unsafe
+34 | __all__ = [
+
+RUF069 [*] `__all__` contains duplicate entries
+  --> RUF069.py:36:5
+   |
+34 | __all__ = [
+35 |     "A",
+36 |     "A",
+   |     ^^^
+37 |     "B",
+38 |     # Comment
+   |
+help: Remove duplicate entries from `__all__`
+33 | # Bad, unsafe
+34 | __all__ = [
+35 |     "A",
+   -     "A",
+36 |     "B",
+37 |     # Comment
+38 |     "B",  # 2
+
+RUF069 [*] `__all__` contains duplicate entries
+  --> RUF069.py:39:5
+   |
+37 |     "B",
+38 |     # Comment
+39 |     "B",  # 2
+   |     ^^^
+40 |     # 3
+41 | ]
+   |
+help: Remove duplicate entries from `__all__`
+34 | __all__ = [
+35 |     "A",
+36 |     "A",
+   -     "B",
+   -     # Comment
+37 |     "B",  # 2
+38 |     # 3
+39 | ]
 note: This is an unsafe fix and may change runtime behavior
