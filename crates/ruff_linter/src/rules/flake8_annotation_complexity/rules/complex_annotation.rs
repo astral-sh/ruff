@@ -41,7 +41,7 @@ trait AnnotationResolver {
     where
         'a: 'expr;
 
-    /// Resolve if a given Expr reffers to `Annotated` from the `typing` or `typing_extensions`
+    /// Resolve if a given Expr refers to `Annotated` from the `typing` or `typing_extensions`
     /// module
     fn is_typing_annotated(&self, expr: &Expr) -> bool {
         self.resolve_annoation_qualified_name(expr)
@@ -73,9 +73,9 @@ impl<'checker, 'b> AnnotationResolver for CheckerAnnoationResolver<'checker, 'b>
     }
 }
 
-/// Flatterns a left-associative BinOp list into an iterator a vector of non-bin-op expressions.
-/// This is useful for flatterning PEP-604 Unions into a list of types.
-fn flattern_bin_op_expr<'a>(expr: &'a ExprBinOp) -> Vec<&'a Expr> {
+/// Flattens a left-associative BinOp list into an iterator a vector of non-bin-op expressions.
+/// This is useful for flattening PEP-604 Unions into a list of types.
+fn flatten_bin_op_expr<'a>(expr: &'a ExprBinOp) -> Vec<&'a Expr> {
     let mut looking_at = expr;
     let mut result: Vec<&Expr> = vec![&looking_at.right];
 
@@ -104,7 +104,7 @@ where
     };
 
     if let Some(expr_bin_op) = expr.as_bin_op_expr() {
-        return flattern_bin_op_expr(expr_bin_op)
+        return flatten_bin_op_expr(expr_bin_op)
             .iter()
             .map(|node| get_annoation_complexity(annoation_resolver, node))
             .max()
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_flattern_bin_op_expr() {
         let expr = parse_expression("hello | there | my | friend").unwrap();
-        let flatterned: Vec<_> = flattern_bin_op_expr(&expr.expr().as_bin_op_expr().unwrap())
+        let flatterned: Vec<_> = flatten_bin_op_expr(&expr.expr().as_bin_op_expr().unwrap())
             .iter()
             .flat_map(|node| node.as_name_expr().map(|x| x.id.as_str()))
             .collect();
