@@ -43,8 +43,8 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    CallableTypeKind, DATACLASS_FLAGS, DataclassFlags, DataclassParams, FieldInstance,
+    GenericAlias, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
     TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
     enums, list_members, todo_type,
@@ -611,6 +611,25 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Type::DataclassDecorator(params) => match overload.parameter_types() {
+                        [Some(Type::ClassLiteral(class_literal))] => {
+                            overload.set_return_type(Type::from(
+                                class_literal.with_dataclass_params(db, Some(params)),
+                            ));
+                        }
+                        [Some(Type::GenericAlias(generic_alias))] => {
+                            let new_origin = generic_alias
+                                .origin(db)
+                                .with_dataclass_params(db, Some(params));
+                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
+                                db,
+                                new_origin,
+                                generic_alias.specialization(db),
+                            )));
+                        }
+                        _ => {}
+                    },
+
                     Type::BoundMethod(bound_method)
                         if bound_method.self_instance(db).is_property_instance() =>
                     {
@@ -1119,17 +1138,9 @@ impl<'db> Bindings<'db> {
                                 overload.parameter_types()
                             {
                                 let params = DataclassParams::default_params(db);
-                                overload.set_return_type(Type::from(ClassLiteral::new(
-                                    db,
-                                    class_literal.name(db),
-                                    class_literal.body_scope(db),
-                                    class_literal.known(db),
-                                    class_literal.deprecated(db),
-                                    class_literal.type_check_only(db),
-                                    Some(params),
-                                    class_literal.dataclass_transformer_params(db),
-                                    class_literal.total_ordering(db),
-                                )));
+                                overload.set_return_type(Type::from(
+                                    class_literal.with_dataclass_params(db, Some(params)),
+                                ));
                             }
                         }
 
@@ -1176,53 +1187,106 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::NamedTuple) => {
-                            overload
-                                .set_return_type(todo_type!("Support for functional `namedtuple`"));
-                        }
-
                         _ => {
                             // Ideally, either the implementation, or exactly one of the overloads
                             // of the function can have the dataclass_transform decorator applied.
                             // However, we do not yet enforce this, and in the case of multiple
-                            // applications of the decorator, we will only consider the last one
-                            // for the return value, since the prior ones will be over-written.
-                            let return_type = function_type
+                            // applications of the decorator, we will only consider the last one.
+                            let transformer_params = function_type
                                 .iter_overloads_and_implementation(db)
-                                .filter_map(|function_overload| {
-                                    function_overload.dataclass_transformer_params(db).map(
-                                        |params| {
-                                            // This is a call to a custom function that was decorated with `@dataclass_transformer`.
-                                            // If this function was called with a keyword argument like `order=False`, we extract
-                                            // the argument type and overwrite the corresponding flag in `dataclass_params` after
-                                            // constructing them from the `dataclass_transformer`-parameter defaults.
+                                .rev()
+                                .find_map(|function_overload| {
+                                    function_overload.dataclass_transformer_params(db)
+                                });
 
-                                            let dataclass_params =
-                                                DataclassParams::from_transformer_params(
-                                                    db, params,
-                                                );
-                                            let mut flags = dataclass_params.flags(db);
+                            if let Some(params) = transformer_params {
+                                // If this function was called with a keyword argument like
+                                // `order=False`, we extract the argument type and overwrite
+                                // the corresponding flag in `dataclass_params`.
+                                let dataclass_params =
+                                    DataclassParams::from_transformer_params(db, params);
+                                let mut flags = dataclass_params.flags(db);
 
-                                            for (param, flag) in DATACLASS_FLAGS {
-                                                if let Ok(Some(Type::BooleanLiteral(value))) =
-                                                    overload.parameter_type_by_name(param, false)
-                                                {
-                                                    flags.set(*flag, value);
-                                                }
-                                            }
+                                for (param, flag) in DATACLASS_FLAGS {
+                                    if let Ok(Some(Type::BooleanLiteral(value))) =
+                                        overload.parameter_type_by_name(param, false)
+                                    {
+                                        flags.set(*flag, value);
+                                    }
+                                }
 
-                                            Type::DataclassDecorator(DataclassParams::new(
-                                                db,
-                                                flags,
-                                                dataclass_params.field_specifiers(db),
-                                            ))
-                                        },
-                                    )
-                                })
-                                .last();
+                                let dataclass_params = DataclassParams::new(
+                                    db,
+                                    flags,
+                                    dataclass_params.field_specifiers(db),
+                                );
 
-                            if let Some(return_type) = return_type {
-                                overload.set_return_type(return_type);
+                                // The dataclass_transform spec doesn't clarify how to tell whether
+                                // a decorated function is a decorator or a decorator factory. We
+                                // use heuristics based on the number and type of positional arguments:
+                                //
+                                // - Zero positional arguments: assume it's a decorator factory.
+                                // - More than one positional argument: assume it's a decorator factory.
+                                // - Exactly one positional argument that's a class: ambiguous, so check
+                                //   the return type to disambiguate (class-like means decorate directly).
+                                let mut positional_args = overload
+                                    .signature
+                                    .parameters()
+                                    .iter()
+                                    .zip(overload.parameter_types())
+                                    .filter(|(param, ty)| ty.is_some() && !param.is_keyword_only())
+                                    .map(|(_, ty)| ty);
+
+                                let first_positional = positional_args.next();
+                                let has_more = positional_args.next().is_some();
+
+                                // Only attempt direct decoration if exactly one positional argument.
+                                if !has_more {
+                                    // Helper to check if return type is class-like.
+                                    let returns_class = || {
+                                        matches!(
+                                            overload.return_type(),
+                                            Type::ClassLiteral(_)
+                                                | Type::GenericAlias(_)
+                                                | Type::SubclassOf(_)
+                                        )
+                                    };
+
+                                    match first_positional {
+                                        Some(Some(Type::ClassLiteral(class_literal)))
+                                            if returns_class() =>
+                                        {
+                                            overload.set_return_type(Type::from(
+                                                class_literal.with_dataclass_params(
+                                                    db,
+                                                    Some(dataclass_params),
+                                                ),
+                                            ));
+                                            continue;
+                                        }
+                                        Some(Some(Type::GenericAlias(generic_alias)))
+                                            if returns_class() =>
+                                        {
+                                            let new_origin = generic_alias
+                                                .origin(db)
+                                                .with_dataclass_params(db, Some(dataclass_params));
+                                            overload.set_return_type(Type::GenericAlias(
+                                                GenericAlias::new(
+                                                    db,
+                                                    new_origin,
+                                                    generic_alias.specialization(db),
+                                                ),
+                                            ));
+                                            continue;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+
+                                // Zero or more than one positional argument, or the argument is
+                                // not a class: assume it's a decorator factory.
+                                overload
+                                    .set_return_type(Type::DataclassDecorator(dataclass_params));
                             }
                         }
                     },
@@ -1371,12 +1435,6 @@ impl<'db> Bindings<'db> {
                                 [Some(arg)] => overload.set_return_type(arg.str(db)),
                                 [None] => overload.set_return_type(Type::string_literal(db, "")),
                                 _ => {}
-                            }
-                        }
-
-                        Some(KnownClass::Type) if overload_index == 0 => {
-                            if let [Some(arg)] = overload.parameter_types() {
-                                overload.set_return_type(arg.dunder_class(db));
                             }
                         }
 
@@ -3187,12 +3245,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // This is one of the few places where we want to check if there's _any_ specialization
         // where assignability holds; normally we want to check that assignability holds for
         // _all_ specializations.
+        //
         // TODO: Soon we will go further, and build the actual specializations from the
         // constraint set that we get from this assignability check, instead of inferring and
         // building them in an earlier separate step.
-        if argument_type
-            .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
-            .is_never_satisfied(self.db)
+        //
+        // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
+        if !parameter.has_starred_annotation()
+            && argument_type
+                .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
+                .is_never_satisfied(self.db)
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                 && !parameter.is_variadic();

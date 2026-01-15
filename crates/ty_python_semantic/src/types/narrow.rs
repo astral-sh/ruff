@@ -155,7 +155,7 @@ impl ClassInfoConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
-        let constraint_fn = |class: ClassLiteral<'db>| match self {
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
                 Type::instance(db, class.top_materialization(db))
             }
@@ -166,9 +166,11 @@ impl ClassInfoConstraintFunction {
 
         match classinfo {
             Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
-            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal)),
+            Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
+                SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
+                    Some(constraint_from_class_literal(class_literal))
+                }
                 // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
                 // e.g. `isinstance(x, list[int])` fails at runtime.
                 SubclassOfInner::Class(ClassType::Generic(_)) => None,
@@ -452,13 +454,6 @@ fn merge_constraints_or<'db>(
     }
 }
 
-fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
-    match expr {
-        ast::Expr::Named(named) => PlaceExpr::try_from_expr(named.target.as_ref()),
-        _ => PlaceExpr::try_from_expr(expr),
-    }
-}
-
 /// Return `true` if it is possible for any two inhabitants of the given types to
 /// compare equal to each other; otherwise return `false`.
 fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<'db>) -> bool {
@@ -719,7 +714,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr: &ast::Expr,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = place_expr(expr)?;
+        let target = PlaceExpr::try_from_expr(expr)?;
         let place = self.expect_place(&target);
 
         let ty = if is_positive {
@@ -1028,15 +1023,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
             && let ast::Expr::Subscript(subscript) = &**left
             && let Type::Union(union) = inference.expression_type(&*subscript.value)
-            && let Some(subscript_place_expr) = place_expr(&subscript.value)
+            && let Some(subscript_place_expr) = PlaceExpr::try_from_expr(&subscript.value)
             && let Type::IntLiteral(index) = inference.expression_type(&*subscript.slice)
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
             && rhs_ty.is_singleton(self.db)
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
-            let filtered: Vec<_> = union
-                .elements(self.db)
+            let union_elements = union.elements(self.db);
+            let filtered: Vec<_> = union_elements
                 .iter()
                 .filter(|elem| {
                     elem.as_nominal_instance()
@@ -1054,11 +1049,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 })
                 .copied()
                 .collect();
-            if filtered.len() < union.elements(self.db).len() {
+            if filtered.len() < union_elements.len() {
                 let place = self.expect_place(&subscript_place_expr);
                 constraints.insert(
                     place,
-                    NarrowingConstraint::regular(UnionType::from_elements(self.db, filtered)),
+                    NarrowingConstraint::typeguard(UnionType::from_elements(self.db, filtered)),
                 );
             }
         }
@@ -1120,7 +1115,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //         reveal_type(u)  # revealed: Bar
         if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
             && let Type::StringLiteral(key) = inference.expression_type(&**left)
-            && let Some(rhs_place_expr) = place_expr(&comparators[0])
+            && let Some(rhs_place_expr) = PlaceExpr::try_from_expr(&comparators[0])
             && let rhs_type = inference.expression_type(&comparators[0])
             && is_typeddict_or_union_with_typeddicts(self.db, rhs_type)
         {
@@ -1188,7 +1183,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 | ast::Expr::Attribute(_)
                 | ast::Expr::Subscript(_)
                 | ast::Expr::Named(_) => {
-                    if let Some(left) = place_expr(left)
+                    if let Some(left) = PlaceExpr::try_from_expr(left)
                         && let Some(ty) =
                             self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
                     {
@@ -1213,17 +1208,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     };
 
                     let target = match &**args {
-                        [first] => match place_expr(first) {
+                        [first] => match PlaceExpr::try_from_expr(first) {
                             Some(target) => target,
                             None => continue,
                         },
                         _ => continue,
                     };
 
-                    let is_positive = if is_positive {
-                        op == &ast::CmpOp::Is
-                    } else {
-                        op == &ast::CmpOp::IsNot
+                    let is_positive = match op {
+                        ast::CmpOp::Is => is_positive,
+                        ast::CmpOp::IsNot => !is_positive,
+                        _ => continue,
                     };
 
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
@@ -1242,10 +1237,33 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         constraints.insert(
                             place,
                             NarrowingConstraint::regular(
-                                Type::instance(self.db, rhs_class.unknown_specialization(self.db))
+                                Type::instance(self.db, rhs_class.top_materialization(self.db))
                                     .negate_if(self.db, !is_positive),
                             ),
                         );
+                    }
+                }
+                // For symmetric operators (==, !=, is, is not), if left is not a narrowable target,
+                // try to narrow the right operand instead by swapping the operands.
+                // E.g., `None != x` should narrow `x` the same way as `x != None`.
+                _ if matches!(
+                    op,
+                    ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot
+                ) && matches!(
+                    right,
+                    ast::Expr::Name(_)
+                        | ast::Expr::Attribute(_)
+                        | ast::Expr::Subscript(_)
+                        | ast::Expr::Named(_)
+                ) =>
+                {
+                    if let Some(right_place) = PlaceExpr::try_from_expr(right)
+                        // Swap lhs_ty and rhs_ty since we're narrowing the right operand
+                        && let Some(ty) =
+                            self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
+                    {
+                        let place = self.expect_place(&right_place);
+                        constraints.insert(place, NarrowingConstraint::regular(ty));
                     }
                 }
                 _ => {}
@@ -1290,7 +1308,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 // Narrow only the parts of the type that are safe to narrow based on len().
                 if let Some(narrowed_ty) = Self::narrow_type_by_len(self.db, arg_ty, is_positive) {
-                    let target = place_expr(arg)?;
+                    let target = PlaceExpr::try_from_expr(arg)?;
                     let place = self.expect_place(&target);
                     Some(NarrowingConstraints::from_iter([(
                         place,
@@ -1304,7 +1322,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = place_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(self.db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -1402,7 +1420,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         singleton: ast::Singleton,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
         let ty = match singleton {
@@ -1431,7 +1449,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
         let class_type =
@@ -1461,7 +1479,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let subject_node = subject.node_ref(self.db, self.module);
         let place = {
-            let subject = place_expr(subject_node)?;
+            let subject = PlaceExpr::try_from_expr(subject_node)?;
             self.expect_place(&subject)
         };
         let subject_ty =
@@ -1613,7 +1631,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         if !is_typeddict_or_union_with_typeddicts(self.db, subscript_value_type) {
             return None;
         }
-        let subscript_place_expr = place_expr(subscript_value_expr)?;
+        let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
         let Type::StringLiteral(key_literal) = subscript_key_type else {
             return None;
         };
@@ -1699,7 +1717,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let subscript_place_expr = place_expr(subscript_value_expr)?;
+        let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
 
         // Skip narrowing if any tuple in the union has an out-of-bounds index.
         // A diagnostic will be emitted elsewhere for the out-of-bounds access.
@@ -1716,8 +1734,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
 
         // Filter the union based on whether each tuple element at the index could match the rhs.
-        let filtered: Vec<_> = union
-            .elements(self.db)
+        let union_elements = union.elements(self.db);
+        let filtered: Vec<_> = union_elements
             .iter()
             .filter(|elem| {
                 elem.as_nominal_instance()
@@ -1737,11 +1755,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .collect();
 
         // Only create a constraint if we actually narrowed something.
-        if filtered.len() < union.elements(self.db).len() {
+        if filtered.len() < union_elements.len() {
             let place = self.expect_place(&subscript_place_expr);
             Some((
                 place,
-                NarrowingConstraint::regular(UnionType::from_elements(self.db, filtered)),
+                NarrowingConstraint::typeguard(UnionType::from_elements(self.db, filtered)),
             ))
         } else {
             None

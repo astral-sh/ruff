@@ -564,10 +564,11 @@ impl<'db> OverloadLiteral<'db> {
                 let index = semantic_index(db, scope_id.file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class).expect(
-                    "We should always find the surrounding class \
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
+                    .expect(
+                        "We should always find the surrounding class \
                      for an implicit self: Self annotation",
-                );
+                    );
 
                 if self.is_classmethod(db) {
                     Some(SubclassOfType::from(
@@ -748,9 +749,9 @@ impl<'db> FunctionLiteral<'db> {
     fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
-        let (implementation, overloads) = self.overloads_and_implementation(db);
-        overloads.into_iter().chain(implementation.iter().copied())
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
+        let (overloads, implementation) = self.overloads_and_implementation(db);
+        overloads.iter().copied().chain(implementation)
     }
 
     /// Typed externally-visible signature for this function.
@@ -1034,7 +1035,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
         self.literal(db).iter_overloads_and_implementation(db)
     }
 
@@ -1227,10 +1228,7 @@ fn is_instance_truthiness<'db>(
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
-                .any(|c| match c {
-                    ClassType::Generic(c) => c.origin(db) == class,
-                    ClassType::NonGeneric(c) => c == class,
-                })
+                .any(|c| c.class_literal(db) == class)
         {
             return true;
         }
@@ -1820,10 +1818,19 @@ impl KnownFunction {
                     let mut diag = builder.into_diagnostic("Revealed MRO");
                     let span = context.span(&call_expression.arguments.args[0]);
                     let mut message = String::new();
+                    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+                        db,
+                        classes
+                            .iter()
+                            .flat_map(|class| class.iter_mro(db))
+                            .filter_map(ClassBase::into_class),
+                    );
                     for (i, class) in classes.iter().enumerate() {
                         message.push('(');
                         for class in class.iter_mro(db) {
-                            message.push_str(&class.display(db).to_string());
+                            message.push_str(
+                                &class.display_with(db, display_settings.clone()).to_string(),
+                            );
                             // Omit the comma for the last element (which is always `object`)
                             if class
                                 .into_class()
@@ -2023,7 +2030,7 @@ impl KnownFunction {
                 if !class.has_ordering_method_in_mro(db) {
                     report_invalid_total_ordering_call(
                         context,
-                        class.class_literal(db).0,
+                        class.class_literal(db),
                         call_expression,
                     );
                 }
