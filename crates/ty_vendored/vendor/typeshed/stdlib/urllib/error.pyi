@@ -10,6 +10,7 @@ responses, with a status code, headers, and a body.  In some contexts,
 an application may want to handle an exception like a regular
 response.
 """
+
 from email.message import Message
 from typing import IO
 from urllib.response import addinfourl
@@ -21,11 +22,12 @@ class URLError(OSError):
     # The `filename` attribute only exists if it was provided to `__init__` and wasn't `None`.
     filename: str
     """exception filename"""
-    
+
     def __init__(self, reason: str | BaseException, filename: str | None = None) -> None: ...
 
 class HTTPError(URLError, addinfourl):
     """Raised when HTTP error occurs, but also acts like non-error return"""
+
     @property
     def headers(self) -> Message: ...
     @headers.setter
@@ -40,5 +42,6 @@ class HTTPError(URLError, addinfourl):
 
 class ContentTooShortError(URLError):
     """Exception raised when downloaded size does not match content-length."""
+
     content: tuple[str, Message]
     def __init__(self, message: str, content: tuple[str, Message]) -> None: ...
