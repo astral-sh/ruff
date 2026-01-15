@@ -16,6 +16,8 @@ use std::{
 use tempfile::TempDir;
 
 mod analyze_graph;
+#[cfg(feature = "ext-lint")]
+mod ext_lint;
 mod format;
 mod lint;
 
