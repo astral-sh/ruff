@@ -1187,11 +1187,6 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::NamedTuple) => {
-                            overload
-                                .set_return_type(todo_type!("Support for functional `namedtuple`"));
-                        }
-
                         _ => {
                             // Ideally, either the implementation, or exactly one of the overloads
                             // of the function can have the dataclass_transform decorator applied.
@@ -1440,12 +1435,6 @@ impl<'db> Bindings<'db> {
                                 [Some(arg)] => overload.set_return_type(arg.str(db)),
                                 [None] => overload.set_return_type(Type::string_literal(db, "")),
                                 _ => {}
-                            }
-                        }
-
-                        Some(KnownClass::Type) if overload_index == 0 => {
-                            if let [Some(arg)] = overload.parameter_types() {
-                                overload.set_return_type(arg.dunder_class(db));
                             }
                         }
 
@@ -3256,12 +3245,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // This is one of the few places where we want to check if there's _any_ specialization
         // where assignability holds; normally we want to check that assignability holds for
         // _all_ specializations.
+        //
         // TODO: Soon we will go further, and build the actual specializations from the
         // constraint set that we get from this assignability check, instead of inferring and
         // building them in an earlier separate step.
-        if argument_type
-            .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
-            .is_never_satisfied(self.db)
+        //
+        // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
+        if !parameter.has_starred_annotation()
+            && argument_type
+                .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
+                .is_never_satisfied(self.db)
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                 && !parameter.is_variadic();

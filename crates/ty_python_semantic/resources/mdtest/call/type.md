@@ -20,16 +20,13 @@ class Base: ...
 class Mixin: ...
 
 # We synthesize a class type using the name argument
-Foo = type("Foo", (), {})
-reveal_type(Foo)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (), {}))  # revealed: <class 'Foo'>
 
 # With a single base class
-Foo2 = type("Foo", (Base,), {"attr": 1})
-reveal_type(Foo2)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: <class 'Foo'>
 
 # With multiple base classes
-Foo3 = type("Foo", (Base, Mixin), {})
-reveal_type(Foo3)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (Base, Mixin), {}))  # revealed: <class 'Foo'>
 
 # The inferred type is assignable to type[Base] since Foo inherits from Base
 tests: list[type[Base]] = []
@@ -499,39 +496,38 @@ Other numbers of arguments are invalid:
 
 ```py
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Foo", ()))  # revealed: Unknown
+reveal_type(type("Foo", ()))  # revealed: type[Unknown]
 
 # TODO: the keyword arguments for `Foo`/`Bar`/`Baz` here are invalid
-# (you cannot pass `metaclass=` to `type()`, and none of them have
-# base classes with `__init_subclass__` methods),
-# but `type[Unknown]` would be better than `Unknown` here
+# (none of them have base classes with `__init_subclass__` methods).
 #
+# The intent to create a new class is however clear,
+# so we still infer these as class-literal types.
+reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: <class 'Foo'>
+reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: <class 'Bar'>
+
+# You can't pass `metaclass=` to the `type()` constructor, but the intent is clear,
+# so we infer `<class 'Baz'>` here rather than `type[Unknown]`
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: Unknown
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: Unknown
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: Unknown
+reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: <class 'Baz'>
 ```
 
-The following calls are also invalid, due to incorrect argument types.
-
-Inline calls (not assigned to a variable) fall back to regular `type` overload matching, which
-produces slightly different error messages than assigned dynamic class creation:
+The following calls are also invalid, due to incorrect argument types:
 
 ```py
 class Base: ...
 
-# error: 6 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `Literal[b"Foo"]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 1 (`name`) of `type()`: Expected `str`, found `Literal[b"Foo"]`"
 type(b"Foo", (), {})
 
-# error: 13 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
 type("Foo", Base, {})
 
-# error: 13 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `tuple[Literal[1], Literal[2]]`"
+# error: 14 [invalid-base] "Invalid class base with type `Literal[1]`"
+# error: 17 [invalid-base] "Invalid class base with type `Literal[2]`"
 type("Foo", (1, 2), {})
 
-# error: 22 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `dict[str, Any]`, found `dict[str | bytes, Any]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[Unknown | bytes, Unknown | int]`"
 type("Foo", (Base,), {b"attr": 1})
 ```
 
@@ -596,6 +592,19 @@ class Y(C, B): ...
 
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Conflict` with bases `[<class 'X'>, <class 'Y'>]`"
 Conflict = type("Conflict", (X, Y), {})
+```
+
+## MRO error highlighting (snapshot)
+
+<!-- snapshot-diagnostics -->
+
+This snapshot test documents the diagnostic highlighting range for dynamic class literals.
+Currently, the entire `type()` call expression is highlighted:
+
+```py
+class A: ...
+
+Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
 ```
 
 ## Metaclass conflicts
@@ -834,7 +843,7 @@ class Base: ...
 bases_tuple = (Base,)
 Cls1 = type("Cls1", (*bases_tuple,), {})
 reveal_type(Cls1)  # revealed: <class 'Cls1'>
-reveal_mro(Cls1)  # revealed: (<class 'Cls1'>, @Todo(StarredExpression), <class 'object'>)
+reveal_mro(Cls1)  # revealed: (<class 'Cls1'>, <class 'Base'>, <class 'object'>)
 
 # Unpacking a dict for the namespace - the dict contents are not tracked anyway
 namespace = {"attr": 1}
@@ -853,55 +862,77 @@ def f(*args, **kwargs):
 
     # Has a string first arg, but unknown additional args from *args
     B = type("B", *args, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(B)  # revealed: <class 'str'>
+    reveal_type(B)  # revealed: type[Unknown]
 
     # Has string and tuple, but unknown additional args
     C = type("C", (), *args, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(C)  # revealed: type
+    reveal_type(C)  # revealed: type[Unknown]
 
     # All three positional args provided, only **kwargs unknown
     D = type("D", (), {}, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(D)  # revealed: type
+    reveal_type(D)  # revealed: <class 'D'>
 
     # Three starred expressions - we can't know how they expand
     a = ("E",)
     b = ((),)
     c = ({},)
     E = type(*a, *b, *c)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(E)  # revealed: type
+    reveal_type(E)  # revealed: type[Unknown]
 ```
 
 ## Explicit type annotations
 
-TODO: Annotated assignments with `type()` calls don't currently synthesize the specific class type.
-This will be fixed when we support all `type()` calls (including inline) via generic handling.
+When an explicit type annotation is provided, the inferred type is checked against it:
 
 ```py
+# The annotation `type` is compatible with the inferred class literal type
+T: type = type("T", (), {})
+reveal_type(T)  # revealed: <class 'T'>
+
+# The annotation `type[Base]` is compatible with the inferred type
 class Base: ...
 
-# TODO: Should infer `<class 'T'>` instead of `type`
-T: type = type("T", (), {})
-reveal_type(T)  # revealed: type
-
-# TODO: Should infer `<class 'Derived'>` instead of `type[Base]}
-# error: [invalid-assignment] "Object of type `type` is not assignable to `type[Base]`"
 Derived: type[Base] = type("Derived", (Base,), {})
-reveal_type(Derived)  # revealed: type[Base]
+reveal_type(Derived)  # revealed: <class 'Derived'>
+
+# Incompatible annotation produces an error
+class Unrelated: ...
+
+# error: [invalid-assignment]
+Bad: type[Unrelated] = type("Bad", (Base,), {})
 ```
 
 ## Special base classes
 
 Some special base classes work with dynamic class creation, but special semantics may not be fully
-synthesized:
+synthesized.
+
+### Invalid special bases
+
+Dynamic classes cannot directly inherit from `Generic`, `Protocol`, or `TypedDict`. These special
+forms require class syntax for their semantics to be properly applied:
+
+```py
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+# error: [invalid-base] "Invalid base for class created via `type()`"
+GenericClass = type("GenericClass", (Generic[T],), {})
+
+# error: [unsupported-dynamic-base] "Unsupported base for class created via `type()`"
+ProtocolClass = type("ProtocolClass", (Protocol,), {})
+
+# error: [invalid-base] "Invalid base for class created via `type()`"
+TypedDictClass = type("TypedDictClass", (TypedDict,), {})
+```
 
 ### Protocol bases
 
+Inheriting from a class that is itself a protocol is valid:
+
 ```py
-# Protocol bases work - the class is created as a subclass of the protocol
 from typing import Protocol
 from ty_extensions import reveal_mro
 
@@ -918,8 +949,9 @@ reveal_type(instance)  # revealed: ProtoImpl
 
 ### TypedDict bases
 
+Inheriting from a class that is itself a TypedDict is valid:
+
 ```py
-# TypedDict bases work but TypedDict semantics aren't applied to dynamic subclasses
 from typing_extensions import TypedDict
 from ty_extensions import reveal_mro
 
@@ -952,26 +984,26 @@ reveal_mro(Point3D)  # revealed: (<class 'Point3D'>, <class 'Point'>, <class 'tu
 
 ### Enum bases
 
+Creating a class via `type()` that inherits from any Enum class fails at runtime because `EnumMeta`
+expects special attributes in the class dict that `type()` doesn't provide:
+
 ```py
-# Enum subclassing via type() is not supported - EnumMeta requires special dict handling
-# that type() cannot provide. This applies even to empty enums.
 from enum import Enum
 
 class Color(Enum):
     RED = 1
     GREEN = 2
 
+# Enums with members are final and cannot be subclassed
+# error: [subclass-of-final-class]
+ExtendedColor = type("ExtendedColor", (Color,), {})
+
 class EmptyEnum(Enum):
     pass
 
-# TODO: We should emit a diagnostic here - type() cannot create Enum subclasses
-ExtendedColor = type("ExtendedColor", (Color,), {})
-reveal_type(ExtendedColor)  # revealed: <class 'ExtendedColor'>
-
-# Even empty enums fail - EnumMeta requires special dict handling
-# TODO: We should emit a diagnostic here too
-ValidExtension = type("ValidExtension", (EmptyEnum,), {})
-reveal_type(ValidExtension)  # revealed: <class 'ValidExtension'>
+# Empty enums fail because EnumMeta requires special dict handling
+# error: [invalid-base] "Invalid base for class created via `type()`"
+InvalidExtension = type("InvalidExtension", (EmptyEnum,), {})
 ```
 
 ## `__init_subclass__` keyword arguments
@@ -992,9 +1024,6 @@ class Child(Base, required_arg="value"):
 # The dynamically assigned attribute has Unknown in its type
 reveal_type(Child.config)  # revealed: Unknown | str
 
-# Dynamic class creation - keyword arguments are not yet supported
-# TODO: This should work: type("DynamicChild", (Base,), {}, required_arg="value")
-# error: [no-matching-overload]
 DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 ```
 
@@ -1033,4 +1062,28 @@ reveal_type(Dynamic)  # revealed: <class 'Dynamic'>
 
 # Metaclass attributes are accessible on the class
 reveal_type(Dynamic.custom_attr)  # revealed: str
+```
+
+## `final()` on dynamic classes
+
+Using `final()` as a function (not a decorator) on dynamic classes will not be understood by type
+checkers. The class is passed through unchanged, and subclassing will not be prevented:
+
+```py
+from typing import final
+
+# error: [ineffective-final]
+FinalClass = final(type("FinalClass", (), {}))
+reveal_type(FinalClass)  # revealed: <class 'FinalClass'>
+
+# Subclassing is allowed because type checkers don't understand `final()` called as a function
+class Child(FinalClass): ...
+
+# Same with base classes
+class Base: ...
+
+# error: [ineffective-final]
+FinalDerived = final(type("FinalDerived", (Base,), {}))
+
+class Child2(FinalDerived): ...
 ```

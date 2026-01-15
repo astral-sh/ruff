@@ -123,7 +123,7 @@ def set_debug(flags: int, /) -> None:
     Debugging information is written to sys.stderr.
     """
 
-def set_threshold(threshold0: int, threshold1: int = ..., threshold2: int = ..., /) -> None:
+def set_threshold(threshold0: int, threshold1: int = 0, threshold2: int = 0, /) -> None:
     """set_threshold(threshold0, [threshold1, [threshold2]])
     Set the collection thresholds (the collection frequency).
 

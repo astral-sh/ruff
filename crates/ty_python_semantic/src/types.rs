@@ -3384,17 +3384,16 @@ impl<'db> Type<'db> {
                         .map(|class| class.class_literal(db)),
                     _ => None,
                 };
-                if let Some(enum_class) = enum_class {
-                    if let Some(metadata) = enum_metadata(db, enum_class) {
-                        if let Some(resolved_name) = metadata.resolve_member(&name) {
-                            return Place::bound(Type::EnumLiteral(EnumLiteralType::new(
-                                db,
-                                enum_class,
-                                resolved_name,
-                            )))
-                            .into();
-                        }
-                    }
+                if let Some(enum_class) = enum_class
+                    && let Some(metadata) = enum_metadata(db, enum_class)
+                    && let Some(resolved_name) = metadata.resolve_member(&name)
+                {
+                    return Place::bound(Type::EnumLiteral(EnumLiteralType::new(
+                        db,
+                        enum_class,
+                        resolved_name,
+                    )))
+                    .into();
                 }
 
                 let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
@@ -4111,55 +4110,6 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownClass::Type) => {
-                    let str_instance = KnownClass::Str.to_instance(db);
-                    let type_instance = KnownClass::Type.to_instance(db);
-
-                    // ```py
-                    // class type:
-                    //     @overload
-                    //     def __init__(self, o: object, /) -> None: ...
-                    //     @overload
-                    //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
-                    // ```
-                    CallableBinding::from_overloads(
-                        self,
-                        [
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_only(Some(Name::new_static("o")))
-                                        .with_annotated_type(Type::any())],
-                                ),
-                                type_instance,
-                            ),
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [
-                                        Parameter::positional_only(Some(Name::new_static("name")))
-                                            .with_annotated_type(str_instance),
-                                        Parameter::positional_only(Some(Name::new_static("bases")))
-                                            .with_annotated_type(Type::homogeneous_tuple(
-                                                db,
-                                                type_instance,
-                                            )),
-                                        Parameter::positional_only(Some(Name::new_static("dict")))
-                                            .with_annotated_type(
-                                                KnownClass::Dict.to_specialized_instance(
-                                                    db,
-                                                    &[str_instance, Type::any()],
-                                                ),
-                                            ),
-                                    ],
-                                ),
-                                type_instance,
-                            ),
-                        ],
-                    )
-                    .into()
-                }
-
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:
@@ -4449,10 +4399,6 @@ impl<'db> Type<'db> {
                     ),
                 )
                 .into()
-            }
-
-            Type::SpecialForm(SpecialFormType::NamedTuple) => {
-                Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
             }
 
             Type::GenericAlias(_) => {
@@ -5116,16 +5062,15 @@ impl<'db> Type<'db> {
 
         let from_class_base = |base: ClassBase<'db>| {
             let class = base.into_class()?;
-            if class.is_known(db, KnownClass::Generator) {
-                if let Some((_, Some(specialization))) =
+            if class.is_known(db, KnownClass::Generator)
+                && let Some((_, Some(specialization))) =
                     class.static_class_literal_specialized(db, None)
-                {
-                    if let [_, _, return_ty] = specialization.types(db) {
-                        return Some(*return_ty);
-                    }
-                }
+                && let [_, _, return_ty] = specialization.types(db)
+            {
+                Some(*return_ty)
+            } else {
+                None
             }
-            None
         };
 
         match self {
@@ -6559,9 +6504,9 @@ impl<'db> Type<'db> {
                 Some(TypeDefinition::Function(function.definition(db)))
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
-            Self::ClassLiteral(class_literal) => Some(class_literal.type_definition(db)),
+            Self::ClassLiteral(class_literal) => class_literal.type_definition(db),
             Self::GenericAlias(alias) => Some(TypeDefinition::StaticClass(alias.definition(db))),
-            Self::NominalInstance(instance) => Some(instance.class(db).type_definition(db)),
+            Self::NominalInstance(instance) => instance.class(db).type_definition(db),
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
                     Some(TypeDefinition::TypeVar(var.definition(db)?))
@@ -6575,7 +6520,7 @@ impl<'db> Type<'db> {
 
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => None,
-                SubclassOfInner::Class(class) => Some(class.type_definition(db)),
+                SubclassOfInner::Class(class) => class.type_definition(db),
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?))
                 }
@@ -6605,7 +6550,7 @@ impl<'db> Type<'db> {
             Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(class) => Some(class.type_definition(db)),
+                Protocol::FromClass(class) => class.type_definition(db),
                 Protocol::Synthesized(_) => None,
             },
 
@@ -8107,15 +8052,10 @@ impl<'db> TypeVarInstance<'db> {
                 let typevar_node = typevar.node(&module);
                 let bound =
                     definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
-                let constraints = if let Some(tuple) = bound
-                    .as_nominal_instance()
-                    .and_then(|instance| instance.tuple_spec(db))
+                let constraints = if let Some(tuple) = bound.tuple_instance_spec(db)
+                    && let Tuple::Fixed(tuple) = tuple.into_owned()
                 {
-                    if let Tuple::Fixed(tuple) = tuple.into_owned() {
-                        tuple.owned_elements()
-                    } else {
-                        vec![Type::unknown()].into_boxed_slice()
-                    }
+                    tuple.owned_elements()
                 } else {
                     vec![Type::unknown()].into_boxed_slice()
                 };
@@ -9193,13 +9133,13 @@ impl<'db> AwaitError<'db> {
                     ""
                 };
                 diag.info(format_args!("`__await__` is{possibly} not callable"));
-                if let Some(definition) = bindings.callable_type().definition(db) {
-                    if let Some(definition_range) = definition.focus_range(db) {
-                        diag.annotate(
-                            Annotation::secondary(definition_range.into())
-                                .message("attribute defined here"),
-                        );
-                    }
+                if let Some(definition) = bindings.callable_type().definition(db)
+                    && let Some(definition_range) = definition.focus_range(db)
+                {
+                    diag.annotate(
+                        Annotation::secondary(definition_range.into())
+                            .message("attribute defined here"),
+                    );
                 }
             }
             Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
@@ -9213,13 +9153,12 @@ impl<'db> AwaitError<'db> {
             }
             Self::Call(CallDunderError::MethodNotAvailable) => {
                 diag.info("`__await__` is missing");
-                if let Some(type_definition) = context_expression_type.definition(db) {
-                    if let Some(definition_range) = type_definition.focus_range(db) {
-                        diag.annotate(
-                            Annotation::secondary(definition_range.into())
-                                .message("type defined here"),
-                        );
-                    }
+                if let Some(type_definition) = context_expression_type.definition(db)
+                    && let Some(definition_range) = type_definition.focus_range(db)
+                {
+                    diag.annotate(
+                        Annotation::secondary(definition_range.into()).message("type defined here"),
+                    );
                 }
             }
             Self::InvalidReturnType(return_type, bindings) => {
@@ -11405,20 +11344,20 @@ impl<'db> ModuleLiteralType<'db> {
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         if let Some(file) = self.module(db).file(db) {
             let getattr_symbol = imported_symbol(db, file, "__getattr__", None);
-            if let Place::Defined(place) = getattr_symbol.place {
-                // If we found a __getattr__ function, try to call it with the name argument
-                if let Ok(outcome) = place.ty.try_call(
+            // If we found a __getattr__ function, try to call it with the name argument
+            if let Place::Defined(place) = getattr_symbol.place
+                && let Ok(outcome) = place.ty.try_call(
                     db,
                     &CallArguments::positional([Type::string_literal(db, name)]),
-                ) {
-                    return PlaceAndQualifiers {
-                        place: Place::Defined(DefinedPlace {
-                            ty: outcome.return_type(db),
-                            ..place
-                        }),
-                        qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
-                    };
-                }
+                )
+            {
+                return PlaceAndQualifiers {
+                    place: Place::Defined(DefinedPlace {
+                        ty: outcome.return_type(db),
+                        ..place
+                    }),
+                    qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
+                };
             }
         }
 
@@ -11444,10 +11383,10 @@ impl<'db> ModuleLiteralType<'db> {
         // the parent module's `__init__.py` file being evaluated. That said, we have
         // chosen to always have the submodule take priority. (This matches pyright's
         // current behavior, but is the opposite of mypy's current behavior.)
-        if self.available_submodule_attributes(db).contains(name) {
-            if let Some(submodule) = self.resolve_submodule(db, name) {
-                return Place::bound(submodule).into();
-            }
+        if self.available_submodule_attributes(db).contains(name)
+            && let Some(submodule) = self.resolve_submodule(db, name)
+        {
+            return Place::bound(submodule).into();
         }
 
         let place_and_qualifiers = self
@@ -12146,17 +12085,11 @@ impl<'db> UnionType<'db> {
         let mut has_float = false;
         let mut has_complex = false;
         for element in self.elements(db) {
-            if let Type::NominalInstance(nominal) = element
-                && let Some(known) = nominal.known_class(db)
-            {
-                match known {
-                    KnownClass::Int => has_int = true,
-                    KnownClass::Float => has_float = true,
-                    KnownClass::Complex => has_complex = true,
-                    _ => return None,
-                }
-            } else {
-                return None;
+            match element.as_nominal_instance()?.known_class(db)? {
+                KnownClass::Int => has_int = true,
+                KnownClass::Float => has_float = true,
+                KnownClass::Complex => has_complex = true,
+                _ => return None,
             }
         }
         match (has_int, has_float, has_complex) {

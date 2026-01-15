@@ -73,6 +73,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
@@ -103,6 +104,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
+    registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -958,6 +960,48 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for enum classes that are also generic.
+    ///
+    /// ## Why is this bad?
+    /// Enum classes cannot be generic. Python does not support generic enums:
+    /// attempting to create one will either result in an immediate `TypeError`
+    /// at runtime, or will create a class that cannot be specialized in the way
+    /// that a normal generic class can.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from enum import Enum
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")
+    ///
+    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
+    /// class E[T](Enum):
+    ///     A = 1
+    ///
+    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
+    /// class F(Enum, Generic[T]):
+    ///     A = 1
+    ///
+    /// # error: enum class cannot be generic -- the class creation does not immediately fail...
+    /// class G(Generic[T], Enum):
+    ///     A = 1
+    ///
+    /// # ...but this raises `KeyError`:
+    /// x: G[int]
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: Enum](https://docs.python.org/3/library/enum.html)
+    pub(crate) static INVALID_GENERIC_ENUM = {
+        summary: "detects generic enum classes",
+        status: LintStatus::stable("0.0.12"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for the creation of invalid generic classes
     ///
     /// ## Why is this bad?
@@ -1743,6 +1787,34 @@ declare_lint! {
         summary: "detects overrides of final methods",
         status: LintStatus::stable("0.0.1-alpha.29"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to `final()` that type checkers cannot interpret.
+    ///
+    /// ## Why is this bad?
+    /// The `final()` function is designed to be used as a decorator. When called directly
+    /// as a function (e.g., `final(type(...))`), type checkers will not understand the
+    /// application of `final` and will not prevent subclassing.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// # Incorrect: type checkers will not prevent subclassing
+    /// MyClass = final(type("MyClass", (), {}))
+    ///
+    /// # Correct: use `final` as a decorator
+    /// @final
+    /// class MyClass: ...
+    /// ```
+    pub(crate) static INEFFECTIVE_FINAL = {
+        summary: "detects calls to `final()` that type checkers cannot interpret",
+        status: LintStatus::preview("0.0.1-alpha.33"),
+        default_level: Level::Warn,
     }
 }
 
