@@ -114,60 +114,175 @@ AIR303 `create_asset` signature is changed in Airflow 3.0
 help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
 
 AIR303 `Dataset` signature is changed in Airflow 3.0
-  --> AIR303.py:37:1
-   |
-36 | # second argument is of type dict, should raise diagnostic
-37 | Dataset("ds1", {"extra": "metadata"})
-   | ^^^^^^^
-38 | Dataset("ds1", {})
-39 | Dataset("uri", dict())
-   |
-help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
-
-AIR303 `Dataset` signature is changed in Airflow 3.0
-  --> AIR303.py:38:1
-   |
-36 | # second argument is of type dict, should raise diagnostic
-37 | Dataset("ds1", {"extra": "metadata"})
-38 | Dataset("ds1", {})
-   | ^^^^^^^
-39 | Dataset("uri", dict())
-40 | # second argument is not of type dict, should not raise diagnostic
-   |
-help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
-
-AIR303 `Dataset` signature is changed in Airflow 3.0
   --> AIR303.py:39:1
    |
-37 | Dataset("ds1", {"extra": "metadata"})
-38 | Dataset("ds1", {})
-39 | Dataset("uri", dict())
+38 | # second argument is of type dict, should raise diagnostic
+39 | Dataset("ds1", {"extra": "metadata"})
    | ^^^^^^^
-40 | # second argument is not of type dict, should not raise diagnostic
-41 | Dataset("ds1")
+40 | Dataset("ds1", {})
+41 | Dataset("ds1", dict())
    |
 help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
 
 AIR303 `Dataset` signature is changed in Airflow 3.0
-  --> AIR303.py:48:1
+  --> AIR303.py:40:1
    |
-46 | from airflow.datasets import Dataset
-47 |
-48 | Dataset("ds2", {"extra": "metadata"})
+38 | # second argument is of type dict, should raise diagnostic
+39 | Dataset("ds1", {"extra": "metadata"})
+40 | Dataset("ds1", {})
    | ^^^^^^^
-49 | Dataset("ds2")
-50 | Dataset("ds2", extra={"key": "value"})
+41 | Dataset("ds1", dict())
+42 | Dataset("ds1", extra_params)
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:41:1
+   |
+39 | Dataset("ds1", {"extra": "metadata"})
+40 | Dataset("ds1", {})
+41 | Dataset("ds1", dict())
+   | ^^^^^^^
+42 | Dataset("ds1", extra_params)
+43 | Dataset("ds1", {k: v for k, v in zip(["extra"], ["metadata"])})
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:42:1
+   |
+40 | Dataset("ds1", {})
+41 | Dataset("ds1", dict())
+42 | Dataset("ds1", extra_params)
+   | ^^^^^^^
+43 | Dataset("ds1", {k: v for k, v in zip(["extra"], ["metadata"])})
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:43:1
+   |
+41 | Dataset("ds1", dict())
+42 | Dataset("ds1", extra_params)
+43 | Dataset("ds1", {k: v for k, v in zip(["extra"], ["metadata"])})
+   | ^^^^^^^
+44 |
+45 | # second argument is not of type dict, should not raise diagnostic
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:53:1
+   |
+51 | from airflow.datasets import Dataset
+52 |
+53 | Dataset("ds2", {"extra": "metadata"})
+   | ^^^^^^^
+54 | Dataset("ds2", {})
+55 | Dataset("ds2", dict())
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:54:1
+   |
+53 | Dataset("ds2", {"extra": "metadata"})
+54 | Dataset("ds2", {})
+   | ^^^^^^^
+55 | Dataset("ds2", dict())
+56 | Dataset("ds2", extra_params)
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:55:1
+   |
+53 | Dataset("ds2", {"extra": "metadata"})
+54 | Dataset("ds2", {})
+55 | Dataset("ds2", dict())
+   | ^^^^^^^
+56 | Dataset("ds2", extra_params)
+57 | Dataset("ds2", {k: v for k, v in zip(["extra"], ["metadata"])})
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:56:1
+   |
+54 | Dataset("ds2", {})
+55 | Dataset("ds2", dict())
+56 | Dataset("ds2", extra_params)
+   | ^^^^^^^
+57 | Dataset("ds2", {k: v for k, v in zip(["extra"], ["metadata"])})
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Dataset` signature is changed in Airflow 3.0
+  --> AIR303.py:57:1
+   |
+55 | Dataset("ds2", dict())
+56 | Dataset("ds2", extra_params)
+57 | Dataset("ds2", {k: v for k, v in zip(["extra"], ["metadata"])})
+   | ^^^^^^^
+58 |
+59 | Dataset("ds2")
    |
 help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
 
 AIR303 `Asset` signature is changed in Airflow 3.0
-  --> AIR303.py:56:1
+  --> AIR303.py:66:1
    |
-54 | from airflow.sdk import Asset
-55 |
-56 | Asset("asset1", {"extra": "metadata"})
+64 | from airflow.sdk import Asset
+65 |
+66 | Asset("asset1", {"extra": "metadata"})
    | ^^^^^
-57 | Asset("asset1")
-58 | Asset("asset1", extra={"key": "value"})
+67 | Asset("asset1", {})
+68 | Asset("asset1", dict())
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Asset` signature is changed in Airflow 3.0
+  --> AIR303.py:67:1
+   |
+66 | Asset("asset1", {"extra": "metadata"})
+67 | Asset("asset1", {})
+   | ^^^^^
+68 | Asset("asset1", dict())
+69 | Asset("asset1", extra_params)
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Asset` signature is changed in Airflow 3.0
+  --> AIR303.py:68:1
+   |
+66 | Asset("asset1", {"extra": "metadata"})
+67 | Asset("asset1", {})
+68 | Asset("asset1", dict())
+   | ^^^^^
+69 | Asset("asset1", extra_params)
+70 | Asset("asset1", {k: v for k, v in zip(["extra"], ["metadata"])})
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Asset` signature is changed in Airflow 3.0
+  --> AIR303.py:69:1
+   |
+67 | Asset("asset1", {})
+68 | Asset("asset1", dict())
+69 | Asset("asset1", extra_params)
+   | ^^^^^
+70 | Asset("asset1", {k: v for k, v in zip(["extra"], ["metadata"])})
+   |
+help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `Asset` signature is changed in Airflow 3.0
+  --> AIR303.py:70:1
+   |
+68 | Asset("asset1", dict())
+69 | Asset("asset1", extra_params)
+70 | Asset("asset1", {k: v for k, v in zip(["extra"], ["metadata"])})
+   | ^^^^^
+71 |
+72 | Asset("asset1")
    |
 help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)

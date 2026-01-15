@@ -157,25 +157,22 @@ fn check_constructor_arguments(
     }
 }
 
-/// Check if an expression is a dictionary (either a literal or a `dict()` call).
+/// Check if an expression is a dictionary.
 fn is_dict_expression(checker: &Checker, expr: &Expr) -> bool {
-    // Check for dict literal: {} or {"key": "value"}
-    if expr.is_dict_expr() {
-        return true;
-    }
-
-    // Check for dict() call
-    if let Expr::Call(call) = expr {
-        if checker
+    match expr {
+        Expr::Dict(_) => true,
+        Expr::DictComp(_) => true,
+        Expr::Call(call) => checker
             .semantic()
             .resolve_builtin_symbol(&call.func)
-            .is_some_and(|name| name == "dict")
-        {
-            return true;
-        }
+            .is_some_and(|name| name == "dict"),
+        Expr::Name(name) => checker
+            .semantic()
+            .resolve_name(name)
+            .map(|id| checker.semantic().binding(id))
+            .is_some_and(|binding| typing::is_dict(binding, checker.semantic())),
+        _ => false,
     }
-
-    false
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
