@@ -509,9 +509,9 @@ async function startPlayground(): Promise<InitializedPlayground> {
   await ty.default();
 
   if (import.meta.env.DEV) {
-    ty.init_logging(ty.LogLevel.Debug);
+    ty.initLogging(ty.LogLevel.Debug);
   } else {
-    ty.init_logging(ty.LogLevel.Info);
+    ty.initLogging(ty.LogLevel.Info);
   }
 
   const version = ty.version();

@@ -115,10 +115,10 @@ pub fn run() {
 ///
 /// ## Panics
 /// If this function is called more than once.
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "initLogging")]
 pub fn init_logging(level: LogLevel) {
     console_log::init_with_level(level.into())
-        .expect("init_logging to only be called at most once.")
+        .expect("`initLogging` to only be called at most once.");
 }
 
 #[derive(Copy, Clone, Debug)]
