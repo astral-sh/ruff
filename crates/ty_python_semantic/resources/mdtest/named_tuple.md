@@ -559,17 +559,57 @@ Bad5 = NamedTuple("Bad5", [("x", int)], foobarbaz=42)
 # error: [invalid-argument-type] "Invalid argument to parameter `fields` of `NamedTuple()`"
 Bad6 = NamedTuple("Bad6", 12345)
 reveal_type(Bad6)  # revealed: <class 'Bad6'>
+
+# Invalid field definitions: strings instead of (name, type) tuples
+# error: [invalid-argument-type] "Invalid `NamedTuple()` field definition"
+# error: [invalid-argument-type] "Invalid `NamedTuple()` field definition"
+Bad7 = NamedTuple("Bad7", ["a", "b"])
+reveal_type(Bad7)  # revealed: <class 'Bad7'>
+
+# Invalid field definitions: type is not a valid type expression (e.g., int literals)
+# error: [invalid-type-form] "Invalid type `Literal[123]` in `NamedTuple` field type"
+# error: [invalid-type-form] "Invalid type `Literal[456]` in `NamedTuple` field type"
+Bad8 = NamedTuple("Bad8", [("a", 123), ("b", 456)])
+reveal_type(Bad8)  # revealed: <class 'Bad8'>
 ```
 
-### Starred and double-starred arguments
+### Missing required arguments
 
-When starred (`*args`) or double-starred (`**kwargs`) arguments are used, we fall back to normal
-call binding since we can't statically determine the arguments. This results in `NamedTupleFallback`
-being returned:
+`NamedTuple` and `namedtuple` require at least two positional arguments: `typename` and
+`fields`/`field_names`.
 
 ```py
 import collections
 from typing import NamedTuple
+
+# Missing both typename and fields
+# error: [missing-argument] "Missing required arguments `typename` and `fields` to `NamedTuple()`"
+Bad1 = NamedTuple()
+reveal_type(Bad1)  # revealed: type[NamedTupleFallback]
+
+# Missing fields argument
+# error: [missing-argument] "Missing required argument `fields` to `NamedTuple()`"
+Bad2 = NamedTuple("Bad2")
+reveal_type(Bad2)  # revealed: type[NamedTupleFallback]
+
+# Missing both typename and field_names for collections.namedtuple
+# error: [missing-argument] "Missing required arguments `typename` and `field_names` to `namedtuple()`"
+Bad3 = collections.namedtuple()
+reveal_type(Bad3)  # revealed: type[NamedTupleFallback]
+
+# Missing field_names argument
+# error: [missing-argument] "Missing required argument `field_names` to `namedtuple()`"
+Bad4 = collections.namedtuple("Bad4")
+reveal_type(Bad4)  # revealed: type[NamedTupleFallback]
+```
+
+### Starred and double-starred arguments
+
+For `collections.namedtuple`, starred (`*args`) or double-starred (`**kwargs`) arguments cause us to
+fall back to `NamedTupleFallback` since we can't statically determine the arguments:
+
+```py
+import collections
 
 args = ("Point", ["x", "y"])
 kwargs = {"rename": True}
@@ -578,16 +618,37 @@ kwargs = {"rename": True}
 Point1 = collections.namedtuple(*args)
 reveal_type(Point1)  # revealed: type[NamedTupleFallback]
 
-# Ideally we'd catch this false negative,
-# but it's unclear if it's worth the added complexity
-Point2 = NamedTuple(*args)
+# Double-starred keyword arguments - falls back to NamedTupleFallback
+Point2 = collections.namedtuple("Point", ["x", "y"], **kwargs)
 reveal_type(Point2)  # revealed: type[NamedTupleFallback]
 
-# Double-starred keyword arguments - falls back to NamedTupleFallback
-Point3 = collections.namedtuple("Point", ["x", "y"], **kwargs)
+# Both starred and double-starred
+Point3 = collections.namedtuple(*args, **kwargs)
+reveal_type(Point3)  # revealed: type[NamedTupleFallback]
+```
+
+For `typing.NamedTuple`, variadic arguments are not supported and result in an error:
+
+```py
+from typing import NamedTuple
+
+args = ("Point", [("x", int), ("y", int)])
+kwargs = {"extra": True}
+
+# error: [invalid-argument-type] "Variadic positional arguments are not supported in `NamedTuple()` calls"
+Point1 = NamedTuple(*args)
+reveal_type(Point1)  # revealed: type[NamedTupleFallback]
+
+# error: [invalid-argument-type] "Variadic positional arguments are not supported in `NamedTuple()` calls"
+Point2 = NamedTuple("Point", *args)
+reveal_type(Point2)  # revealed: type[NamedTupleFallback]
+
+# error: [invalid-argument-type] "Variadic keyword arguments are not supported in `NamedTuple()` calls"
+Point3 = NamedTuple("Point", [("x", int), ("y", int)], **kwargs)
 reveal_type(Point3)  # revealed: type[NamedTupleFallback]
 
-Point4 = NamedTuple("Point", [("x", int), ("y", int)], **kwargs)
+# error: [invalid-argument-type] "Variadic positional and keyword arguments are not supported in `NamedTuple()` calls"
+Point4 = NamedTuple(*args, **kwargs)
 reveal_type(Point4)  # revealed: type[NamedTupleFallback]
 ```
 
