@@ -70,6 +70,7 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::Range;
+use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -2176,29 +2177,9 @@ impl<'db> InteriorNode<'db> {
 
     /// Returns a sequent map for this BDD, which records the relationships between the constraints
     /// that appear in the BDD.
-    #[salsa::tracked(
-        returns(ref),
-        cycle_initial=sequent_map_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn sequent_map(self, db: &'db dyn Db) -> SequentMap<'db> {
-        tracing::trace!(
-            target: "ty_python_semantic::types::constraints::SequentMap",
-            constraints = %Node::Interior(self).display(db),
-            "create sequent map",
-        );
-
-        // Sort the constraints in this BDD by their `source_order`s before adding them to the
-        // sequent map. This ensures that constraints appear in the sequent map in a stable order.
-        // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
-        // unstable sort is fine.
-        let mut constraints = Vec::new();
-        Node::Interior(self).for_each_constraint(db, &mut |constraint, source_order| {
-            constraints.push((constraint, source_order));
-        });
-        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
-
-        SequentMap::new(constraints.into_iter().map(|(constraint, _)| constraint))
+        SequentMap::new(db, self)
     }
 
     fn path_assignments(self, db: &'db dyn Db) -> PathAssignments<'db> {
@@ -2614,14 +2595,6 @@ impl<'db> InteriorNode<'db> {
     }
 }
 
-fn sequent_map_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: InteriorNode<'db>,
-) -> SequentMap<'db> {
-    SequentMap::default()
-}
-
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
 /// must provide an assignment for each variable present in the BDD.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update)]
@@ -2751,8 +2724,13 @@ impl<'db> ConstraintAssignment<'db> {
 ///
 /// - `C → D`: This indicates that `C` on its own is enough to imply `D`. Any path that assumes `C`
 ///   holds but `D` does _not_ is impossible and can be pruned.
-#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 struct SequentMap<'db> {
+    inner: Arc<Mutex<SequentMapInner<'db>>>,
+}
+
+#[derive(Debug, get_size2::GetSize)]
+struct SequentMapInner<'db> {
     /// Sequents of the form `¬C₁ → false`
     single_tautologies: FxHashSet<ConstrainedTypeVar<'db>>,
     /// Sequents of the form `C₁ ∧ C₂ → false`
@@ -2771,20 +2749,41 @@ struct SequentMap<'db> {
 }
 
 impl<'db> SequentMap<'db> {
-    fn new(constraints: impl IntoIterator<Item = ConstrainedTypeVar<'db>>) -> Self {
+    fn new(db: &'db dyn Db, node: InteriorNode<'db>) -> Self {
+        tracing::trace!(
+            target: "ty_python_semantic::types::constraints::SequentMap",
+            constraints = %Node::Interior(node).display(db),
+            "create sequent map",
+        );
+
+        // Sort the constraints in this BDD by their `source_order`s before adding them to the
+        // sequent map. This ensures that constraints appear in the sequent map in a stable order.
+        // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
+        // unstable sort is fine.
+        let mut constraints = Vec::new();
+        Node::Interior(node).for_each_constraint(db, &mut |constraint, source_order| {
+            constraints.push((constraint, source_order));
+        });
+        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
+
         let discovered = constraints
             .into_iter()
-            .map(|constraint| (constraint, false))
+            .map(|(constraint, _)| (constraint, false))
             .collect();
-        Self {
+        let inner = SequentMapInner {
             single_tautologies: FxHashSet::default(),
             pair_impossibilities: FxHashSet::default(),
             pair_implications: FxHashMap::default(),
             single_implications: FxHashMap::default(),
             discovered,
+        };
+        Self {
+            inner: Arc::new(Mutex::new(inner)),
         }
     }
+}
 
+impl<'db> SequentMapInner<'db> {
     fn add(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
         // If we've already processed this constraint, we can skip it.
         let (new_index, existing) = self.discovered.insert_full(constraint, true);
@@ -3229,7 +3228,9 @@ impl<'db> SequentMap<'db> {
             }
         }
     }
+}
 
+impl<'db> SequentMap<'db> {
     #[expect(dead_code)] // Keep this around for debugging purposes
     fn display<'a>(&'a self, db: &'db dyn Db, prefix: &'a dyn Display) -> impl Display + 'a {
         struct DisplaySequentMap<'a, 'db> {
@@ -3240,6 +3241,7 @@ impl<'db> SequentMap<'db> {
 
         impl Display for DisplaySequentMap<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let map = self.map.inner.lock().unwrap();
                 let mut first = true;
                 let mut maybe_write_prefix = |f: &mut std::fmt::Formatter<'_>| {
                     if first {
@@ -3250,7 +3252,7 @@ impl<'db> SequentMap<'db> {
                     }
                 };
 
-                for (ante1, ante2) in &self.map.pair_impossibilities {
+                for (ante1, ante2) in &map.pair_impossibilities {
                     maybe_write_prefix(f)?;
                     write!(
                         f,
@@ -3260,7 +3262,7 @@ impl<'db> SequentMap<'db> {
                     )?;
                 }
 
-                for ((ante1, ante2), posts) in &self.map.pair_implications {
+                for ((ante1, ante2), posts) in &map.pair_implications {
                     for post in posts {
                         maybe_write_prefix(f)?;
                         write!(
@@ -3273,7 +3275,7 @@ impl<'db> SequentMap<'db> {
                     }
                 }
 
-                for (ante, posts) in &self.map.single_implications {
+                for (ante, posts) in &map.single_implications {
                     for post in posts {
                         maybe_write_prefix(f)?;
                         write!(f, "{} → {}", ante.display(self.db), post.display(self.db))?;
@@ -3292,6 +3294,21 @@ impl<'db> SequentMap<'db> {
             prefix,
             db,
         }
+    }
+}
+
+impl PartialEq for SequentMap<'_> {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
+#[expect(unsafe_code)]
+unsafe impl salsa::Update for SequentMap<'_> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_map: Self) -> bool {
+        let old_map: &mut Self = unsafe { &mut *old_pointer };
+        *old_map = new_map;
+        true
     }
 }
 
@@ -3348,7 +3365,11 @@ impl<'db> PathAssignments<'db> {
             edge = %assignment.display(db),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, assignment, source_order);
+        let found_conflict = {
+            let map = self.map.inner.clone();
+            let mut map = map.lock().unwrap();
+            self.add_assignment(db, &mut map, assignment, source_order)
+        };
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -3398,6 +3419,7 @@ impl<'db> PathAssignments<'db> {
     fn add_assignment(
         &mut self,
         db: &'db dyn Db,
+        map: &mut SequentMapInner<'db>,
         assignment: ConstraintAssignment<'db>,
         source_order: usize,
     ) -> Result<(), PathAssignmentConflict> {
@@ -3431,9 +3453,9 @@ impl<'db> PathAssignments<'db> {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
-        self.map.add(db, assignment.constraint());
+        map.add(db, assignment.constraint());
 
-        for ante in &self.map.single_tautologies {
+        for ante in &map.single_tautologies {
             if self.assignment_holds(ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
                 // it's false.
@@ -3450,7 +3472,7 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for (ante1, ante2) in &self.map.pair_impossibilities {
+        for (ante1, ante2) in &map.pair_impossibilities {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
@@ -3470,7 +3492,7 @@ impl<'db> PathAssignments<'db> {
         }
 
         let mut new_constraints = Vec::new();
-        for ((ante1, ante2), posts) in &self.map.pair_implications {
+        for ((ante1, ante2), posts) in &map.pair_implications {
             for post in posts {
                 if self.assignment_holds(ante1.when_true())
                     && self.assignment_holds(ante2.when_true())
@@ -3480,7 +3502,7 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for (ante, posts) in &self.map.single_implications {
+        for (ante, posts) in &map.single_implications {
             for post in posts {
                 if self.assignment_holds(ante.when_true()) {
                     new_constraints.push(*post);
@@ -3489,7 +3511,7 @@ impl<'db> PathAssignments<'db> {
         }
 
         for new_constraint in new_constraints {
-            self.add_assignment(db, new_constraint.when_true(), source_order)?;
+            self.add_assignment(db, map, new_constraint.when_true(), source_order)?;
         }
 
         Ok(())
