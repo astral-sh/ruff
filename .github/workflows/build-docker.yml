@@ -169,9 +169,9 @@ jobs:
         # Mapping of base image followed by a comma followed by one or more base tags (comma separated)
         # Note, org.opencontainers.image.version label will use the first base tag (use the most specific tag first)
         image-mapping:
-          - alpine:3.21,alpine3.21,alpine
-          - debian:bookworm-slim,bookworm-slim,debian-slim
-          - buildpack-deps:bookworm,bookworm,debian
+          - alpine:3.23,alpine3.23,alpine
+          - debian:trixie-slim,trixie-slim,debian-slim
+          - buildpack-deps:trixie,trixie,debian
     steps:
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
