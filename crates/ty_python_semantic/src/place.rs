@@ -1131,12 +1131,12 @@ fn symbol_impl<'db>(
         // is always a string, even though typeshed says `str | None`. For a namespace package,
         // meanwhile, it will always be `None`.
         //
-        // The case where this doesn't hold is a C-extension module (stdlib examples include
-        // `sys`, `itertools`, etc.). These may not have a `__file__` attribute at runtime
-        // at all, but that doesn't really affect the *type* of the attribute, just the
-        // *boundness*. There's no way for us to know right now whether a stub represents a
-        // C extension or not, so for now we do not attempt to detect this; we just infer
-        // `str` still. This matches other major.
+        // Note that C-extension modules (stdlib examples include `sys`, `itertools`, etc.)
+        //  may not have a `__file__` attribute at runtime at all, but that doesn't really
+        // affect the *type* of the attribute, just the *boundness*. There's no way for us
+        // to know right now whether a stub represents a C extension or not, so for now we
+        // do not attempt to detect this; we just infer `str` still. This matches the
+        // behaviour of other major type checkers.
         let default_type = if module.file(db).is_some() {
             KnownClass::Str.to_instance(db)
         } else {
