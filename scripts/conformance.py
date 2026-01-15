@@ -619,6 +619,7 @@ def main():
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
         print(f"Output written to {args.output}", file=sys.stderr)
+        print(rendered, file=sys.stderr)
     else:
         print(rendered)
 
