@@ -262,11 +262,11 @@ def _(
     af: type[AmbiguousClass] | type[FalsyClass],
     flag: bool,
 ):
-    reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass]
+    reveal_type(ta)  # revealed: type[TruthyClass | AmbiguousClass]
     if ta:
         reveal_type(ta)  # revealed: type[TruthyClass] | (type[AmbiguousClass] & ~AlwaysFalsy)
 
-    reveal_type(af)  # revealed: type[AmbiguousClass] | type[FalsyClass]
+    reveal_type(af)  # revealed: type[AmbiguousClass | FalsyClass]
     if af:
         reveal_type(af)  # revealed: type[AmbiguousClass] & ~AlwaysFalsy
 
