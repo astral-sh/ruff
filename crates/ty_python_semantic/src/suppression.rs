@@ -47,7 +47,7 @@ declare_lint! {
     pub static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `ty: ignore` and `type: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Ignore,
+        default_level: Level::Warn,
     }
 }
 
