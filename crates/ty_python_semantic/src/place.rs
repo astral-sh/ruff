@@ -1128,7 +1128,8 @@ fn symbol_impl<'db>(
     {
         // We special-case `__file__` here because we know that for a successfully imported
         // non-namespace-package Python module, that hasn't been explicitly overridden it
-        // is always a string, even though typeshed says `str | None`.
+        // is always a string, even though typeshed says `str | None`. For a namespace package,
+        // meanwhile, it will always be `None`.
         //
         // The case where this doesn't hold is a C-extension module (stdlib examples include
         // `sys`, `itertools`, etc.). These may not have a `__file__` attribute at runtime
