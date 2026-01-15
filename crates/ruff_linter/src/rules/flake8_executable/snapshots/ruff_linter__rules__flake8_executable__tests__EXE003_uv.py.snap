@@ -1,4 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
-
+EXE003 Shebang should contain `python`, `pytest`, or `uv run`
+  --> EXE003_uv.py:16:1
+   |
+14 | print("uvx quiet")
+15 |
+16 | #!/usr/bin/env uv_not_really_run
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 | print("this should fail")
+   |
