@@ -39,16 +39,16 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{Tuple, TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
-    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
-    PropertyInstanceType, TypeAliasType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder,
-    VarianceInferable, binding_type, declaration_type, determine_upper_bound,
+    DeprecatedInstance, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType,
+    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
+    TypeAliasType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder, VarianceInferable,
+    binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -69,7 +69,7 @@ use crate::{
     },
 };
 use indexmap::IndexSet;
-use itertools::Itertools as _;
+use itertools::{Either, Itertools as _};
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -2426,10 +2426,6 @@ impl<'db> StaticClassLiteral<'db> {
         let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
 
-        if class_stmt.bases().iter().any(ast::Expr::is_starred_expr) {
-            return Box::new([Type::Dynamic(DynamicType::TodoStarredExpression)]);
-        }
-
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
@@ -2449,7 +2445,27 @@ impl<'db> StaticClassLiteral<'db> {
             _ => class_stmt
                 .bases()
                 .iter()
-                .map(|base_node| definition_expression_type(db, class_definition, base_node))
+                .flat_map(|base_node| {
+                    if let ast::Expr::Starred(starred) = base_node {
+                        let starred_ty =
+                            definition_expression_type(db, class_definition, &starred.value);
+                        // If the starred expression is a fixed-length tuple, unpack it.
+                        if let Some(Tuple::Fixed(tuple)) = starred_ty
+                            .tuple_instance_spec(db)
+                            .map(std::borrow::Cow::into_owned)
+                        {
+                            return Either::Left(tuple.owned_elements().into_vec().into_iter());
+                        }
+                        // Otherwise, we can't statically determine the bases.
+                        Either::Right(std::iter::once(Type::unknown()))
+                    } else {
+                        Either::Right(std::iter::once(definition_expression_type(
+                            db,
+                            class_definition,
+                            base_node,
+                        )))
+                    }
+                })
                 .collect(),
         }
     }

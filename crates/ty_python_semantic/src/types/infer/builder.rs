@@ -96,7 +96,7 @@ use crate::types::diagnostic::{
     report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
-    report_unsupported_binary_operation, report_unsupported_comparison,
+    report_unsupported_base, report_unsupported_binary_operation, report_unsupported_comparison,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
@@ -127,8 +127,8 @@ use crate::types::{
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
-    todo_type,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type,
+    definition_expression_type, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -811,6 +811,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             base_params,
                         );
                     }
+                }
+            }
+
+            // (4.5) Check for starred variable-length tuples that cannot be unpacked
+            let class_definition = self.index.expect_single_definition(class_node);
+            for base in class_node.bases() {
+                if let ast::Expr::Starred(starred) = base
+                    && let starred_ty =
+                        definition_expression_type(self.db(), class_definition, &starred.value)
+                    && let Some(tuple_spec) = starred_ty.tuple_instance_spec(self.db())
+                    && !matches!(tuple_spec.as_ref(), Tuple::Fixed(_))
+                {
+                    report_unsupported_base(&self.context, base, starred_ty, class);
                 }
             }
 
