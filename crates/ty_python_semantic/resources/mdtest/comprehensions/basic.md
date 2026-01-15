@@ -207,8 +207,9 @@ class Person(TypedDict):
 y3: list[Person] = [{"name": n} for n in ["Alice", "Bob"]]
 reveal_type(y3)  # revealed: list[Person]
 
-# TODO: This should be an invalid-key error.
 # error: [invalid-assignment]
+# error: [invalid-key] "Unknown key "misspelled" for TypedDict `Person`: Unknown key "misspelled""
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 y4: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 ```
 
