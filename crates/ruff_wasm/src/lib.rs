@@ -99,8 +99,6 @@ pub fn before_main() {}
 
 #[wasm_bindgen(start)]
 pub fn run() {
-    use log::Level;
-
     before_main();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -111,8 +109,38 @@ pub fn run() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
 
-    console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+/// Initializes the logger with the given log level.
+///
+/// ## Panics
+/// If this function is called more than once.
+#[wasm_bindgen(js_name = "initLogging")]
+pub fn init_logging(level: LogLevel) {
+    console_log::init_with_level(level.into())
+        .expect("`initLogging` to only be called at most once.");
+}
+
+#[derive(Copy, Clone, Debug)]
+#[wasm_bindgen]
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
+        }
+    }
 }
 
 #[wasm_bindgen]

@@ -507,6 +507,13 @@ export interface InitializedPlayground {
 async function startPlayground(): Promise<InitializedPlayground> {
   const ty = await import("ty_wasm");
   await ty.default();
+
+  if (import.meta.env.DEV) {
+    ty.initLogging(ty.LogLevel.Debug);
+  } else {
+    ty.initLogging(ty.LogLevel.Info);
+  }
+
   const version = ty.version();
   const monaco = await loader.init();
 
