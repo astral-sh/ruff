@@ -74,7 +74,7 @@ use crate::types::diagnostic::{
     INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases,
-    NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
+    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
     TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
@@ -6531,6 +6531,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
         } = &call_expr.arguments;
 
+        // Check for variadic arguments early, before extracting positional args.
+        let has_starred = args.iter().any(ast::Expr::is_starred_expr);
+        let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
+
+        // Emit diagnostic for missing required arguments or unsupported variadic arguments.
+        // For `typing.NamedTuple`, emit a diagnostic since variadic arguments are not supported.
+        // For `collections.namedtuple`, silently fall back since it's more permissive at runtime.
+        if (has_starred || has_double_starred)
+            && kind.is_typing()
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, call_expr)
+        {
+            let arg_type = if has_starred && has_double_starred {
+                "Variadic positional and keyword arguments are"
+            } else if has_starred {
+                "Variadic positional arguments are"
+            } else {
+                "Variadic keyword arguments are"
+            };
+            builder.into_diagnostic(format_args!(
+                "{arg_type} not supported in `NamedTuple()` calls"
+            ));
+        }
+
         // Need at least typename and fields/field_names.
         let [name_arg, fields_arg, rest @ ..] = &**args else {
             for arg in args {
@@ -6538,6 +6561,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
+            }
+
+            if !has_starred && !has_double_starred {
+                let fields_param = match kind {
+                    NamedTupleKind::Typing => "fields",
+                    NamedTupleKind::Collections => "field_names",
+                };
+                let missing = if args.is_empty() {
+                    format!("`typename` and `{fields_param}`")
+                } else {
+                    format!("`{fields_param}`")
+                };
+                if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
+                    builder.into_diagnostic(format_args!(
+                        "Missing required argument{} {missing} to `{kind}()`",
+                        if args.is_empty() { "s" } else { "" }
+                    ));
+                }
             }
             return KnownClass::NamedTupleFallback.to_subclass_of(self.db());
         };
@@ -6551,15 +6592,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If any argument is a starred expression or any keyword is a double-starred expression,
         // we can't statically determine the arguments, so fall back to normal call binding.
-        if args.iter().any(ast::Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none())
-        {
+        if has_starred || has_double_starred {
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
             }
             return KnownClass::NamedTupleFallback.to_subclass_of(self.db());
         }
 
-        // Check for excess positional arguments (only typename and fields are expected).
+        // Check for excess positional arguments (only `typename` and `fields` are expected).
         if !rest.is_empty() {
             if let Some(builder) = self
                 .context
@@ -6724,21 +6764,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
 
-                    // Emit diagnostic if the type is outright invalid (not an iterable).
+                    // Emit diagnostic if the type is outright invalid (not an iterable) or
+                    // if we have a list/tuple literal with invalid field specs.
                     if fields.is_none() {
                         let iterable_any =
                             KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                        if !fields_type.is_assignable_to(db, iterable_any)
-                            && let Some(builder) =
+                        if !fields_type.is_assignable_to(db, iterable_any) {
+                            if let Some(builder) =
                                 self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Invalid argument to parameter `fields` of `NamedTuple()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected an iterable of `(name, type)` pairs, found `{}`",
-                                fields_type.display(db)
-                            ));
+                            {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Invalid argument to parameter `fields` of `NamedTuple()`"
+                                ));
+                                diagnostic.set_primary_message(format_args!(
+                                    "Expected an iterable of `(name, type)` pairs, found `{}`",
+                                    fields_type.display(db)
+                                ));
+                            }
+                        } else {
+                            // Check if we have a list/tuple literal with invalid elements
+                            // (e.g., strings instead of (name, type) tuples).
+                            let elements: Option<&[ast::Expr]> = match fields_arg {
+                                ast::Expr::List(list) => Some(&list.elts),
+                                ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+                                _ => None,
+                            };
+                            if let Some(elements) = elements {
+                                for elt in elements {
+                                    let is_valid_field_spec = matches!(
+                                        elt,
+                                        ast::Expr::Tuple(t) if t.elts.len() == 2
+                                    ) || matches!(
+                                        elt,
+                                        ast::Expr::List(l) if l.elts.len() == 2
+                                    );
+                                    if !is_valid_field_spec {
+                                        let elt_type = self.expression_type(elt);
+                                        if let Some(builder) =
+                                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, elt)
+                                        {
+                                            let mut diagnostic =
+                                                builder.into_diagnostic(format_args!(
+                                                    "Invalid `NamedTuple()` field definition"
+                                                ));
+                                            diagnostic.set_primary_message(format_args!(
+                                                "Expected a `(name, type)` tuple, found `{}`",
+                                                elt_type.display(db)
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -6930,7 +7006,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
                             {
                                 builder.into_diagnostic(format_args!(
-                                    "Invalid type `{}` in `NamedTuple` field type",
+                                    "Object of type `{}` is not valid as a `NamedTuple` field type",
                                     field_type.display(db)
                                 ));
                             }
@@ -6999,6 +7075,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         fields_arg: &ast::Expr,
     ) -> Option<Box<[(Name, Type<'db>, Option<Type<'db>>)]>> {
         let db = self.db();
+        let scope_id = self.scope();
+        let typevar_binding_context = self.typevar_binding_context;
 
         // Get the elements from the list or tuple literal.
         let elements: &[ast::Expr] = match fields_arg {
@@ -7028,10 +7106,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Second element: field type (infer as type expression).
                 let field_type_expr = &field_spec_elts[1];
-                let field_ty = self
-                    .expression_type(field_type_expr)
-                    .in_type_expression(db, self.scope(), self.typevar_binding_context)
-                    .ok()?;
+                let field_value_ty = self.expression_type(field_type_expr);
+                let field_ty = field_value_ty
+                    .in_type_expression(db, scope_id, typevar_binding_context)
+                    .unwrap_or_else(|error| {
+                        // Report diagnostic for invalid type expression.
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_FORM, field_type_expr)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Object of type `{}` is not valid as a `NamedTuple` field type",
+                                field_value_ty.display(db)
+                            ));
+                        }
+                        error.fallback_type
+                    });
 
                 Some((field_name, field_ty, None))
             })
@@ -15506,6 +15596,10 @@ enum NamedTupleKind {
 impl NamedTupleKind {
     const fn is_collections(self) -> bool {
         matches!(self, Self::Collections)
+    }
+
+    const fn is_typing(self) -> bool {
+        matches!(self, Self::Typing)
     }
 
     fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
