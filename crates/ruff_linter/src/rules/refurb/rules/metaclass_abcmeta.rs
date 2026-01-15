@@ -110,41 +110,33 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
             &|qualified_name| matches!(qualified_name.segments(), ["abc", "ABC"]),
         );
 
+        let delete_metaclass_keyword = remove_argument(
+            keyword,
+            arguments,
+            Parentheses::Remove,
+            checker.source(),
+            checker.tokens(),
+        )?;
+
         Ok(if position > 0 {
             // When the `abc.ABCMeta` is not the first keyword and `abc.ABC` is not
             // in base classes put `abc.ABC` before the first keyword argument.
-            let edits = if has_abc {
-                vec![]
+            if has_abc {
+                Fix::applicable_edit(delete_metaclass_keyword, applicability)
             } else {
-                vec![
-                    Edit::insertion(format!("{binding}, "), class_def.keywords()[0].start()),
-                    import_edit,
-                ]
-            };
-
-            Fix::applicable_edits(
-                // Delete the `metaclass` keyword.
-                remove_argument(
-                    keyword,
-                    arguments,
-                    Parentheses::Remove,
-                    checker.source(),
-                    checker.tokens(),
-                )?,
-                // Add `abc.ABC` if needed.
-                edits,
-                applicability,
-            )
+                Fix::applicable_edits(
+                    delete_metaclass_keyword,
+                    [
+                        Edit::insertion(format!("{binding}, "), class_def.keywords()[0].start()),
+                        import_edit,
+                    ],
+                    applicability,
+                )
+            }
         } else {
             let edit_action = if has_abc {
                 // Class already inherits the `abc.ABC`, delete the `metaclass` keyword only.
-                remove_argument(
-                    keyword,
-                    arguments,
-                    Parentheses::Remove,
-                    checker.source(),
-                    checker.tokens(),
-                )?
+                delete_metaclass_keyword
             } else {
                 // Replace `metaclass` keyword by `abc.ABC`.
                 Edit::range_replacement(binding, keyword.range)
