@@ -4,7 +4,6 @@ use js_sys::Error;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 use ruff_formatter::printer::SourceMapGeneration;
@@ -114,14 +113,32 @@ pub fn run() {
 
 /// Initializes the logger with the given log level.
 ///
-/// The `level` string should be one of: "trace", "debug", "info", "warn", or "error".
-/// This function should be called at most once.
+/// ## Panics
+/// If this function is called more than once.
 #[wasm_bindgen]
-pub fn init_logging(level: &str) {
-    #[cfg(feature = "console_log")]
-    {
-        if let Ok(level) = log::Level::from_str(level) {
-            let _ = console_log::init_with_level(level);
+pub fn init_logging(level: LogLevel) {
+    console_log::init_with_level(level.into())
+        .expect("init_logging to only be called at most once.")
+}
+
+#[derive(Copy, Clone, Debug)]
+#[wasm_bindgen]
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
         }
     }
 }

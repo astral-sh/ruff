@@ -3,9 +3,9 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Header, useTheme, setupMonaco } from "shared";
 import { persist, persistLocal, restore, stringify } from "./settings";
 import { default as Editor, Source } from "./Editor";
-import initRuff, { Workspace } from "ruff_wasm";
 import { loader } from "@monaco-editor/react";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
+import { default as init_ruff, LogLevel, Workspace } from "ruff_wasm";
 
 export default function Chrome() {
   const initPromise = useRef<null | Promise<void>>(null);
@@ -110,7 +110,14 @@ async function startPlayground(): Promise<{
   settings: string;
   ruffVersion: string;
 }> {
-  await initRuff();
+  const ruff = await init_ruff();
+
+  if (import.meta.env.DEV) {
+    ruff.init_logging(LogLevel.Debug);
+  } else {
+    ruff.init_logging(LogLevel.Info);
+  }
+
   const monaco = await loader.init();
 
   setupMonaco(monaco, {

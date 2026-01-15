@@ -29,7 +29,7 @@ ruff_text_size = { workspace = true }
 ruff_workspace = { workspace = true }
 
 console_error_panic_hook = { workspace = true, optional = true }
-console_log = { workspace = true, optional = true }
+console_log = { workspace = true }
 # Not a direct dependency but required to enable the `wasm_js` feature.
 # See https://docs.rs/getrandom/latest/getrandom/#webassembly-support
 getrandom = { workspace = true, features = ["wasm_js"] }
@@ -45,7 +45,7 @@ wasm-bindgen = { workspace = true }
 wasm-bindgen-test = { workspace = true }
 
 [features]
-default = ["console_error_panic_hook", "console_log"]
+default = ["console_error_panic_hook"]
 
 [lints]
 workspace = true
