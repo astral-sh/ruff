@@ -4120,7 +4120,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = target;
 
         let object_ty = self.infer_expression(object, TypeContext::default());
-        let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
+
+        // Track whether this is the first inference of the slice to handle multi-inference
+        // scenarios where the closure might be called multiple times.
+        let mut first_slice_inference = true;
+        let mut infer_slice_ty = |builder: &mut Self, tcx| {
+            let prev_multi_inference_state = if first_slice_inference {
+                first_slice_inference = false;
+                None
+            } else {
+                Some(builder.set_multi_inference_state(MultiInferenceState::Overwrite))
+            };
+
+            let slice_ty = builder.infer_expression(slice, tcx);
+
+            if let Some(prev_state) = prev_multi_inference_state {
+                builder.multi_inference_state = prev_state;
+            }
+
+            slice_ty
+        };
 
         self.validate_subscript_assignment_impl(
             target,
@@ -5484,9 +5503,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Subscript(subscript_expr) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
+                    // Track whether this is the first inference to handle multi-inference scenarios
+                    // where the closure might be called multiple times with different type contexts.
+                    let mut first_inference = true;
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
+                        // If this is not the first inference, set MultiInferenceState::Overwrite
+                        // to allow overwriting previously inferred types. This handles cases where
+                        // validate_subscript_assignment_impl calls the closure multiple times.
+                        let prev_multi_inference_state = if first_inference {
+                            first_inference = false;
+                            None
+                        } else {
+                            Some(builder.set_multi_inference_state(MultiInferenceState::Overwrite))
+                        };
+
                         let assigned_ty = infer_assigned_ty(builder, tcx);
                         builder.store_expression_type(target, assigned_ty);
+
+                        // Restore the previous multi-inference state if we changed it.
+                        if let Some(prev_state) = prev_multi_inference_state {
+                            builder.multi_inference_state = prev_state;
+                        }
+
                         assigned_ty
                     };
 
