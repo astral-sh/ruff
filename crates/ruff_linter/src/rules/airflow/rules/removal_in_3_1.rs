@@ -78,13 +78,9 @@ impl Violation for Airflow31Removal {
                 module,
                 name,
                 version,
-                warning_message,
-            } => {
-                let warning = warning_message.unwrap_or("");
-                Some(format!(
-                    "`{name}` has been moved to `{module}` since Airflow 3.1 (with task-sdk {version}). {warning}"
-                ))
-            }
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.1 (with apache-airflow-task-sdk>={version})."
+            )),
         }
     }
 }
@@ -134,21 +130,20 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "utils",
             "setup_teardown",
-            rest @ ("BaseSetupTeardownContext" | "SetupTeardownContext"),
-        ] => Replacement::SourceModuleMovedToSDK {
-            module: "airflow.sdk.definitions._internal.setup_teardown",
-            name: rest.to_string(),
-            version: "1.1",
-            warning_message: Some(
-                "WARNING: This is an internal API and may change without notice.",
-            ),
-        },
+            "BaseSetupTeardownContext",
+        ] => Replacement::Message(
+            "`BaseSetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` \
+            since Airflow 3.1. This is an internal module and is subject to change without notice.",
+        ),
+        ["airflow", "utils", "setup_teardown", "SetupTeardownContext"] => Replacement::Message(
+            "`SetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` \
+            since Airflow 3.1. This is an internal module and is subject to change without notice.",
+        ),
         // airflow.secrets
         ["airflow", "secrets", "cache", "SecretCache"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "SecretCache".to_string(),
-            version: "1.1",
-            warning_message: None,
+            version: "1.1.6",
         },
         // airflow.utils.xcom
         ["airflow", "utils", "xcom", "XCOM_RETURN_KEY"] => Replacement::SourceModuleMoved {
@@ -159,8 +154,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "utils", "task_group", "TaskGroup"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "TaskGroup".to_string(),
-            version: "1.1",
-            warning_message: None,
+            version: "1.1.6",
         },
         // airflow.utils.timezone
         [
@@ -172,44 +166,46 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.timezone",
             name: rest.to_string(),
-            version: "1.1",
-            warning_message: None,
+            version: "1.1.6",
         },
         // airflow.utils.decorators
+        ["airflow", "utils", "decorators", "remove_task_decorator"] => Replacement::Message(
+            "`remove_task_decorator` has been moved to `airflow.sdk.definitions._internal.decorators` \
+            since Airflow 3.1. This is an internal module and is subject to change without notice.",
+        ),
         [
             "airflow",
             "utils",
             "decorators",
-            rest @ ("remove_task_decorator" | "fixup_decorator_warning_stack"),
-        ] => Replacement::SourceModuleMovedToSDK {
-            module: "airflow.sdk.definitions._internal.decorators",
-            name: rest.to_string(),
-            version: "1.1",
-            warning_message: Some(
-                "WARNING: This is an internal API and may change without notice.",
-            ),
-        },
+            "fixup_decorator_warning_stack",
+        ] => Replacement::Message(
+            "`fixup_decorator_warning_stack` has been moved to `airflow.sdk.definitions._internal.decorators` \
+            since Airflow 3.1. This is an internal module and is subject to change without notice.",
+        ),
         // airflow.models.abstractoperator
+        ["airflow", "models", "abstractoperator", "AbstractOperator"] => Replacement::Message(
+            "`AbstractOperator` has been moved to `airflow.sdk.definitions._internal.abstractoperator` \
+            since Airflow 3.1. This is an internal module and is subject to change without notice.",
+        ),
+        ["airflow", "models", "abstractoperator", "NotMapped"] => Replacement::Message(
+            "`NotMapped` has been moved to `airflow.sdk.definitions._internal.abstractoperator` \
+            since Airflow 3.1. This is an internal module and is subject to change without notice.",
+        ),
         [
             "airflow",
             "models",
             "abstractoperator",
-            rest @ ("AbstractOperator" | "NotMapped" | "TaskStateChangeCallback"),
-        ] => Replacement::SourceModuleMovedToSDK {
-            module: "airflow.sdk.definitions._internal.abstractoperator",
-            name: rest.to_string(),
-            version: "1.1",
-            warning_message: Some(
-                "WARNING: This is an internal API and may change without notice.",
-            ),
-        },
+            "TaskStateChangeCallback",
+        ] => Replacement::Message(
+            "`TaskStateChangeCallback` has been moved to `airflow.sdk.definitions._internal.abstractoperator` \
+            since Airflow 3.1. This is an internal module and is subject to change without notice.",
+        ),
         // airflow.models.baseoperator
         ["airflow", "models", "baseoperator", "BaseOperator"] => {
             Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
                 name: "BaseOperator".to_string(),
-                version: "1.1",
-                warning_message: None,
+                version: "1.1.6",
             }
         }
         // airflow.macros
@@ -220,16 +216,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.execution_time.macros",
             name: rest.to_string(),
-            version: "1.1",
-            warning_message: None,
+            version: "1.1.6",
         },
         // airflow.io
         ["airflow", "io", rest @ ("get_fs" | "has_fs" | "Properties")] => {
             Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk.io",
                 name: rest.to_string(),
-                version: "1.1",
-                warning_message: None,
+                version: "1.1.6",
             }
         }
         _ => return,

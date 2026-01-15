@@ -86,13 +86,9 @@ impl Violation for Airflow3Removal {
                 module,
                 name,
                 version,
-                warning_message,
-            } => {
-                let warning = warning_message.unwrap_or("");
-                Some(format!(
-                    "`{name}` has been moved to `{module}` since Airflow 3.0 (with task-sdk {version}). {warning}"
-                ))
-            }
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0 (with apache-airflow-task-sdk>={version})."
+            )),
         }
     }
 }
@@ -726,8 +722,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk.bases.notifier",
                 name: "BaseNotifier".to_string(),
-                version: "1.0",
-                warning_message: None,
+                version: "1.0.6",
             }
         }
 
@@ -740,8 +735,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
                 name: "get_current_context".to_string(),
-                version: "1.0",
-                warning_message: None,
+                version: "1.0.6",
             }
         }
 
@@ -766,8 +760,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.bases.sensor",
             name: "BaseSensorOperator".to_string(),
-            version: "1.0",
-            warning_message: None,
+            version: "1.0.6",
         },
 
         // airflow.timetables
@@ -818,22 +811,19 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             ["helpers", "chain"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
                 name: "chain".to_string(),
-                version: "1.0",
-                warning_message: None,
+                version: "1.0.6",
             },
             ["helpers", "cross_downstream"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
                 name: "cross_downstream".to_string(),
-                version: "1.0",
-                warning_message: None,
+                version: "1.0.6",
             },
 
             // airflow.utils.log.secrets_masker
             ["log", "secrets_masker"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk.execution_time",
                 name: "secrets_masker".to_string(),
-                version: "1.0",
-                warning_message: None,
+                version: "1.0.6",
             },
 
             // airflow.utils.state

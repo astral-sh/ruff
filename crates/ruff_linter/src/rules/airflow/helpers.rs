@@ -39,7 +39,6 @@ pub(crate) enum Replacement {
         module: &'static str,
         name: String,
         version: &'static str,
-        warning_message: Option<&'static str>,
     },
 }
 
