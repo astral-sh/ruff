@@ -130,6 +130,7 @@ help: Use removesuffix instead of ternary expression conditional upon endswith.
 147 | 
 148 | def remove_prefix_comparable_literal_expr() -> None:
 149 |     return ("abc" "def")[3:] if ("abc" "def").startswith("abc") else "abc" "def"
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:149:12
@@ -213,6 +214,7 @@ help: Use removeprefix instead of assignment conditional upon startswith.
 161 |     if text.startswith("!"):
 162 |         text = text[1::None]
 163 |     print(text)
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:162:5
@@ -234,6 +236,7 @@ help: Use removeprefix instead of assignment conditional upon startswith.
 163 |     print(text)
 164 | 
 165 | 
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:183:5
@@ -254,6 +257,7 @@ help: Use removeprefix instead of assignment conditional upon startswith.
 184 | 
 185 | 
 186 | def handle_surrogates():
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:190:5
@@ -298,6 +302,7 @@ help: Use removeprefix instead of assignment conditional upon startswith.
 194 |     
 195 |     # should not be linted
 196 |     text = "\ud800\udc00heythere"
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    --> FURB188.py:205:5
@@ -317,3 +322,24 @@ help: Use removesuffix instead of assignment conditional upon endswith.
     -         a = a[: -len("foo")]
 205 +     a = a.removesuffix("foo")
 206 |     print(a)
+207 | 
+208 | 
+
+FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+   --> FURB188.py:229:5
+    |
+228 |   def custom_sequence_fix_is_unsafe(seq: Seq) -> Seq:
+229 | /     if seq.startswith("123"):
+230 | |         seq = seq[3:]
+    | |_____________________^
+231 |       return seq
+    |
+help: Use removeprefix instead of assignment conditional upon startswith.
+226 | 
+227 | 
+228 | def custom_sequence_fix_is_unsafe(seq: Seq) -> Seq:
+    -     if seq.startswith("123"):
+    -         seq = seq[3:]
+229 +     seq = seq.removeprefix("123")
+230 |     return seq
+note: This is an unsafe fix and may change runtime behavior
