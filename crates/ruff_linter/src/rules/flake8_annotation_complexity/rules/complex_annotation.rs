@@ -1,6 +1,6 @@
 use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, StmtFunctionDef};
+use ruff_python_ast::{Expr, StmtFunctionDef, name::QualifiedName};
 use ruff_python_parser::parse_expression;
 use ruff_text_size::Ranged;
 
@@ -33,11 +33,57 @@ impl Violation for ComplexAnnotation {
     }
 }
 
-fn get_annoation_complexity(expr: &Expr) -> isize {
+trait AnnotationResolver {
+    fn resolve_annoation_qualified_name<'a, 'expr>(
+        &'a self,
+        expr: &'expr Expr,
+    ) -> Option<QualifiedName<'expr>>
+    where
+        'a: 'expr;
+
+    /// Resolve if a given Expr reffers to `Annotated` from the `typing` or `typing_extensions`
+    /// module
+    fn is_typing_annotated(&self, expr: &Expr) -> bool {
+        self.resolve_annoation_qualified_name(expr)
+            .map(|qualified_name| match qualified_name.segments() {
+                ["typing", "Annotated"] => true,
+                ["typing_extensions", "Annotated"] => true,
+                _ => false,
+            })
+            .unwrap_or(false)
+    }
+}
+
+struct CheckerAnnoationResolver<'a, 'b>
+where
+    'b: 'a,
+{
+    checker: &'a Checker<'b>,
+}
+
+impl<'checker, 'b> AnnotationResolver for CheckerAnnoationResolver<'checker, 'b> {
+    fn resolve_annoation_qualified_name<'a, 'expr>(
+        &'a self,
+        expr: &'expr Expr,
+    ) -> Option<QualifiedName<'expr>>
+    where
+        'a: 'expr,
+    {
+        self.checker.semantic().resolve_qualified_name(expr)
+    }
+}
+
+fn get_annoation_complexity<'checker, 'expr>(
+    annoation_resolver: &'checker impl AnnotationResolver,
+    expr: &'expr Expr,
+) -> isize
+where
+    'checker: 'expr,
+{
     if let Some(expr) = expr.as_string_literal_expr() {
         if let Some(literal_value) = expr.as_single_part_string() {
             if let Ok(inner_expr) = parse_expression(&literal_value.value) {
-                return get_annoation_complexity(&inner_expr.into_expr());
+                return get_annoation_complexity(annoation_resolver, &inner_expr.into_expr());
             }
         }
     };
@@ -46,15 +92,18 @@ fn get_annoation_complexity(expr: &Expr) -> isize {
         let type_params = &expr.slice;
 
         let inner_compleixty = match &**type_params {
-            Expr::Subscript(_) => get_annoation_complexity(type_params),
+            Expr::Subscript(_) => get_annoation_complexity(annoation_resolver, type_params),
             Expr::Tuple(expr_tuple) => expr_tuple
                 .elts
                 .iter()
-                .map(|node| get_annoation_complexity(node))
+                .map(|node| get_annoation_complexity(annoation_resolver, node))
                 .max()
                 .unwrap_or(0),
             _ => 0,
         };
+        if annoation_resolver.is_typing_annotated(&expr.value) {
+            return inner_compleixty;
+        }
         return inner_compleixty + 1;
     }
 
@@ -68,9 +117,12 @@ pub(crate) fn complex_annotation(checker: &Checker, function_def: &StmtFunctionD
         .flake8_annotation_complexity
         .max_annotation_complexity;
 
+    let annoation_resolver = CheckerAnnoationResolver { checker };
+
     for arg in function_def.parameters.iter_non_variadic_params() {
         if let Some(type_annotation) = arg.annotation() {
-            let annoation_complexity = get_annoation_complexity(type_annotation);
+            let annoation_complexity =
+                get_annoation_complexity(&annoation_resolver, type_annotation);
             if annoation_complexity > max_complexity {
                 checker.report_diagnostic(
                     ComplexAnnotation {
@@ -87,9 +139,30 @@ pub(crate) fn complex_annotation(checker: &Checker, function_def: &StmtFunctionD
 
 #[cfg(test)]
 mod tests {
-    use super::get_annoation_complexity;
+    use super::*;
     use ruff_python_parser::parse_expression;
     use test_case::test_case;
+
+    struct FromTypingResolver;
+
+    impl AnnotationResolver for FromTypingResolver {
+        fn resolve_annoation_qualified_name<'a, 'expr>(
+            &'a self,
+            expr: &'expr Expr,
+        ) -> Option<QualifiedName<'expr>>
+        where
+            'a: 'expr,
+        {
+            if let Some(name) = expr.as_name_expr() {
+                match name.id.as_str() {
+                    "Annotated" => Some(QualifiedName::from_dotted_name("typing.Annotated")),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        }
+    }
 
     #[test_case(r"int", 0)]
     #[test_case(r"dict[str, Any]", 1)]
@@ -103,7 +176,7 @@ mod tests {
         expected_complexity: isize,
     ) {
         let expr = parse_expression(annotation).unwrap();
-        let complexity = get_annoation_complexity(&expr.expr());
+        let complexity = get_annoation_complexity(&FromTypingResolver {}, &expr.expr());
         assert_eq!(complexity, expected_complexity);
     }
 }
