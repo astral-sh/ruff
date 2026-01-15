@@ -64,7 +64,6 @@ impl AlwaysFixableViolation for MetaClassABCMeta {
 
 /// FURB180
 pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
-
     // Determine whether the class definition contains at least one argument.
     let Some(arguments) = &class_def.arguments.as_ref() else {
         return;
@@ -89,10 +88,18 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let applicability = if class_def.bases().is_empty() {
-        Applicability::Safe
-    } else {
+    let applicability = if !class_def.bases().is_empty() {
+        // The class has base arguments (not just a `metaclass` keyword).
+        // Applying the fix may change semantics, so it is considered unsafe.
         Applicability::Unsafe
+    } else if checker.comment_ranges().intersects(arguments.range()) {
+        // The `metaclass` keyword overlaps with a comment.
+        // Applying the fix would remove or alter the comment, so it is unsafe.
+        Applicability::Unsafe
+    } else {
+        // An empty class definition with no overlapping comments.
+        // Applying the fix is considered safe.
+        Applicability::Safe
     };
     let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range);
 
