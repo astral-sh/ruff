@@ -89,14 +89,13 @@ jobs:
             echo "Creating comment with conformance comparison"
             cd ruff
             git switch - --detach
-            cd ..
 
-            python "${RUFF_DIR}/scripts/conformance.py" \
-             --old-ty "${RUFF_DIR}/ty-old" \
-             --new-ty "${RUFF_DIR}/ty-new" \
+            python "./scripts/conformance.py" \
+             --old-ty "./ty-old" \
+             --new-ty "./ty-new" \
              --tests-path "${GITHUB_WORKSPACE}/typing/conformance/tests/" \
              --python-version "$PYTHON_VERSION" \
-             --output typing_conformance_diagnostics.diff
+             --output ../typing_conformance_diagnostics.diff
           )
 
           echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
