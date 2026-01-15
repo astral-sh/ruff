@@ -433,6 +433,9 @@ def diff_format(
     neutral: bool = False,
     is_percentage: bool = False,
 ):
+    if diff == 0:
+        return ""
+
     increased = diff > 0
     good = " (✅)" if not neutral else ""
     bad = " (❌)" if not neutral else ""
@@ -467,6 +470,16 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
     false_pos_change = new.false_positives - old.false_positives
     false_neg_change = new.false_negatives - old.false_negatives
     total_change = new.total - old.total
+
+    if (
+        precision_change == 0
+        and recall_change == 0
+        and true_pos_change == 0
+        and false_pos_change == 0
+        and false_neg_change == 0
+        and total_change == 0
+    ):
+        return "## Typing conformance\n\nNo changes"
 
     true_pos_diff = diff_format(true_pos_change, greater_is_better=True)
     false_pos_diff = diff_format(false_pos_change, greater_is_better=False)
