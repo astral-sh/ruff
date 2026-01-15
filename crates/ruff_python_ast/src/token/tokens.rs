@@ -199,8 +199,7 @@ impl Tokens {
     /// other than the start of the range.
     pub fn split_at(&self, offset: TextSize) -> (&[Token], &[Token]) {
         let partition_point = self.partition_point(|token| token.start() < offset);
-        let before = &self.raw[..partition_point];
-        let after = &self.raw[partition_point..];
+        let (before, after) = &self.raw.split_at(partition_point);
 
         if let Some(last) = before.last() {
             assert!(
