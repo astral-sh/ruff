@@ -7,7 +7,7 @@ use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for environment variables that are not capitalized.
@@ -310,8 +310,14 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         },
         expr.range(),
     );
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        expected,
-        expr.range(),
-    )));
+    // Mark the fix as unsafe if it would delete comments.
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(expected, expr.range()),
+        applicability,
+    ));
 }
