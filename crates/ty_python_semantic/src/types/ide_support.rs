@@ -1816,6 +1816,16 @@ fn class_literal_to_hierarchy_info(
                 (header_range, header_range)
             }
         }
+        ClassLiteral::DynamicTypedDict(typeddict) => {
+            if let DynamicClassAnchor::Definition(definition) = typeddict.anchor(db) {
+                let parsed = parsed_module(db, file).load(db);
+                let kind = definition.kind(db);
+                (kind.full_range(&parsed), kind.target_range(&parsed))
+            } else {
+                let header_range = typeddict.header_range(db);
+                (header_range, header_range)
+            }
+        }
     };
 
     TypeHierarchyClass {
