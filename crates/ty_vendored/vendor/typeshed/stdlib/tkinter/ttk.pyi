@@ -243,7 +243,8 @@ LAYOUTS
             /,
             *,
             padding: _Padding = ...,
-        ) -> None: ...
+        ) -> None:
+            """Create a new element in the current theme of given etype."""
         @overload
         def element_create(
             self,
