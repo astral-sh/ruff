@@ -2726,6 +2726,7 @@ impl<'db> ConstraintAssignment<'db> {
 ///   holds but `D` does _not_ is impossible and can be pruned.
 #[derive(Clone, Debug, get_size2::GetSize)]
 struct SequentMap<'db> {
+    node: InteriorNode<'db>,
     inner: Arc<Mutex<SequentMapInner<'db>>>,
 }
 
@@ -2778,6 +2779,7 @@ impl<'db> SequentMap<'db> {
             discovered,
         };
         Self {
+            node,
             inner: Arc::new(Mutex::new(inner)),
         }
     }
@@ -3298,8 +3300,8 @@ impl<'db> SequentMap<'db> {
 }
 
 impl PartialEq for SequentMap<'_> {
-    fn eq(&self, _other: &Self) -> bool {
-        false
+    fn eq(&self, other: &Self) -> bool {
+        self.node == other.node
     }
 }
 
