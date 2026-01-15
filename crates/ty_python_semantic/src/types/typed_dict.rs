@@ -10,7 +10,7 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassType, CodeGeneratorKind, Field};
+use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, DynamicTypedDictLiteral, Field};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
@@ -109,8 +109,31 @@ impl<'db> TypedDictType<'db> {
                 .collect()
         }
 
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn dynamic_typeddict_items<'db>(
+            db: &'db dyn Db,
+            class: DynamicTypedDictLiteral<'db>,
+        ) -> TypedDictSchema<'db> {
+            class
+                .fields(db)
+                .iter()
+                .map(|(name, ty, is_required)| {
+                    let field = TypedDictFieldBuilder::new(*ty)
+                        .required(*is_required)
+                        .build();
+                    (name.clone(), field)
+                })
+                .collect()
+        }
+
         match self {
-            Self::Class(defining_class) => class_based_items(db, defining_class),
+            Self::Class(defining_class) => {
+                // Check if this is a dynamic TypedDict
+                if let ClassLiteral::DynamicTypedDict(class) = defining_class.class_literal(db) {
+                    return dynamic_typeddict_items(db, class);
+                }
+                class_based_items(db, defining_class)
+            }
             Self::Synthesized(synthesized) => synthesized.items(db),
         }
     }

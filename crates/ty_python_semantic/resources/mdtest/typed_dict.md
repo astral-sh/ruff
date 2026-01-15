@@ -1619,23 +1619,96 @@ _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charl
 
 ## Function/assignment syntax
 
-This is not yet supported. Make sure that we do not emit false positives for this syntax:
+TypedDicts can be created using the functional syntax:
 
 ```py
-from typing_extensions import TypedDict, Required
+from typing_extensions import TypedDict
 
-# Alternative syntax
-Message = TypedDict("Message", {"id": Required[int], "content": str}, total=False)
+Movie = TypedDict("Movie", {"name": str, "year": int})
 
-msg = Message(id=1, content="Hello")
+reveal_type(Movie)  # revealed: <class 'Movie'>
 
-# No errors for yet-unsupported features (`closed`):
+movie = Movie(name="The Matrix", year=1999)
+
+reveal_type(movie)  # revealed: Movie
+reveal_type(movie["name"])  # revealed: str
+reveal_type(movie["year"])  # revealed: int
+```
+
+## Function syntax with `total=False`
+
+The `total=False` keyword makes all fields optional by default:
+
+```py
+from typing_extensions import TypedDict
+
+# With total=False, all fields are optional by default
+PartialMovie = TypedDict("PartialMovie", {"name": str, "year": int}, total=False)
+
+# All fields are optional
+partial = PartialMovie()
+partial_with_name = PartialMovie(name="The Matrix")
+```
+
+## Function syntax with `Required` and `NotRequired`
+
+The `Required` and `NotRequired` wrappers can be used to override the default requiredness:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# With total=True (default), all fields are required unless wrapped in NotRequired
+MovieWithOptional = TypedDict("MovieWithOptional", {"name": str, "year": NotRequired[int]})
+
+# name is required, year is optional
+# error: [missing-argument] "No argument provided for required parameter `name`"
+empty_movie = MovieWithOptional()
+movie_no_year = MovieWithOptional(name="The Matrix")
+reveal_type(movie_no_year)  # revealed: MovieWithOptional
+reveal_type(movie_no_year["name"])  # revealed: str
+reveal_type(movie_no_year["year"])  # revealed: int
+```
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# With total=False, all fields are optional unless wrapped in Required
+PartialWithRequired = TypedDict("PartialWithRequired", {"name": Required[str], "year": int}, total=False)
+
+# name is required, year is optional
+# error: [missing-argument] "No argument provided for required parameter `name`"
+empty_partial = PartialWithRequired()
+partial_no_year = PartialWithRequired(name="The Matrix")
+reveal_type(partial_no_year)  # revealed: PartialWithRequired
+```
+
+## Function syntax with `closed`
+
+The `closed` keyword is accepted but not yet fully supported:
+
+```py
+from typing_extensions import TypedDict
+
+# closed is accepted (no error)
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
+```
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for functional `TypedDict`)
+## Function syntax with invalid arguments
 
-# TODO: this should be an error
-msg.content
+```py
+from typing_extensions import TypedDict
+
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`"
+Bad1 = TypedDict(123, {"name": str})
+
+# error: [invalid-argument-type] "Invalid argument to parameter `fields` of `TypedDict()`"
+Bad2 = TypedDict("Bad2", "not a dict")
+
+# error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
+
+# error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+Bad4 = TypedDict("Bad4", {"name": str}, closed=123)
 ```
 
 ## Error cases

@@ -37,13 +37,13 @@ impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         match class.class_literal(db) {
             // Dynamic classes created via `type()` don't have special instance types.
-            // TODO: When we add functional TypedDict support, this branch should check
-            // for TypedDict and return `Type::typed_dict(class)` for that case.
             ClassLiteral::Dynamic(_)
             | ClassLiteral::DynamicNamedTuple(_)
             | ClassLiteral::DynamicDataclass(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
+            // Functional TypedDicts return a TypedDict instance type.
+            ClassLiteral::DynamicTypedDict(_) => Type::typed_dict(class),
             ClassLiteral::Static(class_literal) => {
                 let specialization = class.into_generic_alias().map(|g| g.specialization(db));
                 match class_literal.known(db) {
