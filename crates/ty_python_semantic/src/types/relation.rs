@@ -195,6 +195,17 @@ impl TypeRelation<'_> {
     pub(crate) const fn is_subtyping(self) -> bool {
         matches!(self, TypeRelation::Subtyping)
     }
+
+    pub(crate) const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
+        match self {
+            TypeRelation::Assignability
+            | TypeRelation::ConstraintSetAssignability
+            | TypeRelation::Redundancy => true,
+            TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
+                ty.subtyping_is_always_reflexive()
+            }
+        }
+    }
 }
 
 #[salsa::tracked]
@@ -329,7 +340,7 @@ impl<'db> Type<'db> {
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
-        if (!relation.is_subtyping() || self.subtyping_is_always_reflexive()) && self == target {
+        if relation.can_safely_assume_reflexivity(self) && self == target {
             return ConstraintSet::from(true);
         }
 
@@ -460,44 +471,41 @@ impl<'db> Type<'db> {
                 },
             }),
 
-            // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
+            // In general, a TypeVar `T` is not redundant with a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
             //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
             // 2. `T` is a constrained TypeVar and all of `T`'s constraints are subtypes of `S`.
             //
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
-            (Type::TypeVar(bound_typevar), Type::Union(union))
-                if !bound_typevar.is_inferable(db, inferable)
+            (_, Type::Union(union))
+                if relation.can_safely_assume_reflexivity(self)
                     && union.elements(db).contains(&self) =>
             {
                 ConstraintSet::from(true)
             }
 
             // A similar rule applies in reverse to intersection types.
-            (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, inferable)
+            (Type::Intersection(intersection), _)
+                if relation.can_safely_assume_reflexivity(target)
                     && intersection.positive(db).contains(&target) =>
             {
                 ConstraintSet::from(true)
             }
-            (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, inferable)
+            (Type::Intersection(intersection), _)
+                if relation.is_assignability()
+                    && intersection.positive(db).iter().any(Type::is_dynamic) =>
+            {
+                // If the intersection contains `Any`/`Unknown`/`@Todo`, it is assignable to any type.
+                // `Any` could materialize to `Never`, `Never & T & ~S` simplifies to `Never` for any
+                // `T` and any `S`, and `Never` is a subtype of all types.
+                ConstraintSet::from(true)
+            }
+            (Type::Intersection(intersection), _)
+                if relation.can_safely_assume_reflexivity(target)
                     && intersection.negative(db).contains(&target) =>
             {
                 ConstraintSet::from(false)
-            }
-
-            // Two identical typevars must always solve to the same type, so they are always
-            // subtypes of each other and assignable to each other.
-            //
-            // Note that this is not handled by the early return at the beginning of this method,
-            // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
-            (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
-                if !lhs_bound_typevar.is_inferable(db, inferable)
-                    && lhs_bound_typevar.is_same_typevar_as(db, rhs_bound_typevar) =>
-            {
-                ConstraintSet::from(true)
             }
 
             // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
