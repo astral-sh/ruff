@@ -112,7 +112,7 @@ impl Db for ModuleDb {
         false
     }
 
-    fn analysis_settings(&self) -> &AnalysisSettings {
+    fn analysis_settings(&self, file: _File) -> &AnalysisSettings {
         &self.analysis_settings
     }
 }
