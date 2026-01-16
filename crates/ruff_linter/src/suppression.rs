@@ -157,6 +157,7 @@ pub struct Suppressions {
 struct SuppressionDiagnostic<'a> {
     suppression: &'a Suppression,
     invalid_codes: Vec<&'a str>,
+    duplicated_codes: Vec<&'a str>,
     disabled_codes: Vec<&'a str>,
     unused_codes: Vec<&'a str>,
 }
@@ -166,9 +167,20 @@ impl<'a> SuppressionDiagnostic<'a> {
         Self {
             suppression,
             invalid_codes: Vec::new(),
+            duplicated_codes: Vec::new(),
             disabled_codes: Vec::new(),
             unused_codes: Vec::new(),
         }
+    }
+
+    fn any_invalid(&self) -> bool {
+        !self.invalid_codes.is_empty()
+    }
+
+    fn any_unused(&self) -> bool {
+        !self.disabled_codes.is_empty()
+            || !self.duplicated_codes.is_empty()
+            || !self.unused_codes.is_empty()
     }
 }
 
@@ -224,6 +236,7 @@ impl Suppressions {
         let mut unmatched_ranges = FxHashSet::default();
         for suppression in &self.valid {
             let key = suppression.comments.disable_comment().range;
+            let code_str = suppression.code.as_str();
 
             if !code_is_valid(&suppression.code, &context.settings().external) {
                 // InvalidRuleCode
@@ -244,9 +257,21 @@ impl Suppressions {
                     .or_insert_with(|| SuppressionDiagnostic::new(suppression));
 
                 if context.is_rule_enabled(rule) {
-                    entry.unused_codes.push(suppression.code.as_str());
+                    if suppression
+                        .comments
+                        .disable_comment()
+                        .codes_as_str(locator.contents())
+                        .filter(|code| *code == code_str)
+                        .collect_vec()
+                        .len()
+                        > 1
+                    {
+                        entry.duplicated_codes.push(code_str);
+                    } else {
+                        entry.unused_codes.push(code_str);
+                    }
                 } else {
-                    entry.disabled_codes.push(suppression.code.as_str());
+                    entry.disabled_codes.push(code_str);
                 }
             } else if let DisableEnableComments::Disable(comment) = &suppression.comments {
                 // UnmatchedSuppressionComment
@@ -260,13 +285,12 @@ impl Suppressions {
         }
 
         for group in grouped_diagnostics.values() {
-            if !group.invalid_codes.is_empty() {
-                let mut codes = group.invalid_codes.clone();
+            if group.any_invalid() {
                 Suppressions::report_suppression_codes(
                     context,
                     locator,
                     group.suppression,
-                    &mut codes,
+                    &group.invalid_codes,
                     true,
                     InvalidRuleCode {
                         rule_code: group
@@ -279,19 +303,24 @@ impl Suppressions {
                     },
                 );
             }
-            if !group.disabled_codes.is_empty() || !group.unused_codes.is_empty() {
+            if group.any_unused() {
                 let mut codes = group.disabled_codes.clone();
                 codes.extend(group.unused_codes.clone());
                 Suppressions::report_suppression_codes(
                     context,
                     locator,
                     group.suppression,
-                    &mut codes,
+                    &codes,
                     false,
                     UnusedNOQA {
                         codes: Some(UnusedCodes {
                             disabled: group
                                 .disabled_codes
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect_vec(),
+                            duplicated: group
+                                .duplicated_codes
                                 .iter()
                                 .map(ToString::to_string)
                                 .collect_vec(),
@@ -342,7 +371,7 @@ impl Suppressions {
         context: &LintContext,
         locator: &Locator,
         suppression: &Suppression,
-        codes: &mut Vec<&str>,
+        remove_codes: &[&str],
         highlight_only_code: bool,
         kind: T,
     ) {
@@ -350,7 +379,7 @@ impl Suppressions {
         let (range, edit) = Suppressions::delete_codes_or_comment(
             locator,
             disable_comment,
-            codes,
+            remove_codes,
             highlight_only_code,
         );
         if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(kind, range) {
@@ -358,7 +387,7 @@ impl Suppressions {
                 let (enable_range, enable_range_edit) = Suppressions::delete_codes_or_comment(
                     locator,
                     enable_comment,
-                    codes,
+                    remove_codes,
                     highlight_only_code,
                 );
                 diagnostic.secondary_annotation("", enable_range);
@@ -372,7 +401,7 @@ impl Suppressions {
     fn delete_codes_or_comment(
         locator: &Locator<'_>,
         comment: &SuppressionComment,
-        codes: &mut Vec<&str>,
+        remove_codes: &[&str],
         highlight_only_code: bool,
     ) -> (TextRange, Edit) {
         let mut range = comment.range;
@@ -393,7 +422,8 @@ impl Suppressions {
             let code_range = TextRange::new(first.start(), last.end());
             let remaining = comment
                 .codes_as_str(locator.contents())
-                .filter(|code| !codes.contains(code))
+                .filter(|code| !remove_codes.contains(code))
+                .dedup()
                 .collect_vec();
 
             if remaining.is_empty() {
@@ -562,7 +592,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 // record a combined range suppression from the matching comments
                 let combined_range =
                     TextRange::new(comment.comment.range.start(), other.comment.range.end());
-                for code in comment.comment.codes_as_str(self.source).dedup() {
+                for code in comment.comment.codes_as_str(self.source) {
                     self.valid.push(Suppression {
                         code: code.into(),
                         range: combined_range,
@@ -582,7 +612,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 // to the end of the current indentation level
                 let implicit_range =
                     TextRange::new(comment.comment.range.start(), dedent_range.end());
-                for code in comment.comment.codes_as_str(self.source).dedup() {
+                for code in comment.comment.codes_as_str(self.source) {
                     self.valid.push(Suppression {
                         code: code.into(),
                         range: implicit_range,

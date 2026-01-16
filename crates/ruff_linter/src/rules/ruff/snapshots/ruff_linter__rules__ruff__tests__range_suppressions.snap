@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 15
-Added: 16
+Added: 17
 
 --- Removed ---
 E741 Ambiguous variable name: `I`
@@ -151,14 +151,14 @@ note: This is an unsafe fix and may change runtime behavior
 F841 [*] Local variable `foo` is assigned to but never used
   --> suppressions.py:62:5
    |
-60 |     # TODO: Duplicate codes should be counted as duplicate, not unused
+60 |     # Duplicate codes that are actually used.
 61 |     # ruff: disable[F841, F841]
 62 |     foo = 0
    |     ^^^
    |
 help: Remove assignment to unused variable `foo`
 59 | def f():
-60 |     # TODO: Duplicate codes should be counted as duplicate, not unused
+60 |     # Duplicate codes that are actually used.
 61 |     # ruff: disable[F841, F841]
    -     foo = 0
 62 +     pass
@@ -339,11 +339,31 @@ RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:61:5
    |
 59 | def f():
-60 |     # TODO: Duplicate codes should be counted as duplicate, not unused
+60 |     # Duplicate codes that are actually used.
 61 |     # ruff: disable[F841, F841]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 62 |     foo = 0
    |
+
+
+RUF100 [*] Unused suppression (duplicated: `F841`)
+  --> suppressions.py:61:21
+   |
+59 | def f():
+60 |     # Duplicate codes that are actually used.
+61 |     # ruff: disable[F841, F841]
+   |                     ^^^^^^^^^^
+62 |     foo = 0
+   |
+help: Remove unused suppression
+58 | 
+59 | def f():
+60 |     # Duplicate codes that are actually used.
+   -     # ruff: disable[F841, F841]
+61 +     # ruff: disable[F841]
+62 |     foo = 0
+63 | 
+64 | 
 
 
 RUF104 Suppression comment without matching `#ruff:enable` comment
