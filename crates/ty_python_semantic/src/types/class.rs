@@ -2774,8 +2774,14 @@ impl<'db> StaticClassLiteral<'db> {
             return known.is_typed_dict_subclass();
         }
 
-        self.iter_mro(db, None)
-            .any(|base| matches!(base, ClassBase::TypedDict))
+        self.iter_mro(db, None).any(|base| match base {
+            ClassBase::TypedDict => true,
+            // Also check if a base class is a DynamicTypedDict (functional TypedDict syntax).
+            ClassBase::Class(class) => {
+                matches!(class.class_literal(db), ClassLiteral::DynamicTypedDict(_))
+            }
+            _ => false,
+        })
     }
 
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
@@ -3968,25 +3974,63 @@ impl<'db> StaticClassLiteral<'db> {
             return self.own_fields(db, specialization, field_policy);
         }
 
-        let matching_classes_in_mro: Vec<(StaticClassLiteral<'db>, Option<Specialization<'db>>)> =
-            self.iter_mro(db, specialization)
-                .filter_map(|superclass| {
-                    let class = superclass.into_class()?;
-                    // Dynamic classes don't have fields (no class body).
-                    let (class_literal, specialization) = class.static_class_literal(db)?;
-                    if field_policy.matches(db, class_literal.into(), specialization) {
-                        Some((class_literal, specialization))
-                    } else {
-                        None
+        // A field source can be either a static class or a dynamic TypedDict.
+        // Dynamic TypedDicts don't have a class body but still have fields defined
+        // in their schema.
+        enum FieldSource<'db> {
+            Static(StaticClassLiteral<'db>, Option<Specialization<'db>>),
+            DynamicTypedDict(DynamicTypedDictLiteral<'db>),
+        }
+
+        let matching_classes_in_mro: Vec<FieldSource<'db>> = self
+            .iter_mro(db, specialization)
+            .filter_map(|superclass| {
+                let class = superclass.into_class()?;
+
+                // Try to get static class literal first.
+                if let Some((class_literal, spec)) = class.static_class_literal(db) {
+                    if field_policy.matches(db, class_literal.into(), spec) {
+                        return Some(FieldSource::Static(class_literal, spec));
                     }
-                })
-                // We need to collect into a `Vec` here because we iterate the MRO in reverse order
-                .collect();
+                }
+
+                // For TypedDict policy, also check for DynamicTypedDict base classes.
+                if field_policy == CodeGeneratorKind::TypedDict {
+                    if let ClassLiteral::DynamicTypedDict(typeddict) = class.class_literal(db) {
+                        return Some(FieldSource::DynamicTypedDict(typeddict));
+                    }
+                }
+
+                None
+            })
+            // We need to collect into a `Vec` here because we iterate the MRO in reverse order
+            .collect();
 
         matching_classes_in_mro
             .into_iter()
             .rev()
-            .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
+            .flat_map(|source| match source {
+                FieldSource::Static(class, specialization) => {
+                    class.own_fields(db, specialization, field_policy)
+                }
+                FieldSource::DynamicTypedDict(typeddict) => {
+                    // Convert TypedDictField to Field for dynamic TypedDicts.
+                    dynamic_typed_dict_schema(db, typeddict)
+                        .iter()
+                        .map(|(name, td_field)| {
+                            let field = Field {
+                                declared_ty: td_field.declared_ty,
+                                kind: FieldKind::TypedDict {
+                                    is_required: td_field.is_required(),
+                                    is_read_only: td_field.is_read_only(),
+                                },
+                                first_declaration: td_field.first_declaration(),
+                            };
+                            (name.clone(), field)
+                        })
+                        .collect()
+                }
+            })
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
     }
@@ -6207,11 +6251,6 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         ])
     }
 
-    /// Returns an iterator over the MRO.
-    pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
-        MroIterator::new(db, ClassLiteral::DynamicTypedDict(self), None)
-    }
-
     /// Get the metaclass of this `TypedDict`.
     ///
     /// `TypedDict`s use `type` as their metaclass.
@@ -6532,23 +6571,20 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        // First check synthesized members.
+        // First check synthesized members (like __getitem__, __init__, get, etc.).
         let member = self.own_class_member(db, name);
         if !member.is_undefined() {
             return member.inner;
         }
 
-        // Fall back to dict class members via MRO lookup.
-        let result =
-            MroLookup::new(db, self.iter_mro(db).skip(1)).class_member(name, policy, None, false);
-
-        match result {
-            ClassMemberResult::Done(completed) => completed.finalize(db),
-            ClassMemberResult::TypedDict => {
-                // This shouldn't happen since dict doesn't inherit from TypedDict.
-                PlaceAndQualifiers::unbound()
-            }
-        }
+        // Fall back to TypedDictFallback for methods like __contains__, items, keys, etc.
+        // This mirrors the behavior of StaticClassLiteral::typed_dict_member.
+        KnownClass::TypedDictFallback
+            .to_class_literal(db)
+            .find_name_in_mro_with_policy(db, name, policy)
+            .expect(
+                "`find_name_in_mro_with_policy` will return `Some()` when called on class literal",
+            )
     }
 
     /// Look up an instance member by name (including superclasses).

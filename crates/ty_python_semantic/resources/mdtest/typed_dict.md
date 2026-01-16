@@ -1496,6 +1496,36 @@ emp_invalid1 = Employee(department="HR")
 emp_invalid2 = Employee(id=3)
 ```
 
+## Class-based inheritance from functional `TypedDict`
+
+Class-based TypedDicts can inherit from functional TypedDicts:
+
+```py
+from typing import TypedDict
+
+# Functional TypedDict base
+Base = TypedDict("Base", {"a": int}, total=False)
+
+# Class-based TypedDict inheriting from functional
+class Child(Base):
+    b: str
+    c: list[int]
+
+# Child inherits 'a' (optional) from Base, and adds 'b' and 'c' (required)
+child1 = Child(b="hello", c=[1, 2, 3])  # Valid - 'a' is optional
+child2 = Child(a=1, b="world", c=[])  # Valid - all keys provided
+
+reveal_type(child1["a"])  # revealed: int
+reveal_type(child1["b"])  # revealed: str
+reveal_type(child1["c"])  # revealed: list[int]
+
+# error: [missing-typed-dict-key] "Missing required key 'b' in TypedDict `Child` constructor"
+bad_child1 = Child(c=[1])
+
+# error: [missing-typed-dict-key] "Missing required key 'c' in TypedDict `Child` constructor"
+bad_child2 = Child(b="test")
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
