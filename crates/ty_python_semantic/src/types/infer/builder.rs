@@ -2769,6 +2769,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !default_ty.is_assignable_to(self.db(), declared_ty)
                     && !((self.in_stub()
                         || self.in_function_overload_or_abstractmethod()
+                        || self.scope().scope(self.db()).in_type_checking_block()
                         || self
                             .class_context_of_current_method()
                             .is_some_and(|class| class.is_protocol(self.db())))
