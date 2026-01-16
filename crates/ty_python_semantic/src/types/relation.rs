@@ -651,6 +651,48 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
+            // Fast path: `object` is not a subtype of any nominal instance type other than itself.
+            // This is important for performance when checking intersections with no positive
+            // elements (pure negations like `~str`), which are treated as having `object` as
+            // the implicit positive element.
+            (Type::NominalInstance(source), Type::NominalInstance(_)) if source.is_object() => {
+                ConstraintSet::from(false)
+            }
+
+            // Fast path: `object` (an instance type) is not a subtype of any `type[X]` (a class type).
+            (Type::NominalInstance(source), Type::SubclassOf(_)) if source.is_object() => {
+                ConstraintSet::from(false)
+            }
+
+            // Fast path: `object` is not a subtype of any non-inferable type variable, since the
+            // type variable could be specialized to a type smaller than `object`.
+            (Type::NominalInstance(source), Type::TypeVar(typevar))
+                if source.is_object() && !typevar.is_inferable(db, inferable) =>
+            {
+                ConstraintSet::from(false)
+            }
+
+            // Fast path: `object` is assignable to any inferable type variable with no upper bound
+            // (or with `object` as its upper bound), which is the common case for generic
+            // type parameters like `_T` in `Iterator[_T]`.
+            (Type::NominalInstance(source), Type::TypeVar(typevar))
+                if source.is_object()
+                    && typevar.is_inferable(db, inferable)
+                    && relation.is_assignability()
+                    && typevar
+                        .typevar(db)
+                        .upper_bound(db)
+                        .is_none_or(|bound| bound.is_object()) =>
+            {
+                ConstraintSet::from(true)
+            }
+
+            // Fast path: `object` is not a subtype of any callable type, since not all objects
+            // are callable.
+            (Type::NominalInstance(source), Type::Callable(_)) if source.is_object() => {
+                ConstraintSet::from(false)
+            }
+
             // `Never` is the bottom type, the empty set.
             (_, Type::Never) => ConstraintSet::from(false),
 
@@ -796,7 +838,37 @@ impl<'db> Type<'db> {
                     })
                 }),
 
+            // Fast path for pure negations (~X): these are semantically `object & ~X`, so they're
+            // only assignable to types that `object` is assignable to. Since `object` is only
+            // assignable to `object`, dynamic types, unions/protocols/intersections that might
+            // contain `object`, we can short-circuit most cases directly.
+            (Type::Intersection(intersection), _) if intersection.positive(db).is_empty() => {
+                match target {
+                    // `object` is a subtype of `object`
+                    _ if target.is_object() => ConstraintSet::from(true),
+                    // `object` is a subtype of dynamic types
+                    Type::Dynamic(_) => ConstraintSet::from(true),
+                    // These cases need more complex checking - delegate to full machinery
+                    // (TypeVar needs special handling for inference)
+                    Type::Union(_)
+                    | Type::ProtocolInstance(_)
+                    | Type::Intersection(_)
+                    | Type::TypeVar(_) => Type::object().has_relation_to_impl(
+                        db,
+                        target,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    ),
+                    // `object` is not a subtype of any other type
+                    _ => ConstraintSet::from(false),
+                }
+            }
+
             (Type::Intersection(intersection), _) => {
+                // An intersection type is a subtype of another type if at least one of its
+                // positive elements is a subtype of that type.
                 intersection.positive(db).iter().when_any(db, |&elem_ty| {
                     elem_ty.has_relation_to_impl(
                         db,

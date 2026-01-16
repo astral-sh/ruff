@@ -951,3 +951,17 @@ for x in Bar:
     # TODO: should reveal `Any`
     reveal_type(x)  # revealed: Unknown
 ```
+
+## Iterating over a list with a negated type parameter
+
+When we have a list with a negated type parameter (e.g., `list[~str]`), we should still be able to
+iterate over it correctly. The negated type parameter represents all types except `str`, and
+`list[~str]` is still a valid list that can be iterated.
+
+```py
+from ty_extensions import Not
+
+def _(value: list[Not[str]]):
+    for x in value:
+        reveal_type(x)  # revealed: ~str
+```
