@@ -256,7 +256,7 @@ class Url(NamedTuple("Url", [("host", str), ("path", str)])):
 reveal_type(Url)  # revealed: <class 'Url'>
 # revealed: (<class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:7'>, <class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:11'>, <class 'tuple[str, str]'>, <class 'object'>)
 reveal_mro(Url)
-reveal_type(Url.__new__)  # revealed: (cls: type, host: str, path: str) -> Url
+reveal_type(Url.__new__)  # revealed: [Self](cls: type[Self], host: str, path: str) -> Self
 
 # Constructor works with the inherited fields.
 url = Url("example.com", "/path")
@@ -451,7 +451,7 @@ from ty_extensions import reveal_mro
 # `rename=True` replaces invalid identifiers with positional names
 Point = collections.namedtuple("Point", ["x", "class", "_y", "z", "z"], rename=True)
 reveal_type(Point)  # revealed: <class 'Point'>
-reveal_type(Point.__new__)  # revealed: (cls: type, x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Point
+reveal_type(Point.__new__)  # revealed: [Self](cls: type[Self], x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Self
 reveal_mro(Point)  # revealed: (<class 'Point'>, <class 'tuple[Any, Any, Any, Any, Any]'>, <class 'object'>)
 p = Point(1, 2, 3, 4, 5)
 reveal_type(p.x)  # revealed: Any
@@ -464,7 +464,7 @@ reveal_type(p._4)  # revealed: Any
 # error: [invalid-argument-type] "Invalid argument to parameter `rename` of `namedtuple()`"
 Point2 = collections.namedtuple("Point2", ["_x", "class"], rename=1)
 reveal_type(Point2)  # revealed: <class 'Point2'>
-reveal_type(Point2.__new__)  # revealed: (cls: type, _0: Any, _1: Any) -> Point2
+reveal_type(Point2.__new__)  # revealed: [Self](cls: type[Self], _0: Any, _1: Any) -> Self
 
 # Without `rename=True`, invalid field names emit diagnostics:
 # - Field names starting with underscore
@@ -490,7 +490,7 @@ reveal_type(Invalid)  # revealed: <class 'Invalid'>
 # `defaults` provides default values for the rightmost fields
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
-reveal_type(Person.__new__)  # revealed: (cls: type, name: Any, age: Any, city: Any = "Unknown") -> Person
+reveal_type(Person.__new__)  # revealed: [Self](cls: type[Self], name: Any, age: Any, city: Any = "Unknown") -> Self
 
 reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'tuple[Any, Any, Any]'>, <class 'object'>)
 # Can create with all fields
@@ -508,7 +508,7 @@ reveal_type(Config)  # revealed: <class 'Config'>
 # error: [invalid-named-tuple] "Too many defaults for `namedtuple()`"
 TooManyDefaults = collections.namedtuple("TooManyDefaults", ["x", "y"], defaults=("a", "b", "c"))
 reveal_type(TooManyDefaults)  # revealed: <class 'TooManyDefaults'>
-reveal_type(TooManyDefaults.__new__)  # revealed: (cls: type, x: Any = "a", y: Any = "b") -> TooManyDefaults
+reveal_type(TooManyDefaults.__new__)  # revealed: [Self](cls: type[Self], x: Any = "a", y: Any = "b") -> Self
 
 # Unknown keyword arguments produce an error
 # error: [unknown-argument]
@@ -1390,4 +1390,44 @@ class Foo(NamedTuple):
         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
         _asdict = True
+```
+
+## `super().__new__` in `NamedTuple` subclasses
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/2522>.
+
+```py
+from typing import NamedTuple, Generic, TypeVar
+from typing_extensions import Self
+
+class Base(NamedTuple):
+    x: int
+    y: int
+
+class Child(Base):
+    def __new__(cls, x: int, y: int) -> Self:
+        instance = super().__new__(cls, x, y)
+        reveal_type(instance)  # revealed: Self@__new__
+        return instance
+
+reveal_type(Child(1, 2))  # revealed: Child
+
+T = TypeVar("T")
+
+class GenericBase(NamedTuple, Generic[T]):
+    x: T
+
+class ConcreteChild(GenericBase[str]):
+    def __new__(cls, x: str) -> "ConcreteChild":
+        instance = super().__new__(cls, x)
+        reveal_type(instance)  # revealed: Self@__new__
+        return instance
+
+class GenericChild(GenericBase[T]):
+    def __new__(cls, x: T) -> Self:
+        instance = super().__new__(cls, x)
+        reveal_type(instance)  # revealed: @Todo(super in generic class)
+        return instance
+
+reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]
 ```

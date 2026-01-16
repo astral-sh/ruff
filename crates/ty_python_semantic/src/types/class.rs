@@ -5204,9 +5204,20 @@ fn synthesize_namedtuple_class_member<'db>(
     match name {
         "__new__" => {
             // __new__(cls, field1, field2, ...) -> Self
+            let self_typevar =
+                BoundTypeVarInstance::synthetic_self(db, instance_ty, BindingContext::Synthetic);
+            let self_ty = Type::TypeVar(self_typevar);
+
+            let variables = inherited_generic_context
+                .iter()
+                .flat_map(|ctx| ctx.variables(db))
+                .chain(std::iter::once(self_typevar));
+
+            let generic_context = GenericContext::from_typevar_instances(db, variables);
+
             let mut parameters = vec![
                 Parameter::positional_or_keyword(Name::new_static("cls"))
-                    .with_annotated_type(KnownClass::Type.to_instance(db)),
+                    .with_annotated_type(SubclassOfType::from(db, self_typevar)),
             ];
 
             for (field_name, field_ty, default_ty) in fields {
@@ -5219,9 +5230,9 @@ fn synthesize_namedtuple_class_member<'db>(
             }
 
             let signature = Signature::new_generic(
-                inherited_generic_context,
+                Some(generic_context),
                 Parameters::new(db, parameters),
-                instance_ty,
+                self_ty,
             );
             Some(Type::function_like_callable(db, signature))
         }
