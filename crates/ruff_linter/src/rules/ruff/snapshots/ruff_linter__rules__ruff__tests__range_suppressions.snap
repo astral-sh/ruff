@@ -440,12 +440,12 @@ RUF104 Suppression comment without matching `#ruff:enable` comment
 
 
 RUF100 [*] Unused suppression (non-enabled: `F401`)
-  --> suppressions.py:81:21
+  --> suppressions.py:81:5
    |
 79 | def f():
 80 |     # Multiple codes but only two are used
 81 |     # ruff: disable[E741, F401, F841]
-   |                     ^^^^^^^^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 82 |     I = 0
    |
 help: Remove unused suppression
@@ -506,15 +506,15 @@ help: Remove the suppression comment
 
 
 RUF102 [*] Invalid rule code in suppression: RQW320
-  --> suppressions.py:94:21
+  --> suppressions.py:94:27
    |
 92 |     # Unknown rule codes
 93 |     # ruff: disable[YF829]
 94 |     # ruff: disable[F841, RQW320]
-   |                     ^^^^^^^^^^^^
+   |                           ^^^^^^
 95 |     value = 0
 96 |     # ruff: enable[F841, RQW320]
-   |                    ------------
+   |                          ------
 97 |     # ruff: enable[YF829]
    |
 help: Remove the rule code `RQW320`

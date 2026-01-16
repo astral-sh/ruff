@@ -410,6 +410,27 @@ impl Suppressions {
                 range = comment.codes[0];
             }
             delete_comment(comment.range, locator)
+        } else if remove_codes.len() == 1 {
+            let code_index = comment
+                .codes
+                .iter()
+                .position(|range| locator.slice(range) == remove_codes[0])
+                .unwrap();
+            if highlight_only_code {
+                range = comment.codes[code_index];
+            }
+            let code_range = if code_index < (comment.codes.len() - 1) {
+                TextRange::new(
+                    comment.codes[code_index].start(),
+                    comment.codes[code_index + 1].start(),
+                )
+            } else {
+                TextRange::new(
+                    comment.codes[code_index - 1].end(),
+                    comment.codes[code_index].end(),
+                )
+            };
+            Edit::range_deletion(code_range)
         } else {
             let first = comment
                 .codes
@@ -427,9 +448,6 @@ impl Suppressions {
                 .collect_vec();
 
             if remaining.is_empty() {
-                if highlight_only_code {
-                    range = code_range;
-                }
                 delete_comment(comment.range, locator)
             } else {
                 range = code_range;
