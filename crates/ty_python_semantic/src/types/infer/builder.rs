@@ -11586,15 +11586,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
                 // in `ClassType::own_class_member()`).
                 class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
-            ) || class
-                .static_class_literal(self.db())
-                .is_some_and(|(class_literal, specialization)| {
-                    CodeGeneratorKind::TypedDict.matches(
-                        self.db(),
-                        class_literal.into(),
-                        specialization,
-                    )
-                });
+            )
+            // TypedDict constructors are validated via `validate_typed_dict_constructor`,
+            // not via the default constructor-call logic.
+            || class.is_typed_dict(self.db());
 
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes

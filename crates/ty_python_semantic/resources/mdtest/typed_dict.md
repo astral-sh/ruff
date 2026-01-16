@@ -1712,6 +1712,30 @@ reveal_type(movie["name"])  # revealed: str
 reveal_type(movie["year"])  # revealed: int
 ```
 
+Constructor validation also works with dict literals:
+
+```py
+from typing_extensions import TypedDict
+
+Film = TypedDict("Film", {"title": str, "year": int})
+
+# Valid usage
+film1 = Film({"title": "The Matrix", "year": 1999})
+film2 = Film(title="Inception", year=2010)
+
+reveal_type(film1)  # revealed: Film
+reveal_type(film2)  # revealed: Film
+
+# error: [invalid-argument-type] "Invalid argument to key "year" with declared type `int` on TypedDict `Film`: value of type `Literal["not a year"]`"
+invalid_type = Film({"title": "Bad", "year": "not a year"})
+
+# error: [missing-typed-dict-key] "Missing required key 'year' in TypedDict `Film` constructor"
+missing_key = Film({"title": "Incomplete"})
+
+# error: [invalid-key] "Unknown key "director" for TypedDict `Film`"
+extra_key = Film({"title": "Extra", "year": 2020, "director": "Someone"})
+```
+
 ## Function syntax with `total=False`
 
 The `total=False` keyword makes all fields optional by default:
@@ -1738,7 +1762,7 @@ from typing_extensions import TypedDict, Required, NotRequired
 MovieWithOptional = TypedDict("MovieWithOptional", {"name": str, "year": NotRequired[int]})
 
 # name is required, year is optional
-# error: [missing-argument] "No argument provided for required parameter `name`"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `MovieWithOptional` constructor"
 empty_movie = MovieWithOptional()
 movie_no_year = MovieWithOptional(name="The Matrix")
 reveal_type(movie_no_year)  # revealed: MovieWithOptional
@@ -1753,7 +1777,7 @@ from typing_extensions import TypedDict, Required, NotRequired
 PartialWithRequired = TypedDict("PartialWithRequired", {"name": Required[str], "year": int}, total=False)
 
 # name is required, year is optional
-# error: [missing-argument] "No argument provided for required parameter `name`"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `PartialWithRequired` constructor"
 empty_partial = PartialWithRequired()
 partial_no_year = PartialWithRequired(name="The Matrix")
 reveal_type(partial_no_year)  # revealed: PartialWithRequired
