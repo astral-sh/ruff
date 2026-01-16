@@ -122,8 +122,6 @@ impl<'db> Completions<'db> {
     /// sequence of completions.
     fn into_completions(mut self) -> Vec<Completion<'db>> {
         self.items.sort_unstable();
-        self.items
-            .dedup_by(|c1, c2| (&c1.0.name, c1.0.module_name) == (&c2.0.name, c2.0.module_name));
         self.items.truncate(Completions::LIMIT);
         self.items
             .into_iter()
@@ -134,8 +132,6 @@ impl<'db> Completions<'db> {
     // Convert this collection into a list of "import..." fixes
     fn into_imports(mut self) -> Vec<ImportEdit> {
         self.items.sort_unstable();
-        self.items
-            .dedup_by(|c1, c2| (&c1.0.name, c1.0.module_name) == (&c2.0.name, c2.0.module_name));
         self.items
             .into_iter()
             .map(|CompletionRanker(c)| c)
@@ -151,8 +147,6 @@ impl<'db> Completions<'db> {
     // Convert this collection into a list of "qualify..." fixes
     fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
         self.items.sort_unstable();
-        self.items
-            .dedup_by(|c1, c2| (&c1.0.name, c1.0.module_name) == (&c2.0.name, c2.0.module_name));
         self.items
             .into_iter()
             .map(|CompletionRanker(c)| c)
@@ -208,11 +202,8 @@ impl<'db> Completions<'db> {
         if self.context.exclude(self.db, &builder) {
             return false;
         }
-        self.items.push(CompletionRanker(builder.build(
-            self.db,
-            &self.context,
-            &self.query,
-        )));
+        let completion = builder.build(self.db, &self.context, &self.query);
+        self.items.push(CompletionRanker(completion));
         true
     }
 }
@@ -1409,11 +1400,11 @@ fn add_function_arg_completions<'db>(
     let Some(sig_help) = signature_help(db, file, cursor.offset) else {
         return;
     };
-    let set_function_args = detect_set_function_args(cursor);
+    let mut set_function_args = detect_set_function_args(cursor);
 
     for sig in &sig_help.signatures {
         for p in &sig.parameters {
-            if p.is_positional_only || set_function_args.contains(&p.name.as_str()) {
+            if p.is_positional_only || !set_function_args.insert(p.name.as_str()) {
                 continue;
             }
             let mut builder = CompletionBuilder::argument(&p.name).ty(p.ty);
@@ -8167,6 +8158,20 @@ def f(x: Intersection[int, Any] | str):
         assert_snapshot!(
             builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
             @"__file__ :: None",
+        );
+    }
+
+    #[test]
+    fn no_duplicate_keyword_arg() {
+        let builder = completion_test_builder(
+            r#"
+import re
+re.match('', '', fla<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().skip_builtins().build().snapshot(),
+            @"flags=",
         );
     }
 
