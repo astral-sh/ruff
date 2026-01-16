@@ -72,22 +72,19 @@ pub fn all_symbols<'db>(
                     );
                     let _entered = symbols_for_file_span.entered();
 
+                    let mut symbols = vec![];
                     if query.is_match_symbol_name(module.name(&*db)) {
-                        let symbol = AllSymbolInfo::from_module(&*db, module, file);
-                        results.lock().unwrap().push(symbol);
+                        symbols.push(AllSymbolInfo::from_module(&*db, module, file));
                     }
                     for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
-                        let symbol = AllSymbolInfo::from_non_module_symbol(
+                        symbols.push(AllSymbolInfo::from_non_module_symbol(
                             &*db,
                             symbol.to_owned(),
                             module,
                             file,
-                        );
-                        // It seems like we could do better here than
-                        // locking `results` for every single symbol,
-                        // but this works pretty well as it is.
-                        results.lock().unwrap().push(symbol);
+                        ));
                     }
+                    results.lock().unwrap().extend(symbols);
                 });
             }
         });
