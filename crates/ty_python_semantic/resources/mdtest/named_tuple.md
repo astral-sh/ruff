@@ -244,7 +244,8 @@ class BadNode(NamedTuple("X", [("value", int), ("next", "X | None")])):
 
 n = BadNode(1, None)
 reveal_type(n.value)  # revealed: int
-reveal_type(n.next)  # revealed: Unknown
+# X is not in scope, so it resolves to Unknown; None is correctly resolved
+reveal_type(n.next)  # revealed: Unknown | None
 ```
 
 ### Functional syntax with variable name
@@ -1007,6 +1008,8 @@ reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
 ```
 
+### Functional syntax with generics
+
 Generic namedtuples can also be defined using the functional syntax with type variables in the field
 types. We don't currently support this, but mypy does:
 
@@ -1026,16 +1029,13 @@ reveal_type(Pair)  # revealed: <class 'Pair'>
 # error: [invalid-argument-type]
 reveal_type(Pair(1, 2))  # revealed: Pair
 
-# TODO: The deferred inference for TypeVars doesn't bind them correctly, so we get
-# `TypeVar | TypeVar` instead of `T@Pair`. This should be fixed.
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(Pair(1, 2).first)  # revealed: T@Pair
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
-reveal_type(Pair(1, 2).first)  # revealed: TypeVar | TypeVar
-
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(Pair(1, 2).second)  # revealed: TypeVar | TypeVar
+reveal_type(Pair(1, 2).second)  # revealed: T@Pair
 ```
 
 ## Attributes on `NamedTuple`
