@@ -8099,6 +8099,39 @@ def f(x: Intersection[int, Any] | str):
         );
     }
 
+    #[test]
+    fn dunder_file_attribute_completion_non_namespace_package() {
+        let builder = CursorTest::builder()
+            .source("module.py", "")
+            .source("main.py", "import module; module.__file<CURSOR>")
+            .completion_test_builder();
+
+        // __file__ should be `str` when accessed as an attribute on a non-namespace-package module,
+        // not `str | None`
+        assert_snapshot!(
+            builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
+            @"__file__ :: str",
+        );
+    }
+
+    #[test]
+    fn dunder_file_attribute_completion_namespace_package() {
+        let builder = CursorTest::builder()
+            .source("namespace_package/foo.py", "")
+            .source(
+                "main.py",
+                "import namespace_package; namespace_package.__file<CURSOR>",
+            )
+            .completion_test_builder();
+
+        // __file__ should be `None` when accessed as an attribute on a namespace-package module,
+        // not `str | None`
+        assert_snapshot!(
+            builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
+            @"__file__ :: None",
+        );
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///

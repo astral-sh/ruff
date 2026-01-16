@@ -91,10 +91,18 @@ def nested_scope():
 `ModuleType` attributes can also be accessed as attributes on module-literal types. The special
 attributes `__dict__` and `__init__`, and all attributes on `builtins.object`, can also be accessed
 as attributes on module-literal types, despite the fact that these are inaccessible as globals from
-inside the module:
+inside the module. They can even be accessed on namespace packages:
+
+`namespace_package/foo.py`:
+
+```py
+```
+
+`a.py`:
 
 ```py
 import typing
+import namespace_package
 
 reveal_type(typing.__name__)  # revealed: str
 reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ...) -> None
@@ -110,23 +118,34 @@ reveal_type(typing.__file__)  # revealed: str
 
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
-
 reveal_type(typing.__class__)  # revealed: <class 'ModuleType'>
-
 reveal_type(typing.__dict__)  # revealed: dict[str, Any]
+
+reveal_type(namespace_package.__name__)  # revealed: str
+reveal_type(namespace_package.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ...) -> None
+reveal_type(namespace_package.__file__)  # revealed: None
+reveal_type(namespace_package.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
+reveal_type(namespace_package.__class__)  # revealed: <class 'ModuleType'>
+reveal_type(namespace_package.__dict__)  # revealed: dict[str, Any]
 ```
 
 Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType` to help out with
 dynamic imports; but we ignore that for module-literal types where we know exactly which module
 we're dealing with:
 
+`b.py`:
+
 ```py
+import typing
+
 # error: [unresolved-attribute]
 reveal_type(typing.__getattr__)  # revealed: Unknown
 ```
 
 However, if we have a `ModuleType` instance, we make `__getattr__` available. This means that
 arbitrary attribute accesses are allowed (with a result type of `Any`):
+
+`c.py`:
 
 ```py
 import types

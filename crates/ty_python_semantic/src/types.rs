@@ -11343,7 +11343,7 @@ impl<'db> ModuleLiteralType<'db> {
         // For module literals, we want to try calling the module's own `__getattr__` function
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         if let Some(file) = self.module(db).file(db) {
-            let getattr_symbol = imported_symbol(db, file, "__getattr__", None);
+            let getattr_symbol = imported_symbol(db, Some(file), "__getattr__", None);
             // If we found a __getattr__ function, try to call it with the name argument
             if let Place::Defined(place) = getattr_symbol.place
                 && let Ok(outcome) = place.ty.try_call(
@@ -11389,11 +11389,7 @@ impl<'db> ModuleLiteralType<'db> {
             return Place::bound(submodule).into();
         }
 
-        let place_and_qualifiers = self
-            .module(db)
-            .file(db)
-            .map(|file| imported_symbol(db, file, name, None))
-            .unwrap_or_default();
+        let place_and_qualifiers = imported_symbol(db, self.module(db).file(db), name, None);
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {

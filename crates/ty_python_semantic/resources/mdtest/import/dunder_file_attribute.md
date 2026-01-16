@@ -76,9 +76,5 @@ reveal_type(a.__file__)  # revealed: str
 ```py
 import namespace
 
-# TODO: `__file__` does exist on namespace packages but is set to `None`;
-# this is a false positive
-#
-# error: [unresolved-attribute] "Module `namespace` has no member `__file__`"
-reveal_type(namespace.__file__)  # revealed: Unknown
+reveal_type(namespace.__file__)  # revealed: None
 ```
