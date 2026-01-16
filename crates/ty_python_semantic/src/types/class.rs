@@ -6009,6 +6009,22 @@ impl<'db> DynamicDataclassLiteral<'db> {
                         .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), field_any]),
                 )
             }
+            "__setattr__" if params.flags(db).contains(DataclassFlags::FROZEN) => {
+                // Frozen dataclasses have __setattr__ that returns Never (immutable).
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_or_keyword(Name::new_static("name")),
+                            Parameter::positional_or_keyword(Name::new_static("value")),
+                        ],
+                    ),
+                    Type::Never,
+                );
+                Some(Type::function_like_callable(db, signature))
+            }
             _ => None,
         }
     }

@@ -7178,6 +7178,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
         } = &call_expr.arguments;
 
+        let has_starred = args.iter().any(ast::Expr::is_starred_expr);
+        let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
+
         // Need at least cls_name and fields.
         let [name_arg, fields_arg, rest @ ..] = &**args else {
             for arg in args {
@@ -7186,6 +7189,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
             }
+
+            // Report missing argument diagnostic if we can statically determine the arguments.
+            if !has_starred && !has_double_starred {
+                let missing = if args.is_empty() {
+                    "`cls_name` and `fields`"
+                } else {
+                    "`fields`"
+                };
+                if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
+                    builder.into_diagnostic(format_args!(
+                        "No argument{} provided for required parameter{} {missing} of function `make_dataclass`",
+                        if args.is_empty() { "s" } else { "" },
+                        if args.is_empty() { "s" } else { "" }
+                    ));
+                }
+            }
+
             // Fall back to type[object]
             return KnownClass::Object.to_subclass_of(db);
         };
@@ -7199,8 +7219,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If any argument is a starred expression or any keyword is a double-starred expression,
         // we can't statically determine the arguments, so fall back to normal call binding.
-        if args.iter().any(ast::Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none())
-        {
+        if has_starred || has_double_starred {
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
             }
@@ -7232,7 +7251,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             match arg.id.as_str() {
                 "bases" => {
-                    // Type validation is done in `extract_make_dataclass_bases`.
+                    // Validate that bases is a tuple.
+                    // At runtime, make_dataclass requires a tuple (not list or other iterable).
+                    //
+                    // We use `tuple[object, ...]` rather than `tuple[type, ...]` because special
+                    // forms like `TypedDict`, `Protocol`, and `Generic` are not subtypes of `type`.
+                    // Using `tuple[type, ...]` would emit a generic type error here, but we prefer
+                    // to let `extract_dynamic_bases` emit more specific diagnostics.
+                    let tuple_of_objects =
+                        Type::homogeneous_tuple(db, KnownClass::Object.to_instance(db));
+                    if !kw_type.is_assignable_to(db, tuple_of_objects) {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Invalid argument to parameter `bases` of `make_dataclass()`"
+                            ));
+                            diagnostic.set_primary_message(format_args!(
+                                "Expected `tuple`, found `{}`",
+                                kw_type.display(db)
+                            ));
+                        }
+                    }
                     bases_arg = Some((&kw.value, kw_type));
                 }
                 "namespace" => {

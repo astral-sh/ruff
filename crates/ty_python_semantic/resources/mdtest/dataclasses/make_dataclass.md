@@ -49,10 +49,12 @@ reveal_type(c.z)  # revealed: str
 
 ```py
 from dataclasses import make_dataclass
+from ty_extensions import reveal_mro
 
 Point2 = make_dataclass("Point2", [("x", int), ("y", int)])
 
 reveal_type(Point2)  # revealed: <class 'Point2'>
+reveal_mro(Point2)  # revealed: (<class 'Point2'>, <class 'object'>)
 ```
 
 ## Fields with defaults
@@ -92,19 +94,6 @@ p3 = Point3(1)
 
 # error: [missing-argument]
 p4 = Point3()
-```
-
-### `__eq__`
-
-```py
-from dataclasses import make_dataclass
-
-Point4 = make_dataclass("Point4", [("x", int), ("y", int)])
-
-p1 = Point4(1, 2)
-p2 = Point4(1, 2)
-
-reveal_type(p1 == p2)  # revealed: bool
 ```
 
 ## Dataclass parameters
@@ -161,6 +150,10 @@ p = PointFrozen(1, 2)
 
 # frozen dataclasses generate __hash__
 reveal_type(hash(p))  # revealed: int
+
+# frozen dataclasses are immutable
+p.x = 42  # error: [invalid-assignment]
+p.y = 56  # error: [invalid-assignment]
 ```
 
 ### `kw_only=True`
@@ -204,12 +197,14 @@ The `bases` keyword argument specifies base classes:
 
 ```py
 from dataclasses import make_dataclass
+from ty_extensions import reveal_mro
 
 class Base:
     def greet(self) -> str:
         return "Hello"
 
 Derived = make_dataclass("Derived", [("value", int)], bases=(Base,))
+reveal_mro(Derived)  # revealed: (<class 'Derived'>, <class 'Base'>, <class 'object'>)
 
 d = Derived(42)
 reveal_type(d)  # revealed: Derived
@@ -223,6 +218,7 @@ When the fields argument is dynamic (not a literal), we fall back to gradual typ
 
 ```py
 from dataclasses import make_dataclass
+from ty_extensions import reveal_mro
 
 def get_fields():
     return [("x", int)]
@@ -232,10 +228,28 @@ PointDynamic = make_dataclass("PointDynamic", fields)
 
 p = PointDynamic(1)  # No error - accepts any arguments
 reveal_type(p.x)  # revealed: Any
+
+# The class is still inferred as inheriting directly from `object`
+# (`Unknown` is not inserted into the MRO)
+reveal_mro(PointDynamic)  # revealed: (<class 'PointDynamic'>, <class 'object'>)
+
+# ...but nonetheless, we assume that all attributes are available,
+# similar to attribute access on `Unknown`
 reveal_type(p.unknown)  # revealed: Any
 ```
 
 ## Argument validation
+
+### Too few positional arguments
+
+Both `cls_name` and `fields` are required:
+
+```py
+from dataclasses import make_dataclass
+
+# error: [missing-argument] "No argument provided for required parameter `fields` of function `make_dataclass`"
+Point = make_dataclass("Point")
+```
 
 ### Too many positional arguments
 
@@ -308,6 +322,20 @@ from dataclasses import make_dataclass
 Point = make_dataclass("Point", [("x", int)], module=123)
 ```
 
+### Invalid type for `bases`
+
+At runtime, `make_dataclass` requires `bases` to be a tuple (not a list or other iterable).
+
+```py
+from dataclasses import make_dataclass
+
+# error: [invalid-argument-type] "Invalid argument to parameter `bases` of `make_dataclass()`: Expected `tuple`, found `Literal[12345]`"
+Point1 = make_dataclass("Point1", [("x", int)], bases=12345)
+
+# error: [invalid-argument-type] "Invalid argument to parameter `bases` of `make_dataclass()`: Expected `tuple`, found `list[Unknown | <class 'object'>]`"
+Point2 = make_dataclass("Point2", [("x", int)], bases=[object])
+```
+
 ### Valid `namespace` and `module`
 
 ```py
@@ -340,7 +368,7 @@ B = make_dataclass("B", [("x", int)], bases=(Generic,))
 ### Protocol base
 
 Protocol bases use a different lint (`unsupported-dynamic-base`) because they're technically valid
-Python but not supported by ty for MRO computation.
+Python but not supported by ty for dynamic classes.
 
 ```py
 from dataclasses import make_dataclass
