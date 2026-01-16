@@ -1471,7 +1471,7 @@ impl RangedValue<OverrideOptions> {
         let analysis = self.analysis.or_default();
 
         // First, warn about incorrect or useless overrides.
-        if rules.is_empty() && &*analysis == &AnalysisOptions::default() {
+        if rules.is_empty() && *analysis == AnalysisOptions::default() {
             let mut diagnostic = OptionDiagnostic::new(
                 DiagnosticId::UselessOverridesSection,
                 "Useless `overrides` section".to_string(),
@@ -1499,7 +1499,7 @@ impl RangedValue<OverrideOptions> {
                     ));
                 }
 
-                if self.analysis.is_some() && &*analysis == &AnalysisOptions::default() {
+                if self.analysis.is_some() && *analysis == AnalysisOptions::default() {
                     diagnostic = diagnostic.sub(SubDiagnostic::new(
                         SubDiagnosticSeverity::Info,
                         "The `analysis` table is empty",
