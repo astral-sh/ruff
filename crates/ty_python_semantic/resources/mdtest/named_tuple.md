@@ -127,6 +127,107 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Functional syntax with string annotations
+
+String annotations (forward references) are properly evaluated to types:
+
+```py
+from typing import NamedTuple
+
+Point = NamedTuple("Point", [("x", "int"), ("y", "int")])
+p = Point(1, 2)
+
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+```
+
+Recursive references in functional syntax are supported:
+
+```py
+from typing import NamedTuple
+
+Node = NamedTuple("Node", [("value", int), ("next", "Node | None")])
+n = Node(1, None)
+
+reveal_type(n.value)  # revealed: int
+reveal_type(n.next)  # revealed: Node | None
+```
+
+### Functional syntax with tuple literal
+
+Using a tuple literal for fields instead of a list:
+
+```py
+from typing import NamedTuple
+
+Point = NamedTuple("Point", (("x", int), ("y", int)))
+p = Point(1, 2)
+
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+```
+
+### Functional syntax with variable fields and string annotations
+
+String annotations in variable fields are properly resolved:
+
+```py
+from typing import NamedTuple
+
+fields = [("value", "int"), ("label", "str")]
+Item = NamedTuple("Item", fields)
+item = Item(42, "test")
+
+reveal_type(item.value)  # revealed: int
+reveal_type(item.label)  # revealed: str
+```
+
+Recursive string annotations also work when fields come from a variable:
+
+```py
+from typing import NamedTuple
+
+tree_fields = [("value", int), ("left", "Tree | None"), ("right", "Tree | None")]
+Tree = NamedTuple("Tree", tree_fields)
+t = Tree(1, None, None)
+
+reveal_type(t.value)  # revealed: int
+reveal_type(t.left)  # revealed: Tree | None
+reveal_type(t.right)  # revealed: Tree | None
+```
+
+### Functional syntax as base class (dangling call)
+
+When NamedTuple is used directly as a base class without being assigned to a variable first, it's a
+"dangling call". The types are still properly inferred:
+
+```py
+from typing import NamedTuple
+
+class Point(NamedTuple("Point", [("x", int), ("y", int)])):
+    def magnitude(self) -> float:
+        return (self.x**2 + self.y**2) ** 0.5
+
+p = Point(3, 4)
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+reveal_type(p.magnitude())  # revealed: int | float
+```
+
+String annotations in dangling calls currently don't resolve properly (this is a known limitation):
+
+```py
+from typing import NamedTuple
+
+class Node(NamedTuple("Node", [("value", int), ("next", "Node | None")])):
+    pass
+
+n = Node(1, None)
+reveal_type(n.value)  # revealed: int
+# TODO: This should be `Node | None`, but string annotations in dangling calls aren't resolved.
+reveal_type(n.next)  # revealed: Unknown
+```
+
 ### Functional syntax with variable name
 
 When the typename is passed via a variable, we can extract it from the inferred literal string type:
