@@ -70,7 +70,6 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::Range;
-use std::rc::Rc;
 
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -1786,73 +1785,66 @@ impl<'db> Node<'db> {
             db: &'db dyn Db,
             node: Node<'db>,
             prefix: &'a dyn Display,
-            seen: Rc<RefCell<FxOrderSet<InteriorNode<'db>>>>,
+            seen: RefCell<FxOrderSet<InteriorNode<'db>>>,
         }
 
-        impl<'a, 'db> DisplayNode<'a, 'db> {
-            fn new(
-                db: &'db dyn Db,
-                node: Node<'db>,
-                prefix: &'a dyn Display,
-                seen: Rc<RefCell<FxOrderSet<InteriorNode<'db>>>>,
-            ) -> Self {
-                Self {
-                    db,
-                    node,
-                    prefix,
-                    seen,
+        fn format_node<'db>(
+            db: &'db dyn Db,
+            node: Node<'db>,
+            prefix: &dyn Display,
+            seen: &RefCell<FxOrderSet<InteriorNode<'db>>>,
+            f: &mut std::fmt::Formatter<'_>,
+        ) -> std::fmt::Result {
+            match node {
+                Node::AlwaysTrue => write!(f, "always"),
+                Node::AlwaysFalse => write!(f, "never"),
+                Node::Interior(interior) => {
+                    let (index, is_new) = seen.borrow_mut().insert_full(interior);
+                    if !is_new {
+                        return write!(f, "<{index}> SHARED");
+                    }
+                    write!(
+                        f,
+                        "<{index}> {} {}/{}",
+                        interior.constraint(db).display(db),
+                        interior.source_order(db),
+                        interior.max_source_order(db),
+                    )?;
+                    // Calling display_graph recursively here causes rustc to claim that the
+                    // expect(unused) up above is unfulfilled!
+                    write!(f, "\n{prefix}┡━₁ ",)?;
+                    format_node(
+                        db,
+                        interior.if_true(db),
+                        &format_args!("{prefix}│   ",),
+                        seen,
+                        f,
+                    )?;
+                    write!(f, "\n{prefix}└─₀ ",)?;
+                    format_node(
+                        db,
+                        interior.if_false(db),
+                        &format_args!("{prefix}    ",),
+                        seen,
+                        f,
+                    )?;
+                    Ok(())
                 }
             }
         }
 
         impl Display for DisplayNode<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.node {
-                    Node::AlwaysTrue => write!(f, "always"),
-                    Node::AlwaysFalse => write!(f, "never"),
-                    Node::Interior(interior) => {
-                        let (index, is_new) = self.seen.borrow_mut().insert_full(interior);
-                        if !is_new {
-                            return write!(f, "<{index}> SHARED");
-                        }
-                        write!(
-                            f,
-                            "<{index}> {} {}/{}",
-                            interior.constraint(self.db).display(self.db),
-                            interior.source_order(self.db),
-                            interior.max_source_order(self.db),
-                        )?;
-                        // Calling display_graph recursively here causes rustc to claim that the
-                        // expect(unused) up above is unfulfilled!
-                        write!(
-                            f,
-                            "\n{}┡━₁ {}",
-                            self.prefix,
-                            DisplayNode::new(
-                                self.db,
-                                interior.if_true(self.db),
-                                &format_args!("{}│   ", self.prefix),
-                                Rc::clone(&self.seen),
-                            ),
-                        )?;
-                        write!(
-                            f,
-                            "\n{}└─₀ {}",
-                            self.prefix,
-                            DisplayNode::new(
-                                self.db,
-                                interior.if_false(self.db),
-                                &format_args!("{}    ", self.prefix),
-                                Rc::clone(&self.seen),
-                            ),
-                        )?;
-                        Ok(())
-                    }
-                }
+                format_node(self.db, self.node, self.prefix, &self.seen, f)
             }
         }
 
-        DisplayNode::new(db, self, prefix, Rc::default())
+        DisplayNode {
+            db,
+            node: self,
+            prefix,
+            seen: RefCell::default(),
+        }
     }
 }
 
