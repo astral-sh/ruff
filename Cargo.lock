@@ -3175,7 +3175,6 @@ dependencies = [
  "schemars",
  "serde",
  "ty_module_resolver",
- "ty_python_semantic",
  "ty_site_packages",
  "zip",
 ]
