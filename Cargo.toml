@@ -49,6 +49,7 @@ ty_module_resolver = { path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
 ty_server = { path = "crates/ty_server" }
+ty_site_packages = { path = "crates/ty_site_packages" }
 ty_static = { path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }

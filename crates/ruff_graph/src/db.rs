@@ -10,9 +10,10 @@ use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{SearchPathSettings, SearchPaths};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin, default_lint_registry,
+    AnalysisSettings, Db, Program, ProgramSettings, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, default_lint_registry,
 };
+use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
     let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);

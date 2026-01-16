@@ -3176,6 +3176,7 @@ dependencies = [
  "serde",
  "ty_module_resolver",
  "ty_python_semantic",
+ "ty_site_packages",
  "zip",
 ]
 
@@ -4562,7 +4563,6 @@ dependencies = [
  "bitflags 2.10.0",
  "bitvec",
  "camino",
- "colored 3.0.0",
  "compact_str",
  "datatest-stable",
  "drop_bomb",
@@ -4578,7 +4578,6 @@ dependencies = [
  "pretty_assertions",
  "quickcheck",
  "quickcheck_macros",
- "ruff_annotate_snippets",
  "ruff_db",
  "ruff_diagnostics",
  "ruff_index",
@@ -4606,6 +4605,7 @@ dependencies = [
  "tracing",
  "ty_combine",
  "ty_module_resolver",
+ "ty_site_packages",
  "ty_static",
  "ty_test",
  "ty_vendored",
@@ -4647,6 +4647,26 @@ dependencies = [
  "ty_module_resolver",
  "ty_project",
  "ty_python_semantic",
+]
+
+[[package]]
+name = "ty_site_packages"
+version = "0.0.0"
+dependencies = [
+ "camino",
+ "colored 3.0.0",
+ "get-size2",
+ "indexmap",
+ "ruff_annotate_snippets",
+ "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "strum",
+ "strum_macros",
+ "tracing",
+ "ty_static",
 ]
 
 [[package]]
