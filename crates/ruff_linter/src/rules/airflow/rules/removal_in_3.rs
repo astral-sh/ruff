@@ -64,7 +64,8 @@ impl Violation for Airflow3Removal {
             | Replacement::SourceModuleMoved { module: _, name: _ }
             | Replacement::SourceModuleMovedToSDK {
                 module: _, name: _, ..
-            } => {
+            }
+            | Replacement::InternalModule { module: _, name: _ } => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
             }
         }
@@ -88,6 +89,10 @@ impl Violation for Airflow3Removal {
                 version,
             } => Some(format!(
                 "`{name}` has been moved to `{module}` since Airflow 3.0 (with apache-airflow-task-sdk>={version})."
+            )),
+            Replacement::InternalModule { module, name } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0. \
+                This is an internal module which is not supposed to be used and is subject to change without notice."
             )),
         }
     }
