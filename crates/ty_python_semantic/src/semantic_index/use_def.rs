@@ -769,7 +769,7 @@ impl<'db> ConstraintsIterator<'_, 'db> {
                 constraint.merge_constraint_and(acc, db)
             })
             .map_or(base_ty, |constraint| {
-                NarrowingConstraint::regular(base_ty)
+                NarrowingConstraint::intersection(base_ty)
                     .merge_constraint_and(constraint, db)
                     .evaluate_constraint_type(db)
             })
