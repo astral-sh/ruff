@@ -507,6 +507,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::DynamicDataclass(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
+            ClassLiteral::DynamicTypedDict(literal) => {
+                ClassBase::Class(ClassType::NonGeneric(literal.into()))
+            }
         }
     }
 
@@ -541,6 +544,11 @@ impl<'db> MroIterator<'db> {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),
                     };
+                    full_mro_iter.next();
+                    full_mro_iter
+                }
+                ClassLiteral::DynamicTypedDict(literal) => {
+                    let mut full_mro_iter = literal.mro(self.db).iter();
                     full_mro_iter.next();
                     full_mro_iter
                 }

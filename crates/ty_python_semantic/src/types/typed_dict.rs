@@ -10,13 +10,14 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassType, CodeGeneratorKind, Field};
+use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, DynamicTypedDictLiteral, Field};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
     report_missing_typed_dict_key,
 };
-use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
+use super::infer::infer_deferred_types;
+use super::{ApplyTypeMappingVisitor, Type, TypeMapping, TypeQualifiers, visitor};
 use crate::Db;
 use crate::semantic_index::definition::Definition;
 use crate::types::TypeDefinition;
@@ -109,8 +110,131 @@ impl<'db> TypedDictType<'db> {
                 .collect()
         }
 
+        /// Compute field types for a dynamic `TypedDict` by re-reading the AST and inferring types.
+        ///
+        /// This is done lazily (after the `TypedDict` definition is complete) to support recursive
+        /// `TypedDict`s where field types may reference the `TypedDict` being defined.
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn dynamic_typeddict_items<'db>(
+            db: &'db dyn Db,
+            class: DynamicTypedDictLiteral<'db>,
+        ) -> TypedDictSchema<'db> {
+            // If fields are not known statically, return empty schema (attribute access returns Any).
+            if !class.has_known_fields(db) {
+                return TypedDictSchema::default();
+            }
+
+            // Get the definition (if any) to access deferred type inference.
+            let Some(definition) = class.definition(db) else {
+                // For dangling TypedDict calls without a definition, we can't do deferred inference.
+                // Return types as Unknown with default requiredness.
+                return class
+                    .raw_fields(db)
+                    .iter()
+                    .cloned()
+                    .map(|name| {
+                        let field = TypedDictFieldBuilder::new(Type::unknown())
+                            .required(class.total(db))
+                            .build();
+                        (name, field)
+                    })
+                    .collect();
+            };
+
+            // Get the deferred inference to access the inferred field types.
+            let deferred_inference = infer_deferred_types(db, definition);
+
+            // Get the call expression AST to find field value expressions.
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
+
+            // Get the call expression from the definition.
+            let Some(call_expr) = definition.kind(db).value(&module) else {
+                return TypedDictSchema::default();
+            };
+            let ast::Expr::Call(ast::ExprCall { arguments, .. }) = call_expr else {
+                return TypedDictSchema::default();
+            };
+
+            // Build a mapping from field names to their value expressions.
+            let mut field_value_exprs: BTreeMap<&str, &ast::Expr> = BTreeMap::new();
+
+            // Check for dict argument (normal syntax).
+            if let Some(fields_arg) = arguments.args.get(1)
+                && let ast::Expr::Dict(dict_expr) = fields_arg
+            {
+                for item in &dict_expr.items {
+                    if let Some(key) = &item.key
+                        && let ast::Expr::StringLiteral(key_lit) = key
+                    {
+                        field_value_exprs.insert(key_lit.value.to_str(), &item.value);
+                    }
+                }
+            }
+
+            // Also check for deprecated keyword-argument syntax.
+            for kw in &arguments.keywords {
+                if let Some(arg) = &kw.arg {
+                    match arg.id.as_str() {
+                        "total" | "closed" | "extra_items" => continue,
+                        field_name => {
+                            field_value_exprs.insert(field_name, &kw.value);
+                        }
+                    }
+                }
+            }
+
+            // Build the schema by looking up inferred types and qualifiers for each field.
+            class
+                .raw_fields(db)
+                .iter()
+                .cloned()
+                .map(|name| {
+                    // Look up the value expression for this field.
+                    let (field_ty, is_required) =
+                        if let Some(value_expr) = field_value_exprs.get(name.as_str()) {
+                            // Get the inferred type from deferred inference.
+                            // The type was inferred as an annotation expression in
+                            // `infer_functional_typeddict_deferred`.
+                            let ty = deferred_inference
+                                .try_expression_type(*value_expr)
+                                .unwrap_or(Type::unknown());
+
+                            // Get the qualifiers (Required/NotRequired) from deferred inference.
+                            let qualifiers = deferred_inference
+                                .try_qualifiers(*value_expr)
+                                .unwrap_or(TypeQualifiers::empty());
+
+                            // Determine requiredness from qualifiers or use class default.
+                            let required = if qualifiers.contains(TypeQualifiers::REQUIRED) {
+                                true
+                            } else if qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+                                false
+                            } else {
+                                class.total(db)
+                            };
+
+                            (ty, required)
+                        } else {
+                            (Type::unknown(), class.total(db))
+                        };
+
+                    let field = TypedDictFieldBuilder::new(field_ty)
+                        .required(is_required)
+                        .build();
+                    (name, field)
+                })
+                .collect()
+        }
+
         match self {
-            Self::Class(defining_class) => class_based_items(db, defining_class),
+            Self::Class(defining_class) => {
+                // Check if this is a dynamic TypedDict
+                if let ClassLiteral::DynamicTypedDict(class) = defining_class.class_literal(db) {
+                    return dynamic_typeddict_items(db, class);
+                }
+                class_based_items(db, defining_class)
+            }
             Self::Synthesized(synthesized) => synthesized.items(db),
         }
     }
@@ -517,6 +641,16 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             }
         }
     }
+}
+
+/// Get the [`TypedDictSchema`] for a [`DynamicTypedDictLiteral`].
+///
+/// This is a helper function for use by class.rs to access the computed field types.
+pub(super) fn dynamic_typed_dict_schema<'db>(
+    db: &'db dyn Db,
+    class: DynamicTypedDictLiteral<'db>,
+) -> &'db TypedDictSchema<'db> {
+    TypedDictType::Class(ClassType::NonGeneric(class.into())).items(db)
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {

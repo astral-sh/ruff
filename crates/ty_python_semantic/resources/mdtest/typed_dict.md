@@ -1496,6 +1496,36 @@ emp_invalid1 = Employee(department="HR")
 emp_invalid2 = Employee(id=3)
 ```
 
+## Class-based inheritance from functional `TypedDict`
+
+Class-based TypedDicts can inherit from functional TypedDicts:
+
+```py
+from typing import TypedDict
+
+# Functional TypedDict base
+Base = TypedDict("Base", {"a": int}, total=False)
+
+# Class-based TypedDict inheriting from functional
+class Child(Base):
+    b: str
+    c: list[int]
+
+# Child inherits 'a' (optional) from Base, and adds 'b' and 'c' (required)
+child1 = Child(b="hello", c=[1, 2, 3])  # Valid - 'a' is optional
+child2 = Child(a=1, b="world", c=[])  # Valid - all keys provided
+
+reveal_type(child1["a"])  # revealed: int
+reveal_type(child1["b"])  # revealed: str
+reveal_type(child1["c"])  # revealed: list[int]
+
+# error: [missing-typed-dict-key] "Missing required key 'b' in TypedDict `Child` constructor"
+bad_child1 = Child(c=[1])
+
+# error: [missing-typed-dict-key] "Missing required key 'c' in TypedDict `Child` constructor"
+bad_child2 = Child(b="test")
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
@@ -1617,25 +1647,242 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
-## Function/assignment syntax
+## Recursive functional `TypedDict`
 
-This is not yet supported. Make sure that we do not emit false positives for this syntax:
+Functional `TypedDict`s can also be recursive, referencing themselves in field types:
 
 ```py
-from typing_extensions import TypedDict, Required
+from __future__ import annotations
+from typing_extensions import TypedDict
 
-# Alternative syntax
-Message = TypedDict("Message", {"id": Required[int], "content": str}, total=False)
+# Self-referencing TypedDict using functional syntax
+TreeNode = TypedDict("TreeNode", {"value": int, "left": TreeNode | None, "right": TreeNode | None})
 
-msg = Message(id=1, content="Hello")
+reveal_type(TreeNode)  # revealed: <class 'TreeNode'>
 
-# No errors for yet-unsupported features (`closed`):
+leaf: TreeNode = {"value": 1, "left": None, "right": None}
+reveal_type(leaf["value"])  # revealed: int
+reveal_type(leaf["left"])  # revealed: TreeNode | None
+
+tree: TreeNode = {
+    "value": 10,
+    "left": {"value": 5, "left": None, "right": None},
+    "right": {"value": 15, "left": None, "right": None},
+}
+
+# error: [invalid-argument-type]
+bad_tree: TreeNode = {"value": 1, "left": "not a node", "right": None}
+```
+
+Recursive functional `TypedDict`s work with `Required` and `NotRequired`:
+
+```py
+from typing_extensions import Required, NotRequired
+
+LinkedList = TypedDict(
+    "LinkedList",
+    {"value": Required[int], "next": NotRequired[LinkedList | None]},
+    total=False,
+)
+
+# 'value' is required, 'next' is not required
+node1: LinkedList = {"value": 1}
+node2: LinkedList = {"value": 2, "next": node1}
+node3: LinkedList = {"value": 3, "next": {"value": 4, "next": None}}
+
+# error: [missing-typed-dict-key]
+bad_node: LinkedList = {"next": None}
+```
+
+## Function/assignment syntax
+
+TypedDicts can be created using the functional syntax:
+
+```py
+from typing_extensions import TypedDict
+
+Movie = TypedDict("Movie", {"name": str, "year": int})
+
+reveal_type(Movie)  # revealed: <class 'Movie'>
+
+movie = Movie(name="The Matrix", year=1999)
+
+reveal_type(movie)  # revealed: Movie
+reveal_type(movie["name"])  # revealed: str
+reveal_type(movie["year"])  # revealed: int
+```
+
+Constructor validation also works with dict literals:
+
+```py
+from typing_extensions import TypedDict
+
+Film = TypedDict("Film", {"title": str, "year": int})
+
+# Valid usage
+film1 = Film({"title": "The Matrix", "year": 1999})
+film2 = Film(title="Inception", year=2010)
+
+reveal_type(film1)  # revealed: Film
+reveal_type(film2)  # revealed: Film
+
+# error: [invalid-argument-type] "Invalid argument to key "year" with declared type `int` on TypedDict `Film`: value of type `Literal["not a year"]`"
+invalid_type = Film({"title": "Bad", "year": "not a year"})
+
+# error: [missing-typed-dict-key] "Missing required key 'year' in TypedDict `Film` constructor"
+missing_key = Film({"title": "Incomplete"})
+
+# error: [invalid-key] "Unknown key "director" for TypedDict `Film`"
+extra_key = Film({"title": "Extra", "year": 2020, "director": "Someone"})
+```
+
+## Function syntax with `total=False`
+
+The `total=False` keyword makes all fields optional by default:
+
+```py
+from typing_extensions import TypedDict
+
+# With total=False, all fields are optional by default
+PartialMovie = TypedDict("PartialMovie", {"name": str, "year": int}, total=False)
+
+# All fields are optional
+partial = PartialMovie()
+partial_with_name = PartialMovie(name="The Matrix")
+```
+
+## Function syntax with `Required` and `NotRequired`
+
+The `Required` and `NotRequired` wrappers can be used to override the default requiredness:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# With total=True (default), all fields are required unless wrapped in NotRequired
+MovieWithOptional = TypedDict("MovieWithOptional", {"name": str, "year": NotRequired[int]})
+
+# name is required, year is optional
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `MovieWithOptional` constructor"
+empty_movie = MovieWithOptional()
+movie_no_year = MovieWithOptional(name="The Matrix")
+reveal_type(movie_no_year)  # revealed: MovieWithOptional
+reveal_type(movie_no_year["name"])  # revealed: str
+reveal_type(movie_no_year["year"])  # revealed: int
+```
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# With total=False, all fields are optional unless wrapped in Required
+PartialWithRequired = TypedDict("PartialWithRequired", {"name": Required[str], "year": int}, total=False)
+
+# name is required, year is optional
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `PartialWithRequired` constructor"
+empty_partial = PartialWithRequired()
+partial_no_year = PartialWithRequired(name="The Matrix")
+reveal_type(partial_no_year)  # revealed: PartialWithRequired
+```
+
+## Function syntax with `closed`
+
+The `closed` keyword is accepted but not yet fully supported:
+
+```py
+from typing_extensions import TypedDict
+
+# closed is accepted (no error)
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
+```
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for functional `TypedDict`)
+## Function syntax with `extra_items`
 
-# TODO: this should be an error
-msg.content
+The `extra_items` keyword is accepted and validated as a type expression:
+
+```py
+from typing_extensions import TypedDict
+
+# extra_items is accepted (no error)
+MovieWithExtras = TypedDict("MovieWithExtras", {"name": str}, extra_items=bool)
+```
+
+## Function syntax with forward references
+
+Functional TypedDict supports forward references (string annotations):
+
+```py
+from typing_extensions import TypedDict, NotRequired
+
+class Director:
+    name: str
+
+# Forward reference to a class defined above
+MovieWithDirector = TypedDict("MovieWithDirector", {"title": str, "director": NotRequired["Director"]})
+
+movie: MovieWithDirector = {"title": "The Matrix"}
+reveal_type(movie)  # revealed: MovieWithDirector
+```
+
+String annotations can also wrap the entire `Required` or `NotRequired` qualifier:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# NotRequired as a string annotation
+TD = TypedDict("TD", {"required": str, "optional": "NotRequired[int]"})
+
+# 'required' is required, 'optional' is not required
+td1: TD = {"required": "hello"}  # Valid - optional is not required
+td2: TD = {"required": "hello", "optional": 42}  # Valid - all keys provided
+reveal_type(td1)  # revealed: TD
+reveal_type(td1["required"])  # revealed: str
+reveal_type(td1["optional"])  # revealed: int
+
+# error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD` constructor"
+bad_td: TD = {"optional": 42}
+
+# Also works with Required in total=False TypedDicts
+TD2 = TypedDict("TD2", {"required": "Required[str]", "optional": int}, total=False)
+
+# 'required' is required, 'optional' is not required
+td3: TD2 = {"required": "hello"}  # Valid
+# error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD2` constructor"
+bad_td2: TD2 = {"optional": 42}
+```
+
+## Deprecated keyword-argument syntax
+
+The deprecated keyword-argument syntax (fields as keyword arguments instead of a dict) is supported
+for backwards compatibility:
+
+```py
+from typing_extensions import TypedDict
+
+# Deprecated syntax: TypedDict("Name", field1=type1, field2=type2)
+Movie2 = TypedDict("Movie2", name=str, year=int)
+
+movie2: Movie2 = {"name": "Blade Runner", "year": 1982}
+reveal_type(movie2)  # revealed: Movie2
+
+# error: [invalid-argument-type]
+bad_movie: Movie2 = {"name": "Blade Runner", "year": "not an int"}
+```
+
+## Function syntax with invalid arguments
+
+```py
+from typing_extensions import TypedDict
+
+# error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`"
+Bad1 = TypedDict(123, {"name": str})
+
+# error: [invalid-argument-type] "Invalid argument to parameter `fields` of `TypedDict()`"
+Bad2 = TypedDict("Bad2", "not a dict")
+
+# error: [invalid-argument-type] "Invalid argument to parameter `total` of `TypedDict()`"
+Bad3 = TypedDict("Bad3", {"name": str}, total="not a bool")
+
+# error: [invalid-argument-type] "Invalid argument to parameter `closed` of `TypedDict()`"
+Bad4 = TypedDict("Bad4", {"name": str}, closed=123)
 ```
 
 ## Error cases
