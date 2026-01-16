@@ -132,6 +132,7 @@ impl<'db> Completions<'db> {
     // Convert this collection into a list of "import..." fixes
     fn into_imports(mut self) -> Vec<ImportEdit> {
         self.items.sort_unstable();
+        self.items.truncate(Completions::LIMIT);
         self.items
             .into_iter()
             .map(|CompletionRanker(c)| c)
@@ -147,6 +148,7 @@ impl<'db> Completions<'db> {
     // Convert this collection into a list of "qualify..." fixes
     fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
         self.items.sort_unstable();
+        self.items.truncate(Completions::LIMIT);
         self.items
             .into_iter()
             .map(|CompletionRanker(c)| c)
