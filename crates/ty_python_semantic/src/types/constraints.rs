@@ -117,9 +117,9 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
 pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
     ///
-    /// This method is not guaranteed to short-circuit — we might invoke your callback for later
-    /// iterator elements even if you produce
-    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied] for earlier elements.
+    /// This method short-circuits; if we encounter any element that
+    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied], then the overall result
+    /// must be as well, and we stop consuming elements from the iterator.
     fn when_any<'db>(
         self,
         db: &'db dyn Db,
@@ -128,9 +128,9 @@ pub(crate) trait IteratorConstraintsExtension<T> {
 
     /// Returns the constraints under which every element of the iterator holds.
     ///
-    /// This method is not guaranteed to short-circuit — we might invoke your callback for later
-    /// iterator elements even if you produce
-    /// [`is_never_satisfied`][ConstraintSet::is_never_satisfied] for earlier elements.
+    /// This method short-circuits; if we encounter any element that
+    /// [`is_never_satisfied`][ConstraintSet::is_never_satisfied], then the overall result
+    /// must be as well, and we stop consuming elements from the iterator.
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
@@ -147,8 +147,7 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let inputs: Vec<_> = self.map(|element| f(element).node).collect();
-        let node = Node::distributed_or(db, &inputs);
+        let node = Node::distributed_or(db, self.map(|element| f(element).node));
         ConstraintSet { node }
     }
 
@@ -157,8 +156,7 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let inputs: Vec<_> = self.map(|element| f(element).node).collect();
-        let node = Node::distributed_and(db, &inputs);
+        let node = Node::distributed_and(db, self.map(|element| f(element).node));
         ConstraintSet { node }
     }
 }
@@ -1166,32 +1164,57 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn distributed_or(db: &'db dyn Db, inputs: &[Self]) -> Self {
-        match inputs {
-            [] => Node::AlwaysFalse,
-            [one] => *one,
-            [first, second] => first.or_with_offset(db, *second),
-            _ => {
-                let (first, second) = inputs.split_at(inputs.len() / 2);
-                let first = Self::distributed_or(db, first);
-                let second = Self::distributed_or(db, second);
-                first.or(db, second)
+    fn tree_fold(
+        db: &'db dyn Db,
+        nodes: impl Iterator<Item = Self>,
+        zero: Self,
+        one: Self,
+        mut combine: impl FnMut(Self, &'db dyn Db, Self) -> Self,
+    ) -> Self {
+        let mut accumulator: SmallVec<[(Node<'db>, u8); 8]> = SmallVec::default();
+        for node in nodes {
+            if node == one {
+                return one;
             }
+
+            let (mut node, mut depth) = (node, 1);
+            while accumulator
+                .last()
+                .is_some_and(|(_, existing)| *existing == depth)
+            {
+                let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
+                node = combine(existing, db, node);
+                if node == one {
+                    return one;
+                }
+                depth += 1;
+            }
+            accumulator.push((node, depth));
         }
+
+        accumulator
+            .into_iter()
+            .fold(zero, |result, (node, _)| combine(result, db, node))
     }
 
-    fn distributed_and(db: &'db dyn Db, inputs: &[Self]) -> Self {
-        match inputs {
-            [] => Node::AlwaysTrue,
-            [one] => *one,
-            [first, second] => first.and_with_offset(db, *second),
-            _ => {
-                let (first, second) = inputs.split_at(inputs.len() / 2);
-                let first = Self::distributed_and(db, first);
-                let second = Self::distributed_and(db, second);
-                first.and(db, second)
-            }
-        }
+    fn distributed_or(db: &'db dyn Db, nodes: impl Iterator<Item = Node<'db>>) -> Self {
+        Self::tree_fold(
+            db,
+            nodes,
+            Node::AlwaysFalse,
+            Node::AlwaysTrue,
+            Self::or_with_offset,
+        )
+    }
+
+    fn distributed_and(db: &'db dyn Db, nodes: impl Iterator<Item = Node<'db>>) -> Self {
+        Self::tree_fold(
+            db,
+            nodes,
+            Node::AlwaysTrue,
+            Node::AlwaysFalse,
+            Self::and_with_offset,
+        )
     }
 
     /// Returns the `and` or intersection of two BDDs.
