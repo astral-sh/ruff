@@ -42,6 +42,12 @@ def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 
 l5: int | list[int] = f(1, True)
+
+a: list[int] = [1, 2, *(3, 4, 5)]
+reveal_type(a)  # revealed: list[int]
+
+b: list[list[int]] = [[1], [2], *([3], [4])]
+reveal_type(b)  # revealed: list[list[int]]
 ```
 
 `typed_dict.py`:
@@ -265,7 +271,7 @@ def f[T](x: T) -> list[T]:
 
 class A:
     def __new__(cls, value: list[int | str]):
-        return super().__new__(cls, value)
+        return super().__new__(cls)
 
     def __init__(self, value: list[int | None]): ...
 

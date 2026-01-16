@@ -1208,7 +1208,7 @@ def _(flag: bool):
     reveal_type(C1.y)  # revealed: int | str
 
     C1.y = 100
-    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:8'>`"
+    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3:15'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:8:15'>`"
     C1.y = "problematic"
 
     class C2:
@@ -2094,8 +2094,8 @@ def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(b.__class__)  # revealed: <class 'str'>
     reveal_type(type(b))  # revealed: <class 'str'>
 
-    reveal_type(c.__class__)  # revealed: type[int] | type[str]
-    reveal_type(type(c))  # revealed: type[int] | type[str]
+    reveal_type(c.__class__)  # revealed: type[int | str]
+    reveal_type(type(c))  # revealed: type[int | str]
 
     # `type[type]`, a.k.a., either the class `type` or some subclass of `type`.
     # It would be incorrect to infer `Literal[type]` here,

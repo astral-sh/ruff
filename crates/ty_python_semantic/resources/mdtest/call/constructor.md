@@ -76,7 +76,7 @@ from typing_extensions import Self
 
 class Base:
     def __new__(cls, x: int) -> Self:
-        return cls()
+        return cls(x)
 
 class Foo(Base): ...
 

@@ -18,7 +18,7 @@ from _typeshed.importlib import LoaderProtocol
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableSequence, Sequence
 from importlib.machinery import ModuleSpec
 from importlib.metadata import DistributionFinder, PathDistribution
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, overload
 from typing_extensions import Self, deprecated
 
 if sys.version_info >= (3, 10):
@@ -35,7 +35,11 @@ else:
 
 MAGIC_NUMBER: Final[bytes]
 
-def cache_from_source(path: StrPath, debug_override: bool | None = None, *, optimization: Any | None = None) -> str:
+@overload
+@deprecated(
+    "The `debug_override` parameter is deprecated since Python 3.5; will be removed in Python 3.15. Use `optimization` instead."
+)
+def cache_from_source(path: StrPath, debug_override: bool, *, optimization: None = None) -> str:
     """Given the path to a .py file, return the path to its .pyc file.
 
     The .py file does not need to exist; this simply returns the path to the
@@ -54,6 +58,8 @@ def cache_from_source(path: StrPath, debug_override: bool | None = None, *, opti
 
     """
 
+@overload
+def cache_from_source(path: StrPath, debug_override: None = None, *, optimization: Any | None = None) -> str: ...
 def source_from_cache(path: StrPath) -> str:
     """Given the path to a .pyc. file, return the path to its .py file.
 

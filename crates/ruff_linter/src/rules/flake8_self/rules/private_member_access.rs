@@ -101,7 +101,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    // Allow some documented private methods, like `os._exit()`.
+    // Allow some public functions whose names start with an underscore, like `os._exit()`.
     if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
         if matches!(qualified_name.segments(), ["os", "_exit"]) {
             return;

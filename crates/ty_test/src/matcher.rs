@@ -231,11 +231,11 @@ fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
 /// Normalize paths in diagnostics to Unix paths before comparing them against
 /// the expected type. Doing otherwise means that it's hard to write cross-platform
 /// tests, since in some edge cases the display of a type can include a path to the
-/// file in which the type was defined (e.g. `foo.bar.A @ src/foo/bar.py:10` on Unix,
-/// but `foo.bar.A @ src\foo\bar.py:10` on Windows).
+/// file in which the type was defined (e.g. `foo.bar.A @ src/foo/bar.py:10:5` on Unix,
+/// but `foo.bar.A @ src\foo\bar.py:10:5` on Windows).
 fn normalize_paths(ty: &str) -> Cow<'_, str> {
     static PATH_IN_CLASS_DISPLAY_REGEX: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r"( @ )(.+)(\.pyi?:\d)").unwrap());
+        LazyLock::new(|| regex::Regex::new(r"( @ )([^\.]+?)(\.pyi?:\d)").unwrap());
 
     fn normalize_path_captures(path_captures: &regex::Captures) -> String {
         let normalized_path = std::path::Path::new(&path_captures[2])
@@ -359,6 +359,8 @@ impl Matcher {
                     else {
                         return false;
                     };
+
+                    let primary_annotation = normalize_paths(primary_annotation);
 
                     // reveal_type, reveal_protocol_interface
                     if matches!(

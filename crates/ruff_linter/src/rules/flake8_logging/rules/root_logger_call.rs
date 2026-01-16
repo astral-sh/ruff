@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_logging::helpers::is_logger_method_name;
 
 /// ## What it does
 /// Checks for usages of the following `logging` top-level functions:
@@ -65,12 +66,4 @@ pub(crate) fn root_logger_call(checker: &Checker, call: &ExprCall) {
         attr: (*attr).to_string(),
     };
     checker.report_diagnostic(kind, call.range);
-}
-
-#[inline]
-fn is_logger_method_name(attr: &str) -> bool {
-    matches!(
-        attr,
-        "debug" | "info" | "warn" | "warning" | "error" | "critical" | "log" | "exception"
-    )
 }
