@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return_annotation.py
 ---
 ## Input
 ```python
@@ -507,4 +506,87 @@ def process_board_action(
     payload: WildValue, action_type: Optional[str]
 ) -> Optional[Tuple[str, str]]:
     pass
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -131,58 +131,48 @@
+ 
+ # Breaking return type annotations. Black adds parentheses if the parameters are
+ # empty; otherwise, it leverages the expressions own parentheses if possible.
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
++    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
++): ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
++    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
++): ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
++    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
++): ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
++    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
++): ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+     x,
+-) -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++) -> Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]: ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+     x,
+-) -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++) -> Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]: ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+     *args,
+-) -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++) -> Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]: ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(  # foo
+-) -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++) -> Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]: ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+     # bar
+-) -> Set[
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-]: ...
++) -> Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]: ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
 ```

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assignment_split_value_first.py
 ---
 ## Input
 ```python
@@ -472,4 +471,60 @@ type A[str, int, number] = (
 type A[
     VeryLongTypeNameThatShouldBreakFirstToTheRightBeforeSplitngtinthatExceedsTheWidth
 ] = str
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -26,15 +26,11 @@
+ 
+ # Preserve parentheses around the first target
+ (
+-    req["ticket"]["steps"]["step"][0]["tasks"]["task"]["fields"]["field"][
+-        "access_request"
+-    ]["destinations"]["destination"][0]["ip_address"]
++    req["ticket"]["steps"]["step"][0]["tasks"]["task"]["fields"]["field"]["access_request"]["destinations"]["destination"][0]["ip_address"]
+ ) = dst
+ 
+ # Augmented assignment
+-req["ticket"]["steps"]["step"][0]["tasks"]["task"]["fields"]["field"][
+-    "access_request"
+-] += dst
++req["ticket"]["steps"]["step"][0]["tasks"]["task"]["fields"]["field"]["access_request"] += dst
+ 
+ # Always parenthesize the value if it avoids splitting the target, regardless of the value's width.
+ _a: a[aaaa] = (
+@@ -45,9 +41,7 @@
+ # Avoid parenthesizing the value if the expression right before the `=` splits to avoid an unnecessary pair of parentheses
+ 
+ # The type annotation is guaranteed to split because it is too long.
+-_a: a[
+-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvvvvvvv
+-] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvvvvvvv
++_a: a[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvvvvvvv] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvvvvvvv
+ 
+ # The target is too long
+ (
+@@ -155,17 +149,11 @@
+ 
+ #######
+ # Subscripts and non-fluent attribute chains
+-a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
+-    xxxxx
+-].bbvbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb[
++a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[xxxxx].bbvbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb[
+     yyyyyyyyyy[aaaa]
+ ] = ccccccccccccccccccccccccccccccccccc["aaaaaaa"]
+ 
+-a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
+-    xxxxx
+-].bbvbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = ccccccccccccccccccccccccccccccccccc[
+-    "aaaaaaa"
+-]
++a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[xxxxx].bbvbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = ccccccccccccccccccccccccccccccccccc["aaaaaaa"]
+ 
+ label_thresholds[label_id] = label_quantiles[label_id][
+     min(int(tolerance * num_thresholds), num_thresholds - 1)
 ```
