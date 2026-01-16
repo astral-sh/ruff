@@ -43,6 +43,7 @@ use crate::types::{
     NegativeIntersectionElements, StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -299,7 +300,7 @@ impl<'db> UnionBuilder<'db> {
         self.elements.push(UnionElement::Type(Type::object()));
     }
 
-    fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
+    fn widen_literal_types(&mut self, seen_aliases: &mut FxHashSet<Type<'db>>) {
         let mut replace_with = vec![];
         for elem in &self.elements {
             match elem {
@@ -331,10 +332,14 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
-        self.add_in_place_impl(ty, &mut vec![]);
+        self.add_in_place_impl(ty, &mut FxHashSet::default());
     }
 
-    pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    pub(crate) fn add_in_place_impl(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut FxHashSet<Type<'db>>,
+    ) {
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
@@ -373,11 +378,10 @@ impl<'db> UnionBuilder<'db> {
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
-                if seen_aliases.contains(&ty) {
-                    // Union contains itself recursively via a type alias. This is an error, just
-                    // leave out the recursive alias. TODO surface this error.
-                } else {
-                    seen_aliases.push(ty);
+                // If the `insert` call returns `false`, the union contains itself recursively
+                // via a type alias. This is an error, just leave out the recursive alias.
+                // TODO surface this error.
+                if seen_aliases.insert(ty) {
                     self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
                 }
             }
@@ -612,7 +616,7 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
-    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut FxHashSet<Type<'db>>) {
         let bool_pair = if let Type::BooleanLiteral(b) = ty {
             Some(Type::BooleanLiteral(!b))
         } else {
