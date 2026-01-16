@@ -159,7 +159,9 @@ impl<'a> SemanticModel<'a> {
             scope_id: ScopeId::global(),
             definitions: Definitions::for_module(module),
             definition_id: DefinitionId::module(),
-            bindings: Bindings::default(),
+            // We'll always add in the builtin bindings
+            // right away, so leave room
+            bindings: Bindings::with_capacity(180),
             resolved_references: ResolvedReferences::default(),
             unresolved_references: UnresolvedReferences::default(),
             globals: GlobalsArena::default(),

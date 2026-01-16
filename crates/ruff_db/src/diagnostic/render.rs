@@ -915,7 +915,7 @@ fn context_before(
     let mut line = start.saturating_sub(len);
     // Trim leading empty lines.
     while line < start {
-        if !source.line_text(line).trim().is_empty() {
+        if !source.line_text(line).chars().all(char::is_whitespace) {
             break;
         }
         line = line.saturating_add(1);
@@ -953,7 +953,7 @@ fn context_after(
     let mut line = start.saturating_add(len).min(max_lines);
     // Trim trailing empty lines.
     while line > start {
-        if !source.line_text(line).trim().is_empty() {
+        if !source.line_text(line).chars().all(char::is_whitespace) {
             break;
         }
         line = line.saturating_sub(1);
