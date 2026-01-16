@@ -251,6 +251,11 @@ impl<'db> SemanticModel<'db> {
         // Builtins are available in all scopes.
         let builtins = ModuleName::new_static("builtins").expect("valid module name");
         completions.extend(self.module_completions(&builtins));
+
+        // The above can sometimes result in duplicates. Get rid of them.
+        completions.sort_by(|c1, c2| c1.name.cmp(&c2.name));
+        completions.dedup_by(|c1, c2| c1.name == c2.name);
+
         completions
     }
 
