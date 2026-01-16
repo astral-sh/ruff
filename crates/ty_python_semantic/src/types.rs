@@ -131,10 +131,11 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
-        // Scopes that need type context, e.g., comprehensions, are inferred during
+        // Scopes that need type context, e.g., lambdas and comprehensions, are inferred during
         // the inference of their outer scope.
         match scope_id.node(db) {
-            NodeWithScopeKind::ListComprehension(_)
+            NodeWithScopeKind::Lambda(_)
+            | NodeWithScopeKind::ListComprehension(_)
             | NodeWithScopeKind::SetComprehension(_)
             | NodeWithScopeKind::DictComprehension(_) => continue,
             _ => {}
