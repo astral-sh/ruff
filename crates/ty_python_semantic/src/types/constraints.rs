@@ -84,7 +84,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
     UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxIndexMap, FxOrderSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -1828,14 +1828,14 @@ impl<'db> Node<'db> {
             db: &'db dyn Db,
             node: Node<'db>,
             prefix: &'a dyn Display,
-            seen: RefCell<FxOrderSet<InteriorNode<'db>>>,
+            seen: RefCell<FxIndexSet<InteriorNode<'db>>>,
         }
 
         fn format_node<'db>(
             db: &'db dyn Db,
             node: Node<'db>,
             prefix: &dyn Display,
-            seen: &RefCell<FxOrderSet<InteriorNode<'db>>>,
+            seen: &RefCell<FxIndexSet<InteriorNode<'db>>>,
             f: &mut std::fmt::Formatter<'_>,
         ) -> std::fmt::Result {
             match node {
