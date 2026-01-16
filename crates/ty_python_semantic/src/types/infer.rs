@@ -162,7 +162,7 @@ pub(crate) fn infer_deferred_types<'db>(
 
     TypeInferenceBuilder::new(
         db,
-        InferenceRegion::Deferred(CallAnchor::Definition(definition)),
+        InferenceRegion::Deferred(DeferredAnchor::Definition(definition)),
         index,
         &module,
     )
@@ -211,7 +211,7 @@ pub(crate) fn infer_deferred_namedtuple_call_types<'db>(
 
     TypeInferenceBuilder::new(
         db,
-        InferenceRegion::Deferred(CallAnchor::ScopeOffset { scope, offset }),
+        InferenceRegion::Deferred(DeferredAnchor::ScopeOffset { scope, offset }),
         index,
         &module,
     )
@@ -539,39 +539,40 @@ pub(crate) fn nearest_enclosing_function<'db>(
         })
 }
 
-/// Identifies a call expression for deferred type inference.
+/// Identifies a region for deferred type inference.
 ///
-/// This is used to locate call expressions (like `NamedTuple(...)`, `TypedDict(...)`,
-/// or `type(...)`) that may contain string annotations requiring deferred resolution.
+/// Deferred inference is used when type expressions contain forward references
+/// (string annotations) that need to be resolved after the full scope is available.
 ///
 /// There are two cases:
-/// - For assigned calls (e.g., `Point = NamedTuple(...)`), the `Definition` uniquely
-///   identifies the call and we can get the expression from the definition's value.
-/// - For dangling calls (e.g., used directly as base classes), we store a relative
-///   offset from the enclosing scope's anchor node index to locate the call.
+/// - For definitions (functions, classes, assignments), the `Definition` uniquely
+///   identifies the region containing annotations that need deferred resolution.
+/// - For dangling calls (e.g., `NamedTuple(...)` used directly as a base class),
+///   we store a relative offset from the enclosing scope's anchor node index.
 #[derive(
     Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
 )]
-pub enum CallAnchor<'db> {
-    /// The call is assigned to a variable.
+pub enum DeferredAnchor<'db> {
+    /// A definition containing annotations that need deferred resolution.
     ///
-    /// The `Definition` uniquely identifies this call. The call expression
-    /// is the `value` of the assignment, so we can get its range from the definition.
+    /// This covers functions (parameter/return annotations), classes (base classes),
+    /// type variables, and assignments (including `NamedTuple(...)` assignments).
     Definition(Definition<'db>),
 
-    /// The call is "dangling" (not assigned to a variable).
+    /// A dangling call expression (not assigned to a variable).
     ///
     /// The offset is relative to the enclosing scope's anchor node index.
     /// For module scope, this is equivalent to an absolute index (anchor is 0).
+    /// This is used for patterns like `class Foo(NamedTuple("Foo", [...]))`.
     ScopeOffset { scope: ScopeId<'db>, offset: u32 },
 }
 
-impl<'db> CallAnchor<'db> {
-    /// Returns the scope in which this call exists.
+impl<'db> DeferredAnchor<'db> {
+    /// Returns the scope containing this deferred region.
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
-            CallAnchor::Definition(definition) => definition.scope(db),
-            CallAnchor::ScopeOffset { scope, .. } => scope,
+            DeferredAnchor::Definition(definition) => definition.scope(db),
+            DeferredAnchor::ScopeOffset { scope, .. } => scope,
         }
     }
 }
@@ -583,12 +584,12 @@ pub(crate) enum InferenceRegion<'db> {
     Expression(Expression<'db>, TypeContext<'db>),
     /// Infer types for a [`Definition`]
     Definition(Definition<'db>),
-    /// Infer deferred types for a dynamic class call (`NamedTuple`, `TypedDict`, etc.)
+    /// Infer deferred types (forward references / string annotations).
     ///
-    /// The anchor identifies the call - either by its definition (for assigned calls like
-    /// `Point = NamedTuple(...)`) or by scope offset (for dangling calls used directly
-    /// as base classes).
-    Deferred(CallAnchor<'db>),
+    /// The anchor identifies the region - either by its definition (for functions,
+    /// classes, assignments) or by scope offset (for dangling calls like
+    /// `NamedTuple(...)` used directly as base classes).
+    Deferred(DeferredAnchor<'db>),
     /// Infer types for an entire [`ScopeId`]
     Scope(ScopeId<'db>),
 }

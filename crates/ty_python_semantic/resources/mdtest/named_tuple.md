@@ -317,6 +317,25 @@ reveal_type(url[1])  # revealed: int
 url[2]
 ```
 
+### Functional syntax with Final variable field names
+
+When field names are `Final` variables, they resolve to their literal string values:
+
+```py
+from typing import Final, NamedTuple
+
+X: Final = "x"
+Y: Final = "y"
+N = NamedTuple("N", [(X, int), (Y, int)])
+
+reveal_type(N(x=3, y=4).x)  # revealed: int
+reveal_type(N(x=3, y=4).y)  # revealed: int
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+N(x="", y="")
+```
+
 ### Functional syntax with variadic tuple fields
 
 When fields are passed as a variadic tuple (e.g., `tuple[..., *tuple[T, ...]]`), we cannot determine

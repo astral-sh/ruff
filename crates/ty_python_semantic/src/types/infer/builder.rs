@@ -22,7 +22,7 @@ use ty_module_resolver::{
     resolve_module, search_paths,
 };
 
-use super::CallAnchor;
+use super::DeferredAnchor;
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
     InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
@@ -1654,12 +1654,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_region_deferred(&mut self, anchor: CallAnchor<'db>) {
+    fn infer_region_deferred(&mut self, anchor: DeferredAnchor<'db>) {
         match anchor {
-            CallAnchor::Definition(definition) => {
+            DeferredAnchor::Definition(definition) => {
                 self.infer_region_deferred_definition(definition);
             }
-            CallAnchor::ScopeOffset { scope, offset } => {
+            DeferredAnchor::ScopeOffset { scope, offset } => {
                 self.infer_region_deferred_scope_offset(scope, offset);
             }
         }
@@ -6455,7 +6455,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // - For assigned `type()` calls, the Definition uniquely identifies the class.
         // - For dangling calls, compute a relative offset from the scope's node index.
         let anchor = if let Some(def) = definition {
-            CallAnchor::Definition(def)
+            DeferredAnchor::Definition(def)
         } else {
             let call_node_index = call_expr.node_index().load();
             let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
@@ -6465,7 +6465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let call_u32 = call_node_index
                 .as_u32()
                 .expect("call node should not be NodeIndex::NONE");
-            CallAnchor::ScopeOffset {
+            DeferredAnchor::ScopeOffset {
                 scope,
                 offset: call_u32 - anchor_u32,
             }
@@ -7019,7 +7019,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // - For assigned namedtuple calls, the Definition uniquely identifies the namedtuple.
         // - For dangling calls, compute a relative offset from the scope's node index.
         let anchor = if let Some(def) = definition {
-            CallAnchor::Definition(def)
+            DeferredAnchor::Definition(def)
         } else {
             let call_node_index = call_expr.node_index.load();
             let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
@@ -7029,7 +7029,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let call_u32 = call_node_index
                 .as_u32()
                 .expect("call node should not be NodeIndex::NONE");
-            CallAnchor::ScopeOffset {
+            DeferredAnchor::ScopeOffset {
                 scope,
                 offset: call_u32 - anchor_u32,
             }
@@ -7063,7 +7063,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let tuple_spec = fields_type.tuple_instance_spec(db)?;
         let fixed_tuple = tuple_spec.as_fixed_length()?;
 
-        // Extract field names and validate types from the inferred type.
+        // Check if we have AST literals for better error locations.
+        let has_ast_literals = matches!(fields_arg, ast::Expr::List(_) | ast::Expr::Tuple(_));
+
+        // Extract field names from the inferred type.
         let field_names: Option<Box<[_]>> = fixed_tuple
             .all_elements()
             .iter()
@@ -7075,10 +7078,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return None;
                 };
 
-                // Validate the field type; report diagnostic if invalid.
-                if field_type
-                    .in_type_expression(db, self.scope(), self.typevar_binding_context)
-                    .is_err()
+                // Validate the field type only when fields come from a variable (no AST literals).
+                // When we have AST literals, we validate below with better error locations.
+                if !has_ast_literals
+                    && field_type
+                        .in_type_expression(db, self.scope(), self.typevar_binding_context)
+                        .is_err()
                 {
                     // Report diagnostic at the fields argument (best we can do for variable case).
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
@@ -7094,42 +7099,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
             .collect();
 
-        // Also validate AST elements if we have direct literals (for better error location).
-        if field_names.is_some() {
-            let elements: Option<&[ast::Expr]> = match fields_arg {
-                ast::Expr::List(list) => Some(&list.elts),
-                ast::Expr::Tuple(tuple) => Some(&tuple.elts),
-                _ => None,
+        // Validate AST elements when we have direct literals (for better error locations).
+        if field_names.is_some() && has_ast_literals {
+            let elements: &[ast::Expr] = match fields_arg {
+                ast::Expr::List(list) => &list.elts,
+                ast::Expr::Tuple(tuple) => &tuple.elts,
+                _ => &[],
             };
-            if let Some(elements) = elements {
-                for elt in elements {
-                    // Check that each element is a valid (name, type) pair.
-                    let field_spec_elts: &[ast::Expr] = match elt {
-                        ast::Expr::Tuple(tuple) => &tuple.elts,
-                        ast::Expr::List(list) => &list.elts,
-                        _ => continue,
-                    };
-                    if field_spec_elts.len() == 2 {
-                        // Validate the type expression (will be re-inferred in deferred phase).
-                        let field_type_expr = &field_spec_elts[1];
+            for elt in elements {
+                // Check that each element is a valid (name, type) pair.
+                let field_spec_elts: &[ast::Expr] = match elt {
+                    ast::Expr::Tuple(tuple) => &tuple.elts,
+                    ast::Expr::List(list) => &list.elts,
+                    _ => continue,
+                };
+                if field_spec_elts.len() == 2 {
+                    // Validate the type expression (will be re-inferred in deferred phase).
+                    let field_type_expr = &field_spec_elts[1];
 
-                        // Skip validation for string literals; they're valid string annotations
-                        // that will be parsed as types in the deferred phase.
-                        if !matches!(field_type_expr, ast::Expr::StringLiteral(_)) {
-                            let field_value_ty = self.expression_type(field_type_expr);
-                            if field_value_ty
-                                .in_type_expression(db, self.scope(), self.typevar_binding_context)
-                                .is_err()
+                    // Skip validation for string literals; they're valid string annotations
+                    // that will be parsed as types in the deferred phase.
+                    if !matches!(field_type_expr, ast::Expr::StringLiteral(_)) {
+                        let field_value_ty = self.expression_type(field_type_expr);
+                        if field_value_ty
+                            .in_type_expression(db, self.scope(), self.typevar_binding_context)
+                            .is_err()
+                        {
+                            if let Some(builder) = self
+                                .context
+                                .report_lint(&INVALID_TYPE_FORM, field_type_expr)
                             {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_lint(&INVALID_TYPE_FORM, field_type_expr)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Object of type `{}` is not valid as a `NamedTuple` field type",
-                                        field_value_ty.display(db)
-                                    ));
-                                }
+                                builder.into_diagnostic(format_args!(
+                                    "Object of type `{}` is not valid as a `NamedTuple` field type",
+                                    field_value_ty.display(db)
+                                ));
                             }
                         }
                     }

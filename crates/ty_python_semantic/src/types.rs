@@ -30,7 +30,7 @@ pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
-    CallAnchor, TypeContext, infer_deferred_namedtuple_call_types, infer_deferred_types,
+    DeferredAnchor, TypeContext, infer_deferred_namedtuple_call_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types, infer_scope_types,
     static_expression_truthiness,
 };
