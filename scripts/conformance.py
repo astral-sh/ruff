@@ -44,7 +44,7 @@ from itertools import groupby
 from operator import attrgetter, or_
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, assert_never
 
 # The conformance tests include 4 types of errors:
 # 1. Required errors (E): The type checker must raise an error on this line
@@ -136,6 +136,10 @@ class Diagnostic:
     fingerprint: str | None
     location: Location
     source: Source
+
+    def __post_init__(self, *args, **kwargs) -> None:
+        # Escape pipe characters for GitHub markdown tables
+        self.description = self.description.replace("|", "\\|")
 
     def __str__(self) -> str:
         return (
@@ -271,9 +275,11 @@ def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
                 diagnostics.append(
                     Diagnostic(
                         check_name="conformance",
-                        description=error.group("description")
-                        or error.group("tag")
-                        or "Missing",
+                        description=(
+                            error.group("description")
+                            or error.group("tag")
+                            or "Missing"
+                        ),
                         severity="major",
                         fingerprint=None,
                         location=Location(
@@ -437,7 +443,7 @@ def diff_format(
     *,
     greater_is_better: bool = True,
     neutral: bool = False,
-):
+) -> str:
     if diff == 0:
         return ""
 
@@ -456,6 +462,11 @@ def diff_format(
             return f"{down}{bad}"
         case (False, False):
             return f"{down}{good}"
+        case _:
+            # The ty false positive seems to be due to insufficient type narrowing for tuples;
+            # possibly related to https://github.com/astral-sh/ty/issues/493 and/or
+            # https://github.com/astral-sh/ty/issues/887
+            assert_never((greater_is_better, increased))  # ty: ignore[type-assertion-failure]
 
 
 def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
@@ -537,7 +548,7 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
         | True Positives  | {old.true_positives} | {new.true_positives} | {true_pos_change:+} | {true_pos_diff} |
         | False Positives | {old.false_positives} | {new.false_positives} | {false_pos_change:+} | {false_pos_diff} |
         | False Negatives | {old.false_negatives} | {new.false_negatives} | {false_neg_change:+} | {false_neg_diff} |
-        | Total Diagnostics | {old.total} | {new.total} | {total_change} | {total_diff} |
+        | Total Diagnostics | {old.total} | {new.total} | {total_change:+} | {total_diff} |
         | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:+.2%} | {precision_diff} |
         | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
 
