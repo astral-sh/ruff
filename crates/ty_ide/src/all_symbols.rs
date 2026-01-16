@@ -246,7 +246,7 @@ mod merge {
         db: &'db dyn Db,
         mut symbols: Vec<AllSymbolInfo<'db>>,
     ) -> Vec<AllSymbolInfo<'db>> {
-        symbols.sort_by(|s1, s2| sort_key(db, s1).cmp(&sort_key(db, s2)));
+        symbols.sort_unstable_by(|s1, s2| cmp(db, s1, s2));
 
         let mut group = Group::default();
         let mut merged = Vec::with_capacity(symbols.len());
@@ -301,7 +301,7 @@ mod merge {
         // so re-sort them. If this ends up being a perf problem,
         // the above code should be adapted to avoid changing
         // the order. ---AG
-        merged.sort_by(|s1, s2| sort_key(db, s1).cmp(&sort_key(db, s2)));
+        merged.sort_unstable_by(|s1, s2| cmp(db, s1, s2));
         merged
     }
 
@@ -519,13 +519,32 @@ mod merge {
         }
     }
 
-    fn sort_key<'a>(db: &'a dyn Db, sym: &'a AllSymbolInfo<'_>) -> (&'a str, &'a str, &'a str) {
-        (
-            sym.name_in_file()
-                .unwrap_or_else(|| sym.module().name(db).as_str()),
-            sym.module().name(db).as_str(),
-            sym.file.path(db).as_str(),
-        )
+    fn cmp<'a>(
+        db: &'a dyn Db,
+        sym1: &'a AllSymbolInfo<'_>,
+        sym2: &'a AllSymbolInfo<'_>,
+    ) -> std::cmp::Ordering {
+        let name1 = sym1
+            .name_in_file()
+            .unwrap_or_else(|| sym1.module().name(db).as_str());
+        let name2 = sym2
+            .name_in_file()
+            .unwrap_or_else(|| sym2.module().name(db).as_str());
+        let ord = name1.cmp(name2);
+        if !ord.is_eq() {
+            return ord;
+        }
+
+        let mod1 = sym1.module().name(db).as_str();
+        let mod2 = sym2.module().name(db).as_str();
+        let ord = mod1.cmp(mod2);
+        if !ord.is_eq() {
+            return ord;
+        }
+
+        let path1 = sym1.file.path(db).as_str();
+        let path2 = sym2.file.path(db).as_str();
+        path1.cmp(path2)
     }
 }
 

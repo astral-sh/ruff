@@ -114,7 +114,7 @@ impl<'db> Completions<'db> {
     /// Convert this collection into a simple
     /// sequence of completions.
     fn into_completions(mut self) -> Vec<Completion<'db>> {
-        self.items.sort_by(rank);
+        self.items.sort_unstable_by(rank);
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
         // A user should refine its completion request if the searched symbol doesn't appear in the first 1k results.
@@ -125,7 +125,7 @@ impl<'db> Completions<'db> {
 
     // Convert this collection into a list of "import..." fixes
     fn into_imports(mut self) -> Vec<ImportEdit> {
-        self.items.sort_by(rank);
+        self.items.sort_unstable_by(rank);
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
         self.items
@@ -141,7 +141,7 @@ impl<'db> Completions<'db> {
 
     // Convert this collection into a list of "qualify..." fixes
     fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
-        self.items.sort_by(rank);
+        self.items.sort_unstable_by(rank);
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
         self.items
