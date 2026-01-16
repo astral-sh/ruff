@@ -1208,7 +1208,7 @@ def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
 # revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
 reveal_type(ParentDataclass.__init__)
 
-# revealed: (self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
+# revealed: [T](self: ParentDataclass[T], value: T) -> None
 reveal_type(ChildOfParentDataclass.__init__)
 
 result_int = uses_dataclass(42)
@@ -1685,4 +1685,39 @@ ordered_foo = dataclass(order=True)(Foo)
 reveal_type(ordered_foo)  # revealed: <class 'Foo'>
 reveal_type(ordered_foo())  # revealed: Foo
 reveal_type(ordered_foo() < ordered_foo())  # revealed: bool
+```
+
+## Dynamic class literals
+
+Dynamic classes created with `type()` can be wrapped with `dataclass()` as a function:
+
+```py
+from dataclasses import dataclass
+
+# Basic dynamic class wrapped with dataclass
+DynamicFoo = type("DynamicFoo", (), {})
+DynamicFoo = dataclass(DynamicFoo)
+
+# The class is recognized as a dataclass
+reveal_type(DynamicFoo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+# Can create instances
+instance = DynamicFoo()
+reveal_type(instance)  # revealed: DynamicFoo
+```
+
+Dynamic classes that inherit from a dataclass base also work:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Base:
+    x: int
+
+# Dynamic class inheriting from a dataclass
+DynamicChild = type("DynamicChild", (Base,), {})
+DynamicChild = dataclass(DynamicChild)
+
+reveal_type(DynamicChild.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 ```

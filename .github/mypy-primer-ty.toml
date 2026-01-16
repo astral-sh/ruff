@@ -6,3 +6,4 @@
 possibly-unresolved-reference = "warn"
 possibly-missing-import = "warn"
 division-by-zero = "warn"
+unsupported-dynamic-base = "warn"

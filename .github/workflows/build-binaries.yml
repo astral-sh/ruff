@@ -51,7 +51,7 @@ jobs:
       - name: "Build sdist"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          maturin-version: v1.9.6
+          maturin-version: v1.11.5
           command: sdist
           args: --out dist
       - name: "Test sdist"
@@ -82,9 +82,9 @@ jobs:
       - name: "Build wheels - x86_64"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          maturin-version: v1.9.6
+          maturin-version: v1.11.5
           target: x86_64
-          args: --release --locked --out dist
+          args: --release --locked --out dist --compatibility pypi
       - name: "Upload wheels"
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
@@ -125,9 +125,9 @@ jobs:
       - name: "Build wheels - aarch64"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          maturin-version: v1.9.6
+          maturin-version: v1.11.5
           target: aarch64
-          args: --release --locked --out dist
+          args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel - aarch64"
         run: |
           pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
@@ -182,9 +182,9 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          maturin-version: v1.9.6
+          maturin-version: v1.11.5
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist
+          args: --release --locked --out dist --compatibility pypi
         env:
           # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
@@ -236,10 +236,10 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          maturin-version: v1.9.6
+          maturin-version: v1.11.5
           target: ${{ matrix.target }}
-          manylinux: auto
-          args: --release --locked --out dist
+          manylinux: 2_17
+          args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
@@ -280,25 +280,34 @@ jobs:
         platform:
           - target: aarch64-unknown-linux-gnu
             arch: aarch64
+            manylinux: 2_17
             # see https://github.com/astral-sh/ruff/issues/3791
             # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
+            manylinux: 2_17
           - target: s390x-unknown-linux-gnu
             arch: s390x
+            manylinux: 2_17
           - target: powerpc64le-unknown-linux-gnu
             arch: ppc64le
+            manylinux: 2_17
             # see https://github.com/astral-sh/ruff/issues/10073
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: powerpc64-unknown-linux-gnu
             arch: ppc64
+            manylinux: 2_17
             # see https://github.com/astral-sh/ruff/issues/10073
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: arm-unknown-linux-musleabihf
+            # Use the cross container, but tag as `linux_armv6l`
+            manylinux: auto
             arch: arm
           - target: riscv64gc-unknown-linux-gnu
             arch: riscv64
+            # Minimum manylinux target for riscv64
+            manylinux: 2_31
 
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -313,11 +322,11 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          maturin-version: v1.9.6
+          maturin-version: v1.11.5
           target: ${{ matrix.platform.target }}
-          manylinux: auto
+          manylinux: ${{ matrix.platform.manylinux }}
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist
+          args: --release --locked --out dist --compatibility pypi
       - uses: uraimo/run-on-arch-action@d94c13912ea685de38fccc1109385b83fd79427d # v3.0.1
         if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
@@ -380,10 +389,10 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          maturin-version: v1.9.6
+          maturin-version: v1.11.5
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist
+          args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
@@ -446,10 +455,10 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
-          maturin-version: v1.9.6
+          maturin-version: v1.11.5
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist
+          args: --release --locked --out dist --compatibility pypi
           docker-options: ${{ matrix.platform.maturin_docker_options }}
       - uses: uraimo/run-on-arch-action@d94c13912ea685de38fccc1109385b83fd79427d # v3.0.1
         name: Test wheel
