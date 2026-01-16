@@ -1,0 +1,25 @@
+{
+  "name": "ty-embed",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "prebuild": "npm run build:wasm",
+    "build": "vite build",
+    "build:wasm": "wasm-pack build ../../crates/ty_wasm --target web --out-dir ../../playground/ty-embed/ty_wasm",
+    "dev:wasm": "wasm-pack build ../../crates/ty_wasm --dev --target web --out-dir ../../playground/ty-embed/ty_wasm",
+    "predev:build": "npm run dev:wasm",
+    "dev:build": "vite build",
+    "prestart": "npm run dev:wasm",
+    "start": "vite"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.54.0",
+    "ty_wasm": "file:ty_wasm"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vite": "^7.0.0",
+    "vite-plugin-static-copy": "^2.2.0"
+  }
+}
