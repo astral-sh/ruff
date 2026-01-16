@@ -1061,7 +1061,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "065") => rules::ruff::rules::LoggingEagerConversion,
         (Ruff, "066") => rules::ruff::rules::PropertyWithoutReturn,
         (Ruff, "067") => rules::ruff::rules::NonEmptyInitModule,
-        (Ruff, "069") => rules::ruff::rules::DuplicateEntryInDunderAll,
+        (Ruff, "068") => rules::ruff::rules::DuplicateEntryInDunderAll,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,

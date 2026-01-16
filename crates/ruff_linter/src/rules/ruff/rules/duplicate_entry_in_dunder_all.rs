@@ -64,7 +64,7 @@ impl Violation for DuplicateEntryInDunderAll {
     }
 }
 
-/// Apply RUF069 to `StmtAssign` AST node. For example: `__all__ = ["a", "b", "a"]`.
+/// Apply RUF068 to `StmtAssign` AST node. For example: `__all__ = ["a", "b", "a"]`.
 pub(crate) fn duplicate_entry_in_dunder_all_assign(
     checker: &Checker,
     ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
@@ -74,7 +74,7 @@ pub(crate) fn duplicate_entry_in_dunder_all_assign(
     }
 }
 
-/// Apply RUF069 to `StmtAugAssign` AST node. For example: `__all__ += ["a", "b", "a"]`.
+/// Apply RUF068 to `StmtAugAssign` AST node. For example: `__all__ += ["a", "b", "a"]`.
 pub(crate) fn duplicate_entry_in_dunder_all_aug_assign(
     checker: &Checker,
     node: &ast::StmtAugAssign,
@@ -84,7 +84,7 @@ pub(crate) fn duplicate_entry_in_dunder_all_aug_assign(
     }
 }
 
-/// Apply RUF069 to `__all__.extend()`.
+/// Apply RUF068 to `__all__.extend()`.
 pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     checker: &Checker,
     ast::ExprCall {
@@ -104,7 +104,7 @@ pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     }
 }
 
-/// Apply RUF069 to a `StmtAnnAssign` AST node.
+/// Apply RUF068 to a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["a", "b", "a"]`.
 pub(crate) fn duplicate_entry_in_dunder_all_ann_assign(
     checker: &Checker,
@@ -115,7 +115,7 @@ pub(crate) fn duplicate_entry_in_dunder_all_ann_assign(
     }
 }
 
-/// RUF069
+/// RUF068
 /// This routine checks whether `__all__` contains duplicated entries, and emits
 /// a violation if it does.
 fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &ast::Expr) {

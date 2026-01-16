@@ -117,7 +117,7 @@ mod tests {
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_0.py"))]
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
     #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
-    #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF069.py"))]
+    #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
