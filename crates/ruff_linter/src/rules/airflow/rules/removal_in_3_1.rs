@@ -56,7 +56,8 @@ impl Violation for Airflow31Removal {
             | Replacement::SourceModuleMoved { module: _, name: _ }
             | Replacement::SourceModuleMovedToSDK {
                 module: _, name: _, ..
-            } => {
+            }
+            | Replacement::InternalModule { module: _, name: _ } => {
                 format!("`{deprecated}` is removed in Airflow 3.1")
             }
         }
@@ -80,6 +81,10 @@ impl Violation for Airflow31Removal {
                 version,
             } => Some(format!(
                 "`{name}` has been moved to `{module}` since Airflow 3.1 (with apache-airflow-task-sdk>={version})."
+            )),
+            Replacement::InternalModule { module, name } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.1. \
+                This is an internal module which is not supposed to be used and is subject to change without notice."
             )),
         }
     }
@@ -130,15 +135,11 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "utils",
             "setup_teardown",
-            "BaseSetupTeardownContext",
-        ] => Replacement::Message(
-            "`BaseSetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` \
-            since Airflow 3.1. This is an internal module and is subject to change without notice.",
-        ),
-        ["airflow", "utils", "setup_teardown", "SetupTeardownContext"] => Replacement::Message(
-            "`SetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` \
-            since Airflow 3.1. This is an internal module and is subject to change without notice.",
-        ),
+            rest @ ("BaseSetupTeardownContext" | "SetupTeardownContext"),
+        ] => Replacement::InternalModule {
+            module: "airflow.sdk.definitions._internal.setup_teardown",
+            name: rest.to_string(),
+        },
         // airflow.secrets
         ["airflow", "secrets", "cache", "SecretCache"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
@@ -146,7 +147,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             version: "1.1.6",
         },
         // airflow.utils.xcom
-        ["airflow", "utils", "xcom", "XCOM_RETURN_KEY"] => Replacement::SourceModuleMoved {
+        ["airflow", "utils", "xcom", "XCOM_RETURN_KEY"] => Replacement::InternalModule {
             module: "airflow.models.xcom",
             name: "XCOM_RETURN_KEY".to_string(),
         },
@@ -169,37 +170,25 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             version: "1.1.6",
         },
         // airflow.utils.decorators
-        ["airflow", "utils", "decorators", "remove_task_decorator"] => Replacement::Message(
-            "`remove_task_decorator` has been moved to `airflow.sdk.definitions._internal.decorators` \
-            since Airflow 3.1. This is an internal module and is subject to change without notice.",
-        ),
         [
             "airflow",
             "utils",
             "decorators",
-            "fixup_decorator_warning_stack",
-        ] => Replacement::Message(
-            "`fixup_decorator_warning_stack` has been moved to `airflow.sdk.definitions._internal.decorators` \
-            since Airflow 3.1. This is an internal module and is subject to change without notice.",
-        ),
+            rest @ ("remove_task_decorator" | "fixup_decorator_warning_stack"),
+        ] => Replacement::InternalModule {
+            module: "airflow.sdk.definitions._internal.decorators",
+            name: rest.to_string(),
+        },
         // airflow.models.abstractoperator
-        ["airflow", "models", "abstractoperator", "AbstractOperator"] => Replacement::Message(
-            "`AbstractOperator` has been moved to `airflow.sdk.definitions._internal.abstractoperator` \
-            since Airflow 3.1. This is an internal module and is subject to change without notice.",
-        ),
-        ["airflow", "models", "abstractoperator", "NotMapped"] => Replacement::Message(
-            "`NotMapped` has been moved to `airflow.sdk.definitions._internal.abstractoperator` \
-            since Airflow 3.1. This is an internal module and is subject to change without notice.",
-        ),
         [
             "airflow",
             "models",
             "abstractoperator",
-            "TaskStateChangeCallback",
-        ] => Replacement::Message(
-            "`TaskStateChangeCallback` has been moved to `airflow.sdk.definitions._internal.abstractoperator` \
-            since Airflow 3.1. This is an internal module and is subject to change without notice.",
-        ),
+            rest @ ("AbstractOperator" | "NotMapped" | "TaskStateChangeCallback"),
+        ] => Replacement::InternalModule {
+            module: "airflow.sdk.definitions._internal.abstractoperator",
+            name: rest.to_string(),
+        },
         // airflow.models.baseoperator
         ["airflow", "models", "baseoperator", "BaseOperator"] => {
             Replacement::SourceModuleMovedToSDK {
