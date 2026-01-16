@@ -38,7 +38,7 @@ use crate::{Applicability, Edit};
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.176")]
+#[violation_metadata(stable_since = "v0.0.176", safety = "unsafe")]
 pub(crate) struct InDictKeys {
     operator: String,
 }

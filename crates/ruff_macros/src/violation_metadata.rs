@@ -5,12 +5,13 @@ use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
 
-    let Some(group) = get_rule_status(&input.attrs)? else {
+    let (Some(group), applicability) = get_rule_status(&input.attrs)? else {
         return Err(Error::new_spanned(
             input,
             "Missing required rule group metadata",
         ));
     };
+    let applicability = applicability.unwrap_or(quote!(Applicability::Safe));
 
     let name = input.ident;
 
@@ -38,6 +39,10 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
 
             fn line() -> u32 {
                 line!()
+            }
+
+            fn applicability() -> crate::Applicability {
+                crate::#applicability
             }
         }
     })
@@ -73,11 +78,13 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 ///
 /// The result is returned as a `TokenStream` so that the version string literal can be combined
 /// with the proper `RuleGroup` variant, e.g. `RuleGroup::Stable` for `stable_since` above.
-fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
+fn get_rule_status(attrs: &[Attribute]) -> syn::Result<(Option<TokenStream>, Option<TokenStream>)> {
     let mut group = None;
+    let mut applicability = None;
     for attr in attrs {
         if attr.path().is_ident("violation_metadata") {
             attr.parse_nested_meta(|meta| {
+                // Rule group options
                 if meta.path.is_ident("stable_since") {
                     let lit: LitStr = meta.value()?.parse()?;
                     group = Some(quote!(RuleGroup::Stable { since: #lit }));
@@ -95,6 +102,16 @@ fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
                     group = Some(quote!(RuleGroup::Removed { since: #lit }));
                     return Ok(());
                 }
+                // Applicability options
+                else if meta.path.is_ident("safety") {
+                    match meta.value()?.parse::<LitStr>()?.value().as_str() {
+                        "safe" => applicability = Some(quote!(Applicability::Safe)),
+                        "unsafe" => applicability = Some(quote!(Applicability::Unsafe)),
+                        "display-only" => applicability = Some(quote!(Applicability::DisplayOnly)),
+                        _ => return Err(Error::new_spanned(attr, "unknown safety variant")),
+                    }
+                    return Ok(());
+                }
                 Err(Error::new_spanned(
                     attr,
                     "unimplemented violation metadata option",
@@ -102,7 +119,7 @@ fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
             })?;
         }
     }
-    Ok(group)
+    Ok((group, applicability))
 }
 
 fn parse_attr<'a, const LEN: usize>(

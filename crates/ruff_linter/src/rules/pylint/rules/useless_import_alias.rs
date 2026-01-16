@@ -41,7 +41,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - `lint.isort.required-imports`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.156")]
+#[violation_metadata(stable_since = "v0.0.156", safety = "unsafe")]
 pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
 }

@@ -44,7 +44,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ## References
 /// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", safety = "unsafe")]
 pub(crate) struct UnnecessaryFutureImport {
     pub names: Vec<String>,
 }

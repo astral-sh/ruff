@@ -45,7 +45,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [logging documentation]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", safety = "unsafe")]
 pub(crate) struct InvalidGetLoggerArgument;
 
 impl Violation for InvalidGetLoggerArgument {
