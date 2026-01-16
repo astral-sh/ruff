@@ -2,6 +2,28 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:15:15
+   |
+13 | __all__: typing.Any = ("A", "B")
+14 | __all__ = ["A", "B"]
+15 | __all__ = [A, "B", "B"]
+   |               ---  ^^^ `B` duplicated here
+   |               |
+   |               previous occurrence of `B` here
+16 | __all__ += ["A", "B"]
+17 | __all__.extend(["A", "B"])
+   |
+help: Remove duplicate entries from `__all__`
+12 | __all__: list[str] = ["A", "B"]
+13 | __all__: typing.Any = ("A", "B")
+14 | __all__ = ["A", "B"]
+   - __all__ = [A, "B", "B"]
+15 + __all__ = [A, "B"]
+16 | __all__ += ["A", "B"]
+17 | __all__.extend(["A", "B"])
+18 | 
+
+RUF068 [*] `__all__` contains duplicate entries
   --> RUF068.py:20:23
    |
 19 | # Bad
