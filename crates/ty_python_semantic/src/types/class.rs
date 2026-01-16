@@ -2289,11 +2289,6 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         ])
     }
 
-    /// Returns an iterator over the MRO.
-    pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
-        MroIterator::new(db, ClassLiteral::DynamicTypedDict(self), None)
-    }
-
     /// Get the metaclass of this `TypedDict`.
     ///
     /// `TypedDict`s use `type` as their metaclass.
@@ -2614,23 +2609,20 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        // First check synthesized members.
+        // First check synthesized members (like __getitem__, __init__, get, etc.).
         let member = self.own_class_member(db, name);
         if !member.is_undefined() {
             return member.inner;
         }
 
-        // Fall back to dict class members via MRO lookup.
-        let result =
-            MroLookup::new(db, self.iter_mro(db).skip(1)).class_member(name, policy, None, false);
-
-        match result {
-            ClassMemberResult::Done(completed) => completed.finalize(db),
-            ClassMemberResult::TypedDict => {
-                // This shouldn't happen since dict doesn't inherit from TypedDict.
-                PlaceAndQualifiers::unbound()
-            }
-        }
+        // Fall back to TypedDictFallback for methods like __contains__, items, keys, etc.
+        // This mirrors the behavior of StaticClassLiteral::typed_dict_member.
+        KnownClass::TypedDictFallback
+            .to_class_literal(db)
+            .find_name_in_mro_with_policy(db, name, policy)
+            .expect(
+                "`find_name_in_mro_with_policy` will return `Some()` when called on class literal",
+            )
     }
 
     /// Look up an instance member by name (including superclasses).
