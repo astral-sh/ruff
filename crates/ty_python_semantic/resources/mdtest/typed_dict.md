@@ -1822,6 +1822,33 @@ movie: MovieWithDirector = {"title": "The Matrix"}
 reveal_type(movie)  # revealed: MovieWithDirector
 ```
 
+String annotations can also wrap the entire `Required` or `NotRequired` qualifier:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# NotRequired as a string annotation
+TD = TypedDict("TD", {"required": str, "optional": "NotRequired[int]"})
+
+# 'required' is required, 'optional' is not required
+td1: TD = {"required": "hello"}  # Valid - optional is not required
+td2: TD = {"required": "hello", "optional": 42}  # Valid - all keys provided
+reveal_type(td1)  # revealed: TD
+reveal_type(td1["required"])  # revealed: str
+reveal_type(td1["optional"])  # revealed: int
+
+# error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD` constructor"
+bad_td: TD = {"optional": 42}
+
+# Also works with Required in total=False TypedDicts
+TD2 = TypedDict("TD2", {"required": "Required[str]", "optional": int}, total=False)
+
+# 'required' is required, 'optional' is not required
+td3: TD2 = {"required": "hello"}  # Valid
+# error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD2` constructor"
+bad_td2: TD2 = {"optional": 42}
+```
+
 ## Deprecated keyword-argument syntax
 
 The deprecated keyword-argument syntax (fields as keyword arguments instead of a dict) is supported

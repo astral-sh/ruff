@@ -54,7 +54,7 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Truthiness, Type, TypeAndQualifiers,
-    declaration_type,
+    TypeQualifiers, declaration_type,
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
@@ -615,6 +615,10 @@ pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
+    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Only populated for expressions that have non-empty qualifiers.
+    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
+
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
     scope: ScopeId<'db>,
@@ -660,6 +664,7 @@ impl<'db> DefinitionInference<'db> {
 
         Self {
             expressions: FxHashMap::default(),
+            qualifiers: FxHashMap::default(),
             bindings: Box::default(),
             declarations: Box::default(),
             #[cfg(debug_assertions)]
@@ -723,6 +728,14 @@ impl<'db> DefinitionInference<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    /// Get qualifiers for an annotation expression, if any.
+    pub(crate) fn try_qualifiers(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<TypeQualifiers> {
+        self.qualifiers.get(&expression.into()).copied()
     }
 
     #[track_caller]

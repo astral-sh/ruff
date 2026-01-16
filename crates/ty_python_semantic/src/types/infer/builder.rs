@@ -242,6 +242,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
+    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Only populated for expressions that have non-empty qualifiers.
+    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
+
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
@@ -356,6 +360,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             multi_inference_state: MultiInferenceState::Panic,
             inner_expression_inference_state: InnerExpressionInferenceState::Infer,
             expressions: FxHashMap::default(),
+            qualifiers: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
@@ -391,6 +396,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.expressions.extend(inference.expressions.iter());
+        self.qualifiers
+            .extend(inference.qualifiers.iter());
         self.declarations
             .extend(inference.declarations(), self.multi_inference_state);
 
@@ -507,6 +514,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .get(&expr.into())
             .copied()
             .or(self.fallback_type())
+    }
+
+    /// Store qualifiers for an annotation expression.
+    fn store_qualifiers(&mut self, expr: &ast::Expr, qualifiers: TypeQualifiers) {
+        if !qualifiers.is_empty() {
+            self.qualifiers.insert(expr.into(), qualifiers);
+        }
     }
 
     /// Get the type of an expression from any scope in the same file.
@@ -7752,7 +7766,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer keyword arguments. Track `total` and collect deprecated-syntax field definitions.
         let mut total = true;
         let deprecated_syntax = fields_arg.is_none();
-        let mut deprecated_fields: Vec<(Name, Option<bool>)> = Vec::new();
+        let mut deprecated_fields: Vec<Name> = Vec::new();
 
         for kw in keywords {
             let Some(arg) = &kw.arg else {
@@ -7807,10 +7821,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 field_name => {
                     // For deprecated keyword-argument syntax, treat unknown kwargs as field definitions.
                     if deprecated_syntax {
-                        // Extract explicit requiredness from AST without type inference.
-                        let explicit_required =
-                            self.extract_explicit_requiredness_from_ast(&kw.value);
-                        deprecated_fields.push((Name::new(field_name), explicit_required));
+                        // Just collect field names. Types and requiredness are computed lazily
+                        // in deferred inference via `dynamic_typeddict_items`.
+                        deprecated_fields.push(Name::new(field_name));
                     } else {
                         // Normal syntax - report unknown argument.
                         self.infer_expression(&kw.value, TypeContext::default());
@@ -7880,28 +7893,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
     }
 
-    /// Extract raw field information from a `TypedDict` fields dict argument.
+    /// Extract field names from a `TypedDict` fields dict argument.
     ///
-    /// Returns field names and explicit requiredness WITHOUT evaluating field types.
-    /// Field types are computed lazily in `dynamic_typeddict_items` to support recursive
+    /// Returns field names WITHOUT evaluating field types or requiredness.
+    /// Field types and requiredness (Required/NotRequired qualifiers) are computed lazily
+    /// in `dynamic_typeddict_items` using deferred inference to support recursive
     /// `TypedDict`s where field types may reference the `TypedDict` being defined.
     ///
-    /// Returns `(raw_fields, has_known_fields)` where `raw_fields` contains (name, `explicit_required`).
-    #[allow(clippy::type_complexity)]
+    /// Returns `(raw_fields, has_known_fields)` where `raw_fields` contains field names.
     fn extract_raw_typeddict_fields(
         &mut self,
         fields_arg: &ast::Expr,
         fields_type: Option<Type<'db>>,
-    ) -> (Box<[(Name, Option<bool>)]>, bool) {
+    ) -> (Box<[Name]>, bool) {
         let db = self.db();
 
         // First try to extract from AST if it's a dict literal.
         if let ast::Expr::Dict(dict_expr) = fields_arg {
-            let mut fields: Vec<(Name, Option<bool>)> = Vec::with_capacity(dict_expr.items.len());
+            let mut fields: Vec<Name> = Vec::with_capacity(dict_expr.items.len());
             let mut all_valid = true;
 
             for item in &dict_expr.items {
-                let ast::DictItem { key, value } = item;
+                let ast::DictItem { key, value: _ } = item;
 
                 // Key must be a string literal for the field name.
                 let Some(key) = key else {
@@ -7918,11 +7931,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue; // Key must be a string literal
                 };
 
-                // Extract explicit requiredness from AST without type inference.
-                // This is crucial for supporting recursive TypedDicts.
-                let explicit_required = self.extract_explicit_requiredness_from_ast(value);
-
-                fields.push((name, explicit_required));
+                fields.push(name);
             }
 
             if all_valid {
@@ -7946,37 +7955,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Return empty fields with unknown flag.
         (Box::default(), false)
-    }
-
-    /// Extract explicit requiredness from AST without type inference.
-    ///
-    /// This function checks if the expression is wrapped in `Required[...]` or `NotRequired[...]`
-    /// by examining the AST structure. It does NOT perform type inference, which is crucial for
-    /// supporting recursive `TypedDict`s where field types may reference the `TypedDict` being defined.
-    ///
-    /// Returns:
-    /// - `Some(true)` if explicitly wrapped in `Required[...]`
-    /// - `Some(false)` if explicitly wrapped in `NotRequired[...]`
-    /// - `None` if no explicit wrapper (should use `total` default)
-    #[allow(clippy::unused_self)]
-    fn extract_explicit_requiredness_from_ast(&self, expr: &ast::Expr) -> Option<bool> {
-        // Check if this is a subscript expression like Required[...] or NotRequired[...]
-        let ast::Expr::Subscript(subscript) = expr else {
-            return None;
-        };
-
-        // Check if the value is a name expression (Required or NotRequired)
-        let ast::Expr::Name(name) = &*subscript.value else {
-            // Could be an attribute like typing.Required, but we'll simplify for now
-            // and just check simple names
-            return None;
-        };
-
-        match name.id.as_str() {
-            "Required" => Some(true),
-            "NotRequired" => Some(false),
-            _ => None,
-        }
     }
 
     /// Extract fields from a `make_dataclass` fields argument.
@@ -15815,6 +15793,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             mut expressions,
+            qualifiers: _,
             string_annotations,
             scope,
             bindings,
@@ -15885,6 +15864,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             mut expressions,
+            mut qualifiers,
             string_annotations,
             scope,
             bindings,
@@ -15940,9 +15920,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         expressions.shrink_to_fit();
+        qualifiers.shrink_to_fit();
 
         DefinitionInference {
             expressions,
+            qualifiers,
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -15965,6 +15947,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
+            qualifiers: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,

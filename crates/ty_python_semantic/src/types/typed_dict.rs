@@ -17,7 +17,7 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::infer::infer_deferred_types;
-use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
+use super::{ApplyTypeMappingVisitor, Type, TypeMapping, TypeQualifiers, visitor};
 use crate::Db;
 use crate::semantic_index::definition::Definition;
 use crate::types::TypeDefinition;
@@ -127,16 +127,16 @@ impl<'db> TypedDictType<'db> {
             // Get the definition (if any) to access deferred type inference.
             let Some(definition) = class.definition(db) else {
                 // For dangling TypedDict calls without a definition, we can't do deferred inference.
-                // Return types as Unknown.
+                // Return types as Unknown with default requiredness.
                 return class
                     .raw_fields(db)
                     .iter()
-                    .map(|(name, explicit_required)| {
-                        let is_required = explicit_required.unwrap_or(class.total(db));
+                    .cloned()
+                    .map(|name| {
                         let field = TypedDictFieldBuilder::new(Type::unknown())
-                            .required(is_required)
+                            .required(class.total(db))
                             .build();
-                        (name.clone(), field)
+                        (name, field)
                     })
                     .collect();
             };
@@ -184,29 +184,45 @@ impl<'db> TypedDictType<'db> {
                 }
             }
 
-            // Build the schema by looking up inferred types for each field.
+            // Build the schema by looking up inferred types and qualifiers for each field.
             class
                 .raw_fields(db)
                 .iter()
-                .map(|(name, explicit_required)| {
-                    let is_required = explicit_required.unwrap_or(class.total(db));
-
+                .cloned()
+                .map(|name| {
                     // Look up the value expression for this field.
-                    let field_ty = if let Some(value_expr) = field_value_exprs.get(name.as_str()) {
-                        // Get the inferred type from deferred inference.
-                        // The type was inferred as an annotation expression in
-                        // `infer_functional_typeddict_deferred`.
-                        deferred_inference
-                            .try_expression_type(*value_expr)
-                            .unwrap_or(Type::unknown())
-                    } else {
-                        Type::unknown()
-                    };
+                    let (field_ty, is_required) =
+                        if let Some(value_expr) = field_value_exprs.get(name.as_str()) {
+                            // Get the inferred type from deferred inference.
+                            // The type was inferred as an annotation expression in
+                            // `infer_functional_typeddict_deferred`.
+                            let ty = deferred_inference
+                                .try_expression_type(*value_expr)
+                                .unwrap_or(Type::unknown());
+
+                            // Get the qualifiers (Required/NotRequired) from deferred inference.
+                            let qualifiers = deferred_inference
+                                .try_qualifiers(*value_expr)
+                                .unwrap_or(TypeQualifiers::empty());
+
+                            // Determine requiredness from qualifiers or use class default.
+                            let required = if qualifiers.contains(TypeQualifiers::REQUIRED) {
+                                true
+                            } else if qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+                                false
+                            } else {
+                                class.total(db)
+                            };
+
+                            (ty, required)
+                        } else {
+                            (Type::unknown(), class.total(db))
+                        };
 
                     let field = TypedDictFieldBuilder::new(field_ty)
                         .required(is_required)
                         .build();
-                    (name.clone(), field)
+                    (name, field)
                 })
                 .collect()
         }

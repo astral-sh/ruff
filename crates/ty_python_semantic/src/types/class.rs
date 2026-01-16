@@ -6136,17 +6136,13 @@ pub struct DynamicTypedDictLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    /// The raw field information: field names and explicit requiredness.
+    /// The field names for this TypedDict.
     ///
-    /// The `Option<bool>` indicates explicit requiredness from `Required`/`NotRequired` wrappers:
-    /// - `Some(true)` = explicitly `Required[...]`
-    /// - `Some(false)` = explicitly `NotRequired[...]`
-    /// - `None` = no explicit wrapper, use `total` default
-    ///
-    /// Field types are computed lazily in `dynamic_typeddict_items` to support recursive
-    /// TypedDicts where field types may reference the TypedDict being defined.
+    /// Field types and requiredness (Required/NotRequired qualifiers) are computed lazily
+    /// in `dynamic_typeddict_items` by re-reading the AST and using deferred inference.
+    /// This supports recursive TypedDicts where field types may reference the TypedDict being defined.
     #[returns(ref)]
-    pub raw_fields: Box<[(Name, Option<bool>)]>,
+    pub raw_fields: Box<[Name]>,
 
     /// The default requiredness for fields without explicit `Required`/`NotRequired` wrapper.
     /// This comes from the `total` keyword argument (default `True`).
