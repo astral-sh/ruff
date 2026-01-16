@@ -1951,18 +1951,18 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
-        if field_policy == CodeGeneratorKind::NamedTuple {
-            // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
-            // fields of this class only.
-            return self.own_fields(db, specialization, field_policy);
-        }
-
         // A field source can be either a static class or a dynamic TypedDict.
         // Dynamic TypedDicts don't have a class body but still have fields defined
         // in their schema.
         enum FieldSource<'db> {
             Static(StaticClassLiteral<'db>, Option<Specialization<'db>>),
             DynamicTypedDict(DynamicTypedDictLiteral<'db>),
+        }
+
+        if field_policy == CodeGeneratorKind::NamedTuple {
+            // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
+            // fields of this class only.
+            return self.own_fields(db, specialization, field_policy);
         }
 
         let matching_classes_in_mro: Vec<FieldSource<'db>> = self

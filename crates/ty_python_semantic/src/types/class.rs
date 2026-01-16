@@ -969,6 +969,11 @@ impl<'db> ClassType<'db> {
         self.is_known(db, KnownClass::Object)
     }
 
+    /// Return `true` if this class is a `TypedDict`.
+    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).is_typed_dict(db)
+    }
+
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -2330,9 +2335,30 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
         match name {
             "__init__" => {
-                // __init__(self, **kwargs) -> None
-                // Each field becomes a keyword argument.
-                let mut parameters = vec![
+                // TypedDict constructors accept two forms:
+                // 1. __init__(self, mapping: dict[str, object], /) -> None
+                // 2. __init__(self, *, field1: T1, field2: T2, ...) -> None
+
+                // Overload 1: Accept a dict literal as positional argument
+                let dict_type = KnownClass::Dict.to_specialized_instance(
+                    db,
+                    &[KnownClass::Str.to_instance(db), Type::object()],
+                );
+                let dict_signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("__m")))
+                                .with_annotated_type(dict_type),
+                        ],
+                    ),
+                    Type::none(db),
+                );
+
+                // Overload 2: Accept keyword arguments for each field
+                let mut kw_parameters = vec![
                     Parameter::positional_or_keyword(Name::new_static("self"))
                         .with_annotated_type(instance_ty),
                 ];
@@ -2344,11 +2370,17 @@ impl<'db> DynamicTypedDictLiteral<'db> {
                         // Optional fields have a default (conceptually the key being absent).
                         param = param.with_default_type(field.declared_ty);
                     }
-                    parameters.push(param);
+                    kw_parameters.push(param);
                 }
 
-                let signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
-                Member::definitely_declared(Type::function_like_callable(db, signature))
+                let kw_signature =
+                    Signature::new(Parameters::new(db, kw_parameters), Type::none(db));
+
+                Member::definitely_declared(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads([dict_signature, kw_signature]),
+                    CallableTypeKind::FunctionLike,
+                )))
             }
             "__required_keys__" => {
                 // frozenset of required key names
