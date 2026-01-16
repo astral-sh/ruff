@@ -1164,6 +1164,24 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Combine an iterator of nodes into a single node using an associative operator.
+    ///
+    /// Because the operator is associative, we don't have to combine the nodes left to right; we
+    /// can instead combine them in a "tree-like" way:
+    ///
+    /// ```text
+    /// linear:  (((((a ∨ b) ∨ c) ∨ d) ∨ e) ∨ f) ∨ g
+    /// tree:    ((a ∨ b) ∨ (c ∨ d)) ∨ ((e ∨ f) ∨ g)
+    /// ```
+    ///
+    /// We have to invoke the operator the same number of times. But BDD operators are often much
+    /// cheaper when the operands are small, and with the tree shape, many more of the invocations
+    /// are performed on small BDDs.
+    ///
+    /// You must also provide the "zero" and "one" units of the operator. The "zero" is the value
+    /// that has no effect (`0 ∨ a = a`). It is returned if the iterator is empty. The "one" is the
+    /// value that saturates (`1 ∨ a = 1`). We use this to short-circuit; if any element BDD or any
+    /// intermediate result evaluates to "one", we can return early.
     fn tree_fold(
         db: &'db dyn Db,
         nodes: impl Iterator<Item = Self>,
@@ -1171,13 +1189,37 @@ impl<'db> Node<'db> {
         one: Self,
         mut combine: impl FnMut(Self, &'db dyn Db, Self) -> Self,
     ) -> Self {
+        // To implement the "linear" shape described above, we could collect the iterator elements
+        // into a vector, and then use the fold at the bottom of this method to combine the
+        // elements using the operator.
+        //
+        // To implement the "tree" shape, we also maintain a "depth" for each element of the
+        // vector, which indicates how many times the operator has been applied to the element.
+        // As we collect elements into the vector, we keep it capped at a length `O(log n)` of the
+        // number of elements seen so far. To do that, whenever the last two elements of the vector
+        // have the same depth, we apply the operator once to combine those two elements, adding
+        // the result back to the vector with an incremented depth. (That might let us combine the
+        // result with the _next_ intermediate result in the vector, and so on.)
+        //
+        // Walking through the example above, our vector ends up looking like:
+        //
+        //                                   a/0
+        //                        a/0 b/0 => a∨b/1
+        //                                   a∨b/1 c/0
+        //   a∨b/1 c/0 d/0 => a∨b/1 c∨d/1 => a∨b∨c∨d/2
+        //                                   a∨b∨c∨d/2 e/0
+        //              a∨b∨c∨d/2 e/0 f/0 => a∨b∨c∨d/2 e∨f/1
+        //                                   a∨b∨c∨d/2 e∨f/1 g/0
+        //
+        // We use a SmallVec for the accumulator so that we don't have to spill over to the heap
+        // until the iterator passes 256 elements.
         let mut accumulator: SmallVec<[(Node<'db>, u8); 8]> = SmallVec::default();
         for node in nodes {
             if node == one {
                 return one;
             }
 
-            let (mut node, mut depth) = (node, 1);
+            let (mut node, mut depth) = (node, 0);
             while accumulator
                 .last()
                 .is_some_and(|(_, existing)| *existing == depth)
@@ -1192,6 +1234,9 @@ impl<'db> Node<'db> {
             accumulator.push((node, depth));
         }
 
+        // At this point, we've consumed all of the iterator. The length of the accumulator will be
+        // the same as the number of 1 bits in the length of the iterator. We do a final fold to
+        // produce the overall result.
         accumulator
             .into_iter()
             .fold(zero, |result, (node, _)| combine(result, db, node))
