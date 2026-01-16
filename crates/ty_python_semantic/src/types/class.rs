@@ -3174,12 +3174,13 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        let has_dataclass_param = |param| {
-            dataclass_params.is_some_and(|params| params.flags(db).contains(param))
-                // TODO if we were correctly initializing `dataclass_params` from the
-                // transformer params, this fallback shouldn't be needed here.
-                || transformer_params.is_some_and(|params| params.flags(db).contains(param))
-        };
+        // Compute combined flags from both dataclass_params and transformer_params.
+        // TODO: if we were correctly initializing `dataclass_params` from the
+        // transformer params, this union shouldn't be needed here.
+        let combined_flags = dataclass_params.map_or(DataclassFlags::empty(), |p| p.flags(db))
+            | transformer_params.map_or(DataclassFlags::empty(), |p| p.flags(db));
+
+        let has_dataclass_param = |param| combined_flags.contains(param);
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -3353,72 +3354,35 @@ impl<'db> StaticClassLiteral<'db> {
                     specialization.map(|s| s.generic_context(db)),
                 )
             }
-            (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
-                if !has_dataclass_param(DataclassFlags::ORDER) {
-                    return None;
-                }
-
-                let signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_or_keyword(Name::new_static("self"))
-                                // TODO: could be `Self`.
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_or_keyword(Name::new_static("other"))
-                                // TODO: could be `Self`.
-                                .with_annotated_type(instance_ty),
-                        ],
-                    ),
-                    KnownClass::Bool.to_instance(db),
-                );
-
-                Some(Type::function_like_callable(db, signature))
-            }
-            (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
-                let unsafe_hash = has_dataclass_param(DataclassFlags::UNSAFE_HASH);
-                let frozen = has_dataclass_param(DataclassFlags::FROZEN);
-                let eq = has_dataclass_param(DataclassFlags::EQ);
-
-                if unsafe_hash || (frozen && eq) {
-                    let signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty)],
-                        ),
-                        KnownClass::Int.to_instance(db),
-                    );
-
-                    Some(Type::function_like_callable(db, signature))
-                } else if eq && !frozen {
-                    Some(Type::none(db))
-                } else {
-                    // No `__hash__` is generated, fall back to `object.__hash__`
-                    None
-                }
-            }
+            (
+                CodeGeneratorKind::DataclassLike(_),
+                "__lt__" | "__le__" | "__gt__" | "__ge__" | "__hash__",
+            ) => synthesize_dataclass_dunder_method(db, name, instance_ty, combined_flags),
             (CodeGeneratorKind::DataclassLike(_), "__match_args__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
-                if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
-                    return None;
-                }
-
                 let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
-
                 let fields = self.fields(db, specialization, field_policy);
-                let match_args = fields
-                    .iter()
-                    .filter(|(_, field)| {
-                        if let FieldKind::Dataclass { init, kw_only, .. } = &field.kind {
-                            *init && !kw_only.unwrap_or(kw_only_default)
-                        } else {
-                            false
-                        }
-                    })
-                    .map(|(name, _)| Type::string_literal(db, name));
-                Some(Type::heterogeneous_tuple(db, match_args))
+                let fields_iter = fields.iter().filter_map(|(name, field)| {
+                    if let FieldKind::Dataclass { init, kw_only, .. } = &field.kind {
+                        Some(DataclassFieldInfo {
+                            name: name.clone(),
+                            ty: field.declared_ty,
+                            default_ty: None,
+                            init: *init,
+                            kw_only: kw_only.unwrap_or(kw_only_default),
+                        })
+                    } else {
+                        None
+                    }
+                });
+                synthesize_dataclass_class_member(
+                    db,
+                    name,
+                    instance_ty,
+                    combined_flags,
+                    fields_iter,
+                )
             }
             (CodeGeneratorKind::DataclassLike(_), "__weakref__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
@@ -3467,23 +3431,7 @@ impl<'db> StaticClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if has_dataclass_param(DataclassFlags::FROZEN) {
-                    let signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_or_keyword(Name::new_static("self"))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_or_keyword(Name::new_static("name")),
-                                Parameter::positional_or_keyword(Name::new_static("value")),
-                            ],
-                        ),
-                        Type::Never,
-                    );
-
-                    return Some(Type::function_like_callable(db, signature));
-                }
-                None
+                synthesize_dataclass_dunder_method(db, name, instance_ty, combined_flags)
             }
             (CodeGeneratorKind::DataclassLike(_), "__slots__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
@@ -5262,6 +5210,161 @@ fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db>
     Type::PropertyInstance(property)
 }
 
+/// Field information for synthesizing dataclass methods.
+///
+/// This is a common representation used by both `DynamicDataclassLiteral` and `StaticClassLiteral`
+/// to share the method synthesis logic.
+struct DataclassFieldInfo<'db> {
+    /// The field name (or alias if provided).
+    name: Name,
+    /// The declared type of the field.
+    ty: Type<'db>,
+    /// The default value type, if any.
+    default_ty: Option<Type<'db>>,
+    /// Whether this field should be included in `__init__`.
+    init: bool,
+    /// Whether this field is keyword-only.
+    kw_only: bool,
+}
+
+/// Synthesize a dataclass class member given the dataclass flags, instance type, and fields.
+///
+/// This is used by both `DynamicDataclassLiteral` and `StaticClassLiteral` (for declarative
+/// dataclasses) to avoid duplicating the synthesis logic.
+fn synthesize_dataclass_class_member<'db>(
+    db: &'db dyn Db,
+    name: &str,
+    instance_ty: Type<'db>,
+    flags: DataclassFlags,
+    fields: impl Iterator<Item = DataclassFieldInfo<'db>>,
+) -> Option<Type<'db>> {
+    match name {
+        "__init__" if flags.contains(DataclassFlags::INIT) => {
+            let mut parameters = vec![
+                Parameter::positional_or_keyword(Name::new_static("self"))
+                    .with_annotated_type(instance_ty),
+            ];
+
+            for field in fields {
+                if !field.init {
+                    continue;
+                }
+                let mut param = if field.kw_only {
+                    Parameter::keyword_only(field.name)
+                } else {
+                    Parameter::positional_or_keyword(field.name)
+                };
+                param = param.with_annotated_type(field.ty);
+                if let Some(default) = field.default_ty {
+                    param = param.with_default_type(default);
+                }
+                parameters.push(param);
+            }
+
+            let signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
+            Some(Type::function_like_callable(db, signature))
+        }
+        "__match_args__" if flags.contains(DataclassFlags::MATCH_ARGS) => {
+            // __match_args__ includes only fields that are in __init__ and not keyword-only
+            let match_args = fields
+                .filter(|field| field.init && !field.kw_only)
+                .map(|field| Type::string_literal(db, &field.name));
+            Some(Type::heterogeneous_tuple(db, match_args))
+        }
+        _ => synthesize_dataclass_dunder_method(db, name, instance_ty, flags),
+    }
+}
+
+/// Synthesize a dataclass dunder method that doesn't require field information.
+fn synthesize_dataclass_dunder_method<'db>(
+    db: &'db dyn Db,
+    name: &str,
+    instance_ty: Type<'db>,
+    flags: DataclassFlags,
+) -> Option<Type<'db>> {
+    match name {
+        "__setattr__" if flags.contains(DataclassFlags::FROZEN) => {
+            // Frozen dataclasses have __setattr__ that returns Never (immutable).
+            let signature = Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("name")),
+                        Parameter::positional_or_keyword(Name::new_static("value")),
+                    ],
+                ),
+                Type::Never,
+            );
+            Some(Type::function_like_callable(db, signature))
+        }
+        "__lt__" | "__le__" | "__gt__" | "__ge__" if flags.contains(DataclassFlags::ORDER) => {
+            // Ordering methods: (self, other: Self) -> bool
+            let signature = Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("other"))
+                            .with_annotated_type(instance_ty),
+                    ],
+                ),
+                KnownClass::Bool.to_instance(db),
+            );
+            Some(Type::function_like_callable(db, signature))
+        }
+        "__hash__" => {
+            let has_hash = flags.contains(DataclassFlags::UNSAFE_HASH)
+                || (flags.contains(DataclassFlags::FROZEN) && flags.contains(DataclassFlags::EQ));
+            if has_hash {
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty)],
+                    ),
+                    KnownClass::Int.to_instance(db),
+                );
+                Some(Type::function_like_callable(db, signature))
+            } else if flags.contains(DataclassFlags::EQ) && !flags.contains(DataclassFlags::FROZEN)
+            {
+                // eq=True without frozen=True sets __hash__ to None
+                Some(Type::none(db))
+            } else {
+                // No __hash__ is generated, fall back to object.__hash__
+                None
+            }
+        }
+        "__eq__" if flags.contains(DataclassFlags::EQ) => {
+            // __eq__(self, other: object) -> bool
+            let signature = Signature::new(
+                Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("other"))
+                            .with_annotated_type(KnownClass::Object.to_instance(db)),
+                    ],
+                ),
+                KnownClass::Bool.to_instance(db),
+            );
+            Some(Type::function_like_callable(db, signature))
+        }
+        "__dataclass_fields__" => {
+            // __dataclass_fields__: dict[str, Field[Any]]
+            let field_any = KnownClass::Field.to_specialized_instance(db, &[Type::any()]);
+            Some(
+                KnownClass::Dict
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), field_any]),
+            )
+        }
+        _ => None,
+    }
+}
+
 /// Synthesize a namedtuple class member given the field information.
 ///
 /// This is used by both `DynamicNamedTupleLiteral` and `StaticClassLiteral` (for declarative
@@ -5900,6 +6003,7 @@ impl<'db> DynamicDataclassLiteral<'db> {
     fn synthesized_class_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
         let instance_ty = self.to_instance(db);
         let params = self.dataclass_params(db);
+        let flags = params.flags(db);
 
         // When fields are unknown, handle constructors specially.
         // We need to handle both __new__ and __init__ to avoid falling back
@@ -5914,119 +6018,19 @@ impl<'db> DynamicDataclassLiteral<'db> {
             }
         }
 
-        match name {
-            "__init__" if params.flags(db).contains(DataclassFlags::INIT) => {
-                // __init__(self, field1, field2, ...) -> None
-                let mut parameters = vec![
-                    Parameter::positional_or_keyword(Name::new_static("self"))
-                        .with_annotated_type(instance_ty),
-                ];
+        // For dynamic dataclasses, all fields have init=true and kw_only comes from the class flag.
+        let kw_only = flags.contains(DataclassFlags::KW_ONLY);
+        let fields_iter = self.fields(db).iter().map(|(name, ty, default_ty)| {
+            DataclassFieldInfo {
+                name: name.clone(),
+                ty: *ty,
+                default_ty: *default_ty,
+                init: true,
+                kw_only,
+            }
+        });
 
-                let kw_only = params.flags(db).contains(DataclassFlags::KW_ONLY);
-
-                for (field_name, field_ty, default_ty) in self.fields(db).as_ref() {
-                    let mut param = if kw_only {
-                        Parameter::keyword_only(field_name.clone())
-                    } else {
-                        Parameter::positional_or_keyword(field_name.clone())
-                    };
-                    param = param.with_annotated_type(*field_ty);
-                    if let Some(default) = default_ty {
-                        param = param.with_default_type(*default);
-                    }
-                    parameters.push(param);
-                }
-
-                let signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
-                Some(Type::function_like_callable(db, signature))
-            }
-            "__eq__" if params.flags(db).contains(DataclassFlags::EQ) => {
-                // __eq__(self, other: object) -> bool
-                let signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_or_keyword(Name::new_static("other"))
-                                .with_annotated_type(KnownClass::Object.to_instance(db)),
-                        ],
-                    ),
-                    KnownClass::Bool.to_instance(db),
-                );
-                Some(Type::function_like_callable(db, signature))
-            }
-            "__lt__" | "__le__" | "__gt__" | "__ge__"
-                if params.flags(db).contains(DataclassFlags::ORDER) =>
-            {
-                // Ordering methods: (self, other: Self) -> bool
-                let signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_or_keyword(Name::new_static("other"))
-                                .with_annotated_type(instance_ty),
-                        ],
-                    ),
-                    KnownClass::Bool.to_instance(db),
-                );
-                Some(Type::function_like_callable(db, signature))
-            }
-            "__hash__" => {
-                // __hash__ is generated if frozen=True and eq=True (or unsafe_hash=True)
-                let has_hash = params.flags(db).contains(DataclassFlags::UNSAFE_HASH)
-                    || (params.flags(db).contains(DataclassFlags::FROZEN)
-                        && params.flags(db).contains(DataclassFlags::EQ));
-                if has_hash {
-                    let signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty)],
-                        ),
-                        KnownClass::Int.to_instance(db),
-                    );
-                    Some(Type::function_like_callable(db, signature))
-                } else {
-                    None
-                }
-            }
-            "__match_args__" if params.flags(db).contains(DataclassFlags::MATCH_ARGS) => {
-                // __match_args__: tuple[Literal["field1"], Literal["field2"], ...]
-                let field_types = self
-                    .fields(db)
-                    .iter()
-                    .map(|(field_name, _, _)| Type::string_literal(db, field_name));
-                Some(Type::heterogeneous_tuple(db, field_types))
-            }
-            "__dataclass_fields__" => {
-                // __dataclass_fields__: dict[str, Field[Any]]
-                let field_any = KnownClass::Field.to_specialized_instance(db, &[Type::any()]);
-                Some(
-                    KnownClass::Dict
-                        .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), field_any]),
-                )
-            }
-            "__setattr__" if params.flags(db).contains(DataclassFlags::FROZEN) => {
-                // Frozen dataclasses have __setattr__ that returns Never (immutable).
-                let signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_or_keyword(Name::new_static("name")),
-                            Parameter::positional_or_keyword(Name::new_static("value")),
-                        ],
-                    ),
-                    Type::Never,
-                );
-                Some(Type::function_like_callable(db, signature))
-            }
-            _ => None,
-        }
+        synthesize_dataclass_class_member(db, name, instance_ty, flags, fields_iter)
     }
 }
 
