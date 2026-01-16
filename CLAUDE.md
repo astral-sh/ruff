@@ -69,3 +69,4 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Avoid writing significant amounts of new code. This is often a sign that we're missing an existing method or mechanism that could help solve the problem. Look for existing utilities first.
 - Avoid falling back to patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system.
 - Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability.
+- If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible.
