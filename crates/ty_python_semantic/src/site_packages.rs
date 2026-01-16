@@ -348,6 +348,25 @@ impl PythonImplementation {
         }
     }
 
+    /// Return the relative path from `sys.prefix` to the `dist-packages` directory
+    /// if this is a known implementation. Return `None` if this is an unknown implementation.
+    ///
+    /// `dist-packages` is a Debian/Ubuntu-specific directory where system-installed
+    /// Python packages are placed (as opposed to `site-packages` which is used by pip).
+    fn relative_dist_packages_path(
+        self,
+        lib_dir: UnixLibDir,
+        version: Option<PythonVersion>,
+    ) -> Option<String> {
+        match self {
+            Self::CPython | Self::GraalPy => {
+                version.map(|version| format!("{lib_dir}/python{version}/dist-packages"))
+            }
+            Self::PyPy => version.map(|version| format!("{lib_dir}/pypy{version}/dist-packages")),
+            Self::Unknown => None,
+        }
+    }
+
     /// Return the relative path from `sys.prefix` to the directory containing the python stdlib's
     /// .pys if this is a known implementation. Return `None` if this is an unknown implementation.
     fn relative_stdlib_path(self, version: Option<PythonVersion>) -> Option<String> {
@@ -1225,6 +1244,29 @@ fn site_packages_directories_from_sys_prefix(
                 }
             }
         }
+
+        // Also check for `dist-packages`, which is used on Debian/Ubuntu for system-installed packages
+        if let Some(expected_relative_path) =
+            implementation.relative_dist_packages_path(lib_dir, python_version)
+        {
+            let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
+            if system.is_directory(&expected_absolute_path) {
+                directories.insert(expected_absolute_path);
+            }
+        }
+    }
+
+    // Debian/Ubuntu also uses `/usr/lib/python3/dist-packages/` (without minor version)
+    // for packages that work across multiple Python versions.
+    // See: https://wiki.debian.org/Python#Deviations_from_upstream
+    if matches!(
+        implementation,
+        PythonImplementation::CPython | PythonImplementation::Unknown
+    ) {
+        let debian_dist_packages = sys_prefix_path.join("lib/python3/dist-packages");
+        if system.is_directory(&debian_dist_packages) {
+            directories.insert(debian_dist_packages);
+        }
     }
 
     if !directories.is_empty() {
@@ -1258,19 +1300,32 @@ fn site_packages_directories_from_sys_prefix(
                 continue;
             }
 
-            let mut path = entry.into_path();
+            let path = entry.into_path();
 
             let name = path.file_name().unwrap_or_else(|| panic!(
                 "File name should be non-null because path is guaranteed to be a child of `{lib_dir}`",
             ));
 
-            if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
-                continue;
+            // Check for version-specific directories (e.g., python3.12, pypy3.10)
+            if name.starts_with("python3.") || name.starts_with("pypy3.") {
+                // Check both site-packages and dist-packages
+                let site_packages = path.join("site-packages");
+                if system.is_directory(&site_packages) {
+                    directories.insert(site_packages);
+                }
+
+                let dist_packages = path.join("dist-packages");
+                if system.is_directory(&dist_packages) {
+                    directories.insert(dist_packages);
+                }
             }
 
-            path.push("site-packages");
-            if system.is_directory(&path) {
-                directories.insert(path);
+            // Also check Debian's python3 directory (without minor version)
+            if name == "python3" {
+                let dist_packages = path.join("dist-packages");
+                if system.is_directory(&dist_packages) {
+                    directories.insert(dist_packages);
+                }
             }
         }
     }
@@ -2433,5 +2488,172 @@ mod tests {
         paths.insert(SystemPathBuf::from("/path/to/site/packages"));
 
         assert_eq!(paths.to_string(), r#"["/path/to/site/packages"]"#);
+    }
+
+    /// Test that dist-packages directories (Debian/Ubuntu) are discovered alongside site-packages
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_dist_packages_in_system_environment() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        // Create a system Python installation with both site-packages and dist-packages
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        let dist_packages = sys_prefix.join("lib/python3.12/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs.create_directory_all(&dist_packages).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter().any(|p| p.as_str().ends_with("site-packages")),
+            "Expected to find site-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter().any(|p| p.as_str().ends_with("dist-packages")),
+            "Expected to find dist-packages, got: {dirs:?}"
+        );
+    }
+
+    /// Test that Debian's version-agnostic dist-packages directory is discovered
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_debian_python3_dist_packages() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        // Create a Debian-style system Python installation
+        // Debian uses /usr/lib/python3/dist-packages for packages that work across versions
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let site_packages = sys_prefix.join("lib/python3.12/site-packages");
+        let debian_dist_packages = sys_prefix.join("lib/python3/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&debian_dist_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            Some(PythonVersion {
+                major: 3,
+                minor: 12,
+            }),
+            PythonImplementation::CPython,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str().contains("python3/dist-packages")),
+            "Expected to find Debian's python3/dist-packages, got: {dirs:?}"
+        );
+    }
+
+    /// Test that dist-packages are found during fallback enumeration (when version is unknown
+    /// and Debian's python3/dist-packages does not exist)
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_dist_packages_in_fallback_enumeration() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        // Create a system Python installation without the Debian-specific python3/dist-packages
+        // This forces the fallback enumeration to run
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let site_packages = sys_prefix.join("lib/python3.11/site-packages");
+        let dist_packages = sys_prefix.join("lib/python3.11/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs.create_directory_all(&dist_packages).unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        // Use Unknown implementation to trigger fallback enumeration
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            None,
+            PythonImplementation::Unknown,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        assert!(
+            dirs.iter().any(|p| p.as_str().ends_with("site-packages")),
+            "Expected to find site-packages in fallback, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str().contains("python3.11/dist-packages")),
+            "Expected to find version-specific dist-packages in fallback, got: {dirs:?}"
+        );
+    }
+
+    /// Test that Debian's python3/dist-packages is found during fallback enumeration
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn finds_debian_dist_packages_in_fallback_enumeration() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        // Create a system Python installation with Debian's python3/dist-packages
+        let sys_prefix = SystemPathBuf::from("/usr");
+        let site_packages = sys_prefix.join("lib/python3.11/site-packages");
+        let debian_dist_packages = sys_prefix.join("lib/python3/dist-packages");
+
+        memory_fs.create_directory_all(&site_packages).unwrap();
+        memory_fs
+            .create_directory_all(&debian_dist_packages)
+            .unwrap();
+
+        let sys_prefix_path = SysPrefixPath {
+            inner: sys_prefix,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+        };
+
+        // Use Unknown implementation to trigger fallback enumeration
+        let directories = site_packages_directories_from_sys_prefix(
+            &sys_prefix_path,
+            None,
+            PythonImplementation::Unknown,
+            &system,
+        )
+        .unwrap();
+
+        let dirs: Vec<_> = directories.into_iter().collect();
+        // The Debian-specific check runs first and finds python3/dist-packages
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str().contains("python3/dist-packages")),
+            "Expected to find Debian's python3/dist-packages, got: {dirs:?}"
+        );
     }
 }
