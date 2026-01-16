@@ -2773,17 +2773,24 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 // will allow us to error when `*args: P.args` is matched against, for example,
                 // `n: int` and correctly type check when `*args: P.args` is matched against
                 // `*args: P.args` (another ParamSpec).
-                match union.elements(db) {
-                    [paramspec @ Type::TypeVar(typevar), other]
-                    | [other, paramspec @ Type::TypeVar(typevar)]
-                        if typevar.is_paramspec(db) && other.is_unknown() =>
-                    {
-                        VariadicArgumentType::ParamSpec(*paramspec)
+                let elements = union.elements(db);
+                let mut paramspec = None;
+                if elements.len() == 2 {
+                    match (elements[0], elements[1]) {
+                        (Type::TypeVar(typevar), Type::Dynamic(_))
+                        | (Type::Dynamic(_), Type::TypeVar(typevar))
+                            if typevar.is_paramspec(db) =>
+                        {
+                            paramspec = Some(Type::TypeVar(typevar));
+                        }
+                        _ => {}
                     }
-                    _ => {
-                        // TODO: Same todo comment as in the non-paramspec case below
-                        VariadicArgumentType::Other(argument_type.iterate(db))
-                    }
+                }
+                if let Some(paramspec) = paramspec {
+                    VariadicArgumentType::ParamSpec(paramspec)
+                } else {
+                    // TODO: Same todo comment as in the non-paramspec case below
+                    VariadicArgumentType::Other(argument_type.iterate(db))
                 }
             }
             Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
@@ -2904,15 +2911,20 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             let value_type = match argument_type {
                 Some(argument_type @ Type::Union(union)) => {
                     // See the comment in `match_variadic` for why we special case this situation.
-                    match union.elements(db) {
-                        [paramspec @ Type::TypeVar(typevar), other]
-                        | [other, paramspec @ Type::TypeVar(typevar)]
-                            if typevar.is_paramspec(db) && other.is_unknown() =>
-                        {
-                            *paramspec
+                    let elements = union.elements(db);
+                    let mut paramspec = None;
+                    if elements.len() == 2 {
+                        match (elements[0], elements[1]) {
+                            (Type::TypeVar(typevar), Type::Dynamic(_))
+                            | (Type::Dynamic(_), Type::TypeVar(typevar))
+                                if typevar.is_paramspec(db) =>
+                            {
+                                paramspec = Some(Type::TypeVar(typevar));
+                            }
+                            _ => {}
                         }
-                        _ => dunder_getitem_return_type(argument_type),
                     }
+                    paramspec.unwrap_or_else(|| dunder_getitem_return_type(argument_type))
                 }
                 Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => paramspec,
                 Some(argument_type) => dunder_getitem_return_type(argument_type),
@@ -3565,15 +3577,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let value_type = match argument_type {
                 Type::Union(union) => {
                     // See the comment in `match_variadic` for why we special case this situation.
-                    match union.elements(self.db) {
-                        [paramspec @ Type::TypeVar(typevar), other]
-                        | [other, paramspec @ Type::TypeVar(typevar)]
-                            if typevar.is_paramspec(self.db) && other.is_unknown() =>
-                        {
-                            Some(*paramspec)
+                    let elements = union.elements(self.db);
+                    let mut paramspec = None;
+                    if elements.len() == 2 {
+                        match (elements[0], elements[1]) {
+                            (Type::TypeVar(typevar), Type::Dynamic(_))
+                            | (Type::Dynamic(_), Type::TypeVar(typevar))
+                                if typevar.is_paramspec(self.db) =>
+                            {
+                                paramspec = Some(Type::TypeVar(typevar));
+                            }
+                            _ => {}
                         }
-                        _ => value_type_fallback(argument_type),
                     }
+                    paramspec.or_else(|| value_type_fallback(argument_type))
                 }
                 Type::TypeVar(typevar) if typevar.is_paramspec(self.db) => Some(argument_type),
                 _ => value_type_fallback(argument_type),

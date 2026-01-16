@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::FxIndexSet;
+use crate::FxOrderSet;
 use crate::place::builtins_module_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
@@ -229,8 +230,8 @@ pub fn definitions_for_attribute<'db>(
     };
 
     let tys = match lhs_ty {
-        Type::Union(union) => union.elements(model.db()).to_vec(),
-        _ => vec![lhs_ty],
+        Type::Union(union) => union.elements(model.db()).clone(),
+        _ => FxOrderSet::from_iter([lhs_ty]),
     };
 
     // Expand intersections for each subtype into their components

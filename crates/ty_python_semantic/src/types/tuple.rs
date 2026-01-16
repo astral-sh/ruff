@@ -1793,7 +1793,7 @@ impl<'db> Tuple<Type<'db>> {
 
         // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
         let release_level_ty = {
-            let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
+            let elements: FxOrderSet<_> = ["alpha", "beta", "candidate", "final"]
                 .iter()
                 .map(|level| Type::string_literal(db, level))
                 .collect();

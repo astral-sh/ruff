@@ -11718,8 +11718,8 @@ pub(super) struct MetaclassCandidate<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
-    #[returns(deref)]
-    pub elements: Box<[Type<'db>]>,
+    #[returns(ref)]
+    pub elements: FxOrderSet<Type<'db>>,
     /// Whether the value pointed to by this type is recursively defined.
     /// If `Yes`, union literal widening is performed early.
     recursively_defined: RecursivelyDefined,

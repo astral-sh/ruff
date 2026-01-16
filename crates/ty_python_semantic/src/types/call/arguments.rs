@@ -4,10 +4,10 @@ use std::fmt::Display;
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 
-use crate::Db;
 use crate::types::KnownClass;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::{Tuple, TupleType};
+use crate::{Db, FxOrderSet};
 
 use super::Type;
 
@@ -363,17 +363,17 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// Expands a type into its possible subtypes, if applicable.
 ///
 /// Returns [`None`] if the type cannot be expanded.
-fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<FxOrderSet<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
 
             if class.is_known(db, KnownClass::Bool) {
-                return Some(vec![
+                return Some(FxOrderSet::from_iter([
                     Type::BooleanLiteral(true),
                     Type::BooleanLiteral(false),
-                ]);
+                ]));
             }
 
             // If the class is a fixed-length tuple subtype, we expand it to its elements.
@@ -391,7 +391,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                             })
                             .multi_cartesian_product()
                             .map(|types| Type::tuple(TupleType::heterogeneous(db, types)))
-                            .collect::<Vec<_>>();
+                            .collect::<FxOrderSet<_>>();
 
                         if expanded.len() == 1 {
                             // There are no elements in the tuple type that can be expanded.
@@ -410,7 +410,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
             None
         }
-        Type::Union(union) => Some(union.elements(db).to_vec()),
+        Type::Union(union) => Some(union.elements(db).clone()),
         // For type aliases, expand the underlying value type.
         Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
@@ -421,6 +421,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
 #[cfg(test)]
 mod tests {
+    use crate::FxOrderSet;
     use crate::db::tests::setup_db;
     use crate::types::tuple::TupleType;
     use crate::types::{KnownClass, ManualPEP695TypeAliasType, Type, TypeAliasType, UnionType};
@@ -431,12 +432,12 @@ mod tests {
     #[test]
     fn expand_union_type() {
         let db = setup_db();
-        let types = [
+        let types = FxOrderSet::from_iter([
             KnownClass::Int.to_instance(&db),
             KnownClass::Str.to_instance(&db),
             KnownClass::Bytes.to_instance(&db),
-        ];
-        let union_type = UnionType::from_elements(&db, types);
+        ]);
+        let union_type = UnionType::from_elements(&db, &types);
         let expanded = expand_type(&db, union_type).unwrap();
         assert_eq!(expanded.len(), types.len());
         assert_eq!(expanded, types);
@@ -445,12 +446,12 @@ mod tests {
     #[test]
     fn expand_pep695_type_alias() {
         let db = setup_db();
-        let types = [
+        let types = FxOrderSet::from_iter([
             KnownClass::Int.to_instance(&db),
             KnownClass::Str.to_instance(&db),
             KnownClass::Bytes.to_instance(&db),
-        ];
-        let union_type = UnionType::from_elements(&db, types);
+        ]);
+        let union_type = UnionType::from_elements(&db, &types);
         let alias_type =
             Type::TypeAlias(TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
                 &db,
@@ -468,7 +469,8 @@ mod tests {
         let db = setup_db();
         let bool_instance = KnownClass::Bool.to_instance(&db);
         let expanded = expand_type(&db, bool_instance).unwrap();
-        let expected_types = [Type::BooleanLiteral(true), Type::BooleanLiteral(false)];
+        let expected_types =
+            FxOrderSet::from_iter([Type::BooleanLiteral(true), Type::BooleanLiteral(false)]);
         assert_eq!(expanded.len(), expected_types.len());
         assert_eq!(expanded, expected_types);
     }
@@ -502,14 +504,14 @@ mod tests {
                 UnionType::from_elements(&db, [int_ty, str_ty, bytes_ty]),
             ],
         );
-        let expected_types = [
+        let expected_types = FxOrderSet::from_iter([
             Type::heterogeneous_tuple(&db, [true_ty, int_ty]),
             Type::heterogeneous_tuple(&db, [true_ty, str_ty]),
             Type::heterogeneous_tuple(&db, [true_ty, bytes_ty]),
             Type::heterogeneous_tuple(&db, [false_ty, int_ty]),
             Type::heterogeneous_tuple(&db, [false_ty, str_ty]),
             Type::heterogeneous_tuple(&db, [false_ty, bytes_ty]),
-        ];
+        ]);
         let expanded = expand_type(&db, tuple_type2).unwrap();
         assert_eq!(expanded, expected_types);
 
@@ -523,12 +525,12 @@ mod tests {
                 str_ty,
             ],
         );
-        let expected_types = [
+        let expected_types = FxOrderSet::from_iter([
             Type::heterogeneous_tuple(&db, [true_ty, int_ty, str_ty, str_ty]),
             Type::heterogeneous_tuple(&db, [true_ty, int_ty, bytes_ty, str_ty]),
             Type::heterogeneous_tuple(&db, [false_ty, int_ty, str_ty, str_ty]),
             Type::heterogeneous_tuple(&db, [false_ty, int_ty, bytes_ty, str_ty]),
-        ];
+        ]);
         let expanded = expand_type(&db, tuple_type3).unwrap();
         assert_eq!(expanded, expected_types);
 
