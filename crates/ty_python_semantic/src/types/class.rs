@@ -5208,11 +5208,11 @@ fn synthesize_namedtuple_class_member<'db>(
                 BoundTypeVarInstance::synthetic_self(db, instance_ty, BindingContext::Synthetic);
             let self_ty = Type::TypeVar(self_typevar);
 
-            let mut variables = Vec::new();
-            if let Some(ctx) = inherited_generic_context {
-                variables.extend(ctx.variables(db));
-            }
-            variables.push(self_typevar);
+            let variables = inherited_generic_context
+                .iter()
+                .flat_map(|ctx| ctx.variables(db))
+                .chain(std::iter::once(self_typevar));
+
             let generic_context = GenericContext::from_typevar_instances(db, variables);
 
             let mut parameters = vec![

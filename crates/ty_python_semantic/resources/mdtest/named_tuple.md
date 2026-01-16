@@ -1392,22 +1392,42 @@ class Foo(NamedTuple):
         _asdict = True
 ```
 
-## `super().__new__` in a `NamedTuple` subclass
+## `super().__new__` in `NamedTuple` subclasses
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/2522>.
 
 ```py
-from typing import NamedTuple
+from typing import NamedTuple, Generic, TypeVar
+from typing_extensions import Self
 
 class Base(NamedTuple):
     x: int
     y: int
 
 class Child(Base):
-    def __new__(cls, x: int, y: int):
+    def __new__(cls, x: int, y: int) -> Self:
         instance = super().__new__(cls, x, y)
         reveal_type(instance)  # revealed: Self@__new__
         return instance
 
 reveal_type(Child(1, 2))  # revealed: Child
+
+T = TypeVar("T")
+
+class GenericBase(NamedTuple, Generic[T]):
+    x: T
+
+class ConcreteChild(GenericBase[str]):
+    def __new__(cls, x: str) -> "ConcreteChild":
+        instance = super().__new__(cls, x)
+        reveal_type(instance)  # revealed: Self@__new__
+        return instance
+
+class GenericChild(GenericBase[T]):
+    def __new__(cls, x: T) -> Self:
+        instance = super().__new__(cls, x)
+        reveal_type(instance)  # revealed: @Todo(super in generic class)
+        return instance
+
+reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]
 ```
