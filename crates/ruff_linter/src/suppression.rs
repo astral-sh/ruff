@@ -243,7 +243,7 @@ impl Suppressions {
                 let entry = grouped_diagnostics
                     .entry(key)
                     .or_insert_with(|| SuppressionDiagnostic::new(suppression));
-                entry.invalid_codes.push(suppression.code.as_str());
+                entry.invalid_codes.push(code_str);
             } else if !suppression.used.get() {
                 // UnusedNOQA
                 let Ok(rule) = Rule::from_code(
@@ -262,8 +262,7 @@ impl Suppressions {
                         .disable_comment()
                         .codes_as_str(locator.contents())
                         .filter(|code| *code == code_str)
-                        .collect_vec()
-                        .len()
+                        .count()
                         > 1
                     {
                         entry.duplicated_codes.push(code_str);
@@ -293,11 +292,7 @@ impl Suppressions {
                     &group.invalid_codes,
                     true,
                     InvalidRuleCode {
-                        rule_code: group
-                            .invalid_codes
-                            .iter()
-                            .map(ToString::to_string)
-                            .join(", "),
+                        rule_code: group.invalid_codes.iter().join(", "),
                         kind: InvalidRuleCodeKind::Suppression,
                         whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
                     },
@@ -445,14 +440,12 @@ impl Suppressions {
                 .codes_as_str(locator.contents())
                 .filter(|code| !remove_codes.contains(code))
                 .dedup()
-                .collect_vec();
+                .join(", ");
 
             if remaining.is_empty() {
                 delete_comment(comment.range, locator)
             } else {
-                range = code_range;
-                let replacement = remaining.join(", ");
-                Edit::range_replacement(replacement, code_range)
+                Edit::range_replacement(remaining, code_range)
             }
         };
         (range, edit)

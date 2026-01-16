@@ -347,12 +347,12 @@ RUF104 Suppression comment without matching `#ruff:enable` comment
 
 
 RUF100 [*] Unused suppression (duplicated: `F841`)
-  --> suppressions.py:61:21
+  --> suppressions.py:61:5
    |
 59 | def f():
 60 |     # Duplicate codes that are actually used.
 61 |     # ruff: disable[F841, F841]
-   |                     ^^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 62 |     foo = 0
    |
 help: Remove unused suppression
@@ -409,12 +409,12 @@ RUF104 Suppression comment without matching `#ruff:enable` comment
 
 
 RUF100 [*] Unused suppression (unused: `E741`; non-enabled: `F401`)
-  --> suppressions.py:75:21
+  --> suppressions.py:75:5
    |
 73 | def f():
 74 |     # Multiple codes but only one is used
 75 |     # ruff: disable[E741, F401, F841]
-   |                     ^^^^^^^^^^^^^^^^
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 76 |     foo = 0
    |
 help: Remove unused suppression
