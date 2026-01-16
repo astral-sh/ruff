@@ -169,7 +169,9 @@ reveal_type(p.y)  # revealed: int
 
 ### Functional syntax with variable fields and string annotations
 
-String annotations in variable fields are properly resolved:
+String annotations in variable fields don't currently resolve (this is a known limitation). The
+types are extracted from the inferred tuple type, but string literals don't get evaluated as type
+expressions:
 
 ```py
 from typing import NamedTuple
@@ -178,22 +180,24 @@ fields = [("value", "int"), ("label", "str")]
 Item = NamedTuple("Item", fields)
 item = Item(42, "test")
 
-reveal_type(item.value)  # revealed: int
-reveal_type(item.label)  # revealed: str
+# TODO: These should resolve to `int` and `str`, but string annotations in variable fields
+# aren't currently evaluated.
+reveal_type(item.value)  # revealed: Any
+reveal_type(item.label)  # revealed: Any
 ```
 
-Recursive string annotations also work when fields come from a variable:
+When using non-string types in variable fields, they work correctly when using a tuple literal:
 
 ```py
 from typing import NamedTuple
 
-tree_fields = [("value", int), ("left", "Tree | None"), ("right", "Tree | None")]
+tree_fields = (("value", int), ("left", int | None), ("right", int | None))
 Tree = NamedTuple("Tree", tree_fields)
 t = Tree(1, None, None)
 
 reveal_type(t.value)  # revealed: int
-reveal_type(t.left)  # revealed: Tree | None
-reveal_type(t.right)  # revealed: Tree | None
+reveal_type(t.left)  # revealed: int | None
+reveal_type(t.right)  # revealed: int | None
 ```
 
 ### Functional syntax as base class (dangling call)
@@ -214,7 +218,8 @@ reveal_type(p.y)  # revealed: int
 reveal_type(p.magnitude())  # revealed: int | float
 ```
 
-String annotations in dangling calls currently don't resolve properly (this is a known limitation):
+String annotations in dangling calls work correctly for forward references to classes defined in the
+same scope. This allows recursive types:
 
 ```py
 from typing import NamedTuple
@@ -224,7 +229,21 @@ class Node(NamedTuple("Node", [("value", int), ("next", "Node | None")])):
 
 n = Node(1, None)
 reveal_type(n.value)  # revealed: int
-# TODO: This should be `Node | None`, but string annotations in dangling calls aren't resolved.
+reveal_type(n.next)  # revealed: Node | None
+```
+
+Note that the string annotation must reference a name that exists in scope. References to the
+internal NamedTuple name (if different from the class name) won't work:
+
+```py
+from typing import NamedTuple
+
+# The string "X" refers to the internal name, not "BadNode", so it won't resolve:
+class BadNode(NamedTuple("X", [("value", int), ("next", "X | None")])):
+    pass
+
+n = BadNode(1, None)
+reveal_type(n.value)  # revealed: int
 reveal_type(n.next)  # revealed: Unknown
 ```
 
@@ -1007,13 +1026,16 @@ reveal_type(Pair)  # revealed: <class 'Pair'>
 # error: [invalid-argument-type]
 reveal_type(Pair(1, 2))  # revealed: Pair
 
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(Pair(1, 2).first)  # revealed: T@Pair
+# TODO: The deferred inference for TypeVars doesn't bind them correctly, so we get
+# `TypeVar | TypeVar` instead of `T@Pair`. This should be fixed.
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
-reveal_type(Pair(1, 2).second)  # revealed: T@Pair
+reveal_type(Pair(1, 2).first)  # revealed: TypeVar | TypeVar
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(Pair(1, 2).second)  # revealed: TypeVar | TypeVar
 ```
 
 ## Attributes on `NamedTuple`

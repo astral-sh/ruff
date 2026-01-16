@@ -53,8 +53,8 @@ use crate::types::{
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
     place::{
-        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, Widening,
-        known_module_symbol, place_from_bindings, place_from_declarations,
+        ConsideredDefinitions, Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers,
+        Widening, known_module_symbol, place_from_bindings, place_from_declarations, symbol,
     },
     semantic_index::{
         attribute_assignments,
@@ -73,6 +73,7 @@ use itertools::{Either, Itertools as _};
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
@@ -5810,9 +5811,18 @@ fn dynamic_namedtuple_fields<'db>(
                     let field_ty = field_type_exprs
                         .get(name.as_str())
                         .map(|type_expr| {
-                            deferred_inference
+                            let ty = deferred_inference
                                 .try_expression_type(*type_expr)
-                                .unwrap_or_else(Type::unknown)
+                                .unwrap_or_else(Type::unknown);
+                            // For TypeVar instances, we need to bind them to the definition.
+                            // Other types (class literals, string annotations) are already
+                            // correctly resolved by deferred inference.
+                            if let Type::KnownInstance(KnownInstanceType::TypeVar(_)) = ty {
+                                ty.in_type_expression(db, scope, Some(definition))
+                                    .unwrap_or_else(|error| error.fallback_type)
+                            } else {
+                                ty
+                            }
                         })
                         .unwrap_or_else(Type::unknown);
                     // typing.NamedTuple functional form doesn't support defaults.
@@ -5906,12 +5916,26 @@ fn dynamic_namedtuple_fields<'db>(
             .cloned()
             .map(|name| {
                 let field_ty = if let Some(type_expr) = field_type_exprs.get(name.as_str()) {
-                    // Get the inferred type from scope inference.
-                    let value_ty = scope_inference.expression_type(*type_expr);
-                    // Convert value type to type (e.g., class literal to instance).
-                    value_ty
-                        .in_type_expression(db, scope, None)
-                        .unwrap_or_else(|error| error.fallback_type)
+                    // Check if the type expression is a string literal.
+                    if let ast::Expr::StringLiteral(string_expr) = type_expr {
+                        // Try to resolve the string annotation.
+                        resolve_string_annotation_type(db, scope, string_expr).unwrap_or_else(
+                            || {
+                                // Fall back to using the inferred type if resolution fails.
+                                let value_ty = scope_inference.expression_type(*type_expr);
+                                value_ty
+                                    .in_type_expression(db, scope, None)
+                                    .unwrap_or_else(|error| error.fallback_type)
+                            },
+                        )
+                    } else {
+                        // Get the inferred type from scope inference.
+                        let value_ty = scope_inference.expression_type(*type_expr);
+                        // Convert value type to type (e.g., class literal to instance).
+                        value_ty
+                            .in_type_expression(db, scope, None)
+                            .unwrap_or_else(|error| error.fallback_type)
+                    }
                 } else {
                     // No AST expression available, use inferred type from variable.
                     field_types_from_inferred
@@ -5923,6 +5947,80 @@ fn dynamic_namedtuple_fields<'db>(
                 (name, field_ty, None)
             })
             .collect()
+    }
+}
+
+/// Resolves a type from a string annotation in a dangling `NamedTuple` call context.
+///
+/// This handles simple cases like `"ClassName"` and union types like `"ClassName | None"`.
+/// More complex type expressions return `Unknown`.
+fn resolve_string_annotation_type<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    string_expr: &ast::ExprStringLiteral,
+) -> Option<Type<'db>> {
+    let file = scope.file(db);
+    let source = source_text(db, file);
+
+    // Only handle simple string literals (not f-strings, byte strings, etc.)
+    let string_literal = string_expr.as_single_part_string()?;
+    let prefix = string_literal.flags.prefix();
+    if prefix.is_raw() {
+        return None;
+    }
+
+    // Check for escape characters.
+    if &source[string_literal.content_range()] != string_literal.as_str() {
+        return None;
+    }
+
+    // Parse the string as a type annotation.
+    let parsed =
+        ruff_python_parser::parse_string_annotation(source.as_str(), string_literal).ok()?;
+
+    // Resolve the parsed expression to a type.
+    resolve_parsed_type_expr(db, scope, parsed.expr())
+}
+
+/// Resolves a parsed type expression to a type by looking up names in the scope.
+///
+/// This handles simple names, `None`, and union types (via `|` operator).
+fn resolve_parsed_type_expr<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    expr: &ast::Expr,
+) -> Option<Type<'db>> {
+    match expr {
+        ast::Expr::Name(name) => {
+            if name.id.as_str() == "None" {
+                return Some(Type::none(db));
+            }
+            // Look up the name in the scope.
+            let place = symbol(
+                db,
+                scope,
+                name.id.as_str(),
+                ConsideredDefinitions::AllReachable,
+            );
+            match place.place {
+                Place::Defined(defined) => Some(
+                    defined
+                        .ty
+                        .in_type_expression(db, scope, None)
+                        .unwrap_or_else(|error| error.fallback_type),
+                ),
+                Place::Undefined => None,
+            }
+        }
+        ast::Expr::BinOp(binop) if binop.op == ast::Operator::BitOr => {
+            // Handle union types: `X | Y`
+            let left = resolve_parsed_type_expr(db, scope, &binop.left)?;
+            let right = resolve_parsed_type_expr(db, scope, &binop.right)?;
+            Some(UnionType::from_elements(db, [left, right]))
+        }
+        ast::Expr::NoneLiteral(_) => Some(Type::none(db)),
+        // More complex expressions are not supported.
+        _ => None,
     }
 }
 
