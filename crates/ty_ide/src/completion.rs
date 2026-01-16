@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, binary_heap};
 
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -87,7 +88,7 @@ pub fn completion<'db>(
 struct Completions<'db> {
     db: &'db dyn Db,
     context: CollectionContext<'db>,
-    items: Vec<CompletionRanker<'db>>,
+    items: BinaryHeap<CompletionRanker<'db>>,
     /// The query used to match against candidate completions.
     ///
     /// If a completion's name doesn't match this query, then
@@ -113,27 +114,25 @@ impl<'db> Completions<'db> {
         Completions {
             db,
             context,
-            items: vec![],
+            items: BinaryHeap::new(),
             query,
         }
     }
 
     /// Convert this collection into a simple
     /// sequence of completions.
-    fn into_completions(mut self) -> Vec<Completion<'db>> {
-        self.items.sort_unstable();
-        self.items.truncate(Completions::LIMIT);
+    fn into_completions(self) -> Vec<Completion<'db>> {
         self.items
+            .into_sorted_vec()
             .into_iter()
             .map(|CompletionRanker(c)| c)
             .collect()
     }
 
     // Convert this collection into a list of "import..." fixes
-    fn into_imports(mut self) -> Vec<ImportEdit> {
-        self.items.sort_unstable();
-        self.items.truncate(Completions::LIMIT);
+    fn into_imports(self) -> Vec<ImportEdit> {
         self.items
+            .into_sorted_vec()
             .into_iter()
             .map(|CompletionRanker(c)| c)
             .filter_map(|item| {
@@ -146,10 +145,9 @@ impl<'db> Completions<'db> {
     }
 
     // Convert this collection into a list of "qualify..." fixes
-    fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
-        self.items.sort_unstable();
-        self.items.truncate(Completions::LIMIT);
+    fn into_qualifications(self, range: TextRange) -> Vec<ImportEdit> {
         self.items
+            .into_sorted_vec()
             .into_iter()
             .map(|CompletionRanker(c)| c)
             .filter_map(|item| {
@@ -204,8 +202,16 @@ impl<'db> Completions<'db> {
         if self.context.exclude(self.db, &builder) {
             return false;
         }
-        let completion = builder.build(self.db, &self.context, &self.query);
-        self.items.push(CompletionRanker(completion));
+        let completion = CompletionRanker(builder.build(self.db, &self.context, &self.query));
+        if self.items.len() >= Completions::LIMIT {
+            // OK because `self.items` is guaranteed to be non-empty here.
+            let worst = self.items.peek_mut().unwrap();
+            if *worst <= completion {
+                return false;
+            }
+            binary_heap::PeekMut::pop(worst);
+        }
+        self.items.push(completion);
         true
     }
 }
