@@ -208,6 +208,16 @@
     "OverrideOptions": {
       "type": "object",
       "properties": {
+        "analysis": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnalysisOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "exclude": {
           "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`.\nExclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
           "anyOf": [

@@ -14,7 +14,7 @@ pub trait Db: ModuleResolverDb {
 
     fn lint_registry(&self) -> &LintRegistry;
 
-    fn analysis_settings(&self) -> &AnalysisSettings;
+    fn analysis_settings(&self, file: File) -> &AnalysisSettings;
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
@@ -138,7 +138,7 @@ pub(crate) mod tests {
             default_lint_registry()
         }
 
-        fn analysis_settings(&self) -> &AnalysisSettings {
+        fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
             &self.analysis_settings
         }
 
