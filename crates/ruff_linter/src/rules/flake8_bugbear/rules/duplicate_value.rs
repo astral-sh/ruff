@@ -70,9 +70,7 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
                 );
 
                 diagnostic.secondary_annotation(format_args!("previous occurrence here"), existing);
-
                 diagnostic.set_primary_message(format_args!("duplicated here"));
-
                 diagnostic.try_set_fix(|| {
                     edits::remove_member(&set.elts, index, checker.locator().contents())
                         .map(Fix::safe_edit)
