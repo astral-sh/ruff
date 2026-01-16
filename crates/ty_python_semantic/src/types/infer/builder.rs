@@ -7181,7 +7181,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let has_starred = args.iter().any(ast::Expr::is_starred_expr);
         let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
 
-        // Need at least cls_name and fields.
+        // Need at least `cls_name` and `fields`.
         let [name_arg, fields_arg, rest @ ..] = &**args else {
             for arg in args {
                 self.infer_expression(arg, TypeContext::default());
@@ -7226,7 +7226,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return KnownClass::Object.to_subclass_of(db);
         }
 
-        // Check for excess positional arguments (only cls_name and fields are positional).
+        // Check for excess positional arguments (only `cls_name` and `fields` are positional).
         if !rest.is_empty() {
             if let Some(builder) = self
                 .context
@@ -7251,8 +7251,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             match arg.id.as_str() {
                 "bases" => {
-                    // Validate that bases is a tuple.
-                    // At runtime, make_dataclass requires a tuple (not list or other iterable).
+                    // Validate that bases is a tuple. At runtime, `make_dataclass` requires a tuple
+                    // (not list or other iterable).
                     //
                     // We use `tuple[object, ...]` rather than `tuple[type, ...]` because special
                     // forms like `TypedDict`, `Protocol`, and `Generic` are not subtypes of `type`.
@@ -7543,7 +7543,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // - str: field name only, type defaults to Any
         // - tuple (name, type): field with type annotation
         // - tuple (name, type, Field): field with type and Field object for metadata
-        #[allow(clippy::type_complexity)]
+        #[expect(clippy::type_complexity)]
         let (fields, has_known_fields): (
             Box<[(Name, Type<'db>, Option<Type<'db>>)]>,
             bool,
@@ -7553,17 +7553,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if maybe_fields.is_none() {
                 // Emit diagnostic if the type is invalid (not an iterable).
                 let iterable_any = KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                if !fields_type.is_assignable_to(db, iterable_any)
-                    && let Some(builder) =
+                if !fields_type.is_assignable_to(db, iterable_any) {
+                    if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-                {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Invalid argument to parameter `fields` of `make_dataclass()`"
-                    ));
-                    diagnostic.set_primary_message(format_args!(
-                        "Expected an iterable of field definitions, found `{}`",
-                        fields_type.display(db)
-                    ));
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `fields` of `make_dataclass()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected an iterable of field definitions, found `{}`",
+                            fields_type.display(db)
+                        ));
+                    }
+                } else {
+                    // Type is a valid iterable, but we couldn't extract fields.
+                    let elements: Option<&[ast::Expr]> = match fields_arg {
+                        ast::Expr::List(list) => Some(&list.elts),
+                        ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+                        _ => None,
+                    };
+                    if let Some(elements) = elements {
+                        for elt in elements {
+                            // Valid field specs are:
+                            // - string literal: "field_name"
+                            // - 2-tuple: ("field_name", type)
+                            // - 3-tuple: ("field_name", type, field_or_default)
+                            let is_valid_field_spec = matches!(elt, ast::Expr::StringLiteral(_))
+                                || matches!(
+                                    elt,
+                                    ast::Expr::Tuple(t) if (2..=3).contains(&t.elts.len())
+                                )
+                                || matches!(
+                                    elt,
+                                    ast::Expr::List(l) if (2..=3).contains(&l.elts.len())
+                                );
+                            if !is_valid_field_spec {
+                                let elt_type = self.expression_type(elt);
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_ARGUMENT_TYPE, elt)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Invalid `make_dataclass()` field definition"
+                                    ));
+                                    diagnostic.set_primary_message(format_args!(
+                                        "Expected a string or `(name, type)` tuple, found `{}`",
+                                        elt_type.display(db)
+                                    ));
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -7673,7 +7712,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let fields: Option<Box<[_]>> = fixed_tuple
                 .all_elements()
                 .iter()
-                .map(|field_def| self.extract_single_make_dataclass_field_from_type(*field_def))
+                .map(|field_def| {
+                    self.extract_single_make_dataclass_field_from_type(*field_def, fields_arg)
+                })
                 .collect();
             if fields.is_some() {
                 return fields;
@@ -7688,6 +7729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn extract_single_make_dataclass_field_from_type(
         &self,
         field_def: Type<'db>,
+        fields_arg: &ast::Expr,
     ) -> Option<(Name, Type<'db>, Option<Type<'db>>)> {
         let db = self.db();
 
@@ -7699,36 +7741,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Field can be a tuple of (name, type) or (name, type, field).
         let tuple_spec = field_def.exact_tuple_instance_spec(db)?;
         let fixed = tuple_spec.as_fixed_length()?;
-        let elements = fixed.all_elements();
 
-        match elements.len() {
-            2 => {
+        match fixed.all_elements() {
+            [name_type, field_type] => {
                 // (name, type)
-                let name = elements[0]
+                let name = name_type
                     .as_string_literal()
                     .map(|s| Name::new(s.value(db)))?;
-                // Convert class type to instance type (e.g., type[int] -> int)
-                let field_ty = elements[1]
+                let field_ty = field_type
                     .in_type_expression(db, self.scope(), self.typevar_binding_context)
-                    .unwrap_or(Type::unknown());
+                    .unwrap_or_else(|error| {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Object of type `{}` is not valid as a `make_dataclass` field type",
+                                field_type.display(db)
+                            ));
+                        }
+                        error.fallback_type
+                    });
                 Some((name, field_ty, None))
             }
-            3 => {
+            [name_type, field_type, default_type] => {
                 // (name, type, default_or_field)
-                let name = elements[0]
+                let name = name_type
                     .as_string_literal()
                     .map(|s| Name::new(s.value(db)))?;
-                // Convert class type to instance type (e.g., type[int] -> int)
-                let field_ty = elements[1]
+                let field_ty = field_type
                     .in_type_expression(db, self.scope(), self.typevar_binding_context)
-                    .unwrap_or(Type::unknown());
+                    .unwrap_or_else(|error| {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Object of type `{}` is not valid as a `make_dataclass` field type",
+                                field_type.display(db)
+                            ));
+                        }
+                        error.fallback_type
+                    });
                 // The third element can be either a direct default value or a Field object.
                 // If it's a Field instance, we can't easily extract the default, so leave it as None.
                 // Otherwise, use the value's type as the default type.
-                let default_ty = if elements[2].is_instance_of(db, KnownClass::Field) {
+                let default_ty = if default_type.is_instance_of(db, KnownClass::Field) {
                     None
                 } else {
-                    Some(elements[2])
+                    Some(*default_type)
                 };
                 Some((name, field_ty, default_ty))
             }
@@ -7767,39 +7826,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => return None,
                 };
 
-                match field_elements.len() {
-                    2 => {
+                match field_elements {
+                    [name_expr, type_expr] => {
                         // (name, type)
-                        let name_expr = &field_elements[0];
                         let name_ty = self.expression_type(name_expr);
                         let name_lit = name_ty.as_string_literal()?;
                         let field_name = Name::new(name_lit.value(db));
 
-                        let type_expr = &field_elements[1];
-                        let field_ty = self
-                            .expression_type(type_expr)
+                        let field_value_ty = self.expression_type(type_expr);
+                        let field_ty = field_value_ty
                             .in_type_expression(db, self.scope(), self.typevar_binding_context)
-                            .unwrap_or(Type::any());
+                            .unwrap_or_else(|error| {
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, type_expr)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Object of type `{}` is not valid as a `make_dataclass` field type",
+                                        field_value_ty.display(db)
+                                    ));
+                                }
+                                error.fallback_type
+                            });
 
                         Some((field_name, field_ty, None))
                     }
-                    3 => {
+                    [name_expr, type_expr, default_expr] => {
                         // (name, type, default_or_field)
-                        let name_expr = &field_elements[0];
                         let name_ty = self.expression_type(name_expr);
                         let name_lit = name_ty.as_string_literal()?;
                         let field_name = Name::new(name_lit.value(db));
 
-                        let type_expr = &field_elements[1];
-                        let field_ty = self
-                            .expression_type(type_expr)
+                        let field_value_ty = self.expression_type(type_expr);
+                        let field_ty = field_value_ty
                             .in_type_expression(db, self.scope(), self.typevar_binding_context)
-                            .unwrap_or(Type::any());
+                            .unwrap_or_else(|error| {
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, type_expr)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Object of type `{}` is not valid as a `make_dataclass` field type",
+                                        field_value_ty.display(db)
+                                    ));
+                                }
+                                error.fallback_type
+                            });
 
                         // The third element can be either a direct default value or a Field object.
                         // If it's a Field instance, we can't easily extract the default, so leave it as None.
                         // Otherwise, use the value's type as the default type.
-                        let default_expr = &field_elements[2];
                         let default_ty_value = self.expression_type(default_expr);
                         let default_ty = if default_ty_value.is_instance_of(db, KnownClass::Field) {
                             None

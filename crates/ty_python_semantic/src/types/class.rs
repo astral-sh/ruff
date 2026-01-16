@@ -5211,9 +5211,7 @@ fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db>
 }
 
 /// Field information for synthesizing dataclass methods.
-///
-/// This is a common representation used by both `DynamicDataclassLiteral` and `StaticClassLiteral`
-/// to share the method synthesis logic.
+#[derive(Debug, Clone)]
 struct DataclassFieldInfo<'db> {
     /// The field name (or alias if provided).
     name: Name,
@@ -5228,9 +5226,6 @@ struct DataclassFieldInfo<'db> {
 }
 
 /// Synthesize a dataclass class member given the dataclass flags, instance type, and fields.
-///
-/// This is used by both `DynamicDataclassLiteral` and `StaticClassLiteral` (for declarative
-/// dataclasses) to avoid duplicating the synthesis logic.
 fn synthesize_dataclass_class_member<'db>(
     db: &'db dyn Db,
     name: &str,
@@ -5284,7 +5279,7 @@ fn synthesize_dataclass_dunder_method<'db>(
 ) -> Option<Type<'db>> {
     match name {
         "__setattr__" if flags.contains(DataclassFlags::FROZEN) => {
-            // Frozen dataclasses have __setattr__ that returns Never (immutable).
+            // Frozen dataclasses have `__setattr__` that returns `Never` (immutable).
             let signature = Signature::new(
                 Parameters::new(
                     db,
@@ -6020,15 +6015,16 @@ impl<'db> DynamicDataclassLiteral<'db> {
 
         // For dynamic dataclasses, all fields have init=true and kw_only comes from the class flag.
         let kw_only = flags.contains(DataclassFlags::KW_ONLY);
-        let fields_iter = self.fields(db).iter().map(|(name, ty, default_ty)| {
-            DataclassFieldInfo {
+        let fields_iter = self
+            .fields(db)
+            .iter()
+            .map(|(name, ty, default_ty)| DataclassFieldInfo {
                 name: name.clone(),
                 ty: *ty,
                 default_ty: *default_ty,
                 init: true,
                 kw_only,
-            }
-        });
+            });
 
         synthesize_dataclass_class_member(db, name, instance_ty, flags, fields_iter)
     }
