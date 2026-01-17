@@ -94,7 +94,7 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum UnionElement<'db> {
     IntLiterals(FxOrderSet<i64>),
     StringLiterals(FxOrderSet<StringLiteralType<'db>>),
@@ -613,6 +613,12 @@ impl<'db> UnionBuilder<'db> {
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        // First do a quick check to see if the type is trivially contained
+        // in the union.
+        if self.elements.contains(&UnionElement::Type(ty)) {
+            return;
+        }
+
         let bool_pair = if let Type::BooleanLiteral(b) = ty {
             Some(Type::BooleanLiteral(!b))
         } else {
@@ -644,10 +650,6 @@ impl<'db> UnionBuilder<'db> {
                     return;
                 }
             };
-
-            if ty == element_type {
-                return;
-            }
 
             if Some(element_type) == bool_pair {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
@@ -1064,6 +1066,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
 
             _ => {
+                if self.positive.contains(&new_positive) {
+                    return;
+                }
+
                 let positive_as_instance = new_positive.as_nominal_instance();
 
                 if let Some(instance) = positive_as_instance
@@ -1225,6 +1231,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             _ => {
+                if self.negative.contains(&new_negative) {
+                    return;
+                }
+
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
