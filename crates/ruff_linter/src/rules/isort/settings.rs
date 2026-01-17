@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::display_settings;
+use crate::line_width::LineLength;
 use crate::rules::isort::ImportType;
 use crate::rules::isort::categorize::KnownModules;
 use ruff_macros::CacheKey;
@@ -47,6 +48,8 @@ pub struct Settings {
     pub combine_as_imports: bool,
     pub force_single_line: bool,
     pub force_sort_within_sections: bool,
+    pub lexicographical: bool,
+    pub group_by_package: bool,
     pub case_sensitive: bool,
     pub force_wrap_aliases: bool,
     pub force_to_top: FxHashSet<String>,
@@ -69,6 +72,7 @@ pub struct Settings {
     pub from_first: bool,
     pub length_sort: bool,
     pub length_sort_straight: bool,
+    pub line_length: Option<LineLength>,
 }
 
 impl Settings {
@@ -101,6 +105,8 @@ impl Default for Settings {
             combine_as_imports: false,
             force_single_line: false,
             force_sort_within_sections: false,
+            lexicographical: false,
+            group_by_package: false,
             detect_same_package: true,
             case_sensitive: false,
             force_wrap_aliases: false,
@@ -123,6 +129,7 @@ impl Default for Settings {
             from_first: false,
             length_sort: false,
             length_sort_straight: false,
+            line_length: None,
         }
     }
 }
@@ -137,6 +144,8 @@ impl Display for Settings {
                 self.combine_as_imports,
                 self.force_single_line,
                 self.force_sort_within_sections,
+                self.lexicographical,
+                self.group_by_package,
                 self.detect_same_package,
                 self.case_sensitive,
                 self.force_wrap_aliases,
@@ -158,7 +167,8 @@ impl Display for Settings {
                 self.no_sections,
                 self.from_first,
                 self.length_sort,
-                self.length_sort_straight
+                self.length_sort_straight,
+                self.line_length | optional
             ]
         }
         Ok(())
