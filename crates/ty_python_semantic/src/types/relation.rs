@@ -368,6 +368,124 @@ impl<'db> Type<'db> {
         }
 
         match (self, target) {
+            // These branches here are quick optimisations to exclude
+            // fully static variants that we know are always mutually disjoint.
+            (
+                Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
+                | Type::WrapperDescriptor(..)
+                | Type::ModuleLiteral(..)
+                | Type::ClassLiteral(..)
+                | Type::SpecialForm(..),
+                Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
+                | Type::WrapperDescriptor(..)
+                | Type::ModuleLiteral(..)
+                | Type::ClassLiteral(..)
+                | Type::SpecialForm(..),
+            ) => ConstraintSet::from(self == target),
+
+            (
+                Type::TypeIs(..)
+                | Type::TypeGuard(..)
+                | Type::BoundSuper(_)
+                | Type::PropertyInstance(_),
+                Type::LiteralString,
+            )
+            | (
+                Type::LiteralString,
+                Type::TypeIs(..)
+                | Type::TypeGuard(..)
+                | Type::BoundSuper(_)
+                | Type::PropertyInstance(_),
+            )
+            | (
+                Type::TypedDict(..),
+                Type::LiteralString
+                | Type::TypeIs(..)
+                | Type::TypeGuard(..)
+                | Type::BoundSuper(_)
+                | Type::PropertyInstance(_),
+            )
+            | (
+                Type::TypeGuard(..) | Type::LiteralString | Type::TypeIs(..),
+                Type::TypedDict(..) | Type::BoundSuper(_) | Type::PropertyInstance(_),
+            )
+            | (
+                Type::TypeIs(..)
+                | Type::TypeGuard(..)
+                | Type::LiteralString
+                | Type::TypedDict(..)
+                | Type::BoundSuper(_)
+                | Type::PropertyInstance(_),
+                Type::ClassLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
+                | Type::WrapperDescriptor(..)
+                | Type::ModuleLiteral(..)
+                | Type::SpecialForm(..)
+                | Type::SubclassOf(..),
+            )
+            | (
+                Type::ClassLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
+                | Type::WrapperDescriptor(..)
+                | Type::ModuleLiteral(..)
+                | Type::SubclassOf(_)
+                | Type::SpecialForm(..),
+                Type::TypeIs(..)
+                | Type::TypeGuard(..)
+                | Type::LiteralString
+                | Type::TypedDict(..)
+                | Type::BoundSuper(_)
+                | Type::PropertyInstance(_),
+            )
+            | (
+                Type::SubclassOf(..) | Type::GenericAlias(..),
+                Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::LiteralString
+                | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
+                | Type::KnownBoundMethod(..)
+                | Type::WrapperDescriptor(..)
+                | Type::TypedDict(..)
+                | Type::ModuleLiteral(..)
+                | Type::BoundSuper(_)
+                | Type::PropertyInstance(_),
+            )
+            | (
+                Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::LiteralString
+                | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::BoundMethod(..)
+                | Type::KnownBoundMethod(..)
+                | Type::TypedDict(..)
+                | Type::WrapperDescriptor(..)
+                | Type::ModuleLiteral(..)
+                | Type::BoundSuper(_)
+                | Type::PropertyInstance(_),
+                Type::SubclassOf(..) | Type::GenericAlias(..),
+            ) => ConstraintSet::from(false),
+
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.is_object() => {
                 ConstraintSet::from(true)
@@ -924,27 +1042,6 @@ impl<'db> Type<'db> {
                     disjointness_visitor,
                 )
             }
-
-            // No literal type is a subtype of any other literal type, unless they are the same
-            // type (which is handled above). This case is not necessary from a correctness
-            // perspective (the fallback cases below will handle it correctly), but it is important
-            // for performance of simplifying large unions of literal types.
-            (
-                Type::StringLiteral(_)
-                | Type::IntLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_)
-                | Type::EnumLiteral(_),
-                Type::StringLiteral(_)
-                | Type::IntLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_)
-                | Type::EnumLiteral(_),
-            ) => ConstraintSet::from(false),
 
             (Type::Callable(self_callable), Type::Callable(other_callable)) => relation_visitor
                 .visit((self, target, relation), || {
