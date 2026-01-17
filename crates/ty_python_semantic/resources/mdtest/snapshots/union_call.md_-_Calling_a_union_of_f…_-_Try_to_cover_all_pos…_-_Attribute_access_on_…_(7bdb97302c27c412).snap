@@ -3,7 +3,7 @@ source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - attribute access on typevar with union upper bound
+mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - Attribute access on a typevar with multiple bounds
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
 ---
 
@@ -16,56 +16,30 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
  2 | 
  3 | class A:
  4 |     def foo(self, x: int) -> Self:
- 5 |         pass
+ 5 |         return self
  6 | 
  7 | class B:
  8 |     def foo(self, x: str) -> Self:
- 9 |         pass
+ 9 |         return self
 10 | 
 11 | T = TypeVar("T", A, B)
 12 | 
 13 | def _(x: T, y: int) -> T:
-14 |     return x.foo(y)
+14 |     # error: [invalid-argument-type]
+15 |     # error: [invalid-argument-type]
+16 |     # error: [invalid-argument-type]
+17 |     return x.foo(y)
 ```
 
 # Diagnostics
 
 ```
-error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `Self@foo`
- --> src/mdtest_snippet.py:4:30
-  |
-3 | class A:
-4 |     def foo(self, x: int) -> Self:
-  |                              ^^^^
-5 |         pass
-  |
-info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: Only functions in stub files, methods on protocol classes, or methods with `@abstractmethod` are permitted to have empty bodies
-info: rule `invalid-return-type` is enabled by default
-
-```
-
-```
-error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `Self@foo`
- --> src/mdtest_snippet.py:8:30
-  |
-7 | class B:
-8 |     def foo(self, x: str) -> Self:
-  |                              ^^^^
-9 |         pass
-  |
-info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: Only functions in stub files, methods on protocol classes, or methods with `@abstractmethod` are permitted to have empty bodies
-info: rule `invalid-return-type` is enabled by default
-
-```
-
-```
 error[invalid-argument-type]: Argument to bound method `foo` is incorrect
-  --> src/mdtest_snippet.py:14:12
+  --> src/mdtest_snippet.py:17:12
    |
-13 | def _(x: T, y: int) -> T:
-14 |     return x.foo(y)
+15 |     # error: [invalid-argument-type]
+16 |     # error: [invalid-argument-type]
+17 |     return x.foo(y)
    |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `A` of type variable `Self`
    |
 info: Type variable defined here
@@ -76,7 +50,7 @@ info: Type variable defined here
 3 | class A:
   |       ^
 4 |     def foo(self, x: int) -> Self:
-5 |         pass
+5 |         return self
   |
 info: Union variant `bound method T@_.foo(x: int) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
@@ -86,21 +60,22 @@ info: rule `invalid-argument-type` is enabled by default
 
 ```
 error[invalid-argument-type]: Argument to bound method `foo` is incorrect
-  --> src/mdtest_snippet.py:14:12
+  --> src/mdtest_snippet.py:17:12
    |
-13 | def _(x: T, y: int) -> T:
-14 |     return x.foo(y)
+15 |     # error: [invalid-argument-type]
+16 |     # error: [invalid-argument-type]
+17 |     return x.foo(y)
    |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `B` of type variable `Self`
    |
 info: Type variable defined here
  --> src/mdtest_snippet.py:7:7
   |
-5 |         pass
+5 |         return self
 6 |
 7 | class B:
   |       ^
 8 |     def foo(self, x: str) -> Self:
-9 |         pass
+9 |         return self
   |
 info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
@@ -110,10 +85,11 @@ info: rule `invalid-argument-type` is enabled by default
 
 ```
 error[invalid-argument-type]: Argument to bound method `foo` is incorrect
-  --> src/mdtest_snippet.py:14:18
+  --> src/mdtest_snippet.py:17:18
    |
-13 | def _(x: T, y: int) -> T:
-14 |     return x.foo(y)
+15 |     # error: [invalid-argument-type]
+16 |     # error: [invalid-argument-type]
+17 |     return x.foo(y)
    |                  ^ Expected `str`, found `int`
    |
 info: Method defined here
@@ -122,7 +98,7 @@ info: Method defined here
 7 | class B:
 8 |     def foo(self, x: str) -> Self:
   |         ^^^       ------ Parameter declared here
-9 |         pass
+9 |         return self
   |
 info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
