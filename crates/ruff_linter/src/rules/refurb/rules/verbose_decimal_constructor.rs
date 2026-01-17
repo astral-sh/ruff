@@ -1,15 +1,15 @@
+use std::borrow::Cow;
+
+use itertools::Itertools;
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_trivia::PythonWhitespace;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
-use itertools::Itertools;
-use ruff_diagnostics::Applicability;
-use ruff_python_ast::{self as ast, Expr};
-use ruff_python_trivia::PythonWhitespace;
-use ruff_text_size::Ranged;
-use std::borrow::Cow;
-
 /// ## What it does
 /// Checks for unnecessary string literal or float casts in `Decimal`
 /// constructors.
