@@ -125,6 +125,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
+    registry.register_lint(&INVALID_TYPED_DICT);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -2324,6 +2325,34 @@ declare_lint! {
     pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
         summary: "detects invalid statements in `TypedDict` class bodies",
         status: LintStatus::stable("0.0.9"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalidly defined `TypedDict` classes.
+    ///
+    /// ## Why is this bad?
+    /// An invalidly defined `TypedDict` class may lead to the type checker
+    /// drawing incorrect conclusions. It may also lead to `TypeError`s or
+    /// `AttributeError`s at runtime.
+    ///
+    /// ## Examples
+    /// A `TypedDict` class cannot be decorated with `@dataclass`, as this will
+    /// cause an `AttributeError` at runtime when instantiating the class:
+    ///
+    /// ```python
+    /// from dataclasses import dataclass
+    /// from typing import TypedDict
+    ///
+    /// @dataclass  # error: [invalid-typed-dict]
+    /// class Foo(TypedDict):
+    ///     x: int
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT = {
+        summary: "detects invalid `TypedDict` class definitions",
+        status: LintStatus::preview("0.0.1-alpha.20"),
         default_level: Level::Error,
     }
 }

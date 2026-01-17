@@ -585,6 +585,15 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns whether this class is a `NamedTuple`.
+    pub fn is_named_tuple(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::DynamicNamedTuple(_) => true,
+            Self::Static(class) => class.is_named_tuple(db),
+            Self::Dynamic(_) => false,
+        }
+    }
+
     /// Returns whether this class is `builtins.tuple` exactly
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         match self {
@@ -803,11 +812,6 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns a new `ClassLiteral` with the given dataclass params, preserving all other fields.
-    ///
-    /// TODO: Applying `@dataclasses.dataclass` to a `NamedTuple` subclass doesn't fail at runtime
-    /// (e.g., `@dataclasses.dataclass class Foo(NamedTuple): ...`), and neither does
-    /// `dataclasses.dataclass(collections.namedtuple("A", ()))`. We should either infer these
-    /// accurately or emit a diagnostic on them.
     pub(crate) fn with_dataclass_params(
         self,
         db: &'db dyn Db,
@@ -2691,6 +2695,18 @@ impl<'db> StaticClassLiteral<'db> {
 
         self.iter_mro(db, None)
             .any(|base| matches!(base, ClassBase::TypedDict))
+    }
+
+    /// Return `true` if this class is a `NamedTuple` (inherits from `typing.NamedTuple`,
+    /// either directly or indirectly, including functional forms like `NamedTuple("X", ...)`).
+    pub fn is_named_tuple(self, db: &'db dyn Db) -> bool {
+        self.explicit_bases(db).iter().any(|base| match base {
+            Type::SpecialForm(SpecialFormType::NamedTuple) => true,
+            Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(_)) => true,
+            Type::ClassLiteral(ClassLiteral::Static(class)) => class.is_named_tuple(db),
+            Type::GenericAlias(alias) => alias.origin(db).is_named_tuple(db),
+            _ => false,
+        })
     }
 
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.

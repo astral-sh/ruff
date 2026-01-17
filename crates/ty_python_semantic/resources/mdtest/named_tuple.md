@@ -1427,6 +1427,92 @@ class Child(Base):
     _asdict = 42
 ```
 
+## `NamedTuple` with `@dataclass` decorator
+
+Applying `@dataclass` to a `NamedTuple` class is invalid and will cause an `AttributeError` at
+runtime when instantiating the class:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+# error: [invalid-named-tuple] "Class `Foo` inherits from `NamedTuple` and is decorated with `@dataclass`, which will cause a runtime error"
+@dataclass
+class Foo(NamedTuple):
+    x: int
+    y: str
+```
+
+The same error occurs with `dataclasses.dataclass` used as a function call:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+# error: [invalid-named-tuple]
+@dataclass()
+class Bar(NamedTuple):
+    x: int
+```
+
+It also applies when using `frozen=True` or other dataclass parameters:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+# error: [invalid-named-tuple]
+@dataclass(frozen=True)
+class Baz(NamedTuple):
+    x: int
+```
+
+Classes that inherit from a `NamedTuple` subclass (indirectly inheriting from `NamedTuple`) also
+cannot be decorated with `@dataclass`:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+class Base(NamedTuple):
+    x: int
+
+# error: [invalid-named-tuple]
+@dataclass
+class Child(Base):
+    y: str
+```
+
+The same restriction applies to classes inheriting from functional namedtuples:
+
+```py
+from dataclasses import dataclass
+from collections import namedtuple
+from typing import NamedTuple
+
+# error: [invalid-named-tuple]
+@dataclass
+class Foo(namedtuple("Foo", ["x", "y"])):
+    pass
+
+# error: [invalid-named-tuple]
+@dataclass
+class Bar(NamedTuple("Bar", [("x", int), ("y", str)])):
+    pass
+```
+
+The same applies when using `dataclass` as a function on a functional `NamedTuple`:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+# TODO: This should emit `invalid-named-tuple` but currently emits `no-matching-overload`
+# due to overload resolution not matching `DynamicNamedTuple` against `type[_T]`.
+# error: [no-matching-overload]
+X = dataclass(NamedTuple("X", [("x", int)]))
+```
+
 ## Edge case: multiple reachable definitions with distinct issues
 
 <!-- snapshot-diagnostics -->

@@ -28,8 +28,9 @@ use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
-    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
-    POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    INVALID_NAMED_TUPLE, INVALID_TYPED_DICT, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
+    PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS,
+    UNKNOWN_ARGUMENT,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -613,9 +614,15 @@ impl<'db> Bindings<'db> {
 
                     Type::DataclassDecorator(params) => match overload.parameter_types() {
                         [Some(Type::ClassLiteral(class_literal))] => {
-                            overload.set_return_type(Type::from(
-                                class_literal.with_dataclass_params(db, Some(params)),
-                            ));
+                            if class_literal.is_named_tuple(db) {
+                                overload.errors.push(BindingError::DataclassOnNamedTuple);
+                            } else if class_literal.is_typed_dict(db) {
+                                overload.errors.push(BindingError::DataclassOnTypedDict);
+                            } else {
+                                overload.set_return_type(Type::from(
+                                    class_literal.with_dataclass_params(db, Some(params)),
+                                ));
+                            }
                         }
                         [Some(Type::GenericAlias(generic_alias))] => {
                             let new_origin = generic_alias
@@ -1137,10 +1144,16 @@ impl<'db> Bindings<'db> {
                             if let [Some(Type::ClassLiteral(class_literal))] =
                                 overload.parameter_types()
                             {
-                                let params = DataclassParams::default_params(db);
-                                overload.set_return_type(Type::from(
-                                    class_literal.with_dataclass_params(db, Some(params)),
-                                ));
+                                if class_literal.is_named_tuple(db) {
+                                    overload.errors.push(BindingError::DataclassOnNamedTuple);
+                                } else if class_literal.is_typed_dict(db) {
+                                    overload.errors.push(BindingError::DataclassOnTypedDict);
+                                } else {
+                                    let params = DataclassParams::default_params(db);
+                                    overload.set_return_type(Type::from(
+                                        class_literal.with_dataclass_params(db, Some(params)),
+                                    ));
+                                }
                             }
                         }
 
@@ -4197,6 +4210,10 @@ pub(crate) enum BindingError<'db> {
     /// represents the infinite union of all callables. While such types *are* callable (they pass
     /// `callable()`), any specific call should fail because we don't know the actual signature.
     CalledTopCallable(Type<'db>),
+    /// The `@dataclass` decorator was applied to a `NamedTuple`, which will fail at runtime.
+    DataclassOnNamedTuple,
+    /// The `@dataclass` decorator was applied to a `TypedDict`, which will fail at runtime.
+    DataclassOnTypedDict,
 }
 
 impl<'db> BindingError<'db> {
@@ -4642,6 +4659,26 @@ impl<'db> BindingError<'db> {
                     if let Some(union_diag) = union_diag {
                         union_diag.add_union_context(context.db(), &mut diag);
                     }
+                }
+            }
+
+            Self::DataclassOnNamedTuple => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, node) {
+                    builder.into_diagnostic(
+                        "Cannot use `@dataclass` on a `NamedTuple` class; \
+                        this will cause a runtime error",
+                    );
+                }
+            }
+
+            Self::DataclassOnTypedDict => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&INVALID_TYPED_DICT, node) {
+                    builder.into_diagnostic(
+                        "Cannot use `@dataclass` on a `TypedDict` class; \
+                        this will cause a runtime error",
+                    );
                 }
             }
         }
