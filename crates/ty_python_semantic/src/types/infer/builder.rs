@@ -8699,10 +8699,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // We silence diagnostics until we successfully narrow to a specific type.
-        let mut speculated_bindings = bindings.clone();
         let was_in_multi_inference = self.context.set_multi_inference(true);
 
         let mut try_narrow = |narrowed_ty| {
+            let mut speculated_bindings = bindings.clone();
             let narrowed_tcx = TypeContext::new(Some(narrowed_ty));
 
             // Attempt to infer the argument types using the narrowed type context.
