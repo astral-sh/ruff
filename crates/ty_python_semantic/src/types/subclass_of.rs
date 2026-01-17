@@ -195,6 +195,20 @@ impl<'db> SubclassOfType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
+        // For Self type variables with instance bounds (e.g., `Self@Model` bounded by `Model`),
+        // we need to look up class-level attributes in the class's MRO. Check this BEFORE
+        // `with_transposed_type_var` which would convert the instance bound to a SubclassOf.
+        if let SubclassOfInner::TypeVar(bound_typevar) = self.subclass_of {
+            if bound_typevar.typevar(db).is_self(db) {
+                if let Some(TypeVarBoundOrConstraints::UpperBound(Type::NominalInstance(
+                    instance,
+                ))) = bound_typevar.typevar(db).bound_or_constraints(db)
+                {
+                    return Some(instance.class(db).class_member(db, name, policy));
+                }
+            }
+        }
+
         let class_like = match self.subclass_of.with_transposed_type_var(db) {
             SubclassOfInner::Class(class) => Type::from(class),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
