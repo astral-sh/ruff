@@ -122,6 +122,17 @@ async def _():
     [reveal_type(x) async for x in range(3)]
 ```
 
+## Comprehension value type
+
+The type of the expression being iterated over is immutable, and so should not be widened with
+`Unknown` or through literal promotion:
+
+```py
+# TODO: This should reveal `Literal["a", "b"]`
+# revealed: Unknown | str
+x = [reveal_type(string) for string in ["a", "b"]]
+```
+
 ## Comprehension expression types
 
 The type of the comprehension expression itself should reflect the inferred element type:
@@ -129,16 +140,16 @@ The type of the comprehension expression itself should reflect the inferred elem
 ```py
 from typing import TypedDict, Literal
 
-# revealed: list[int | Unknown]
+# revealed: list[Unknown | int]
 reveal_type([x for x in range(10)])
 
-# revealed: set[int | Unknown]
+# revealed: set[Unknown | int]
 reveal_type({x for x in range(10)})
 
-# revealed: dict[int | Unknown, str | Unknown]
+# revealed: dict[Unknown | int, Unknown | str]
 reveal_type({x: str(x) for x in range(10)})
 
-# revealed: list[tuple[int, Unknown | str] | Unknown]
+# revealed: list[Unknown | tuple[int, Unknown | str]]
 reveal_type([(x, y) for x in range(5) for y in ["a", "b", "c"]])
 
 squares: list[int | None] = [x**2 for x in range(10)]
@@ -148,27 +159,34 @@ reveal_type(squares)  # revealed: list[int | None]
 Inference for comprehensions takes the type context into account:
 
 ```py
+from typing import Sequence
+
 # Without type context:
 reveal_type([x for x in [1, 2, 3]])  # revealed: list[Unknown | int]
-reveal_type({x: "a" for x in [1, 2, 3]})  # revealed: dict[Unknown | int, str | Unknown]
-reveal_type({str(x): x for x in [1, 2, 3]})  # revealed: dict[str | Unknown, Unknown | int]
+reveal_type({x: "a" for x in [1, 2, 3]})  # revealed: dict[Unknown | int, Unknown | str]
+reveal_type({str(x): x for x in [1, 2, 3]})  # revealed: dict[Unknown | str, Unknown | int]
 reveal_type({x for x in [1, 2, 3]})  # revealed: set[Unknown | int]
 
 # With type context:
-xs: list[int] = [x for x in [1, 2, 3]]
-reveal_type(xs)  # revealed: list[int]
+x1: list[int] = [x for x in [1, 2, 3]]
+reveal_type(x1)  # revealed: list[int]
 
-ys: dict[int, str] = {x: str(x) for x in [1, 2, 3]}
-reveal_type(ys)  # revealed: dict[int, str]
+x2: Sequence[int] = [x for x in [1, 2, 3]]
+# TODO: This should reveal `list[int]`.
+reveal_type(x2)  # revealed: list[Unknown | int]
 
-zs: set[int] = {x for x in [1, 2, 3]}
+x3: dict[int, str] = {x: str(x) for x in [1, 2, 3]}
+reveal_type(x3)  # revealed: dict[int, str]
+
+x4: set[int] = {x for x in [1, 2, 3]}
+reveal_type(x4)  # revealed: set[int]
 ```
 
 This also works for nested comprehensions:
 
 ```py
 table = [[(x, y) for x in range(3)] for y in range(3)]
-reveal_type(table)  # revealed: list[list[tuple[int, int] | Unknown] | Unknown]
+reveal_type(table)  # revealed: list[Unknown | list[Unknown | tuple[int, int]]]
 
 table_with_content: list[list[tuple[int, int, str | None]]] = [[(x, y, None) for x in range(3)] for y in range(3)]
 reveal_type(table_with_content)  # revealed: list[list[tuple[int, int, str | None]]]
@@ -177,25 +195,30 @@ reveal_type(table_with_content)  # revealed: list[list[tuple[int, int, str | Non
 The type context is propagated down into the comprehension:
 
 ```py
+y1: list[list[int]] = [[n] for n in [1, 2, 3]]
+reveal_type(y1)  # revealed: list[list[int]]
+
+y2: list[Sequence[int]] = [[i] for i in [1, 2, 3]]
+reveal_type(y2)  # revealed: list[Sequence[int]]
+
 class Person(TypedDict):
     name: str
 
-# TODO: This should not error.
-# error: [invalid-assignment]
-persons: list[Person] = [{"name": n} for n in ["Alice", "Bob"]]
-reveal_type(persons)  # revealed: list[Person]
+y3: list[Person] = [{"name": n} for n in ["Alice", "Bob"]]
+reveal_type(y3)  # revealed: list[Person]
 
-# TODO: This should be an invalid-key error.
 # error: [invalid-assignment]
-invalid: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
+# error: [invalid-key] "Unknown key "misspelled" for TypedDict `Person`: Unknown key "misspelled""
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+y4: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 ```
 
 We promote literals to avoid overly-precise types in invariant positions:
 
 ```py
-reveal_type([x for x in ("a", "b", "c")])  # revealed: list[str | Unknown]
-reveal_type({x for x in (1, 2, 3)})  # revealed: set[int | Unknown]
-reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[str | Unknown, int | Unknown]
+reveal_type([x for x in ("a", "b", "c")])  # revealed: list[Unknown | str]
+reveal_type({x for x in (1, 2, 3)})  # revealed: set[Unknown | int]
+reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[Unknown | str, Unknown | int]
 ```
 
 Type context can prevent this promotion from happening:

@@ -15,7 +15,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::list_members::{Member, all_members, all_reachable_members};
-use crate::types::{Type, binding_type, infer_scope_types};
+use crate::types::{Type, TypeContext, binding_type, infer_scope_types};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -358,7 +358,7 @@ impl<'db> SemanticModel<'db> {
         let index = semantic_index(self.db, self.file);
         let file_scope = index.expression_scope_id(&expr);
         let scope = file_scope.to_scope_id(self.db, self.file);
-        if !infer_scope_types(self.db, scope).is_string_annotation(expr) {
+        if !infer_scope_types(self.db, scope, TypeContext::default()).is_string_annotation(expr) {
             return None;
         }
 
@@ -467,7 +467,7 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        infer_scope_types(model.db, scope).try_expression_type(*self)
+        infer_scope_types(model.db, scope, TypeContext::default()).try_expression_type(*self)
     }
 }
 
