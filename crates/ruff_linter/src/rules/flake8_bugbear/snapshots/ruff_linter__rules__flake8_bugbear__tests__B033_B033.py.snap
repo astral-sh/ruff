@@ -157,7 +157,7 @@ help: Remove duplicate item
    -     1,
 20 | }
 21 | incorrect_set = {False, 1, 0}
-22 | 
+22 | incorrect_set_multiline_with_comment = {
 
 B033 [*] Sets should not contain duplicate items, but `False` and `0` has the same value
   --> B033.py:22:28
@@ -166,8 +166,8 @@ B033 [*] Sets should not contain duplicate items, but `False` and `0` has the sa
 21 | }
 22 | incorrect_set = {False, 1, 0}
    |                            ^
-23 |
-24 | ###
+23 | incorrect_set_multiline_with_comment = {
+24 |     "value1",
    |
 help: Remove duplicate item
 19 |     1,
@@ -175,6 +175,26 @@ help: Remove duplicate item
 21 | }
    - incorrect_set = {False, 1, 0}
 22 + incorrect_set = {False, 1}
-23 | 
-24 | ###
-25 | # Non-errors.
+23 | incorrect_set_multiline_with_comment = {
+24 |     "value1",
+25 |     23,
+
+B033 [*] Sets should not contain duplicate item `"value1"`
+  --> B033.py:27:5
+   |
+25 |     23,
+26 |     # B033
+27 |     "value1",
+   |     ^^^^^^^^
+28 | }
+   |
+help: Remove duplicate item
+23 | incorrect_set_multiline_with_comment = {
+24 |     "value1",
+25 |     23,
+   -     # B033
+   -     "value1",
+26 | }
+27 | 
+28 | ###
+note: This is an unsafe fix and may change runtime behavior
