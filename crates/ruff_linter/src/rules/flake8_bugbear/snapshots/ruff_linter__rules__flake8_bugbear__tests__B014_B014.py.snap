@@ -96,3 +96,34 @@ help: De-duplicate exceptions
    - except(re.error, re.error):
 89 + except re.error:
 90 |     p
+91 | 
+92 | 
+
+B014 [*] Exception handler with duplicate exception: `ValueError`
+   --> B014.py:95:8
+    |
+ 93 |   try:
+ 94 |       pass
+ 95 |   except (
+    |  ________^
+ 96 | |     ValueError,
+ 97 | |     ValueError,
+ 98 | |     # text
+ 99 | |     TypeError,
+100 | | ):
+    | |_^
+101 |       pass
+    |
+help: De-duplicate exceptions
+92 | 
+93 | try:
+94 |     pass
+   - except (
+   -     ValueError,
+   -     ValueError,
+   -     # text
+   -     TypeError,
+   - ):
+95 + except (ValueError, TypeError):
+96 |     pass
+note: This is an unsafe fix and may change runtime behavior
