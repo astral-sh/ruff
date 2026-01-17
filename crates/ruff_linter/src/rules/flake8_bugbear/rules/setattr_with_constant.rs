@@ -111,7 +111,8 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     // attribute syntax (e.g., `obj.attr = value`) would normalize the name and potentially change
     // program behavior.
     let attr_name = name.to_str();
-    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name;
+    let has_comments = checker.comment_ranges().intersects(expr.range());
+    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
 
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
