@@ -40,7 +40,7 @@ import sys
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
 from functools import reduce
-from itertools import chain, filterfalse, groupby, tee
+from itertools import chain, groupby
 from operator import attrgetter, or_
 from pathlib import Path
 from textwrap import dedent
@@ -435,19 +435,17 @@ def render_grouped_diagnostics(
             diag for diag in grouped if diag.change in (Change.ADDED, Change.REMOVED)
         ]
 
-    g1, g2 = tee(grouped)
-    required, optional = (
-        filterfalse(attrgetter("optional"), g1),
-        filter(attrgetter("optional"), g2),
-    )
-    required = sorted(
-        required,
-        key=attrgetter("classification"),
+    get_change = attrgetter("change")
+    get_classification = attrgetter("classification")
+
+    optional_diagnostics = sorted(
+        (diag for diag in grouped if diag.optional),
+        key=get_change,
         reverse=True,
     )
-    optional = sorted(
-        optional,
-        key=attrgetter("change"),
+    required_diagnostics = sorted(
+        (diag for diag in grouped if not diag.optional),
+        key=get_classification,
         reverse=True,
     )
 
@@ -466,8 +464,8 @@ def render_grouped_diagnostics(
 
     lines = []
     for group, diagnostics in chain(
-        groupby(required, key=attrgetter("classification")),
-        groupby(optional, key=attrgetter("change")),
+        groupby(required_diagnostics, key=get_classification),
+        groupby(optional_diagnostics, key=get_change),
     ):
         lines.append(f"### {group.into_title()}")
         lines.extend(["", "<details>", ""])
