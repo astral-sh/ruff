@@ -191,8 +191,7 @@ reveal_type(Hexagon().area)  # revealed: Unknown
 
 The runtime package is a regular package but the stubs are namespace packages. Pyright skips the
 stub package if the "regular" package isn't a namespace package. I'm not aware that the behavior
-here is specified, and using the stubs without probing the runtime package first requires slightly
-fewer lookups.
+here is specified, but we currently agree with pyright here.
 
 ```toml
 [environment]
@@ -202,17 +201,13 @@ extra-paths = ["/packages"]
 `/packages/shapes-stubs/polygons/pentagon.pyi`:
 
 ```pyi
-class Pentagon:
-    sides: int
-    area: float
+class Pentagon: ...
 ```
 
 `/packages/shapes-stubs/polygons/hexagon.pyi`:
 
 ```pyi
-class Hexagon:
-    sides: int
-    area: float
+class Hexagon: ...
 ```
 
 `/packages/shapes/__init__.py`:
@@ -228,13 +223,17 @@ class Hexagon:
 `/packages/shapes/polygons/pentagon.py`:
 
 ```py
-class Pentagon: ...
+class Pentagon:
+    sides: int
+    area: float
 ```
 
 `/packages/shapes/polygons/hexagon.py`:
 
 ```py
-class Hexagon: ...
+class Hexagon:
+    sides: int
+    area: float
 ```
 
 `main.py`:
