@@ -42,6 +42,8 @@ mod junit;
 mod pylint;
 #[cfg(feature = "serde")]
 mod rdjson;
+#[cfg(feature = "serde")]
+pub mod sarif;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///
@@ -145,6 +147,19 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             DiagnosticFormat::Github => {
                 GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "serde")]
+            DiagnosticFormat::Sarif => {
+                use crate::diagnostic::SarifToolInfo;
+
+                sarif::SarifRenderer::new(
+                    self.resolver,
+                    SarifToolInfo {
+                        name: "ty",
+                        information_uri: "https://github.com/astral-sh/ty",
+                    },
+                )
+                .render(f, self.diagnostics)?;
             }
         }
 
