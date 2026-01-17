@@ -7435,74 +7435,83 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
-        fn alias_syntax_validation(expr: &ast::Expr, allow_context_dependent: bool) -> bool {
-            match expr {
-                ast::Expr::Name(_) | ast::Expr::StringLiteral(_) | ast::Expr::NoneLiteral(_) => {
-                    true
-                }
-                ast::Expr::Attribute(ast::ExprAttribute {
-                    value,
-                    attr: _,
-                    node_index: _,
-                    range: _,
-                    ctx: _,
-                }) => alias_syntax_validation(value, allow_context_dependent),
-                ast::Expr::Subscript(ast::ExprSubscript {
-                    value,
-                    slice,
-                    node_index: _,
-                    range: _,
-                    ctx: _,
-                }) => {
-                    if !alias_syntax_validation(value, allow_context_dependent) {
-                        return false;
+        /// Simple syntactic validation for the right-hand sides of PEP-613 type aliases.
+        ///
+        /// TODO: this is far from exhaustive and should be improved.
+        const fn alias_syntax_validation(expr: &ast::Expr) -> bool {
+            const fn inner(expr: &ast::Expr, allow_context_dependent: bool) -> bool {
+                match expr {
+                    ast::Expr::Name(_)
+                    | ast::Expr::StringLiteral(_)
+                    | ast::Expr::NoneLiteral(_) => true,
+                    ast::Expr::Attribute(ast::ExprAttribute {
+                        value,
+                        attr: _,
+                        node_index: _,
+                        range: _,
+                        ctx: _,
+                    }) => inner(value, allow_context_dependent),
+                    ast::Expr::Subscript(ast::ExprSubscript {
+                        value,
+                        slice,
+                        node_index: _,
+                        range: _,
+                        ctx: _,
+                    }) => {
+                        if !inner(value, allow_context_dependent) {
+                            return false;
+                        }
+                        match &**slice {
+                            ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                match elts.as_slice() {
+                                    [first, ..] => inner(first, true),
+                                    _ => true,
+                                }
+                            }
+                            _ => inner(slice, true),
+                        }
                     }
-                    match &**slice {
-                        ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
-                            .first()
-                            .is_none_or(|elt| alias_syntax_validation(elt, true)),
-                        _ => alias_syntax_validation(slice, true),
+                    ast::Expr::BinOp(ast::ExprBinOp {
+                        left,
+                        op,
+                        right,
+                        range: _,
+                        node_index: _,
+                    }) => {
+                        op.is_bit_or()
+                            && inner(left, allow_context_dependent)
+                            && inner(right, allow_context_dependent)
                     }
+                    ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                        op,
+                        operand,
+                        range: _,
+                        node_index: _,
+                    }) => {
+                        allow_context_dependent
+                            && matches!(op, ast::UnaryOp::UAdd | ast::UnaryOp::USub)
+                            && matches!(
+                                &**operand,
+                                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                    value: ast::Number::Int(_),
+                                    ..
+                                })
+                            )
+                    }
+                    ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value,
+                        node_index: _,
+                        range: _,
+                    }) => allow_context_dependent && value.is_int(),
+                    ast::Expr::EllipsisLiteral(_)
+                    | ast::Expr::BytesLiteral(_)
+                    | ast::Expr::BooleanLiteral(_)
+                    | ast::Expr::Starred(_)
+                    | ast::Expr::List(_) => allow_context_dependent,
+                    _ => false,
                 }
-                ast::Expr::BinOp(ast::ExprBinOp {
-                    left,
-                    op,
-                    right,
-                    range: _,
-                    node_index: _,
-                }) => {
-                    op.is_bit_or()
-                        && alias_syntax_validation(left, allow_context_dependent)
-                        && alias_syntax_validation(right, allow_context_dependent)
-                }
-                ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                    op,
-                    operand,
-                    range: _,
-                    node_index: _,
-                }) => {
-                    allow_context_dependent
-                        && matches!(op, ast::UnaryOp::UAdd | ast::UnaryOp::USub)
-                        && matches!(
-                            &**operand,
-                            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                                value: ast::Number::Int(_),
-                                ..
-                            })
-                        )
-                }
-                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value,
-                    node_index: _,
-                    range: _,
-                }) => allow_context_dependent && value.is_int(),
-                ast::Expr::EllipsisLiteral(_)
-                | ast::Expr::BytesLiteral(_)
-                | ast::Expr::BooleanLiteral(_)
-                | ast::Expr::Starred(_)
-                | ast::Expr::List(_) => allow_context_dependent,
-                _ => false,
             }
+            inner(expr, false)
         }
 
         let annotation = assignment.annotation(self.module());
@@ -7516,7 +7525,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(value) = value
             && declared.qualifiers.contains(TypeQualifiers::PEP_613_ALIAS)
-            && !alias_syntax_validation(value, false)
+            && !alias_syntax_validation(value)
             && let Some(builder) = self.context.report_lint(
                 &INVALID_TYPE_FORM,
                 definition.full_range(self.db(), self.module()),
