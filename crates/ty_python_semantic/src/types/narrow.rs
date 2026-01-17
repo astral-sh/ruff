@@ -1228,7 +1228,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     && let Some(target) = PlaceExpr::try_from_expr(single_argument)
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
                     // if `Y` is a final class
-                    && (class.is_final(self.db) || is_positive)
+                    && (is_positive || class.is_final(self.db))
                     && let Type::ClassLiteral(called_class) = inference.expression_type(func)
                     && called_class.is_known(self.db, KnownClass::Type)
                 {
