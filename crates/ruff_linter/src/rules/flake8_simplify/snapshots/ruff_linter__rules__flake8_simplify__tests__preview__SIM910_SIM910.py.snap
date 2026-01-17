@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+assertion_line: 78
 ---
 SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
  --> SIM910.py:2:1
@@ -244,3 +245,27 @@ help: Replace `ages.get(get_key(), None)` with `ages.get(get_key())`
 83 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
    - age = ages.get(get_key(), None)
 84 + age = ages.get(get_key())
+85 | 
+86 | 
+87 | # Comment preservation tests (https://github.com/astral-sh/ruff/issues/18775)
+
+SIM910 [*] Use `dict.get()` without default value
+  --> SIM910.py:90:7
+   |
+88 |   # Fixes that delete comments should be marked as unsafe
+89 |   ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+90 |   age = ages.get(  # comment
+   |  _______^
+91 | |     "Cat", None
+92 | | )
+   | |_^
+   |
+help: Remove default value
+87 | # Comment preservation tests (https://github.com/astral-sh/ruff/issues/18775)
+88 | # Fixes that delete comments should be marked as unsafe
+89 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+   - age = ages.get(  # comment
+   -     "Cat", None
+   - )
+90 + age = ages.get("Cat")
+note: This is an unsafe fix and may change runtime behavior

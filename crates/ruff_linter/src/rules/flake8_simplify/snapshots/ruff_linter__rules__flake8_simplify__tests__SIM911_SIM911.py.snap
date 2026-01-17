@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+assertion_line: 58
 ---
 SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values())`
  --> SIM911.py:2:17
@@ -93,3 +94,28 @@ help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.
 37 | 
 38 | # Regression test for https://github.com/astral-sh/ruff/issues/18778
 39 | d = {}
+
+SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
+  --> SIM911.py:46:13
+   |
+44 |   # Fixes that delete comments should be marked as unsafe
+45 |   d = {}
+46 |   for k, v in zip(
+   |  _____________^
+47 | |     d.keys(),  # comment
+48 | |     d.values()
+49 | | ):
+   | |_^
+50 |       ...
+   |
+help: Replace `zip(dict.keys(), dict.values())` with `dict.items()`
+43 | # Comment preservation tests (https://github.com/astral-sh/ruff/issues/18775)
+44 | # Fixes that delete comments should be marked as unsafe
+45 | d = {}
+   - for k, v in zip(
+   -     d.keys(),  # comment
+   -     d.values()
+   - ):
+46 + for k, v in d.items():
+47 |     ...
+note: This is an unsafe fix and may change runtime behavior

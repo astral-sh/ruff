@@ -5,7 +5,7 @@ use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
 use crate::fix::edits;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
 
 /// ## What it does
@@ -122,10 +122,16 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
         },
         expr.range(),
     );
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        expected,
-        expr.range(),
-    )));
+    // Mark the fix as unsafe if it would delete comments.
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(expected, expr.range()),
+        applicability,
+    ));
 }
 
 fn get_var_attr_args(expr: &Expr) -> Option<(&ExprName, &Identifier, &Arguments)> {
