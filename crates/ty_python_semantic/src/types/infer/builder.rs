@@ -8594,52 +8594,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let use_constructor_call =
             class.is_some_and(|class| class.should_use_constructor_call(self.db()));
 
-        if use_constructor_call {
-            let call_arguments = CallArguments::positional([decorated_ty]);
-            match decorator_ty.try_call_constructor(
-                self.db(),
-                |_| call_arguments,
-                TypeContext::default(),
-            ) {
-                Ok(return_ty) => {
-                    if let Some(return_ty_modified) = propagatable_kind
-                        .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
-                    {
-                        return_ty_modified
-                    } else {
-                        return_ty
-                    }
-                }
-                Err(err) => {
+        let call_arguments = CallArguments::positional([decorated_ty]);
+        let return_ty = if use_constructor_call {
+            decorator_ty
+                .try_call_constructor(self.db(), |_| call_arguments, TypeContext::default())
+                .unwrap_or_else(|err| {
                     err.report_diagnostic(&self.context, decorator_ty, decorator_node.into());
                     err.return_type()
-                }
-            }
+                })
         } else {
-            match decorator_ty
-                .try_call(self.db(), &CallArguments::positional([decorated_ty]))
+            decorator_ty
+                .try_call(self.db(), &call_arguments)
                 .map(|bindings| bindings.return_type(self.db()))
-            {
-                Ok(return_ty) => {
-                    if let Some(return_ty_modified) = propagatable_kind
-                        .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
-                    {
-                        // When a method on a class is decorated with a function that returns a
-                        // `Callable`, assume that the returned callable is also function-like (or
-                        // classmethod-like or staticmethod-like). See "Decorating a method with
-                        // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
-                        // extended explanation.
-                        return_ty_modified
-                    } else {
-                        return_ty
-                    }
-                }
-                Err(CallError(_, bindings)) => {
+                .unwrap_or_else(|CallError(_, bindings)| {
                     bindings.report_diagnostics(&self.context, decorator_node.into());
                     bindings.return_type(self.db())
-                }
-            }
-        }
+                })
+        };
+
+        // When a method on a class is decorated with a function that returns a
+        // `Callable`, assume that the returned callable is also function-like (or
+        // classmethod-like or staticmethod-like). See "Decorating a method with
+        // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
+        // extended explanation.
+        propagatable_kind
+            .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
+            .unwrap_or(return_ty)
     }
 
     /// Infer the argument types for a single binding.

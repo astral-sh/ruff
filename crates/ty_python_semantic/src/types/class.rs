@@ -1927,11 +1927,11 @@ impl<'db> ClassType<'db> {
             // `tuple[int, *tuple[str, ...]]` (etc.) are handled by the default constructor-call
             // logic (we synthesize a `__new__` method for them in `ClassType::own_class_member`).
             self.is_known(db, KnownClass::Tuple) && !self.is_generic()
-        ) || self
-            .static_class_literal(db)
-            .is_some_and(|(class_literal, specialization)| {
+        ) || self.static_class_literal(db).is_some_and(
+            |(class_literal, specialization)| {
                 CodeGeneratorKind::TypedDict.matches(db, class_literal.into(), specialization)
-            });
+            },
+        );
 
         // Use regular `try_call` for all subclasses of `enum.Enum`. This is a temporary
         // special-casing until we support the functional syntax for creating enum classes.

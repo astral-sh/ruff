@@ -235,7 +235,7 @@ def takes_no_argument() -> str:
 def g(x): ...
 ```
 
-### Class decorator with wrong signature
+### Class, with wrong signature, used as a decorator
 
 When a class is used as a decorator, its constructor (`__init__` or `__new__`) must accept the
 decorated function as an argument. If the class's constructor doesn't accept the right arguments, we
@@ -257,9 +257,9 @@ def bar(): ...
 reveal_type(bar)  # revealed: int
 ```
 
-### Class decorator with correct signature
+### Class, with correct signature, used as a decorator
 
-When a class's constructor accepts the decorated function, no error is emitted:
+When a class's constructor accepts the decorated function/class, no error is emitted:
 
 ```py
 from typing import Callable
@@ -273,9 +273,20 @@ def my_func() -> int:
     return 42
 
 reveal_type(my_func)  # revealed: Wrapper
+
+class AcceptsType:
+    def __init__(self, cls: type) -> None:
+        self.cls = cls
+
+# Decorator call is validated, but the type transformation isn't applied yet.
+# TODO: Class decorator return types should transform the class binding type.
+@AcceptsType
+class MyClass: ...
+
+reveal_type(MyClass)  # revealed: <class 'MyClass'>
 ```
 
-### Generic class decorator
+### Generic class, used as a decorator
 
 Generic class decorators are validated through constructor calls:
 
@@ -294,7 +305,7 @@ def returns_str() -> str:
     return "hello"
 ```
 
-### `type[SomeClass]` decorator
+### `type[SomeClass]` used as a decorator
 
 Using `type[SomeClass]` as a decorator validates against the class's constructor:
 
