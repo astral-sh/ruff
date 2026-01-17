@@ -4437,6 +4437,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ty_completion_bench"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bstr",
+ "clap",
+ "ruff_db",
+ "ruff_text_size",
+ "ty_ide",
+ "ty_project",
+]
+
+[[package]]
 name = "ty_completion_eval"
 version = "0.0.0"
 dependencies = [
