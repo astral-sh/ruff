@@ -498,7 +498,7 @@ pub(crate) fn format_source(
                 r"(?imsx)
                 (?<before>
                     ^(?<indent>\ *)```[^\S\r\n]*
-                    (?:python|py|python3|py3)
+                    (?<lang>python|py|python3|py3|pyi)
                     (?:\ .*?)?\n
                 )
                 (?<code>.*?)
@@ -512,11 +512,17 @@ pub(crate) fn format_source(
             let mut changed = false;
             let formatted_document =
                 code_block_regex.replace_all(unformatted_document, |capture: &Captures| {
-                    let (original, [before, code_indent, unformatted_code, after]) =
+                    let (original, [before, code_indent, code_lang, unformatted_code, after]) =
                         capture.extract();
 
+                    let code_block_source_type = if code_lang == "pyi" {
+                        PySourceType::Stub
+                    } else {
+                        PySourceType::Python
+                    };
                     let unformatted_code = dedent(unformatted_code);
-                    let options = settings.to_format_options(source_type, &unformatted_code, path);
+                    let options =
+                        settings.to_format_options(code_block_source_type, &unformatted_code, path);
 
                     let formatted_code = if let Some(_range) = range {
                         unimplemented!()
