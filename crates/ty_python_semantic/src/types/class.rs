@@ -3,11 +3,13 @@ use std::cell::RefCell;
 use std::fmt::Write;
 use std::sync::{LazyLock, Mutex};
 
-use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, Mro, MroIterator, SpecialFormType, StaticMroError,
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
-    function::FunctionType,
+    function::FunctionType, infer_scope_types,
+};
+use super::{
+    DeferredAnchor, TypeVarVariance, infer_deferred_namedtuple_call_types, infer_deferred_types,
 };
 use crate::place::{DefinedPlace, TypeOrigin};
 use crate::semantic_index::definition::{Definition, DefinitionState};
@@ -170,6 +172,45 @@ fn fields_cycle_initial<'db>(
     _field_policy: CodeGeneratorKind<'db>,
 ) -> FxIndexMap<Name, Field<'db>> {
     FxIndexMap::default()
+}
+
+/// Cycle initial function for `DynamicNamedTupleLiteral::mro`.
+///
+/// Calls `tuple_base_class()` which may call `fields()`. If `fields()` is also
+/// in the cycle, its `cycle_initial` will return `Unknown` types, breaking the cycle.
+fn dynamic_namedtuple_mro_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    self_: DynamicNamedTupleLiteral<'db>,
+) -> Mro<'db> {
+    let self_base = ClassBase::Class(ClassType::NonGeneric(self_.into()));
+    let tuple_class = self_.tuple_base_class(db);
+    let object_class = KnownClass::Object
+        .to_class_literal(db)
+        .as_class_literal()
+        .expect("object should be a class literal")
+        .default_specialization(db);
+    Mro::from([
+        self_base,
+        ClassBase::Class(tuple_class),
+        ClassBase::Class(object_class),
+    ])
+}
+
+/// Cycle initial function for `DynamicNamedTupleLiteral::fields`.
+///
+/// Returns fields with `Unknown` types to break cycles in recursive namedtuples.
+fn dynamic_namedtuple_fields_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    self_: DynamicNamedTupleLiteral<'db>,
+) -> Box<[(Name, Type<'db>, Option<Type<'db>>)]> {
+    self_
+        .raw_fields(db)
+        .iter()
+        .cloned()
+        .map(|name| (name, Type::unknown(), None))
+        .collect()
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -4909,7 +4950,7 @@ pub struct DynamicClassLiteral<'db> {
     ///   uniquely identifies this class and can be used to find the `type()` call.
     /// - `ScopeOffset`: The `type()` call is "dangling" (not assigned). The offset
     ///   is relative to the enclosing scope's anchor node index.
-    pub anchor: DynamicClassAnchor<'db>,
+    pub anchor: DeferredAnchor<'db>,
 
     /// The class members from the namespace dict (third argument to `type()`).
     /// Each entry is a (name, type) pair extracted from the dict literal.
@@ -4926,28 +4967,6 @@ pub struct DynamicClassLiteral<'db> {
     pub dataclass_params: Option<DataclassParams<'db>>,
 }
 
-/// Anchor for identifying a dynamic class literal.
-///
-/// This enum provides stable identity for `DynamicClassLiteral`:
-/// - For assigned calls, the `Definition` uniquely identifies the class.
-/// - For dangling calls, a relative offset provides stable identity.
-#[derive(
-    Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
-)]
-pub enum DynamicClassAnchor<'db> {
-    /// The `type()` call is assigned to a variable.
-    ///
-    /// The `Definition` uniquely identifies this class. The `type()` call expression
-    /// is the `value` of the assignment, so we can get its range from the definition.
-    Definition(Definition<'db>),
-
-    /// The `type()` call is "dangling" (not assigned to a variable).
-    ///
-    /// The offset is relative to the enclosing scope's anchor node index.
-    /// For module scope, this is equivalent to an absolute index (anchor is 0).
-    ScopeOffset { scope: ScopeId<'db>, offset: u32 },
-}
-
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
 
 #[salsa::tracked]
@@ -4955,16 +4974,16 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns the definition where this class is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => Some(definition),
-            DynamicClassAnchor::ScopeOffset { .. } => None,
+            DeferredAnchor::Definition(definition) => Some(definition),
+            DeferredAnchor::ScopeOffset { .. } => None,
         }
     }
 
     /// Returns the scope in which this dynamic class was created.
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => definition.scope(db),
-            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
+            DeferredAnchor::Definition(definition) => definition.scope(db),
+            DeferredAnchor::ScopeOffset { scope, .. } => scope,
         }
     }
 
@@ -4982,16 +5001,16 @@ impl<'db> DynamicClassLiteral<'db> {
         let module = parsed_module(db, file).load(db);
 
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => {
+            DeferredAnchor::Definition(definition) => {
                 // For definitions, get the range from the definition's value.
                 // The `type()` call is the value of the assignment.
                 definition
                     .kind(db)
                     .value(&module)
-                    .expect("DynamicClassAnchor::Definition should only be used for assignments")
+                    .expect("DeferredAnchor::Definition should only be used for assignments")
                     .range()
             }
-            DynamicClassAnchor::ScopeOffset { offset, .. } => {
+            DeferredAnchor::ScopeOffset { offset, .. } => {
                 // For dangling `type()` calls, compute the absolute index from the offset.
                 let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
                 let anchor_u32 = scope_anchor
@@ -5385,6 +5404,41 @@ fn synthesize_namedtuple_class_member<'db>(
     }
 }
 
+/// Extract field types from the inferred type of the fields argument.
+///
+/// This handles cases where field specs come from variables rather than AST literals.
+fn extract_field_types_from_inferred<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    fields_type: Type<'db>,
+) -> FxIndexMap<&'db str, Type<'db>> {
+    let mut field_types = FxIndexMap::default();
+
+    let Some(tuple_spec) = fields_type.tuple_instance_spec(db) else {
+        return field_types;
+    };
+    let Some(fixed_tuple) = tuple_spec.as_fixed_length() else {
+        return field_types;
+    };
+
+    for field_tuple in fixed_tuple.all_elements() {
+        // Each field must be a fixed-length tuple of exactly 2 elements.
+        if let Some(field_spec) = field_tuple.exact_tuple_instance_spec(db)
+            && let Some(field_fixed) = field_spec.as_fixed_length()
+            && let [Type::StringLiteral(name_lit), field_type] = field_fixed.all_elements()
+        {
+            let field_name = name_lit.value(db);
+            // Convert value type to type expression.
+            let field_ty = field_type
+                .in_type_expression(db, scope, None)
+                .unwrap_or_else(|error| error.fallback_type);
+            field_types.insert(field_name, field_ty);
+        }
+    }
+
+    field_types
+}
+
 /// A namedtuple created via the functional form `namedtuple(name, fields)` or
 /// `NamedTuple(name, fields)`.
 ///
@@ -5405,12 +5459,27 @@ pub struct DynamicNamedTupleLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    /// The fields as (name, type, default) tuples.
+    /// The field names for this namedtuple.
+    ///
+    /// For `typing.NamedTuple`, field types are computed lazily in `fields()`
+    /// by re-reading the AST and using deferred inference. This supports
+    /// recursive namedtuples where field types may reference the namedtuple being defined.
+    ///
     /// For `collections.namedtuple`, all types are `Any`.
-    /// For `typing.NamedTuple`, types come from the field definitions.
-    /// The third element is the default type, if any.
     #[returns(ref)]
-    pub fields: Box<[(Name, Type<'db>, Option<Type<'db>>)]>,
+    pub raw_fields: Box<[Name]>,
+
+    /// The kind of namedtuple (`typing.NamedTuple` or `collections.namedtuple`).
+    pub kind: NamedTupleKind,
+
+    /// The default value types for fields with defaults.
+    ///
+    /// For `collections.namedtuple`, these come from the `defaults` parameter.
+    /// For `typing.NamedTuple` (functional form), defaults are not supported.
+    /// The defaults apply to the rightmost fields (i.e., the last N fields
+    /// where N is the length of this slice).
+    #[returns(ref)]
+    pub default_types: Box<[Type<'db>]>,
 
     /// Whether the fields are known statically.
     ///
@@ -5425,7 +5494,7 @@ pub struct DynamicNamedTupleLiteral<'db> {
     ///   uniquely identifies this namedtuple and can be used to find the call.
     /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
     ///   is relative to the enclosing scope's anchor node index.
-    pub anchor: DynamicClassAnchor<'db>,
+    pub anchor: DeferredAnchor<'db>,
 }
 
 impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
@@ -5435,16 +5504,16 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// Returns the definition where this namedtuple is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => Some(definition),
-            DynamicClassAnchor::ScopeOffset { .. } => None,
+            DeferredAnchor::Definition(definition) => Some(definition),
+            DeferredAnchor::ScopeOffset { .. } => None,
         }
     }
 
     /// Returns the scope in which this dynamic class was created.
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => definition.scope(db),
-            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
+            DeferredAnchor::Definition(definition) => definition.scope(db),
+            DeferredAnchor::ScopeOffset { scope, .. } => scope,
         }
     }
 
@@ -5460,16 +5529,16 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         let module = parsed_module(db, file).load(db);
 
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => {
+            DeferredAnchor::Definition(definition) => {
                 // For definitions, get the range from the definition's value.
                 // The namedtuple call is the value of the assignment.
                 definition
                     .kind(db)
                     .value(&module)
-                    .expect("DynamicClassAnchor::Definition should only be used for assignments")
+                    .expect("DeferredAnchor::Definition should only be used for assignments")
                     .range()
             }
-            DynamicClassAnchor::ScopeOffset { offset, .. } => {
+            DeferredAnchor::ScopeOffset { offset, .. } => {
                 // For dangling calls, compute the absolute index from the offset.
                 let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
                 let anchor_u32 = scope_anchor
@@ -5492,12 +5561,189 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
+    /// Compute field types for this namedtuple.
+    ///
+    /// For `typing.NamedTuple`, field types are computed lazily using deferred inference.
+    /// For `collections.namedtuple`, all field types are `Any`.
+    ///
+    /// Returns `(name, type, default_type)` tuples where `default_type` is `Some` for
+    /// fields with defaults (only for `collections.namedtuple` via the `defaults` parameter).
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial = dynamic_namedtuple_fields_cycle_initial,
+        heap_size = ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn fields(self, db: &'db dyn Db) -> Box<[(Name, Type<'db>, Option<Type<'db>>)]> {
+        let raw_fields = self.raw_fields(db);
+        let kind = self.kind(db);
+        let default_types = self.default_types(db);
+        let num_defaults = default_types.len();
+        let num_fields = raw_fields.len();
+
+        // For `collections.namedtuple`, all types are `Any`.
+        if kind == NamedTupleKind::Collections {
+            return raw_fields
+                .iter()
+                .enumerate()
+                .map(|(i, name)| {
+                    let default_ty = if num_defaults > 0 && i >= num_fields - num_defaults {
+                        // Get the actual default type from the stored defaults.
+                        let default_index = i - (num_fields - num_defaults);
+                        Some(default_types[default_index])
+                    } else {
+                        None
+                    };
+                    (name.clone(), Type::any(), default_ty)
+                })
+                .collect();
+        }
+
+        // For `typing.NamedTuple`, compute field types.
+        let scope = self.scope(db);
+        let file = scope.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        // Get the call expression, either from the definition or from the scope offset.
+        let (call_expr, scope_offset): (&ast::ExprCall, Option<u32>) = match self.anchor(db) {
+            DeferredAnchor::Definition(definition) => {
+                let expr = definition
+                    .kind(db)
+                    .value(&module)
+                    .expect("NamedTuple definition should have a value")
+                    .as_call_expr()
+                    .expect("NamedTuple definition value should be a Call");
+                (expr, None)
+            }
+            DeferredAnchor::ScopeOffset { offset, .. } => {
+                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+                let anchor_u32 = scope_anchor
+                    .as_u32()
+                    .expect("anchor should not be NodeIndex::NONE");
+                let absolute_index = NodeIndex::from(anchor_u32 + offset);
+                let expr = module
+                    .get_by_index(absolute_index)
+                    .try_into()
+                    .expect("scope offset should point to ExprCall");
+                (expr, Some(offset))
+            }
+        };
+
+        // The second positional argument should be the fields list/tuple.
+        let Some(fields_arg) = call_expr.arguments.args.get(1) else {
+            return raw_fields
+                .iter()
+                .cloned()
+                .map(|name| (name, Type::unknown(), None))
+                .collect();
+        };
+
+        // Try to get field type expressions from AST literal.
+        // If the fields argument is not a literal (e.g., a variable), we'll fall back to
+        // extracting types from the inferred type.
+        let elements: Option<&[ast::Expr]> = match fields_arg {
+            ast::Expr::List(list) => Some(&list.elts),
+            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+            _ => None,
+        };
+
+        // We need scope inference to resolve field names from variables (e.g., Final variables).
+        let scope_inference = infer_scope_types(db, scope);
+
+        // Build a mapping from field names to their type expressions (for AST literals).
+        // Field names may be string literals or variables (e.g., Final variables).
+        let mut field_type_exprs = FxIndexMap::<&str, &ast::Expr>::default();
+        if let Some(elements) = elements {
+            for elt in elements {
+                // Each element should be a tuple like ("field_name", type).
+                let field_spec_elts: &[ast::Expr] = match elt {
+                    ast::Expr::Tuple(tuple) => &tuple.elts,
+                    ast::Expr::List(list) => &list.elts,
+                    _ => continue,
+                };
+                let [field_name_expr, field_type_expr] = &field_spec_elts else {
+                    continue;
+                };
+
+                // Resolve the field name via inference to handle Final variables.
+                let field_name_ty = scope_inference.expression_type(field_name_expr);
+                if let Some(field_name_lit) = field_name_ty.as_string_literal() {
+                    let field_name = field_name_lit.value(db);
+                    field_type_exprs.insert(field_name, field_type_expr);
+                }
+            }
+        }
+
+        // Build a mapping from field names to their types (from the inferred type).
+        // This is used as a fallback when field specs come from variables.
+        let field_types_from_inferred = extract_field_types_from_inferred(
+            db,
+            scope,
+            scope_inference.expression_type(fields_arg),
+        );
+
+        // Get the definition for deferred inference (if this is a definition-based anchor).
+        let definition = match self.anchor(db) {
+            DeferredAnchor::Definition(def) => Some(def),
+            DeferredAnchor::ScopeOffset { .. } => None,
+        };
+
+        // Resolve each field's type, preferring deferred inference when available.
+        // `typing.NamedTuple` functional form doesn't support defaults.
+        raw_fields
+            .iter()
+            .cloned()
+            .map(|name| {
+                // Try deferred inference first for fields with AST type expressions.
+                let field_ty = if let Some(type_expr) = field_type_exprs.get(name.as_str()) {
+                    let deferred_ty = match (definition, scope_offset) {
+                        (Some(def), _) => {
+                            infer_deferred_types(db, def).try_expression_type(*type_expr)
+                        }
+                        (None, Some(offset)) => {
+                            infer_deferred_namedtuple_call_types(db, scope, offset)
+                                .try_expression_type(*type_expr)
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(ty) = deferred_ty {
+                        // For TypeVar instances, bind them to the definition.
+                        if let Type::KnownInstance(KnownInstanceType::TypeVar(_)) = ty {
+                            ty.in_type_expression(db, scope, definition)
+                                .unwrap_or_else(|error| error.fallback_type)
+                        } else {
+                            ty
+                        }
+                    } else {
+                        // Fall back to inferred type from variable.
+                        field_types_from_inferred
+                            .get(name.as_str())
+                            .copied()
+                            .unwrap_or_else(Type::unknown)
+                    }
+                } else {
+                    // No AST type expression; use inferred type from variable.
+                    field_types_from_inferred
+                        .get(name.as_str())
+                        .copied()
+                        .unwrap_or_else(Type::unknown)
+                };
+
+                (name, field_ty, None)
+            })
+            .collect()
+    }
+
     /// Compute the MRO for this namedtuple.
     ///
     /// The MRO is `[self, tuple[field_types...], object]`.
     /// For example, `namedtuple("Point", [("x", int), ("y", int)])` has MRO
     /// `[Point, tuple[int, int], object]`.
-    #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial = dynamic_namedtuple_mro_cycle_initial,
+        heap_size = ruff_memory_usage::heap_size
+    )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let tuple_class = self.tuple_base_class(db);
@@ -8139,5 +8385,45 @@ mod tests {
                 );
             }
         }
+    }
+}
+
+/// The kind of namedtuple: `typing.NamedTuple` or `collections.namedtuple`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update)]
+pub enum NamedTupleKind {
+    /// `collections.namedtuple` - all field types are `Any`.
+    Collections,
+    /// `typing.NamedTuple` - field types come from type annotations.
+    Typing,
+}
+
+impl get_size2::GetSize for NamedTupleKind {}
+
+impl NamedTupleKind {
+    pub(crate) const fn is_collections(self) -> bool {
+        matches!(self, Self::Collections)
+    }
+
+    pub(crate) const fn is_typing(self) -> bool {
+        matches!(self, Self::Typing)
+    }
+
+    pub(crate) fn from_type(db: &dyn Db, ty: Type) -> Option<Self> {
+        match ty {
+            Type::SpecialForm(SpecialFormType::NamedTuple) => Some(NamedTupleKind::Typing),
+            Type::FunctionLiteral(function) => function
+                .is_known(db, KnownFunction::NamedTuple)
+                .then_some(NamedTupleKind::Collections),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for NamedTupleKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            NamedTupleKind::Collections => "namedtuple",
+            NamedTupleKind::Typing => "NamedTuple",
+        })
     }
 }

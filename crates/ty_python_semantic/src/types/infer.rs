@@ -160,8 +160,13 @@ pub(crate) fn infer_deferred_types<'db>(
 
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
-        .finish_definition()
+    TypeInferenceBuilder::new(
+        db,
+        InferenceRegion::Deferred(DeferredAnchor::Definition(definition)),
+        index,
+        &module,
+    )
+    .finish_definition()
 }
 
 fn deferred_cycle_recovery<'db>(
@@ -180,6 +185,37 @@ fn deferred_cycle_initial<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+}
+
+/// Infer deferred field types for a dangling `NamedTuple` call.
+///
+/// This is used when a `NamedTuple` call is used directly as a base class without being
+/// assigned to a variable first. The offset is relative to the scope's anchor node index.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn infer_deferred_namedtuple_call_types<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    offset: u32,
+) -> ExpressionInference<'db> {
+    let file = scope.file(db);
+    let module = parsed_module(db, file).load(db);
+    let _span = tracing::trace_span!(
+        "infer_deferred_namedtuple_call_types",
+        scope = ?scope.as_id(),
+        offset,
+        ?file
+    )
+    .entered();
+
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(
+        db,
+        InferenceRegion::Deferred(DeferredAnchor::ScopeOffset { scope, offset }),
+        index,
+        &module,
+    )
+    .finish_expression()
 }
 
 /// Infer all types for an [`Expression`] (including sub-expressions).
@@ -503,16 +539,58 @@ pub(crate) fn nearest_enclosing_function<'db>(
         })
 }
 
+/// Identifies a region for deferred type inference.
+///
+/// Deferred inference is used when type expressions contain forward references
+/// (string annotations) that need to be resolved after the full scope is available.
+///
+/// There are two cases:
+/// - For definitions (functions, classes, assignments), the `Definition` uniquely
+///   identifies the region containing annotations that need deferred resolution.
+/// - For dangling calls (e.g., `NamedTuple(...)` used directly as a base class),
+///   we store a relative offset from the enclosing scope's anchor node index.
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
+)]
+pub enum DeferredAnchor<'db> {
+    /// A definition containing annotations that need deferred resolution.
+    ///
+    /// This covers functions (parameter/return annotations), classes (base classes),
+    /// type variables, and assignments (including `NamedTuple(...)` assignments).
+    Definition(Definition<'db>),
+
+    /// A dangling call expression (not assigned to a variable).
+    ///
+    /// The offset is relative to the enclosing scope's anchor node index.
+    /// For module scope, this is equivalent to an absolute index (anchor is 0).
+    /// This is used for patterns like `class Foo(NamedTuple("Foo", [...]))`.
+    ScopeOffset { scope: ScopeId<'db>, offset: u32 },
+}
+
+impl<'db> DeferredAnchor<'db> {
+    /// Returns the scope containing this deferred region.
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        match self {
+            DeferredAnchor::Definition(definition) => definition.scope(db),
+            DeferredAnchor::ScopeOffset { scope, .. } => scope,
+        }
+    }
+}
+
 /// A region within which we can infer types.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InferenceRegion<'db> {
-    /// infer types for a standalone [`Expression`]
+    /// Infer types for a standalone [`Expression`]
     Expression(Expression<'db>, TypeContext<'db>),
-    /// infer types for a [`Definition`]
+    /// Infer types for a [`Definition`]
     Definition(Definition<'db>),
-    /// infer deferred types for a [`Definition`]
-    Deferred(Definition<'db>),
-    /// infer types for an entire [`ScopeId`]
+    /// Infer deferred types (forward references / string annotations).
+    ///
+    /// The anchor identifies the region - either by its definition (for functions,
+    /// classes, assignments) or by scope offset (for dangling calls like
+    /// `NamedTuple(...)` used directly as base classes).
+    Deferred(DeferredAnchor<'db>),
+    /// Infer types for an entire [`ScopeId`]
     Scope(ScopeId<'db>),
 }
 
@@ -520,9 +598,8 @@ impl<'db> InferenceRegion<'db> {
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
-            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                definition.scope(db)
-            }
+            InferenceRegion::Definition(definition) => definition.scope(db),
+            InferenceRegion::Deferred(anchor) => anchor.scope(db),
             InferenceRegion::Scope(scope) => scope,
         }
     }

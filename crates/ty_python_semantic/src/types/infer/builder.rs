@@ -22,6 +22,7 @@ use ty_module_resolver::{
     resolve_module, search_paths,
 };
 
+use super::DeferredAnchor;
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
     InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
@@ -57,11 +58,11 @@ use crate::semantic_index::{
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::DynamicNamedTupleLiteral;
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
-    DynamicMetaclassConflict, FieldKind, MetaclassErrorKind, MethodDecorator,
+    ClassLiteral, CodeGeneratorKind, DynamicClassLiteral, DynamicMetaclassConflict, FieldKind,
+    MetaclassErrorKind, MethodDecorator,
 };
+use crate::types::class::{DynamicNamedTupleLiteral, NamedTupleKind};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
@@ -536,7 +537,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match self.region {
             InferenceRegion::Scope(scope) => self.infer_region_scope(scope),
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
-            InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
+            InferenceRegion::Deferred(anchor) => self.infer_region_deferred(anchor),
             InferenceRegion::Expression(expression, tcx) => {
                 self.infer_region_expression(expression, tcx);
             }
@@ -1655,7 +1656,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_region_deferred(&mut self, definition: Definition<'db>) {
+    fn infer_region_deferred(&mut self, anchor: DeferredAnchor<'db>) {
+        match anchor {
+            DeferredAnchor::Definition(definition) => {
+                self.infer_region_deferred_definition(definition);
+            }
+            DeferredAnchor::ScopeOffset { scope, offset } => {
+                self.infer_region_deferred_scope_offset(scope, offset);
+            }
+        }
+    }
+
+    fn infer_region_deferred_definition(&mut self, definition: Definition<'db>) {
         // N.B. We don't defer the types for an annotated assignment here because it is done in
         // the same definition query. It utilizes the deferred expression state instead.
         //
@@ -1683,6 +1695,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => {}
         }
+    }
+
+    /// Infer deferred field types for a dangling call (e.g., `NamedTuple`, `TypedDict`).
+    ///
+    /// This looks up the call expression using the scope offset and infers the field type
+    /// annotations with deferred state, enabling forward references.
+    fn infer_region_deferred_scope_offset(&mut self, scope: ScopeId<'db>, offset: u32) {
+        let db = self.db();
+
+        // Compute the absolute node index from the scope anchor + offset.
+        let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+        let anchor_u32 = scope_anchor
+            .as_u32()
+            .expect("scope anchor should not be NodeIndex::NONE");
+        let absolute_index = NodeIndex::from(anchor_u32 + offset);
+
+        // Look up the call expression from the parsed module.
+        let call_expr: &ast::ExprCall = self
+            .module()
+            .get_by_index(absolute_index)
+            .try_into()
+            .expect("offset should point to ExprCall");
+
+        // Infer the field type annotations with deferred state.
+        self.infer_functional_namedtuple_deferred(&call_expr.arguments);
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>, tcx: TypeContext<'db>) {
@@ -6110,6 +6147,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_newtype_assignment_deferred(arguments);
             return;
         }
+        if matches!(func_ty, Type::SpecialForm(SpecialFormType::NamedTuple)) {
+            self.infer_functional_namedtuple_deferred(arguments);
+            return;
+        }
         for arg in arguments.args.iter().skip(1) {
             self.infer_type_expression(arg);
         }
@@ -6385,7 +6426,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // - For assigned `type()` calls, the Definition uniquely identifies the class.
         // - For dangling calls, compute a relative offset from the scope's node index.
         let anchor = if let Some(def) = definition {
-            DynamicClassAnchor::Definition(def)
+            DeferredAnchor::Definition(def)
         } else {
             let call_node_index = call_expr.node_index().load();
             let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
@@ -6395,7 +6436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let call_u32 = call_node_index
                 .as_u32()
                 .expect("call node should not be NodeIndex::NONE");
-            DynamicClassAnchor::ScopeOffset {
+            DeferredAnchor::ScopeOffset {
                 scope,
                 offset: call_u32 - anchor_u32,
             }
@@ -6478,11 +6519,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
     }
 
+    /// Infer field types for functional `NamedTuple` in deferred phase.
+    ///
+    /// This is called during `infer_deferred_types` to infer field types after the `NamedTuple`
+    /// definition is complete. This enables support for recursive namedtuples and proper
+    /// handling of string annotations like `("x", "int")`.
+    fn infer_functional_namedtuple_deferred(&mut self, arguments: &ast::Arguments) {
+        // The second positional argument is the fields list/tuple (if present).
+        let Some(fields_arg) = arguments.args.get(1) else {
+            return;
+        };
+
+        // Get the elements from the list or tuple literal.
+        let elements: &[ast::Expr] = match fields_arg {
+            ast::Expr::List(list) => &list.elts,
+            ast::Expr::Tuple(tuple) => &tuple.elts,
+            _ => return,
+        };
+
+        // Infer each field's type expression in deferred mode.
+        for elt in elements {
+            // Each element should be a tuple like ("field_name", type).
+            let field_spec_elts: &[ast::Expr] = match elt {
+                ast::Expr::Tuple(tuple) => &tuple.elts,
+                ast::Expr::List(list) => &list.elts,
+                _ => continue,
+            };
+            if field_spec_elts.len() == 2 {
+                // Infer the type expression (second element) as an annotation.
+                let field_type_expr = &field_spec_elts[1];
+                self.infer_annotation_expression(
+                    field_type_expr,
+                    DeferredExpressionState::Deferred,
+                );
+            }
+        }
+    }
+
     /// Infer a `typing.NamedTuple(typename, fields)` or `collections.namedtuple(typename, field_names)` call.
     ///
     /// This method *does not* call `infer_expression` on the object being called;
     /// it is assumed that the type for this AST node has already been inferred before this method is called.
-    #[expect(clippy::type_complexity)]
     fn infer_namedtuple_call_expression(
         &mut self,
         call_expr: &ast::ExprCall,
@@ -6713,27 +6790,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Handle fields based on which namedtuple variant.
-        let (fields, has_known_fields): (Box<[(Name, Type<'db>, Option<Type<'db>>)]>, bool) =
+        //
+        // For `typing.NamedTuple`, we only extract field names here; types are computed lazily
+        // via deferred inference to support recursive namedtuples and string annotations.
+        //
+        // For `collections.namedtuple`, all types are `Any`, so we just need names and default
+        // types.
+        let (raw_fields, field_defaults, has_known_fields): (Box<[Name]>, Box<[Type<'db>]>, bool) =
             match kind {
                 NamedTupleKind::Typing => {
-                    let fields = self
-                        .extract_typing_namedtuple_fields(fields_arg, fields_type)
-                        .or_else(|| self.extract_typing_namedtuple_fields_from_ast(fields_arg));
+                    // Extract field names only (types will be computed lazily).
+                    let field_names = self
+                        .extract_typing_namedtuple_field_names(fields_arg, fields_type)
+                        .or_else(|| {
+                            self.extract_typing_namedtuple_field_names_from_ast(fields_arg)
+                        });
 
                     // Validate field names if we have known fields.
-                    if let Some(ref fields) = fields {
-                        let field_names: Vec<_> =
-                            fields.iter().map(|(name, _, _)| name.clone()).collect();
-                        self.report_invalid_namedtuple_field_names(
-                            &field_names,
-                            fields_arg,
-                            NamedTupleKind::Typing,
-                        );
+                    if let Some(ref names) = field_names {
+                        self.report_invalid_namedtuple_field_names(names, fields_arg, kind);
                     }
 
                     // Emit diagnostic if the type is outright invalid (not an iterable) or
                     // if we have a list/tuple literal with invalid field specs.
-                    if fields.is_none() {
+                    if field_names.is_none() {
                         let iterable_any =
                             KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
                         if !fields_type.is_assignable_to(db, iterable_any) {
@@ -6760,10 +6840,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 for elt in elements {
                                     let is_valid_field_spec = matches!(
                                         elt,
-                                        ast::Expr::Tuple(t) if t.elts.len() == 2
+                                        ast::Expr::Tuple(tuple) if tuple.elts.len() == 2
                                     ) || matches!(
                                         elt,
-                                        ast::Expr::List(l) if l.elts.len() == 2
+                                        ast::Expr::List(list) if list.elts.len() == 2
                                     );
                                     if !is_valid_field_spec {
                                         let elt_type = self.expression_type(elt);
@@ -6785,8 +6865,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
 
-                    let has_known_fields = fields.is_some();
-                    (fields.unwrap_or_default(), has_known_fields)
+                    let has_known_fields = field_names.is_some();
+                    // The `typing.NamedTuple` functional form doesn't support defaults.
+                    (
+                        field_names.unwrap_or_default(),
+                        Box::new([]),
+                        has_known_fields,
+                    )
                 }
                 NamedTupleKind::Collections => {
                     // `collections.namedtuple`: `field_names` is a list or tuple of strings, or a space or
@@ -6852,7 +6937,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.report_invalid_namedtuple_field_names(
                                 &field_names,
                                 fields_arg,
-                                NamedTupleKind::Collections,
+                                kind,
                             );
                         } else {
                             // Apply rename logic.
@@ -6871,9 +6956,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
 
                         let num_fields = field_names.len();
-                        let defaults_count = default_types.len();
 
-                        if defaults_count > num_fields
+                        if default_types.len() > num_fields
                             && let Some(defaults_kw) = defaults_kw
                             && let Some(builder) =
                                 self.context.report_lint(&INVALID_NAMED_TUPLE, defaults_kw)
@@ -6882,32 +6966,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 "Too many defaults for `namedtuple()`"
                             ));
                             diagnostic.set_primary_message(format_args!(
-                                "Got {defaults_count} default values but only {num_fields} field names"
+                                "Got {} default values but only {num_fields} field names",
+                                default_types.len()
                             ));
                             diagnostic.info("This will raise `TypeError` at runtime");
                         }
 
-                        let defaults_count = defaults_count.min(num_fields);
-                        let fields = field_names
-                            .iter()
-                            .enumerate()
-                            .map(|(i, field_name)| {
-                                let default =
-                                    if defaults_count > 0 && i >= num_fields - defaults_count {
-                                        // Index into default_types: first default corresponds to first
-                                        // field that has a default.
-                                        let default_idx = i - (num_fields - defaults_count);
-                                        Some(default_types[default_idx])
-                                    } else {
-                                        None
-                                    };
-                                (field_name.clone(), Type::any(), default)
-                            })
-                            .collect();
-                        (fields, true)
+                        // Truncate defaults to at most `num_fields`.
+                        let default_types: Box<[Type<'db>]> =
+                            default_types.into_iter().take(num_fields).collect();
+
+                        (field_names, default_types, true)
                     } else {
-                        // Couldn't determine fields statically; attribute lookups will return Any.
-                        (Box::new([]), false)
+                        // Couldn't determine fields statically; attribute lookups will return `Any`.
+                        (Box::new([]), Box::new([]), false)
                     }
                 }
             };
@@ -6918,7 +6990,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // - For assigned namedtuple calls, the Definition uniquely identifies the namedtuple.
         // - For dangling calls, compute a relative offset from the scope's node index.
         let anchor = if let Some(def) = definition {
-            DynamicClassAnchor::Definition(def)
+            DeferredAnchor::Definition(def)
         } else {
             let call_node_index = call_expr.node_index.load();
             let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
@@ -6928,32 +7000,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let call_u32 = call_node_index
                 .as_u32()
                 .expect("call node should not be NodeIndex::NONE");
-            DynamicClassAnchor::ScopeOffset {
+            DeferredAnchor::ScopeOffset {
                 scope,
                 offset: call_u32 - anchor_u32,
             }
         };
 
-        let namedtuple = DynamicNamedTupleLiteral::new(db, name, fields, has_known_fields, anchor);
+        let namedtuple = DynamicNamedTupleLiteral::new(
+            db,
+            name,
+            raw_fields,
+            kind,
+            field_defaults,
+            has_known_fields,
+            anchor,
+        );
 
         Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple))
     }
 
-    /// Extract fields from a typing.NamedTuple fields argument.
-    #[expect(clippy::type_complexity)]
-    fn extract_typing_namedtuple_fields(
-        &mut self,
+    /// Extract field names from a `typing.NamedTuple` fields argument.
+    ///
+    /// Only extracts field names; types are computed lazily via deferred inference
+    /// to support recursive namedtuples and string annotations.
+    fn extract_typing_namedtuple_field_names(
+        &self,
         fields_arg: &ast::Expr,
         fields_type: Type<'db>,
-    ) -> Option<Box<[(Name, Type<'db>, Option<Type<'db>>)]>> {
+    ) -> Option<Box<[Name]>> {
         let db = self.db();
-        let scope_id = self.scope();
-        let typevar_binding_context = self.typevar_binding_context;
 
         // Try to extract from a fixed-length tuple type.
         let tuple_spec = fields_type.tuple_instance_spec(db)?;
         let fixed_tuple = tuple_spec.as_fixed_length()?;
-        let fields: Option<Box<[_]>> = fixed_tuple
+
+        // Check if we have AST literals for better error locations.
+        let has_ast_literals = matches!(fields_arg, ast::Expr::List(_) | ast::Expr::Tuple(_));
+
+        // Extract field names from the inferred type.
+        let field_names: Option<Box<[_]>> = fixed_tuple
             .all_elements()
             .iter()
             .map(|field_tuple| {
@@ -6963,28 +7048,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let [Type::StringLiteral(name), field_type] = field_fixed.all_elements() else {
                     return None;
                 };
-                // Convert value types to type expression types (e.g., class literals to instances).
-                let resolved_ty =
-                    match field_type.in_type_expression(db, scope_id, typevar_binding_context) {
-                        Ok(ty) => ty,
-                        Err(error) => {
-                            // Report diagnostic for invalid type expression.
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Object of type `{}` is not valid as a `NamedTuple` field type",
-                                    field_type.display(db)
-                                ));
-                            }
-                            error.fallback_type
-                        }
-                    };
-                Some((Name::new(name.value(self.db())), resolved_ty, None))
+
+                // Validate the field type only when fields come from a variable (no AST literals).
+                // When we have AST literals, we validate below with better error locations.
+                if !has_ast_literals
+                    && field_type
+                        .in_type_expression(db, self.scope(), self.typevar_binding_context)
+                        .is_err()
+                {
+                    // Report diagnostic at the fields argument (best we can do for variable case).
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Object of type `{}` is not valid as a `NamedTuple` field type",
+                            field_type.display(db)
+                        ));
+                    }
+                }
+
+                Some(Name::new(name.value(db)))
             })
             .collect();
 
-        fields
+        // Validate AST elements when we have direct literals (for better error locations).
+        if field_names.is_some() && has_ast_literals {
+            let elements: &[ast::Expr] = match fields_arg {
+                ast::Expr::List(list) => &list.elts,
+                ast::Expr::Tuple(tuple) => &tuple.elts,
+                _ => &[],
+            };
+            for elt in elements {
+                // Check that each element is a valid (name, type) pair.
+                let field_spec_elts: &[ast::Expr] = match elt {
+                    ast::Expr::Tuple(tuple) => &tuple.elts,
+                    ast::Expr::List(list) => &list.elts,
+                    _ => continue,
+                };
+                if field_spec_elts.len() == 2 {
+                    // Validate the type expression (will be re-inferred in deferred phase).
+                    let field_type_expr = &field_spec_elts[1];
+
+                    // Skip validation for string literals; they're valid string annotations
+                    // that will be parsed as types in the deferred phase.
+                    if !matches!(field_type_expr, ast::Expr::StringLiteral(_)) {
+                        let field_value_ty = self.expression_type(field_type_expr);
+                        if field_value_ty
+                            .in_type_expression(db, self.scope(), self.typevar_binding_context)
+                            .is_err()
+                        {
+                            if let Some(builder) = self
+                                .context
+                                .report_lint(&INVALID_TYPE_FORM, field_type_expr)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Object of type `{}` is not valid as a `NamedTuple` field type",
+                                    field_value_ty.display(db)
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        field_names
     }
 
     /// Report diagnostics for invalid field names in a namedtuple definition.
@@ -7034,16 +7161,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Extract fields from a typing.NamedTuple fields argument by looking at the AST directly.
-    /// This handles list/tuple literals that contain (name, type) pairs.
-    #[expect(clippy::type_complexity)]
-    fn extract_typing_namedtuple_fields_from_ast(
-        &mut self,
+    /// Extract field names from a `typing.NamedTuple` fields argument by looking at the AST directly.
+    ///
+    /// Only extracts field names; types are computed lazily via deferred inference
+    /// to support recursive namedtuples and string annotations.
+    fn extract_typing_namedtuple_field_names_from_ast(
+        &self,
         fields_arg: &ast::Expr,
-    ) -> Option<Box<[(Name, Type<'db>, Option<Type<'db>>)]>> {
+    ) -> Option<Box<[Name]>> {
         let db = self.db();
-        let scope_id = self.scope();
-        let typevar_binding_context = self.typevar_binding_context;
 
         // Get the elements from the list or tuple literal.
         let elements: &[ast::Expr] = match fields_arg {
@@ -7052,7 +7178,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => return None,
         };
 
-        let fields: Option<Box<[_]>> = elements
+        elements
             .iter()
             .map(|elt| {
                 // Each element should be a tuple or list like ("field_name", type) or ["field_name", type].
@@ -7061,23 +7187,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ast::Expr::List(list) => &list.elts,
                     _ => return None,
                 };
-                if field_spec_elts.len() != 2 {
+
+                let [field_name_expr, field_type_expr] = &field_spec_elts else {
                     return None;
-                }
+                };
 
                 // First element: field name (string literal).
-                let field_name_expr = &field_spec_elts[0];
                 let field_name_ty = self.expression_type(field_name_expr);
                 let field_name_lit = field_name_ty.as_string_literal()?;
-                let field_name = Name::new(field_name_lit.value(db));
 
-                // Second element: field type (infer as type expression).
-                let field_type_expr = &field_spec_elts[1];
-                let field_value_ty = self.expression_type(field_type_expr);
-                let field_ty = field_value_ty
-                    .in_type_expression(db, scope_id, typevar_binding_context)
-                    .unwrap_or_else(|error| {
-                        // Report diagnostic for invalid type expression.
+                // Second element: validate the type expression. String literals will be parsed in
+                // the deferred inference phase, so skip those here.
+                if !matches!(field_type_expr, ast::Expr::StringLiteral(_)) {
+                    let field_value_ty = self.expression_type(field_type_expr);
+                    if field_value_ty
+                        .in_type_expression(db, self.scope(), self.typevar_binding_context)
+                        .is_err()
+                    {
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_TYPE_FORM, field_type_expr)
@@ -7087,14 +7213,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 field_value_ty.display(db)
                             ));
                         }
-                        error.fallback_type
-                    });
+                    }
+                }
 
-                Some((field_name, field_ty, None))
+                Some(Name::new(field_name_lit.value(db)))
             })
-            .collect();
-
-        fields
+            .collect()
     }
 
     /// Extract field names from a collections.namedtuple fields argument by looking at the AST directly.
@@ -15689,40 +15813,5 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         .zip(safe_mutable_class.generic_origin(db))
                         .is_some_and(|(l, r)| l == r)
             })
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NamedTupleKind {
-    Collections,
-    Typing,
-}
-
-impl NamedTupleKind {
-    const fn is_collections(self) -> bool {
-        matches!(self, Self::Collections)
-    }
-
-    const fn is_typing(self) -> bool {
-        matches!(self, Self::Typing)
-    }
-
-    fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        match ty {
-            Type::SpecialForm(SpecialFormType::NamedTuple) => Some(NamedTupleKind::Typing),
-            Type::FunctionLiteral(function) => function
-                .is_known(db, KnownFunction::NamedTuple)
-                .then_some(NamedTupleKind::Collections),
-            _ => None,
-        }
-    }
-}
-
-impl std::fmt::Display for NamedTupleKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            NamedTupleKind::Collections => "namedtuple",
-            NamedTupleKind::Typing => "NamedTuple",
-        })
     }
 }
