@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
@@ -104,18 +105,28 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryKeyCheck, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        format!(
-            "{}.get({})",
-            checker.locator().slice(
-                parenthesized_range(obj_right.into(), right.into(), checker.tokens(),)
-                    .unwrap_or(obj_right.range())
+
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(
+            format!(
+                "{}.get({})",
+                checker.locator().slice(
+                    parenthesized_range(obj_right.into(), right.into(), checker.tokens(),)
+                        .unwrap_or(obj_right.range())
+                ),
+                checker.locator().slice(
+                    parenthesized_range(key_right.into(), right.into(), checker.tokens(),)
+                        .unwrap_or(key_right.range())
+                ),
             ),
-            checker.locator().slice(
-                parenthesized_range(key_right.into(), right.into(), checker.tokens(),)
-                    .unwrap_or(key_right.range())
-            ),
+            expr.range(),
         ),
-        expr.range(),
-    )));
+        applicability,
+    ));
 }
