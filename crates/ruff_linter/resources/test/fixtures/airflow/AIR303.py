@@ -72,4 +72,3 @@ Asset("asset1", {k: v for k, v in zip(["extra"], ["metadata"])})
 Asset("asset1")
 Asset("asset1", extra={"key": "value"})
 Asset(uri="asset1", extra={"key": "value"})
-
