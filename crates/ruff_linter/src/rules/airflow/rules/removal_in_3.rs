@@ -61,7 +61,11 @@ impl Violation for Airflow3Removal {
             | Replacement::AttrName(_)
             | Replacement::Message(_)
             | Replacement::Rename { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ } => {
+            | Replacement::SourceModuleMoved { module: _, name: _ }
+            | Replacement::SourceModuleMovedToSDK {
+                module: _, name: _, ..
+            }
+            | Replacement::InternalModule { module: _, name: _ } => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
             }
         }
@@ -79,6 +83,17 @@ impl Violation for Airflow3Removal {
             Replacement::SourceModuleMoved { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
+            Replacement::SourceModuleMovedToSDK {
+                module,
+                name,
+                version,
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0 (with apache-airflow-task-sdk>={version})."
+            )),
+            Replacement::InternalModule { module, name } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0. \
+                This is an internal module which is not supposed to be used and is subject to change without notice."
+            )),
         }
     }
 }
@@ -708,26 +723,28 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.notifications
-        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => Replacement::Rename {
-            module: "airflow.sdk.bases.notifier",
-            name: "BaseNotifier",
-        },
+        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk.bases.notifier",
+                name: "BaseNotifier".to_string(),
+                version: "1.0.6",
+            }
+        }
 
         // airflow.operators
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
         }
         ["airflow", "operators", "postgres_operator", "Mapping"] => Replacement::None,
-        ["airflow", "operators", "python", "get_current_context"] => Replacement::Rename {
-            module: "airflow.sdk",
-            name: "get_current_context",
-        },
+        ["airflow", "operators", "python", "get_current_context"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk",
+                name: "get_current_context".to_string(),
+                version: "1.0.6",
+            }
+        }
 
         // airflow.secrets
-        ["airflow", "secrets", "cache", "SecretCache"] => Replacement::Rename {
-            module: "airflow.sdk",
-            name: "SecretCache",
-        },
         ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::Rename {
             module: "airflow.secrets.local_filesystem",
             name: "load_connections_dict",
@@ -745,9 +762,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "sensors",
             "base_sensor_operator",
             "BaseSensorOperator",
-        ] => Replacement::Rename {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.bases.sensor",
-            name: "BaseSensorOperator",
+            name: "BaseSensorOperator".to_string(),
+            version: "1.0.6",
         },
 
         // airflow.timetables
@@ -795,20 +813,22 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             ["file", "mkdirs"] => Replacement::Message("Use `pathlib.Path({path}).mkdir` instead"),
 
             // airflow.utils.helpers
-            ["helpers", "chain"] => Replacement::Rename {
+            ["helpers", "chain"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "chain",
+                name: "chain".to_string(),
+                version: "1.0.6",
             },
-            ["helpers", "cross_downstream"] => Replacement::Rename {
+            ["helpers", "cross_downstream"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "cross_downstream",
+                name: "cross_downstream".to_string(),
+                version: "1.0.6",
             },
 
-            // TODO: update it as SourceModuleMoved
             // airflow.utils.log.secrets_masker
-            ["log", "secrets_masker"] => Replacement::Rename {
+            ["log", "secrets_masker"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk.execution_time",
-                name: "secrets_masker",
+                name: "secrets_masker".to_string(),
+                version: "1.0.6",
             },
 
             // airflow.utils.state
@@ -992,6 +1012,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     let (module, name) = match &replacement {
         Replacement::Rename { module, name } => (module, *name),
         Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        Replacement::SourceModuleMovedToSDK { module, name, .. } => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(
                 Airflow3Removal {
