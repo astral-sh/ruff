@@ -1070,6 +1070,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "104") => rules::ruff::rules::UnmatchedSuppressionComment,
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
+        (Ruff, "300") => rules::ruff::rules::ExternalLinter,
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => rules::ruff::rules::StableTestRule,
         #[cfg(any(feature = "test-rules", test))]
@@ -1096,7 +1097,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "960") => rules::ruff::rules::RedirectedFromPrefixTestRule,
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "990") => rules::ruff::rules::PanicyTestRule,
-
 
         // flake8-django
         (Flake8Django, "001") => rules::flake8_django::rules::DjangoNullableModelStringField,
