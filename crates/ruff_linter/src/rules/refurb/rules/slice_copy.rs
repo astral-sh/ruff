@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
@@ -64,11 +65,17 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
     };
     let mut diagnostic = checker.report_diagnostic(SliceCopy, subscript.range());
     let replacement = generate_method_call(name.clone(), "copy", checker.generator());
-    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-        replacement,
-        subscript.start(),
-        subscript.end(),
-    )));
+
+    let applicability = if checker.comment_ranges().intersects(subscript.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::replacement(replacement, subscript.start(), subscript.end()),
+        applicability,
+    ));
 }
 
 /// Matches `obj[:]` where `obj` is a list.
