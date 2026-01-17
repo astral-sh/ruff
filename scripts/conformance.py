@@ -537,14 +537,7 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
     base_header = f"[Typing conformance results]({CONFORMANCE_DIR_WITH_README})"
 
-    if (
-        precision_change == 0
-        and recall_change == 0
-        and true_pos_change == 0
-        and false_pos_change == 0
-        and false_neg_change == 0
-        and total_change == 0
-    ):
+    if all(diag.change is Change.UNCHANGED for diag in grouped_diagnostics):
         return dedent(
             f"""
             ## {base_header}
