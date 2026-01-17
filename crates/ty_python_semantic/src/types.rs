@@ -1090,6 +1090,15 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(f) => {
                 f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
             }
+            Type::TypeAlias(alias) => alias.value_type(db).is_type_check_only(db),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_type_check_only(db)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|element| element.is_type_check_only(db)),
             _ => false,
         }
     }
