@@ -1666,6 +1666,8 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             let typevar = bound_typevar.typevar(self.db);
             if typevar.is_paramspec(self.db) {
                 f.write_str("**")?;
+            } else if typevar.is_typevartuple(self.db) {
+                f.write_str("*")?;
             }
             write!(
                 f.with_type(Type::TypeVar(bound_typevar)),
@@ -1686,6 +1688,12 @@ impl<'db> DisplayGenericContext<'_, 'db> {
                 f.write_str(", ")?;
             }
             f.set_invalid_type_annotation();
+            let typevar = bound_typevar.typevar(self.db);
+            if typevar.is_paramspec(self.db) {
+                f.write_str("**")?;
+            } else if typevar.is_typevartuple(self.db) {
+                f.write_str("*")?;
+            }
             write!(
                 f.with_type(Type::TypeVar(bound_typevar)),
                 "{}",

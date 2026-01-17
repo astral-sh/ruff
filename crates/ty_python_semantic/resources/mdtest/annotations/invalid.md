@@ -180,11 +180,14 @@ def f(
     reveal_type(y)  # revealed: tuple[str | int, ...]
     reveal_type(z)  # revealed: tuple[*tuple[int, ...], str]
 
-T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
+# TypeVarTuple is allowed to appear multiple times in the same tuple, this is not the same
+# as an unbounded variadic tuple
+T1 = tuple[int, *Ts, str, *Ts]
 
 def func3(t: tuple[*Ts]):
     t5: tuple[*tuple[str], *Ts]  # OK
-    t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
+    # Mixing a variadic tuple with a TypeVarTuple is also allowed
+    t6: tuple[*tuple[str, ...], *Ts]
 ```
 
 ## Ellipses in the wrong place in a `tuple` specialization
