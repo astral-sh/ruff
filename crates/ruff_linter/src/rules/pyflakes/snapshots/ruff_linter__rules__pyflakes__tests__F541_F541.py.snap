@@ -19,6 +19,7 @@ help: Remove extraneous `f` prefix
 7 | d = f"def" + "ghi"
 8 | e = (
 9 |     f"def" +
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
  --> F541.py:7:5
@@ -39,6 +40,7 @@ help: Remove extraneous `f` prefix
 8  | e = (
 9  |     f"def" +
 10 |     "ghi"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:9:5
@@ -59,6 +61,7 @@ help: Remove extraneous `f` prefix
 10 |     "ghi"
 11 | )
 12 | f = (
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:13:5
@@ -79,6 +82,7 @@ help: Remove extraneous `f` prefix
 14 |     F"b"
 15 |     "c"
 16 |     rf"d"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:14:5
@@ -99,6 +103,7 @@ help: Remove extraneous `f` prefix
 15 |     "c"
 16 |     rf"d"
 17 |     fr"e"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:16:5
@@ -119,6 +124,7 @@ help: Remove extraneous `f` prefix
 17 |     fr"e"
 18 | )
 19 | g = f""
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:17:5
@@ -139,6 +145,7 @@ help: Remove extraneous `f` prefix
 18 | )
 19 | g = f""
 20 | 
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:19:5
@@ -159,6 +166,7 @@ help: Remove extraneous `f` prefix
 20 | 
 21 | # OK
 22 | g = f"ghi{123:{45}}"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:25:13
@@ -178,6 +186,7 @@ help: Remove extraneous `f` prefix
 26 | 
 27 | v = 23.234234
 28 | 
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:34:7
@@ -197,6 +206,7 @@ help: Remove extraneous `f` prefix
 35 | f"{f''}"
 36 | f"{{test}}"
 37 | f'{{ 40 }}'
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:35:4
@@ -217,6 +227,7 @@ help: Remove extraneous `f` prefix
 36 | f"{{test}}"
 37 | f'{{ 40 }}'
 38 | f"{{a {{x}}"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:36:1
@@ -237,6 +248,7 @@ help: Remove extraneous `f` prefix
 37 | f'{{ 40 }}'
 38 | f"{{a {{x}}"
 39 | f"{{{{x}}}}"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:37:1
@@ -257,6 +269,7 @@ help: Remove extraneous `f` prefix
 38 | f"{{a {{x}}"
 39 | f"{{{{x}}}}"
 40 | ""f""
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:38:1
@@ -277,6 +290,7 @@ help: Remove extraneous `f` prefix
 39 | f"{{{{x}}}}"
 40 | ""f""
 41 | ''f""
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:39:1
@@ -297,6 +311,7 @@ help: Remove extraneous `f` prefix
 40 | ""f""
 41 | ''f""
 42 | (""f""r"")
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:40:3
@@ -317,6 +332,7 @@ help: Remove extraneous `f` prefix
 41 | ''f""
 42 | (""f""r"")
 43 | f"{v:{f"0.2f"}}"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:41:3
@@ -337,6 +353,7 @@ help: Remove extraneous `f` prefix
 42 | (""f""r"")
 43 | f"{v:{f"0.2f"}}"
 44 | f"\{{x}}"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:42:4
@@ -356,6 +373,7 @@ help: Remove extraneous `f` prefix
 42 + ("" ""r"")
 43 | f"{v:{f"0.2f"}}"
 44 | f"\{{x}}"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:43:7
@@ -373,6 +391,7 @@ help: Remove extraneous `f` prefix
    - f"{v:{f"0.2f"}}"
 43 + f"{v:{"0.2f"}}"
 44 | f"\{{x}}"
+note: This is an unsafe fix and may change runtime behavior
 
 F541 [*] f-string without any placeholders
   --> F541.py:44:1
@@ -388,3 +407,4 @@ help: Remove extraneous `f` prefix
 43 | f"{v:{f"0.2f"}}"
    - f"\{{x}}"
 44 + "\{x}"
+note: This is an unsafe fix and may change runtime behavior

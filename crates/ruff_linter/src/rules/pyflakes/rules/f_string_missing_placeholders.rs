@@ -51,6 +51,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// See [#10885](https://github.com/astral-sh/ruff/issues/10885) for more.
 ///
+/// ## Fix Safety
+/// This rule’s fix is marked as unsafe because the author intent is unclear.
+/// An f-string without placeholders may indicate the author intended to
+/// interpolate a variable but forgot the braces (e.g., `f"Hello name!"`
+/// instead of `f"Hello {name}!"`).
+///
 /// ## References
 /// - [PEP 498 – Literal String Interpolation](https://peps.python.org/pep-0498/)
 #[derive(ViolationMetadata)]
@@ -133,7 +139,7 @@ fn convert_f_string_to_regular_string(
         content.insert(0, ' ');
     }
 
-    Fix::safe_edit(Edit::replacement(
+    Fix::unsafe_edit(Edit::replacement(
         content,
         prefix_range.start(),
         node_range.end(),
