@@ -95,13 +95,20 @@ impl Violation for ManualListComprehension {
 
 /// PERF401
 pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
-    let Expr::Name(ast::ExprName {
-        id: for_stmt_target_id,
-        ..
-    }) = &*for_stmt.target
-    else {
-        return;
-    };
+    let mut targets = Vec::new();
+    match &*for_stmt.target {
+        Expr::Name(ast::ExprName { id, .. }) => targets.push(id),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            for elt in elts {
+                if let Expr::Name(ast::ExprName { id, .. }) = elt {
+                    targets.push(id);
+                } else {
+                    return;
+                }
+            }
+        }
+        _ => return,
+    }
 
     let (stmt, if_test) = match &*for_stmt.body {
         // ```python
@@ -180,7 +187,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         if if_test.is_none() {
             if arg
                 .as_name_expr()
-                .is_some_and(|arg| arg.id == *for_stmt_target_id)
+                .is_some_and(|arg| targets.contains(&&arg.id))
             {
                 return;
             }
@@ -244,25 +251,28 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = [x for x in y]
     // print(x)
     // ```
-    let target_binding = checker
-        .semantic()
-        .bindings
-        .iter()
-        .find(|binding| for_stmt.target.range() == binding.range)
-        .unwrap();
-    // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
-    // then it is intended to be used elsewhere outside the for loop.
-    if target_binding.is_global() || target_binding.is_nonlocal() {
-        return;
-    }
-    // If any references to the loop target variable are after the loop,
-    // then converting it into a comprehension would cause a NameError
-    if target_binding
-        .references()
-        .map(|reference| checker.semantic().reference(reference))
-        .any(|other_reference| for_stmt.end() < other_reference.start())
-    {
-        return;
+
+    // Ensure none of the loop targets (e.g., x, y in `for x, y in ...`)
+    // leak outside the loop.
+    for target_id in &targets {
+        let Some(target_binding) = checker.semantic().bindings.iter().find(|binding| {
+            binding.name(checker.locator().contents()) == **target_id
+                && for_stmt.target.range().contains(binding.range().start())
+        }) else {
+            return;
+        };
+
+        if target_binding.is_global() || target_binding.is_nonlocal() {
+            return;
+        }
+
+        if target_binding
+            .references()
+            .map(|reference| checker.semantic().reference(reference))
+            .any(|other_reference| other_reference.start() >= for_stmt.end())
+        {
+            return;
+        }
     }
 
     let list_binding_stmt = list_binding.statement(checker.semantic());
