@@ -877,6 +877,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "029") => rules::flake8_pytest_style::rules::PytestWarnsWithoutWarning,
         (Flake8PytestStyle, "030") => rules::flake8_pytest_style::rules::PytestWarnsTooBroad,
         (Flake8PytestStyle, "031") => rules::flake8_pytest_style::rules::PytestWarnsWithMultipleStatements,
+        (Flake8PytestStyle, "101") => rules::flake8_pytest_style::rules::PytestParametrizeBoolWithoutIds,
 
         // flake8-pie
         (Flake8Pie, "790") => rules::flake8_pie::rules::UnnecessaryPlaceholder,
