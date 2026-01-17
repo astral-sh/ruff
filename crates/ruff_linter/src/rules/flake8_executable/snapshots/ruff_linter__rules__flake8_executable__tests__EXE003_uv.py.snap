@@ -1,4 +1,62 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
+EXE005 Shebang should be at the beginning of the file
+ --> EXE003_uv.py:4:1
+  |
+2 | print("hello world")
+3 |
+4 | #!/usr/bin/env uv --offline run
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | print("offline")
+  |
 
+EXE005 Shebang should be at the beginning of the file
+ --> EXE003_uv.py:7:1
+  |
+5 | print("offline")
+6 |
+7 | #!/usr/bin/env uvx
+  | ^^^^^^^^^^^^^^^^^^
+8 | print("uvx")
+  |
+
+EXE005 Shebang should be at the beginning of the file
+  --> EXE003_uv.py:10:1
+   |
+ 8 | print("uvx")
+ 9 |
+10 | #!/usr/bin/env uv tool run
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 | print("uv tool")
+   |
+
+EXE005 Shebang should be at the beginning of the file
+  --> EXE003_uv.py:13:1
+   |
+11 | print("uv tool")
+12 |
+13 | #!/usr/bin/env uvx --quiet
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 | print("uvx quiet")
+   |
+
+EXE003 Shebang should contain `python`, `pytest`, or `uv run`
+  --> EXE003_uv.py:16:1
+   |
+14 | print("uvx quiet")
+15 |
+16 | #!/usr/bin/env uv_not_really_run
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 | print("this should fail")
+   |
+
+EXE005 Shebang should be at the beginning of the file
+  --> EXE003_uv.py:16:1
+   |
+14 | print("uvx quiet")
+15 |
+16 | #!/usr/bin/env uv_not_really_run
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 | print("this should fail")
+   |
