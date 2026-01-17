@@ -111,11 +111,11 @@ class Change(StrEnum):
     def into_title(self) -> str:
         match self:
             case Change.ADDED:
-                return "Added (Optional)"
+                return "Optional Diagnostics Added"
             case Change.REMOVED:
-                return "Removed (Optional)"
+                return "Optional Diagnostics Removed"
             case Change.UNCHANGED:
-                return "Unchanged (Optional)"
+                return "Optional Diagnostics Unchanged"
 
 
 @dataclass(kw_only=True, slots=True)
