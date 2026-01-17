@@ -736,7 +736,15 @@ fn unused_imports_from_binding<'a, 'b>(
                                 .expect("binding to be import binding since current function called after restricting to these in `unused_imports_in_scope`")
                                 .qualified_name()
                                 .segments().first().expect("import binding to have nonempty qualified name");
-            mark_uses_of_qualified_name(&mut marked, &QualifiedName::user_defined(first));
+            let qualified_first = QualifiedName::user_defined(first);
+            for (binding, is_used) in marked.iter_mut() {
+                if let Some(import) = binding.as_any_import() {
+                    if import.qualified_name().starts_with(&qualified_first) {
+                        *is_used = true;
+                    }
+                }
+            }
+
             marked_dunder_all = true;
             continue;
         }
