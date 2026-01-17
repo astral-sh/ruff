@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_text_size::Ranged;
@@ -86,6 +87,13 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
             },
             type_.range(),
         );
+
+        let applicability = if checker.comment_ranges().intersects(type_.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
         // If there's no space between the `except` and the tuple, we need to insert a space,
         // as in:
         // ```python
@@ -93,13 +101,16 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
         // ```
         // Otherwise, the output will be invalid syntax, since we're removing a set of
         // parentheses.
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            pad(
-                checker.generator().expr(elt),
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(
+                pad(
+                    checker.generator().expr(elt),
+                    type_.range(),
+                    checker.locator(),
+                ),
                 type_.range(),
-                checker.locator(),
             ),
-            type_.range(),
-        )));
+            applicability,
+        ));
     }
 }
