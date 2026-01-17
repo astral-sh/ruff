@@ -442,7 +442,49 @@ reveal_type(TooMany)  # revealed: <class 'TooMany'>
 
 ### Keyword arguments for `collections.namedtuple`
 
-The `collections.namedtuple` function accepts `rename`, `defaults`, and `module` keyword arguments:
+The `collections.namedtuple` function accepts `typename` and `field_names` as keyword arguments, as
+well as `rename`, `defaults`, and `module`:
+
+```py
+import collections
+from ty_extensions import reveal_mro
+
+# Both `typename` and `field_names` can be passed as keyword arguments
+NT1 = collections.namedtuple(typename="NT1", field_names="x y")
+reveal_type(NT1)  # revealed: <class 'NT1'>
+reveal_mro(NT1)  # revealed: (<class 'NT1'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+nt1 = NT1(1, 2)
+reveal_type(nt1.x)  # revealed: Any
+reveal_type(nt1.y)  # revealed: Any
+
+# Only `field_names` as keyword argument
+NT2 = collections.namedtuple("NT2", field_names=["a", "b", "c"])
+reveal_type(NT2)  # revealed: <class 'NT2'>
+reveal_mro(NT2)  # revealed: (<class 'NT2'>, <class 'tuple[Any, Any, Any]'>, <class 'object'>)
+
+nt2 = NT2(1, 2, 3)
+reveal_type(nt2.a)  # revealed: Any
+reveal_type(nt2.b)  # revealed: Any
+reveal_type(nt2.c)  # revealed: Any
+
+# Keyword arguments can be combined with other kwargs like `defaults`
+NT3 = collections.namedtuple(typename="NT3", field_names="x y z", defaults=[None])
+reveal_type(NT3)  # revealed: <class 'NT3'>
+reveal_type(NT3.__new__)  # revealed: [Self](cls: type[Self], x: Any, y: Any, z: Any = None) -> Self
+
+nt3 = NT3(1, 2)
+reveal_type(nt3.z)  # revealed: Any
+
+# Passing the same argument positionally and as a keyword is an error
+# error: [parameter-already-assigned] "Multiple values provided for parameter `typename` of `namedtuple`"
+Bad1 = collections.namedtuple("Bad1", "x y", typename="Bad1")
+
+# error: [parameter-already-assigned] "Multiple values provided for parameter `field_names` of `namedtuple`"
+Bad2 = collections.namedtuple("Bad2", "x y", field_names="a b")
+```
+
+The `rename`, `defaults`, and `module` keyword arguments:
 
 ```py
 import collections
@@ -541,13 +583,26 @@ reveal_type(Bad5)  # revealed: <class 'Bad5'>
 
 ### Keyword arguments for `typing.NamedTuple`
 
-The `typing.NamedTuple` function does not accept any keyword arguments:
+Unlike `collections.namedtuple`, the `typing.NamedTuple` function does not accept `typename` or
+`fields` as keyword arguments. It also does not accept `rename`, `defaults`, or `module`:
 
 ```py
 from typing import NamedTuple
 
+# `typename` and `fields` are not valid as keyword arguments for typing.NamedTuple
+# (We only report the missing-argument error in this case since we return early)
+# error: [missing-argument]
+Bad1 = NamedTuple(typename="Bad1", fields=[("x", int)])
+
 # error: [unknown-argument]
-Bad3 = NamedTuple("Bad3", [("x", int)], rename=True)
+Bad2 = NamedTuple("Bad2", [("x", int)], typename="Bad2")
+
+# error: [unknown-argument]
+Bad3 = NamedTuple("Bad3", [("x", int)], fields=[("y", str)])
+
+# `rename`, `defaults`, and `module` are also not valid for typing.NamedTuple
+# error: [unknown-argument]
+Bad4 = NamedTuple("Bad4", [("x", int)], rename=True)
 
 # error: [unknown-argument]
 Bad4 = NamedTuple("Bad4", [("x", int)], defaults=[0])
@@ -575,8 +630,9 @@ reveal_type(Bad8)  # revealed: <class 'Bad8'>
 
 ### Missing required arguments
 
-`NamedTuple` and `namedtuple` require at least two positional arguments: `typename` and
-`fields`/`field_names`.
+`NamedTuple` and `namedtuple` require `typename` and `fields`/`field_names` arguments. For
+`collections.namedtuple`, these can be positional or keyword; for `typing.NamedTuple`, they must be
+positional.
 
 ```py
 import collections

@@ -74,11 +74,11 @@ use crate::types::diagnostic::{
     INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases,
-    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
+    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
@@ -6521,8 +6521,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
         }
 
-        // Need at least typename and fields/field_names.
-        let [name_arg, fields_arg, rest @ ..] = &**args else {
+        // Extract typename and fields from positional or keyword arguments.
+        // For `collections.namedtuple`, both `typename` and `field_names` can be keyword arguments.
+        // For `typing.NamedTuple`, only positional arguments are supported.
+        let (name_arg, fields_arg, rest, name_from_keyword, fields_from_keyword): (
+            Option<&ast::Expr>,
+            Option<&ast::Expr>,
+            &[ast::Expr],
+            bool,
+            bool,
+        ) = match kind {
+            NamedTupleKind::Collections => {
+                let find_keyword = |name: &str| -> Option<&ast::Keyword> {
+                    keywords
+                        .iter()
+                        .find(|kw| kw.arg.as_ref().is_some_and(|arg| arg.id.as_str() == name))
+                };
+                let typename_kw = find_keyword("typename");
+                let field_names_kw = find_keyword("field_names");
+
+                match &**args {
+                    [name, fields, rest @ ..] => (Some(name), Some(fields), rest, false, false),
+                    [name, rest @ ..] => (
+                        Some(name),
+                        field_names_kw.map(|kw| &kw.value),
+                        rest,
+                        false,
+                        field_names_kw.is_some(),
+                    ),
+                    [] => (
+                        typename_kw.map(|kw| &kw.value),
+                        field_names_kw.map(|kw| &kw.value),
+                        &[],
+                        typename_kw.is_some(),
+                        field_names_kw.is_some(),
+                    ),
+                }
+            }
+            NamedTupleKind::Typing => match &**args {
+                [name, fields, rest @ ..] => (Some(name), Some(fields), rest, false, false),
+                [name, rest @ ..] => (Some(name), None, rest, false, false),
+                [] => (None, None, &[], false, false),
+            },
+        };
+
+        // Check if we have both required arguments.
+        let (Some(name_arg), Some(fields_arg)) = (name_arg, fields_arg) else {
             for arg in args {
                 self.infer_expression(arg, TypeContext::default());
             }
@@ -6531,19 +6575,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if !has_starred && !has_double_starred {
-                let fields_param = match kind {
+                let fields_param_name = match kind {
                     NamedTupleKind::Typing => "fields",
                     NamedTupleKind::Collections => "field_names",
                 };
-                let missing = if args.is_empty() {
-                    format!("`typename` and `{fields_param}`")
-                } else {
-                    format!("`{fields_param}`")
+                let missing = match (name_arg.is_none(), fields_arg.is_none()) {
+                    (true, true) => format!("`typename` and `{fields_param_name}`"),
+                    (true, false) => "`typename`".to_string(),
+                    (false, true) => format!("`{fields_param_name}`"),
+                    (false, false) => unreachable!(),
                 };
+                let plural = name_arg.is_none() && fields_arg.is_none();
                 if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
                     builder.into_diagnostic(format_args!(
                         "Missing required argument{} {missing} to `{kind}()`",
-                        if args.is_empty() { "s" } else { "" }
+                        if plural { "s" } else { "" }
                     ));
                 }
             }
@@ -6585,11 +6631,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut rename_type = None;
 
         for kw in keywords {
+            // `kw.arg` is `None` for double-starred kwargs (`**kwargs`), but we already
+            // returned early above if there were any, so this should always be `Some`.
+            let arg = kw
+                .arg
+                .as_ref()
+                .expect("double-starred kwargs should have been handled above");
+
+            // Skip keywords that were used for the required arguments (already inferred above).
+            // These flags are only true for `collections.namedtuple`.
+            if name_from_keyword && arg.id.as_str() == "typename" {
+                continue;
+            }
+            if fields_from_keyword && arg.id.as_str() == "field_names" {
+                continue;
+            }
+
             let kw_type = self.infer_expression(&kw.value, TypeContext::default());
 
-            let Some(arg) = &kw.arg else {
-                continue;
-            };
             match arg.id.as_str() {
                 "defaults" if kind.is_collections() => {
                     defaults_kw = Some(kw);
@@ -6680,6 +6739,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "Expected `str | None`, found `{}`",
                             kw_type.display(db)
                         ));
+                    }
+                }
+                // `typename` is valid as a keyword argument only for `collections.namedtuple`.
+                // If it was already provided positionally, emit an error.
+                "typename" if kind.is_collections() => {
+                    if !args.is_empty() {
+                        if let Some(builder) =
+                            self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Multiple values provided for parameter `typename` of `{kind}`"
+                            ));
+                        }
+                    }
+                }
+                // `field_names` is valid only for `collections.namedtuple`.
+                // If it was already provided positionally, emit an error.
+                "field_names" if kind.is_collections() => {
+                    if args.len() >= 2 {
+                        if let Some(builder) =
+                            self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Multiple values provided for parameter `field_names` of `{kind}`"
+                            ));
+                        }
                     }
                 }
                 unknown_kwarg => {
