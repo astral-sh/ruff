@@ -43,7 +43,7 @@ info: Type variable defined here
 1 | from typing import TypeVar
 2 |
 3 | T = TypeVar("T", int, None)
-  | ^
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 4 |
 5 | def f(x: T) -> T:
   |

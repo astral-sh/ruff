@@ -196,7 +196,7 @@ info: Type variable defined here
 11 |     return 0
 12 |
 13 | def f4[T: str](x: T) -> int:
-   |        ^
+   |        ^^^^^^
 14 |     return 0
    |
 info: Union variant `def f4[T](x: T) -> int` is incompatible with this call site

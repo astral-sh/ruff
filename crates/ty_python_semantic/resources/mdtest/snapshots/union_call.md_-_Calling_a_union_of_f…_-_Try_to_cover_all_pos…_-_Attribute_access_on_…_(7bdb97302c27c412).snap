@@ -42,16 +42,6 @@ error[invalid-argument-type]: Argument to bound method `foo` is incorrect
 17 |     return x.foo(y)
    |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `A` of type variable `Self`
    |
-info: Type variable defined here
- --> src/mdtest_snippet.py:3:7
-  |
-1 | from typing import TypeVar, Self
-2 |
-3 | class A:
-  |       ^
-4 |     def foo(self, x: int) -> Self:
-5 |         return self
-  |
 info: Union variant `bound method T@_.foo(x: int) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
 info: rule `invalid-argument-type` is enabled by default
@@ -67,16 +57,6 @@ error[invalid-argument-type]: Argument to bound method `foo` is incorrect
 17 |     return x.foo(y)
    |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `B` of type variable `Self`
    |
-info: Type variable defined here
- --> src/mdtest_snippet.py:7:7
-  |
-5 |         return self
-6 |
-7 | class B:
-  |       ^
-8 |     def foo(self, x: str) -> Self:
-9 |         return self
-  |
 info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
 info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
 info: rule `invalid-argument-type` is enabled by default

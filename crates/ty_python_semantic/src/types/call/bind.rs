@@ -4578,10 +4578,12 @@ impl<'db> BindingError<'db> {
                     }
                 }
 
-                if let Some(typevar_definition) = typevar.definition(context.db()) {
+                if !typevar.is_self(context.db())
+                    && let Some(typevar_definition) = typevar.definition(context.db())
+                {
                     let module = parsed_module(context.db(), typevar_definition.file(context.db()))
                         .load(context.db());
-                    let typevar_range = typevar_definition.focus_range(context.db(), &module);
+                    let typevar_range = typevar_definition.full_range(context.db(), &module);
                     let mut sub = SubDiagnostic::new(
                         SubDiagnosticSeverity::Info,
                         "Type variable defined here",
