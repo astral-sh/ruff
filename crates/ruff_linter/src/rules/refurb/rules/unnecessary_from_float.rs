@@ -151,7 +151,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     let is_type_safe = is_valid_argument_type(arg_value, method_name, constructor, checker);
 
     // Determine fix safety
-    let applicability = if is_type_safe {
+    let applicability = if is_type_safe && !checker.comment_ranges().intersects(call.range()) {
         Applicability::Safe
     } else {
         Applicability::Unsafe
