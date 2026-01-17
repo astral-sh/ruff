@@ -7299,7 +7299,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
-    pub(crate) struct TypeQualifiers: u16 {
+    pub(crate) struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -7320,8 +7320,6 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
-        /// A non-standard type qualifier that marks a PEP 613 type alias.
-        const PEP_613_ALIAS = 1 << 8;
     }
 }
 
@@ -7389,11 +7387,6 @@ impl<'db> TypeAndQualifiers<'db> {
     /// Insert/add an additional type qualifier.
     pub(crate) fn add_qualifier(&mut self, qualifier: TypeQualifiers) {
         self.qualifiers |= qualifier;
-    }
-
-    pub(crate) fn with_qualifier(mut self, qualifier: TypeQualifiers) -> Self {
-        self.add_qualifier(qualifier);
-        self
     }
 
     /// Return the set of type qualifiers.

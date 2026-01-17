@@ -7523,8 +7523,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeferredExpressionState::from(self.defer_annotations()),
         );
 
-        if let Some(value) = value
-            && declared.qualifiers.contains(TypeQualifiers::PEP_613_ALIAS)
+        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
+
+        if is_pep_613_type_alias
+            && let Some(value) = value
             && !alias_syntax_validation(value)
             && let Some(builder) = self.context.report_lint(
                 &INVALID_TYPE_FORM,
@@ -7584,10 +7586,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             declared.inner = Type::BooleanLiteral(true);
         }
-
-        // Check if this is a PEP 613 `TypeAlias`. (This must come below the SpecialForm handling
-        // immediately below, since that can overwrite the type to be `TypeAlias`.)
-        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr()
