@@ -541,7 +541,7 @@ class Foo(TypedDict):
 Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
 ```
 
-## TODO: A `NewType` cannot be generic
+## A `NewType` cannot be generic
 
 ```py
 from typing import Any, NewType, TypeVar
@@ -553,7 +553,14 @@ B = NewType("B", list[Any])
 
 # But a free typevar is not allowed.
 T = TypeVar("T")
-C = NewType("C", list[T])  # TODO: should be "error: [invalid-newtype]"
+C = NewType("C", list[T])  # error: [invalid-newtype]
+
+D = dict[str, T]
+E = NewType("E", D[T])  # error: [invalid-newtype]
+
+# this is fine: omitting the type argument means that this is equivalent
+# to `F = NewType("F", dict[str, Any])
+F = NewType("F", D)
 ```
 
 ## Forward references in stub files
