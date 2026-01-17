@@ -250,3 +250,26 @@ help: Merge `global` statements
 59 | 
 60 | 
 61 | # Ok
+
+FURB154 [*] Use of repeated consecutive `global`
+  --> FURB154.py:90:5
+   |
+89 |   def func():
+90 | /     global x
+91 | |     # text
+92 | |     global y
+   | |____________^
+93 |
+94 |       print(x, y)
+   |
+help: Merge `global` statements
+87 | 
+88 | 
+89 | def func():
+   -     global x
+   -     # text
+   -     global y
+90 +     global x, y
+91 | 
+92 |     print(x, y)
+note: This is an unsafe fix and may change runtime behavior

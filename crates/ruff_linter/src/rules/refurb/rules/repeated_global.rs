@@ -1,5 +1,5 @@
 use itertools::Itertools;
-
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
@@ -75,23 +75,33 @@ pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
         // diagnostic.
         if let [first, .., last] = globals_sequence {
             let range = first.range().cover(last.range());
+
+            let applicability = if checker.comment_ranges().intersects(range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
             checker
                 .report_diagnostic(RepeatedGlobal { global_kind }, range)
-                .set_fix(Fix::safe_edit(Edit::range_replacement(
-                    format!(
-                        "{global_kind} {}",
-                        globals_sequence
-                            .iter()
-                            .flat_map(|stmt| match stmt {
-                                Stmt::Global(stmt) => &stmt.names,
-                                Stmt::Nonlocal(stmt) => &stmt.names,
-                                _ => unreachable!(),
-                            })
-                            .map(ruff_python_ast::Identifier::id)
-                            .format(", ")
+                .set_fix(Fix::applicable_edit(
+                    Edit::range_replacement(
+                        format!(
+                            "{global_kind} {}",
+                            globals_sequence
+                                .iter()
+                                .flat_map(|stmt| match stmt {
+                                    Stmt::Global(stmt) => &stmt.names,
+                                    Stmt::Nonlocal(stmt) => &stmt.names,
+                                    _ => unreachable!(),
+                                })
+                                .map(ruff_python_ast::Identifier::id)
+                                .format(", ")
+                        ),
+                        range,
                     ),
-                    range,
-                )));
+                    applicability,
+                ));
         }
 
         suite = next_suite;
