@@ -133,4 +133,7 @@ help: Replace `setattr` with assignment
 80 | getattr(foo, "ſ")
    - setattr(foo, "ſ", 1)
 81 + foo.ſ = 1
+82 | 
+83 | 
+84 | getattr(
 note: This is an unsafe fix and may change runtime behavior

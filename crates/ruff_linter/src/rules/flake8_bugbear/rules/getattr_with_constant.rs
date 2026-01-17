@@ -89,7 +89,8 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     // attribute syntax (e.g., `obj.attr`) would normalize the name and potentially change
     // program behavior.
     let attr_name = value.to_str();
-    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name;
+    let has_comments = checker.comment_ranges().intersects(expr.range());
+    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
 
     let mut diagnostic = checker.report_diagnostic(GetAttrWithConstant, expr.range());
     let edit = Edit::range_replacement(
