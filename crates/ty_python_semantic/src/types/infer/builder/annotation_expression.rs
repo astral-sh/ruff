@@ -115,7 +115,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::SpecialForm(SpecialFormType::TypeAlias)
                     if pep_613_policy == PEP613Policy::Allowed =>
                 {
-                    TypeAndQualifiers::declared(ty)
+                    TypeAndQualifiers::declared(ty).with_qualifier(TypeQualifiers::PEP_613_ALIAS)
                 }
                 // Conditional import of `typing.TypeAlias` or `typing_extensions.TypeAlias` on a
                 // Python version where the former doesn't exist.
