@@ -2723,6 +2723,18 @@ impl<'db> ConstraintAssignment<'db> {
 ///
 /// - `C → D`: This indicates that `C` on its own is enough to imply `D`. Any path that assumes `C`
 ///   holds but `D` does _not_ is impossible and can be pruned.
+///
+/// Sequent maps are primarily used when walking a BDD path with a [`PathAssignments`]. The
+/// `PathAssignments` will hold a sequent map containing all of the constraints that are
+/// encountered during the walk. It builds up its sequent map lazily, so that it only has to
+/// include sequents for the constraints that are actually encountered. However, we also don't want
+/// to perform duplicate work if we perform multiple BDD walks on the same constraint set. The
+/// [`for_constraint`][Self::for_constraint] and [`for_constraint_pair`][Self::for_constraint_pair]
+/// methods are salsa-tracked, to ensure that we only perform them once for any particular
+/// constraint or pair of constraints. `PathAssignments` invokes these methods when it encounters a
+/// new constraint, and then merges those cached sequents into its own sequent map. (That means we
+/// also share the work of calculating the sequent map across `PathAssignments` for _different_
+/// constraint sets.)
 #[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 struct SequentMap<'db> {
     /// Sequents of the form `¬C₁ → false`
@@ -2739,6 +2751,9 @@ struct SequentMap<'db> {
 }
 
 impl<'db> SequentMap<'db> {
+    /// Returns a sequent map containing the sequents that we can infer from a single constraint in
+    /// isolation. This method is salsa-tracked so that we only perform this work once per
+    /// constraint.
     fn for_constraint(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> &'db Self {
         #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
         fn for_constraint_inner<'db>(
@@ -2758,6 +2773,12 @@ impl<'db> SequentMap<'db> {
         for_constraint_inner(db, constraint)
     }
 
+    /// Returns a sequent map containing the sequents that we can infer from a pair of constraints.
+    /// This method is salsa-tracked so that we only perform this work once per constraint pair.
+    ///
+    /// (Note that this method is _not_ commutative; you should provide `left` and `right` in the
+    /// order that they appear in the source code, so that we can construct derived constraints
+    /// that retain that ordering.)
     fn for_constraint_pair(
         db: &'db dyn Db,
         left: ConstrainedTypeVar<'db>,
@@ -2783,6 +2804,7 @@ impl<'db> SequentMap<'db> {
         for_constraint_pair_inner(db, left, right)
     }
 
+    /// Merges the sequents from another sequent map into this one.
     fn merge(&mut self, db: &'db dyn Db, other: &Self) {
         self.single_tautologies.extend(&other.single_tautologies);
         self.pair_impossibilities
@@ -3273,6 +3295,9 @@ impl<'db> SequentMap<'db> {
 pub(crate) struct PathAssignments<'db> {
     map: SequentMap<'db>,
     assignments: FxIndexMap<ConstraintAssignment<'db>, usize>,
+    /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
+    /// ensures a stable order for all of the derived constraints that we create, while still
+    /// letting us create them lazily.)
     discovered: FxIndexMap<ConstrainedTypeVar<'db>, bool>,
 }
 
@@ -3377,6 +3402,11 @@ impl<'db> PathAssignments<'db> {
         self.assignments.contains_key(&assignment)
     }
 
+    /// Update our sequent map to ensure that it holds all of the sequents that involve the given
+    /// constraint. We do not calculate the new sequents directly. Instead, we call
+    /// [`SequentMap::for_constraint`] and [`for_constraint_pair`][SequentMap::for_constraint_pair]
+    /// to calculate _and cache_ the constraints, so that if we walk another constraint set
+    /// containing this constraint, we reuse the work to calculate its sequents.
     fn discover_constraint(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
         // If we've already processed this constraint, we can skip it.
         let existing = self.discovered.insert(constraint, true);
