@@ -7454,6 +7454,85 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
+        /// Simple syntactic validation for the right-hand sides of PEP-613 type aliases.
+        ///
+        /// TODO: this is far from exhaustive and should be improved.
+        const fn alias_syntax_validation(expr: &ast::Expr) -> bool {
+            const fn inner(expr: &ast::Expr, allow_context_dependent: bool) -> bool {
+                match expr {
+                    ast::Expr::Name(_)
+                    | ast::Expr::StringLiteral(_)
+                    | ast::Expr::NoneLiteral(_) => true,
+                    ast::Expr::Attribute(ast::ExprAttribute {
+                        value,
+                        attr: _,
+                        node_index: _,
+                        range: _,
+                        ctx: _,
+                    }) => inner(value, allow_context_dependent),
+                    ast::Expr::Subscript(ast::ExprSubscript {
+                        value,
+                        slice,
+                        node_index: _,
+                        range: _,
+                        ctx: _,
+                    }) => {
+                        if !inner(value, allow_context_dependent) {
+                            return false;
+                        }
+                        match &**slice {
+                            ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                match elts.as_slice() {
+                                    [first, ..] => inner(first, true),
+                                    _ => true,
+                                }
+                            }
+                            _ => inner(slice, true),
+                        }
+                    }
+                    ast::Expr::BinOp(ast::ExprBinOp {
+                        left,
+                        op,
+                        right,
+                        range: _,
+                        node_index: _,
+                    }) => {
+                        op.is_bit_or()
+                            && inner(left, allow_context_dependent)
+                            && inner(right, allow_context_dependent)
+                    }
+                    ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                        op,
+                        operand,
+                        range: _,
+                        node_index: _,
+                    }) => {
+                        allow_context_dependent
+                            && matches!(op, ast::UnaryOp::UAdd | ast::UnaryOp::USub)
+                            && matches!(
+                                &**operand,
+                                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                    value: ast::Number::Int(_),
+                                    ..
+                                })
+                            )
+                    }
+                    ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value,
+                        node_index: _,
+                        range: _,
+                    }) => allow_context_dependent && value.is_int(),
+                    ast::Expr::EllipsisLiteral(_)
+                    | ast::Expr::BytesLiteral(_)
+                    | ast::Expr::BooleanLiteral(_)
+                    | ast::Expr::Starred(_)
+                    | ast::Expr::List(_) => allow_context_dependent,
+                    _ => false,
+                }
+            }
+            inner(expr, false)
+        }
+
         let annotation = assignment.annotation(self.module());
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
@@ -7462,6 +7541,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
+
+        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
+
+        if is_pep_613_type_alias
+            && let Some(value) = value
+            && !alias_syntax_validation(value)
+            && let Some(builder) = self.context.report_lint(
+                &INVALID_TYPE_FORM,
+                definition.full_range(self.db(), self.module()),
+            )
+        {
+            // TODO: better error message; full type-expression validation; etc.
+            let mut diagnostic = builder
+                .into_diagnostic("Invalid right-hand side for `typing.TypeAlias` assignment");
+            diagnostic.help(
+                "See https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+            );
+        }
 
         if !declared.qualifiers.is_empty() {
             let current_scope_id = self.scope().file_scope_id(self.db());
@@ -7508,10 +7605,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             declared.inner = Type::BooleanLiteral(true);
         }
-
-        // Check if this is a PEP 613 `TypeAlias`. (This must come below the SpecialForm handling
-        // immediately below, since that can overwrite the type to be `TypeAlias`.)
-        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr()
