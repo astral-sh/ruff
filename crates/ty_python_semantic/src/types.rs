@@ -1376,6 +1376,31 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the number of union clauses in this type. If the type is not a union, returns 1.
+    pub(crate) fn union_size(self, db: &'db dyn Db) -> usize {
+        self.as_union()
+            .map(|union_type| union_type.elements(db).len())
+            .unwrap_or(1)
+    }
+
+    /// Returns the number of intersection clauses in this type. If the type is a union, this is
+    /// the maximum of the `intersection_size` of each union element. If the type is not a union
+    /// nor an intersection, returns 1.
+    pub(crate) fn intersection_size(self, db: &'db dyn Db) -> usize {
+        match self {
+            Type::Intersection(intersection) => {
+                intersection.positive(db).len() + intersection.negative(db).len()
+            }
+            Type::Union(union_type) => union_type
+                .elements(db)
+                .iter()
+                .map(|element| element.intersection_size(db))
+                .max()
+                .unwrap_or(1),
+            _ => 1,
+        }
+    }
+
     pub(crate) const fn as_function_literal(self) -> Option<FunctionType<'db>> {
         match self {
             Type::FunctionLiteral(function_type) => Some(function_type),
@@ -7892,6 +7917,16 @@ impl<'db> TypeVarInstance<'db> {
             TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self.lazy_bound(db),
             TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self.lazy_constraints(db),
         })
+    }
+
+    /// Returns the bounds or constraints of this typevar. If the typevar is unbounded, returns
+    /// `object` as its upper bound.
+    pub(crate) fn require_bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+    ) -> TypeVarBoundOrConstraints<'db> {
+        self.bound_or_constraints(db)
+            .unwrap_or_else(|| TypeVarBoundOrConstraints::UpperBound(Type::object()))
     }
 
     pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
