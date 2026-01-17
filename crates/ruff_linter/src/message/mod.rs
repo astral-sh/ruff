@@ -8,8 +8,9 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, DisplayGithubDiagnostics, FileResolver, GithubRenderer, Input, LintName,
-    SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    DisplayDiagnostics, DisplayGithubDiagnostics, DisplaySarifDiagnostics, FileResolver,
+    GithubRenderer, Input, LintName, SarifRenderer, SarifToolInfo, SecondaryCode, Severity, Span,
+    SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -17,14 +18,12 @@ pub use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
-pub use sarif::SarifEmitter;
 
 use crate::Fix;
 use crate::registry::Rule;
 use crate::settings::types::{OutputFormat, RuffOutputFormat};
 
 mod grouped;
-mod sarif;
 
 /// Create a `Diagnostic` from a panic.
 pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
@@ -213,15 +212,21 @@ pub fn render_diagnostics(
             let value = DisplayGithubDiagnostics::new(&renderer, diagnostics);
             write!(writer, "{value}")?;
         }
+        Err(RuffOutputFormat::Sarif) => {
+            let renderer = SarifRenderer::new(
+                context,
+                SarifToolInfo {
+                    name: "Ruff",
+                    information_uri: "https://github.com/astral-sh/ruff",
+                },
+            );
+            let value = DisplaySarifDiagnostics::new(&renderer, diagnostics);
+            write!(writer, "{value}")?;
+        }
         Err(RuffOutputFormat::Grouped) => {
             GroupedEmitter::default()
                 .with_show_fix_status(config.show_fix_status())
                 .with_applicability(config.fix_applicability())
-                .emit(writer, diagnostics, context)
-                .map_err(std::io::Error::other)?;
-        }
-        Err(RuffOutputFormat::Sarif) => {
-            SarifEmitter
                 .emit(writer, diagnostics, context)
                 .map_err(std::io::Error::other)?;
         }

@@ -1,21 +1,7 @@
 ---
-source: crates/ruff/tests/cli/lint.rs
-info:
-  program: ruff
-  args:
-    - check
-    - "--no-cache"
-    - "--output-format"
-    - sarif
-    - "--select"
-    - "F401,F821"
-    - "--target-version"
-    - py39
-    - input.py
+source: crates/ruff_db/src/diagnostic/render/sarif.rs
+expression: output
 ---
-success: false
-exit_code: 1
------ stdout -----
 {
   "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
   "runs": [
@@ -27,7 +13,7 @@ exit_code: 1
               "artifactChanges": [
                 {
                   "artifactLocation": {
-                    "uri": "[TMP]/input.py"
+                    "uri": "file://fib.py"
                   },
                   "replacements": [
                     {
@@ -51,7 +37,7 @@ exit_code: 1
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "[TMP]/input.py"
+                  "uri": "file://fib.py"
                 },
                 "region": {
                   "endColumn": 10,
@@ -68,26 +54,50 @@ exit_code: 1
           "ruleId": "F401"
         },
         {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "file://fib.py"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 10,
+                        "endLine": 6,
+                        "startColumn": 5,
+                        "startLine": 6
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "Remove assignment to unused variable `x`"
+              }
+            }
+          ],
           "level": "error",
           "locations": [
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "[TMP]/input.py"
+                  "uri": "file://fib.py"
                 },
                 "region": {
                   "endColumn": 6,
-                  "endLine": 2,
+                  "endLine": 6,
                   "startColumn": 5,
-                  "startLine": 2
+                  "startLine": 6
                 }
               }
             }
           ],
           "message": {
-            "text": "Undefined name `y`"
+            "text": "Local variable `x` is assigned to but never used"
           },
-          "ruleId": "F821"
+          "ruleId": "F841"
         },
         {
           "level": "error",
@@ -95,27 +105,27 @@ exit_code: 1
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "[TMP]/input.py"
+                  "uri": "file://undef.py"
                 },
                 "region": {
-                  "endColumn": 6,
-                  "endLine": 3,
-                  "startColumn": 1,
-                  "startLine": 3
+                  "endColumn": 5,
+                  "endLine": 1,
+                  "startColumn": 4,
+                  "startLine": 1
                 }
               }
             }
           ],
           "message": {
-            "text": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
+            "text": "Undefined name `a`"
           },
-          "ruleId": "invalid-syntax"
+          "ruleId": "F821"
         }
       ],
       "tool": {
         "driver": {
-          "informationUri": "https://github.com/astral-sh/ruff",
-          "name": "Ruff",
+          "informationUri": "https://github.com/astral-sh/ty",
+          "name": "ty",
           "rules": [
             {
               "helpUri": "https://docs.astral.sh/ruff/rules/unused-import",
@@ -134,7 +144,17 @@ exit_code: 1
                 "id": "F821"
               },
               "shortDescription": {
-                "text": "Undefined name `y`"
+                "text": "Undefined name `a`"
+              }
+            },
+            {
+              "helpUri": "https://docs.astral.sh/ruff/rules/unused-variable",
+              "id": "F841",
+              "properties": {
+                "id": "F841"
+              },
+              "shortDescription": {
+                "text": "Local variable `x` is assigned to but never used"
               }
             }
           ],
@@ -145,4 +165,3 @@ exit_code: 1
   ],
   "version": "2.1.0"
 }
------ stderr -----
