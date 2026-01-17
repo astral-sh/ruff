@@ -90,3 +90,11 @@ class A11(MyMetaClass, metaclass=ABCMeta):  # FURB180
     @abstractmethod
     def foo(self):
         pass
+
+
+class A12(
+    keyword_argument=1,
+    # comment
+    metaclass=abc.ABCMeta,
+):  # FURB180
+    pass

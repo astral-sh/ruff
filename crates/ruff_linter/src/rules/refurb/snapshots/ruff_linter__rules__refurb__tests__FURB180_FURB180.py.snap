@@ -156,3 +156,25 @@ help: Replace with `abc.ABC`
 91 |     def foo(self):
 92 |         pass
 note: This is an unsafe fix and may change runtime behavior
+
+FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+   --> FURB180.py:98:5
+    |
+ 96 |     keyword_argument=1,
+ 97 |     # comment
+ 98 |     metaclass=abc.ABCMeta,
+    |     ^^^^^^^^^^^^^^^^^^^^^
+ 99 | ):  # FURB180
+100 |     pass
+    |
+help: Replace with `abc.ABC`
+93 | 
+94 | 
+95 | class A12(
+   -     keyword_argument=1,
+   -     # comment
+   -     metaclass=abc.ABCMeta,
+96 +     abc.ABC, keyword_argument=1,
+97 | ):  # FURB180
+98 |     pass
+note: This is an unsafe fix and may change runtime behavior
