@@ -2,7 +2,6 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
-
 ---
 mdtest name: functions.md - Generic functions: PEP 695 syntax - Inferring a bound typevar
 mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/functions.md
@@ -41,7 +40,7 @@ info: Type variable defined here
 1 | from typing_extensions import reveal_type
 2 |
 3 | def f[T: int](x: T) -> T:
-  |       ^^^^^^
+  |       ^
 4 |     return x
   |
 info: rule `invalid-argument-type` is enabled by default

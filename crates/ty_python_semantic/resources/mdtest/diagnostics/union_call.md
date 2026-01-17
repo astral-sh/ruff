@@ -162,3 +162,22 @@ def _(n: int):
     # error: [invalid-argument-type]
     f1(x)
 ```
+
+### Attribute access on a typevar with multiple bounds
+
+```py
+from typing import TypeVar, Self
+
+class A:
+    def foo(self, x: int) -> Self:
+        pass
+
+class B:
+    def foo(self, x: str) -> Self:
+        pass
+
+T = TypeVar("T", A, B)
+
+def _(x: T, y: int) -> T:
+    return x.foo(y)
+```
