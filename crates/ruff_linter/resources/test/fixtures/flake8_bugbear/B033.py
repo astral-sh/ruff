@@ -20,6 +20,12 @@ incorrect_set = {
     1,
 }
 incorrect_set = {False, 1, 0}
+incorrect_set_multiline_with_comment = {
+    "value1",
+    23,
+    # B033
+    "value1",
+}
 
 ###
 # Non-errors.

@@ -1,4 +1,4 @@
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::{Applicability, Fix};
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -27,6 +27,20 @@ use crate::{FixAvailability, Violation};
 /// Use instead:
 /// ```python
 /// {1, 2, 3}
+/// ```
+///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the
+/// original expression, potentially losing important context or documentation.
+///
+/// For example:
+/// ```python
+/// {
+///     1,
+///     2,
+///     # Comment
+///     1,
+/// }
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.271")]
@@ -68,12 +82,20 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
                     },
                     value.range(),
                 );
-
                 diagnostic.secondary_annotation(format_args!("previous occurrence here"), existing);
                 diagnostic.set_primary_message(format_args!("duplicated here"));
                 diagnostic.try_set_fix(|| {
-                    edits::remove_member(&set.elts, index, checker.locator().contents())
-                        .map(Fix::safe_edit)
+                    edits::remove_member(&set.elts, index, checker.locator().contents()).map(
+                        |edit| {
+                            let applicability = if checker.comment_ranges().intersects(edit.range())
+                            {
+                                Applicability::Unsafe
+                            } else {
+                                Applicability::Safe
+                            };
+                            Fix::applicable_edit(edit, applicability)
+                        },
+                    )
                 });
             }
         }
