@@ -4574,6 +4574,7 @@ dependencies = [
  "itertools 0.14.0",
  "memchr",
  "ordermap",
+ "parking_lot",
  "pretty_assertions",
  "quickcheck",
  "quickcheck_macros",
