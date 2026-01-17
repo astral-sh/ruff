@@ -3896,8 +3896,7 @@ impl<'db> StaticClassLiteral<'db> {
             if let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
                 && matches!(name.as_str(), "__setattr__" | "__delattr__")
             {
-                if let Some(CodeGeneratorKind::DataclassLike(_)) =
-                    CodeGeneratorKind::from_static_class(db, self, None)
+                if let CodeGeneratorKind::DataclassLike(_) = field_policy
                     && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
                 {
                     if let Some(builder) = context.report_lint(
