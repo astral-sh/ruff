@@ -1186,6 +1186,95 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(Type::DataclassTransformer(params));
                             }
                         }
+                        Some(KnownFunction::Unpack) => {
+                            let [Some(format), Some(_buffer)] = overload.parameter_types() else {
+                                continue;
+                            };
+
+                            let Some(format_literal) = format.as_string_literal() else {
+                                continue;
+                            };
+                            let format_string = format_literal.value(db);
+
+                            // Strip the byte order/size/alignment prefix
+                            let core = format_string.trim_start_matches(['@', '=', '<', '>', '!']);
+
+                            let mut elements = Vec::new();
+                            let mut escaped = false;
+                            let mut chars = core.chars().peekable();
+
+                            while chars.peek().is_some() {
+                                // Extract count (optional)
+                                let mut count: usize = 0;
+                                let mut has_count = false;
+
+                                while let Some(&d) = chars.peek() {
+                                    if let Some(digit) = d.to_digit(10) {
+                                        count =
+                                            count.saturating_mul(10).saturating_add(digit as usize);
+                                        has_count = true;
+                                        chars.next();
+                                    } else {
+                                        break;
+                                    }
+                                }
+
+                                if !has_count {
+                                    count = 1;
+                                }
+
+                                // Extract format character
+                                if let Some(tag) = chars.next() {
+                                    // Map tag to Type
+                                    let ty = match tag {
+                                        // Pad byte (no value returned)
+                                        'x' => None,
+                                        // 's' (char[]) and 'p' (pascal string) are bytes
+                                        's' | 'p' => Some(KnownClass::Bytes.to_instance(db)),
+                                        // 'c' is char (bytes of length 1)
+                                        'c' => Some(KnownClass::Bytes.to_instance(db)),
+                                        // Integers
+                                        'b' | 'B' | 'h' | 'H' | 'i' | 'I' | 'l' | 'L' | 'q'
+                                        | 'Q' | 'n' | 'N' | 'P' => {
+                                            Some(KnownClass::Int.to_instance(db))
+                                        }
+                                        // Booleans
+                                        '?' => Some(KnownClass::Bool.to_instance(db)),
+                                        // Floats
+                                        'e' | 'f' | 'd' => Some(KnownClass::Float.to_instance(db)),
+                                        _ => None,
+                                    };
+
+                                    if let Some(ty) = ty {
+                                        if matches!(tag, 's' | 'p') {
+                                            // For 's' and 'p', the count represents size in bytes,
+                                            // yielding a single bytes object.
+                                            elements.push(ty);
+                                        } else {
+                                            // To prevent OOM errors, we cap the number of repetitions by escaping to Unknown.
+                                            if count >= 2 ^ 16 {
+                                                escaped = true;
+                                                break;
+                                            }
+                                            for _ in 0..count {
+                                                elements.push(ty);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if escaped {
+                                // set return type to tuple[Unknown, ...]
+                                overload
+                                    .set_return_type(Type::homogeneous_tuple(db, Type::unknown()));
+                            } else {
+                                overload.set_return_type(Type::heterogeneous_tuple(
+                                    db,
+                                    elements.into_iter(),
+                                ));
+                            }
+                        }
 
                         _ => {
                             // Ideally, either the implementation, or exactly one of the overloads
