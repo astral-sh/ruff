@@ -10,6 +10,7 @@ use std::sync::LazyLock;
 use types::CompiledPerFileTargetVersionList;
 
 use crate::codes::RuleCodePrefix;
+use crate::external::ExternalLintRegistry;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
 
@@ -243,6 +244,9 @@ pub struct LinterSettings {
     pub builtins: Vec<String>,
     pub dummy_variable_rgx: Regex,
     pub external: Vec<String>,
+    pub external_ast: Option<ExternalLintRegistry>,
+    pub selected_external: Vec<String>,
+    pub ignored_external: Vec<String>,
     pub ignore_init_module_imports: bool,
     pub logger_objects: Vec<String>,
     pub namespace_packages: Vec<PathBuf>,
@@ -318,6 +322,9 @@ impl Display for LinterSettings {
                 self.typing_modules | array,
                 self.typing_extensions,
             ]
+        }
+        if let Some(registry) = &self.external_ast {
+            writeln!(f, "linter.ext-lint = {registry:#?}")?;
         }
         writeln!(f, "\n# Linter Plugins")?;
         display_settings! {
@@ -410,6 +417,9 @@ impl LinterSettings {
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
 
             external: vec![],
+            external_ast: None,
+            selected_external: Vec::new(),
+            ignored_external: Vec::new(),
             ignore_init_module_imports: true,
             logger_objects: vec![],
             namespace_packages: vec![],
