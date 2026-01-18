@@ -3789,16 +3789,58 @@ impl<'db> Type<'db> {
     pub(crate) fn infer_subscript_expression_types(
         self,
         db: &'db dyn Db,
-        subscript: &ast::ExprSubscript,
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
         scope_id: ScopeId<'db>,
         index: &'db SemanticIndex<'db>,
         typevar_binding_context: Option<Definition<'db>>,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
+        fn try_intersection<'db, F>(
+            db: &'db dyn Db,
+            elements: impl Iterator<Item = Type<'db>>,
+            mut op: F,
+        ) -> Result<Type<'db>, SubscriptError<'db>>
+        where
+            F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
+        {
+            let mut results = Vec::new();
+            let mut errors = Vec::new();
+
+            for element in elements {
+                match op(element) {
+                    Ok(result) => results.push(result),
+                    Err(error) => errors.push(error),
+                }
+            }
+
+            if results.is_empty() {
+                if let Some(first) = errors.pop() {
+                    let result_ty = first.result_type();
+                    let mut all_errors = first.into_errors();
+                    for error in errors {
+                        all_errors.extend(error.into_errors());
+                    }
+                    return Err(SubscriptError::with_errors(result_ty, all_errors));
+                }
+                return Ok(Type::unknown());
+            }
+
+            let mut builder = IntersectionBuilder::new(db);
+            for result in results {
+                builder = builder.add_positive(result);
+            }
+            Ok(builder.build())
+        }
+
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         enum LegacyGenericContextError<'db> {
+            /// It's invalid to subscript `Generic` or `Protocol` with this type.
             InvalidArgument(Type<'db>),
+            /// It's invalid to subscript `Generic` or `Protocol` with a variadic tuple type.
+            /// We should emit a diagnostic for this, but we don't yet.
             VariadicTupleArguments,
+            /// It's valid to subscribe `Generic` or `Protocol` with this type,
+            /// but the type is not yet supported.
             NotYetSupported,
         }
 
@@ -3843,7 +3885,7 @@ impl<'db> Type<'db> {
                             typevar_binding_context,
                             typevar,
                         )
-                        .ok_or_else(|| LegacyGenericContextError::InvalidArgument(argument_ty))
+                        .ok_or(LegacyGenericContextError::InvalidArgument(argument_ty))
                     } else if any_over_type(
                         db,
                         argument_ty,
@@ -3874,7 +3916,6 @@ impl<'db> Type<'db> {
 
             (Type::TypeAlias(alias), _) => Some(alias.value_type(db).infer_subscript_expression_types(
                 db,
-                subscript,
                 slice_ty,
                 expr_context,
                 scope_id,
@@ -3884,7 +3925,6 @@ impl<'db> Type<'db> {
 
             (_, Type::TypeAlias(alias)) => Some(value_ty.infer_subscript_expression_types(
                 db,
-                subscript,
                 alias.value_type(db),
                 expr_context,
                 scope_id,
@@ -3895,7 +3935,6 @@ impl<'db> Type<'db> {
             (Type::Union(union), _) => Some(map_union_subscript(db, union, |element| {
                 element.infer_subscript_expression_types(
                     db,
-                    subscript,
                     slice_ty,
                     expr_context,
                     scope_id,
@@ -3907,7 +3946,6 @@ impl<'db> Type<'db> {
             (_, Type::Union(union)) => Some(map_union_subscript(db, union, |element| {
                 value_ty.infer_subscript_expression_types(
                     db,
-                    subscript,
                     element,
                     expr_context,
                     scope_id,
@@ -3916,12 +3954,30 @@ impl<'db> Type<'db> {
                 )
             })),
 
-            // TODO: we can map over the intersection and fold the results back into an intersection,
-            // but we need to make sure we avoid emitting a diagnostic if one positive element has a `__getitem__`
-            // method but another does not. This means `infer_subscript_expression_types`
-            // needs to return a `Result` rather than eagerly emitting diagnostics.
-            (Type::Intersection(_), _) | (_, Type::Intersection(_)) => {
-                Some(Ok(todo_type!("Subscript expressions with intersections")))
+            (Type::Intersection(intersection), _) => {
+                Some(try_intersection(db, intersection.iter_positive(db), |element| {
+                    element.infer_subscript_expression_types(
+                        db,
+                        slice_ty,
+                        expr_context,
+                        scope_id,
+                        index,
+                        typevar_binding_context,
+                    )
+                }))
+            }
+
+            (_, Type::Intersection(intersection)) => {
+                Some(try_intersection(db, intersection.iter_positive(db), |element| {
+                    value_ty.infer_subscript_expression_types(
+                        db,
+                        element,
+                        expr_context,
+                        scope_id,
+                        index,
+                        typevar_binding_context,
+                    )
+                }))
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
@@ -4055,7 +4111,6 @@ impl<'db> Type<'db> {
             (Type::StringLiteral(_) | Type::BytesLiteral(_), Type::BooleanLiteral(bool)) => {
                 Some(value_ty.infer_subscript_expression_types(
                     db,
-                    subscript,
                     Type::IntLiteral(i64::from(bool)),
                     expr_context,
                     scope_id,
@@ -4069,7 +4124,6 @@ impl<'db> Type<'db> {
             {
                 Some(value_ty.infer_subscript_expression_types(
                     db,
-                    subscript,
                     Type::IntLiteral(i64::from(bool)),
                     expr_context,
                     scope_id,
@@ -9739,20 +9793,23 @@ pub(crate) struct SubscriptError<'db> {
 
 #[derive(Debug)]
 pub(crate) enum SubscriptErrorKind<'db> {
+    /// An index is out of bounds for a literal tuple/string/bytes subscript.
     IndexOutOfBounds {
         kind: &'static str,
         tuple_ty: Type<'db>,
         length: String,
         index: i64,
     },
+    /// A slice literal used a step size of zero.
     SliceStepSizeZero,
-    NonGenericTypeAlias {
-        alias: TypeAliasType<'db>,
-    },
+    /// A non-generic PEP 695 type alias was subscripted.
+    NonGenericTypeAlias { alias: TypeAliasType<'db> },
+    /// `__getitem__` exists but is possibly unbound.
     DunderPossiblyUnbound {
         method: &'static str,
         value_ty: Type<'db>,
     },
+    /// `__getitem__` exists but can't be called with the given arguments.
     DunderCallError {
         method: &'static str,
         value_ty: Type<'db>,
@@ -9760,19 +9817,23 @@ pub(crate) enum SubscriptErrorKind<'db> {
         kind: CallErrorKind,
         bindings: Box<Bindings<'db>>,
     },
+    /// `__class_getitem__` exists but isn't callable.
     CallNonCallable {
         method: &'static str,
         value_ty: Type<'db>,
         bindings: Box<Bindings<'db>>,
     },
+    /// `__class_getitem__` exists but may be missing at runtime.
     PossiblyMissingImplicitCall {
         method: &'static str,
         value_ty: Type<'db>,
     },
+    /// The type does not support subscripting via the expected dunder.
     NotSubscriptable {
         value_ty: Type<'db>,
         method: &'static str,
     },
+    /// An invalid argument was provided to `Generic` or `Protocol`.
     InvalidLegacyGenericArgument {
         origin: &'static str,
         argument_ty: Type<'db>,
@@ -9963,7 +10024,7 @@ where
     let mut builder = UnionBuilder::new(db);
     let mut errors = Vec::new();
 
-    for element in union.elements(db).iter() {
+    for element in union.elements(db) {
         match map_fn(*element) {
             Ok(result) => {
                 builder = builder.add(result);
