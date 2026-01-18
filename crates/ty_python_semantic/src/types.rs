@@ -3796,9 +3796,15 @@ impl<'db> Type<'db> {
         index: &'db SemanticIndex<'db>,
         typevar_binding_context: Option<Definition<'db>>,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         enum LegacyGenericContextError<'db> {
+            /// It's invalid to subscript `Generic` or `Protocol` with this type.
             InvalidArgument(Type<'db>),
+            /// It's invalid to subscript `Generic` or `Protocol` with a variadic tuple type.
+            /// We should emit a diagnostic for this, but we don't yet.
             VariadicTupleArguments,
+            /// It's valid to subscribe `Generic` or `Protocol` with this type,
+            /// but the type is not yet supported.
             NotYetSupported,
         }
 
@@ -3869,6 +3875,43 @@ impl<'db> Type<'db> {
 
         let value_ty = self;
 
+        fn try_intersection<'db, F>(
+            db: &'db dyn Db,
+            elements: impl Iterator<Item = Type<'db>>,
+            mut op: F,
+        ) -> Result<Type<'db>, SubscriptError<'db>>
+        where
+            F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
+        {
+            let mut results = Vec::new();
+            let mut errors = Vec::new();
+
+            for element in elements {
+                match op(element) {
+                    Ok(result) => results.push(result),
+                    Err(error) => errors.push(error),
+                }
+            }
+
+            if results.is_empty() {
+                if let Some(first) = errors.pop() {
+                    let result_ty = first.result_type();
+                    let mut all_errors = first.into_errors();
+                    for error in errors {
+                        all_errors.extend(error.into_errors());
+                    }
+                    return Err(SubscriptError::with_errors(result_ty, all_errors));
+                }
+                return Ok(Type::unknown());
+            }
+
+            let mut builder = IntersectionBuilder::new(db);
+            for result in results {
+                builder = builder.add_positive(result);
+            }
+            Ok(builder.build())
+        }
+
         let inferred = match (value_ty, slice_ty) {
             (Type::Dynamic(_) | Type::Never, _) => Some(Ok(value_ty)),
 
@@ -3916,12 +3959,32 @@ impl<'db> Type<'db> {
                 )
             })),
 
-            // TODO: we can map over the intersection and fold the results back into an intersection,
-            // but we need to make sure we avoid emitting a diagnostic if one positive element has a `__getitem__`
-            // method but another does not. This means `infer_subscript_expression_types`
-            // needs to return a `Result` rather than eagerly emitting diagnostics.
-            (Type::Intersection(_), _) | (_, Type::Intersection(_)) => {
-                Some(Ok(todo_type!("Subscript expressions with intersections")))
+            (Type::Intersection(intersection), _) => {
+                Some(try_intersection(db, intersection.iter_positive(db), |element| {
+                    element.infer_subscript_expression_types(
+                        db,
+                        subscript,
+                        slice_ty,
+                        expr_context,
+                        scope_id,
+                        index,
+                        typevar_binding_context,
+                    )
+                }))
+            }
+
+            (_, Type::Intersection(intersection)) => {
+                Some(try_intersection(db, intersection.iter_positive(db), |element| {
+                    value_ty.infer_subscript_expression_types(
+                        db,
+                        subscript,
+                        element,
+                        expr_context,
+                        scope_id,
+                        index,
+                        typevar_binding_context,
+                    )
+                }))
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
