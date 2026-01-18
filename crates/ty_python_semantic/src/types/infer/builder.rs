@@ -12072,6 +12072,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
                 .negate()
                 .into_type(self.db()),
+
+            // Similar to binary operators, try calling the dunder method first for NewType,
+            // and fall back to the concrete base type if that fails. This is needed for
+            // NewTypes of float and complex where the base type is a union.
+            (op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert), Type::NewTypeInstance(newtype)) => {
+                let unary_dunder_method = match op {
+                    ast::UnaryOp::Invert => "__invert__",
+                    ast::UnaryOp::UAdd => "__pos__",
+                    ast::UnaryOp::USub => "__neg__",
+                    ast::UnaryOp::Not => {
+                        unreachable!("Not operator is handled in its own case");
+                    }
+                };
+
+                operand_type
+                    .try_call_dunder(
+                        self.db(),
+                        unary_dunder_method,
+                        CallArguments::none(),
+                        TypeContext::default(),
+                    )
+                    .map(|outcome| outcome.return_type(self.db()))
+                    .unwrap_or_else(|_| {
+                        self.infer_unary_expression_type(op, newtype.concrete_base_type(self.db()), unary)
+                    })
+            }
+
             (
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
@@ -12102,8 +12129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_),
+                | Type::TypedDict(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
