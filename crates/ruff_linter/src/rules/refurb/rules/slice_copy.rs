@@ -35,6 +35,9 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// b = a.copy()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the slice expression contains comments.
+///
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#mutable-sequence-types)
 #[derive(ViolationMetadata)]
