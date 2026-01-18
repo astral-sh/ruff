@@ -700,7 +700,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // (4) Check for invalid `@dataclass` applications.
             if class.dataclass_params(self.db()).is_some() {
-                if class.has_named_tuple_class_in_mro(self.db()) {
+                if ClassLiteral::Static(class).has_named_tuple_class_in_mro(self.db()) {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
