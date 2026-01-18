@@ -211,6 +211,24 @@ impl MemberExpr {
                             }
                             _ => return None,
                         },
+                        // Handle positive integer subscripts with explicit plus, like `x[+1]`.
+                        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                            op: ast::UnaryOp::UAdd,
+                            operand,
+                            ..
+                        }) => match operand.as_ref() {
+                            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                value: ast::Number::Int(index),
+                                ..
+                            }) => {
+                                let _ = write!(path, "{index}");
+                                segments.push(SegmentInfo::new(
+                                    SegmentKind::IntSubscript,
+                                    start_offset,
+                                ));
+                            }
+                            _ => return None,
+                        },
                         ast::Expr::StringLiteral(string) => {
                             let _ = write!(path, "{}", string.value);
                             segments

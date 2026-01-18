@@ -458,3 +458,23 @@ def _(x: list[tuple[Subscriptable, int] | NotSubscriptable]):
         reveal_type(x[-1])  # revealed: tuple[Subscriptable, int] & ~NotSubscriptable
         reveal_type(x[-1][0])  # revealed: Subscriptable
 ```
+
+## Narrowing with explicit positive subscripts
+
+Narrowing should work with explicit positive subscripts like `x[+1]`:
+
+```py
+class Subscriptable:
+    def __getitem__(self, key: int) -> int:
+        return 42
+
+class NotSubscriptable: ...
+
+def _(x: list[Subscriptable | NotSubscriptable]):
+    if not isinstance(x[+0], NotSubscriptable):
+        reveal_type(x[+0])  # revealed: Subscriptable & ~NotSubscriptable
+        reveal_type(x[+0][0])  # revealed: int
+
+    if not isinstance(x[+1], NotSubscriptable):
+        reveal_type(x[+1])  # revealed: Subscriptable & ~NotSubscriptable
+```
