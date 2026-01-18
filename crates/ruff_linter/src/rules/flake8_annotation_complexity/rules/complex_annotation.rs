@@ -222,7 +222,7 @@ pub(crate) fn complex_annotation_assignment(checker: &Checker, assign_stmt: &Stm
                 complexity_value: annotation_complexity,
                 max_complexity_value: max_complexity,
             },
-            assign_stmt.range(),
+            assign_stmt.annotation.range(),
         );
     }
 }
