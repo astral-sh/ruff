@@ -29,6 +29,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// hashed = sha512(b"some data").hexdigest()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `hashlib`](https://docs.python.org/3/library/hashlib.html)
 #[derive(ViolationMetadata)]
