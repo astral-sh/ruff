@@ -713,27 +713,6 @@ fn inferable_typevars_cycle_initial<'db>(
     FxHashSet::default()
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum LegacyGenericBase {
-    Generic,
-    Protocol,
-}
-
-impl LegacyGenericBase {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Generic => "Generic",
-            Self::Protocol => "Protocol",
-        }
-    }
-}
-
-impl Display for LegacyGenericBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
 /// An assignment of a specific type to each type variable in a generic scope.
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
