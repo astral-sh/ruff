@@ -297,8 +297,12 @@ class Statistics:
 
 def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
-    for file in path.resolve().rglob("*.py"):
-        for idx, line in enumerate(file.read_text().splitlines(), 1):
+    for entry in path.iterdir():
+        if not entry.is_file():
+            continue
+        if entry.suffix not in {".py", ".pyi"}:
+            continue
+        for idx, line in enumerate(entry.read_text().splitlines(), 1):
             if error := re.search(CONFORMANCE_ERROR_PATTERN, line):
                 diagnostics.append(
                     Diagnostic(
@@ -311,7 +315,7 @@ def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
                         severity="major",
                         fingerprint=None,
                         location=Location(
-                            path=file,
+                            path=entry,
                             positions=Positions(
                                 begin=Position(
                                     line=idx,
@@ -345,7 +349,11 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--exit-zero",
-            tests_path,
+            *(
+                str(path)
+                for path in Path(tests_path).iterdir()
+                if path.suffix in {".py", ".pyi"} and not path.name.startswith("_")
+            ),
         ],
         capture_output=True,
         text=True,
