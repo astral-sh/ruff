@@ -349,16 +349,25 @@ GenericWithOrder[int](1) < GenericWithOrder[int](1)
 GenericWithOrder[int](1) < GenericWithOrder[str]("a")  # error: [unsupported-operator]
 ```
 
-If a class already defines one of the comparison methods, a `TypeError` is raised at runtime.
-Ideally, we would emit a diagnostic in that case:
+If a class already defines one of the comparison methods, a `TypeError` is raised at runtime and a
+diagnostic is emitted.
 
 ```py
 @dataclass(order=True)
-class AlreadyHasCustomDunderLt:
+class InvalidCustomOrderDunderOverrides:
     x: int
 
-    # TODO: Ideally, we would emit a diagnostic here
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__lt__` in class `InvalidCustomOrderDunderOverrides`"
     def __lt__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__le__` in class `InvalidCustomOrderDunderOverrides`"
+    def __le__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__gt__` in class `InvalidCustomOrderDunderOverrides`"
+    def __gt__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__ge__` in class `InvalidCustomOrderDunderOverrides`"
+    def __ge__(self, other: object) -> bool:
         return False
 ```
 
