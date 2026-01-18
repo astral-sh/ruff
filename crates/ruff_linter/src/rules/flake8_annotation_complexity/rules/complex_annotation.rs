@@ -1,6 +1,6 @@
 use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprBinOp, StmtAnnAssign, StmtFunctionDef, name::QualifiedName};
+use ruff_python_ast::{Expr, ExprBinOp, StmtAnnAssign, StmtFunctionDef};
 use ruff_python_parser::parse_expression;
 use ruff_text_size::Ranged;
 
@@ -63,25 +63,11 @@ impl Violation for ComplexAnnotation {
     }
 }
 
+/// Indirection of `checker.semantic.resolve_qualified_name` to allow unit-testing of
+/// annotation complexity calculation on a single annotation expression.
 trait AnnotationResolver {
-    fn resolve_annotation_qualified_name<'a, 'expr>(
-        &'a self,
-        expr: &'expr Expr,
-    ) -> Option<QualifiedName<'expr>>
-    where
-        'a: 'expr;
-
-    /// Resolve if a given Expr refers to `Annotated` from the `typing` or `typing_extensions`
-    /// module
-    fn is_annotated_type(&self, expr: &Expr) -> bool {
-        self.resolve_annotation_qualified_name(expr)
-            .map(|qualified_name| match qualified_name.segments() {
-                ["typing", "Annotated"] => true,
-                ["typing_extensions", "Annotated"] => true,
-                _ => false,
-            })
-            .unwrap_or(false)
-    }
+    /// Returns if a Expr references `typing.Annotated`
+    fn is_annotated_type(&self, expr: &Expr) -> bool;
 }
 
 struct CheckerAnnotationResolver<'a, 'b>
@@ -92,14 +78,16 @@ where
 }
 
 impl<'checker, 'b> AnnotationResolver for CheckerAnnotationResolver<'checker, 'b> {
-    fn resolve_annotation_qualified_name<'a, 'expr>(
-        &'a self,
-        expr: &'expr Expr,
-    ) -> Option<QualifiedName<'expr>>
-    where
-        'a: 'expr,
-    {
-        self.checker.semantic().resolve_qualified_name(expr)
+    fn is_annotated_type(&self, expr: &Expr) -> bool {
+        self.checker
+            .semantic()
+            .resolve_qualified_name(expr)
+            .map(|qualified_name| {
+                self.checker
+                    .semantic()
+                    .match_typing_qualified_name(&qualified_name, "Annotated")
+            })
+            .unwrap_or(false)
     }
 }
 
@@ -244,20 +232,11 @@ mod tests {
     struct FromTypingResolver;
 
     impl AnnotationResolver for FromTypingResolver {
-        fn resolve_annotation_qualified_name<'a, 'expr>(
-            &'a self,
-            expr: &'expr Expr,
-        ) -> Option<QualifiedName<'expr>>
-        where
-            'a: 'expr,
-        {
+        fn is_annotated_type(&self, expr: &Expr) -> bool {
             if let Some(name) = expr.as_name_expr() {
-                match name.id.as_str() {
-                    "Annotated" => Some(QualifiedName::from_dotted_name("typing.Annotated")),
-                    _ => None,
-                }
+                name.id.as_str() == "Annotated"
             } else {
-                None
+                false
             }
         }
     }
