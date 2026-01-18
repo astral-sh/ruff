@@ -187,7 +187,7 @@ impl ClientOptions {
         for rule in rules {
             match RuleSelector::from_str(rule) {
                 Ok(selector) => known.push(selector),
-                Err(ParseError::Unknown(_)) => unknown.push(rule),
+                Err(ParseError::Unknown(_) | ParseError::External(_)) => unknown.push(rule),
             }
         }
         if !unknown.is_empty() {

@@ -109,6 +109,17 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "extend-ignore-external": {
+      "description": "A list of external linter IDs or rule codes to ignore, in addition to those specified by [`ignore-external`](#lint_ignore-external).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "deprecated": true,
+      "items": {
+        "type": "string"
+      }
+    },
     "extend-include": {
       "description": "A list of file patterns to include when linting, in addition to those\nspecified by [`include`](#include).\n\nInclusion are based on globs, and should be single-path patterns, like\n`*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
@@ -153,6 +164,17 @@
       "deprecated": true,
       "items": {
         "$ref": "#/definitions/RuleSelector"
+      }
+    },
+    "extend-select-external": {
+      "description": "A list of external linter IDs or rule codes to enable, in addition to those specified by [`select-external`](#lint_select-external).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "deprecated": true,
+      "items": {
+        "type": "string"
       }
     },
     "extend-unfixable": {
@@ -446,6 +468,17 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "ignore-external": {
+      "description": "A list of external linter IDs or rule codes to ignore. Prefixes are not supported.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "deprecated": true,
+      "items": {
+        "type": "string"
+      }
+    },
     "ignore-init-module-imports": {
       "description": "Avoid automatically removing unused imports in `__init__.py` files. Such\nimports will still be flagged, but with a dedicated message suggesting\nthat the import is either added to the module's `__all__` symbol, or\nre-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports\nvia an unsafe fix.",
       "type": [
@@ -684,6 +717,17 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "select-external": {
+      "description": "A list of external linter IDs or rule codes to enable. When omitted, external linters remain disabled.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "deprecated": true,
+      "items": {
+        "type": "string"
+      }
+    },
     "show-fixes": {
       "description": "Whether to show an enumeration of all fixed lint violations\n(overridden by the `--show-fixes` command-line flag).",
       "type": [
@@ -906,6 +950,27 @@
           "const": "dynamic"
         }
       ]
+    },
+    "ExternalAstLinterOptions": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Whether this external linter should be considered during lint runs.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "path": {
+          "description": "Path to the TOML file containing external lint rule definitions.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "Flake8AnnotationsOptions": {
       "description": "Options for the `flake8-annotations` plugin.",
@@ -2048,6 +2113,16 @@
             "$ref": "#/definitions/RuleSelector"
           }
         },
+        "extend-ignore-external": {
+          "description": "A list of external linter IDs or rule codes to ignore, in addition to those specified by [`ignore-external`](#lint_ignore-external).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "extend-per-file-ignores": {
           "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).",
           "type": [
@@ -2081,6 +2156,16 @@
             "$ref": "#/definitions/RuleSelector"
           }
         },
+        "extend-select-external": {
+          "description": "A list of external linter IDs or rule codes to enable, in addition to those specified by [`select-external`](#lint_select-external).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "extend-unfixable": {
           "description": "A list of rule codes or prefixes to consider non-auto-fixable, in addition to those\nspecified by [`unfixable`](#lint_unfixable).",
           "type": [
@@ -2110,6 +2195,15 @@
           ],
           "items": {
             "type": "string"
+          }
+        },
+        "external-ast": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/ExternalAstLinterOptions"
           }
         },
         "fixable": {
@@ -2326,6 +2420,16 @@
             "$ref": "#/definitions/RuleSelector"
           }
         },
+        "ignore-external": {
+          "description": "A list of external linter IDs or rule codes to ignore. Prefixes are not supported.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "ignore-init-module-imports": {
           "description": "Avoid automatically removing unused imports in `__init__.py` files. Such\nimports will still be flagged, but with a dedicated message suggesting\nthat the import is either added to the module's `__all__` symbol, or\nre-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports\nvia an unsafe fix.",
           "type": [
@@ -2482,6 +2586,16 @@
           ],
           "items": {
             "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "select-external": {
+          "description": "A list of external linter IDs or rule codes to enable. When omitted, external linters remain disabled.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
           }
         },
         "task-tags": {
@@ -4099,6 +4213,9 @@
         "RUF2",
         "RUF20",
         "RUF200",
+        "RUF3",
+        "RUF30",
+        "RUF300",
         "S",
         "S1",
         "S10",
