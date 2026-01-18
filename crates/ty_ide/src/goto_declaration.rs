@@ -10,18 +10,35 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// A "declaration" includes both formal declarations (class statements, def statements,
 /// and variable annotations) but also variable assignments. This expansive definition
 /// is needed because Python doesn't require formal declarations of variables like most languages do.
+///
+/// For class instantiations like `MyClass()`:
+/// - Clicking on the class name navigates to the class declaration only
+/// - Clicking on `(` navigates to the constructor (`__init__`) only
 pub fn goto_declaration(
     db: &dyn Db,
     file: File,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
+    use crate::goto::{Definitions, GotoTarget, definitions_for_expression};
+
     let module = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
 
-    let declaration_targets = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .declaration_targets(db)?;
+    // For Call targets (clicking on the callable name like `MyClass` in `MyClass()`),
+    // we only return the expression declaration (the class/function), not the callable
+    // declaration (__init__). This provides a cleaner UX where clicking on the name
+    // goes to the name's declaration, and clicking on `(` goes to the constructor.
+    // See https://github.com/astral-sh/ty/issues/2218
+    let declaration_targets = if let GotoTarget::Call { callable, .. } = goto_target {
+        let definitions =
+            definitions_for_expression(&model, callable, ImportAliasResolution::ResolveAliases)?;
+        Definitions(definitions).declaration_targets(db)?
+    } else {
+        goto_target
+            .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
+            .declaration_targets(db)?
+    };
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -92,6 +109,8 @@ mod tests {
         ");
     }
 
+    /// Clicking on the class name goes to the class declaration only.
+    /// To go to __init__, click on the opening parenthesis.
     #[test]
     fn goto_declaration_class_instantiation() {
         let test = cursor_test(
@@ -113,11 +132,43 @@ mod tests {
         6 | instance = MyClass()
           |            ^^^^^^^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> main.py:2:7
           |
         2 | class MyClass:
           |       -------
+        3 |     def __init__(self):
+        4 |         pass
+          |
+        ");
+    }
+
+    /// Clicking on the opening parenthesis goes to __init__.
+    #[test]
+    fn goto_declaration_class_instantiation_parens() {
+        let test = cursor_test(
+            "
+            class MyClass:
+                def __init__(self):
+                    pass
+
+            instance = MyClass<CURSOR>()
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:6:19
+          |
+        4 |         pass
+        5 |
+        6 | instance = MyClass()
+          |                   ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:3:9
+          |
+        2 | class MyClass:
         3 |     def __init__(self):
           |         --------
         4 |         pass
@@ -1190,7 +1241,7 @@ def another_helper(path):
                     return 42
 
             c = C()
-            res = c.foo<CURSOR>()
+            res = c.fo<CURSOR>o()
             ",
         );
 

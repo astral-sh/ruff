@@ -180,25 +180,37 @@ pub(crate) enum GotoTarget<'a> {
     Globals {
         identifier: &'a ast::Identifier,
     },
-    /// Go to on the invocation of a callable
+    /// Go to on the invocation of a callable (clicking on the callable name)
     ///
     /// ```py
     /// x = mymodule.MyClass(1, 2)
     ///              ^^^^^^^
     /// ```
     ///
-    /// This is equivalent to `GotoTarget::Expression(callable)` but enriched
-    /// with information about the actual callable implementation.
-    ///
-    /// That is, if you click on `MyClass` in `MyClass()` it is *both* a
-    /// reference to the class and to the initializer of the class. Therefore
-    /// it would be ideal for goto-* and docstrings to be some intelligent
-    /// merging of both the class and the initializer.
+    /// This returns definitions for both the callable itself (e.g. the class)
+    /// and the specific overload being invoked (e.g. `__init__`).
     Call {
         /// The callable that can actually be selected by a cursor
         callable: ast::ExprRef<'a>,
         /// The call of the callable
         call: &'a ast::ExprCall,
+    },
+
+    /// Go to on the opening parenthesis of a call expression
+    ///
+    /// ```py
+    /// x = mymodule.MyClass(1, 2)
+    ///                     ^
+    /// ```
+    ///
+    /// This only navigates to the actual callable implementation (e.g. `__init__`)
+    /// and not the class definition itself. This allows users to specifically
+    /// jump to the constructor when clicking on `(`.
+    CallParens {
+        /// The call expression
+        call: &'a ast::ExprCall,
+        /// The range of the opening parenthesis
+        paren_range: TextRange,
     },
 
     /// Go to on a sub-expression of a string annotation's sub-AST
@@ -309,6 +321,8 @@ impl GotoTarget<'_> {
             // When asking the type of a callable, usually you want the callable itself?
             // (i.e. the type of `MyClass` in `MyClass()` is `<class MyClass>` and not `() -> MyClass`)
             GotoTarget::Call { callable, .. } => callable.inferred_type(model),
+            // For CallParens, we want the type of the callable that gets invoked
+            GotoTarget::CallParens { call, .. } => call.func.inferred_type(model),
             GotoTarget::TypeParamTypeVarName(typevar) => typevar.inferred_type(model),
             GotoTarget::ImportModuleComponent {
                 module_name,
@@ -363,10 +377,11 @@ impl GotoTarget<'_> {
         &self,
         model: &SemanticModel,
     ) -> Option<String> {
-        if let GotoTarget::Call { call, .. } = self {
-            call_type_simplified_by_overloads(model, call)
-        } else {
-            None
+        match self {
+            GotoTarget::Call { call, .. } | GotoTarget::CallParens { call, .. } => {
+                call_type_simplified_by_overloads(model, call)
+            }
+            _ => None,
         }
     }
 
@@ -526,6 +541,23 @@ impl GotoTarget<'_> {
                 }
             }
 
+            // For CallParens (clicking on `(`), go to the actual callable implementation
+            // (e.g., `__init__` for class instantiation).
+            GotoTarget::CallParens { call, .. } => {
+                // `definitions_for_callable` always resolves import aliases. That's why we
+                // skip it in cases import alias resolution is turned off (rename, highlight references).
+                if alias_resolution == ImportAliasResolution::ResolveAliases {
+                    let definitions = definitions_for_callable(model, call);
+                    if definitions.is_empty() {
+                        None
+                    } else {
+                        Some(definitions)
+                    }
+                } else {
+                    None
+                }
+            }
+
             GotoTarget::BinOp { expression, .. } => {
                 let (definitions, _) =
                     ty_python_semantic::definitions_for_bin_op(model, expression)?;
@@ -613,6 +645,8 @@ impl GotoTarget<'_> {
                 ast::ExprRef::Attribute(attr) => Some(Cow::Borrowed(attr.attr.as_str())),
                 _ => None,
             },
+            // CallParens represents the `(` character, which has no meaningful string representation
+            GotoTarget::CallParens { .. } => None,
             GotoTarget::StringAnnotationSubexpr { name, .. } => name.as_deref().map(Cow::Borrowed),
             GotoTarget::FunctionDef(function) => Some(Cow::Borrowed(function.name.as_str())),
             GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name.as_str())),
@@ -933,6 +967,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::Globals { identifier, .. } => identifier.range,
             GotoTarget::BinOp { operator_range, .. }
             | GotoTarget::UnaryOp { operator_range, .. } => *operator_range,
+            GotoTarget::CallParens { paren_range, .. } => *paren_range,
         }
     }
 }
@@ -973,7 +1008,7 @@ fn convert_resolved_definitions_to_targets<'db>(
 }
 
 /// Shared helper to get definitions for an expr (that is presumably a name/attr)
-fn definitions_for_expression<'db>(
+pub(crate) fn definitions_for_expression<'db>(
     model: &SemanticModel<'db>,
     expression: ruff_python_ast::ExprRef<'_>,
     alias_resolution: ImportAliasResolution,
@@ -1035,6 +1070,34 @@ pub(crate) fn find_goto_target_impl<'a>(
     syntax: AnyNodeRef<'a>,
     offset: TextSize,
 ) -> Option<GotoTarget<'a>> {
+    // Special handling for clicking on the opening parenthesis of a call expression.
+    // This allows jumping directly to the constructor/callable implementation.
+    // We check for Lpar tokens BEFORE the main token selection, because the main
+    // token selection gives priority to Name tokens which would hide the Lpar.
+    // We only match if the offset is strictly within the token (not at the boundary),
+    // to avoid matching when the cursor is right after `(` but on the next token.
+    if let Some(lpar_token) = tokens
+        .at_offset(offset)
+        .find(|t| t.kind() == TokenKind::Lpar && t.range().contains(offset))
+    {
+        let covering_node_result = covering_node(syntax, lpar_token.range())
+            .find_first(|node| node.is_expression())
+            .ok();
+
+        if let Some(covering) = covering_node_result {
+            if let AnyNodeRef::ExprCall(call) = covering.node() {
+                // Verify the token is the opening paren of the call (not inside an argument)
+                // by checking that it's right after the func expression
+                if lpar_token.start() == call.func.end() {
+                    return Some(GotoTarget::CallParens {
+                        call,
+                        paren_range: lpar_token.range(),
+                    });
+                }
+            }
+        }
+    }
+
     let token = tokens
         .at_offset(offset)
         .max_by_key(|token| match token.kind() {

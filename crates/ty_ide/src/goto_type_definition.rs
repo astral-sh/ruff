@@ -1522,6 +1522,7 @@ def function():
         ");
     }
 
+    /// Clicking on `(` in a function call goes to the function definition
     #[test]
     fn goto_between_call_arguments() {
         let test = cursor_test(
@@ -1534,12 +1535,12 @@ def function():
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
+         --> main.py:4:4
           |
         2 | def foo(a, b): ...
         3 |
         4 | foo()
-          | ^^^ Clicking here
+          |    ^ Clicking here
           |
         info: Found 1 type definition
          --> main.py:2:5

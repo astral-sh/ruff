@@ -11,17 +11,35 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// rather than a stub file. This differs from "declaration" which may navigate to stub files.
 /// When possible, this function will map from stub file declarations to their corresponding
 /// source file implementations using the `StubMapper`.
+///
+/// For class instantiations like `MyClass()`:
+/// - Clicking on the class name navigates to the class definition only
+/// - Clicking on `(` navigates to the constructor (`__init__`) only
 pub fn goto_definition(
     db: &dyn Db,
     file: File,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
+    use crate::goto::{Definitions, GotoTarget, definitions_for_expression};
+
     let module = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
-    let definition_targets = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .definition_targets(db)?;
+
+    // For Call targets (clicking on the callable name like `MyClass` in `MyClass()`),
+    // we only return the expression definition (the class/function), not the callable
+    // definition (__init__). This provides a cleaner UX where clicking on the name
+    // goes to the name's definition, and clicking on `(` goes to the constructor.
+    // See https://github.com/astral-sh/ty/issues/2218
+    let definition_targets = if let GotoTarget::Call { callable, .. } = goto_target {
+        let definitions =
+            definitions_for_expression(&model, callable, ImportAliasResolution::ResolveAliases)?;
+        Definitions(definitions).definition_targets(db)?
+    } else {
+        goto_target
+            .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
+            .definition_targets(db)?
+    };
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -392,9 +410,9 @@ class MyOtherClass:
         ");
     }
 
-    /// goto-definition on a class init should go to the .py not the .pyi
+    /// goto-definition on a class name in a call should go to the class definition
     #[test]
-    fn goto_definition_stub_map_class_init() {
+    fn goto_definition_stub_map_class_name_in_call() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -435,11 +453,64 @@ class MyOtherClass:
         3 | x = MyClass(0)
           |     ^^^^^^^ Clicking here
           |
-        info: Found 2 definitions
+        info: Found 1 definition
          --> mymodule.py:2:7
           |
         2 | class MyClass:
           |       -------
+        3 |     def __init__(self, val):
+        4 |         self.val = val
+          |
+        ");
+    }
+
+    /// goto-definition on the opening parenthesis of a class call should go to __init__
+    #[test]
+    fn goto_definition_stub_map_class_init_parens() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+x = MyClass<CURSOR>(0)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+
+class MyOtherClass:
+    def __init__(self, val):
+        self.val = val + 1
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    def __init__(self, val: bool): ...
+
+class MyOtherClass:
+    def __init__(self, val: bool): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:3:12
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass(0)
+          |            ^ Clicking here
+          |
+        info: Found 1 definition
+         --> mymodule.py:3:9
+          |
+        2 | class MyClass:
         3 |     def __init__(self, val):
           |         --------
         4 |         self.val = val
@@ -1650,6 +1721,7 @@ Traceb<CURSOR>ackType
     }
 
     /// goto-definition on a dynamic class literal (created via `type()`)
+    /// Clicking on the class name goes to the class definition only
     #[test]
     fn goto_definition_dynamic_class_literal() {
         let test = CursorTest::builder()
@@ -1672,15 +1744,42 @@ x = DynCla<CURSOR>ss()
         4 | x = DynClass()
           |     ^^^^^^^^ Clicking here
           |
-        info: Found 2 definitions
-           --> main.py:2:1
-            |
-          2 | DynClass = type("DynClass", (), {})
-            | --------
-          3 |
-          4 | x = DynClass()
-            |
-           ::: stdlib/builtins.pyi:137:9
+        info: Found 1 definition
+         --> main.py:2:1
+          |
+        2 | DynClass = type("DynClass", (), {})
+          | --------
+        3 |
+        4 | x = DynClass()
+          |
+        "#);
+    }
+
+    /// goto-definition on the opening parenthesis of a dynamic class call goes to __new__
+    #[test]
+    fn goto_definition_dynamic_class_literal_parens() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+DynClass = type("DynClass", (), {})
+
+x = DynClass<CURSOR>()
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:13
+          |
+        2 | DynClass = type("DynClass", (), {})
+        3 |
+        4 | x = DynClass()
+          |             ^ Clicking here
+          |
+        info: Found 1 definition
+           --> stdlib/builtins.pyi:137:9
             |
         135 |     def __class__(self, type: type[Self], /) -> None: ...
         136 |     def __init__(self) -> None: ...

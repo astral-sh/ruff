@@ -1555,6 +1555,7 @@ def ab(a: int, *, c: int):
         ");
     }
 
+    /// Hovering on the opening parenthesis of a function call shows the function signature
     #[test]
     fn hover_overload_ambiguous() {
         let test = cursor_test(
@@ -1607,18 +1608,20 @@ def ab(a: int, *, c: int):
         The first overload
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:19:1
+          --> main.py:19:4
            |
         17 |     a = "hello"
         18 |
         19 | foo(a, 2)
-           | ^^^- Cursor offset
-           | |
-           | source
+           |    -
+           |    |
+           |    source
+           |    Cursor offset
            |
         "#);
     }
 
+    /// Hovering on the opening parenthesis of a function call shows the function signature (compact)
     #[test]
     fn hover_overload_ambiguous_compact() {
         let test = cursor_test(
@@ -1659,14 +1662,15 @@ def ab(a: int, *, c: int):
         The first overload
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:19:1
+          --> main.py:19:4
            |
         17 |     a = "hello"
         18 |
         19 | foo(a)
-           | ^^^- Cursor offset
-           | |
-           | source
+           |    -
+           |    |
+           |    source
+           |    Cursor offset
            |
         "#);
     }

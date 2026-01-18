@@ -1632,7 +1632,7 @@ result = func(10, y=20)
                 r#"
                 from lib import test
 
-                test<CURSOR>("test")
+                te<CURSOR>st("test")
                 "#,
             )
             .build();
