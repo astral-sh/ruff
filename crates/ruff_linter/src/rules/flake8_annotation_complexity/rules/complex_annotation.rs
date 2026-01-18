@@ -7,10 +7,10 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for type annotation which are complex.
+/// Checks for type annotation which are too complex.
 ///
 /// ## Why is this bad?
-/// High type-annotation complexity is a symptom of a complex data structure using generic types.
+/// Annotation complexity is a symptom of using generic types for complex, nested data structures.
 /// These are hard to comprehend and limit the invariants a type-checker can enforce.
 ///
 /// ## Example
@@ -55,7 +55,7 @@ impl Violation for ComplexAnnotation {
 }
 
 trait AnnotationResolver {
-    fn resolve_annoation_qualified_name<'a, 'expr>(
+    fn resolve_annotation_qualified_name<'a, 'expr>(
         &'a self,
         expr: &'expr Expr,
     ) -> Option<QualifiedName<'expr>>
@@ -65,7 +65,7 @@ trait AnnotationResolver {
     /// Resolve if a given Expr refers to `Annotated` from the `typing` or `typing_extensions`
     /// module
     fn is_typing_annotated(&self, expr: &Expr) -> bool {
-        self.resolve_annoation_qualified_name(expr)
+        self.resolve_annotation_qualified_name(expr)
             .map(|qualified_name| match qualified_name.segments() {
                 ["typing", "Annotated"] => true,
                 ["typing_extensions", "Annotated"] => true,
@@ -75,15 +75,15 @@ trait AnnotationResolver {
     }
 }
 
-struct CheckerAnnoationResolver<'a, 'b>
+struct CheckerAnnotationResolver<'a, 'b>
 where
     'b: 'a,
 {
     checker: &'a Checker<'b>,
 }
 
-impl<'checker, 'b> AnnotationResolver for CheckerAnnoationResolver<'checker, 'b> {
-    fn resolve_annoation_qualified_name<'a, 'expr>(
+impl<'checker, 'b> AnnotationResolver for CheckerAnnotationResolver<'checker, 'b> {
+    fn resolve_annotation_qualified_name<'a, 'expr>(
         &'a self,
         expr: &'expr Expr,
     ) -> Option<QualifiedName<'expr>>
@@ -109,8 +109,8 @@ fn flatten_bin_op_expr<'a>(expr: &'a ExprBinOp) -> Vec<&'a Expr> {
     result
 }
 
-fn get_annoation_complexity<'checker, 'expr>(
-    annoation_resolver: &'checker impl AnnotationResolver,
+fn get_annotation_complexity<'checker, 'expr>(
+    annotation_resolver: &'checker impl AnnotationResolver,
     expr: &'expr Expr,
 ) -> isize
 where
@@ -119,7 +119,7 @@ where
     if let Some(expr) = expr.as_string_literal_expr() {
         if let Some(literal_value) = expr.as_single_part_string() {
             if let Ok(inner_expr) = parse_expression(&literal_value.value) {
-                return get_annoation_complexity(annoation_resolver, &inner_expr.into_expr());
+                return get_annotation_complexity(annotation_resolver, &inner_expr.into_expr());
             }
         }
     };
@@ -127,7 +127,7 @@ where
     if let Some(expr_bin_op) = expr.as_bin_op_expr() {
         return flatten_bin_op_expr(expr_bin_op)
             .iter()
-            .map(|node| get_annoation_complexity(annoation_resolver, node))
+            .map(|node| get_annotation_complexity(annotation_resolver, node))
             .max()
             .unwrap_or(0)
             + 1;
@@ -138,17 +138,17 @@ where
 
         let inner_compleixty = match &**type_params {
             Expr::Subscript(_) | Expr::BinOp(_) => {
-                get_annoation_complexity(annoation_resolver, type_params)
+                get_annotation_complexity(annotation_resolver, type_params)
             }
             Expr::Tuple(expr_tuple) => expr_tuple
                 .elts
                 .iter()
-                .map(|node| get_annoation_complexity(annoation_resolver, node))
+                .map(|node| get_annotation_complexity(annotation_resolver, node))
                 .max()
                 .unwrap_or(0),
             _ => 0,
         };
-        if annoation_resolver.is_typing_annotated(&expr.value) {
+        if annotation_resolver.is_typing_annotated(&expr.value) {
             return inner_compleixty;
         }
         return inner_compleixty + 1;
@@ -164,17 +164,17 @@ pub(crate) fn complex_annotation_function(checker: &Checker, function_def: &Stmt
         .flake8_annotation_complexity
         .max_annotation_complexity;
 
-    let annoation_resolver = CheckerAnnoationResolver { checker };
+    let annotation_resolver = CheckerAnnotationResolver { checker };
 
     for arg in function_def.parameters.iter_non_variadic_params() {
         if let Some(type_annotation) = arg.annotation() {
-            let annoation_complexity =
-                get_annoation_complexity(&annoation_resolver, type_annotation);
-            if annoation_complexity > max_complexity {
+            let annotation_complexity =
+                get_annotation_complexity(&annotation_resolver, type_annotation);
+            if annotation_complexity > max_complexity {
                 checker.report_diagnostic(
                     ComplexAnnotation {
                         symbol_name: arg.name().to_string(),
-                        complexity_value: annoation_complexity,
+                        complexity_value: annotation_complexity,
                         max_complexity_value: max_complexity,
                     },
                     type_annotation.range(),
@@ -184,13 +184,13 @@ pub(crate) fn complex_annotation_function(checker: &Checker, function_def: &Stmt
     }
 
     if let Some(return_annotation) = &function_def.returns {
-        let annoation_complexity =
-            get_annoation_complexity(&annoation_resolver, &return_annotation);
-        if annoation_complexity > max_complexity {
+        let annotation_complexity =
+            get_annotation_complexity(&annotation_resolver, &return_annotation);
+        if annotation_complexity > max_complexity {
             checker.report_diagnostic(
                 ComplexAnnotation {
                     symbol_name: "return type".to_owned(),
-                    complexity_value: annoation_complexity,
+                    complexity_value: annotation_complexity,
                     max_complexity_value: max_complexity,
                 },
                 return_annotation.range(),
@@ -206,11 +206,11 @@ pub(crate) fn complex_annotation_assignment(checker: &Checker, assign_stmt: &Stm
         .flake8_annotation_complexity
         .max_annotation_complexity;
 
-    let annoation_resolver = CheckerAnnoationResolver { checker };
+    let annotation_resolver = CheckerAnnotationResolver { checker };
 
-    let annoation_complexity =
-        get_annoation_complexity(&annoation_resolver, &assign_stmt.annotation);
-    if annoation_complexity > max_complexity {
+    let annotation_complexity =
+        get_annotation_complexity(&annotation_resolver, &assign_stmt.annotation);
+    if annotation_complexity > max_complexity {
         checker.report_diagnostic(
             ComplexAnnotation {
                 symbol_name: assign_stmt
@@ -219,7 +219,7 @@ pub(crate) fn complex_annotation_assignment(checker: &Checker, assign_stmt: &Stm
                     .map(|x| x.id.as_str())
                     .unwrap_or("")
                     .to_owned(),
-                complexity_value: annoation_complexity,
+                complexity_value: annotation_complexity,
                 max_complexity_value: max_complexity,
             },
             assign_stmt.range(),
@@ -236,7 +236,7 @@ mod tests {
     struct FromTypingResolver;
 
     impl AnnotationResolver for FromTypingResolver {
-        fn resolve_annoation_qualified_name<'a, 'expr>(
+        fn resolve_annotation_qualified_name<'a, 'expr>(
             &'a self,
             expr: &'expr Expr,
         ) -> Option<QualifiedName<'expr>>
@@ -268,25 +268,25 @@ mod tests {
     #[test_case(r#"a | dict[str, str] | dict[str, list[str]]"#, 3)]
     #[test_case(r#"list[Union[a, b, c]]"#, 2)]
     #[test_case(r#"list[a | b | c]"#, 2)]
-    fn test_get_annoation_complexity_yields_expected_value(
+    fn test_get_annotation_complexity_yields_expected_value(
         annotation: &str,
         expected_complexity: isize,
     ) {
         let expr = parse_expression(annotation).unwrap();
-        let complexity = get_annoation_complexity(&FromTypingResolver {}, &expr.expr());
+        let complexity = get_annotation_complexity(&FromTypingResolver {}, &expr.expr());
         assert_eq!(complexity, expected_complexity);
     }
 
     #[test]
-    fn test_flattern_bin_op_expr() {
+    fn test_flatten_bin_op_expr() {
         let expr = parse_expression("hello | there | my | friend").unwrap();
-        let flatterned: Vec<_> = flatten_bin_op_expr(&expr.expr().as_bin_op_expr().unwrap())
+        let flattened: Vec<_> = flatten_bin_op_expr(&expr.expr().as_bin_op_expr().unwrap())
             .iter()
             .flat_map(|node| node.as_name_expr().map(|x| x.id.as_str()))
             .collect();
 
         // Note: left-associativity reverses the expected liet
         let expected = vec!["friend", "my", "there", "hello"];
-        assert_eq!(flatterned, expected);
+        assert_eq!(flattened, expected);
     }
 }
