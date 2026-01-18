@@ -27,3 +27,8 @@ def variable_with_complex_ann_in_fn() -> None:
 
 class ClassWithComplexMemberFunction:
     def __init__(self, bad_arg: dict[str, dict[str, dict[str, dict[str, str]]]]) -> None: ...
+
+# Quoted case
+class ClassWithComplexMemberFunction:
+    def __init__(self, bad_arg: "dict[str, dict[str, dict[str, dict[str, str]]]]") -> None:
+        _var: "list[list[list[str]]]" = []

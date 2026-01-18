@@ -6,21 +6,16 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use test_case::test_case;
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    #[test_case(Path::new("TAE002.py"))]
-    #[test_case(Path::new("TAE002_quoted.py"))]
-    fn tae002_yields_errors(path: &Path) -> Result<()> {
-        let snapshot = format!("TAE002_yields_errors_{}", path.to_string_lossy());
+    #[test]
+    fn tae002_yields_errors() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("flake8_annotation_complexity")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_annotation_complexity/TAE002.py"),
             &LinterSettings {
                 flake8_annotation_complexity: super::settings::Settings {
                     max_annotation_complexity: 3,
@@ -28,7 +23,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::ComplexAnnotation)
             },
         )?;
-        assert_diagnostics!(snapshot, diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 

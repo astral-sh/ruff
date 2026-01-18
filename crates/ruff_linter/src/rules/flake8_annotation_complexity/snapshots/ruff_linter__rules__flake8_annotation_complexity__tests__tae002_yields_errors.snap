@@ -46,4 +46,16 @@ TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
 28 | class ClassWithComplexMemberFunction:
 29 |     def __init__(self, bad_arg: dict[str, dict[str, dict[str, dict[str, str]]]]) -> None: ...
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 |
+31 | # Quoted case
+   |
+
+TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
+  --> TAE002.py:33:33
+   |
+31 | # Quoted case
+32 | class ClassWithComplexMemberFunction:
+33 |     def __init__(self, bad_arg: "dict[str, dict[str, dict[str, dict[str, str]]]]") -> None:
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+34 |         _var: "list[list[list[str]]]" = []
    |
