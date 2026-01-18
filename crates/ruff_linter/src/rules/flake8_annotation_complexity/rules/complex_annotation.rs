@@ -73,7 +73,7 @@ trait AnnotationResolver {
 
     /// Resolve if a given Expr refers to `Annotated` from the `typing` or `typing_extensions`
     /// module
-    fn is_typing_annotated(&self, expr: &Expr) -> bool {
+    fn is_annotated_type(&self, expr: &Expr) -> bool {
         self.resolve_annotation_qualified_name(expr)
             .map(|qualified_name| match qualified_name.segments() {
                 ["typing", "Annotated"] => true,
@@ -156,7 +156,7 @@ where
                 .unwrap_or(0),
             _ => 0,
         };
-        if annotation_resolver.is_typing_annotated(&expr.value) {
+        if annotation_resolver.is_annotated_type(&expr.value) {
             return inner_compleixty;
         }
         return inner_compleixty + 1;
