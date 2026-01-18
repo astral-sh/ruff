@@ -3303,6 +3303,39 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => {
                 let fallback = self.instance_member(db, name_str);
 
+                // Bind `Self` type variables in the fallback to the concrete instance type.
+                // This handles patterns like Django's Manager[Self] where accessing an attribute
+                // on an instance should resolve `Self` to the concrete class.
+                //
+                // We only do this for NominalInstance types, not TypeVars, because:
+                // - For concrete instances like `confirmation.objects`, Self should be bound
+                // - For TypeVars like `self.next_node` where `self: Self`, Self should remain unbound
+                let fallback = if let Type::NominalInstance(instance) = self {
+                    let self_type = Type::NominalInstance(instance);
+                    fallback.map_type(|ty| {
+                        // Don't bind Self for function types - their Self binding happens during
+                        // method binding/call resolution.
+                        if matches!(
+                            ty,
+                            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
+                        ) || !ty.contains_self(db)
+                        {
+                            ty
+                        } else {
+                            ty.apply_type_mapping(
+                                db,
+                                &TypeMapping::BindSelf {
+                                    self_type,
+                                    self_typevar_identity: None,
+                                },
+                                TypeContext::default(),
+                            )
+                        }
+                    })
+                } else {
+                    fallback
+                };
+
                 // `Self` type variables use `InstanceFallbackShadowsNonDataDescriptor::Yes`
                 // because instance attributes should shadow non-data descriptors on the class.
                 let instance_fallback_shadows = if matches!(self, Type::TypeVar(tv) if tv.typevar(db).is_self(db))

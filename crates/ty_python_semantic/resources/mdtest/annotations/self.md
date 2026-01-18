@@ -824,7 +824,9 @@ class CacheMap:
 
 ## Self in class attributes with generic classes
 
-Django-like patterns where a class attribute uses `Self` as a type argument to a generic class:
+Django-like patterns where a class attribute uses `Self` as a type argument to a generic class. Both
+class access (`Confirmation.objects`) and instance access (`instance.objects`) should properly bind
+`Self` to the concrete class.
 
 ```py
 from typing import Self, Generic, TypeVar
@@ -841,8 +843,81 @@ class Model:
 class Confirmation(Model):
     expiry_date: int
 
-def test():
+def test() -> None:
+    # Class access: Self is bound to Confirmation
     confirmation = Confirmation.objects.get()
     reveal_type(confirmation)  # revealed: Confirmation
     x = confirmation.expiry_date  # Should work - Confirmation has expiry_date
+
+    # Instance access: Self should also be bound to Confirmation
+    instance = Confirmation()
+    reveal_type(instance.objects)  # revealed: Manager[Confirmation]
+    instance_result = instance.objects.get()
+    reveal_type(instance_result)  # revealed: Confirmation
+```
+
+## Limitation: Stubs that rely on type checker plugins
+
+Some stub packages like `django-stubs` rely on mypy plugins to synthesize attributes that don't
+exist in the stubs themselves. For example, Django's `Model` class automatically gets an `id: int`
+field at runtime, but `django-stubs` doesn't include this in the stub because the mypy plugin adds
+it dynamically based on the model definition.
+
+Without plugin support, type checkers (including ty, mypy, and pyright) will correctly report that
+the attribute doesn't exist. This is the expected behavior - the stubs are incomplete without the
+plugin.
+
+```py
+from typing import Self, Generic, TypeVar, ClassVar, Any
+
+_T = TypeVar("_T", bound="Model", covariant=True)
+
+class Manager(Generic[_T]):
+    def create(self, **kwargs: Any) -> _T:
+        raise NotImplementedError
+
+class Model:
+    # django-stubs defines pk: Any but NOT id: int
+    # The id field is supposed to be synthesized by the mypy plugin
+    pk: Any
+    objects: ClassVar[Manager[Self]]
+
+class CustomerPlan(Model):
+    name: str
+
+plan = CustomerPlan.objects.create(name="test")
+
+# Self binding works correctly - plan is CustomerPlan, not Unknown
+reveal_type(plan)  # revealed: CustomerPlan
+
+# pk works because it's defined in Model
+reveal_type(plan.pk)  # revealed: Any
+
+# id fails because it's not in the stubs (requires mypy plugin)
+# error: [unresolved-attribute]
+plan.id
+```
+
+The workaround is to add the missing attributes to a custom base class:
+
+```py
+from typing import Self, Generic, TypeVar, ClassVar, Any
+
+_T = TypeVar("_T", bound="Model", covariant=True)
+
+class Manager(Generic[_T]):
+    def create(self, **kwargs: Any) -> _T:
+        raise NotImplementedError
+
+class Model:
+    id: int  # Explicitly add id to work without mypy plugin
+    pk: Any
+    objects: ClassVar[Manager[Self]]
+
+class CustomerPlan(Model):
+    name: str
+
+plan = CustomerPlan.objects.create(name="test")
+reveal_type(plan)  # revealed: CustomerPlan
+reveal_type(plan.id)  # revealed: int
 ```
