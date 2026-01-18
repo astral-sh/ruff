@@ -35,7 +35,8 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
-    SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr, walk_stmt,
+    SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
+    walk_interpolated_string_element, walk_stmt,
 };
 use ruff_python_ast::{
     self as ast, AnyNodeRef, BytesLiteral, Expr, InterpolatedStringElement, Stmt, StringLiteral,
@@ -949,21 +950,16 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     ) {
         match interpolated_string_element {
             InterpolatedStringElement::Literal(literal) => {
+                // Emit a String token for literal parts of f-strings/t-strings
                 self.add_token(
                     literal.range(),
                     SemanticTokenType::String,
                     SemanticTokenModifier::empty(),
                 );
             }
-            InterpolatedStringElement::Interpolation(interpolation) => {
-                self.visit_expr(&interpolation.expression);
-
-                // Handle format spec if present (can contain nested interpolated elements)
-                if let Some(format_spec) = &interpolation.format_spec {
-                    for element in &format_spec.elements {
-                        self.visit_interpolated_string_element(element);
-                    }
-                }
+            InterpolatedStringElement::Interpolation(_) => {
+                // The default walker handles visiting the expression and format spec
+                walk_interpolated_string_element(self, interpolated_string_element);
             }
         }
     }
