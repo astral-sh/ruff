@@ -4710,9 +4710,8 @@ impl<'db> BindingError<'db> {
             Self::DataclassOnProtocol => {
                 let node = Self::get_node(node, None);
                 if let Some(builder) = context.report_lint(&INVALID_DATACLASS, node) {
-                    let mut diag = builder.into_diagnostic(
-                        "Cannot use `dataclass()` on a protocol class",
-                    );
+                    let mut diag =
+                        builder.into_diagnostic("Cannot use `dataclass()` on a protocol class");
                     diag.info("Protocols define interfaces and cannot be instantiated");
                 }
             }

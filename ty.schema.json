@@ -910,16 +910,6 @@
             }
           ]
         },
-        "invalid-typed-dict": {
-          "title": "detects invalid `TypedDict` class definitions",
-          "description": "## What it does\nChecks for invalidly defined `TypedDict` classes.\n\n## Why is this bad?\nAn invalidly defined `TypedDict` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s or\n`AttributeError`s at runtime.\n\n## Examples\nA `TypedDict` class cannot be decorated with `@dataclass`, as this will\ncause an `AttributeError` at runtime when instantiating the class:\n\n```python\nfrom dataclasses import dataclass\nfrom typing import TypedDict\n\n@dataclass  # error: [invalid-typed-dict]\nclass Foo(TypedDict):\n    x: int\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "invalid-typed-dict-statement": {
           "title": "detects invalid statements in `TypedDict` class bodies",
           "description": "## What it does\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For\nexample, method definitions and field values aren't allowed. None of these will be\navailable on \"instances of the `TypedDict`\" at runtime (as `dict` is the runtime class of\nall \"`TypedDict` instances\").\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",

@@ -1790,8 +1790,8 @@ class ExtendedProtocol(BaseProtocol, Protocol):
 ### Using `dataclass()` as a function
 
 The same restrictions apply when using `dataclass()` as a function call instead of a decorator.
-Currently, these emit `no-matching-overload` because overload resolution fails before
-our custom check can run:
+Currently, these emit `no-matching-overload` because overload resolution fails before our custom
+check can run:
 
 ```py
 from dataclasses import dataclass
