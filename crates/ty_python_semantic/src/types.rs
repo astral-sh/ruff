@@ -73,7 +73,7 @@ use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{TypeKind, any_over_type};
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
@@ -870,6 +870,29 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
+fn type_contains_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    if let Type::TypeVar(typevar) = ty {
+        return typevar.typevar(db).is_self(db);
+    }
+
+    if let Type::NominalInstance(instance) = ty
+        && !instance.can_contain_self()
+    {
+        return false;
+    }
+
+    if matches!(TypeKind::from(ty), TypeKind::Atomic) {
+        return false;
+    }
+
+    any_over_type(
+        db,
+        ty,
+        &|inner_ty| matches!(inner_ty, Type::TypeVar(tv) if tv.typevar(db).is_self(db)),
+        false,
+    )
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -901,12 +924,7 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if this type contains a `Self` type variable.
     pub(crate) fn contains_self(&self, db: &'db dyn Db) -> bool {
-        any_over_type(
-            db,
-            *self,
-            &|ty| matches!(ty, Type::TypeVar(tv) if tv.typevar(db).is_self(db)),
-            false,
-        )
+        type_contains_self(db, *self)
     }
 
     pub(crate) fn bind_self_typevars(
