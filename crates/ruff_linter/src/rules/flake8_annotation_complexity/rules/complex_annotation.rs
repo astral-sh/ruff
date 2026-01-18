@@ -125,12 +125,11 @@ fn get_annotation_complexity<'checker, 'expr>(
 where
     'checker: 'expr,
 {
-    if let Some(expr) = expr.as_string_literal_expr() {
-        if let Some(literal_value) = expr.as_single_part_string() {
-            if let Ok(inner_expr) = parse_expression(&literal_value.value) {
-                return get_annotation_complexity(annotation_resolver, &inner_expr.into_expr());
-            }
-        }
+    if let Some(expr) = expr.as_string_literal_expr()
+        && let Some(literal_value) = expr.as_single_part_string()
+        && let Ok(inner_expr) = parse_expression(&literal_value.value)
+    {
+        return get_annotation_complexity(annotation_resolver, &inner_expr.into_expr());
     };
 
     if let Some(expr_bin_op) = expr.as_bin_op_expr() {
