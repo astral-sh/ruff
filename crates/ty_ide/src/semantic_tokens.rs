@@ -38,8 +38,8 @@ use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr, walk_stmt,
 };
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt,
-    StringLiteral, TString, TypeParam,
+    self as ast, AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement,
+    InterpolatedStringElements, Stmt, StringLiteral, TString, TypeParam,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
@@ -259,6 +259,29 @@ impl<'db> SemanticTokenVisitor<'db> {
             token_type,
             modifiers,
         });
+    }
+
+    /// Visit interpolated string elements (used by both f-strings and t-strings).
+    fn visit_interpolated_string_elements(&mut self, elements: &InterpolatedStringElements) {
+        for element in elements {
+            match element {
+                InterpolatedStringElement::Literal(literal_element) => {
+                    self.add_token(
+                        literal_element.range(),
+                        SemanticTokenType::String,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+                InterpolatedStringElement::Interpolation(expr_element) => {
+                    self.visit_expr(&expr_element.expression);
+
+                    // Handle format spec if present
+                    if let Some(format_spec) = &expr_element.format_spec {
+                        self.visit_interpolated_string_elements(&format_spec.elements);
+                    }
+                }
+            }
+        }
     }
 
     fn is_constant_name(name: &str) -> bool {
@@ -944,82 +967,11 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     }
 
     fn visit_f_string(&mut self, f_string: &FString) {
-        // F-strings contain elements that can be literal strings or expressions
-        for element in &f_string.elements {
-            match element {
-                InterpolatedStringElement::Literal(literal_element) => {
-                    // This is a literal string part within the f-string
-                    self.add_token(
-                        literal_element.range(),
-                        SemanticTokenType::String,
-                        SemanticTokenModifier::empty(),
-                    );
-                }
-                InterpolatedStringElement::Interpolation(expr_element) => {
-                    // This is an expression within the f-string - visit it normally
-                    self.visit_expr(&expr_element.expression);
-
-                    // Handle format spec if present
-                    if let Some(format_spec) = &expr_element.format_spec {
-                        // Format specs can contain their own interpolated elements
-                        for spec_element in &format_spec.elements {
-                            match spec_element {
-                                InterpolatedStringElement::Literal(literal) => {
-                                    self.add_token(
-                                        literal.range(),
-                                        SemanticTokenType::String,
-                                        SemanticTokenModifier::empty(),
-                                    );
-                                }
-                                InterpolatedStringElement::Interpolation(nested_expr) => {
-                                    self.visit_expr(&nested_expr.expression);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        self.visit_interpolated_string_elements(&f_string.elements);
     }
 
     fn visit_t_string(&mut self, t_string: &TString) {
-        // T-strings contain elements that can be literal strings or expressions
-        // (same structure as f-strings)
-        for element in &t_string.elements {
-            match element {
-                InterpolatedStringElement::Literal(literal_element) => {
-                    // This is a literal string part within the t-string
-                    self.add_token(
-                        literal_element.range(),
-                        SemanticTokenType::String,
-                        SemanticTokenModifier::empty(),
-                    );
-                }
-                InterpolatedStringElement::Interpolation(expr_element) => {
-                    // This is an expression within the t-string - visit it normally
-                    self.visit_expr(&expr_element.expression);
-
-                    // Handle format spec if present
-                    if let Some(format_spec) = &expr_element.format_spec {
-                        // Format specs can contain their own interpolated elements
-                        for spec_element in &format_spec.elements {
-                            match spec_element {
-                                InterpolatedStringElement::Literal(literal) => {
-                                    self.add_token(
-                                        literal.range(),
-                                        SemanticTokenType::String,
-                                        SemanticTokenModifier::empty(),
-                                    );
-                                }
-                                InterpolatedStringElement::Interpolation(nested_expr) => {
-                                    self.visit_expr(&nested_expr.expression);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        self.visit_interpolated_string_elements(&t_string.elements);
     }
 
     /// Visit decorators, handling simple name decorators vs complex expressions
