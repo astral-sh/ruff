@@ -803,11 +803,6 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns a new `ClassLiteral` with the given dataclass params, preserving all other fields.
-    ///
-    /// TODO: Applying `@dataclasses.dataclass` to a `NamedTuple` subclass doesn't fail at runtime
-    /// (e.g., `@dataclasses.dataclass class Foo(NamedTuple): ...`), and neither does
-    /// `dataclasses.dataclass(collections.namedtuple("A", ()))`. We should either infer these
-    /// accurately or emit a diagnostic on them.
     pub(crate) fn with_dataclass_params(
         self,
         db: &'db dyn Db,
@@ -2691,6 +2686,21 @@ impl<'db> StaticClassLiteral<'db> {
 
         self.iter_mro(db, None)
             .any(|base| matches!(base, ClassBase::TypedDict))
+    }
+
+    /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
+    /// `typing.NamedTuple`, either directly or indirectly, including functional forms like
+    /// `NamedTuple("X", ...)`).
+    pub(crate) fn has_named_tuple_class_in_mro(self, db: &'db dyn Db) -> bool {
+        self.iter_mro(db, None)
+            .filter_map(ClassBase::into_class)
+            .any(|base| match base.class_literal(db) {
+                ClassLiteral::DynamicNamedTuple(_) => true,
+                ClassLiteral::Dynamic(_) => false,
+                ClassLiteral::Static(class) => class
+                    .explicit_bases(db)
+                    .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
+            })
     }
 
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
