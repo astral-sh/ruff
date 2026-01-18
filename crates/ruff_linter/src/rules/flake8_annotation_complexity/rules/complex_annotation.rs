@@ -63,6 +63,76 @@ impl Violation for ComplexAnnotation {
     }
 }
 
+/// TAE002 (on function)
+pub(crate) fn complex_annotation_function(checker: &Checker, function_def: &StmtFunctionDef) {
+    let max_complexity = checker
+        .settings()
+        .flake8_annotation_complexity
+        .max_annotation_complexity;
+
+    let annotation_resolver = CheckerAnnotationResolver { checker };
+
+    for arg in function_def.parameters.iter_non_variadic_params() {
+        if let Some(type_annotation) = arg.annotation() {
+            let annotation_complexity =
+                get_annotation_complexity(&annotation_resolver, type_annotation);
+            if annotation_complexity > max_complexity {
+                checker.report_diagnostic(
+                    ComplexAnnotation {
+                        symbol_name: arg.name().to_string(),
+                        complexity_value: annotation_complexity,
+                        max_complexity_value: max_complexity,
+                    },
+                    type_annotation.range(),
+                );
+            }
+        }
+    }
+
+    if let Some(return_annotation) = &function_def.returns {
+        let annotation_complexity =
+            get_annotation_complexity(&annotation_resolver, &return_annotation);
+        if annotation_complexity > max_complexity {
+            checker.report_diagnostic(
+                ComplexAnnotation {
+                    symbol_name: "return type".to_owned(),
+                    complexity_value: annotation_complexity,
+                    max_complexity_value: max_complexity,
+                },
+                return_annotation.range(),
+            );
+        }
+    }
+}
+
+/// TAE002 (on assignment)
+pub(crate) fn complex_annotation_assignment(checker: &Checker, assign_stmt: &StmtAnnAssign) {
+    let max_complexity = checker
+        .settings()
+        .flake8_annotation_complexity
+        .max_annotation_complexity;
+
+    let annotation_resolver = CheckerAnnotationResolver { checker };
+
+    let annotation_complexity =
+        get_annotation_complexity(&annotation_resolver, &assign_stmt.annotation);
+    if annotation_complexity > max_complexity {
+        checker.report_diagnostic(
+            ComplexAnnotation {
+                symbol_name: assign_stmt
+                    .target
+                    .as_name_expr()
+                    .map(|x| x.id.as_str())
+                    .unwrap_or("")
+                    .to_owned(),
+                complexity_value: annotation_complexity,
+                max_complexity_value: max_complexity,
+            },
+            assign_stmt.annotation.range(),
+        );
+    }
+}
+
 /// Indirection of `checker.semantic.resolve_qualified_name` to allow unit-testing of
 /// annotation complexity calculation on a single annotation expression.
 trait AnnotationResolver {
@@ -151,76 +221,6 @@ where
     }
 
     0
-}
-
-/// TAE002 (on function)
-pub(crate) fn complex_annotation_function(checker: &Checker, function_def: &StmtFunctionDef) {
-    let max_complexity = checker
-        .settings()
-        .flake8_annotation_complexity
-        .max_annotation_complexity;
-
-    let annotation_resolver = CheckerAnnotationResolver { checker };
-
-    for arg in function_def.parameters.iter_non_variadic_params() {
-        if let Some(type_annotation) = arg.annotation() {
-            let annotation_complexity =
-                get_annotation_complexity(&annotation_resolver, type_annotation);
-            if annotation_complexity > max_complexity {
-                checker.report_diagnostic(
-                    ComplexAnnotation {
-                        symbol_name: arg.name().to_string(),
-                        complexity_value: annotation_complexity,
-                        max_complexity_value: max_complexity,
-                    },
-                    type_annotation.range(),
-                );
-            }
-        }
-    }
-
-    if let Some(return_annotation) = &function_def.returns {
-        let annotation_complexity =
-            get_annotation_complexity(&annotation_resolver, &return_annotation);
-        if annotation_complexity > max_complexity {
-            checker.report_diagnostic(
-                ComplexAnnotation {
-                    symbol_name: "return type".to_owned(),
-                    complexity_value: annotation_complexity,
-                    max_complexity_value: max_complexity,
-                },
-                return_annotation.range(),
-            );
-        }
-    }
-}
-
-/// TAE002 (on assignment)
-pub(crate) fn complex_annotation_assignment(checker: &Checker, assign_stmt: &StmtAnnAssign) {
-    let max_complexity = checker
-        .settings()
-        .flake8_annotation_complexity
-        .max_annotation_complexity;
-
-    let annotation_resolver = CheckerAnnotationResolver { checker };
-
-    let annotation_complexity =
-        get_annotation_complexity(&annotation_resolver, &assign_stmt.annotation);
-    if annotation_complexity > max_complexity {
-        checker.report_diagnostic(
-            ComplexAnnotation {
-                symbol_name: assign_stmt
-                    .target
-                    .as_name_expr()
-                    .map(|x| x.id.as_str())
-                    .unwrap_or("")
-                    .to_owned(),
-                complexity_value: annotation_complexity,
-                max_complexity_value: max_complexity,
-            },
-            assign_stmt.annotation.range(),
-        );
-    }
 }
 
 #[cfg(test)]
