@@ -156,6 +156,10 @@ class Diagnostic:
     location: Location
     source: Source
     optional: bool
+    # {filename:tag} identifying an error that can occur on multiple lines
+    tag: str | None
+    # True if the error can occur on multiple lines or only once per tag
+    multi: bool
 
     def __post_init__(self, *args, **kwargs) -> None:
         # Remove check name prefix from description
@@ -196,6 +200,8 @@ class Diagnostic:
             ),
             source=source,
             optional=False,
+            tag=None,
+            multi=False,
         )
 
     @property
@@ -327,6 +333,8 @@ def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]
                         ),
                         source=Source.EXPECTED,
                         optional=error.group("optional") is not None,
+                        tag=f"{file.stem}:{error.group('tag')}",
+                        multi=error.group("multi") is not None,
                     )
                 )
 
@@ -394,6 +402,13 @@ def group_diagnostics_by_key(
         )
 
     return grouped
+
+
+def process_tagged_diagnostics(grouped_diagnostics: list[GroupedDiagnostics]):
+    """For each group of diagnostics, group once again by tag, and track
+    for each ty diagnostic whether the associated test case already has an expected
+    error. If a diagnostic occurs on
+    """
 
 
 def compute_stats(
