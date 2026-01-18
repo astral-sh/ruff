@@ -585,19 +585,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns whether this class is, or inherits from, a `NamedTuple` class.
-    pub(crate) fn has_named_tuple_class_in_mro(self, db: &'db dyn Db) -> bool {
-        self.iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .any(|class| match class.class_literal(db) {
-                ClassLiteral::DynamicNamedTuple(_) => true,
-                ClassLiteral::Dynamic(_) => false,
-                ClassLiteral::Static(class) => class
-                    .explicit_bases(db)
-                    .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
-            })
-    }
-
     /// Returns whether this class is `builtins.tuple` exactly
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         match self {

@@ -1437,7 +1437,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 @dataclass
-# error: [invalid-dataclass] "Class `Foo` inherits from `NamedTuple` and is decorated with `@dataclass`"
+# error: [invalid-dataclass] "`NamedTuple` class `Foo` cannot be decorated with `@dataclass`"
 class Foo(NamedTuple):
     x: int
     y: str

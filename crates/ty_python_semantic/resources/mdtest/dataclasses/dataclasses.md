@@ -1724,6 +1724,101 @@ reveal_type(DynamicChild.__dataclass_fields__)  # revealed: dict[str, Field[Any]
 
 ## Invalid `@dataclass` applications
 
+### NamedTuple classes (functional form)
+
+Applying `@dataclass` to a `namedtuple` class created via the functional form is problematic because
+the namedtuple machinery conflicts with dataclass semantics:
+
+```py
+from collections import namedtuple
+from dataclasses import dataclass
+
+NT = namedtuple("NT", "x y")
+
+# TODO: should emit `invalid-dataclass`
+# error: [no-matching-overload]
+dataclass(NT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(NT)
+
+# TODO: should emit `invalid-dataclass`
+# error: [no-matching-overload]
+dataclass(namedtuple("Inline1", "a b"))
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(namedtuple("Inline2", "a b"))
+```
+
+The same applies to `typing.NamedTuple` used in functional form:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+TNT = NamedTuple("TNT", [("x", int), ("y", int)])
+
+# TODO: should emit `invalid-dataclass`
+# error: [no-matching-overload]
+dataclass(TNT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(TNT)
+
+# TODO: should emit `invalid-dataclass`
+# error: [no-matching-overload]
+dataclass(NamedTuple("Inline1", [("a", str)]))
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(NamedTuple("Inline2", [("a", str)]))
+```
+
+### Enum classes (functional form)
+
+Applying `@dataclass` to a functional `Enum` class should also be detected:
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+E = Enum("E", "A B C")
+
+# TODO: should emit `invalid-dataclass`
+dataclass(E)
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(E)
+
+# TODO: should emit `invalid-dataclass`
+dataclass(Enum("Inline1", "X Y"))
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(Enum("Inline2", "X Y"))
+```
+
+### TypedDict classes (functional form)
+
+Applying `@dataclass` to a functional `TypedDict` class should also be detected:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+TD = TypedDict("TD", {"x": int})
+
+# TODO: should emit `invalid-dataclass`
+dataclass(TD)
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(TD)
+
+# TODO: should emit `invalid-dataclass`
+dataclass(TypedDict("Inline1", {"a": str}))
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(TypedDict("Inline2", {"a": str}))
+```
+
 ### Enum classes
 
 Applying `@dataclass` to an enum class is
@@ -1734,7 +1829,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 @dataclass
-# error: [invalid-dataclass] "Class `Color` inherits from `Enum` and is decorated with `@dataclass`"
+# error: [invalid-dataclass] "Enum class `Color` cannot be decorated with `@dataclass`"
 class Color(Enum):
     RED = 1
     GREEN = 2
@@ -1767,7 +1862,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 @dataclass
-# error: [invalid-dataclass] "Class `Greeter` is a protocol and is decorated with `@dataclass`"
+# error: [invalid-dataclass] "Protocol class `Greeter` cannot be decorated with `@dataclass`"
 class Greeter(Protocol):
     def greet(self) -> str: ...
 ```
@@ -1789,9 +1884,9 @@ class ExtendedProtocol(BaseProtocol, Protocol):
 
 ### Using `dataclass()` as a function
 
-The same restrictions apply when using `dataclass()` as a function call instead of a decorator.
-Currently, these emit `no-matching-overload` because overload resolution fails before our custom
-check can run:
+The same restrictions apply when using `dataclass()` as a function call instead of a decorator. When
+using `dataclass(cls)` directly, overload resolution fails before our check can run. When using
+`dataclass()(cls)`, the decorator form is used and we correctly emit `invalid-dataclass`:
 
 ```py
 from dataclasses import dataclass
@@ -1814,15 +1909,27 @@ class MyProtocol(Protocol):
 # error: [no-matching-overload]
 dataclass(MyTuple)
 
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(MyTuple)
+
 # TODO: should emit `invalid-dataclass`
 # error: [no-matching-overload]
 dataclass(MyDict)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
+dataclass()(MyDict)
 
 # TODO: should emit `invalid-dataclass`
 # error: [no-matching-overload]
 dataclass(MyEnum)
 
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
+dataclass()(MyEnum)
+
 # TODO: should emit `invalid-dataclass`
 # error: [no-matching-overload]
 dataclass(MyProtocol)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
+dataclass()(MyProtocol)
 ```

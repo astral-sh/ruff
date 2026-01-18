@@ -700,13 +700,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // (4) Check for invalid `@dataclass` applications.
             if class.dataclass_params(self.db()).is_some() {
-                if ClassLiteral::Static(class).has_named_tuple_class_in_mro(self.db()) {
+                if class.has_named_tuple_class_in_mro(self.db()) {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Class `{}` inherits from `NamedTuple` and is decorated with `@dataclass`",
+                            "`NamedTuple` class `{}` cannot be decorated with `@dataclass`",
                             class.name(self.db()),
                         ));
                         diagnostic.info(
@@ -720,11 +720,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Class `{}` inherits from `TypedDict` and is decorated with `@dataclass`",
+                            "`TypedDict` class `{}` cannot be decorated with `@dataclass`",
                             class.name(self.db()),
                         ));
                         diagnostic.info(
-                            "An exception will be raised when instantiating the class at runtime",
+                            "An exception will often be raised when instantiating the class at runtime",
                         );
                     }
                 }
@@ -734,10 +734,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Class `{}` inherits from `Enum` and is decorated with `@dataclass`",
+                            "Enum class `{}` cannot be decorated with `@dataclass`",
                             class.name(self.db()),
                         ));
-                        diagnostic.info("Dataclass support for enums is explicitly not supported");
+                        diagnostic
+                            .info("Applying `@dataclass` to an enum is not supported at runtime");
                     }
                 }
                 if is_protocol {
@@ -746,10 +747,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Class `{}` is a protocol and is decorated with `@dataclass`",
+                            "Protocol class `{}` cannot be decorated with `@dataclass`",
                             class.name(self.db()),
                         ));
-                        diagnostic.info("Protocols define interfaces and cannot be instantiated");
+                        diagnostic.info(
+                            "Protocols define abstract interfaces and cannot be instantiated",
+                        );
                     }
                 }
             }

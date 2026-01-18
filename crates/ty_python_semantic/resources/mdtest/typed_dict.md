@@ -2388,7 +2388,7 @@ from dataclasses import dataclass
 from typing import TypedDict
 
 @dataclass
-# error: [invalid-dataclass] "Class `Foo` inherits from `TypedDict` and is decorated with `@dataclass`"
+# error: [invalid-dataclass] "`TypedDict` class `Foo` cannot be decorated with `@dataclass`"
 class Foo(TypedDict):
     x: int
     y: str
