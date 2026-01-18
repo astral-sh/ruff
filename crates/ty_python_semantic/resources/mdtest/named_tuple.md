@@ -1443,7 +1443,7 @@ class Foo(NamedTuple):
     y: str
 ```
 
-The same error occurs with `dataclasses.dataclass` used as a function call:
+The same error occurs with `dataclasses.dataclass` used with parentheses:
 
 ```py
 from dataclasses import dataclass

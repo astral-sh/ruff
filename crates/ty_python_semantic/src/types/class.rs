@@ -2691,16 +2691,16 @@ impl<'db> StaticClassLiteral<'db> {
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
     /// `typing.NamedTuple`, either directly or indirectly, including functional forms like
     /// `NamedTuple("X", ...)`).
-    pub fn has_named_tuple_class_in_mro(self, db: &'db dyn Db) -> bool {
-        self.explicit_bases(db).iter().any(|base| match base {
-            Type::SpecialForm(SpecialFormType::NamedTuple) => true,
-            Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(_)) => true,
-            Type::ClassLiteral(ClassLiteral::Static(class)) => {
-                class.has_named_tuple_class_in_mro(db)
-            }
-            Type::GenericAlias(alias) => alias.origin(db).has_named_tuple_class_in_mro(db),
-            _ => false,
-        })
+    pub(crate) fn has_named_tuple_class_in_mro(self, db: &'db dyn Db) -> bool {
+        self.iter_mro(db, None)
+            .filter_map(ClassBase::into_class)
+            .any(|base| match base.class_literal(db) {
+                ClassLiteral::DynamicNamedTuple(_) => true,
+                ClassLiteral::Dynamic(_) => false,
+                ClassLiteral::Static(class) => class
+                    .explicit_bases(db)
+                    .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
+            })
     }
 
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.

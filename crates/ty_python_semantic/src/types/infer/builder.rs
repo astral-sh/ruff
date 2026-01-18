@@ -713,8 +713,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "An exception will be raised when instantiating the class at runtime",
                         );
                     }
-                }
-                if class.is_typed_dict(self.db()) {
+                } else if class.is_typed_dict(self.db()) {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
@@ -727,8 +726,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "An exception will often be raised when instantiating the class at runtime",
                         );
                     }
-                }
-                if is_enum_class_by_inheritance(self.db(), class) {
+                } else if is_enum_class_by_inheritance(self.db(), class) {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
@@ -740,8 +738,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         diagnostic
                             .info("Applying `@dataclass` to an enum is not supported at runtime");
                     }
-                }
-                if is_protocol {
+                } else if is_protocol {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))

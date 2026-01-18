@@ -1843,19 +1843,21 @@ from dataclasses import dataclass
 from enum import Enum
 
 class BaseColor(Enum):
-    RED = 1
+    def fancy_mixin_method(self) -> str:
+        return "hi"
 
 @dataclass
 # error: [invalid-dataclass]
-# error: [subclass-of-final-class]
-class ExtendedColor(BaseColor):
+class Color(BaseColor):
+    RED = 1
     GREEN = 2
+    BLUE = 3
 ```
 
 ### Protocol classes
 
-Applying `@dataclass` to a protocol class is invalid because protocols define interfaces and cannot
-be instantiated:
+Applying `@dataclass` to a protocol class is invalid because protocols define abstract interfaces
+and cannot be instantiated:
 
 ```py
 from dataclasses import dataclass
@@ -1867,7 +1869,7 @@ class Greeter(Protocol):
     def greet(self) -> str: ...
 ```
 
-This also applies to classes that inherit from `Protocol` indirectly:
+This also applies to classes that extend a protocol while remaining a protocol themselves:
 
 ```py
 from dataclasses import dataclass
@@ -1880,6 +1882,26 @@ class BaseProtocol(Protocol):
 # error: [invalid-dataclass]
 class ExtendedProtocol(BaseProtocol, Protocol):
     def other_method(self) -> None: ...
+```
+
+However, concrete classes that implement a protocol (without inheriting from `Protocol` directly)
+can be decorated with `@dataclass`:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+class Greetable(Protocol):
+    name: str
+    def greet(self) -> str: ...
+
+@dataclass
+class Person(Greetable):
+    name: str
+    def greet(self) -> str:
+        return f"Hello, {self.name}!"
+
+reveal_type(Person)  # revealed: <class 'Person'>
 ```
 
 ### Using `dataclass()` as a function

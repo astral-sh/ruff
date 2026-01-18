@@ -2380,8 +2380,8 @@ class Baz(Bar):
 
 Applying `@dataclass` to a `TypedDict` class is conceptually incoherent: `TypedDict` defines
 abstract structural types where "instantiating" always gives you a plain `dict` at runtime, whereas
-`@dataclass` is a tool for customising the creation of new nominal types. An exception will be
-raised when instantiating the class at runtime:
+`@dataclass` is a tool for customising the creation of new nominal types. An exception may be raised
+when instantiating the class at runtime:
 
 ```py
 from dataclasses import dataclass
@@ -2394,7 +2394,7 @@ class Foo(TypedDict):
     y: str
 ```
 
-The same error occurs with `dataclasses.dataclass` used as a function call:
+The same error occurs with `dataclasses.dataclass` used with parentheses:
 
 ```py
 from dataclasses import dataclass
