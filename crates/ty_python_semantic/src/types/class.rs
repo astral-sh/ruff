@@ -2987,7 +2987,38 @@ impl<'db> StaticClassLiteral<'db> {
         );
 
         match result {
-            ClassMemberResult::Done(result) => result.finalize(db),
+            ClassMemberResult::Done(result) => {
+                // Bind any `Self` type variables to the instance type of the accessing class.
+                // This handles patterns like Django's Manager[Self] where a subclass access
+                // should resolve `Self` to the subclass, not the parent class.
+                //
+                // We only do this for non-function types because:
+                // - For class attributes like `objects: Manager[Self]`, `Self` should be bound immediately
+                // - For methods, `Self` binding happens during method binding/call resolution
+                let self_type = Type::instance(db, self.unknown_specialization(db));
+                result.finalize(db).map_type(|ty| {
+                    // Don't bind Self for function types - their Self binding happens during
+                    // method binding/call resolution.
+                    // Also skip binding if the type doesn't contain Self to avoid unnecessary
+                    // type expansion (especially for recursive type aliases).
+                    if matches!(
+                        ty,
+                        Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
+                    ) || !ty.contains_self(db)
+                    {
+                        ty
+                    } else {
+                        ty.apply_type_mapping(
+                            db,
+                            &TypeMapping::BindSelf {
+                                self_type,
+                                self_typevar_identity: None,
+                            },
+                            TypeContext::default(),
+                        )
+                    }
+                })
+            }
 
             ClassMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_class_literal(db)

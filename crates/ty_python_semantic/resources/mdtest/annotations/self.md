@@ -821,3 +821,28 @@ class CacheMap:
         self._key_to_value_set(key, value)
         return value
 ```
+
+## Self in class attributes with generic classes
+
+Django-like patterns where a class attribute uses `Self` as a type argument to a generic class:
+
+```py
+from typing import Self, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Manager(Generic[T]):
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Model:
+    objects: Manager[Self]
+
+class Confirmation(Model):
+    expiry_date: int
+
+def test():
+    confirmation = Confirmation.objects.get()
+    reveal_type(confirmation)  # revealed: Confirmation
+    x = confirmation.expiry_date  # Should work - Confirmation has expiry_date
+```
