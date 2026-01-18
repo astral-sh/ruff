@@ -105,6 +105,5 @@ class Bar:
 
 def f(x: Foo):
     if isinstance(x, Bar):
-        # TODO: should be `int`
-        reveal_type(x["whatever"])  # revealed: @Todo(Subscript expressions with intersections)
+        reveal_type(x["whatever"])  # revealed: int
 ```
