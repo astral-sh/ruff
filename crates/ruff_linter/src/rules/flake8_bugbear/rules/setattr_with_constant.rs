@@ -36,6 +36,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// Rewriting `setattr(obj, "ſ", 1)` to `obj.ſ = 1` would be interpreted as `obj.s = 1` at
 /// runtime, changing behavior.
 ///
+/// Additionally, the fix is marked as unsafe if the expression contains comments,
+/// as the replacement may remove comments attached to the original `setattr` call.
+///
 /// For example, the long s character `"ſ"` normalizes to `"s"` under NFKC, so:
 /// ```python
 /// # This creates an attribute with the exact name "ſ"
