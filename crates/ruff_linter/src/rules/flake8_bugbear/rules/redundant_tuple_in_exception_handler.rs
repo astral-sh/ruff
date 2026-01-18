@@ -34,6 +34,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the exception handler contains comments.
+///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
