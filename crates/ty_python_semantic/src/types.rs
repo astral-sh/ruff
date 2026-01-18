@@ -122,6 +122,7 @@ mod visitor;
 mod definition;
 #[cfg(test)]
 mod property_tests;
+mod subscript;
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
