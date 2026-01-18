@@ -45,8 +45,8 @@ use crate::checkers::ast::Checker;
 #[violation_metadata(preview_since = "v0.14.14")]
 pub(crate) struct ComplexAnnotation {
     symbol_name: String,
-    complexity_value: isize,
-    max_complexity_value: isize,
+    complexity_value: usize,
+    max_complexity_value: usize,
 }
 
 impl Violation for ComplexAnnotation {
@@ -121,7 +121,7 @@ fn flatten_bin_op_expr<'a>(expr: &'a ExprBinOp) -> Vec<&'a Expr> {
 fn get_annotation_complexity<'checker, 'expr>(
     annotation_resolver: &'checker impl AnnotationResolver,
     expr: &'expr Expr,
-) -> isize
+) -> usize
 where
     'checker: 'expr,
 {
@@ -279,7 +279,7 @@ mod tests {
     #[test_case(r#"list[a | b | c]"#, 2)]
     fn test_get_annotation_complexity_yields_expected_value(
         annotation: &str,
-        expected_complexity: isize,
+        expected_complexity: usize,
     ) {
         let expr = parse_expression(annotation).unwrap();
         let complexity = get_annotation_complexity(&FromTypingResolver {}, &expr.expr());

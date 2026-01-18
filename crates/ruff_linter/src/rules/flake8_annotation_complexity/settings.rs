@@ -6,7 +6,7 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
-    pub max_annotation_complexity: isize,
+    pub max_annotation_complexity: usize,
 }
 
 impl Display for Settings {
