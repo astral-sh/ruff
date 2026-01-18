@@ -90,6 +90,9 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// age = ages.get("Cat")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[derive(ViolationMetadata)]
