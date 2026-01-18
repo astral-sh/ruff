@@ -28,9 +28,8 @@ use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
-    INVALID_NAMED_TUPLE, INVALID_TYPED_DICT, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
-    PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS,
-    UNKNOWN_ARGUMENT,
+    INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -618,6 +617,10 @@ impl<'db> Bindings<'db> {
                                 overload.errors.push(BindingError::DataclassOnNamedTuple);
                             } else if class_literal.is_typed_dict(db) {
                                 overload.errors.push(BindingError::DataclassOnTypedDict);
+                            } else if is_enum_class(db, Type::from(*class_literal)) {
+                                overload.errors.push(BindingError::DataclassOnEnum);
+                            } else if class_literal.is_protocol(db) {
+                                overload.errors.push(BindingError::DataclassOnProtocol);
                             } else {
                                 overload.set_return_type(Type::from(
                                     class_literal.with_dataclass_params(db, Some(params)),
@@ -1148,6 +1151,10 @@ impl<'db> Bindings<'db> {
                                     overload.errors.push(BindingError::DataclassOnNamedTuple);
                                 } else if class_literal.is_typed_dict(db) {
                                     overload.errors.push(BindingError::DataclassOnTypedDict);
+                                } else if is_enum_class(db, Type::from(*class_literal)) {
+                                    overload.errors.push(BindingError::DataclassOnEnum);
+                                } else if class_literal.is_protocol(db) {
+                                    overload.errors.push(BindingError::DataclassOnProtocol);
                                 } else {
                                     let params = DataclassParams::default_params(db);
                                     overload.set_return_type(Type::from(
@@ -4210,10 +4217,14 @@ pub(crate) enum BindingError<'db> {
     /// represents the infinite union of all callables. While such types *are* callable (they pass
     /// `callable()`), any specific call should fail because we don't know the actual signature.
     CalledTopCallable(Type<'db>),
-    /// The `@dataclass` decorator was applied to a `NamedTuple`, which will fail at runtime.
+    /// The `@dataclass` decorator was applied to a `NamedTuple`.
     DataclassOnNamedTuple,
-    /// The `@dataclass` decorator was applied to a `TypedDict`, which will fail at runtime.
+    /// The `@dataclass` decorator was applied to a `TypedDict`.
     DataclassOnTypedDict,
+    /// The `@dataclass` decorator was applied to an `Enum`.
+    DataclassOnEnum,
+    /// The `@dataclass` decorator was applied to a `Protocol`.
+    DataclassOnProtocol,
 }
 
 impl<'db> BindingError<'db> {
@@ -4664,21 +4675,45 @@ impl<'db> BindingError<'db> {
 
             Self::DataclassOnNamedTuple => {
                 let node = Self::get_node(node, None);
-                if let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, node) {
-                    builder.into_diagnostic(
-                        "Cannot use `@dataclass` on a `NamedTuple` class; \
-                        this will cause a runtime error",
+                if let Some(builder) = context.report_lint(&INVALID_DATACLASS, node) {
+                    let mut diag = builder.into_diagnostic(
+                        "Cannot use `dataclass()` on a class that inherits from `NamedTuple`",
+                    );
+                    diag.info(
+                        "An exception will be raised when instantiating the class at runtime",
                     );
                 }
             }
 
             Self::DataclassOnTypedDict => {
                 let node = Self::get_node(node, None);
-                if let Some(builder) = context.report_lint(&INVALID_TYPED_DICT, node) {
-                    builder.into_diagnostic(
-                        "Cannot use `@dataclass` on a `TypedDict` class; \
-                        this will cause a runtime error",
+                if let Some(builder) = context.report_lint(&INVALID_DATACLASS, node) {
+                    let mut diag = builder.into_diagnostic(
+                        "Cannot use `dataclass()` on a class that inherits from `TypedDict`",
                     );
+                    diag.info(
+                        "An exception will be raised when instantiating the class at runtime",
+                    );
+                }
+            }
+
+            Self::DataclassOnEnum => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&INVALID_DATACLASS, node) {
+                    let mut diag = builder.into_diagnostic(
+                        "Cannot use `dataclass()` on a class that inherits from `Enum`",
+                    );
+                    diag.info("Dataclass support for enums is explicitly not supported");
+                }
+            }
+
+            Self::DataclassOnProtocol => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&INVALID_DATACLASS, node) {
+                    let mut diag = builder.into_diagnostic(
+                        "Cannot use `dataclass()` on a protocol class",
+                    );
+                    diag.info("Protocols define interfaces and cannot be instantiated");
                 }
             }
         }

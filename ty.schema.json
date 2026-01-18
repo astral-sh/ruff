@@ -602,7 +602,7 @@
         },
         "invalid-dataclass": {
           "title": "detects invalid `@dataclass` applications",
-          "description": "## What it does\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\nApplying `@dataclass` to a class that inherits from `NamedTuple` or `TypedDict` is\ninvalid and will raise an exception at runtime when instantiating the class.\n\n## Examples\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n@dataclass  # error: [invalid-dataclass]\nclass Foo(NamedTuple):\n    x: int\n```",
+          "description": "## What it does\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\nApplying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,\n`Enum`, or `Protocol` is invalid:\n\n- `NamedTuple` and `TypedDict` classes will raise an exception at runtime when\n  instantiating the class.\n- `Enum` classes with `@dataclass` are [explicitly not supported].\n- `Protocol` classes define interfaces and cannot be instantiated.\n\n## Examples\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n@dataclass  # error: [invalid-dataclass]\nclass Foo(NamedTuple):\n    x: int\n```\n\n[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support",
           "default": "error",
           "oneOf": [
             {

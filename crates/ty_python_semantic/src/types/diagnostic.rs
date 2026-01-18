@@ -463,8 +463,13 @@ declare_lint! {
     /// Checks for invalid applications of the `@dataclass` decorator.
     ///
     /// ## Why is this bad?
-    /// Applying `@dataclass` to a class that inherits from `NamedTuple` or `TypedDict` is
-    /// invalid and will raise an exception at runtime when instantiating the class.
+    /// Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
+    /// `Enum`, or `Protocol` is invalid:
+    ///
+    /// - `NamedTuple` and `TypedDict` classes will raise an exception at runtime when
+    ///   instantiating the class.
+    /// - `Enum` classes with `@dataclass` are [explicitly not supported].
+    /// - `Protocol` classes define interfaces and cannot be instantiated.
     ///
     /// ## Examples
     /// ```python
@@ -475,6 +480,8 @@ declare_lint! {
     /// class Foo(NamedTuple):
     ///     x: int
     /// ```
+    ///
+    /// [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
     pub(crate) static INVALID_DATACLASS = {
         summary: "detects invalid `@dataclass` applications",
         status: LintStatus::preview("0.0.12"),

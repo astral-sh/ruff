@@ -1721,3 +1721,108 @@ DynamicChild = dataclass(DynamicChild)
 
 reveal_type(DynamicChild.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 ```
+
+## Invalid `@dataclass` applications
+
+### Enum classes
+
+Applying `@dataclass` to an enum class is
+[explicitly not supported](https://docs.python.org/3/howto/enum.html#dataclass-support):
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+@dataclass
+# error: [invalid-dataclass] "Class `Color` inherits from `Enum` and is decorated with `@dataclass`"
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+This also applies to classes that inherit from an enum class:
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+class BaseColor(Enum):
+    RED = 1
+
+@dataclass
+# error: [invalid-dataclass]
+# error: [subclass-of-final-class]
+class ExtendedColor(BaseColor):
+    GREEN = 2
+```
+
+### Protocol classes
+
+Applying `@dataclass` to a protocol class is invalid because protocols define interfaces and cannot
+be instantiated:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+@dataclass
+# error: [invalid-dataclass] "Class `Greeter` is a protocol and is decorated with `@dataclass`"
+class Greeter(Protocol):
+    def greet(self) -> str: ...
+```
+
+This also applies to classes that inherit from `Protocol` indirectly:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+class BaseProtocol(Protocol):
+    def method(self) -> None: ...
+
+@dataclass
+# error: [invalid-dataclass]
+class ExtendedProtocol(BaseProtocol, Protocol):
+    def other_method(self) -> None: ...
+```
+
+### Using `dataclass()` as a function
+
+The same restrictions apply when using `dataclass()` as a function call instead of a decorator.
+Currently, these emit `no-matching-overload` because overload resolution fails before
+our custom check can run:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, TypedDict, Protocol
+from enum import Enum
+
+class MyTuple(NamedTuple):
+    x: int
+
+class MyDict(TypedDict):
+    x: int
+
+class MyEnum(Enum):
+    A = 1
+
+class MyProtocol(Protocol):
+    def method(self) -> None: ...
+
+# TODO: should emit `invalid-dataclass`
+# error: [no-matching-overload]
+dataclass(MyTuple)
+
+# TODO: should emit `invalid-dataclass`
+# error: [no-matching-overload]
+dataclass(MyDict)
+
+# TODO: should emit `invalid-dataclass`
+# error: [no-matching-overload]
+dataclass(MyEnum)
+
+# TODO: should emit `invalid-dataclass`
+# error: [no-matching-overload]
+dataclass(MyProtocol)
+```
