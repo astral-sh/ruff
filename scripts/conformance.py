@@ -37,6 +37,8 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
+from collections.abc import Sequence, Set as AbstractSet
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
 from functools import reduce
@@ -295,9 +297,9 @@ class Statistics:
         return self.true_positives + self.false_positives
 
 
-def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
+def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
-    for file in path.resolve().rglob("*.py"):
+    for file in test_files:
         for idx, line in enumerate(file.read_text().splitlines(), 1):
             if error := re.search(CONFORMANCE_ERROR_PATTERN, line):
                 diagnostics.append(
@@ -335,7 +337,7 @@ def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
 def collect_ty_diagnostics(
     ty_path: list[str],
     source: Source,
-    tests_path: str = ".",
+    test_files: Sequence[Path],
     python_version: str = "3.12",
 ) -> list[Diagnostic]:
     process = subprocess.run(
@@ -345,7 +347,7 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--exit-zero",
-            tests_path,
+            *map(str, test_files),
         ],
         capture_output=True,
         text=True,
@@ -512,7 +514,9 @@ def diff_format(
             assert_never((greater_is_better, increased))  # ty: ignore[type-assertion-failure]
 
 
-def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
+def render_summary(
+    grouped_diagnostics: list[GroupedDiagnostics], *, force_summary_table: bool
+) -> str:
     def format_metric(diff: float, old: float, new: float):
         if diff > 0:
             return f"increased from {old:.2%} to {new:.2%}"
@@ -537,7 +541,9 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
     base_header = f"[Typing conformance results]({CONFORMANCE_DIR_WITH_README})"
 
-    if all(diag.change is Change.UNCHANGED for diag in grouped_diagnostics):
+    if not force_summary_table and all(
+        diag.change is Change.UNCHANGED for diag in grouped_diagnostics
+    ):
         return dedent(
             f"""
             ## {base_header}
@@ -592,6 +598,29 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
     )
 
 
+def get_test_groups(root_dir: Path) -> AbstractSet[str]:
+    """Adapted from typing/conformance/test_groups.py."""
+    # Read the TOML file that defines the test groups. Each test
+    # group has a name that associated test cases must start with.
+    test_group_file = root_dir / "src" / "test_groups.toml"
+    with open(test_group_file, "rb") as f:
+        return tomllib.load(f).keys()
+
+
+def get_test_cases(
+    test_group_names: AbstractSet[str], tests_dir: Path
+) -> Sequence[Path]:
+    """Adapted from typing/conformance/test_groups.py."""
+    # Filter test cases based on test group names. Files that do
+    # not begin with a known test group name are assumed to be
+    # files that support one or more tests.
+    return [
+        p
+        for p in chain(tests_dir.glob("*.py"), tests_dir.glob("*.pyi"))
+        if p.name.split("_")[0] in test_group_names
+    ]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -614,8 +643,8 @@ def parse_args():
     parser.add_argument(
         "--tests-path",
         type=Path,
-        default=Path("typing/conformance/tests"),
-        help="Path to conformance tests directory (default: typing/conformance/tests)",
+        default=Path("typing/conformance"),
+        help="Path to conformance tests directory (default: typing/conformance)",
     )
 
     parser.add_argument(
@@ -641,6 +670,12 @@ def parse_args():
         help="Write output to file instead of stdout",
     )
 
+    parser.add_argument(
+        "--force-summary-table",
+        action="store_true",
+        help="Always print the summary table, even if no changes were detected",
+    )
+
     args = parser.parse_args()
 
     if args.old_ty is None:
@@ -651,21 +686,21 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    tests_path = args.tests_path.resolve().absolute()
-
-    expected = collect_expected_diagnostics(tests_path)
+    tests_dir = args.tests_path.resolve().absolute()
+    test_groups = get_test_groups(tests_dir)
+    test_files = get_test_cases(test_groups, tests_dir / "tests")
+    expected = collect_expected_diagnostics(test_files)
 
     old = collect_ty_diagnostics(
         ty_path=args.old_ty,
-        tests_path=str(tests_path),
+        test_files=test_files,
         source=Source.OLD,
         python_version=args.python_version,
     )
 
     new = collect_ty_diagnostics(
         ty_path=args.new_ty,
-        tests_path=str(tests_path),
+        test_files=test_files,
         source=Source.NEW,
         python_version=args.python_version,
     )
@@ -678,7 +713,7 @@ def main():
 
     rendered = "\n\n".join(
         [
-            render_summary(grouped),
+            render_summary(grouped, force_summary_table=args.force_summary_table),
             render_grouped_diagnostics(
                 grouped, changed_only=not args.all, format=args.format
             ),
