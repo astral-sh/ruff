@@ -35,11 +35,12 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
-    SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr, walk_stmt,
+    SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
+    walk_interpolated_string_element, walk_stmt,
 };
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt,
-    StringLiteral, TypeParam,
+    self as ast, AnyNodeRef, BytesLiteral, Expr, InterpolatedStringElement, Stmt, StringLiteral,
+    TypeParam,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
@@ -942,41 +943,22 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
         );
     }
 
-    fn visit_f_string(&mut self, f_string: &FString) {
-        // F-strings contain elements that can be literal strings or expressions
-        for element in &f_string.elements {
-            match element {
-                InterpolatedStringElement::Literal(literal_element) => {
-                    // This is a literal string part within the f-string
-                    self.add_token(
-                        literal_element.range(),
-                        SemanticTokenType::String,
-                        SemanticTokenModifier::empty(),
-                    );
-                }
-                InterpolatedStringElement::Interpolation(expr_element) => {
-                    // This is an expression within the f-string - visit it normally
-                    self.visit_expr(&expr_element.expression);
-
-                    // Handle format spec if present
-                    if let Some(format_spec) = &expr_element.format_spec {
-                        // Format specs can contain their own interpolated elements
-                        for spec_element in &format_spec.elements {
-                            match spec_element {
-                                InterpolatedStringElement::Literal(literal) => {
-                                    self.add_token(
-                                        literal.range(),
-                                        SemanticTokenType::String,
-                                        SemanticTokenModifier::empty(),
-                                    );
-                                }
-                                InterpolatedStringElement::Interpolation(nested_expr) => {
-                                    self.visit_expr(&nested_expr.expression);
-                                }
-                            }
-                        }
-                    }
-                }
+    fn visit_interpolated_string_element(
+        &mut self,
+        interpolated_string_element: &InterpolatedStringElement,
+    ) {
+        match interpolated_string_element {
+            InterpolatedStringElement::Literal(literal) => {
+                // Emit a String token for literal parts of f-strings/t-strings
+                self.add_token(
+                    literal.range(),
+                    SemanticTokenType::String,
+                    SemanticTokenModifier::empty(),
+                );
+            }
+            InterpolatedStringElement::Interpolation(_) => {
+                // The default walker handles visiting the expression and format spec
+                walk_interpolated_string_element(self, interpolated_string_element);
             }
         }
     }
@@ -2891,6 +2873,44 @@ complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
         ", Hex: " @ 400..407: String
         "value" @ 408..413: Variable
         "x" @ 414..415: String
+        "#);
+    }
+
+    #[test]
+    fn tstring_with_mixed_literals() {
+        let test = SemanticTokenTest::new(
+            r#"
+# Test t-strings with various literal types
+name = "Alice"
+value = 42
+
+# T-string with string literals and expressions
+result = t"Hello {name}! Value: {value}"
+
+# Complex t-string with nested expressions
+complex_tstring = t"User: {name.upper()}, Count: {len(name)}"
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "name" @ 45..49: Variable [definition]
+        "\"Alice\"" @ 52..59: String
+        "value" @ 60..65: Variable [definition]
+        "42" @ 68..70: Number
+        "result" @ 120..126: Variable [definition]
+        "Hello " @ 131..137: String
+        "name" @ 138..142: Variable
+        "! Value: " @ 143..152: String
+        "value" @ 153..158: Variable
+        "complex_tstring" @ 205..220: Variable [definition]
+        "User: " @ 225..231: String
+        "name" @ 232..236: Variable
+        "upper" @ 237..242: Method
+        ", Count: " @ 245..254: String
+        "len" @ 255..258: Function
+        "name" @ 259..263: Variable
         "#);
     }
 
