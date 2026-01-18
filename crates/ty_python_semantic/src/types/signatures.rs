@@ -27,7 +27,7 @@ use crate::types::relation::{
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, todo_type,
+    ParamSpecAttrKind, TypeContext, TypeMapping, TypeVarIdentity, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -897,6 +897,14 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
+    fn self_typevar_identity(&self, db: &'db dyn Db) -> Option<TypeVarIdentity<'db>> {
+        self.generic_context.and_then(|ctx| {
+            ctx.variables(db)
+                .find(|tv| tv.typevar(db).is_self(db))
+                .map(|tv| tv.typevar(db).identity(db))
+        })
+    }
+
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         let mut parameters = self.parameters.iter().cloned().peekable();
 
@@ -906,14 +914,8 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
-        // Find the Self typevar from this signature's generic context, if any.
-        // We only want to bind Self typevars that belong to this signature, not
-        // Self typevars from other classes that might appear in type parameters.
-        let self_typevar_identity = self.generic_context.and_then(|ctx| {
-            ctx.variables(db)
-                .find(|tv| tv.typevar(db).is_self(db))
-                .map(|tv| tv.typevar(db).identity(db))
-        });
+        // Only bind Self typevars that belong to this signature's generic context.
+        let self_typevar_identity = self.self_typevar_identity(db);
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
@@ -941,12 +943,7 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        // Find the Self typevar from this signature's generic context, if any.
-        let self_typevar_identity = self.generic_context.and_then(|ctx| {
-            ctx.variables(db)
-                .find(|tv| tv.typevar(db).is_self(db))
-                .map(|tv| tv.typevar(db).identity(db))
-        });
+        let self_typevar_identity = self.self_typevar_identity(db);
         let self_mapping = TypeMapping::BindSelf {
             self_type,
             self_typevar_identity,

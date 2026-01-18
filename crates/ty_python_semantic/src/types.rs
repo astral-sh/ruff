@@ -909,6 +909,30 @@ impl<'db> Type<'db> {
         )
     }
 
+    pub(crate) fn bind_self_typevars(
+        self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        self_typevar_identity: Option<TypeVarIdentity<'db>>,
+    ) -> Self {
+        if matches!(
+            self,
+            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
+        ) || !self.contains_self(db)
+        {
+            return self;
+        }
+
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::BindSelf {
+                self_type,
+                self_typevar_identity,
+            },
+            TypeContext::default(),
+        )
+    }
+
     /// Returns `true` if `self` is [`Type::Callable`].
     pub(crate) const fn is_callable_type(&self) -> bool {
         matches!(self, Type::Callable(..))
@@ -3303,35 +3327,10 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => {
                 let fallback = self.instance_member(db, name_str);
 
-                // Bind `Self` type variables in the fallback to the concrete instance type.
-                // This handles patterns like Django's Manager[Self] where accessing an attribute
-                // on an instance should resolve `Self` to the concrete class.
-                //
-                // We only do this for NominalInstance types, not TypeVars, because:
-                // - For concrete instances like `confirmation.objects`, Self should be bound
-                // - For TypeVars like `self.next_node` where `self: Self`, Self should remain unbound
+                // Bind `Self` in fallback types to the concrete instance.
                 let fallback = if let Type::NominalInstance(instance) = self {
                     let self_type = Type::NominalInstance(instance);
-                    fallback.map_type(|ty| {
-                        // Don't bind Self for function types - their Self binding happens during
-                        // method binding/call resolution.
-                        if matches!(
-                            ty,
-                            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
-                        ) || !ty.contains_self(db)
-                        {
-                            ty
-                        } else {
-                            ty.apply_type_mapping(
-                                db,
-                                &TypeMapping::BindSelf {
-                                    self_type,
-                                    self_typevar_identity: None,
-                                },
-                                TypeContext::default(),
-                            )
-                        }
-                    })
+                    fallback.map_type(|ty| ty.bind_self_typevars(db, self_type, None))
                 } else {
                     fallback
                 };

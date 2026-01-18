@@ -125,7 +125,7 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
     ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type,
     definition_expression_type, infer_scope_types, todo_type,
@@ -4729,12 +4729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let mut first_tcx = None;
-        let self_mapping = TypeMapping::BindSelf {
-            self_type: object_ty,
-            self_typevar_identity: None,
-        };
-        let bind_self =
-            |ty: Type<'db>| ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
+        let bind_self = |ty: Type<'db>| ty.bind_self_typevars(db, object_ty, None);
 
         // A wrapper over `infer_value_ty` that allows inferring the value type multiple times
         // during attribute resolution.
