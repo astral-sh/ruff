@@ -1,12 +1,15 @@
+use itertools::Itertools;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 
 use crate::place::{DefinedPlace, Place};
+use crate::types::builder::RecursivelyDefined;
 use crate::types::constraints::{IteratorConstraintsExtension, OptionConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::{
-    CallableType, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
+    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
     MemberLookupPolicy, PairVisitor, ProtocolInstanceType, SubclassOfInner,
-    TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{
     Db,
@@ -1044,6 +1047,62 @@ impl<'db> Type<'db> {
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
 
+            // A string literal `Literal["abc"]` is assignable to `str` *and* to
+            // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
+            //
+            // Note that this strictly holds true for all type relations!
+            // However, as an optimisation (to avoid interning many single-character string-literal types),
+            // we only recognise this as being true for assignability.
+            (Type::StringLiteral(value), Type::NominalInstance(instance)) => {
+                let other_class = instance.class(db);
+
+                if other_class.is_known(db, KnownClass::Str) {
+                    return ConstraintSet::from(true);
+                }
+
+                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
+                    && !sequence_class
+                        .iter_mro(db, None)
+                        .filter_map(ClassBase::into_class)
+                        .map(|class| class.class_literal(db))
+                        .contains(&other_class.class_literal(db))
+                {
+                    return ConstraintSet::from(false);
+                }
+
+                let chars: FxHashSet<char> = value.value(db).chars().collect();
+
+                let spec = match chars.len() {
+                    0 => Type::Never,
+                    1 => Type::single_char_string_literal(db, *chars.iter().next().unwrap()),
+                    _ => {
+                        // Optimisation: since we know this union will only include string-literal types,
+                        // avoid eagerly creating string-literal types when unnecessary, and avoid going
+                        // via the union-builder.
+                        let union_elements: Box<[Type<'db>]> = chars
+                            .iter()
+                            .map(|c| Type::single_char_string_literal(db, *c))
+                            .collect();
+                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                    }
+                };
+
+                KnownClass::Sequence
+                    .to_specialized_class_type(db, &[spec])
+                    .when_some_and(|sequence| {
+                        sequence.has_relation_to_impl(
+                            db,
+                            other_class,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+            }
+
+            (Type::StringLiteral(_), _) => ConstraintSet::from(false),
+
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
             (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
@@ -1057,12 +1116,11 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            // Except for the special `LiteralString` case above,
+            // Except for the special `LiteralString` and `StringLiteral` cases above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
             (
-                Type::StringLiteral(_)
-                | Type::LiteralString
+                Type::LiteralString
                 | Type::BooleanLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
