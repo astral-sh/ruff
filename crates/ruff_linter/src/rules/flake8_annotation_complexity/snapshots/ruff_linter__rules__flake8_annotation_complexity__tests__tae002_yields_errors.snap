@@ -10,6 +10,7 @@ TAE002 Type annotation for `d` is too complex (4 > 3)
    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 14 | ) -> list[int]: ...
    |
+help: consider using a type alias or refactoring into a `dataclass`
 
 TAE002 Type annotation for `return type` is too complex (4 > 3)
   --> TAE002.py:18:31
@@ -20,6 +21,7 @@ TAE002 Type annotation for `return type` is too complex (4 > 3)
 19 |
 20 | # Error
    |
+help: consider using a type alias or refactoring into a `dataclass`
 
 TAE002 Type annotation for `variable_with_complex_ann` is too complex (4 > 3)
   --> TAE002.py:21:28
@@ -30,6 +32,7 @@ TAE002 Type annotation for `variable_with_complex_ann` is too complex (4 > 3)
 22 |
 23 | def variable_with_complex_ann_in_fn() -> None:
    |
+help: consider using a type alias or refactoring into a `dataclass`
 
 TAE002 Type annotation for `var` is too complex (4 > 3)
   --> TAE002.py:24:10
@@ -39,6 +42,7 @@ TAE002 Type annotation for `var` is too complex (4 > 3)
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 25 |     print(var)
    |
+help: consider using a type alias or refactoring into a `dataclass`
 
 TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
   --> TAE002.py:29:33
@@ -49,6 +53,7 @@ TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
 30 |
 31 | # Quoted case
    |
+help: consider using a type alias or refactoring into a `dataclass`
 
 TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
   --> TAE002.py:33:33
@@ -59,3 +64,4 @@ TAE002 Type annotation for `bad_arg` is too complex (4 > 3)
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 34 |         _var: "list[list[list[str]]]" = []
    |
+help: consider using a type alias or refactoring into a `dataclass`
