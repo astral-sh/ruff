@@ -2378,15 +2378,17 @@ class Baz(Bar):
 
 ## `TypedDict` with `@dataclass` decorator
 
-Applying `@dataclass` to a `TypedDict` class is invalid and will cause an `AttributeError` at
-runtime when instantiating the class:
+Applying `@dataclass` to a `TypedDict` class is conceptually incoherent: `TypedDict` defines
+abstract structural types where "instantiating" always gives you a plain `dict` at runtime, whereas
+`@dataclass` is a tool for customising the creation of new nominal types. An exception will be
+raised when instantiating the class at runtime:
 
 ```py
 from dataclasses import dataclass
 from typing import TypedDict
 
-# error: [invalid-typed-dict] "Class `Foo` inherits from `TypedDict` and is decorated with `@dataclass`, which will cause a runtime error"
 @dataclass
+# error: [invalid-dataclass] "Class `Foo` inherits from `TypedDict` and is decorated with `@dataclass`"
 class Foo(TypedDict):
     x: int
     y: str
@@ -2398,8 +2400,8 @@ The same error occurs with `dataclasses.dataclass` used as a function call:
 from dataclasses import dataclass
 from typing import TypedDict
 
-# error: [invalid-typed-dict]
 @dataclass()
+# error: [invalid-dataclass]
 class Bar(TypedDict):
     x: int
 ```
@@ -2410,8 +2412,8 @@ It also applies when using `frozen=True` or other dataclass parameters:
 from dataclasses import dataclass
 from typing import TypedDict
 
-# error: [invalid-typed-dict]
 @dataclass(frozen=True)
+# error: [invalid-dataclass]
 class Baz(TypedDict):
     x: int
 ```
@@ -2426,8 +2428,8 @@ from typing import TypedDict
 class Base(TypedDict):
     x: int
 
-# error: [invalid-typed-dict]
 @dataclass
+# error: [invalid-dataclass]
 class Child(Base):
     y: str
 ```

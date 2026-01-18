@@ -614,7 +614,7 @@ impl<'db> Bindings<'db> {
 
                     Type::DataclassDecorator(params) => match overload.parameter_types() {
                         [Some(Type::ClassLiteral(class_literal))] => {
-                            if class_literal.is_named_tuple(db) {
+                            if class_literal.has_named_tuple_class_in_mro(db) {
                                 overload.errors.push(BindingError::DataclassOnNamedTuple);
                             } else if class_literal.is_typed_dict(db) {
                                 overload.errors.push(BindingError::DataclassOnTypedDict);
@@ -1144,7 +1144,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(Type::ClassLiteral(class_literal))] =
                                 overload.parameter_types()
                             {
-                                if class_literal.is_named_tuple(db) {
+                                if class_literal.has_named_tuple_class_in_mro(db) {
                                     overload.errors.push(BindingError::DataclassOnNamedTuple);
                                 } else if class_literal.is_typed_dict(db) {
                                     overload.errors.push(BindingError::DataclassOnTypedDict);

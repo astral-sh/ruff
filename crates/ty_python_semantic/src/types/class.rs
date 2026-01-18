@@ -585,11 +585,11 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns whether this class is a `NamedTuple`.
-    pub fn is_named_tuple(self, db: &'db dyn Db) -> bool {
+    /// Returns whether this class is, or inherits from, a `NamedTuple`.
+    pub fn has_named_tuple_class_in_mro(self, db: &'db dyn Db) -> bool {
         match self {
             Self::DynamicNamedTuple(_) => true,
-            Self::Static(class) => class.is_named_tuple(db),
+            Self::Static(class) => class.has_named_tuple_class_in_mro(db),
             Self::Dynamic(_) => false,
         }
     }
@@ -2697,14 +2697,17 @@ impl<'db> StaticClassLiteral<'db> {
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
-    /// Return `true` if this class is a `NamedTuple` (inherits from `typing.NamedTuple`,
-    /// either directly or indirectly, including functional forms like `NamedTuple("X", ...)`).
-    pub fn is_named_tuple(self, db: &'db dyn Db) -> bool {
+    /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
+    /// `typing.NamedTuple`, either directly or indirectly, including functional forms like
+    /// `NamedTuple("X", ...)`).
+    pub fn has_named_tuple_class_in_mro(self, db: &'db dyn Db) -> bool {
         self.explicit_bases(db).iter().any(|base| match base {
             Type::SpecialForm(SpecialFormType::NamedTuple) => true,
             Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(_)) => true,
-            Type::ClassLiteral(ClassLiteral::Static(class)) => class.is_named_tuple(db),
-            Type::GenericAlias(alias) => alias.origin(db).is_named_tuple(db),
+            Type::ClassLiteral(ClassLiteral::Static(class)) => {
+                class.has_named_tuple_class_in_mro(db)
+            }
+            Type::GenericAlias(alias) => alias.origin(db).has_named_tuple_class_in_mro(db),
             _ => false,
         })
     }

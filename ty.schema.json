@@ -600,6 +600,16 @@
             }
           ]
         },
+        "invalid-dataclass": {
+          "title": "detects invalid `@dataclass` applications",
+          "description": "## What it does\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\nApplying `@dataclass` to a class that inherits from `NamedTuple` or `TypedDict` is\ninvalid and will raise an exception at runtime when instantiating the class.\n\n## Examples\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n@dataclass  # error: [invalid-dataclass]\nclass Foo(NamedTuple):\n    x: int\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-dataclass-override": {
           "title": "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
           "description": "## What it does\nChecks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or\n`__delattr__` method defined.\n\n## Why is this bad?\nFrozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a\n`FrozenInstanceError` to emulate immutability.\n\nOverriding either of these methods raises a runtime error.\n\n## Examples\n```python\nfrom dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass A:\n    def __setattr__(self, name: str, value: object) -> None: ...\n```",

@@ -68,12 +68,12 @@ use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
     DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
-    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT, INVALID_TYPED_DICT_STATEMENT,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
+    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT,
     IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
     PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
     POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -697,24 +697,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // (4) Check if a `NamedTuple` class is decorated with `@dataclass`.
-            if class.is_named_tuple(self.db()) && class.dataclass_params(self.db()).is_some() {
-                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, class_node) {
-                    builder.into_diagnostic(format_args!(
-                        "Class `{}` inherits from `NamedTuple` and is decorated with `@dataclass`, \
-                        which will cause a runtime error",
+            if class.has_named_tuple_class_in_mro(self.db())
+                && class.dataclass_params(self.db()).is_some()
+            {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Class `{}` inherits from `NamedTuple` and is decorated with `@dataclass`",
                         class.name(self.db()),
                     ));
+                    diagnostic.info(
+                        "An exception will be raised when instantiating the class at runtime",
+                    );
                 }
             }
 
             // (5) Check if a `TypedDict` class is decorated with @dataclass.
             if class.is_typed_dict(self.db()) && class.dataclass_params(self.db()).is_some() {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPED_DICT, class_node) {
-                    builder.into_diagnostic(format_args!(
-                        "Class `{}` inherits from `TypedDict` and is decorated with `@dataclass`, \
-                        which will cause a runtime error",
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Class `{}` inherits from `TypedDict` and is decorated with `@dataclass`",
                         class.name(self.db()),
                     ));
+                    diagnostic.info(
+                        "An exception will be raised when instantiating the class at runtime",
+                    );
                 }
             }
 
