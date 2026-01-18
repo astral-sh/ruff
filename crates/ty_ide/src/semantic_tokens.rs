@@ -727,17 +727,16 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.add_dotted_name_tokens(module, SemanticTokenType::Namespace);
                 }
                 for alias in &import.names {
+                    // Get the type of the imported name
+                    let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
+                    let (token_type, modifiers) = self.classify_from_alias_type(ty, &alias.name);
+
+                    // Add token for the imported name (Y in "from X import Y" or "from X import Y as Z")
+                    self.add_token(&alias.name, token_type, modifiers);
+
+                    // For aliased imports (from X import Y as Z), also add a token for the alias Z
                     if let Some(asname) = &alias.asname {
-                        // For aliased imports (from X import Y as Z), classify Z based on what Y is
-                        let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
-                        let (token_type, modifiers) = self.classify_from_alias_type(ty, asname);
                         self.add_token(asname, token_type, modifiers);
-                    } else {
-                        // For direct imports (from X import Y), use semantic classification
-                        let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
-                        let (token_type, modifiers) =
-                            self.classify_from_alias_type(ty, &alias.name);
-                        self.add_token(&alias.name, token_type, modifiers);
                     }
                 }
             }
@@ -3287,6 +3286,30 @@ def foo(self, **key, value=10):
         "path" @ 19..23: Namespace
         "pathlib" @ 29..36: Namespace
         "Path" @ 44..48: Class
+        "#);
+    }
+
+    #[test]
+    fn import_from_as() {
+        // Test that both the imported name and its alias get highlighted
+        // See: https://github.com/astral-sh/ty/issues/2547
+        let test = SemanticTokenTest::new(
+            r#"
+from pathlib import Path as P
+from collections.abc import Set as AbstractSet
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        // Both the imported name and the alias should get the same highlighting
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "pathlib" @ 6..13: Namespace
+        "Path" @ 21..25: Class
+        "P" @ 29..30: Class
+        "collections" @ 36..47: Namespace
+        "abc" @ 48..51: Namespace
+        "Set" @ 59..62: Class
+        "AbstractSet" @ 66..77: Class
         "#);
     }
 
