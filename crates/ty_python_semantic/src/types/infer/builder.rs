@@ -59,9 +59,9 @@ use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
-    DynamicMetaclassConflict, FieldKind, MetaclassErrorKind, MethodDecorator,
+    DynamicMetaclassConflict, DynamicNamedTupleLiteral, FieldKind, MetaclassErrorKind,
+    MethodDecorator, NamedTupleField,
 };
-use crate::types::class::{DynamicNamedTupleLiteral, NamedTupleField};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
@@ -6854,78 +6854,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Handle fields based on which namedtuple variant.
         let (fields, has_known_fields): (Box<[NamedTupleField<'db>]>, bool) = match kind {
-            NamedTupleKind::Typing => {
-                let fields = self
-                    .extract_typing_namedtuple_fields(fields_arg, fields_type)
-                    .or_else(|| self.extract_typing_namedtuple_fields_from_ast(fields_arg));
-
-                // Validate field names if we have known fields.
-                if let Some(ref fields) = fields {
-                    let field_names: Vec<_> =
-                        fields.iter().map(|field| field.name.clone()).collect();
-                    self.report_invalid_namedtuple_field_names(
-                        &field_names,
-                        fields_arg,
-                        NamedTupleKind::Typing,
-                    );
-                }
-
-                // Emit diagnostic if the type is outright invalid (not an iterable) or
-                // if we have a list/tuple literal with invalid field specs.
-                if fields.is_none() {
-                    let iterable_any =
-                        KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                    if !fields_type.is_assignable_to(db, iterable_any) {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Invalid argument to parameter `fields` of `NamedTuple()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected an iterable of `(name, type)` pairs, found `{}`",
-                                fields_type.display(db)
-                            ));
-                        }
-                    } else {
-                        // Check if we have a list/tuple literal with invalid elements
-                        // (e.g., strings instead of (name, type) tuples).
-                        let elements: Option<&[ast::Expr]> = match fields_arg {
-                            ast::Expr::List(list) => Some(&list.elts),
-                            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
-                            _ => None,
-                        };
-                        if let Some(elements) = elements {
-                            for elt in elements {
-                                let is_valid_field_spec = matches!(
-                                    elt,
-                                    ast::Expr::Tuple(t) if t.elts.len() == 2
-                                ) || matches!(
-                                    elt,
-                                    ast::Expr::List(l) if l.elts.len() == 2
-                                );
-                                if !is_valid_field_spec {
-                                    let elt_type = self.expression_type(elt);
-                                    if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, elt)
-                                    {
-                                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Invalid `NamedTuple()` field definition"
-                                        ));
-                                        diagnostic.set_primary_message(format_args!(
-                                            "Expected a `(name, type)` tuple, found `{}`",
-                                            elt_type.display(db)
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                let has_known_fields = fields.is_some();
-                (fields.unwrap_or_default(), has_known_fields)
-            }
+            NamedTupleKind::Typing => self.infer_typing_namedtuple_fields(fields_arg, fields_type),
             NamedTupleKind::Collections => {
                 // `collections.namedtuple`: `field_names` is a list or tuple of strings, or a space or
                 // comma-separated string.
@@ -7080,8 +7009,78 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple))
     }
 
+    fn infer_typing_namedtuple_fields(
+        &mut self,
+        fields_arg: &ast::Expr,
+        fields_type: Type<'db>,
+    ) -> (Box<[NamedTupleField<'db>]>, bool) {
+        let db = self.db();
+
+        let fields = self
+            .extract_typing_namedtuple_fields_from_inferred_type(fields_arg, fields_type)
+            .or_else(|| self.extract_typing_namedtuple_fields_from_ast(fields_arg));
+
+        // Validate field names if we have known fields.
+        if let Some(fields) = fields {
+            let field_names: Vec<Name> = fields.iter().map(|f| f.name.clone()).collect();
+            self.report_invalid_namedtuple_field_names(
+                &field_names,
+                fields_arg,
+                NamedTupleKind::Typing,
+            );
+            return (fields, true);
+        }
+
+        // Emit diagnostic if the type is outright invalid (not an iterable) or
+        // if we have a list/tuple literal with invalid field specs.
+        let iterable_any = KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+        if !fields_type.is_assignable_to(db, iterable_any) {
+            if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg) {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Invalid argument to parameter `fields` of `NamedTuple()`"
+                ));
+                diagnostic.set_primary_message(format_args!(
+                    "Expected an iterable of `(name, type)` pairs, found `{}`",
+                    fields_type.display(db)
+                ));
+            }
+        } else {
+            // Check if we have a list/tuple literal with invalid elements
+            // (e.g., strings instead of (name, type) tuples).
+            let elements: Option<&[ast::Expr]> = match fields_arg {
+                ast::Expr::List(list) => Some(&list.elts),
+                ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+                _ => None,
+            };
+            for elt in elements.into_iter().flatten() {
+                let is_valid_field_spec = matches!(
+                    elt,
+                    ast::Expr::Tuple(t) if t.elts.len() == 2
+                ) || matches!(
+                    elt,
+                    ast::Expr::List(l) if l.elts.len() == 2
+                );
+                if !is_valid_field_spec {
+                    let elt_type = self.expression_type(elt);
+                    if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, elt) {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid `NamedTuple()` field definition"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected a `(name, type)` tuple, found `{}`",
+                            elt_type.display(db)
+                        ));
+                    }
+                }
+            }
+        }
+
+        let has_known_fields = fields.is_some();
+        (fields.unwrap_or_default(), has_known_fields)
+    }
+
     /// Extract fields from a typing.NamedTuple fields argument.
-    fn extract_typing_namedtuple_fields(
+    fn extract_typing_namedtuple_fields_from_inferred_type(
         &mut self,
         fields_arg: &ast::Expr,
         fields_type: Type<'db>,
@@ -7139,39 +7138,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         kind: NamedTupleKind,
     ) {
         for (i, field_name) in field_names.iter().enumerate() {
-            let name_str = field_name.as_str();
-
             // Check for duplicate field names.
-            if field_names[..i].iter().any(|f| f.as_str() == name_str)
+            if field_names[..i].iter().any(|f| f == field_name)
                 && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Duplicate field name `{name_str}` in `{kind}()`"
+                    "Duplicate field name `{field_name}` in `{kind}()`"
                 ));
                 diagnostic.set_primary_message(format_args!(
-                    "Field `{name_str}` already defined; will raise `ValueError` at runtime"
+                    "Field `{field_name}` already defined; will raise `ValueError` at runtime"
                 ));
             }
 
-            if name_str.starts_with('_')
+            if field_name.starts_with('_')
                 && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Field name `{name_str}` in `{kind}()` cannot start with an underscore"
+                    "Field name `{field_name}` in `{kind}()` cannot start with an underscore"
                 ));
                 diagnostic.set_primary_message("Will raise `ValueError` at runtime");
-            } else if is_keyword(name_str)
+            } else if is_keyword(field_name)
                 && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Field name `{name_str}` in `{kind}()` cannot be a Python keyword"
+                    "Field name `{field_name}` in `{kind}()` cannot be a Python keyword"
                 ));
                 diagnostic.set_primary_message("Will raise `ValueError` at runtime");
-            } else if !is_identifier(name_str)
+            } else if !is_identifier(field_name)
                 && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Field name `{name_str}` in `{kind}()` is not a valid identifier"
+                    "Field name `{field_name}` in `{kind}()` is not a valid identifier"
                 ));
                 diagnostic.set_primary_message("Will raise `ValueError` at runtime");
             }
