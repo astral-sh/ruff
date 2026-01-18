@@ -7103,22 +7103,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return None;
                 };
                 // Convert value types to type expression types (e.g., class literals to instances).
-                let resolved_ty =
-                    match field_type.in_type_expression(db, scope_id, typevar_binding_context) {
-                        Ok(ty) => ty,
-                        Err(error) => {
-                            // Report diagnostic for invalid type expression.
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Object of type `{}` is not valid as a `NamedTuple` field type",
-                                    field_type.display(db)
-                                ));
-                            }
-                            error.fallback_type
+                let resolved_ty = field_type
+                    .in_type_expression(db, scope_id, typevar_binding_context)
+                    .unwrap_or_else(|error| {
+                        // Report diagnostic for invalid type expression.
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Object of type `{}` is not valid as a `NamedTuple` field type",
+                                field_type.display(db)
+                            ));
                         }
-                    };
+                        error.fallback_type
+                    });
                 Some(NamedTupleField {
                     name: Name::new(name.value(db)),
                     ty: resolved_ty,
