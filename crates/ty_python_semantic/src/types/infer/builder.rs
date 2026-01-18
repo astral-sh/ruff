@@ -6854,7 +6854,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Handle fields based on which namedtuple variant.
         let (fields, has_known_fields): (Box<[NamedTupleField<'db>]>, bool) = match kind {
-            NamedTupleKind::Typing => self.infer_typing_namedtuple_fields(fields_arg, fields_type),
+            NamedTupleKind::Typing => self.infer_typing_namedtuple_fields(fields_arg),
             NamedTupleKind::Collections => self.infer_collections_namedtuple_fields(
                 rename_type,
                 fields_type,
@@ -7024,13 +7024,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_typing_namedtuple_fields(
         &mut self,
         fields_arg: &ast::Expr,
-        fields_type: Type<'db>,
     ) -> (Box<[NamedTupleField<'db>]>, bool) {
-        let db = self.db();
-
-        let fields = self
-            .extract_typing_namedtuple_fields_from_inferred_type(fields_arg, fields_type)
-            .or_else(|| self.extract_typing_namedtuple_fields_from_ast(fields_arg));
+        let fields = self.extract_typing_namedtuple_fields_from_ast(fields_arg);
 
         // Validate field names if we have known fields.
         if let Some(fields) = fields {
@@ -7043,101 +7038,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return (fields, true);
         }
 
-        // Emit diagnostic if the type is outright invalid (not an iterable) or
-        // if we have a list/tuple literal with invalid field specs.
-        let iterable_any = KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-        if !fields_type.is_assignable_to(db, iterable_any) {
-            if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg) {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid argument to parameter `fields` of `NamedTuple()`"
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Expected an iterable of `(name, type)` pairs, found `{}`",
-                    fields_type.display(db)
-                ));
-            }
-        } else {
-            // Check if we have a list/tuple literal with invalid elements
-            // (e.g., strings instead of (name, type) tuples).
-            let elements: Option<&[ast::Expr]> = match fields_arg {
-                ast::Expr::List(list) => Some(&list.elts),
-                ast::Expr::Tuple(tuple) => Some(&tuple.elts),
-                _ => None,
-            };
-            for elt in elements.into_iter().flatten() {
-                let is_valid_field_spec = matches!(
-                    elt,
-                    ast::Expr::Tuple(t) if t.elts.len() == 2
-                ) || matches!(
-                    elt,
-                    ast::Expr::List(l) if l.elts.len() == 2
-                );
-                if !is_valid_field_spec {
-                    let elt_type = self.expression_type(elt);
-                    if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, elt) {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid `NamedTuple()` field definition"
-                        ));
-                        diagnostic.set_primary_message(format_args!(
-                            "Expected a `(name, type)` tuple, found `{}`",
-                            elt_type.display(db)
-                        ));
-                    }
-                }
-            }
-        }
-
         let has_known_fields = fields.is_some();
         (fields.unwrap_or_default(), has_known_fields)
-    }
-
-    /// Extract fields from a typing.NamedTuple fields argument.
-    fn extract_typing_namedtuple_fields_from_inferred_type(
-        &mut self,
-        fields_arg: &ast::Expr,
-        fields_type: Type<'db>,
-    ) -> Option<Box<[NamedTupleField<'db>]>> {
-        let db = self.db();
-        let scope_id = self.scope();
-        let typevar_binding_context = self.typevar_binding_context;
-
-        // Try to extract from a fixed-length tuple type.
-        let tuple_spec = fields_type.tuple_instance_spec(db)?;
-        let fixed_tuple = tuple_spec.as_fixed_length()?;
-        let fields: Option<Box<[_]>> = fixed_tuple
-            .all_elements()
-            .iter()
-            .map(|field_tuple| {
-                // Each field must also be a fixed-length tuple of exactly 2 elements.
-                let field_spec = field_tuple.exact_tuple_instance_spec(db)?;
-                let field_fixed = field_spec.as_fixed_length()?;
-                let [Type::StringLiteral(name), field_type] = field_fixed.all_elements() else {
-                    return None;
-                };
-                // Convert value types to type expression types (e.g., class literals to instances).
-                let resolved_ty = field_type
-                    .in_type_expression(db, scope_id, typevar_binding_context)
-                    .unwrap_or_else(|error| {
-                        // Report diagnostic for invalid type expression.
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, fields_arg)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Object of type `{}` is not valid as a `NamedTuple` field type",
-                                field_type.display(db)
-                            ));
-                        }
-                        error.fallback_type
-                    });
-                Some(NamedTupleField {
-                    name: Name::new(name.value(db)),
-                    ty: resolved_ty,
-                    default: None,
-                })
-            })
-            .collect();
-
-        fields
     }
 
     /// Report diagnostics for invalid field names in a namedtuple definition.
@@ -7199,7 +7101,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let elements: &[ast::Expr] = match fields_arg {
             ast::Expr::List(list) => &list.elts,
             ast::Expr::Tuple(tuple) => &tuple.elts,
-            _ => return None,
+            _ => {
+                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg) {
+                    let mut diagnostic = builder.into_diagnostic(
+                        "Invalid argument to parameter `fields` of `NamedTuple()`",
+                    );
+                    diagnostic.set_primary_message("`fields` must be a literal list or tuple");
+                }
+                return None;
+            }
         };
 
         let fields: Option<Box<[_]>> = elements
@@ -7209,16 +7119,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let field_spec_elts: &[ast::Expr] = match elt {
                     ast::Expr::Tuple(tuple) => &tuple.elts,
                     ast::Expr::List(list) => &list.elts,
-                    _ => return None,
+                    _ => {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(
+                                "Invalid argument to parameter `fields` of `NamedTuple()`",
+                            );
+                            diagnostic.set_primary_message(
+                                "`fields` must be a sequence of literal lists or tuples",
+                            );
+                        }
+                        return None;
+                    }
                 };
                 if field_spec_elts.len() != 2 {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(
+                            "Invalid argument to parameter `fields` of `NamedTuple()`",
+                        );
+                        diagnostic.set_primary_message(
+                            "Each element in `fields` must be a length-2 tuple or list",
+                        );
+                    }
                     return None;
                 }
 
                 // First element: field name (string literal).
                 let field_name_expr = &field_spec_elts[0];
                 let field_name_ty = self.expression_type(field_name_expr);
-                let field_name_lit = field_name_ty.as_string_literal()?;
+                let Type::StringLiteral(field_name_lit) = field_name_ty else {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_NAMED_TUPLE, field_name_expr)
+                    {
+                        let mut diagnostic =
+                            builder.into_diagnostic("Invalid `NamedTuple` field name definition");
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected a string literal for the field name, found `{}`",
+                            field_name_ty.display(db)
+                        ));
+                    }
+                    return None;
+                };
                 let field_name = Name::new(field_name_lit.value(db));
 
                 // Second element: field type (infer as type expression).

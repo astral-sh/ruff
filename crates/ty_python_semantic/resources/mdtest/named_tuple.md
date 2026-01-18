@@ -146,56 +146,48 @@ reveal_type(p.name)  # revealed: str
 
 ### Functional syntax with tuple variable fields
 
-When fields are passed via a tuple variable, we can extract the literal field names and types from
-the inferred tuple type:
+When fields are passed via a tuple variable, we cannot extract the literal field names and types
+from the inferred tuple type. We instead emit a diagnostic:
 
 ```py
 from typing import NamedTuple
 from ty_extensions import static_assert, is_subtype_of, reveal_mro
 
 fields = (("host", str), ("port", int))
-Url = NamedTuple("Url", fields)
+Url = NamedTuple("Url", fields)  # error: [invalid-named-tuple]
 
 url = Url("localhost", 8080)
-reveal_type(url.host)  # revealed: str
-reveal_type(url.port)  # revealed: int
+reveal_type(url.host)  # revealed: Any
+reveal_type(url.port)  # revealed: Any
 
-# Generic types are also correctly converted to instance types.
 generic_fields = (("items", list[int]), ("mapping", dict[str, bool]))
-Container = NamedTuple("Container", generic_fields)
+Container = NamedTuple("Container", generic_fields)  # error: [invalid-named-tuple]
 container = Container([1, 2, 3], {"a": True})
-reveal_type(container.items)  # revealed: list[int]
-reveal_type(container.mapping)  # revealed: dict[str, bool]
+reveal_type(container.items)  # revealed: Any
+reveal_type(container.mapping)  # revealed: Any
 
-# MRO includes the properly specialized tuple type.
-# revealed: (<class 'Url'>, <class 'tuple[str, int]'>, <class 'Sequence[str | int]'>, <class 'Reversible[str | int]'>, <class 'Collection[str | int]'>, <class 'Iterable[str | int]'>, <class 'Container[str | int]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'Url'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Url)
 
-static_assert(is_subtype_of(Url, tuple[str, int]))
-
-# Invalid type expressions in fields produce a diagnostic.
 invalid_fields = (("x", 42),)  # 42 is not a valid type
-# error: [invalid-type-form] "Object of type `Literal[42]` is not valid as a `NamedTuple` field type"
-InvalidNT = NamedTuple("InvalidNT", invalid_fields)
+InvalidNT = NamedTuple("InvalidNT", invalid_fields)  # error: [invalid-named-tuple]
 reveal_type(InvalidNT)  # revealed: <class 'InvalidNT'>
 
-# Unpacking works correctly with the field types.
 host, port = url
-reveal_type(host)  # revealed: str
-reveal_type(port)  # revealed: int
+reveal_type(host)  # revealed: Unknown
+reveal_type(port)  # revealed: Unknown
 
-# error: [invalid-assignment] "Too many values to unpack: Expected 1"
+# fails at runtime but we can't detect that
 (only_one,) = url
 
-# error: [invalid-assignment] "Not enough values to unpack: Expected 3"
+# will error at runtime, but we can't detect that
 a, b, c = url
 
-# Indexing works correctly.
-reveal_type(url[0])  # revealed: str
-reveal_type(url[1])  # revealed: int
+reveal_type(url[0])  # revealed: Unknown
+reveal_type(url[1])  # revealed: Unknown
 
-# error: [index-out-of-bounds]
-url[2]
+# will error at runtime, but we can't detect that
+reveal_type(url[2])  # revealed: Unknown
 ```
 
 ### Functional syntax with variadic tuple fields
@@ -217,7 +209,7 @@ def get_fields() -> tuple[tuple[str, type[int]], *tuple[tuple[str, type[str]], .
     return (("x", int), ("y", str))
 
 fields = get_fields()
-NT = NamedTuple("NT", fields)
+NT = NamedTuple("NT", fields)  # error: [invalid-named-tuple]
 
 # Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
 reveal_type(NT)  # revealed: <class 'NT'>
@@ -343,7 +335,7 @@ from typing_extensions import Self
 
 fields = [("host", str), ("port", int)]
 
-class Url(NamedTuple("Url", fields)):
+class Url(NamedTuple("Url", fields)):  # error: [invalid-named-tuple]
     def with_port(self, port: int) -> Self:
         # Fields are unknown, so attribute access returns Any.
         reveal_type(self.host)  # revealed: Any
@@ -626,13 +618,12 @@ Bad4 = NamedTuple("Bad4", [("x", int)], defaults=[0])
 Bad5 = NamedTuple("Bad5", [("x", int)], foobarbaz=42)
 
 # Invalid type for `fields` (not an iterable)
-# error: [invalid-argument-type] "Invalid argument to parameter `fields` of `NamedTuple()`"
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 Bad6 = NamedTuple("Bad6", 12345)
 reveal_type(Bad6)  # revealed: <class 'Bad6'>
 
 # Invalid field definitions: strings instead of (name, type) tuples
-# error: [invalid-argument-type] "Invalid `NamedTuple()` field definition"
-# error: [invalid-argument-type] "Invalid `NamedTuple()` field definition"
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a sequence of literal lists or tuples"
 Bad7 = NamedTuple("Bad7", ["a", "b"])
 reveal_type(Bad7)  # revealed: <class 'Bad7'>
 
