@@ -304,7 +304,7 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[unused-ignore-comment]: Unused blanket `type: ignore` directive
+warning[unused-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:72:9
    |
 70 |     A,
@@ -356,7 +356,7 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[unused-ignore-comment]: Unused blanket `type: ignore` directive
+warning[unused-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:81:13
    |
 79 | ):

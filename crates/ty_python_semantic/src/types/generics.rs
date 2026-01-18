@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
@@ -95,7 +96,7 @@ pub(crate) fn typing_self<'db>(
     let identity = TypeVarIdentity::new(
         db,
         ast::name::Name::new_static("Self"),
-        Some(class.definition(db)),
+        class.definition(db),
         TypeVarKind::TypingSelf,
     );
     let bounds = TypeVarBoundOrConstraints::UpperBound(Type::instance(
@@ -500,13 +501,17 @@ impl<'db> GenericContext<'db> {
 
     /// Returns a specialization of this generic context where each typevar is mapped to itself.
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = self.variables(db).map(Type::TypeVar).collect();
+        let types: Vec<Type> = self.variables(db).map(Type::TypeVar).collect();
         self.specialize(db, types)
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        let types = vec![Type::unknown(); self.len(db)];
-        self.specialize(db, types.into())
+        match self.len(db) {
+            0 => self.specialize(db, &[]),
+            1 => self.specialize(db, &[Type::unknown(); 1]),
+            2 => self.specialize(db, &[Type::unknown(); 2]),
+            len => self.specialize(db, vec![Type::unknown(); len]),
+        }
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
@@ -545,11 +550,13 @@ impl<'db> GenericContext<'db> {
     /// otherwise, you will be left with a partial specialization. (Use
     /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
     /// in this generic context.)
-    pub(crate) fn specialize(
-        self,
-        db: &'db dyn Db,
-        types: Box<[Type<'db>]>,
-    ) -> Specialization<'db> {
+    pub(crate) fn specialize<'t, T>(self, db: &'db dyn Db, types: T) -> Specialization<'db>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
+        let types = types.into();
+
         assert_eq!(self.len(db), types.len());
         Specialization::new(db, self, types, None, None)
     }
@@ -1871,6 +1878,21 @@ impl<'db> SpecializationBuilder<'db> {
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        if polarity.is_contravariant() {
+                            // In a contravariant position, the formal type variable is a subtype of
+                            // the actual type (`T <: ty`). Since we also have the upper bound
+                            // constraint `T <: bound`, we just need to ensure that the intersection
+                            // of `ty` and `bound` is non-empty. Since `Never` is always a valid
+                            // intersection if the types are disjoint, we don't need to perform any
+                            // check here.
+                            self.add_type_mapping(
+                                bound_typevar,
+                                IntersectionType::from_elements(self.db, [bound, ty]),
+                                polarity,
+                                f,
+                            );
+                            return Ok(());
+                        }
                         if !ty
                             .when_assignable_to(self.db, bound, self.inferable)
                             .is_always_satisfied(self.db)
@@ -1892,10 +1914,16 @@ impl<'db> SpecializationBuilder<'db> {
                         }
 
                         for constraint in constraints.elements(self.db) {
-                            if ty
-                                .when_assignable_to(self.db, *constraint, self.inferable)
-                                .is_always_satisfied(self.db)
-                            {
+                            let is_satisfied = if polarity.is_contravariant() {
+                                constraint
+                                    .when_assignable_to(self.db, ty, self.inferable)
+                                    .is_always_satisfied(self.db)
+                            } else {
+                                ty.when_assignable_to(self.db, *constraint, self.inferable)
+                                    .is_always_satisfied(self.db)
+                            };
+
+                            if is_satisfied {
                                 self.add_type_mapping(bound_typevar, *constraint, polarity, f);
                                 return Ok(());
                             }

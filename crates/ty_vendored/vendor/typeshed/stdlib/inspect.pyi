@@ -1087,6 +1087,7 @@ def formatargvalues(
 def getmro(cls: type) -> tuple[type, ...]:
     """Return tuple of base classes (including cls) in method resolution order."""
 
+@deprecated("Deprecated since Python 3.5. Use `Signature.bind` and `Signature.bind_partial` instead.")
 def getcallargs(func: Callable[_P, Any], /, *args: _P.args, **kwds: _P.kwargs) -> dict[str, Any]:
     """Get the mapping of arguments to values.
 

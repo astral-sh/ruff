@@ -796,13 +796,13 @@ mod tests {
             |       -------
           5 |     """some docs"""
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -850,13 +850,13 @@ mod tests {
             |       -------
           5 |     """some docs"""
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -1609,13 +1609,13 @@ def function():
         916 |     """str(object='') -> str
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }

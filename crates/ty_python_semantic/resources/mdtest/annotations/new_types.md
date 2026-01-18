@@ -235,8 +235,8 @@ Foo(3.14)
 Foo(42)
 Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected `int | float`, found `Literal["hello"]`"
 
-reveal_type(Foo(3.14).__class__)  # revealed: type[int] | type[float]
-reveal_type(Foo(42).__class__)  # revealed: type[int] | type[float]
+reveal_type(Foo(3.14).__class__)  # revealed: type[int | float]
+reveal_type(Foo(42).__class__)  # revealed: type[int | float]
 static_assert(is_assignable_to(Foo, float))
 static_assert(is_assignable_to(Foo, int | float))
 static_assert(is_assignable_to(Foo, int | float | None))
@@ -253,9 +253,9 @@ Bar(3.14)
 Bar(42)
 Bar("goodbye")  # error: [invalid-argument-type]
 
-reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int] | type[float] | type[complex]
-reveal_type(Bar(3.14).__class__)  # revealed: type[int] | type[float] | type[complex]
-reveal_type(Bar(42).__class__)  # revealed: type[int] | type[float] | type[complex]
+reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int | float | complex]
+reveal_type(Bar(3.14).__class__)  # revealed: type[int | float | complex]
+reveal_type(Bar(42).__class__)  # revealed: type[int | float | complex]
 static_assert(is_assignable_to(Bar, complex))
 static_assert(is_assignable_to(Bar, int | float | complex))
 static_assert(is_assignable_to(Bar, int | float | complex | None))
@@ -541,7 +541,7 @@ class Foo(TypedDict):
 Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
 ```
 
-## TODO: A `NewType` cannot be generic
+## A `NewType` cannot be generic
 
 ```py
 from typing import Any, NewType, TypeVar
@@ -553,7 +553,14 @@ B = NewType("B", list[Any])
 
 # But a free typevar is not allowed.
 T = TypeVar("T")
-C = NewType("C", list[T])  # TODO: should be "error: [invalid-newtype]"
+C = NewType("C", list[T])  # error: [invalid-newtype]
+
+D = dict[str, T]
+E = NewType("E", D[T])  # error: [invalid-newtype]
+
+# this is fine: omitting the type argument means that this is equivalent
+# to `F = NewType("F", dict[str, Any])
+F = NewType("F", D)
 ```
 
 ## Forward references in stub files

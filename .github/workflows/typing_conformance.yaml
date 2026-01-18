@@ -14,6 +14,7 @@ on:
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
+      - "scripts/conformance.py"
       - ".github/workflows/typing_conformance.yaml"
       - ".github/workflows/typing_conformance_comment.yaml"
       - "Cargo.lock"
@@ -30,6 +31,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
   CONFORMANCE_SUITE_COMMIT: 9f6d8ced7cd1c8d92687a4e9c96d7716452e471e
+  PYTHON_VERSION: 3.12
 
 jobs:
   typing_conformance:
@@ -54,14 +56,16 @@ jobs:
         with:
           workspaces: "ruff"
 
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Install Rust toolchain
         run: rustup show
 
       - name: Compute diagnostic diff
         shell: bash
         run: |
-          RUFF_DIR="$GITHUB_WORKSPACE/ruff"
-
           # Build the executable for the old and new commit
           (
             cd ruff
@@ -80,23 +84,17 @@ jobs:
           )
 
           (
-            cd typing/conformance/tests
+            echo "Creating comment with conformance comparison"
+            cd ruff
+            git switch - --detach
 
-            echo "Running ty on old commit (merge base)"
-            "$RUFF_DIR/ty-old" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/old-output.txt" 2>&1 || true
-
-            echo "Running ty on new commit"
-            "$RUFF_DIR/ty-new" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/new-output.txt" 2>&1 || true
+            python "./scripts/conformance.py" \
+             --old-ty "./ty-old" \
+             --new-ty "./ty-new" \
+             --tests-path "${GITHUB_WORKSPACE}/typing/conformance/" \
+             --python-version "$PYTHON_VERSION" \
+             --output ../typing_conformance_diagnostics.diff
           )
-
-          if ! diff -u old-output.txt new-output.txt > typing_conformance_diagnostics.diff; then
-            echo "Differences found between base and PR"
-          else
-            echo "No differences found"
-            touch typing_conformance_diagnostics.diff
-          fi
-
-          echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
 
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
@@ -105,11 +103,3 @@ jobs:
         with:
           name: typing_conformance_diagnostics_diff
           path: typing_conformance_diagnostics.diff
-
-      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
-      # Make sure to update the bot if you rename the artifact.
-      - name: Upload conformance suite commit
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: conformance-suite-commit
-          path: conformance-suite-commit

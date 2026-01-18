@@ -38,6 +38,12 @@ impl PlaceExpr {
     pub(crate) fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
         let expr = expr.into();
 
+        // For named expressions (walrus operator), extract the target.
+        let expr = match expr {
+            ast::ExprRef::Named(named) => named.target.as_ref().into(),
+            _ => expr,
+        };
+
         if let ast::ExprRef::Name(name) = expr {
             return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
         }

@@ -284,6 +284,46 @@ pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Token
     }
 }
 
+/// Remove the member at the given index from a sequence of expressions.
+pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> Result<Edit> {
+    if index < elts.len() - 1 {
+        // Case 1: the expression is _not_ the last node, so delete from the start of the
+        // expression to the end of the subsequent comma.
+        // Ex) Delete `"a"` in `{"a", "b", "c"}`.
+        let mut tokenizer = SimpleTokenizer::starts_at(elts[index].end(), source);
+
+        // Find the trailing comma.
+        tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+
+        // Find the next non-whitespace token.
+        let next = tokenizer
+            .find(|token| {
+                token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
+            })
+            .context("Unable to find next token")?;
+
+        Ok(Edit::deletion(elts[index].start(), next.start()))
+    } else if index > 0 {
+        // Case 2: the expression is the last node, but not the _only_ node, so delete from the
+        // start of the previous comma to the end of the expression.
+        // Ex) Delete `"c"` in `{"a", "b", "c"}`.
+        let mut tokenizer = SimpleTokenizer::starts_at(elts[index - 1].end(), source);
+
+        // Find the trailing comma.
+        let comma = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+
+        Ok(Edit::deletion(comma.start(), elts[index].end()))
+    } else {
+        // Case 3: expression is the only node, so delete it.
+        // Ex) Delete `"a"` in `{"a"}`.
+        Ok(Edit::range_deletion(elts[index].range()))
+    }
+}
+
 /// Generic function to add a (regular) parameter to a function definition.
 pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &str) -> Edit {
     if let Some(last) = parameters.args.iter().rfind(|arg| arg.default.is_none()) {

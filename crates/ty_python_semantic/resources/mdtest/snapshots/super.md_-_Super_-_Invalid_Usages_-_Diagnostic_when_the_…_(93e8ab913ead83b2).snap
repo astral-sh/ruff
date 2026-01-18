@@ -33,7 +33,7 @@ error[invalid-super-argument]: Argument is not a valid class
 7 |     else:
 8 |         class A: ...
 9 |     super(A, A())  # error: [invalid-super-argument]
-  |     ^^^^^^^^^^^^^ Argument has type `<class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:6'> | <class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:8'>`
+  |     ^^^^^^^^^^^^^ Argument has type `<class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:6:15'> | <class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:8:15'>`
   |
 info: rule `invalid-super-argument` is enabled by default
 

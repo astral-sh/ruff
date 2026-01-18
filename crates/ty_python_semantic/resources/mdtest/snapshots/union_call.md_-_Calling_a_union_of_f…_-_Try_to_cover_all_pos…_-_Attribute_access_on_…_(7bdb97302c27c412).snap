@@ -1,0 +1,88 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - Attribute access on a typevar with multiple bounds
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypeVar, Self
+ 2 | 
+ 3 | class A:
+ 4 |     def foo(self, x: int) -> Self:
+ 5 |         return self
+ 6 | 
+ 7 | class B:
+ 8 |     def foo(self, x: str) -> Self:
+ 9 |         return self
+10 | 
+11 | T = TypeVar("T", A, B)
+12 | 
+13 | def _(x: T, y: int) -> T:
+14 |     # error: [invalid-argument-type]
+15 |     # error: [invalid-argument-type]
+16 |     # error: [invalid-argument-type]
+17 |     return x.foo(y)
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to bound method `foo` is incorrect
+  --> src/mdtest_snippet.py:17:12
+   |
+15 |     # error: [invalid-argument-type]
+16 |     # error: [invalid-argument-type]
+17 |     return x.foo(y)
+   |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `A` of type variable `Self`
+   |
+info: Union variant `bound method T@_.foo(x: int) -> T@_` is incompatible with this call site
+info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to bound method `foo` is incorrect
+  --> src/mdtest_snippet.py:17:12
+   |
+15 |     # error: [invalid-argument-type]
+16 |     # error: [invalid-argument-type]
+17 |     return x.foo(y)
+   |            ^^^^^^^^ Argument type `T@_` does not satisfy upper bound `B` of type variable `Self`
+   |
+info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
+info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to bound method `foo` is incorrect
+  --> src/mdtest_snippet.py:17:18
+   |
+15 |     # error: [invalid-argument-type]
+16 |     # error: [invalid-argument-type]
+17 |     return x.foo(y)
+   |                  ^ Expected `str`, found `int`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:8:9
+  |
+7 | class B:
+8 |     def foo(self, x: str) -> Self:
+  |         ^^^       ------ Parameter declared here
+9 |         return self
+  |
+info: Union variant `bound method T@_.foo(x: str) -> T@_` is incompatible with this call site
+info: Attempted to call union type `(bound method T@_.foo(x: int) -> T@_) | (bound method T@_.foo(x: str) -> T@_)`
+info: rule `invalid-argument-type` is enabled by default
+
+```

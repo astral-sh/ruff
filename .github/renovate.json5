@@ -76,9 +76,9 @@
       enabled: false,
     },
     {
-      groupName: "pre-commit dependencies",
+      groupName: "prek dependencies",
       matchManagers: ["pre-commit"],
-      description: "Weekly update of pre-commit dependencies",
+      description: "Weekly update of prek dependencies",
     },
     {
       groupName: "NPM Development dependencies",

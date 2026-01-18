@@ -9,6 +9,7 @@
 use regex::Regex;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation};
 use ruff_source_file::UniversalNewlines;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -349,16 +350,37 @@ fn render_markdown(docstring: &str) -> String {
                     | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
                     | "version-removed" | "versionremoved",
                 ) => {
+                    // Map version directives to human-readable phrases (matching Sphinx output)
+                    let pretty_directive = match directive.unwrap() {
+                        "versionadded" | "version-added" => Cow::Borrowed("Added in version"),
+                        "versionchanged" | "version-changed" => Cow::Borrowed("Changed in version"),
+                        "deprecated" | "version-deprecated" => {
+                            Cow::Borrowed("Deprecated since version")
+                        }
+                        "versionremoved" | "version-removed" => Cow::Borrowed("Removed in version"),
+                        other => Cow::Owned(
+                            other
+                                .char_indices()
+                                .map(|(index, c)| {
+                                    if index == 0 {
+                                        c.to_ascii_uppercase()
+                                    } else {
+                                        c
+                                    }
+                                })
+                                .collect(),
+                        ),
+                    };
+
                     // Render the argument of things like `.. version-added:: 4.0`
                     let suffix = if let Some(lang) = lang {
-                        format!(" *{lang}*")
+                        format!(" {lang}")
                     } else {
                         String::new()
                     };
                     // We prepend without_directive here out of caution for preserving input.
                     // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
-                    temp_owned_line =
-                        format!("**{without_directive}{}:**{suffix}", directive.unwrap());
+                    temp_owned_line = format!("**{without_directive}{pretty_directive}{suffix}:**");
 
                     line = temp_owned_line.as_str();
                     None
@@ -1076,7 +1098,7 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @r#"
         The thing you need to understand is that computers are hard.  
           
-        **warning:**  
+        **Warning:**  
         &nbsp;&nbsp;&nbsp;&nbsp;Now listen here buckaroo you might have seen me say computers are hard,  
         &nbsp;&nbsp;&nbsp;&nbsp;and though "yeah I know computers are hard but NO you DON'T KNOW.  
           
@@ -1115,12 +1137,12 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @"
         Some much-updated docs  
           
-        **version-added:** *3.0*  
+        **Added in version 3.0:**  
         &nbsp;&nbsp;&nbsp;Function added  
           
-        **version-changed:** *4.0*  
+        **Changed in version 4.0:**  
         &nbsp;&nbsp;&nbsp;The `spam` argument was added  
-        **version-changed:** *4.1*  
+        **Changed in version 4.1:**  
         &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.  
           
         &nbsp;&nbsp;&nbsp;You really shouldnt use it  
@@ -1141,7 +1163,7 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        **wow this is some changes deprecated:** *1.2.3*  
+        **wow this is some changes Deprecated since version 1.2.3:**  
         &nbsp;&nbsp;&nbsp;&nbsp;x = 2
         ");
     }
@@ -1151,7 +1173,7 @@ mod tests {
     fn explicit_markdown_block_with_ps1_contents() {
         let docstring = r#"
         My cool func:
-        
+
         ```python
         >>> thing.do_thing()
         wow it did the thing
@@ -1162,7 +1184,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func:  
           
         ```python
@@ -1179,7 +1201,7 @@ mod tests {
     fn explicit_markdown_block_with_underscore_contents_tick() {
         let docstring = r#"
         My cool func:
-        
+
         `````python
         x_y = thing_do();
         ``` # this should't close the fence!
@@ -1189,7 +1211,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func:  
           
         `````python
@@ -1205,7 +1227,7 @@ mod tests {
     fn explicit_markdown_block_with_underscore_contents_tilde() {
         let docstring = r#"
         My cool func:
-        
+
         ~~~~~python
         x_y = thing_do();
         ~~~ # this should't close the fence!
@@ -1215,7 +1237,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func:  
           
         ~~~~~python
@@ -1233,7 +1255,7 @@ mod tests {
     fn explicit_markdown_block_with_indent_tick() {
         let docstring = r#"
         My cool func...
-        
+
         Returns:
             Some details
             `````python
@@ -1246,7 +1268,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func...  
           
         Returns:  
@@ -1267,7 +1289,7 @@ mod tests {
     fn explicit_markdown_block_with_indent_tilde() {
         let docstring = r#"
         My cool func...
-        
+
         Returns:
             Some details
             ~~~~~~python
@@ -1280,7 +1302,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func...  
           
         Returns:  
@@ -1299,14 +1321,14 @@ mod tests {
     fn explicit_markdown_block_with_unclosed_fence_tick() {
         let docstring = r#"
         My cool func:
-        
+
         ````python
         x_y = thing_do();
         "#;
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func:  
           
         ````python
@@ -1320,14 +1342,14 @@ mod tests {
     fn explicit_markdown_block_with_unclosed_fence_tilde() {
         let docstring = r#"
         My cool func:
-        
+
         ~~~~~python
         x_y = thing_do();
         "#;
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func:  
           
         ~~~~~python
@@ -1342,7 +1364,7 @@ mod tests {
     fn explicit_markdown_block_messy_corners_tick() {
         let docstring = r#"
         My cool func:
-        
+
                 ``````we still think this is a codefence```
             x_y = thing_do();
         ```````````` and are sloppy as heck with indentation and closing shrugggg
@@ -1350,7 +1372,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func:  
           
         ``````we still think this is a codefence```
@@ -1365,7 +1387,7 @@ mod tests {
     fn explicit_markdown_block_messy_corners_tilde() {
         let docstring = r#"
         My cool func:
-        
+
                 ~~~~~~we still think this is a codefence~~~
             x_y = thing_do();
         ~~~~~~~~~~~~~ and are sloppy as heck with indentation and closing shrugggg
@@ -1373,7 +1395,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         My cool func:  
           
         ~~~~~~we still think this is a codefence~~~
