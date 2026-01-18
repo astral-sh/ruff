@@ -61,6 +61,10 @@ impl Violation for ComplexAnnotation {
             "Type annotation for `{symbol_name}` is too complex ({complexity_value} > {max_complexity_value})"
         )
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("consider using a type alias or refactoring into a `dataclass`".to_string())
+    }
 }
 
 /// TAE002 (on function)
