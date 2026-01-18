@@ -91,7 +91,7 @@ jobs:
             python "./scripts/conformance.py" \
              --old-ty "./ty-old" \
              --new-ty "./ty-new" \
-             --tests-path "${GITHUB_WORKSPACE}/typing/conformance/tests/" \
+             --tests-path "${GITHUB_WORKSPACE}/typing/conformance/" \
              --python-version "$PYTHON_VERSION" \
              --output ../typing_conformance_diagnostics.diff
           )
