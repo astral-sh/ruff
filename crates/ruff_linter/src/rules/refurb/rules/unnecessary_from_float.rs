@@ -51,6 +51,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - The `from_*` methods provide type validation that the constructors don't
 /// - Removing type validation can change program behavior
 /// - The parameter names are different between methods and constructors
+/// - The fix may remove comments attached to the original expression
 ///
 /// The fix is marked as safe only when:
 /// - The argument type is known to be valid for the target constructor
