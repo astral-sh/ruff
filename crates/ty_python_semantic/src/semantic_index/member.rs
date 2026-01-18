@@ -229,10 +229,24 @@ impl MemberExpr {
                             }
                             _ => return None,
                         },
+                        // Handle boolean subscripts, like `x[True]` or `x[False]`.
+                        // In Python, `True` and `False` are equivalent to `1` and `0` for indexing.
+                        ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                            let _ = write!(path, "{}", u8::from(*value));
+                            segments
+                                .push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
+                        }
                         ast::Expr::StringLiteral(string) => {
                             let _ = write!(path, "{}", string.value);
                             segments
                                 .push(SegmentInfo::new(SegmentKind::StringSubscript, start_offset));
+                        }
+                        // Handle bytes literal subscripts, like `x[b"key"]`.
+                        ast::Expr::BytesLiteral(bytes) => {
+                            let bytes_vec: Vec<u8> = bytes.value.bytes().collect();
+                            let _ = write!(path, "{}", String::from_utf8_lossy(&bytes_vec));
+                            segments
+                                .push(SegmentInfo::new(SegmentKind::BytesSubscript, start_offset));
                         }
                         _ => {
                             return None;
@@ -297,6 +311,7 @@ impl std::fmt::Display for MemberExpr {
                 SegmentKind::Attribute => write!(f, ".{}", segment.text)?,
                 SegmentKind::IntSubscript => write!(f, "[{}]", segment.text)?,
                 SegmentKind::StringSubscript => write!(f, "[\"{}\"]", segment.text)?,
+                SegmentKind::BytesSubscript => write!(f, "[b\"{}\"]", segment.text)?,
             }
         }
 
@@ -599,6 +614,7 @@ impl SegmentInfo {
             0 => SegmentKind::Attribute,
             1 => SegmentKind::IntSubscript,
             2 => SegmentKind::StringSubscript,
+            3 => SegmentKind::BytesSubscript,
             _ => panic!("Invalid SegmentKind bits"),
         }
     }
@@ -628,6 +644,7 @@ enum SegmentKind {
     Attribute = 0,
     IntSubscript = 1,
     StringSubscript = 2,
+    BytesSubscript = 3,
 }
 
 /// Iterator over segments that converts `SegmentInfo` to `Segment` with text slices.
@@ -815,6 +832,7 @@ impl Iterator for SmallSegmentsInfoIterator {
             0 => SegmentKind::Attribute,
             1 => SegmentKind::IntSubscript,
             2 => SegmentKind::StringSubscript,
+            3 => SegmentKind::BytesSubscript,
             _ => panic!("Invalid SegmentKind bits"),
         };
 
