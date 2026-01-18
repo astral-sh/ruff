@@ -59,8 +59,8 @@ use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
-    DynamicMetaclassConflict, DynamicNamedTupleLiteral, FieldKind, MetaclassErrorKind,
-    MethodDecorator, NamedTupleField,
+    DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
+    MetaclassErrorKind, MethodDecorator, NamedTupleField, NamedTupleSpec,
 };
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
@@ -6159,6 +6159,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let func_ty = self
             .try_expression_type(func)
             .unwrap_or_else(|| self.infer_expression(func, TypeContext::default()));
+        if func_ty == Type::SpecialForm(SpecialFormType::NamedTuple) {
+            // Only the `fields` argument is deferred for `NamedTuple`;
+            // other arguments are inferred eagerly.
+            self.infer_typing_namedtuple_fields(&arguments.args[1]);
+            return;
+        }
         let known_class = func_ty
             .as_class_literal()
             .and_then(|cls| cls.known(self.db()));
@@ -6852,39 +6858,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Handle fields based on which namedtuple variant.
-        let (fields, has_known_fields): (Box<[NamedTupleField<'db>]>, bool) = match kind {
-            NamedTupleKind::Typing => self.infer_typing_namedtuple_fields(fields_arg),
-            NamedTupleKind::Collections => self.infer_collections_namedtuple_fields(
-                rename_type,
-                fields_arg,
-                &default_types,
-                defaults_kw,
-            ),
-        };
-
-        let scope = self.scope();
-
-        // Create the anchor for identifying this dynamic namedtuple.
-        // - For assigned namedtuple calls, the Definition uniquely identifies the namedtuple.
-        // - For dangling calls, compute a relative offset from the scope's node index.
-        let anchor = if let Some(def) = definition {
-            DynamicClassAnchor::Definition(def)
-        } else {
-            let call_node_index = call_expr.node_index.load();
-            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-            let anchor_u32 = scope_anchor
-                .as_u32()
-                .expect("scope anchor should not be NodeIndex::NONE");
-            let call_u32 = call_node_index
-                .as_u32()
-                .expect("call node should not be NodeIndex::NONE");
-            DynamicClassAnchor::ScopeOffset {
-                scope,
-                offset: call_u32 - anchor_u32,
+        let anchor = match definition {
+            Some(definition) => match kind {
+                NamedTupleKind::Collections => {
+                    let spec = self.infer_collections_namedtuple_fields(
+                        rename_type,
+                        fields_arg,
+                        &default_types,
+                        defaults_kw,
+                    );
+                    DynamicNamedTupleAnchor::CollectionsDefinition { definition, spec }
+                }
+                NamedTupleKind::Typing => {
+                    // The `fields` argument to `typing.NamedTuple` cannot be inferred
+                    // eagerly if it's not a dangling call, as it may contain forward references
+                    // or recursive references.
+                    self.deferred.insert(definition, self.multi_inference_state);
+                    DynamicNamedTupleAnchor::TypingDefinition(definition)
+                }
+            },
+            None => {
+                let call_node_index = call_expr.node_index.load();
+                let scope = self.scope();
+                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+                let anchor_u32 = scope_anchor
+                    .as_u32()
+                    .expect("scope anchor should not be NodeIndex::NONE");
+                let call_u32 = call_node_index
+                    .as_u32()
+                    .expect("call node should not be NodeIndex::NONE");
+                let spec = match kind {
+                    NamedTupleKind::Collections => self.infer_collections_namedtuple_fields(
+                        rename_type,
+                        fields_arg,
+                        &default_types,
+                        defaults_kw,
+                    ),
+                    NamedTupleKind::Typing => self.infer_typing_namedtuple_fields(fields_arg),
+                };
+                DynamicNamedTupleAnchor::ScopeOffset {
+                    scope,
+                    offset: call_u32 - anchor_u32,
+                    spec,
+                }
             }
         };
 
-        let namedtuple = DynamicNamedTupleLiteral::new(db, name, fields, has_known_fields, anchor);
+        let namedtuple = DynamicNamedTupleLiteral::new(db, name, anchor);
 
         Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple))
     }
@@ -6895,7 +6915,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         fields_arg: &ast::Expr,
         default_types: &[Type<'db>],
         defaults_kw: Option<&ast::Keyword>,
-    ) -> (Box<[NamedTupleField<'db>]>, bool) {
+    ) -> NamedTupleSpec<'db> {
         let db = self.db();
 
         // `collections.namedtuple`: `field_names` is a list or tuple of strings, or a space or
@@ -6968,7 +6988,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Some(mut field_names) = maybe_field_names else {
             // Couldn't determine fields statically; attribute lookups will return Any.
-            return (Box::new([]), false);
+            return NamedTupleSpec::unknown(db);
         };
 
         // When `rename` is false (or not specified), emit diagnostics for invalid
@@ -7033,13 +7053,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
             .collect();
 
-        (fields, true)
+        NamedTupleSpec::known(db, fields)
     }
 
-    fn infer_typing_namedtuple_fields(
-        &mut self,
-        fields_arg: &ast::Expr,
-    ) -> (Box<[NamedTupleField<'db>]>, bool) {
+    fn infer_typing_namedtuple_fields(&mut self, fields_arg: &ast::Expr) -> NamedTupleSpec<'db> {
         #[derive(Debug, Copy, Clone, PartialEq, Eq)]
         enum SequenceKind {
             List,
@@ -7060,7 +7077,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                     diagnostic.set_primary_message("`fields` must be a literal list or tuple");
                 }
-                return (Box::default(), false);
+                return NamedTupleSpec::unknown(db);
             }
         };
 
@@ -7098,7 +7115,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "`fields` must be a sequence of literal lists or tuples",
                         );
                     }
-                    return (Box::default(), false);
+                    return NamedTupleSpec::unknown(db);
                 }
             };
 
@@ -7124,7 +7141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "Each element in `fields` must be a length-2 tuple or list",
                     );
                 }
-                return (Box::default(), false);
+                return NamedTupleSpec::unknown(db);
             };
 
             let name_type = self.infer_expression(name_expr, TypeContext::default());
@@ -7161,7 +7178,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         name_type.display(db)
                     ));
                 }
-                return (Box::default(), false);
+                return NamedTupleSpec::unknown(db);
             };
 
             let field = NamedTupleField {
@@ -7170,35 +7187,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 default: None,
             };
 
-            fields.push((field, element_type));
+            fields.push(field);
         }
 
-        let field_args_type = match field_arg_kind {
-            SequenceKind::List => KnownClass::List.to_specialized_instance(
-                db,
-                &[UnionType::from_elements(
-                    db,
-                    fields.iter().map(|(_, element_type)| element_type),
-                )],
-            ),
-            SequenceKind::Tuple => {
-                Type::heterogeneous_tuple(db, fields.iter().map(|(_, element_type)| *element_type))
-            }
-        };
-
-        self.store_expression_type(fields_arg, field_args_type);
-
-        let mut names = Vec::with_capacity(fields.len());
-        let mut new_fields = Vec::with_capacity(fields.len());
-
-        for (field, _) in fields {
-            names.push(field.name.clone());
-            new_fields.push(field);
-        }
+        let names: Vec<Name> = fields.iter().map(|f| f.name.clone()).collect();
 
         self.check_invalid_namedtuple_field_names(&names, fields_arg, NamedTupleKind::Typing);
 
-        (new_fields.into_boxed_slice(), true)
+        let spec = NamedTupleSpec::known(db, fields.into_boxed_slice());
+        self.store_expression_type(
+            fields_arg,
+            Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)),
+        );
+        spec
     }
 
     /// Report diagnostics for invalid field names in a namedtuple definition.

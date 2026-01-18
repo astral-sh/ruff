@@ -1033,6 +1033,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::NamedTupleSpec(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`NamedTuple` specs cannot be specialized",
+                        ));
+                    }
+                    Type::unknown()
+                }
             },
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
