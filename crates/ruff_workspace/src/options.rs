@@ -1020,10 +1020,10 @@ pub struct Flake8AnnotationComplexityOptions {
     /// Maximum annotation complexity
     #[option(
         default = "3",
-        value_type = "isize",
+        value_type = "int",
         example = "max_annotation_complexity = 4"
     )]
-    max_annotation_complexity: Option<isize>,
+    max_annotation_complexity: Option<usize>,
 }
 
 impl Flake8AnnotationComplexityOptions {
