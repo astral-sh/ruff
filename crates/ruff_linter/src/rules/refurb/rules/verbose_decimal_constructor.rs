@@ -45,6 +45,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Decimal("Infinity")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 #[derive(ViolationMetadata)]
