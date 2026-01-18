@@ -32,6 +32,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// def func() -> int: ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the union type contains comments.
+///
 /// ## References
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
