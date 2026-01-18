@@ -29,6 +29,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// if dct.get("key"):
 ///     ...
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct UnnecessaryKeyCheck;
