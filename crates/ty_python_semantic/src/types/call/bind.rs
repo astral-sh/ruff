@@ -3190,7 +3190,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         variance_in_arguments: &mut FxHashMap<BoundTypeVarIdentity<'db>, TypeVarVariance>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
-        let mut assignable_to_declared_type = true;
+        let mut assignable_to_declared_type = false;
 
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_type) in
@@ -3207,10 +3207,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // preferred declared type.
                         if let Some(preferred_ty) = preferred_type_mappings.get(&identity) {
                             if inferred_ty.is_assignable_to(self.db, *preferred_ty) {
+                                assignable_to_declared_type = true;
                                 return None;
                             }
-
-                            assignable_to_declared_type = false;
                         }
 
                         variance_in_arguments
