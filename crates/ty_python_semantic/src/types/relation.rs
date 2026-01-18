@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -6,7 +7,7 @@ use crate::types::builder::RecursivelyDefined;
 use crate::types::constraints::{IteratorConstraintsExtension, OptionConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::{
-    CallableType, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
+    CallableType, ClassBase, ClassType, CycleDetector, DynamicType, KnownClass, KnownInstanceType,
     MemberLookupPolicy, PairVisitor, ProtocolInstanceType, SubclassOfInner,
     TypeVarBoundOrConstraints, UnionType,
 };
@@ -1059,6 +1060,16 @@ impl<'db> Type<'db> {
                     return ConstraintSet::from(true);
                 }
 
+                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
+                    && !sequence_class
+                        .iter_mro(db, None)
+                        .filter_map(ClassBase::into_class)
+                        .map(|class| class.class_literal(db))
+                        .contains(&other_class.class_literal(db))
+                {
+                    return ConstraintSet::from(false);
+                }
+
                 let chars: FxHashSet<char> = value.value(db).chars().collect();
 
                 let spec = match chars.len() {
@@ -1077,7 +1088,7 @@ impl<'db> Type<'db> {
                 };
 
                 KnownClass::Sequence
-                    .to_specialized_class_type(db, [spec])
+                    .to_specialized_class_type(db, &[spec])
                     .when_some_and(|sequence| {
                         sequence.has_relation_to_impl(
                             db,
