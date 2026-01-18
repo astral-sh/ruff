@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 /// ## Example
 ///
 /// ```python
-/// def example_fn(complex_argument: dict[str, list[dict[str, str | int]]]) -> None: ...
+/// def example_fn(complex_argument: dict[str, list[dict[str, str]]]) -> None: ...
 /// ```
 ///
 /// Instead, create concrete data types where possible:
@@ -27,10 +27,19 @@ use crate::checkers::ast::Checker;
 /// @dataclass
 /// class Cat:
 ///     name: str
-///     age: int
+///     color: str
 ///
 ///
 /// def example_fn(complex_argument: dict[str, list[Cat]]) -> None: ...
+/// ```
+///
+/// Or consider user a type alias:
+///
+/// ```python
+///
+/// TaskUserMap = dict[str, str]
+///
+/// def example_fn(complex_argument: dict[str, list[TaskUserMap]]) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.14.14")]
