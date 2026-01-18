@@ -32,6 +32,15 @@ class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
     pass
 
 
+# Fix should be unsafe when a comment would be deleted
+class A4_comment(
+    other_kwarg=1,
+    # comment
+    metaclass=abc.ABCMeta,
+):
+    pass
+
+
 # OK
 
 class Meta(type):

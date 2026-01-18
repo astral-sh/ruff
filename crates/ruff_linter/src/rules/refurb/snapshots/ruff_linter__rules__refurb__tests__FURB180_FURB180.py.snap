@@ -75,3 +75,26 @@ help: Replace with `abc.ABC`
 33 | 
 34 | 
 note: This is an unsafe fix and may change runtime behavior
+
+FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+  --> FURB180.py:39:5
+   |
+37 |     other_kwarg=1,
+38 |     # comment
+39 |     metaclass=abc.ABCMeta,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+40 | ):
+41 |     pass
+   |
+help: Replace with `abc.ABC`
+34 | 
+35 | # Fix should be unsafe when a comment would be deleted
+36 | class A4_comment(
+   -     other_kwarg=1,
+   -     # comment
+   -     metaclass=abc.ABCMeta,
+37 +     abc.ABC, other_kwarg=1,
+38 | ):
+39 |     pass
+40 | 
+note: This is an unsafe fix and may change runtime behavior

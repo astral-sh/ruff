@@ -43,6 +43,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// be validating the class's other base classes (e.g., `typing.Protocol` does this) or otherwise
 /// alter runtime behavior if more base classes are added.
 ///
+/// The fix is also marked unsafe if it would delete comments.
+///
 /// ## References
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
 /// - [Python documentation: `abc.ABCMeta`](https://docs.python.org/3/library/abc.html#abc.ABCMeta)
@@ -82,11 +84,6 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let applicability = if class_def.bases().is_empty() {
-        Applicability::Safe
-    } else {
-        Applicability::Unsafe
-    };
     let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range);
 
     diagnostic.try_set_fix(|| {
@@ -98,12 +95,20 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         Ok(if position > 0 {
             // When the `abc.ABCMeta` is not the first keyword, put `abc.ABC` before the first
             // keyword.
+            let deletion_range = TextRange::new(
+                class_def.keywords()[position - 1].end(),
+                keyword.end(),
+            );
+            // The fix is unsafe if the class has base classes or if comments would be deleted.
+            let applicability =
+                if class_def.bases().is_empty() && !checker.comment_ranges().intersects(deletion_range) {
+                    Applicability::Safe
+                } else {
+                    Applicability::Unsafe
+                };
             Fix::applicable_edits(
                 // Delete from the previous argument, to the end of the `metaclass` argument.
-                Edit::range_deletion(TextRange::new(
-                    class_def.keywords()[position - 1].end(),
-                    keyword.end(),
-                )),
+                Edit::range_deletion(deletion_range),
                 // Insert `abc.ABC` before the first keyword.
                 [
                     Edit::insertion(format!("{binding}, "), class_def.keywords()[0].start()),
@@ -112,6 +117,11 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                 applicability,
             )
         } else {
+            let applicability = if class_def.bases().is_empty() {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            };
             Fix::applicable_edits(
                 Edit::range_replacement(binding, keyword.range),
                 [import_edit],
