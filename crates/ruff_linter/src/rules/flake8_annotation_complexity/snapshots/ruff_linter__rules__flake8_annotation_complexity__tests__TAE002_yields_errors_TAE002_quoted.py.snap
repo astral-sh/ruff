@@ -22,21 +22,21 @@ TAE002 Type annotation for `return type` is too complex (5 > 3)
    |
 
 TAE002 Type annotation for `variable_with_complex_ann` is too complex (4 > 3)
-  --> TAE002_quoted.py:21:1
+  --> TAE002_quoted.py:21:28
    |
 20 | # Error
 21 | variable_with_complex_ann: "dict[str, dict[str, dict[str, dict[str, str]]]]" = {}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 22 |
 23 | def variable_with_complex_ann_in_fn() -> None:
    |
 
 TAE002 Type annotation for `var` is too complex (4 > 3)
-  --> TAE002_quoted.py:24:5
+  --> TAE002_quoted.py:24:10
    |
 23 | def variable_with_complex_ann_in_fn() -> None:
 24 |     var: "dict[str, dict[str, dict[str, dict[str, str]]]]" = {}
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 25 |     print(var)
    |
 
