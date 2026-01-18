@@ -31,6 +31,9 @@ use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
 ///     print(f"{country}'s flag has {stars} stars.")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `dict.items`](https://docs.python.org/3/library/stdtypes.html#dict.items)
 #[derive(ViolationMetadata)]
