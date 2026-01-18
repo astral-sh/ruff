@@ -398,3 +398,63 @@ d = D()
 if d.c is not None and d.c[0].x[0] is not None:
     reveal_type(d.c[0].x[0])  # revealed: int
 ```
+
+## Narrowing with negative subscripts
+
+Narrowing should work with negative subscripts like `x[-1]`:
+
+```py
+class Subscriptable:
+    def __getitem__(self, key: int) -> int:
+        return 42
+
+class NotSubscriptable: ...
+
+def _(x: list[Subscriptable | NotSubscriptable]):
+    if not isinstance(x[-1], NotSubscriptable):
+        # After narrowing, x[-1] excludes NotSubscriptable, which means subscripting works
+        reveal_type(x[-1])  # revealed: Subscriptable & ~NotSubscriptable
+        reveal_type(x[-1][0])  # revealed: int
+```
+
+Nested negative subscripts should also work:
+
+```py
+def _(x: list[list[Subscriptable | NotSubscriptable]]):
+    if not isinstance(x[-1][-1], NotSubscriptable):
+        reveal_type(x[-1][-1])  # revealed: Subscriptable & ~NotSubscriptable
+        reveal_type(x[-1][-1][0])  # revealed: int
+```
+
+Mixed positive and negative subscripts:
+
+```py
+def _(x: list[list[Subscriptable | NotSubscriptable]]):
+    if not isinstance(x[0][-1], NotSubscriptable):
+        reveal_type(x[0][-1])  # revealed: Subscriptable & ~NotSubscriptable
+
+    if not isinstance(x[-1][0], NotSubscriptable):
+        reveal_type(x[-1][0])  # revealed: Subscriptable & ~NotSubscriptable
+```
+
+Attribute access combined with negative subscripts:
+
+```py
+class Container:
+    items: list[Subscriptable | NotSubscriptable]
+
+def _(c: Container):
+    if not isinstance(c.items[-1], NotSubscriptable):
+        reveal_type(c.items[-1])  # revealed: Subscriptable & ~NotSubscriptable
+        reveal_type(c.items[-1][0])  # revealed: int
+```
+
+Multiple conditions in an `and` chain (the pattern from the original issue):
+
+```py
+def _(x: list[tuple[Subscriptable, int] | NotSubscriptable]):
+    # Narrowing should persist through `and` chains
+    if x[-1] and not isinstance(x[-1], NotSubscriptable):
+        reveal_type(x[-1])  # revealed: tuple[Subscriptable, int] & ~NotSubscriptable
+        reveal_type(x[-1][0])  # revealed: Subscriptable
+```
