@@ -33,6 +33,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     print(x, y)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the statements contain comments.
+///
 /// ## References
 /// - [Python documentation: the `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 /// - [Python documentation: the `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#the-nonlocal-statement)
