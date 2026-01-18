@@ -628,8 +628,8 @@ Bad7 = NamedTuple("Bad7", ["a", "b"])
 reveal_type(Bad7)  # revealed: <class 'Bad7'>
 
 # Invalid field definitions: type is not a valid type expression (e.g., int literals)
-# error: [invalid-type-form] "Object of type `Literal[123]` is not valid as a `NamedTuple` field type"
-# error: [invalid-type-form] "Object of type `Literal[456]` is not valid as a `NamedTuple` field type"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 Bad8 = NamedTuple("Bad8", [("a", 123), ("b", 456)])
 reveal_type(Bad8)  # revealed: <class 'Bad8'>
 ```
