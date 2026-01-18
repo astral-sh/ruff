@@ -303,3 +303,17 @@ class C(B):
     def f(self):
         __class__ = B  # Local variable __class__ shadows the implicit __class__
         return super(__class__, self).f()  # Should NOT trigger UP008
+
+class Base:
+    def __init__(self, foo):
+        self.foo = foo
+
+
+class Outer(Base):
+    def __init__(self, foo):
+        super(self).__init__(foo)  # Should not trigger UP008
+
+    class Inner(Base):
+        def __init__(self, foo):
+            super(Outer.Inner, self).__init__(foo)  # Should trigger UP008
+
