@@ -928,17 +928,12 @@ impl<'db> Signature<'db> {
 
         // Only bind Self typevars that belong to this signature's generic context.
         let self_binding_context = self.self_binding_context(db);
-        let self_class_mro =
-            self_type.and_then(|self_type| super::self_class_mro_for_self_type(db, self_type));
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
-            let self_mapping = TypeMapping::BindSelf {
-                self_type,
-                self_class_mro,
-                self_binding_context,
-            };
+            let self_mapping =
+                TypeMapping::BindSelf(super::SelfBinding::new(db, self_type, self_binding_context));
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,
@@ -959,12 +954,8 @@ impl<'db> Signature<'db> {
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         let self_binding_context = self.self_binding_context(db);
-        let self_class_mro = super::self_class_mro_for_self_type(db, self_type);
-        let self_mapping = TypeMapping::BindSelf {
-            self_type,
-            self_class_mro,
-            self_binding_context,
-        };
+        let self_mapping =
+            TypeMapping::BindSelf(super::SelfBinding::new(db, self_type, self_binding_context));
         let parameters = self.parameters.apply_type_mapping_impl(
             db,
             &self_mapping,
