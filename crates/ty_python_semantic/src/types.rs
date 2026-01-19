@@ -932,21 +932,21 @@ fn self_typevar_owner_class_literal<'db>(
 
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
-    self_type: Type<'db>,
-    self_class_mro: Option<Vec<ClassLiteral<'db>>>,
-    self_binding_context: Option<BindingContext<'db>>,
+    ty: Type<'db>,
+    class_mro: Option<Vec<ClassLiteral<'db>>>,
+    binding_context: Option<BindingContext<'db>>,
 }
 
 impl<'db> SelfBinding<'db> {
     fn new(
         db: &'db dyn Db,
         self_type: Type<'db>,
-        self_binding_context: Option<BindingContext<'db>>,
+        binding_context: Option<BindingContext<'db>>,
     ) -> Self {
         Self {
-            self_type,
-            self_class_mro: self_class_mro_for_self_type(db, self_type),
-            self_binding_context,
+            ty: self_type,
+            class_mro: self_class_mro_for_self_type(db, self_type),
+            binding_context,
         }
     }
 
@@ -955,12 +955,10 @@ impl<'db> SelfBinding<'db> {
             return false;
         }
 
-        let matches_owner = self.self_class_mro.as_ref().is_none_or(|self_class_mro| {
+        self.class_mro.as_ref().is_none_or(|class_mro| {
             self_typevar_owner_class_literal(db, bound_typevar)
-                .is_none_or(|owner_class| self_class_mro.iter().any(|class| *class == owner_class))
-        });
-
-        matches_owner
+                .is_none_or(|owner_class| class_mro.contains(&owner_class))
+        })
     }
 }
 
@@ -6026,7 +6024,7 @@ impl<'db> Type<'db> {
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
-            TypeMapping::BindSelf(binding) if self == binding.self_type => return self,
+            TypeMapping::BindSelf(binding) if self == binding.ty => return self,
             _ => {}
         }
 
@@ -7037,7 +7035,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion => context,
-            TypeMapping::BindSelf(binding) => context.remove_self(db, binding.self_binding_context),
+            TypeMapping::BindSelf(binding) => context.remove_self(db, binding.binding_context),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
                 context.variables(db).map(|typevar| {
@@ -8675,7 +8673,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::BindSelf(binding) => {
                 if binding.should_bind(db, self) {
-                    binding.self_type
+                    binding.ty
                 } else {
                     Type::TypeVar(self)
                 }
