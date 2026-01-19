@@ -5500,16 +5500,16 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// The MRO is the MRO of the class's tuple base class, prepended by `self`.
     /// For example, `namedtuple("Point", [("x", int), ("y", int)])` has the following MRO:
     ///
-    /// 1. <class 'Point'>
-    /// 2. <class 'tuple[int, int]'>
-    /// 3. <class 'Sequence[int]'>
-    /// 4. <class 'Reversible[int]'>
-    /// 5. <class 'Collection[int]'>
-    /// 6. <class 'Iterable[int]'>
-    /// 7. <class 'Container[int]'>
-    /// 8. typing.Protocol
-    /// 9. typing.Generic
-    /// 10. <class 'object'>
+    /// 1. `<class 'Point'>`
+    /// 2. `<class 'tuple[int, int]'>`
+    /// 3. `<class 'Sequence[int]'>`
+    /// 4. `<class 'Reversible[int]'>`
+    /// 5. `<class 'Collection[int]'>`
+    /// 6. `<class 'Iterable[int]'>`
+    /// 7. `<class 'Container[int]'>`
+    /// 8. `typing.Protocol`
+    /// 9. `typing.Generic`
+    /// 10. `<class 'object'>`
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
