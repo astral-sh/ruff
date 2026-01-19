@@ -169,14 +169,12 @@ if a.x:
 
 A(x=42)  # error: [invalid-argument-type]
 
-# TODO: uncommenting these causes stack overflows...
-#
-# # error: [invalid-argument-type]
-# # error: [missing-argument]
-# A(x=C())
+# error: [invalid-argument-type]
+# error: [missing-argument]
+A(x=C())
 
-# # error: [invalid-argument-type]
-# A(x=C(x=A(x=None)))
+# error: [invalid-argument-type]
+A(x=C(x=A(x=None)))
 ```
 
 ### Functional syntax as base class (dangling call)
