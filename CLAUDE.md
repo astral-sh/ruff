@@ -60,6 +60,14 @@ cargo run --bin ty -- check path/to/file.py
 
 When working on ty, PR titles should start with `[ty]` and be tagged with the `ty` GitHub label.
 
+## Adding New ty Rules
+
+When adding new ty lint rules, the rule status should specify the _next_ ty version (the version that will be released after the current one). Check https://pypi.org/project/ty/ to find the latest released version, then use the next version number. For example, if the latest version is `0.0.12`, new rules should use:
+
+```rust
+status: LintStatus::stable("0.0.13")
+```
+
 ## Development Guidelines
 
 - All changes must be tested. If you're not testing your changes, you're not done.
