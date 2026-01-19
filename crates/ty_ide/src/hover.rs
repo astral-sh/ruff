@@ -208,8 +208,8 @@ mod tests {
         Literal[10]
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -262,10 +262,10 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        This is such a great func!!  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        This is such a great func!!
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason
         &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -317,10 +317,10 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        This is such a great func!!  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        This is such a great func!!
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason
         &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -380,10 +380,10 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        This is such a great class!!  
-          
-        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
-          
+        This is such a great class!!
+
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?
+
         Everyone loves my class!!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -442,10 +442,10 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        This is such a great class!!  
-          
-        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
-          
+        This is such a great class!!
+
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?
+
         Everyone loves my class!!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -617,10 +617,10 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        This is such a great class!!  
-          
-        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
-          
+        This is such a great class!!
+
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?
+
         Everyone loves my class!!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -688,10 +688,10 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        This is such a great func!!  
-          
-        Args:  
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        This is such a great func!!
+
+        Args:
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason
         &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -1706,8 +1706,8 @@ def ab(a: int, *, c: int):
         <module 'lib'>
         ```
         ---
-        The cool lib/_py module!  
-          
+        The cool lib/_py module!
+
         Wow this module rocks.
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2260,8 +2260,8 @@ def function():
         <module 'lib'>
         ```
         ---
-        The cool lib/_py module!  
-          
+        The cool lib/_py module!
+
         Wow this module rocks.
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2381,8 +2381,8 @@ def function():
         Literal[1]
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2430,8 +2430,8 @@ def function():
         Literal[1]
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2479,8 +2479,8 @@ def function():
         Literal[2]
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2530,8 +2530,8 @@ def function():
         Unknown | Literal[1]
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2573,8 +2573,8 @@ def function():
         int
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2615,8 +2615,8 @@ def function():
         Literal[1]
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2642,7 +2642,7 @@ def function():
 
             Wow these are good docs!
             """
-        
+
         x = Foo()
         x.a<CURSOR>
         "#,
@@ -2660,8 +2660,8 @@ def function():
         int
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2702,8 +2702,8 @@ def function():
         int
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2749,8 +2749,8 @@ def function():
         int
         ```
         ---
-        This is the docs for this value  
-          
+        This is the docs for this value
+
         Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3102,7 +3102,7 @@ def function():
         let test = cursor_test(
             r#"
         def a<CURSOR>b():
-            """wow cool docs""" 
+            """wow cool docs"""
             # and a comment that shouldn't be included
             """and docs"""
             return
@@ -3129,7 +3129,7 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-        3 |     """wow cool docs""" 
+        3 |     """wow cool docs"""
         4 |     # and a comment that shouldn't be included
           |
         "#);
@@ -3141,7 +3141,7 @@ def function():
             r#"
         def a<CURSOR>b():
             (
-                """wow cool docs""" 
+                """wow cool docs"""
                 """and docs"""
             )
             return
@@ -3169,7 +3169,7 @@ def function():
           |     |Cursor offset
           |     source
         3 |     (
-        4 |         """wow cool docs""" 
+        4 |         """wow cool docs"""
           |
         "#);
     }
@@ -3180,7 +3180,7 @@ def function():
             r#"
         def a<CURSOR>b():
             (
-                """wow cool docs""" 
+                """wow cool docs"""
                 # and a comment that shouldn't be included
                 """and docs"""
             )
@@ -3209,7 +3209,7 @@ def function():
           |     |Cursor offset
           |     source
         3 |     (
-        4 |         """wow cool docs""" 
+        4 |         """wow cool docs"""
           |
         "#);
     }
@@ -3826,6 +3826,55 @@ def function():
           |    ^^^^^- Cursor offset
           |    |
           |    source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_comprehension_type_context() {
+        let test = cursor_test(
+            r#"
+            a = [[n]<CURSOR> for n in [1, 2, 3]]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        list[Unknown | int]
+        ---------------------------------------------
+        ```python
+        list[Unknown | int]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:6
+          |
+        2 | a = [[n] for n in [1, 2, 3]]
+          |      ^^^- Cursor offset
+          |      |
+          |      source
+          |
+        ");
+
+        let test = cursor_test(
+            r#"
+            a: list[list[int | str]] = [[n]<CURSOR> for n in [1, 2, 3]]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        list[int | str]
+        ---------------------------------------------
+        ```python
+        list[int | str]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:29
+          |
+        2 | a: list[list[int | str]] = [[n] for n in [1, 2, 3]]
+          |                             ^^^- Cursor offset
+          |                             |
+          |                             source
           |
         ");
     }

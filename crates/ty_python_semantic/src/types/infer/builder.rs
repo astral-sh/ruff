@@ -128,7 +128,7 @@ use crate::types::{
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type,
-    definition_expression_type, infer_scope_types, todo_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -431,6 +431,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
+        self.expressions.extend(inference.expressions.iter());
+
+        if let Some(extra) = &inference.extra {
+            self.context.extend(&extra.diagnostics);
+            self.extend_cycle_recovery(extra.cycle_recovery);
+            self.string_annotations
+                .extend(extra.string_annotations.iter().copied());
+        }
+    }
+
     fn file(&self) -> File {
         self.context.file()
     }
@@ -527,8 +538,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.expression_type(expression)
             }
-            _ => infer_scope_types(self.db(), expr_scope, TypeContext::default())
-                .expression_type(expression),
+            _ => infer_complete_scope_types(self.db(), expr_scope).expression_type(expression),
         }
     }
 
@@ -10228,12 +10238,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, tcx);
-
-        // Comprehensions are skipped when checking all scopes, so this is our only chance
-        // to report diagnostics.
-        if let Some(scope_diagnostics) = inference.diagnostics() {
-            self.context.extend(scope_diagnostics);
-        }
+        self.extend_scope(inference);
 
         self.infer_comprehension_specialization(KnownClass::List, &[Some(elt)], inference, tcx)
             .unwrap_or_else(|| {
@@ -10263,12 +10268,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, tcx);
-
-        // Comprehensions are skipped when checking all scopes, so this is our only chance
-        // to report diagnostics.
-        if let Some(scope_diagnostics) = inference.diagnostics() {
-            self.context.extend(scope_diagnostics);
-        }
+        self.extend_scope(inference);
 
         self.infer_comprehension_specialization(KnownClass::Set, &[Some(elt)], inference, tcx)
             .unwrap_or_else(|| {
@@ -10299,12 +10299,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, tcx);
-
-        // Comprehensions are skipped when checking all scopes, so this is our only chance
-        // to report diagnostics.
-        if let Some(scope_diagnostics) = inference.diagnostics() {
-            self.context.extend(scope_diagnostics);
-        }
+        self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,

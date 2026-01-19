@@ -150,6 +150,37 @@ fn deferred_cycle_initial<'db>(
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
+///
+/// Unlike [`infer_scope_types`], this function does not take a type context, as it may infer
+/// the parent scope to obtain the necessary type context by which to infer the inner scope.
+pub(crate) fn infer_complete_scope_types<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> &'db ScopeInference<'db> {
+    // Scopes that may require type context are inferred during the inference of
+    // their outer scope.
+    if scope.accepts_type_context(db) {
+        let file = scope.file(db);
+        let index = semantic_index(db, file);
+
+        if let Some(parent_scope) = index.parent_scope_id(scope.file_scope_id(db)) {
+            // Note that nested lambdas or comprehensions may require recursing until we reach
+            // an outer scope that is independent of any type context.
+            return infer_complete_scope_types(db, parent_scope.to_scope_id(db, file));
+        }
+    }
+
+    infer_scope_types_impl(db, InferScope::new(db, scope, TypeContext::default()))
+}
+
+/// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
+/// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
+/// scope.
+///
+/// Note that you should generally use [`infer_complete_scope_types`] instead of this method,
+/// unless you have already obtained the necessary type context while inferring the parent scope.
+/// Inferring a nested scope independently without type context can lead to incorrect inferred
+/// types or diagnostics.
 pub(crate) fn infer_scope_types<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
