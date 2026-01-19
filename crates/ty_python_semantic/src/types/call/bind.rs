@@ -3409,8 +3409,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// are passed.
     ///
     /// This method returns `false` if the specialization does not contain a mapping for the given
-    /// `paramspec`, contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`)
-    /// or if the value is an overloaded callable.
+    /// `paramspec` or contains an invalid mapping (i.e., not a `Callable` of kind
+    /// `ParamSpecValue`).
     ///
     /// For more details, refer to [`Self::try_paramspec_evaluation_at`].
     fn evaluate_paramspec_sub_call(
@@ -3429,10 +3429,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         }
 
-        // TODO: Support overloads?
-        let [signature] = callable.signatures(self.db).overloads.as_slice() else {
+        let signatures = &callable.signatures(self.db).overloads;
+        if signatures.is_empty() {
             return false;
-        };
+        }
 
         let sub_arguments = if let Some(argument_index) = argument_index {
             self.arguments.start_from(argument_index)
@@ -3441,7 +3441,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         // TODO: What should be the `signature_type` here?
-        let bindings = match Bindings::from(Binding::single(self.signature_type, signature.clone()))
+        let callable_binding =
+            CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
+        let bindings = match Bindings::from(callable_binding)
             .match_parameters(self.db, &sub_arguments)
             .check_types(self.db, &sub_arguments, self.call_expression_tcx, &[])
         {
@@ -3449,12 +3451,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             Err(CallError(_, bindings)) => bindings,
         };
 
-        // SAFETY: `bindings` was created from a single binding above.
-        let [binding] = bindings.single_element().unwrap().overloads.as_slice() else {
-            unreachable!("ParamSpec sub-call should only contain a single binding");
-        };
+        let callable_binding = bindings
+            .single_element()
+            .expect("ParamSpec sub-call should contain a single CallableBinding");
 
-        self.errors.extend(binding.errors.iter().cloned());
+        // Only extend errors if no overload matched (i.e., all overloads failed type checking).
+        // For overloaded callables, we report errors from the first overload when no match is found.
+        if callable_binding.has_binding_errors() {
+            if let Some(binding) = callable_binding.overloads().first() {
+                self.errors.extend(binding.errors.iter().cloned());
+            }
+        }
 
         true
     }

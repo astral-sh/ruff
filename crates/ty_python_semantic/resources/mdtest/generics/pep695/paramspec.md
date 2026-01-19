@@ -681,11 +681,107 @@ reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, 
 # error: [invalid-argument-type]
 reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
-# TODO: Both of these shouldn't raise an error
-# error: [invalid-argument-type]
 reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-# error: [invalid-argument-type]
 reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# Keyword argument matching should also work
+reveal_type(with_parameters(int_int, x=1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(with_parameters(int_int, x="a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# No matching overload should error
+# error: [invalid-argument-type]
+reveal_type(with_parameters(int_int, 1.5))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+```
+
+### Overloads with multiple parameters
+
+`multi_param.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def multi(x: int, y: int) -> int: ...
+@overload
+def multi(x: str, y: str) -> str: ...
+
+@overload
+def mixed(x: int, y: str) -> int: ...
+@overload
+def mixed(x: str, y: int) -> str: ...
+```
+
+```py
+from typing import Callable
+from multi_param import multi, mixed
+
+def run[**P, R](f: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return f(*args, **kwargs)
+
+# Both arguments match first overload
+reveal_type(run(multi, 1, 2))  # revealed: int | str
+
+# Both arguments match second overload
+reveal_type(run(multi, "a", "b"))  # revealed: int | str
+
+# Mixed positional and keyword
+reveal_type(run(multi, 1, y=2))  # revealed: int | str
+reveal_type(run(multi, x=1, y=2))  # revealed: int | str
+
+# No matching overload (int, str doesn't match either overload of `multi`)
+# error: [invalid-argument-type]
+reveal_type(run(multi, 1, "b"))  # revealed: int | str
+
+# Test with mixed overload
+reveal_type(run(mixed, 1, "a"))  # revealed: int | str
+reveal_type(run(mixed, "a", 1))  # revealed: int | str
+
+# Wrong argument types for mixed
+# error: [invalid-argument-type]
+reveal_type(run(mixed, 1, 1))  # revealed: int | str
+```
+
+### Simulating `asyncio.to_thread`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1838>.
+
+`thread_funcs.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def fetch(url: str) -> str: ...
+@overload
+def fetch(url: str, timeout: int) -> str: ...
+@overload
+def fetch(url: str, timeout: int, retries: int) -> str: ...
+```
+
+```py
+from typing import Callable
+from thread_funcs import fetch
+
+# Simulating asyncio.to_thread signature
+def to_thread[**P, R](func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+# All these should work - matching different overloads
+reveal_type(to_thread(fetch, "https://example.com"))  # revealed: str
+reveal_type(to_thread(fetch, "https://example.com", 30))  # revealed: str
+reveal_type(to_thread(fetch, "https://example.com", 30, 3))  # revealed: str
+
+# Keyword arguments
+reveal_type(to_thread(fetch, url="https://example.com"))  # revealed: str
+reveal_type(to_thread(fetch, "https://example.com", timeout=30))  # revealed: str
+
+# Wrong argument type should error
+# error: [invalid-argument-type]
+reveal_type(to_thread(fetch, 123))  # revealed: str
+
+# Too many arguments should error
+# error: [too-many-positional-arguments]
+reveal_type(to_thread(fetch, "url", 1, 2, 3))  # revealed: str
 ```
 
 ### Overloads with subtitution of `P.args` and `P.kwargs`
