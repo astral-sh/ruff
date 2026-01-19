@@ -1956,7 +1956,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     }
 
     /// Compare expressions can narrow places on either side of the comparison,
-    /// and can also narrow subscript bases (for TypedDict and tuple narrowing).
+    /// and can also narrow subscript bases (for `TypedDict` and tuple narrowing).
     fn expr_compare(&self, expr_compare: &ast::ExprCompare) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
