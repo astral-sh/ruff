@@ -846,21 +846,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             PredicateOrLiteral::Literal(_) => PossiblyNarrowedPlaces::default(),
             PredicateOrLiteral::Predicate(pred) => {
                 let place_table = self.current_place_table();
-                let lookup_place = |place_expr: &PlaceExpr| {
-                    use crate::semantic_index::place::PlaceExprRef;
-                    place_table.place_id(PlaceExprRef::from(place_expr))
-                };
 
                 match pred.node {
                     PredicateNode::Expression(expression) => {
                         let module = self.module;
                         let expression_node = expression.node_ref(self.db, module);
-                        PossiblyNarrowedPlacesBuilder::new(self.db, lookup_place)
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node)
                     }
                     PredicateNode::Pattern(pattern) => {
                         let module = self.module;
-                        PossiblyNarrowedPlacesBuilder::new(self.db, lookup_place)
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
                     PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
