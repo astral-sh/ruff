@@ -3254,6 +3254,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             argument_type = argument_type.apply_specialization(self.db, specialization);
             expected_ty = expected_ty.apply_specialization(self.db, specialization);
         }
+        // Skip type checking for synthetic `self` arguments where the parameter is typed as `Self`.
+        // The synthetic argument is the implicit `self` passed during method binding, and checking
+        // it against `Self` would be circular since `Self` is bound to the type of `self`.
         if matches!(argument, Argument::Synthetic)
             && matches!(expected_ty, Type::TypeVar(bound_typevar) if bound_typevar.typevar(self.db).is_self(self.db))
         {

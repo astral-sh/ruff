@@ -956,17 +956,24 @@ impl<'db> Type<'db> {
         type_contains_self(db, *self)
     }
 
+    /// Bind `Self` type variables in `self` to `self_type`.
+    ///
+    /// This is used when accessing class attributes that contain `Self` annotations,
+    /// binding the `Self` to the concrete instance type.
     pub(crate) fn bind_self_typevars(
         self,
         db: &'db dyn Db,
         self_type: Type<'db>,
         self_binding_context: Option<BindingContext<'db>>,
     ) -> Self {
+        // Skip function literals and bound methods - they handle `Self` binding through
+        // their signature's `bind_self` method when called, not through type mapping.
         if matches!(self, Type::FunctionLiteral(_) | Type::BoundMethod(_))
             || !self.contains_self(db)
         {
             return self;
         }
+        // Skip non-regular callables (e.g., bound-method callables) for the same reason.
         if let Type::Callable(callable) = self
             && !matches!(callable.kind(db), CallableTypeKind::Regular)
         {
@@ -8512,6 +8519,12 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 
     /// Returns whether two bound typevars represent the same logical typevar.
+    ///
+    /// For `Self` typevars, we compare by owner class rather than binding context identity.
+    /// This is because `Self@LinkedList` (from a class attribute) and `Self@next` (from a
+    /// method parameter) should be considered the same typevar if they share the same owner
+    /// class. If we can't determine the owner class for either, we fall back to identity
+    /// comparison.
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
         if self.typevar(db).is_self(db) && other.typevar(db).is_self(db) {
             if let (Some(left), Some(right)) = (

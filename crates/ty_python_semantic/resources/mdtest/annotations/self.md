@@ -459,7 +459,7 @@ class Model:
     name: str
 
     def get_id(self: Self) -> int:
-        # Self is bounded by Model here, but should still find id
+        # Self is bound by Model here, but should still find id
         reveal_type(self.id)  # revealed: int
         return self.id
 

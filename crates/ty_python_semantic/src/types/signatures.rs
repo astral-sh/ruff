@@ -912,9 +912,7 @@ impl<'db> Signature<'db> {
             return Some(BindingContext::Definition(class_definition));
         }
 
-        self.generic_context
-            .and_then(|ctx| ctx.variables(db).find(|tv| tv.typevar(db).is_self(db)))
-            .map(|tv| tv.binding_context(db))
+        None
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {

@@ -232,6 +232,7 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
 }
 
 impl<'db> NominalInstanceType<'db> {
+    #[inline]
     pub(super) fn can_contain_self(self) -> bool {
         match self.0 {
             NominalInstanceInner::Object => false,
