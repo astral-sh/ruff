@@ -1735,15 +1735,13 @@ from dataclasses import dataclass
 
 NT = namedtuple("NT", "x y")
 
-# TODO: should emit `invalid-dataclass`
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 dataclass(NT)
 
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 dataclass()(NT)
 
-# TODO: should emit `invalid-dataclass`
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 dataclass(namedtuple("Inline1", "a b"))
 
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
@@ -1758,15 +1756,13 @@ from typing import NamedTuple
 
 TNT = NamedTuple("TNT", [("x", int), ("y", int)])
 
-# TODO: should emit `invalid-dataclass`
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 dataclass(TNT)
 
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 dataclass()(TNT)
 
-# TODO: should emit `invalid-dataclass`
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 dataclass(NamedTuple("Inline1", [("a", str)]))
 
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
@@ -1906,9 +1902,7 @@ reveal_type(Person)  # revealed: <class 'Person'>
 
 ### Using `dataclass()` as a function
 
-The same restrictions apply when using `dataclass()` as a function call instead of a decorator. When
-using `dataclass(cls)` directly, overload resolution fails before our check can run. When using
-`dataclass()(cls)`, the decorator form is used and we correctly emit `invalid-dataclass`:
+The same restrictions apply when using `dataclass()` as a function call instead of a decorator:
 
 ```py
 from dataclasses import dataclass
@@ -1927,29 +1921,25 @@ class MyEnum(Enum):
 class MyProtocol(Protocol):
     def method(self) -> None: ...
 
-# TODO: should emit `invalid-dataclass`
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 dataclass(MyTuple)
 
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 dataclass()(MyTuple)
 
-# TODO: should emit `invalid-dataclass`
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
 dataclass(MyDict)
 
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
 dataclass()(MyDict)
 
-# TODO: should emit `invalid-dataclass`
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
 dataclass(MyEnum)
 
 # error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
 dataclass()(MyEnum)
 
-# TODO: should emit `invalid-dataclass`
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
 dataclass(MyProtocol)
 
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"

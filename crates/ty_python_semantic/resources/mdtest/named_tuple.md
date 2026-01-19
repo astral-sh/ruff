@@ -1521,9 +1521,7 @@ The same applies when using `dataclass` as a function on a functional `NamedTupl
 from dataclasses import dataclass
 from typing import NamedTuple
 
-# TODO: This should emit `invalid-dataclass` but currently emits `no-matching-overload`
-# due to overload resolution not matching `DynamicNamedTuple` against `type[_T]`.
-# error: [no-matching-overload]
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
 X = dataclass(NamedTuple("X", [("x", int)]))
 ```
 

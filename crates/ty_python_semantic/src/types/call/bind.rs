@@ -1142,8 +1142,8 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(Type::DataclassDecorator(params));
                             }
 
-                            // `dataclass` being used as a non-decorator
-                            if let [Some(Type::ClassLiteral(class_literal))] =
+                            // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`)
+                            if let [Some(Type::ClassLiteral(class_literal)), ..] =
                                 overload.parameter_types()
                             {
                                 if let Some(target) = invalid_dataclass_target(db, class_literal) {
@@ -2259,10 +2259,32 @@ impl<'db> CallableBinding<'db> {
         !self.overloads.is_empty()
     }
 
-    /// Returns whether there were any errors binding this call site. If the callable has multiple
-    /// overloads, they must _all_ have errors.
-    pub(crate) fn has_binding_errors(&self) -> bool {
-        self.matching_overloads().next().is_none()
+    /// Returns whether there were any errors binding this call site.
+    ///
+    /// This is true if either:
+    /// - No overloads matched (all had type/arity errors).
+    /// - A matching overload has errors (including semantic errors that don't affect
+    ///   overload resolution, like applying `@dataclass` to a `NamedTuple`).
+    fn has_binding_errors(&self) -> bool {
+        let mut matching_overloads = self.matching_overloads();
+
+        // If there are no matching overloads, we have binding errors.
+        let Some((_, first_overload)) = matching_overloads.next() else {
+            return true;
+        };
+
+        // If any matching overload has semantic errors (that don't affect overload
+        // resolution), we have binding errors.
+        if !first_overload.errors.is_empty() {
+            return true;
+        }
+        for (_, overload) in matching_overloads {
+            if !overload.errors.is_empty() {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Returns the index of the matching overload in the form of [`MatchingOverloadIndex`].
@@ -2296,7 +2318,7 @@ impl<'db> CallableBinding<'db> {
         self.overloads
             .iter()
             .enumerate()
-            .filter(|(_, overload)| overload.as_result().is_ok())
+            .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
     /// Returns an iterator over all the mutable overloads that matched for this call binding.
@@ -2306,7 +2328,7 @@ impl<'db> CallableBinding<'db> {
         self.overloads
             .iter_mut()
             .enumerate()
-            .filter(|(_, overload)| overload.as_result().is_ok())
+            .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
     /// Returns the return type of this call.
@@ -2400,9 +2422,33 @@ impl<'db> CallableBinding<'db> {
                     _ => None,
                 };
 
-                // If there is a single matching overload, the diagnostics should be reported
-                // directly for that overload.
+                // If only one overload passed arity check, report its errors directly.
                 if let Some(matching_overload_index) = self.matching_overload_before_type_checking {
+                    let callable_description =
+                        CallableDescription::new(context.db(), self.signature_type);
+                    let matching_overload =
+                        function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
+                            index: matching_overload_index,
+                            kind,
+                            function,
+                        });
+                    self.overloads[matching_overload_index].report_diagnostics(
+                        context,
+                        node,
+                        self.signature_type,
+                        callable_description.as_ref(),
+                        union_diag,
+                        matching_overload.as_ref(),
+                    );
+                    return;
+                }
+
+                // If multiple overloads passed arity check but only one matched types
+                // (possibly with semantic errors), report its errors directly instead
+                // of the generic "no matching overload" message.
+                if let MatchingOverloadIndex::Single(matching_overload_index) =
+                    self.matching_overload_index()
+                {
                     let callable_description =
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
@@ -3886,11 +3932,10 @@ impl<'db> Binding<'db> {
         }
     }
 
-    fn as_result(&self) -> Result<(), CallErrorKind> {
-        if !self.errors.is_empty() {
-            return Err(CallErrorKind::BindingError);
-        }
-        Ok(())
+    fn has_errors_affecting_overload_resolution(&self) -> bool {
+        self.errors
+            .iter()
+            .any(BindingError::affects_overload_resolution)
     }
 
     fn snapshot(&self) -> BindingSnapshot<'db> {
@@ -4248,6 +4293,34 @@ fn invalid_dataclass_target<'db>(
 }
 
 impl<'db> BindingError<'db> {
+    /// Returns `true` if this error indicates the overload didn't match the call arguments.
+    ///
+    /// Returns `false` for semantic errors where the overload matched the types but the
+    /// usage is invalid for other reasons (e.g., applying `@dataclass` to a `NamedTuple`).
+    /// These semantic errors should be reported directly rather than causing "no matching
+    /// overload" errors.
+    fn affects_overload_resolution(&self) -> bool {
+        match self {
+            // Semantic errors: the overload matched, but the usage is invalid
+            Self::InvalidDataclassApplication(_)
+            | Self::PropertyHasNoSetter(_)
+            | Self::CalledTopCallable(_)
+            | Self::InternalCallError(_) => false,
+
+            // Matching errors: the overload doesn't apply to these arguments
+            Self::InvalidArgumentType { .. }
+            | Self::InvalidKeyType { .. }
+            | Self::KeywordsNotAMapping { .. }
+            | Self::MissingArguments { .. }
+            | Self::UnknownArgument { .. }
+            | Self::PositionalOnlyParameterAsKwarg { .. }
+            | Self::TooManyPositionalArguments { .. }
+            | Self::ParameterAlreadyAssigned { .. }
+            | Self::SpecializationError { .. }
+            | Self::UnmatchedOverload => true,
+        }
+    }
+
     fn report_diagnostic(
         &self,
         context: &InferContext<'db, '_>,
