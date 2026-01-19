@@ -3254,6 +3254,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             argument_type = argument_type.apply_specialization(self.db, specialization);
             expected_ty = expected_ty.apply_specialization(self.db, specialization);
         }
+        if matches!(argument, Argument::Synthetic)
+            && matches!(expected_ty, Type::TypeVar(bound_typevar) if bound_typevar.typevar(self.db).is_self(self.db))
+        {
+            return;
+        }
         // This is one of the few places where we want to check if there's _any_ specialization
         // where assignability holds; normally we want to check that assignability holds for
         // _all_ specializations.

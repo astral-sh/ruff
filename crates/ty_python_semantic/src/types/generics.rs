@@ -23,8 +23,8 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     UnionType, declaration_type, walk_type_var_bounds,
@@ -302,14 +302,14 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn remove_self(
         self,
         db: &'db dyn Db,
-        self_typevar_identity: Option<TypeVarIdentity<'db>>,
+        self_binding_context: Option<BindingContext<'db>>,
     ) -> Self {
         Self::from_typevar_instances(
             db,
             self.variables(db).filter(|bound_typevar| {
                 !(bound_typevar.typevar(db).is_self(db)
-                    && self_typevar_identity
-                        .is_none_or(|identity| bound_typevar.typevar(db).identity(db) == identity))
+                    && self_binding_context
+                        .is_none_or(|context| bound_typevar.binding_context(db) == context))
             }),
         )
     }

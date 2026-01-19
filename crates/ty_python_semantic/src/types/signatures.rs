@@ -25,9 +25,9 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, CallableTypeKind,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, TypeVarIdentity, VarianceInferable, todo_type,
+    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -897,12 +897,24 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
-    fn self_typevar_identity(&self, db: &'db dyn Db) -> Option<TypeVarIdentity<'db>> {
-        self.generic_context.and_then(|ctx| {
-            ctx.variables(db)
-                .find(|tv| tv.typevar(db).is_self(db))
-                .map(|tv| tv.typevar(db).identity(db))
-        })
+    fn self_binding_context(&self, db: &'db dyn Db) -> Option<BindingContext<'db>> {
+        let definition = self.definition?;
+        if let Some(self_typevar) = self
+            .generic_context
+            .and_then(|ctx| ctx.variables(db).find(|tv| tv.typevar(db).is_self(db)))
+        {
+            return Some(self_typevar.binding_context(db));
+        }
+
+        let scope = definition.scope(db);
+        let index = semantic_index(db, scope.file(db));
+        if let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db)) {
+            return Some(BindingContext::Definition(class_definition));
+        }
+
+        self.generic_context
+            .and_then(|ctx| ctx.variables(db).find(|tv| tv.typevar(db).is_self(db)))
+            .map(|tv| tv.binding_context(db))
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
@@ -915,14 +927,17 @@ impl<'db> Signature<'db> {
         }
 
         // Only bind Self typevars that belong to this signature's generic context.
-        let self_typevar_identity = self.self_typevar_identity(db);
+        let self_binding_context = self.self_binding_context(db);
+        let self_class_literal =
+            self_type.and_then(|self_type| super::self_class_literal_for_self_type(db, self_type));
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
             let self_mapping = TypeMapping::BindSelf {
                 self_type,
-                self_typevar_identity,
+                self_class_literal,
+                self_binding_context,
             };
             parameters = parameters.apply_type_mapping_impl(
                 db,
@@ -935,7 +950,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self
                 .generic_context
-                .map(|generic_context| generic_context.remove_self(db, self_typevar_identity)),
+                .map(|generic_context| generic_context.remove_self(db, self_binding_context)),
             definition: self.definition,
             parameters,
             return_ty,
@@ -943,10 +958,12 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        let self_typevar_identity = self.self_typevar_identity(db);
+        let self_binding_context = self.self_binding_context(db);
+        let self_class_literal = super::self_class_literal_for_self_type(db, self_type);
         let self_mapping = TypeMapping::BindSelf {
             self_type,
-            self_typevar_identity,
+            self_class_literal,
+            self_binding_context,
         };
         let parameters = self.parameters.apply_type_mapping_impl(
             db,

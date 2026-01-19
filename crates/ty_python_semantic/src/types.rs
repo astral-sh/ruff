@@ -893,6 +893,35 @@ fn type_contains_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     )
 }
 
+fn self_class_literal_for_self_type<'db>(
+    db: &'db dyn Db,
+    self_type: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    match self_type {
+        Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+        Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
+            typevar.typevar(db).upper_bound(db).and_then(|ty| match ty {
+                Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+                _ => None,
+            })
+        }
+        _ => None,
+    }
+}
+
+fn self_typevar_owner_class_literal<'db>(
+    db: &'db dyn Db,
+    bound_typevar: BoundTypeVarInstance<'db>,
+) -> Option<ClassLiteral<'db>> {
+    bound_typevar
+        .typevar(db)
+        .upper_bound(db)
+        .and_then(|ty| match ty {
+            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+            _ => None,
+        })
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -931,7 +960,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         self_type: Type<'db>,
-        self_typevar_identity: Option<TypeVarIdentity<'db>>,
+        self_binding_context: Option<BindingContext<'db>>,
     ) -> Self {
         if matches!(self, Type::FunctionLiteral(_) | Type::BoundMethod(_))
             || !self.contains_self(db)
@@ -948,7 +977,8 @@ impl<'db> Type<'db> {
             db,
             &TypeMapping::BindSelf {
                 self_type,
-                self_typevar_identity,
+                self_class_literal: self_class_literal_for_self_type(db, self_type),
+                self_binding_context,
             },
             TypeContext::default(),
         )
@@ -3349,11 +3379,15 @@ impl<'db> Type<'db> {
                 let fallback = self.instance_member(db, name_str);
 
                 // Bind `Self` in fallback types to the concrete instance.
-                let fallback = if let Type::NominalInstance(instance) = self {
-                    let self_type = Type::NominalInstance(instance);
-                    fallback.map_type(|ty| ty.bind_self_typevars(db, self_type, None))
-                } else {
-                    fallback
+                let fallback = match self {
+                    Type::NominalInstance(instance) => {
+                        let self_type = Type::NominalInstance(instance);
+                        fallback.map_type(|ty| ty.bind_self_typevars(db, self_type, None))
+                    }
+                    Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
+                        fallback.map_type(|ty| ty.bind_self_typevars(db, self, None))
+                    }
+                    _ => fallback,
                 };
 
                 // `Self` type variables use `InstanceFallbackShadowsNonDataDescriptor::Yes`
@@ -6914,8 +6948,10 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf {
         self_type: Type<'db>,
-        /// If `Some`, only bind `Self` typevars that have this identity (i.e., from the same class).
-        self_typevar_identity: Option<TypeVarIdentity<'db>>,
+        /// If `Some`, only bind `Self` typevars whose owner class is in this class's MRO.
+        self_class_literal: Option<ClassLiteral<'db>>,
+        /// If `Some`, only remove `Self` typevars that have this binding context from signatures.
+        self_binding_context: Option<BindingContext<'db>>,
     },
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
@@ -6963,9 +6999,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion => context,
             TypeMapping::BindSelf {
-                self_typevar_identity,
+                self_binding_context,
                 ..
-            } => context.remove_self(db, *self_typevar_identity),
+            } => context.remove_self(db, *self_binding_context),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
                 context.variables(db).map(|typevar| {
@@ -8476,16 +8512,17 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 
     /// Returns whether two bound typevars represent the same logical typevar.
-    ///
-    /// For `Self`, we ignore binding context differences (e.g., `Self@LinkedList` vs `Self@next`).
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
-        let both_self = self.typevar(db).is_self(db) && other.typevar(db).is_self(db);
-        if both_self {
-            self.typevar(db).identity(db) == other.typevar(db).identity(db)
-                && self.paramspec_attr(db) == other.paramspec_attr(db)
-        } else {
-            self.identity(db) == other.identity(db)
+        if self.typevar(db).is_self(db) && other.typevar(db).is_self(db) {
+            if let (Some(left), Some(right)) = (
+                self_typevar_owner_class_literal(db, self),
+                self_typevar_owner_class_literal(db, other),
+            ) {
+                return left == right && self.paramspec_attr(db) == other.paramspec_attr(db);
+            }
         }
+
+        self.identity(db) == other.identity(db)
     }
 
     /// Create a new PEP 695 type variable that can be used in signatures
@@ -8602,16 +8639,24 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::BindSelf {
                 self_type,
-                self_typevar_identity,
+                self_class_literal,
+                self_binding_context: _,
             } => {
-                if self.typevar(db).is_self(db)
-                    && self_typevar_identity
-                        .is_none_or(|identity| self.typevar(db).identity(db) == identity)
-                {
-                    *self_type
-                } else {
-                    Type::TypeVar(self)
+                if self.typevar(db).is_self(db) {
+                    let matches_owner = self_class_literal.is_none_or(|self_class_literal| {
+                        self_typevar_owner_class_literal(db, self).is_none_or(|owner_class| {
+                            self_class_literal
+                                .iter_mro(db)
+                                .filter_map(ClassBase::into_class)
+                                .any(|class| class.class_literal(db) == owner_class)
+                        })
+                    });
+
+                    if matches_owner {
+                        return *self_type;
+                    }
                 }
+                Type::TypeVar(self)
             }
             TypeMapping::ReplaceSelf { new_upper_bound } => {
                 if self.typevar(db).is_self(db) {

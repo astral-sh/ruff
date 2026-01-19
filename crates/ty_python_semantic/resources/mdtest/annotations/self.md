@@ -256,10 +256,12 @@ class Bar:
     def bar(self: Self, x: Foo[Self]):
         # revealed: bound method Foo[Self@bar].foo() -> Self@bar
         reveal_type(x.foo)
+        reveal_type(x.foo())  # revealed: Self@bar
 
 def f[U: Bar](x: Foo[U]):
     # revealed: bound method Foo[U@f].foo() -> U@f
     reveal_type(x.foo)
+    reveal_type(x.foo())  # revealed: U@f
 ```
 
 ## typing_extensions
