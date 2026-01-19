@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/function.py
 ---
 ## Input
 
@@ -107,7 +106,7 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -62,6 +62,7 @@
+@@ -62,11 +62,13 @@
  ): ...
  def spaces2(result=_core.Value(None)):
      assert fut is self._read_fut, (fut, self._read_fut)
@@ -115,6 +114,13 @@ def __await__(): return (yield)
  
  
  def example(session):
+     result = (
+-        session.query(models.Customer.id)
++        session
++        .query(models.Customer.id)
+         .filter(
+             models.Customer.account_id == account_id,
+             models.Customer.email == email_address,
 ```
 
 ## Ruff Output
@@ -189,7 +195,8 @@ def spaces2(result=_core.Value(None)):
 
 def example(session):
     result = (
-        session.query(models.Customer.id)
+        session
+        .query(models.Customer.id)
         .filter(
             models.Customer.account_id == account_id,
             models.Customer.email == email_address,
