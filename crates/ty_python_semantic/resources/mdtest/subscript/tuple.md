@@ -429,6 +429,5 @@ class Foo: ...
 class Bar: ...
 
 def test4(val: Intersection[tuple[Foo], tuple[Bar]]):
-    # TODO: should be `Foo & Bar`
-    reveal_type(val[0])  # revealed: @Todo(Subscript expressions with intersections)
+    reveal_type(val[0])  # revealed: Foo & Bar
 ```

@@ -14478,14 +14478,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_subscript_expression_types(subscript, value_ty, *element, expr_context)
             })),
 
-            // TODO: we can map over the intersection and fold the results back into an intersection,
-            // but we need to make sure we avoid emitting a diagnostic if one positive element has a `__getitem__`
-            // method but another does not. This means `infer_subscript_expression_types`
-            // needs to return a `Result` rather than eagerly emitting diagnostics.
-            (Type::Intersection(_), _) | (_, Type::Intersection(_)) => {
-                Some(todo_type!("Subscript expressions with intersections"))
-            }
-
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::NominalInstance(nominal), Type::IntLiteral(i64_int)) => nominal
                 .tuple_spec(db)
@@ -14734,13 +14726,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::LiteralString
                 | Type::TypeVar(_)  // TODO: more complex logic required here!
-                | Type::KnownBoundMethod(_),
+                | Type::KnownBoundMethod(_)
+                | Type::Intersection(_),
                 _,
             ) => None,
         };
 
         if let Some(inferred) = inferred {
             return inferred;
+        }
+
+        // For intersections, try to subscript each positive element and intersect the results.
+        // Skip elements that don't support subscripting (no `__getitem__`).
+        if let Type::Intersection(intersection) = value_ty {
+            let mut builder = IntersectionBuilder::new(db);
+            let mut any_succeeded = false;
+
+            for element in intersection.positive(db) {
+                if let Ok(outcome) = element.try_call_dunder(
+                    db,
+                    "__getitem__",
+                    CallArguments::positional([slice_ty]),
+                    TypeContext::default(),
+                ) {
+                    builder = builder.add_positive(outcome.return_type(db));
+                    any_succeeded = true;
+                }
+            }
+
+            if any_succeeded {
+                return builder.build();
+            }
+            // If no element succeeded, fall through to the normal error handling below
         }
 
         // If the class defines `__getitem__`, return its return type.
