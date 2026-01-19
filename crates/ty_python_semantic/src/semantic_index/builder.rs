@@ -48,6 +48,7 @@ use crate::semantic_index::use_def::{
 };
 use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
+use crate::types::PossiblyNarrowedPlaces;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -801,7 +802,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
-    /// [`SemanticIndexBuilder::record_narrowing_constraint_id`].
+    /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
     fn add_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut().add_predicate(predicate)
     }
@@ -812,27 +813,74 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .add_predicate(predicate.negated())
     }
 
-    /// Records a previously added narrowing constraint by adding it to all live bindings.
-    fn record_narrowing_constraint_id(&mut self, predicate: ScopedPredicateId) {
+    /// Records a previously added narrowing constraint by adding it to the live bindings
+    /// of the specified places.
+    fn record_narrowing_constraint_id_for_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+        places: &PossiblyNarrowedPlaces,
+    ) {
         self.current_use_def_map_mut()
-            .record_narrowing_constraint(predicate);
+            .record_narrowing_constraint_for_places(predicate, places);
     }
 
-    /// Adds and records a narrowing constraint, i.e. adds it to all live bindings.
+    /// Adds and records a narrowing constraint for only the places that could possibly be narrowed.
     fn record_narrowing_constraint(&mut self, predicate: PredicateOrLiteral<'db>) {
+        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
         let use_def = self.current_use_def_map_mut();
         let predicate_id = use_def.add_predicate(predicate);
-        use_def.record_narrowing_constraint(predicate_id);
+        use_def.record_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
     }
 
-    /// Negates the given predicate and then adds it as a narrowing constraint to all live
-    /// bindings.
+    /// Computes the conservative set of places that could possibly be narrowed by a predicate.
+    ///
+    /// This uses the closure-based approach to avoid calling Salsa queries that depend on
+    /// the semantic index (which is still being built).
+    fn compute_possibly_narrowed_places(
+        &self,
+        predicate: &PredicateOrLiteral<'db>,
+    ) -> PossiblyNarrowedPlaces {
+        use crate::types::PossiblyNarrowedPlacesBuilder;
+
+        match predicate {
+            PredicateOrLiteral::Literal(_) => PossiblyNarrowedPlaces::default(),
+            PredicateOrLiteral::Predicate(pred) => {
+                let place_table = self.current_place_table();
+                let lookup_place = |place_expr: &PlaceExpr| {
+                    use crate::semantic_index::place::PlaceExprRef;
+                    place_table.place_id(PlaceExprRef::from(place_expr))
+                };
+
+                match pred.node {
+                    PredicateNode::Expression(expression) => {
+                        let module = self.module;
+                        let expression_node = expression.node_ref(self.db, module);
+                        PossiblyNarrowedPlacesBuilder::new(self.db, lookup_place)
+                            .expression(expression_node)
+                    }
+                    PredicateNode::Pattern(pattern) => {
+                        let module = self.module;
+                        PossiblyNarrowedPlacesBuilder::new(self.db, lookup_place)
+                            .pattern(pattern, module)
+                    }
+                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                        // These predicates don't narrow any places
+                        PossiblyNarrowedPlaces::default()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Negates the given predicate and then adds it as a narrowing constraint to the places
+    /// that could possibly be narrowed.
     fn record_negated_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
     ) -> ScopedPredicateId {
+        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
         let id = self.add_negated_predicate(predicate);
-        self.record_narrowing_constraint_id(id);
+        self.record_narrowing_constraint_id_for_places(id, &possibly_narrowed);
         id
     }
 
@@ -2695,6 +2743,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // anymore.
                     if index < values.len() - 1 {
                         let predicate = self.build_predicate(value);
+                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                         let predicate_id = match op {
                             ast::BoolOp::And => self.add_predicate(predicate),
                             ast::BoolOp::Or => self.add_negated_predicate(predicate),
@@ -2717,7 +2766,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
-                        self.record_narrowing_constraint_id(predicate_id);
+                        self.record_narrowing_constraint_id_for_places(
+                            predicate_id,
+                            &possibly_narrowed,
+                        );
                         reachability_constraints.push(reachability_constraint);
                     }
                 }
