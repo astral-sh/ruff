@@ -5693,7 +5693,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
-        #[salsa::tracked(cycle_initial=deferred_spec_initial)]
+        #[salsa::tracked(cycle_initial=deferred_spec_initial, heap_size=ruff_memory_usage::heap_size)]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
             let module = parsed_module(db, definition.file(db)).load(db);
             let node = definition
@@ -5853,7 +5853,12 @@ impl<'db> NamedTupleSpec<'db> {
             .map(|f| {
                 Some(NamedTupleField {
                     name: f.name.clone(),
-                    ty: f.ty.recursive_type_normalized_impl(db, div, nested)?,
+                    ty: if nested {
+                        f.ty.recursive_type_normalized_impl(db, div, nested)?
+                    } else {
+                        f.ty.recursive_type_normalized_impl(db, div, nested)
+                            .unwrap_or(div)
+                    },
                     default: None,
                 })
             })

@@ -153,6 +153,30 @@ n = Node(1, None)
 
 reveal_type(n.value)  # revealed: int
 reveal_type(n.next)  # revealed: Node | None
+
+A = NamedTuple("A", [("x", "B | None")])
+B = NamedTuple("B", [("x", "C")])
+C = NamedTuple("C", [("x", A)])
+
+a = A(x=B(x=C(x=A(x=None))))
+
+reveal_type(a.x)  # revealed: B | None
+
+if a.x:
+    reveal_type(a.x and a.x.x)  # revealed: C
+    reveal_type(a.x and a.x.x.x)  # revealed: A
+    reveal_type(a.x and a.x.x.x.x)  # revealed: B | None
+
+A(x=42)  # error: [invalid-argument-type]
+
+# TODO: uncommenting these causes stack overflows...
+#
+# # error: [invalid-argument-type]
+# # error: [missing-argument]
+# A(x=C())
+
+# # error: [invalid-argument-type]
+# A(x=C(x=A(x=None)))
 ```
 
 ### Functional syntax as base class (dangling call)
@@ -185,6 +209,19 @@ class Node(NamedTuple("Node", [("value", int), ("next", "Node | None")])):
 n = Node(1, None)
 reveal_type(n.value)  # revealed: int
 reveal_type(n.next)  # revealed: Node | None
+
+class A(NamedTuple("A", [("x", "B | None")])): ...
+class B(NamedTuple("B", [("x", "C")])): ...
+class C(NamedTuple("C", [("x", "A")])): ...
+
+reveal_type(A(x=B(x=C(x=A(x=None)))))  # revealed: A
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `B | None`, found `C`"
+# error: [missing-argument] "No argument provided for required parameter `x`"
+A(x=C())
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `B | None`, found `C`"
+A(x=C(x=A(x=None)))
 ```
 
 Note that the string annotation must reference a name that exists in scope. References to the
@@ -203,6 +240,19 @@ n = BadNode(1, None)
 reveal_type(n.value)  # revealed: int
 # X is not in scope, so it resolves to Unknown; None is correctly resolved
 reveal_type(n.next)  # revealed: Unknown | None
+```
+
+Dangling calls cannot contain other dangling calls; that's an invalid type form:
+
+```py
+from ty_extensions import reveal_mro
+
+# error: [invalid-type-form]
+class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A" | None)]))])):
+    pass
+
+# revealed: (<class 'A'>, <class 'B'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(A)
 ```
 
 ### Functional syntax with variable name
