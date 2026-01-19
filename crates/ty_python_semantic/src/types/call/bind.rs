@@ -3458,8 +3458,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         match callable_binding.matching_overload_index() {
             MatchingOverloadIndex::None => {
                 if let [binding] = callable_binding.overloads() {
-                    // This is not an overloaded function, so we can propagate its errors
-                    // to the outer bindings.
+                    // This is not an overloaded function, so we can propagate its errors to the
+                    // outer bindings.
                     self.errors.extend(binding.errors.iter().cloned());
                 } else {
                     let index = callable_binding
