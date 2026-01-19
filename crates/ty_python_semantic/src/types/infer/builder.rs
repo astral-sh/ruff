@@ -6162,7 +6162,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let known_class = func_ty
             .as_class_literal()
             .and_then(|cls| cls.known(self.db()));
-        if let Some(KnownClass::NewType) = known_class {
+        if known_class == Some(KnownClass::NewType) {
             self.infer_newtype_assignment_deferred(arguments);
             return;
         }
@@ -10536,28 +10536,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .posonlyargs
                 .iter()
                 .map(|param| {
-                    let mut parameter = Parameter::positional_only(Some(param.name().id.clone()));
-                    if let Some(default) = param.default() {
-                        parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
-                        );
-                    }
-                    parameter
+                    Parameter::positional_only(Some(param.name().id.clone()))
+                        .with_optional_default_type(param.default().map(|default_expr| {
+                            self.infer_expression(default_expr, TypeContext::default())
+                                .replace_parameter_defaults(self.db())
+                        }))
                 })
                 .collect::<Vec<_>>();
             let positional_or_keyword = parameters
                 .args
                 .iter()
                 .map(|param| {
-                    let mut parameter = Parameter::positional_or_keyword(param.name().id.clone());
-                    if let Some(default) = param.default() {
-                        parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
-                        );
-                    }
-                    parameter
+                    Parameter::positional_or_keyword(param.name().id.clone())
+                        .with_optional_default_type(param.default().map(|default_expr| {
+                            self.infer_expression(default_expr, TypeContext::default())
+                                .replace_parameter_defaults(self.db())
+                        }))
                 })
                 .collect::<Vec<_>>();
             let variadic = parameters
@@ -10568,14 +10562,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .kwonlyargs
                 .iter()
                 .map(|param| {
-                    let mut parameter = Parameter::keyword_only(param.name().id.clone());
-                    if let Some(default) = param.default() {
-                        parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
-                        );
-                    }
-                    parameter
+                    Parameter::keyword_only(param.name().id.clone()).with_optional_default_type(
+                        param.default().map(|default_expr| {
+                            self.infer_expression(default_expr, TypeContext::default())
+                                .replace_parameter_defaults(self.db())
+                        }),
+                    )
                 })
                 .collect::<Vec<_>>();
             let keyword_variadic = parameters
