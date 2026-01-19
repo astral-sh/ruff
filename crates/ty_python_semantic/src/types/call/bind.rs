@@ -327,6 +327,9 @@ impl<'db> Bindings<'db> {
         }
 
         for binding in self {
+            if binding.as_result().is_ok() {
+                continue;
+            }
             let union_diag = UnionDiagnostic {
                 callable_type: self.callable_type(),
                 binding,
