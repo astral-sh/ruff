@@ -60,7 +60,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           persist-credentials: false
           submodules: recursive
@@ -133,7 +133,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           persist-credentials: false
           submodules: recursive
@@ -185,7 +185,7 @@ jobs:
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           persist-credentials: false
           submodules: recursive
@@ -261,7 +261,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           persist-credentials: false
           submodules: recursive
