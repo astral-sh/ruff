@@ -2297,6 +2297,14 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    pub(crate) fn with_optional_default_type(self, default: Option<Type<'db>>) -> Self {
+        if let Some(default) = default {
+            self.with_default_type(default)
+        } else {
+            self
+        }
+    }
+
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self

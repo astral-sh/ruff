@@ -3268,14 +3268,14 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 .with_annotated_type(field_ty);
 
-                if matches!(name, "__replace__" | "_replace") {
+                parameter = if matches!(name, "__replace__" | "_replace") {
                     // When replacing, we know there is a default value for the field
                     // (the value that is currently assigned to the field)
                     // assume this to be the declared type of the field
-                    parameter = parameter.with_default_type(field_ty);
-                } else if let Some(default_ty) = default_ty {
-                    parameter = parameter.with_default_type(default_ty);
-                }
+                    parameter.with_default_type(field_ty)
+                } else {
+                    parameter.with_optional_default_type(default_ty)
+                };
 
                 parameters.push(parameter);
             }
@@ -5321,19 +5321,15 @@ fn synthesize_namedtuple_class_member<'db>(
 
             let generic_context = GenericContext::from_typevar_instances(db, variables);
 
-            let mut parameters = vec![
-                Parameter::positional_or_keyword(Name::new_static("cls"))
-                    .with_annotated_type(SubclassOfType::from(db, self_typevar)),
-            ];
+            let first_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
+                .with_annotated_type(SubclassOfType::from(db, self_typevar));
 
-            for (field_name, field_ty, default_ty) in fields {
-                let mut param =
-                    Parameter::positional_or_keyword(field_name).with_annotated_type(field_ty);
-                if let Some(default) = default_ty {
-                    param = param.with_default_type(default);
-                }
-                parameters.push(param);
-            }
+            let parameters =
+                std::iter::once(first_parameter).chain(fields.map(|(name, ty, default)| {
+                    Parameter::positional_or_keyword(name)
+                        .with_annotated_type(ty)
+                        .with_optional_default_type(default)
+                }));
 
             let signature = Signature::new_generic(
                 Some(generic_context),
@@ -5364,18 +5360,14 @@ fn synthesize_namedtuple_class_member<'db>(
                 BindingContext::Synthetic,
             ));
 
-            let mut parameters = vec![
-                Parameter::positional_or_keyword(Name::new_static("self"))
-                    .with_annotated_type(self_ty),
-            ];
+            let first_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+                .with_annotated_type(self_ty);
 
-            for (field_name, field_ty, _) in fields {
-                parameters.push(
-                    Parameter::keyword_only(field_name)
-                        .with_annotated_type(field_ty)
-                        .with_default_type(field_ty),
-                );
-            }
+            let parameters = std::iter::once(first_parameter).chain(fields.map(|(name, ty, _)| {
+                Parameter::keyword_only(name)
+                    .with_annotated_type(ty)
+                    .with_default_type(ty)
+            }));
 
             let signature = Signature::new(Parameters::new(db, parameters), self_ty);
             Some(Type::function_like_callable(db, signature))
