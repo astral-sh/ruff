@@ -36,6 +36,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// Rewriting `setattr(obj, "ſ", 1)` to `obj.ſ = 1` would be interpreted as `obj.s = 1` at
 /// runtime, changing behavior.
 ///
+/// Additionally, the fix is marked as unsafe if the expression contains comments,
+/// as the replacement may remove comments attached to the original `setattr` call.
+///
 /// For example, the long s character `"ſ"` normalizes to `"s"` under NFKC, so:
 /// ```python
 /// # This creates an attribute with the exact name "ſ"
@@ -111,7 +114,8 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     // attribute syntax (e.g., `obj.attr = value`) would normalize the name and potentially change
     // program behavior.
     let attr_name = name.to_str();
-    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name;
+    let has_comments = checker.comment_ranges().intersects(expr.range());
+    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
 
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
