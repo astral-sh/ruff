@@ -893,11 +893,11 @@ fn type_contains_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     )
 }
 
-fn self_class_literal_for_self_type<'db>(
+fn self_class_mro_for_self_type<'db>(
     db: &'db dyn Db,
     self_type: Type<'db>,
-) -> Option<ClassLiteral<'db>> {
-    match self_type {
+) -> Option<Vec<ClassLiteral<'db>>> {
+    let class_literal = match self_type {
         Type::NominalInstance(instance) => Some(instance.class_literal(db)),
         Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
             typevar.typevar(db).upper_bound(db).and_then(|ty| match ty {
@@ -906,7 +906,15 @@ fn self_class_literal_for_self_type<'db>(
             })
         }
         _ => None,
-    }
+    }?;
+
+    Some(
+        class_literal
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .map(|class| class.class_literal(db))
+            .collect(),
+    )
 }
 
 fn self_typevar_owner_class_literal<'db>(
@@ -977,7 +985,7 @@ impl<'db> Type<'db> {
             db,
             &TypeMapping::BindSelf {
                 self_type,
-                self_class_literal: self_class_literal_for_self_type(db, self_type),
+                self_class_mro: self_class_mro_for_self_type(db, self_type),
                 self_binding_context,
             },
             TypeContext::default(),
@@ -6949,7 +6957,7 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf {
         self_type: Type<'db>,
         /// If `Some`, only bind `Self` typevars whose owner class is in this class's MRO.
-        self_class_literal: Option<ClassLiteral<'db>>,
+        self_class_mro: Option<Vec<ClassLiteral<'db>>>,
         /// If `Some`, only remove `Self` typevars that have this binding context from signatures.
         self_binding_context: Option<BindingContext<'db>>,
     },
@@ -8639,17 +8647,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::BindSelf {
                 self_type,
-                self_class_literal,
+                self_class_mro,
                 self_binding_context: _,
             } => {
                 if self.typevar(db).is_self(db) {
-                    let matches_owner = self_class_literal.is_none_or(|self_class_literal| {
-                        self_typevar_owner_class_literal(db, self).is_none_or(|owner_class| {
-                            self_class_literal
-                                .iter_mro(db)
-                                .filter_map(ClassBase::into_class)
-                                .any(|class| class.class_literal(db) == owner_class)
-                        })
+                    let matches_owner = self_class_mro.as_ref().is_none_or(|self_class_mro| {
+                        self_typevar_owner_class_literal(db, self)
+                            .is_none_or(|owner_class| self_class_mro.iter().any(|class| *class == owner_class))
                     });
 
                     if matches_owner {
