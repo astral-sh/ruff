@@ -42,3 +42,11 @@ print(hex(sys
 
 # for negatives numbers autofix is display-only
 print(bin(-1)[2:])
+
+
+print(
+    bin(
+        1337
+        # text
+    )[2:]
+)
