@@ -7121,7 +7121,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     };
                 Some(NamedTupleField {
-                    name: Name::new(name.value(self.db())),
+                    name: Name::new(name.value(db)),
                     ty: resolved_ty,
                     default: None,
                 })
