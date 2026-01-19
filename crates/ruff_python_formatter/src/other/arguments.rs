@@ -180,7 +180,7 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
     };
 
     // If the expression itself isn't huggable, then we can't hug it.
-    if !(is_expression_huggable(arg, context)
+    if !(is_expression_huggable(arg)
         || StringLike::try_from(arg)
             .is_ok_and(|string| is_huggable_string_argument(string, arguments, context)))
     {
