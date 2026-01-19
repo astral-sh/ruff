@@ -856,6 +856,10 @@ impl<'db> Type<'db> {
         )
     }
 
+    pub const fn is_unknown_generic(&self) -> bool {
+        matches!(self, Type::Dynamic(DynamicType::UnknownGeneric(_)))
+    }
+
     pub(crate) const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -7495,6 +7499,9 @@ pub enum DynamicType<'db> {
     ///
     /// TODO: Once we implement <https://github.com/astral-sh/ty/issues/1711>, this variant might
     /// not be needed anymore.
+    ///
+    /// This is also used to represent unspecialized inferable type variables from an outer
+    /// generic context during nested generic call inference.
     UnknownGeneric(GenericContext<'db>),
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
