@@ -398,3 +398,84 @@ d = D()
 if d.c is not None and d.c[0].x[0] is not None:
     reveal_type(d.c[0].x[0])  # revealed: int
 ```
+
+## Narrowing with negative subscripts
+
+Narrowing should work with negative subscripts like `x[-1]`:
+
+```py
+def _(x: list[int | None]):
+    if x[-1] is not None:
+        reveal_type(x[-1])  # revealed: int
+
+def _(x: list[str | None]):
+    if x[-1] is None:
+        reveal_type(x[-1])  # revealed: None
+    else:
+        reveal_type(x[-1])  # revealed: str
+```
+
+Nested negative subscripts should also work:
+
+```py
+def _(x: list[list[int | None]]):
+    if x[-1][-1] is not None:
+        reveal_type(x[-1][-1])  # revealed: int
+```
+
+Mixed positive and negative subscripts:
+
+```py
+def _(x: list[list[int | None]]):
+    if x[0][-1] is not None:
+        reveal_type(x[0][-1])  # revealed: int
+
+    if x[-1][0] is not None:
+        reveal_type(x[-1][0])  # revealed: int
+```
+
+Attribute access combined with negative subscripts:
+
+```py
+class Container:
+    items: list[int | None]
+
+def _(c: Container):
+    if c.items[-1] is not None:
+        reveal_type(c.items[-1])  # revealed: int
+```
+
+Multiple conditions in an `and` chain:
+
+```py
+def _(x: list[int | None]):
+    # Narrowing should persist through `and` chains
+    if x[-1] is not None and x[-1] > 0:
+        reveal_type(x[-1])  # revealed: int
+```
+
+Negative indices with tuples:
+
+```py
+def _(t: tuple[int, str, None] | tuple[None, None, int]):
+    if t[-1] is not None:
+        reveal_type(t)  # revealed: tuple[None, None, int]
+    else:
+        reveal_type(t)  # revealed: tuple[int, str, None]
+
+    if t[-3] is not None:
+        reveal_type(t)  # revealed: tuple[int, str, None]
+```
+
+## Narrowing with explicit positive subscripts
+
+Narrowing should work with explicit positive subscripts like `x[+1]`:
+
+```py
+def _(x: list[int | None]):
+    if x[+0] is not None:
+        reveal_type(x[+0])  # revealed: int
+
+    if x[+1] is not None:
+        reveal_type(x[+1])  # revealed: int
+```
