@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.14.14
+
+Released on 2026-01-19.
+
+### Preview features
+
+- Skip walking all tokens when loading range suppressions ([#22446](https://github.com/astral-sh/ruff/pull/22446))
+- \[`airflow`\] Second positional argument to `Asset`/`Dataset` should not be a dictionary (`AIR303`) ([#22453](https://github.com/astral-sh/ruff/pull/22453))
+- \[`ruff`\] Detect duplicate entries in `__all__` (`RUF068`) ([#22114](https://github.com/astral-sh/ruff/pull/22114))
+
+### Bug fixes
+
+- `PIE794`: Detect duplicated declared class fields ([#22717](https://github.com/astral-sh/ruff/pull/22717))
+
+### Rule changes
+
+- Combine suppression code diagnostics ([#22613](https://github.com/astral-sh/ruff/pull/22613))
+- \[`flake8-bugbear`\] Mark fix unsafe when it would remove comments (`B033`) ([#22632](https://github.com/astral-sh/ruff/pull/22632))
+- \[`ruff`\] Add exception for `ctypes.Structure._fields_` (`RUF012`) ([#22559](https://github.com/astral-sh/ruff/pull/22559))
+
+### Contributors
+
+- [@caiquejjx](https://github.com/caiquejjx)
+- [@amyreese](https://github.com/amyreese)
+- [@leandrobbraga](https://github.com/leandrobbraga)
+- [@sjyangkevin](https://github.com/sjyangkevin)
+- [@MichaReiser](https://github.com/MichaReiser)
+
 ## 0.14.13
 
 Released on 2026-01-15.
