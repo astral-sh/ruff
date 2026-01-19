@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/lambda.py
 ---
 ## Input
 ```python
@@ -809,6 +808,10 @@ transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).betwe
     (  # leading-body-end-of-line
         x
     )
+)
+
+lambda x: (
+    x := 1
 )
 ```
 
@@ -1649,6 +1652,8 @@ transform = (
         x
     )
 )
+
+lambda x: (x := 1)
 ```
 
 
