@@ -10756,6 +10756,15 @@ impl<'db> CallableTypes<'db> {
     }
 }
 
+impl<'a, 'db> IntoIterator for &'a CallableTypes<'db> {
+    type Item = CallableType<'db>;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'a, CallableType<'db>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter().copied()
+    }
+}
+
 /// Represents a specific instance of a bound method type for a builtin class.
 ///
 /// Unlike bound methods of user-defined classes, these are not generally instances
