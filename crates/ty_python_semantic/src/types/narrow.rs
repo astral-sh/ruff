@@ -1510,6 +1510,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let value_ty =
             infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
 
+        // For transparent enums (StrEnum, IntEnum), when is_positive is true and the subject
+        // is a primitive literal that equals the enum's underlying value, narrow to that literal.
+        if is_positive {
+            if let Some(underlying_value) = value_ty.transparent_enum_underlying_value(self.db) {
+                if subject_ty.is_single_valued(self.db)
+                    && subject_ty.is_equivalent_to(self.db, underlying_value)
+                {
+                    return Some(NarrowingConstraints::from_iter([(
+                        place,
+                        NarrowingConstraint::intersection(subject_ty),
+                    )]));
+                }
+            }
+        }
+
         let mut constraints = self
             .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
             .map(|ty| {

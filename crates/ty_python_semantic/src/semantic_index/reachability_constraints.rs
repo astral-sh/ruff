@@ -329,7 +329,17 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
     match kind {
         PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
         PatternPredicateKind::Value(value) => {
-            infer_expression_type(db, *value, TypeContext::default())
+            let value_ty = infer_expression_type(db, *value, TypeContext::default());
+
+            // For transparent enums (StrEnum, IntEnum), the pattern also matches
+            // the underlying primitive value. E.g., case Color.GREEN: matches both
+            // EnumLiteral(Color.GREEN) and StringLiteral("g") if GREEN = "g".
+            if let Some(underlying_value) = value_ty.transparent_enum_underlying_value(db) {
+                // Return a union of both the enum literal and its underlying value
+                return UnionType::from_elements(db, [value_ty, underlying_value]);
+            }
+
+            value_ty
         }
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
@@ -779,7 +789,26 @@ impl ReachabilityConstraints {
                 let value_ty = infer_expression_type(db, *value, TypeContext::default());
 
                 if subject_ty.is_single_valued(db) {
-                    Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
+                    // Check standard equivalence first
+                    if subject_ty.is_equivalent_to(db, value_ty) {
+                        return Truthiness::AlwaysTrue;
+                    }
+
+                    // For transparent enums (StrEnum, IntEnum), also check if subject matches
+                    // the enum's underlying value. E.g., StringLiteral("g") can match Color.GREEN
+                    // if Color is a StrEnum with GREEN = "g".
+                    if let Some(underlying_value) = value_ty.transparent_enum_underlying_value(db) {
+                        if subject_ty.is_equivalent_to(db, underlying_value) {
+                            return Truthiness::AlwaysTrue;
+                        }
+                        // If the underlying value is not single-valued (e.g., `int` instead of
+                        // `IntLiteral(1)`), we can't statically determine if the match succeeds.
+                        if !underlying_value.is_single_valued(db) {
+                            return Truthiness::Ambiguous;
+                        }
+                    }
+
+                    Truthiness::AlwaysFalse
                 } else {
                     Truthiness::Ambiguous
                 }

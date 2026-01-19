@@ -18,6 +18,8 @@ use crate::{
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
+    /// Whether this enum has transparent equality semantics (`StrEnum`, `IntEnum`, etc.)
+    pub(crate) has_transparent_equality: bool,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
@@ -27,6 +29,7 @@ impl EnumMetadata<'_> {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
+            has_transparent_equality: false,
         }
     }
 
@@ -294,7 +297,13 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    Some(EnumMetadata { members, aliases })
+    let has_transparent_equality = compute_has_transparent_equality(db, class);
+
+    Some(EnumMetadata {
+        members,
+        aliases,
+        has_transparent_equality,
+    })
 }
 
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(
@@ -356,4 +365,39 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
         }
         _ => None,
     }
+}
+
+/// Checks if an enum class has "transparent" equality semantics.
+///
+/// Transparent enums like `StrEnum` and `IntEnum` compare equal to their
+/// underlying primitive values at runtime (e.g., `Color.GREEN == "g"` is True
+/// if `GREEN = "g"`).
+///
+/// This is a helper function used during `EnumMetadata` computation.
+/// For cached access, use `enum_metadata().has_transparent_equality` instead.
+fn compute_has_transparent_equality<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let class_type = Type::ClassLiteral(ClassLiteral::Static(class));
+
+    // Check if it's a StrEnum subclass
+    if class_type.is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db)) {
+        return true;
+    }
+
+    // For IntEnum, we need to check if the class inherits from int and Enum.
+    // IntEnum is in the enum module and classes inheriting from (int, Enum) also
+    // have transparent equality.
+    if !class_type.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
+        return false;
+    }
+
+    // Check if the class has `int` in its MRO (for IntEnum or custom (int, Enum) classes).
+    for base in class.iter_mro(db, None) {
+        if let Some(base_class) = base.into_class() {
+            if base_class.known(db) == Some(KnownClass::Int) {
+                return true;
+            }
+        }
+    }
+
+    false
 }

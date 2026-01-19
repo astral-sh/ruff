@@ -992,6 +992,22 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// For transparent enum literals (`StrEnum`, `IntEnum`), returns the underlying primitive value.
+    /// Returns `None` if this is not a transparent enum literal.
+    ///
+    /// Transparent enums compare equal to their underlying primitive values at runtime.
+    /// For example, `Color.GREEN == "g"` returns `True` if `Color` is a `StrEnum` with `GREEN = "g"`.
+    pub(crate) fn transparent_enum_underlying_value(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if let Type::EnumLiteral(enum_lit) = self {
+            let class = enum_lit.enum_class(db);
+            let metadata = enums::enum_metadata(db, class)?;
+            if metadata.has_transparent_equality {
+                return metadata.members.get(enum_lit.name(db)).copied();
+            }
+        }
+        None
+    }
+
     fn is_typealias_special_form(&self) -> bool {
         matches!(self, Type::SpecialForm(SpecialFormType::TypeAlias))
     }
