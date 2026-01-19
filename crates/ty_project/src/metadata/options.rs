@@ -480,8 +480,13 @@ impl Options {
         let mut overrides = Vec::with_capacity(override_options.len());
 
         for override_option in override_options {
-            let override_instance =
-                override_option.to_override(db, project_root, self.rules.as_ref(), diagnostics)?;
+            let override_instance = override_option.to_override(
+                db,
+                project_root,
+                self.rules.as_ref(),
+                self.analysis.as_ref(),
+                diagnostics,
+            )?;
 
             if let Some(value) = override_instance {
                 overrides.push(value);
@@ -850,7 +855,6 @@ impl SrcOptions {
 )]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
-    #[get_size(ignore)] // TODO: Add `GetSize` support for `OrderMap`.
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
@@ -1267,6 +1271,7 @@ pub struct TerminalOptions {
     Clone,
     Eq,
     PartialEq,
+    Hash,
     Combine,
     Serialize,
     Deserialize,
@@ -1293,11 +1298,11 @@ pub struct AnalysisOptions {
         respect-type-ignore-comments = false
         "#
     )]
-    respect_type_ignore_comments: Option<bool>,
+    pub respect_type_ignore_comments: Option<bool>,
 }
 
 impl AnalysisOptions {
-    fn to_settings(&self) -> AnalysisSettings {
+    pub(super) fn to_settings(&self) -> AnalysisSettings {
         let AnalysisSettings {
             respect_type_ignore_comments: respect_type_ignore_default,
         } = AnalysisSettings::default();
@@ -1447,6 +1452,10 @@ pub struct OverrideOptions {
         "#
     )]
     pub rules: Option<Rules>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
+    pub analysis: Option<AnalysisOptions>,
 }
 
 impl RangedValue<OverrideOptions> {
@@ -1455,36 +1464,49 @@ impl RangedValue<OverrideOptions> {
         db: &dyn Db,
         project_root: &SystemPath,
         global_rules: Option<&Rules>,
+        global_analysis: Option<&AnalysisOptions>,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> Result<Option<Override>, Box<OptionDiagnostic>> {
         let rules = self.rules.or_default();
+        let analysis = self.analysis.or_default();
 
         // First, warn about incorrect or useless overrides.
-        if rules.is_empty() {
+        if rules.is_empty() && *analysis == AnalysisOptions::default() {
             let mut diagnostic = OptionDiagnostic::new(
                 DiagnosticId::UselessOverridesSection,
                 "Useless `overrides` section".to_string(),
                 Severity::Warning,
             );
 
-            diagnostic = if self.rules.is_none() {
+            diagnostic = if self.rules.is_none() && self.analysis.is_none() {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
-                    "It has no `rules` table",
+                    "It has no `rules` or `analysis` table",
                 ));
                 diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
-                    "Add a `[overrides.rules]` table...",
+                    "Add a `[overrides.rules]` or `[overrides.analysis]` table...",
                 ))
             } else {
-                diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    "The rules table is empty",
-                ));
-                diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    "Add a rule to `[overrides.rules]` to override specific rules...",
-                ))
+                if self.rules.is_some() && rules.is_empty() {
+                    diagnostic = diagnostic.sub(SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        "The `rules` table is empty",
+                    ));
+                    diagnostic = diagnostic.sub(SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        "Add a rule to `[overrides.rules]` to override specific rules...",
+                    ));
+                }
+
+                if self.analysis.is_some() && *analysis == AnalysisOptions::default() {
+                    diagnostic = diagnostic.sub(SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        "The `analysis` table is empty",
+                    ));
+                }
+
+                diagnostic
             };
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
@@ -1497,7 +1519,7 @@ impl RangedValue<OverrideOptions> {
                 if let Ok(file) = system_path_to_file(db, source_file) {
                     let annotation =
                         Annotation::primary(Span::from(file).with_optional_range(self.range()))
-                            .message("This overrides section configures no rules");
+                            .message("This overrides section overrides no settings");
                     diagnostic = diagnostic.with_annotation(Some(annotation));
                 }
             }
@@ -1586,13 +1608,23 @@ impl RangedValue<OverrideOptions> {
         // Convert merged rules to rule selection
         let rule_selection = merged_rules.to_rule_selection(db, diagnostics);
 
+        let mut merged_analysis = analysis.into_owned();
+
+        if let Some(global_analysis) = global_analysis {
+            merged_analysis = merged_analysis.combine(global_analysis.clone());
+        }
+
+        let analysis = merged_analysis.to_settings();
+
         let override_instance = Override {
             files,
             options: Arc::new(InnerOverrideOptions {
                 rules: self.rules.clone(),
+                analysis: self.analysis.clone(),
             }),
             settings: Arc::new(OverrideSettings {
                 rules: rule_selection,
+                analysis,
             }),
         };
 
@@ -1606,6 +1638,8 @@ pub(super) struct InnerOverrideOptions {
     /// Raw rule options as specified in the configuration.
     /// Used when multiple overrides match a file and need to be merged.
     pub(super) rules: Option<Rules>,
+
+    pub(super) analysis: Option<AnalysisOptions>,
 }
 
 /// Error returned when the settings can't be resolved because of a hard error.

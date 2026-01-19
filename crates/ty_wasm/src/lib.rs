@@ -58,8 +58,6 @@ pub fn before_main() {}
 
 #[wasm_bindgen(start)]
 pub fn run() {
-    use log::Level;
-
     before_main();
 
     ruff_db::set_program_version(version()).unwrap();
@@ -72,8 +70,38 @@ pub fn run() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
 
-    console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+/// Initializes the logger with the given log level.
+///
+/// ## Panics
+/// If this function is called more than once.
+#[wasm_bindgen(js_name = "initLogging")]
+pub fn init_logging(level: LogLevel) {
+    console_log::init_with_level(level.into())
+        .expect("`initLogging` to only be called at most once.");
+}
+
+#[derive(Copy, Clone, Debug)]
+#[wasm_bindgen]
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -428,7 +456,8 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|comp| {
-                let kind = comp.kind(&self.db).map(CompletionKind::from);
+                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let kind = comp.kind.map(CompletionKind::from);
                 let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
                     let range = Range::from_text_range(
@@ -443,7 +472,7 @@ impl Workspace {
                     }
                 });
                 Completion {
-                    name: comp.name.into(),
+                    name,
                     kind,
                     detail: type_display,
                     module_name: comp.module_name.map(ToString::to_string),

@@ -314,6 +314,75 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
+## Union of `TypedDict`
+
+When assigning to a union of `TypedDict` types, the type will be narrowed based on the dictionary
+literal:
+
+```py
+from typing import TypedDict
+from typing_extensions import NotRequired
+
+class Foo(TypedDict):
+    foo: int
+
+x1: Foo | None = {"foo": 1}
+reveal_type(x1)  # revealed: Foo
+
+class Bar(TypedDict):
+    bar: int
+
+x2: Foo | Bar = {"foo": 1}
+reveal_type(x2)  # revealed: Foo
+
+x3: Foo | Bar = {"bar": 1}
+reveal_type(x3)  # revealed: Bar
+
+x4: Foo | Bar | None = {"bar": 1}
+reveal_type(x4)  # revealed: Bar
+
+# error: [invalid-assignment]
+x5: Foo | Bar = {"baz": 1}
+reveal_type(x5)  # revealed: Foo | Bar
+
+class FooBar1(TypedDict):
+    foo: int
+    bar: int
+
+class FooBar2(TypedDict):
+    foo: int
+    bar: int
+
+class FooBar3(TypedDict):
+    foo: int
+    bar: int
+    baz: NotRequired[int]
+
+x6: FooBar1 | FooBar2 = {"foo": 1, "bar": 1}
+reveal_type(x6)  # revealed: FooBar1 | FooBar2
+
+x7: FooBar1 | FooBar3 = {"foo": 1, "bar": 1}
+reveal_type(x7)  # revealed: FooBar1 | FooBar3
+
+x8: FooBar1 | FooBar2 | FooBar3 | None = {"foo": 1, "bar": 1}
+reveal_type(x8)  # revealed: FooBar1 | FooBar2 | FooBar3
+```
+
+In doing so, may have to infer the same type with multiple distinct type contexts:
+
+```py
+from typing import TypedDict
+
+class NestedFoo(TypedDict):
+    foo: list[FooBar1]
+
+class NestedBar(TypedDict):
+    foo: list[FooBar2]
+
+x1: NestedFoo | NestedBar = {"foo": [{"foo": 1, "bar": 1}]}
+reveal_type(x1)  # revealed: NestedFoo | NestedBar
+```
+
 ## Type ignore compatibility issues
 
 Users should be able to ignore TypedDict validation errors with `# type: ignore`
@@ -2264,6 +2333,118 @@ def match_with_dict(u: Foo | Bar | dict):
             # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
             # false negative in `is_disjoint_impl`.
             reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+```
+
+## Only annotated declarations are allowed in the class body
+
+<!-- snapshot-diagnostics -->
+
+`TypedDict` class bodies are very restricted in what kinds of statements they can contain. Besides
+annotated items, the only allowed statements are docstrings and `pass`. Annotated items are are also
+not allowed to have a value.
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    """docstring"""
+
+    annotated_item: int
+    """attribute docstring"""
+
+    pass
+
+    # As a non-standard but common extension, we interpret `...` as equivalent to `pass`.
+    ...
+
+class Bar(TypedDict):
+    a: int
+    # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
+    42
+    # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
+    b: str = "hello"
+    # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
+    def bar(self): ...
+```
+
+These rules are also enforced for `TypedDict` classes that don't directly inherit from `TypedDict`:
+
+```py
+class Baz(Bar):
+    # error: [invalid-typed-dict-statement]
+    def baz(self):
+        pass
+```
+
+## `TypedDict` with `@dataclass` decorator
+
+Applying `@dataclass` to a `TypedDict` class is conceptually incoherent: `TypedDict` defines
+abstract structural types where "instantiating" always gives you a plain `dict` at runtime, whereas
+`@dataclass` is a tool for customising the creation of new nominal types. An exception may be raised
+when instantiating the class at runtime:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+@dataclass
+# error: [invalid-dataclass] "`TypedDict` class `Foo` cannot be decorated with `@dataclass`"
+class Foo(TypedDict):
+    x: int
+    y: str
+```
+
+The same error occurs with `dataclasses.dataclass` used with parentheses:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+@dataclass()
+# error: [invalid-dataclass]
+class Bar(TypedDict):
+    x: int
+```
+
+It also applies when using `frozen=True` or other dataclass parameters:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+@dataclass(frozen=True)
+# error: [invalid-dataclass]
+class Baz(TypedDict):
+    x: int
+```
+
+Classes that inherit from a `TypedDict` subclass (indirectly inheriting from `TypedDict`) are also
+TypedDict classes and cannot be decorated with `@dataclass`:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+class Base(TypedDict):
+    x: int
+
+@dataclass
+# error: [invalid-dataclass]
+class Child(Base):
+    y: str
+```
+
+The functional `TypedDict` syntax is not yet fully supported, so we don't currently emit an error
+for it. Once functional `TypedDict` support is added, this should also emit an error:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+# TODO: This should error once functional TypedDict is supported
+@dataclass
+class Foo(TypedDict("Foo", {"x": int, "y": str})):
+    pass
 ```
 
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly

@@ -10,6 +10,12 @@ Run all tests (using `nextest` for faster execution):
 cargo nextest run
 ```
 
+For faster test execution, use the `fast-test` profile which enables optimizations while retaining debug info:
+
+```sh
+cargo nextest run --cargo-profile fast-test
+```
+
 Run tests for a specific crate:
 
 ```sh
@@ -59,6 +65,8 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - All changes must be tested. If you're not testing your changes, you're not done.
 - Get your tests to pass. If you didn't run the tests, your code does not work.
 - Follow existing code style. Check neighboring files for patterns.
-- Always run `uvx pre-commit run -a` at the end of a task.
+- Always run `uvx prek run -a` at the end of a task.
 - Avoid writing significant amounts of new code. This is often a sign that we're missing an existing method or mechanism that could help solve the problem. Look for existing utilities first.
 - Avoid falling back to patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system.
+- Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability.
+- If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible.

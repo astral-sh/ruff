@@ -1305,7 +1305,7 @@ mod tests {
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         let _s = settings.bind_to_scope();
 
-        assert_snapshot!(str::from_utf8(&buf)?, @r"
+        assert_snapshot!(str::from_utf8(&buf)?, @"
         io: test.py: Permission denied
         --> test.py:1:1
 

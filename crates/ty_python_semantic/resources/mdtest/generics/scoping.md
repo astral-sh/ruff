@@ -153,7 +153,7 @@ already solved and specialized when the class was specialized:
 from ty_extensions import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
-reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S@m) -> S@m
+reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S) -> S
 # revealed: ty_extensions.GenericContext[T@Legacy]
 reveal_type(generic_context(Legacy))
 # revealed: ty_extensions.GenericContext[Self@m, S@m]
@@ -342,6 +342,29 @@ class C[T]:
 
     class Inner[S]: ...
     ok2: Inner[T]
+```
+
+## Mixed-scope type parameters
+
+Methods can have type parameters that are scoped to the method itself, while also referring to type
+parameters from the enclosing class.
+
+```py
+from typing import Generic, TypeVar
+
+from ty_extensions import into_callable
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Foo(Generic[T]):
+    def bar(self, x: T, y: S) -> tuple[T, S]:
+        raise NotImplementedError
+
+def f(x: type[Foo[T]]) -> T:
+    # revealed: [S](self, x: T@f, y: S) -> tuple[T@f, S]
+    reveal_type(into_callable(x.bar))
+    raise NotImplementedError
 ```
 
 [scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables

@@ -1,11 +1,13 @@
-use crate::Db;
 use crate::types::class::CodeGeneratorKind;
-use crate::types::generics::Specialization;
+use crate::types::generics::{ApplySpecialization, Specialization};
+use crate::types::mro::MroIterator;
+use crate::{Db, DisplaySettings};
+
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
-    TypeContext, TypeMapping, todo_type,
+    MaterializationKind, NormalizedVisitor, SpecialFormType, StaticMroError, Type, TypeContext,
+    TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -75,10 +77,7 @@ impl<'db> ClassBase<'db> {
 
     /// Return a `ClassBase` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
-        KnownClass::Object
-            .to_class_literal(db)
-            .to_class_type(db)
-            .map_or(Self::unknown(), Self::Class)
+        Self::Class(ClassType::object(db))
     }
 
     pub(super) const fn is_typed_dict(self) -> bool {
@@ -248,7 +247,8 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::Generic => Some(Self::Generic),
 
                 SpecialFormType::NamedTuple => {
-                    let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                    let class = subclass.as_static()?;
+                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,
                         TupleType::heterogeneous(
@@ -312,6 +312,16 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    /// Return the metaclass of this class base.
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Class(class) => class.metaclass(db),
+            Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
+            Self::Protocol | Self::Generic | Self::TypedDict => KnownClass::Type.to_instance(db),
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -335,7 +345,9 @@ impl<'db> ClassBase<'db> {
         if let Some(specialization) = specialization {
             let new_self = self.apply_type_mapping_impl(
                 db,
-                &TypeMapping::Specialization(specialization),
+                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                    specialization,
+                )),
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );
@@ -360,10 +372,16 @@ impl<'db> ClassBase<'db> {
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
         match self {
             ClassBase::Class(class) => {
-                let (class_literal, specialization) = class.class_literal(db);
+                let Some((class_literal, specialization)) = class.static_class_literal(db) else {
+                    // Dynamic classes can't have cyclic MRO since their bases must
+                    // already exist at creation time. Unlike statement classes, we do not
+                    // permit dynamic classes to have forward references in their
+                    // bases list.
+                    return false;
+                };
                 class_literal
                     .try_mro(db, specialization)
-                    .is_err_and(MroError::is_cycle)
+                    .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Dynamic(_)
             | ClassBase::Generic
@@ -390,16 +408,27 @@ impl<'db> ClassBase<'db> {
     }
 
     pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
+        self.display_with(db, DisplaySettings::default())
+    }
+
+    pub(super) fn display_with(
+        self,
+        db: &'db dyn Db,
+        display_settings: DisplaySettings<'db>,
+    ) -> impl std::fmt::Display {
         struct ClassBaseDisplay<'db> {
             db: &'db dyn Db,
             base: ClassBase<'db>,
+            settings: DisplaySettings<'db>,
         }
 
         impl std::fmt::Display for ClassBaseDisplay<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Class(class) => Type::from(class).display(self.db).fmt(f),
+                    ClassBase::Class(class) => Type::from(class)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt(f),
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
                     ClassBase::TypedDict => f.write_str("typing.TypedDict"),
@@ -407,7 +436,11 @@ impl<'db> ClassBase<'db> {
             }
         }
 
-        ClassBaseDisplay { db, base: self }
+        ClassBaseDisplay {
+            db,
+            base: self,
+            settings: display_settings,
+        }
     }
 }
 

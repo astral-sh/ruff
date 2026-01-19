@@ -86,7 +86,7 @@ class MyClass: ...
 def get_MyClass() -> MyClass:
     from . import make_MyClass
 
-    # error: [invalid-return-type] "Return type does not match returned value: expected `package.foo.MyClass @ src/package/foo.py:1`, found `package.foo.MyClass @ src/package/foo.pyi:1`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `package.foo.MyClass @ src/package/foo.py:1:7`, found `package.foo.MyClass @ src/package/foo.pyi:1:7`"
     return make_MyClass()
 ```
 

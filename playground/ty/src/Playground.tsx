@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react";
 import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
@@ -24,15 +25,22 @@ export default function Playground() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [files, dispatchFiles] = useReducer(filesReducer, INIT_FILES_STATE);
 
-  const [workspacePromise] = useState<Promise<Workspace>>(() =>
-    startPlayground().then((fetched) => {
+  const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
+  if (workspacePromiseRef.current == null) {
+    workspacePromiseRef.current = startPlayground().then((fetched) => {
       setVersion(fetched.version);
       const workspace = new Workspace("/", PositionEncoding.Utf16, {});
       restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
       setWorkspace(workspace);
       return workspace;
-    }),
-  );
+    });
+  }
+  // This is safe as this is only called once on startup.
+  // We need useRef to avoid duplicate initialization when
+  // running locally due to react rendering
+  // everything twice in strict mode in debug builds.
+  // eslint-disable-next-line react-hooks/refs
+  const workspacePromise = workspacePromiseRef.current;
 
   const fileName = useMemo(() => {
     return (
@@ -50,7 +58,7 @@ export default function Playground() {
     }
   }, [files]);
 
-  const handleFileAdded = (workspace: Workspace, name: string) => {
+  const handleFileAdded = useCallback((workspace: Workspace, name: string) => {
     let handle = null;
 
     if (name === SETTINGS_FILE_NAME) {
@@ -60,69 +68,74 @@ export default function Playground() {
     }
 
     dispatchFiles({ type: "add", name, handle, content: "" });
-  };
+  }, []);
 
-  const handleFileChanged = (workspace: Workspace, content: string) => {
-    if (files.selected == null) {
-      return;
-    }
+  const handleFileChanged = useCallback(
+    (workspace: Workspace, content: string) => {
+      if (files.selected == null) {
+        return;
+      }
 
-    dispatchFiles({
-      type: "change",
-      id: files.selected,
-      content,
-    });
+      const handle = files.handles[files.selected];
 
-    const handle = files.handles[files.selected];
+      if (handle != null) {
+        updateFile(workspace, handle, content, setError);
+      } else if (fileName === SETTINGS_FILE_NAME) {
+        updateOptions(workspace, content, setError);
+      }
 
-    if (handle != null) {
-      updateFile(workspace, handle, content, setError);
-    } else if (fileName === SETTINGS_FILE_NAME) {
-      updateOptions(workspace, content, setError);
-    }
-  };
+      dispatchFiles({
+        type: "change",
+        id: files.selected,
+        content,
+      });
+    },
+    [fileName, files.handles, files.selected],
+  );
 
-  const handleFileRenamed = (
-    workspace: Workspace,
-    file: FileId,
-    newName: string,
-  ) => {
-    if (newName.startsWith("/")) {
-      setError("File names cannot start with '/'.");
-      return;
-    }
-    if (newName.startsWith("vendored:")) {
-      setError("File names cannot start with 'vendored:'.");
-      return;
-    }
+  const handleFileRenamed = useCallback(
+    (workspace: Workspace, file: FileId, newName: string) => {
+      if (newName.startsWith("/")) {
+        setError("File names cannot start with '/'.");
+        return;
+      }
+      if (newName.startsWith("vendored:")) {
+        setError("File names cannot start with 'vendored:'.");
+        return;
+      }
 
-    const handle = files.handles[file];
-    let newHandle: FileHandle | null = null;
-    if (handle == null) {
-      updateOptions(workspace, null, setError);
-    } else {
-      workspace.closeFile(handle);
-    }
+      const handle = files.handles[file];
+      let newHandle: FileHandle | null = null;
+      if (handle == null) {
+        updateOptions(workspace, null, setError);
+      } else {
+        workspace.closeFile(handle);
+      }
 
-    if (newName === SETTINGS_FILE_NAME) {
-      updateOptions(workspace, files.contents[file], setError);
-    } else {
-      newHandle = workspace.openFile(newName, files.contents[file]);
-    }
+      if (newName === SETTINGS_FILE_NAME) {
+        updateOptions(workspace, files.contents[file], setError);
+      } else {
+        newHandle = workspace.openFile(newName, files.contents[file]);
+      }
 
-    dispatchFiles({ type: "rename", id: file, to: newName, newHandle });
-  };
+      dispatchFiles({ type: "rename", id: file, to: newName, newHandle });
+    },
+    [files.contents, files.handles],
+  );
 
-  const handleFileRemoved = (workspace: Workspace, file: FileId) => {
-    const handle = files.handles[file];
-    if (handle == null) {
-      updateOptions(workspace, null, setError);
-    } else {
-      workspace.closeFile(handle);
-    }
+  const handleFileRemoved = useCallback(
+    (workspace: Workspace, file: FileId) => {
+      const handle = files.handles[file];
+      if (handle == null) {
+        updateOptions(workspace, null, setError);
+      } else {
+        workspace.closeFile(handle);
+      }
 
-    dispatchFiles({ type: "remove", id: file });
-  };
+      dispatchFiles({ type: "remove", id: file });
+    },
+    [files.handles],
+  );
 
   const handleFileSelected = useCallback((file: FileId) => {
     dispatchFiles({ type: "selectFile", id: file });
@@ -494,6 +507,13 @@ export interface InitializedPlayground {
 async function startPlayground(): Promise<InitializedPlayground> {
   const ty = await import("ty_wasm");
   await ty.default();
+
+  if (import.meta.env.DEV) {
+    ty.initLogging(ty.LogLevel.Debug);
+  } else {
+    ty.initLogging(ty.LogLevel.Info);
+  }
+
   const version = ty.version();
   const monaco = await loader.init();
 

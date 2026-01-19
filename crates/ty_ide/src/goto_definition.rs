@@ -326,7 +326,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:3:5
           |
@@ -373,7 +373,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> mymodule.pyi:2:7
           |
@@ -427,7 +427,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:3:5
           |
@@ -486,7 +486,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:4:3
           |
@@ -589,7 +589,7 @@ class MyClass: ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:2:22
           |
@@ -623,7 +623,7 @@ my_func(my_other_func(ab=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:23
           |
@@ -661,7 +661,7 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:6:23
           |
@@ -699,7 +699,7 @@ my_func(my_other_func(ab=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:23
           |
@@ -737,7 +737,7 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:6:23
           |
@@ -1088,7 +1088,7 @@ a <CURSOR>+ b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
           --> main.py:10:3
            |
@@ -1125,7 +1125,7 @@ B() <CURSOR>+ A()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:8:5
           |
@@ -1164,7 +1164,7 @@ a<CURSOR>+b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
           --> main.py:10:2
            |
@@ -1203,7 +1203,7 @@ a+<CURSOR>b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
           --> main.py:10:3
            |
@@ -1262,7 +1262,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1300,7 +1300,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1337,7 +1337,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1374,7 +1374,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:2
           |
@@ -1412,7 +1412,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1449,7 +1449,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1490,7 +1490,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:8:1
           |
@@ -1530,7 +1530,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1647,6 +1647,103 @@ Traceb<CURSOR>ackType
             .build();
 
         assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    /// goto-definition on a dynamic class literal (created via `type()`)
+    #[test]
+    fn goto_definition_dynamic_class_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+DynClass = type("DynClass", (), {})
+
+x = DynCla<CURSOR>ss()
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:5
+          |
+        2 | DynClass = type("DynClass", (), {})
+        3 |
+        4 | x = DynClass()
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 2 definitions
+           --> main.py:2:1
+            |
+          2 | DynClass = type("DynClass", (), {})
+            | --------
+          3 |
+          4 | x = DynClass()
+            |
+           ::: stdlib/builtins.pyi:137:9
+            |
+        135 |     def __class__(self, type: type[Self], /) -> None: ...
+        136 |     def __init__(self) -> None: ...
+        137 |     def __new__(cls) -> Self: ...
+            |         -------
+        138 |     # N.B. `object.__setattr__` and `object.__delattr__` are heavily special-cased by type checkers.
+        139 |     # Overriding them in subclasses has different semantics, even if the override has an identical signature.
+            |
+        "#);
+    }
+
+    /// goto-definition on a dangling dynamic class literal (not assigned to a variable)
+    #[test]
+    fn goto_definition_dangling_dynamic_class_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class Foo(type("Ba<CURSOR>r", (), {})):
+    pass
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    /// goto-definition on a dynamic namedtuple class literal (created via `collections.namedtuple()`)
+    #[test]
+    fn goto_definition_dynamic_namedtuple_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from collections import namedtuple
+
+Point = namedtuple("Point", ["x", "y"])
+
+p = Poi<CURSOR>nt(1, 2)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:6:5
+          |
+        4 | Point = namedtuple("Point", ["x", "y"])
+        5 |
+        6 | p = Point(1, 2)
+          |     ^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:4:1
+          |
+        2 | from collections import namedtuple
+        3 |
+        4 | Point = namedtuple("Point", ["x", "y"])
+          | -----
+        5 |
+        6 | p = Point(1, 2)
+          |
+        "#);
     }
 
     // TODO: Should only list `a: int`

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: descriptor_protocol.md - Descriptor protocol - Special descriptors - Properties with no setters
 mdtest path: crates/ty_python_semantic/resources/mdtest/descriptor_protocol.md

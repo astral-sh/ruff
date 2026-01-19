@@ -42,7 +42,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -168,7 +168,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -201,7 +201,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:6:1
           |
@@ -239,7 +239,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
           --> main.py:12:1
            |
@@ -272,7 +272,7 @@ mod tests {
 
         test.write_file("lib.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:8
           |
@@ -299,7 +299,7 @@ mod tests {
         test.write_file("lib/__init__.py", "b = 7").unwrap();
         test.write_file("lib/submod.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:8
           |
@@ -326,7 +326,7 @@ mod tests {
         test.write_file("lib/__init__.py", "b = 7").unwrap();
         test.write_file("lib/submod.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:12
           |
@@ -352,7 +352,7 @@ mod tests {
 
         test.write_file("lib.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:6
           |
@@ -379,7 +379,7 @@ mod tests {
         test.write_file("lib/__init__.py", "b = 7").unwrap();
         test.write_file("lib/submod.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:6
           |
@@ -406,7 +406,7 @@ mod tests {
         test.write_file("lib/__init__.py", "b = 7").unwrap();
         test.write_file("lib/submod.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:10
           |
@@ -442,7 +442,7 @@ mod tests {
         test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
             .unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> lib/sub/__init__.py:2:11
           |
@@ -479,7 +479,7 @@ mod tests {
         test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
             .unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> lib/sub/__init__.py:2:7
           |
@@ -516,7 +516,7 @@ mod tests {
         test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
             .unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> lib/sub/__init__.py:2:7
           |
@@ -568,7 +568,7 @@ mod tests {
 
         test.write_file("lib.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -651,7 +651,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:34
           |
@@ -675,7 +675,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:41
           |
@@ -796,13 +796,13 @@ mod tests {
             |       -------
           5 |     """some docs"""
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -850,13 +850,13 @@ mod tests {
             |       -------
           5 |     """some docs"""
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -1165,7 +1165,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:13
           |
@@ -1189,7 +1189,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:37
           |
@@ -1503,7 +1503,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:7:1
           |
@@ -1532,7 +1532,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -1609,13 +1609,13 @@ def function():
         916 |     """str(object='') -> str
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -1641,7 +1641,7 @@ def function():
             .build();
 
         // The module is the correct type definition
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:4:5
           |
@@ -1678,7 +1678,7 @@ def function():
             .build();
 
         // The module is the correct type definition
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:2:7
           |
@@ -1715,7 +1715,7 @@ def function():
             .build();
 
         // Unknown is correct, `submod` is not in scope
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:4:5
           |
@@ -1757,7 +1757,7 @@ def function():
             .build();
 
         // The module is correct
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:2:14
           |
@@ -1796,7 +1796,7 @@ def function():
             .build();
 
         // The module is correct
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:2:7
           |

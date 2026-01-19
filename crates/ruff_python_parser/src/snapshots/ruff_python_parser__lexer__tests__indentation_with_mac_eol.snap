@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: indentation_with_eol(MAC_EOL)
-snapshot_kind: text
 ---
 ## Tokens
 ```

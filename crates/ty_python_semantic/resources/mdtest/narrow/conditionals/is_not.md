@@ -16,6 +16,32 @@ def _(flag: bool):
     reveal_type(x)  # revealed: None | Literal[1]
 ```
 
+## `None is not x` (reversed operands)
+
+```py
+def _(flag: bool):
+    x = None if flag else 1
+
+    if None is not x:
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: None
+
+    reveal_type(x)  # revealed: None | Literal[1]
+```
+
+This also works for other singleton types with reversed operands:
+
+```py
+def _(flag: bool):
+    x = True if flag else False
+
+    if False is not x:
+        reveal_type(x)  # revealed: Literal[True]
+    else:
+        reveal_type(x)  # revealed: Literal[False]
+```
+
 ## `is not` for other singleton types
 
 Boolean literals:

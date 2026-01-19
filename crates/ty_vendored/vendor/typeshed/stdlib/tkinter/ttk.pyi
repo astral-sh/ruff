@@ -16,10 +16,10 @@ import _tkinter
 import sys
 import tkinter
 from _typeshed import MaybeNone
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from tkinter.font import _FontDescription
-from typing import Any, Literal, TypedDict, overload, type_check_only
-from typing_extensions import Never, TypeAlias, Unpack
+from typing import Any, Literal, TypedDict, TypeVar, overload, type_check_only
+from typing_extensions import Never, ParamSpec, TypeAlias, Unpack
 
 __all__ = [
     "Button",
@@ -78,6 +78,9 @@ _Padding: TypeAlias = (
 _Statespec: TypeAlias = tuple[Unpack[tuple[str, ...]], Any]
 _ImageStatespec: TypeAlias = tuple[Unpack[tuple[str, ...]], tkinter._Image | str]
 _VsapiStatespec: TypeAlias = tuple[Unpack[tuple[str, ...]], int]
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
 
 class _Layout(TypedDict, total=False):
     side: Literal["left", "right", "top", "bottom"]
@@ -318,7 +321,7 @@ class Style:
 class Widget(tkinter.Widget):
     """Base class for Tk themed widgets."""
 
-    def __init__(self, master: tkinter.Misc | None, widgetname, kw=None) -> None:
+    def __init__(self, master: tkinter.Misc | None, widgetname: str | None, kw: dict[str, Any] | None = None) -> None:
         """Constructs a Ttk Widget with the parent master.
 
         STANDARD OPTIONS
@@ -346,7 +349,8 @@ class Widget(tkinter.Widget):
         x and y are pixel coordinates relative to the widget.
         """
 
-    def instate(self, statespec, callback=None, *args, **kw):
+    @overload
+    def instate(self, statespec: Sequence[str], callback: None = None) -> bool:
         """Test the widget's state.
 
         If callback is not specified, returns True if the widget state
@@ -355,7 +359,11 @@ class Widget(tkinter.Widget):
         matches statespec. statespec is expected to be a sequence.
         """
 
-    def state(self, statespec=None):
+    @overload
+    def instate(
+        self, statespec: Sequence[str], callback: Callable[_P, _T], *args: _P.args, **kw: _P.kwargs
+    ) -> Literal[False] | _T: ...
+    def state(self, statespec: Sequence[str] | None = None) -> tuple[str, ...]:
         """Modify or inquire widget state.
 
         Widget state is returned if statespec is None, otherwise it is
