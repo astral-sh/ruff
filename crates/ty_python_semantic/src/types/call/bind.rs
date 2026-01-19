@@ -1282,7 +1282,11 @@ impl<'db> Bindings<'db> {
                                         '?' => Some(KnownClass::Bool.to_instance(db)),
                                         // Floats
                                         'e' | 'f' | 'd' => Some(KnownClass::Float.to_instance(db)),
-                                        _ => None,
+                                        _ => {
+                                            // Unknown/unsupported format character
+                                            escaped = true;
+                                            break;
+                                        }
                                     };
 
                                     if let Some(ty) = ty {

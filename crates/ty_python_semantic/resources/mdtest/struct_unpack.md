@@ -47,3 +47,15 @@ def _(buf: bytes):
     reveal_type(unpack("18446744073709551616c2h", buf))  # revealed: tuple[Unknown, ...]
     reveal_type(unpack(">n2xN18446744073709551616c@i", buf))  # revealed: tuple[Unknown, ...]
 ```
+
+## Unknown Formats
+
+```py
+from struct import *
+
+def _(buf: bytes):
+    reveal_type(unpack("z", buf))  # revealed: tuple[Unknown, ...]
+    reveal_type(unpack("10z", buf))  # revealed: tuple[Unknown, ...]
+    reveal_type(unpack("y", buf))  # revealed: tuple[Unknown, ...]
+    reveal_type(unpack("5y", buf))  # revealed: tuple[Unknown, ...]
+```
