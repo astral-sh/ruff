@@ -107,3 +107,22 @@ def f(x: Foo):
     if isinstance(x, Bar):
         reveal_type(x["whatever"])  # revealed: int
 ```
+
+When a subscript operation fails due to an invalid argument type, we should report only that error
+(not a spurious `not-subscriptable` error for elements that lack `__getitem__`), and the return type
+should be inferred from the element that does have `__getitem__`.
+
+```py
+class Baz:
+    def __getitem__(self, key: int) -> str:
+        return ""
+
+class Qux: ...
+
+def g(x: Baz):
+    if isinstance(x, Qux):
+        # x is Baz & Qux. Baz has __getitem__(int) -> str, Qux has no __getitem__.
+        # The intersection IS subscriptable (via Baz), but with wrong argument type.
+        # error: [invalid-argument-type]
+        reveal_type(x["hello"])  # revealed: str
+```

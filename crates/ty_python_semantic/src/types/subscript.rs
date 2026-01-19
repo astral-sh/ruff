@@ -169,6 +169,11 @@ impl<'db> SubscriptError<'db> {
         self.errors
     }
 
+    /// Returns `true` if any error indicates the subscript method was available.
+    fn any_method_available(&self) -> bool {
+        self.errors.iter().any(SubscriptErrorKind::method_available)
+    }
+
     pub(crate) fn report_diagnostics(
         &self,
         context: &InferContext<'db, '_>,
@@ -331,6 +336,12 @@ impl<'db> SubscriptErrorKind<'db> {
             }
         }
     }
+
+    /// Returns `true` if this error indicates the subscript method was available
+    /// (even if the call failed). Returns `false` for `NotSubscriptable` errors.
+    fn method_available(&self) -> bool {
+        !matches!(self, Self::NotSubscriptable { .. })
+    }
 }
 
 fn map_union_subscript<'db, F>(
@@ -391,6 +402,34 @@ impl<'db> Type<'db> {
             }
 
             if results.is_empty() {
+                // Check if any element has the method (even if call failed).
+                // If so, we should only report errors for those elements and use their
+                // return types, filtering out `NotSubscriptable` errors for elements
+                // that lack the method.
+                let any_has_method = errors.iter().any(SubscriptError::any_method_available);
+
+                if any_has_method {
+                    let mut builder = IntersectionBuilder::new(db);
+                    let mut filtered_errors = Vec::new();
+
+                    for error in errors {
+                        if error.any_method_available() {
+                            builder = builder.add_positive(error.result_type());
+                            filtered_errors.extend(
+                                error
+                                    .into_errors()
+                                    .into_iter()
+                                    .filter(SubscriptErrorKind::method_available),
+                            );
+                        }
+                    }
+
+                    return Err(SubscriptError::with_errors(
+                        builder.build(),
+                        filtered_errors,
+                    ));
+                }
+
                 if let Some(first) = errors.pop() {
                     let result_ty = first.result_type();
                     let mut all_errors = first.into_errors();
