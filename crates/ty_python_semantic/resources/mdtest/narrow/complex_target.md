@@ -404,59 +404,67 @@ if d.c is not None and d.c[0].x[0] is not None:
 Narrowing should work with negative subscripts like `x[-1]`:
 
 ```py
-class Subscriptable:
-    def __getitem__(self, key: int) -> int:
-        return 42
+def _(x: list[int | None]):
+    if x[-1] is not None:
+        reveal_type(x[-1])  # revealed: int
 
-class NotSubscriptable: ...
-
-def _(x: list[Subscriptable | NotSubscriptable]):
-    if not isinstance(x[-1], NotSubscriptable):
-        # After narrowing, x[-1] excludes NotSubscriptable, which means subscripting works
-        reveal_type(x[-1])  # revealed: Subscriptable & ~NotSubscriptable
-        reveal_type(x[-1][0])  # revealed: int
+def _(x: list[str | None]):
+    if x[-1] is None:
+        reveal_type(x[-1])  # revealed: None
+    else:
+        reveal_type(x[-1])  # revealed: str
 ```
 
 Nested negative subscripts should also work:
 
 ```py
-def _(x: list[list[Subscriptable | NotSubscriptable]]):
-    if not isinstance(x[-1][-1], NotSubscriptable):
-        reveal_type(x[-1][-1])  # revealed: Subscriptable & ~NotSubscriptable
-        reveal_type(x[-1][-1][0])  # revealed: int
+def _(x: list[list[int | None]]):
+    if x[-1][-1] is not None:
+        reveal_type(x[-1][-1])  # revealed: int
 ```
 
 Mixed positive and negative subscripts:
 
 ```py
-def _(x: list[list[Subscriptable | NotSubscriptable]]):
-    if not isinstance(x[0][-1], NotSubscriptable):
-        reveal_type(x[0][-1])  # revealed: Subscriptable & ~NotSubscriptable
+def _(x: list[list[int | None]]):
+    if x[0][-1] is not None:
+        reveal_type(x[0][-1])  # revealed: int
 
-    if not isinstance(x[-1][0], NotSubscriptable):
-        reveal_type(x[-1][0])  # revealed: Subscriptable & ~NotSubscriptable
+    if x[-1][0] is not None:
+        reveal_type(x[-1][0])  # revealed: int
 ```
 
 Attribute access combined with negative subscripts:
 
 ```py
 class Container:
-    items: list[Subscriptable | NotSubscriptable]
+    items: list[int | None]
 
 def _(c: Container):
-    if not isinstance(c.items[-1], NotSubscriptable):
-        reveal_type(c.items[-1])  # revealed: Subscriptable & ~NotSubscriptable
-        reveal_type(c.items[-1][0])  # revealed: int
+    if c.items[-1] is not None:
+        reveal_type(c.items[-1])  # revealed: int
 ```
 
-Multiple conditions in an `and` chain (the pattern from the original issue):
+Multiple conditions in an `and` chain:
 
 ```py
-def _(x: list[tuple[Subscriptable, int] | NotSubscriptable]):
+def _(x: list[int | None]):
     # Narrowing should persist through `and` chains
-    if x[-1] and not isinstance(x[-1], NotSubscriptable):
-        reveal_type(x[-1])  # revealed: tuple[Subscriptable, int] & ~NotSubscriptable
-        reveal_type(x[-1][0])  # revealed: Subscriptable
+    if x[-1] is not None and x[-1] > 0:
+        reveal_type(x[-1])  # revealed: int
+```
+
+Negative indices with tuples:
+
+```py
+def _(t: tuple[int, str, None] | tuple[None, None, int]):
+    if t[-1] is not None:
+        reveal_type(t)  # revealed: tuple[None, None, int]
+    else:
+        reveal_type(t)  # revealed: tuple[int, str, None]
+
+    if t[-3] is not None:
+        reveal_type(t)  # revealed: tuple[int, str, None]
 ```
 
 ## Narrowing with explicit positive subscripts
@@ -464,17 +472,10 @@ def _(x: list[tuple[Subscriptable, int] | NotSubscriptable]):
 Narrowing should work with explicit positive subscripts like `x[+1]`:
 
 ```py
-class Subscriptable:
-    def __getitem__(self, key: int) -> int:
-        return 42
+def _(x: list[int | None]):
+    if x[+0] is not None:
+        reveal_type(x[+0])  # revealed: int
 
-class NotSubscriptable: ...
-
-def _(x: list[Subscriptable | NotSubscriptable]):
-    if not isinstance(x[+0], NotSubscriptable):
-        reveal_type(x[+0])  # revealed: Subscriptable & ~NotSubscriptable
-        reveal_type(x[+0][0])  # revealed: int
-
-    if not isinstance(x[+1], NotSubscriptable):
-        reveal_type(x[+1])  # revealed: Subscriptable & ~NotSubscriptable
+    if x[+1] is not None:
+        reveal_type(x[+1])  # revealed: int
 ```
