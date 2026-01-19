@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::enums::{enum_member_literals, enum_metadata, is_flag_enum};
 use crate::types::tuple::{Tuple, TupleType};
 
 use super::Type;
@@ -404,7 +404,11 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None) {
+            let class_literal = class.class_literal(db);
+
+            if !is_flag_enum(db, class_literal)
+                && let Some(enum_members) = enum_member_literals(db, class_literal, None)
+            {
                 return Some(enum_members.collect());
             }
 

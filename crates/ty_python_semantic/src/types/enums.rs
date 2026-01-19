@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
@@ -336,6 +337,14 @@ pub(crate) fn is_enum_class_by_inheritance<'db>(
         || class
             .metaclass(db)
             .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
+}
+
+pub(crate) fn is_flag_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.known(db))
+        .contains(&KnownClass::Flag)
 }
 
 /// Extracts the inner value type from an `enum.nonmember()` wrapper.
