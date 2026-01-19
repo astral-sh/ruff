@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/call_chains.py
 ---
 ## Input
 ```python
@@ -550,15 +549,13 @@ max_message_id = (
 
 expr = (
     pl.scan_parquet("/data/pypi-parquet/*.parquet")
-    .filter(
-        [
-            pl.col("path").str.contains(
-                r"\.(asm|c|cc|cpp|cxx|h|hpp|rs|[Ff][0-9]{0,2}(?:or)?|go)$"
-            ),
-            ~pl.col("path").str.contains(r"(^|/)test(|s|ing)"),
-            ~pl.col("path").str.contains("/site-packages/", literal=True),
-        ]
-    )
+    .filter([
+        pl.col("path").str.contains(
+            r"\.(asm|c|cc|cpp|cxx|h|hpp|rs|[Ff][0-9]{0,2}(?:or)?|go)$"
+        ),
+        ~pl.col("path").str.contains(r"(^|/)test(|s|ing)"),
+        ~pl.col("path").str.contains("/site-packages/", literal=True),
+    ])
     .with_columns(
         month=pl.col("uploaded_on").dt.truncate("1mo"),
         ext=pl.col("path")
@@ -711,29 +708,18 @@ x = (
          .groupby(
              1,
          )
-@@ -255,19 +264,19 @@
+@@ -255,7 +264,8 @@
  
  
  expr = (
 -    pl.scan_parquet("/data/pypi-parquet/*.parquet")
--    .filter(
--        [
--            pl.col("path").str.contains(
--                r"\.(asm|c|cc|cpp|cxx|h|hpp|rs|[Ff][0-9]{0,2}(?:or)?|go)$"
--            ),
--            ~pl.col("path").str.contains(r"(^|/)test(|s|ing)"),
--            ~pl.col("path").str.contains("/site-packages/", literal=True),
--        ]
--    )
 +    pl
 +    .scan_parquet("/data/pypi-parquet/*.parquet")
-+    .filter([
-+        pl.col("path").str.contains(
-+            r"\.(asm|c|cc|cpp|cxx|h|hpp|rs|[Ff][0-9]{0,2}(?:or)?|go)$"
-+        ),
-+        ~pl.col("path").str.contains(r"(^|/)test(|s|ing)"),
-+        ~pl.col("path").str.contains("/site-packages/", literal=True),
-+    ])
+     .filter([
+         pl.col("path").str.contains(
+             r"\.(asm|c|cc|cpp|cxx|h|hpp|rs|[Ff][0-9]{0,2}(?:or)?|go)$"
+@@ -265,7 +275,8 @@
+     ])
      .with_columns(
          month=pl.col("uploaded_on").dt.truncate("1mo"),
 -        ext=pl.col("path")
@@ -742,7 +728,7 @@ x = (
          .str.extract(pattern=r"\.([a-z0-9]+)$", group_index=1)
          .str.replace_all(pattern=r"cxx|cpp|cc|c|hpp|h", value="C/C++")
          .str.replace_all(pattern="^f.*$", value="Fortran")
-@@ -288,9 +297,8 @@
+@@ -286,9 +297,8 @@
          if more_nested_because_line_length:
              identical_hidden_layer_sizes = all(
                  current_hidden_layer_sizes == first_hidden_layer_sizes
@@ -754,7 +740,7 @@ x = (
                  .values()
                  .attr
              )
-@@ -302,7 +310,8 @@
+@@ -300,7 +310,8 @@
              with self.read_ctx(book_type) as cursor:
                  if (
                      entry_count := len(

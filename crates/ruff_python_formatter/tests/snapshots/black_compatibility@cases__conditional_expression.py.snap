@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/conditional_expression.py
 ---
 ## Input
 
@@ -169,6 +168,20 @@ a = "".join(
      )
  
  
+@@ -104,9 +98,7 @@
+     time.sleep(1) if wait else None
+ 
+ 
+-a = "".join(
+-    (
+-        "",  # comment
+-        "" if True else "",
+-    )
+-)
++a = "".join((
++    "",  # comment
++    "" if True else "",
++))
 ```
 
 ## Ruff Output
@@ -274,12 +287,10 @@ def foo(wait: bool = True):
     time.sleep(1) if wait else None
 
 
-a = "".join(
-    (
-        "",  # comment
-        "" if True else "",
-    )
-)
+a = "".join((
+    "",  # comment
+    "" if True else "",
+))
 ```
 
 ## Black Output

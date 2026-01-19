@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string.py
 ---
 ## Input
 ```python
@@ -698,9 +697,12 @@ assert (
 ##############################################################################
 # Use can_omit_optional_parentheses layout to avoid an instability where the formatter
 # picks the can_omit_optional_parentheses layout when the strings are joined.
-if f"implicitconcatenatedstring" + f"implicitconcadddddddddddedring" * len(
-    [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
-):
+if f"implicitconcatenatedstring" + f"implicitconcadddddddddddedring" * len([
+    aaaaaa,
+    bbbbbbbbbbbbbbbb,
+    cccccccccccccccccc,
+    ddddddddddddddddddddddddddd,
+]):
     pass
 
 # Keep parenthesizing multiline - implicit concatenated strings
@@ -870,27 +872,4 @@ f"aaaaaaaaaaaaaaaa \
     "cccccccccccccc \
             ddddddddddddddddddd"  # comment 4
 )
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -288,9 +288,12 @@
- ##############################################################################
- # Use can_omit_optional_parentheses layout to avoid an instability where the formatter
- # picks the can_omit_optional_parentheses layout when the strings are joined.
--if f"implicitconcatenatedstring" + f"implicitconcadddddddddddedring" * len(
--    [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
--):
-+if f"implicitconcatenatedstring" + f"implicitconcadddddddddddedring" * len([
-+    aaaaaa,
-+    bbbbbbbbbbbbbbbb,
-+    cccccccccccccccccc,
-+    ddddddddddddddddddddddddddd,
-+]):
-     pass
- 
- # Keep parenthesizing multiline - implicit concatenated strings
 ```

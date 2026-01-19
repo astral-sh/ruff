@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/torture.py
 ---
 ## Input
 
@@ -41,7 +40,34 @@ assert (
 ```diff
 --- Black
 +++ Ruff
-@@ -25,9 +25,9 @@
+@@ -5,17 +5,15 @@
+     ** 101234234242352525425252352352525234890264906820496920680926538059059209922523523525
+ )  #
+ 
+-assert sort_by_dependency(
+-    {
+-        "1": {"2", "3"},
+-        "2": {"2a", "2b"},
+-        "3": {"3a", "3b"},
+-        "2a": set(),
+-        "2b": set(),
+-        "3a": set(),
+-        "3b": set(),
+-    }
+-) == ["2a", "2b", "2", "3a", "3b", "3", "1"]
++assert sort_by_dependency({
++    "1": {"2", "3"},
++    "2": {"2a", "2b"},
++    "3": {"3a", "3b"},
++    "2a": set(),
++    "2b": set(),
++    "3a": set(),
++    "3b": set(),
++}) == ["2a", "2b", "2", "3a", "3b", "3", "1"]
+ 
+ importA
+ 0
+@@ -25,9 +23,9 @@
  class A:
      def foo(self):
          for _ in range(10):
@@ -65,17 +91,15 @@ importA
     ** 101234234242352525425252352352525234890264906820496920680926538059059209922523523525
 )  #
 
-assert sort_by_dependency(
-    {
-        "1": {"2", "3"},
-        "2": {"2a", "2b"},
-        "3": {"3a", "3b"},
-        "2a": set(),
-        "2b": set(),
-        "3a": set(),
-        "3b": set(),
-    }
-) == ["2a", "2b", "2", "3a", "3b", "3", "1"]
+assert sort_by_dependency({
+    "1": {"2", "3"},
+    "2": {"2a", "2b"},
+    "3": {"3a", "3b"},
+    "2a": set(),
+    "2b": set(),
+    "3a": set(),
+    "3b": set(),
+}) == ["2a", "2b", "2", "3a", "3b", "3", "1"]
 
 importA
 0
