@@ -52,6 +52,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&CALL_TOP_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
+    registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
+    registry.register_lint(&INVALID_DATACLASS);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
@@ -425,6 +427,63 @@ declare_lint! {
     pub(crate) static DUPLICATE_KW_ONLY = {
         summary: "detects dataclass definitions with more than one usage of `KW_ONLY`",
         status: LintStatus::stable("0.0.1-alpha.12"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or
+    /// `__delattr__` method defined.
+    ///
+    /// ## Why is this bad?
+    /// Frozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a
+    /// `FrozenInstanceError` to emulate immutability.
+    ///
+    /// Overriding either of these methods raises a runtime error.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass(frozen=True)
+    /// class A:
+    ///     def __setattr__(self, name: str, value: object) -> None: ...
+    /// ```
+    pub(crate) static INVALID_DATACLASS_OVERRIDE = {
+        summary: "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid applications of the `@dataclass` decorator.
+    ///
+    /// ## Why is this bad?
+    /// Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
+    /// `Enum`, or `Protocol` is invalid:
+    ///
+    /// - `NamedTuple` and `TypedDict` classes will raise an exception at runtime when
+    ///   instantiating the class.
+    /// - `Enum` classes with `@dataclass` are [explicitly not supported].
+    /// - `Protocol` classes define interfaces and cannot be instantiated.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from dataclasses import dataclass
+    /// from typing import NamedTuple
+    ///
+    /// @dataclass  # error: [invalid-dataclass]
+    /// class Foo(NamedTuple):
+    ///     x: int
+    /// ```
+    ///
+    /// [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
+    pub(crate) static INVALID_DATACLASS = {
+        summary: "detects invalid `@dataclass` applications",
+        status: LintStatus::preview("0.0.12"),
         default_level: Level::Error,
     }
 }

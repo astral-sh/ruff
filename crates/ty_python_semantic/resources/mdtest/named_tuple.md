@@ -256,7 +256,7 @@ class Url(NamedTuple("Url", [("host", str), ("path", str)])):
 reveal_type(Url)  # revealed: <class 'Url'>
 # revealed: (<class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:7'>, <class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:11'>, <class 'tuple[str, str]'>, <class 'object'>)
 reveal_mro(Url)
-reveal_type(Url.__new__)  # revealed: (cls: type, host: str, path: str) -> Url
+reveal_type(Url.__new__)  # revealed: [Self](cls: type[Self], host: str, path: str) -> Self
 
 # Constructor works with the inherited fields.
 url = Url("example.com", "/path")
@@ -442,7 +442,49 @@ reveal_type(TooMany)  # revealed: <class 'TooMany'>
 
 ### Keyword arguments for `collections.namedtuple`
 
-The `collections.namedtuple` function accepts `rename`, `defaults`, and `module` keyword arguments:
+The `collections.namedtuple` function accepts `typename` and `field_names` as keyword arguments, as
+well as `rename`, `defaults`, and `module`:
+
+```py
+import collections
+from ty_extensions import reveal_mro
+
+# Both `typename` and `field_names` can be passed as keyword arguments
+NT1 = collections.namedtuple(typename="NT1", field_names="x y")
+reveal_type(NT1)  # revealed: <class 'NT1'>
+reveal_mro(NT1)  # revealed: (<class 'NT1'>, <class 'tuple[Any, Any]'>, <class 'object'>)
+
+nt1 = NT1(1, 2)
+reveal_type(nt1.x)  # revealed: Any
+reveal_type(nt1.y)  # revealed: Any
+
+# Only `field_names` as keyword argument
+NT2 = collections.namedtuple("NT2", field_names=["a", "b", "c"])
+reveal_type(NT2)  # revealed: <class 'NT2'>
+reveal_mro(NT2)  # revealed: (<class 'NT2'>, <class 'tuple[Any, Any, Any]'>, <class 'object'>)
+
+nt2 = NT2(1, 2, 3)
+reveal_type(nt2.a)  # revealed: Any
+reveal_type(nt2.b)  # revealed: Any
+reveal_type(nt2.c)  # revealed: Any
+
+# Keyword arguments can be combined with other kwargs like `defaults`
+NT3 = collections.namedtuple(typename="NT3", field_names="x y z", defaults=[None])
+reveal_type(NT3)  # revealed: <class 'NT3'>
+reveal_type(NT3.__new__)  # revealed: [Self](cls: type[Self], x: Any, y: Any, z: Any = None) -> Self
+
+nt3 = NT3(1, 2)
+reveal_type(nt3.z)  # revealed: Any
+
+# Passing the same argument positionally and as a keyword is an error
+# error: [parameter-already-assigned] "Multiple values provided for parameter `typename` of `namedtuple`"
+Bad1 = collections.namedtuple("Bad1", "x y", typename="Bad1")
+
+# error: [parameter-already-assigned] "Multiple values provided for parameter `field_names` of `namedtuple`"
+Bad2 = collections.namedtuple("Bad2", "x y", field_names="a b")
+```
+
+The `rename`, `defaults`, and `module` keyword arguments:
 
 ```py
 import collections
@@ -451,7 +493,7 @@ from ty_extensions import reveal_mro
 # `rename=True` replaces invalid identifiers with positional names
 Point = collections.namedtuple("Point", ["x", "class", "_y", "z", "z"], rename=True)
 reveal_type(Point)  # revealed: <class 'Point'>
-reveal_type(Point.__new__)  # revealed: (cls: type, x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Point
+reveal_type(Point.__new__)  # revealed: [Self](cls: type[Self], x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Self
 reveal_mro(Point)  # revealed: (<class 'Point'>, <class 'tuple[Any, Any, Any, Any, Any]'>, <class 'object'>)
 p = Point(1, 2, 3, 4, 5)
 reveal_type(p.x)  # revealed: Any
@@ -464,7 +506,7 @@ reveal_type(p._4)  # revealed: Any
 # error: [invalid-argument-type] "Invalid argument to parameter `rename` of `namedtuple()`"
 Point2 = collections.namedtuple("Point2", ["_x", "class"], rename=1)
 reveal_type(Point2)  # revealed: <class 'Point2'>
-reveal_type(Point2.__new__)  # revealed: (cls: type, _0: Any, _1: Any) -> Point2
+reveal_type(Point2.__new__)  # revealed: [Self](cls: type[Self], _0: Any, _1: Any) -> Self
 
 # Without `rename=True`, invalid field names emit diagnostics:
 # - Field names starting with underscore
@@ -490,7 +532,7 @@ reveal_type(Invalid)  # revealed: <class 'Invalid'>
 # `defaults` provides default values for the rightmost fields
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
-reveal_type(Person.__new__)  # revealed: (cls: type, name: Any, age: Any, city: Any = "Unknown") -> Person
+reveal_type(Person.__new__)  # revealed: [Self](cls: type[Self], name: Any, age: Any, city: Any = "Unknown") -> Self
 
 reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'tuple[Any, Any, Any]'>, <class 'object'>)
 # Can create with all fields
@@ -508,7 +550,7 @@ reveal_type(Config)  # revealed: <class 'Config'>
 # error: [invalid-named-tuple] "Too many defaults for `namedtuple()`"
 TooManyDefaults = collections.namedtuple("TooManyDefaults", ["x", "y"], defaults=("a", "b", "c"))
 reveal_type(TooManyDefaults)  # revealed: <class 'TooManyDefaults'>
-reveal_type(TooManyDefaults.__new__)  # revealed: (cls: type, x: Any = "a", y: Any = "b") -> TooManyDefaults
+reveal_type(TooManyDefaults.__new__)  # revealed: [Self](cls: type[Self], x: Any = "a", y: Any = "b") -> Self
 
 # Unknown keyword arguments produce an error
 # error: [unknown-argument]
@@ -541,13 +583,26 @@ reveal_type(Bad5)  # revealed: <class 'Bad5'>
 
 ### Keyword arguments for `typing.NamedTuple`
 
-The `typing.NamedTuple` function does not accept any keyword arguments:
+Unlike `collections.namedtuple`, the `typing.NamedTuple` function does not accept `typename` or
+`fields` as keyword arguments. It also does not accept `rename`, `defaults`, or `module`:
 
 ```py
 from typing import NamedTuple
 
+# `typename` and `fields` are not valid as keyword arguments for typing.NamedTuple
+# (We only report the missing-argument error in this case since we return early)
+# error: [missing-argument]
+Bad1 = NamedTuple(typename="Bad1", fields=[("x", int)])
+
 # error: [unknown-argument]
-Bad3 = NamedTuple("Bad3", [("x", int)], rename=True)
+Bad2 = NamedTuple("Bad2", [("x", int)], typename="Bad2")
+
+# error: [unknown-argument]
+Bad3 = NamedTuple("Bad3", [("x", int)], fields=[("y", str)])
+
+# `rename`, `defaults`, and `module` are also not valid for typing.NamedTuple
+# error: [unknown-argument]
+Bad4 = NamedTuple("Bad4", [("x", int)], rename=True)
 
 # error: [unknown-argument]
 Bad4 = NamedTuple("Bad4", [("x", int)], defaults=[0])
@@ -575,8 +630,9 @@ reveal_type(Bad8)  # revealed: <class 'Bad8'>
 
 ### Missing required arguments
 
-`NamedTuple` and `namedtuple` require at least two positional arguments: `typename` and
-`fields`/`field_names`.
+`NamedTuple` and `namedtuple` require `typename` and `fields`/`field_names` arguments. For
+`collections.namedtuple`, these can be positional or keyword; for `typing.NamedTuple`, they must be
+positional.
 
 ```py
 import collections
@@ -1371,6 +1427,91 @@ class Child(Base):
     _asdict = 42
 ```
 
+## `NamedTuple` with `@dataclass` decorator
+
+Applying `@dataclass` to a `NamedTuple` class is invalid. An exception will be raised when
+instantiating the class at runtime:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+@dataclass
+# error: [invalid-dataclass] "`NamedTuple` class `Foo` cannot be decorated with `@dataclass`"
+class Foo(NamedTuple):
+    x: int
+    y: str
+```
+
+The same error occurs with `dataclasses.dataclass` used with parentheses:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+@dataclass()
+# error: [invalid-dataclass]
+class Bar(NamedTuple):
+    x: int
+```
+
+It also applies when using `frozen=True` or other dataclass parameters:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+@dataclass(frozen=True)
+# error: [invalid-dataclass]
+class Baz(NamedTuple):
+    x: int
+```
+
+Classes that inherit from a `NamedTuple` class also cannot be decorated with `@dataclass`:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+class Base(NamedTuple):
+    x: int
+
+@dataclass
+# error: [invalid-dataclass]
+class Child(Base):
+    y: str
+```
+
+The same restriction applies to classes inheriting from functional namedtuples:
+
+```py
+from dataclasses import dataclass
+from collections import namedtuple
+from typing import NamedTuple
+
+@dataclass
+# error: [invalid-dataclass]
+class Foo(namedtuple("Foo", ["x", "y"])):
+    pass
+
+@dataclass
+# error: [invalid-dataclass]
+class Bar(NamedTuple("Bar", [("x", int), ("y", str)])):
+    pass
+```
+
+The same applies when using `dataclass` as a function on a functional `NamedTuple`:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+# TODO: This should emit `invalid-dataclass` but currently emits `no-matching-overload`
+# due to overload resolution not matching `DynamicNamedTuple` against `type[_T]`.
+# error: [no-matching-overload]
+X = dataclass(NamedTuple("X", [("x", int)]))
+```
+
 ## Edge case: multiple reachable definitions with distinct issues
 
 <!-- snapshot-diagnostics -->
@@ -1390,4 +1531,44 @@ class Foo(NamedTuple):
         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
         _asdict = True
+```
+
+## `super().__new__` in `NamedTuple` subclasses
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/2522>.
+
+```py
+from typing import NamedTuple, Generic, TypeVar
+from typing_extensions import Self
+
+class Base(NamedTuple):
+    x: int
+    y: int
+
+class Child(Base):
+    def __new__(cls, x: int, y: int) -> Self:
+        instance = super().__new__(cls, x, y)
+        reveal_type(instance)  # revealed: Self@__new__
+        return instance
+
+reveal_type(Child(1, 2))  # revealed: Child
+
+T = TypeVar("T")
+
+class GenericBase(NamedTuple, Generic[T]):
+    x: T
+
+class ConcreteChild(GenericBase[str]):
+    def __new__(cls, x: str) -> "ConcreteChild":
+        instance = super().__new__(cls, x)
+        reveal_type(instance)  # revealed: Self@__new__
+        return instance
+
+class GenericChild(GenericBase[T]):
+    def __new__(cls, x: T) -> Self:
+        instance = super().__new__(cls, x)
+        reveal_type(instance)  # revealed: @Todo(super in generic class)
+        return instance
+
+reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]
 ```

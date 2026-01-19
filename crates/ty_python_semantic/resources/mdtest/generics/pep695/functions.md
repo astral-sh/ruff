@@ -907,6 +907,23 @@ def _(x: list[str]):
     reveal_type(accepts_callable(GenericClass)(x, x))
 ```
 
+### `Callable`s that return union types
+
+```py
+from typing import Callable
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def my_iter[T](f: Callable[[], T | None]) -> Box[T]:
+    return Box()
+
+def get_int() -> int | None: ...
+
+reveal_type(my_iter(get_int))  # revealed: Box[int]
+```
+
 ### Don't include identical lower/upper bounds in type mapping multiple times
 
 This is was a performance regression reported in

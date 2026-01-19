@@ -28,7 +28,7 @@ use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
-    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
     POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::enums::is_enum_class;
@@ -43,11 +43,11 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, DATACLASS_FLAGS, DataclassFlags, DataclassParams, FieldInstance,
-    GenericAlias, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members, todo_type,
+    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    FieldInstance, GenericAlias, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -613,9 +613,15 @@ impl<'db> Bindings<'db> {
 
                     Type::DataclassDecorator(params) => match overload.parameter_types() {
                         [Some(Type::ClassLiteral(class_literal))] => {
-                            overload.set_return_type(Type::from(
-                                class_literal.with_dataclass_params(db, Some(params)),
-                            ));
+                            if let Some(target) = invalid_dataclass_target(db, class_literal) {
+                                overload
+                                    .errors
+                                    .push(BindingError::InvalidDataclassApplication(target));
+                            } else {
+                                overload.set_return_type(Type::from(
+                                    class_literal.with_dataclass_params(db, Some(params)),
+                                ));
+                            }
                         }
                         [Some(Type::GenericAlias(generic_alias))] => {
                             let new_origin = generic_alias
@@ -1137,10 +1143,16 @@ impl<'db> Bindings<'db> {
                             if let [Some(Type::ClassLiteral(class_literal))] =
                                 overload.parameter_types()
                             {
-                                let params = DataclassParams::default_params(db);
-                                overload.set_return_type(Type::from(
-                                    class_literal.with_dataclass_params(db, Some(params)),
-                                ));
+                                if let Some(target) = invalid_dataclass_target(db, class_literal) {
+                                    overload
+                                        .errors
+                                        .push(BindingError::InvalidDataclassApplication(target));
+                                } else {
+                                    let params = DataclassParams::default_params(db);
+                                    overload.set_return_type(Type::from(
+                                        class_literal.with_dataclass_params(db, Some(params)),
+                                    ));
+                                }
                             }
                         }
 
@@ -4197,6 +4209,39 @@ pub(crate) enum BindingError<'db> {
     /// represents the infinite union of all callables. While such types *are* callable (they pass
     /// `callable()`), any specific call should fail because we don't know the actual signature.
     CalledTopCallable(Type<'db>),
+    /// The `@dataclass` decorator was applied to an invalid target.
+    InvalidDataclassApplication(InvalidDataclassTarget),
+}
+
+/// The target of an invalid `@dataclass` application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InvalidDataclassTarget {
+    NamedTuple,
+    TypedDict,
+    Enum,
+    Protocol,
+}
+
+/// Returns the invalid dataclass target for a class literal, if any.
+fn invalid_dataclass_target<'db>(
+    db: &'db dyn Db,
+    class_literal: &ClassLiteral<'db>,
+) -> Option<InvalidDataclassTarget> {
+    if matches!(class_literal, ClassLiteral::DynamicNamedTuple(_))
+        || class_literal
+            .as_static()
+            .is_some_and(|class| class.has_named_tuple_class_in_mro(db))
+    {
+        Some(InvalidDataclassTarget::NamedTuple)
+    } else if class_literal.is_typed_dict(db) {
+        Some(InvalidDataclassTarget::TypedDict)
+    } else if is_enum_class(db, Type::from(*class_literal)) {
+        Some(InvalidDataclassTarget::Enum)
+    } else if class_literal.is_protocol(db) {
+        Some(InvalidDataclassTarget::Protocol)
+    } else {
+        None
+    }
 }
 
 impl<'db> BindingError<'db> {
@@ -4640,6 +4685,32 @@ impl<'db> BindingError<'db> {
                     if let Some(union_diag) = union_diag {
                         union_diag.add_union_context(context.db(), &mut diag);
                     }
+                }
+            }
+
+            Self::InvalidDataclassApplication(target) => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&INVALID_DATACLASS, node) {
+                    let (message, info) = match target {
+                        InvalidDataclassTarget::NamedTuple => (
+                            "Cannot use `dataclass()` on a `NamedTuple` class",
+                            "An exception will be raised when instantiating the class at runtime",
+                        ),
+                        InvalidDataclassTarget::TypedDict => (
+                            "Cannot use `dataclass()` on a `TypedDict` class",
+                            "An exception will often be raised when instantiating the class at runtime",
+                        ),
+                        InvalidDataclassTarget::Enum => (
+                            "Cannot use `dataclass()` on an enum class",
+                            "Applying `@dataclass` to an enum is not supported at runtime",
+                        ),
+                        InvalidDataclassTarget::Protocol => (
+                            "Cannot use `dataclass()` on a protocol class",
+                            "Protocols define abstract interfaces and cannot be instantiated",
+                        ),
+                    };
+                    let mut diag = builder.into_diagnostic(message);
+                    diag.info(info);
                 }
             }
         }

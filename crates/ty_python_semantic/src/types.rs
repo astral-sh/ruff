@@ -1,4 +1,4 @@
-use compact_str::CompactString;
+use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
@@ -1452,6 +1452,10 @@ impl<'db> Type<'db> {
         Self::StringLiteral(StringLiteralType::new(db, string))
     }
 
+    pub(crate) fn single_char_string_literal(db: &'db dyn Db, c: char) -> Self {
+        Type::StringLiteral(StringLiteralType::new(db, c.to_compact_string()))
+    }
+
     pub(crate) fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {
         Self::BytesLiteral(BytesLiteralType::new(db, bytes))
     }
@@ -1840,7 +1844,7 @@ impl<'db> Type<'db> {
     ///
     /// This method may have false negatives, but it should not have false positives. It should be
     /// a cheap shallow check, not an exhaustive recursive check.
-    fn subtyping_is_always_reflexive(self) -> bool {
+    const fn subtyping_is_always_reflexive(self) -> bool {
         match self {
             Type::Never
             | Type::FunctionLiteral(..)
@@ -1861,6 +1865,9 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::PropertyInstance(_)
+            // `T` is always a subtype of itself,
+            // and `T` is always a subtype of `T | None`
+            | Type::TypeVar(_)
             // might inherit `Any`, but subtyping is still reflexive
             | Type::ClassLiteral(_)
              => true,
@@ -1872,7 +1879,6 @@ impl<'db> Type<'db> {
             | Type::Union(_)
             | Type::Intersection(_)
             | Type::Callable(_)
-            | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)

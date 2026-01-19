@@ -107,3 +107,15 @@ def x(y: None = ...) -> None: ...
 def x(y: int) -> str: ...
 def x(y: int | None = None) -> str | None: ...
 ```
+
+### In `if TYPE_CHECKING` blocks
+
+We generally view code in `if TYPE_CHECKING` blocks as having the same semantics and exemptions to
+code in stub files:
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    def foo(x: bool = ...): ...  # fine
+```
