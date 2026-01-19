@@ -2273,7 +2273,8 @@ impl<'db> CallableBinding<'db> {
             return true;
         };
 
-        // If any matching overload has errors, we have binding errors.
+        // If any matching overload has semantic errors (that don't affect overload
+        // resolution), we have binding errors.
         if !first_overload.errors.is_empty() {
             return true;
         }
@@ -2317,7 +2318,7 @@ impl<'db> CallableBinding<'db> {
         self.overloads
             .iter()
             .enumerate()
-            .filter(|(_, overload)| overload.as_result().is_ok())
+            .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
     /// Returns an iterator over all the mutable overloads that matched for this call binding.
@@ -2327,7 +2328,7 @@ impl<'db> CallableBinding<'db> {
         self.overloads
             .iter_mut()
             .enumerate()
-            .filter(|(_, overload)| overload.as_result().is_ok())
+            .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
     /// Returns the return type of this call.
@@ -3931,15 +3932,10 @@ impl<'db> Binding<'db> {
         }
     }
 
-    fn as_result(&self) -> Result<(), CallErrorKind> {
-        if self
-            .errors
+    fn has_errors_affecting_overload_resolution(&self) -> bool {
+        self.errors
             .iter()
             .any(BindingError::affects_overload_resolution)
-        {
-            return Err(CallErrorKind::BindingError);
-        }
-        Ok(())
     }
 
     fn snapshot(&self) -> BindingSnapshot<'db> {
