@@ -933,10 +933,13 @@ impl<'db> Type<'db> {
         self_type: Type<'db>,
         self_typevar_identity: Option<TypeVarIdentity<'db>>,
     ) -> Self {
-        if matches!(
-            self,
-            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
-        ) || !self.contains_self(db)
+        if matches!(self, Type::FunctionLiteral(_) | Type::BoundMethod(_))
+            || !self.contains_self(db)
+        {
+            return self;
+        }
+        if let Type::Callable(callable) = self
+            && !matches!(callable.kind(db), CallableTypeKind::Regular)
         {
             return self;
         }
@@ -8472,12 +8475,17 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
-    /// differences in their bounds or constraints due to materialization, or different binding
-    /// contexts.
+    /// Returns whether two bound typevars represent the same logical typevar.
+    ///
+    /// For `Self`, we ignore binding context differences (e.g., `Self@LinkedList` vs `Self@next`).
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
-        self.typevar(db).identity(db) == other.typevar(db).identity(db)
-            && self.paramspec_attr(db) == other.paramspec_attr(db)
+        let both_self = self.typevar(db).is_self(db) && other.typevar(db).is_self(db);
+        if both_self {
+            self.typevar(db).identity(db) == other.typevar(db).identity(db)
+                && self.paramspec_attr(db) == other.paramspec_attr(db)
+        } else {
+            self.identity(db) == other.identity(db)
+        }
     }
 
     /// Create a new PEP 695 type variable that can be used in signatures

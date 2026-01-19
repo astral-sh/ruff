@@ -481,6 +481,26 @@ class C(Generic[T]):
         reveal_type(self.foo)  # revealed: T@C
 ```
 
+## Callable attributes that return `Self`
+
+Attributes annotated as callables returning `Self` should bind to the concrete class.
+
+```py
+from typing import Callable, Self
+
+class Factory:
+    maker: Callable[[], Self]
+
+    def __init__(self) -> None:
+        self.maker = lambda: self
+
+class Sub(Factory):
+    pass
+
+def _(s: Sub):
+    reveal_type(s.maker())  # revealed: Sub
+```
+
 ## Generic Classes
 
 ```py
