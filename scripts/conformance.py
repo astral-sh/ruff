@@ -152,11 +152,10 @@ class Diagnostic:
     check_name: str
     description: str
     severity: str
-    fingerprint: str | None
     location: Location
     source: Source
     optional: bool
-    # {filename:tag} identifying an error that can occur on multiple lines
+    # tag identifying an error that can occur on multiple lines
     tag: str | None
     # True if the error can occur on multiple lines or only once per tag
     multi: bool
@@ -184,7 +183,6 @@ class Diagnostic:
             check_name=dct["check_name"],
             description=dct["description"],
             severity=dct["severity"],
-            fingerprint=dct["fingerprint"],
             location=Location(
                 path=Path(dct["location"]["path"]).resolve(),
                 positions=Positions(
@@ -221,9 +219,9 @@ class Diagnostic:
 class GroupedDiagnostics:
     key: str
     sources: Source
-    old: Diagnostic | None
-    new: Diagnostic | None
-    expected: Diagnostic | None
+    old: list[Diagnostic] | None
+    new: list[Diagnostic] | None
+    expected: list[Diagnostic] | None
 
     @property
     def classification(self) -> Classification:
@@ -247,14 +245,41 @@ class GroupedDiagnostics:
 
     @property
     def optional(self) -> bool:
-        return self.expected is not None and self.expected.optional
+        return bool(self.expected) and all(
+            diagnostic.optional for diagnostic in self.expected
+        )
 
-    def _render_row(self, diagnostic: Diagnostic):
-        return f"| {diagnostic.location.as_link()} | {diagnostic.check_name} | {diagnostic.description} |"
+    def diagnostics_by_source(self, source: Source) -> list[Diagnostic]:
+        match source:
+            case Source.NEW:
+                return self.new or []
+            case Source.OLD:
+                return self.old or []
+            case Source.EXPECTED:
+                return self.expected or []
+            case _:
+                raise ValueError(f"Invalid source: {source}")
 
-    def _render_diff(self, diagnostic: Diagnostic, *, removed: bool = False):
+    def _render_row(self, diagnostics: list[Diagnostic]):
+        locs = []
+        check_names = []
+        descriptions = []
+
+        for diagnostic in diagnostics:
+            loc = (
+                diagnostic.location.as_link()
+                if diagnostic.location
+                else f"`{diagnostic.tag}`"
+            )
+            locs.append(loc)
+            check_names.append(diagnostic.check_name)
+            descriptions.append(diagnostic.description)
+
+        return f"| {'<br>'.join(locs)} | {'<br>'.join(check_names)} | {'<br>'.join(descriptions)} |"
+
+    def _render_diff(self, diagnostics: list[Diagnostic], *, removed: bool = False):
         sign = "-" if removed else "+"
-        return f"{sign} {diagnostic}"
+        return "\n".join(f"{sign} {diagnostic}" for diagnostic in diagnostics)
 
     def display(self, format: Literal["diff", "github"]) -> str:
         match self.classification:
@@ -267,12 +292,17 @@ class GroupedDiagnostics:
                 )
 
             case Classification.FALSE_NEGATIVE | Classification.TRUE_NEGATIVE:
-                diagnostic = self.old or self.expected
-                assert diagnostic is not None
+                diagnostics = list(
+                    filter(
+                        lambda d: d is not None,
+                        (*(self.old or []), *(self.expected or [])),
+                    )
+                )
+
                 return (
-                    self._render_diff(diagnostic, removed=True)
+                    self._render_diff(diagnostics, removed=True)
                     if format == "diff"
-                    else self._render_row(diagnostic)
+                    else self._render_row(diagnostics)
                 )
 
             case _:
@@ -284,6 +314,7 @@ class Statistics:
     true_positives: int = 0
     false_positives: int = 0
     false_negatives: int = 0
+    total_diagnostics: int = 0
 
     @property
     def precision(self) -> float:
@@ -298,10 +329,6 @@ class Statistics:
         else:
             return 0.0
 
-    @property
-    def total(self) -> int:
-        return self.true_positives + self.false_positives
-
 
 def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
@@ -311,13 +338,8 @@ def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]
                 diagnostics.append(
                     Diagnostic(
                         check_name="conformance",
-                        description=(
-                            error.group("description")
-                            or error.group("tag")
-                            or "Missing"
-                        ),
+                        description=(error.group("description") or "Missing"),
                         severity="major",
-                        fingerprint=None,
                         location=Location(
                             path=file,
                             positions=Positions(
@@ -333,7 +355,9 @@ def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]
                         ),
                         source=Source.EXPECTED,
                         optional=error.group("optional") is not None,
-                        tag=f"{file.stem}:{error.group('tag')}",
+                        tag=f"{file.name}:{error.group('tag')}"
+                        if error.group("tag")
+                        else None,
                         multi=error.group("multi") is not None,
                     )
                 )
@@ -393,10 +417,10 @@ def group_diagnostics_by_key(
             GroupedDiagnostics(
                 key=key,
                 sources=sources,
-                old=next(filter(lambda diag: diag.source == Source.OLD, group), None),
-                new=next(filter(lambda diag: diag.source == Source.NEW, group), None),
-                expected=next(
-                    filter(lambda diag: diag.source == Source.EXPECTED, group), None
+                old=list(filter(lambda diag: diag.source == Source.OLD, group)),
+                new=list(filter(lambda diag: diag.source == Source.NEW, group)),
+                expected=list(
+                    filter(lambda diag: diag.source == Source.EXPECTED, group)
                 ),
             )
         )
@@ -404,11 +428,108 @@ def group_diagnostics_by_key(
     return grouped
 
 
-def process_tagged_diagnostics(grouped_diagnostics: list[GroupedDiagnostics]):
-    """For each group of diagnostics, group once again by tag, and track
-    for each ty diagnostic whether the associated test case already has an expected
-    error. If a diagnostic occurs on
-    """
+def split_expected_by_tag(
+    expected: list[Diagnostic],
+) -> tuple[list[Diagnostic], dict[str, list[Diagnostic]]]:
+    untagged: list[Diagnostic] = []
+    tagged: dict[str, list[Diagnostic]] = {}
+
+    for d in expected:
+        if d.tag is None:
+            untagged.append(d)
+        else:
+            tagged.setdefault(d.tag, []).append(d)
+
+    return untagged, tagged
+
+
+def index_observed_by_path(
+    diagnostics: list[Diagnostic],
+) -> dict[Path, list[Diagnostic]]:
+    index: dict[Path, list[Diagnostic]] = {}
+    for d in diagnostics:
+        index.setdefault(d.location.path, []).append(d)
+    return index
+
+
+def tagged_locations(
+    tagged_expected: dict[str, list[Diagnostic]],
+) -> set[tuple[Path, int]]:
+    locations: set[tuple[Path, int]] = set()
+    for diags in tagged_expected.values():
+        for d in diags:
+            locations.add((d.location.path, d.location.positions.begin.line))
+    return locations
+
+
+def filter_out_tagged(
+    diagnostics: list[Diagnostic],
+    *,
+    tagged_locs: set[tuple[Path, int]],
+) -> list[Diagnostic]:
+    return [
+        d
+        for d in diagnostics
+        if (d.location.path, d.location.positions.begin.line) not in tagged_locs
+    ]
+
+
+def condense_tagged_groups(
+    *,
+    tagged_expected: dict[str, list[Diagnostic]],
+    old: list[Diagnostic],
+    new: list[Diagnostic],
+) -> list[GroupedDiagnostics]:
+    old_by_path = index_observed_by_path(old)
+    new_by_path = index_observed_by_path(new)
+
+    results: list[GroupedDiagnostics] = []
+
+    for tag, expected_diags in tagged_expected.items():
+        exemplar = expected_diags[0]
+        path = exemplar.location.path
+        lines = {d.location.positions.begin.line for d in expected_diags}
+
+        def count_hits(path: Path, lines: set[int], observed: list[Diagnostic]) -> int:
+            return sum(
+                1
+                for d in observed
+                if d.location.path == path and d.location.positions.begin.line in lines
+            )
+
+        old_hits = count_hits(path, lines, old_by_path.get(path, []))
+        new_hits = count_hits(path, lines, new_by_path.get(path, []))
+
+        expected_max = len(expected_diags) if exemplar.multi else 1
+
+        sources = Source.EXPECTED
+        if 1 <= old_hits <= expected_max:
+            sources |= Source.OLD
+        if 1 <= new_hits <= expected_max:
+            sources |= Source.NEW
+
+        old_diagnostics = [
+            d
+            for d in old_by_path.get(path, [])
+            if d.location.positions.begin.line in lines
+        ]
+        new_diagnostics = [
+            d
+            for d in new_by_path.get(path, [])
+            if d.location.positions.begin.line in lines
+        ]
+
+        results.append(
+            GroupedDiagnostics(
+                key=f"{tag}",
+                sources=sources,
+                old=old_diagnostics,
+                new=new_diagnostics,
+                expected=expected_diags,
+            )
+        )
+
+    return results
 
 
 def compute_stats(
@@ -434,6 +555,8 @@ def compute_stats(
             statistics.false_positives += 1
         elif Source.EXPECTED in grouped.sources:
             statistics.false_negatives += 1
+
+        statistics.total_diagnostics += len(grouped.diagnostics_by_source(source))
         return statistics
 
     grouped_diagnostics = [diag for diag in grouped_diagnostics if not diag.optional]
@@ -552,7 +675,7 @@ def render_summary(
     true_pos_change = new.true_positives - old.true_positives
     false_pos_change = new.false_positives - old.false_positives
     false_neg_change = new.false_negatives - old.false_negatives
-    total_change = new.total - old.total
+    total_change = new.total_diagnostics - old.total_diagnostics
 
     base_header = f"[Typing conformance results]({CONFORMANCE_DIR_WITH_README})"
 
@@ -605,7 +728,7 @@ def render_summary(
         | True Positives  | {old.true_positives} | {new.true_positives} | {true_pos_change:+} | {true_pos_diff} |
         | False Positives | {old.false_positives} | {new.false_positives} | {false_pos_change:+} | {false_pos_diff} |
         | False Negatives | {old.false_negatives} | {new.false_negatives} | {false_neg_change:+} | {false_neg_diff} |
-        | Total Diagnostics | {old.total} | {new.total} | {total_change:+} | {total_diff} |
+        | Total Diagnostics | {old.total_diagnostics} | {new.total_diagnostics} | {total_change:+} | {total_diff} |
         | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:+.2%} | {precision_diff} |
         | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
 
@@ -646,6 +769,7 @@ def parse_args():
         "--old-ty",
         nargs="+",
         help="Command to run old version of ty",
+        required=True,
     )
 
     parser.add_argument(
@@ -693,9 +817,6 @@ def parse_args():
 
     args = parser.parse_args()
 
-    if args.old_ty is None:
-        raise ValueError("old_ty is required")
-
     return args
 
 
@@ -704,7 +825,10 @@ def main():
     tests_dir = args.tests_path.resolve().absolute()
     test_groups = get_test_groups(tests_dir)
     test_files = get_test_cases(test_groups, tests_dir / "tests")
-    expected = collect_expected_diagnostics(test_files)
+
+    expected_all = collect_expected_diagnostics(test_files)
+    expected_untagged, expected_tagged = split_expected_by_tag(expected_all)
+    tagged_locs = tagged_locations(expected_tagged)
 
     old = collect_ty_diagnostics(
         ty_path=args.old_ty,
@@ -720,11 +844,29 @@ def main():
         python_version=args.python_version,
     )
 
-    grouped = group_diagnostics_by_key(
+    old_untagged = filter_out_tagged(
+        old,
+        tagged_locs=tagged_locs,
+    )
+
+    new_untagged = filter_out_tagged(
+        new,
+        tagged_locs=tagged_locs,
+    )
+
+    grouped_tagged = condense_tagged_groups(
+        tagged_expected=expected_tagged,
         old=old,
         new=new,
-        expected=expected,
     )
+
+    grouped_untagged = group_diagnostics_by_key(
+        old=old_untagged,
+        new=new_untagged,
+        expected=expected_untagged,
+    )
+
+    grouped = [*grouped_untagged, *grouped_tagged]
 
     rendered = "\n\n".join(
         [
