@@ -61,7 +61,9 @@ impl Violation for Airflow3SuggestedUpdate {
             | Replacement::SourceModuleMovedToSDK {
                 module: _, name: _, ..
             }
-            | Replacement::InternalModule { module: _, name: _ } => {
+            | Replacement::SourceModuleMovedWithMessage {
+                module: _, name: _, ..
+            } => {
                 format!(
                     "`{deprecated}` is removed in Airflow 3.0; \
                     It still works in Airflow 3.0 but is expected to be removed in a future version."
@@ -89,9 +91,13 @@ impl Violation for Airflow3SuggestedUpdate {
             } => Some(format!(
                 "`{name}` has been moved to `{module}` since Airflow 3.0 (with apache-airflow-task-sdk>={version})."
             )),
-            Replacement::InternalModule { module, name } => Some(format!(
-                "`{name}` has been moved to `{module}` since Airflow 3.0. \
-                This is an internal module which is not supposed to be used and is subject to change without notice."
+            Replacement::SourceModuleMovedWithMessage {
+                module,
+                name,
+                message,
+                ..
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0. {message}"
             )),
         }
     }
@@ -349,6 +355,13 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     let (module, name) = match &replacement {
         Replacement::Rename { module, name } => (module, *name),
         Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        Replacement::SourceModuleMovedToSDK { module, name, .. } => (module, name.as_str()),
+        Replacement::SourceModuleMovedWithMessage {
+            module,
+            name,
+            suggest_fix,
+            ..
+        } if *suggest_fix => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(
                 Airflow3SuggestedUpdate {

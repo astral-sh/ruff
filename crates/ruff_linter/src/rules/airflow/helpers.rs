@@ -42,9 +42,11 @@ pub(crate) enum Replacement {
     },
     // Symbols moved to internal module in Airflow 3. Used when we want to raise a warning.
     // e.g., `airflow.utils.setup_teardown.BaseSetupTeardownContext` to `airflow.sdk.definitions._internal.setup_teardown.BaseSetupTeardownContext`
-    InternalModule {
+    SourceModuleMovedWithMessage {
         module: &'static str,
         name: String,
+        message: &'static str,
+        suggest_fix: bool,
     },
 }
 

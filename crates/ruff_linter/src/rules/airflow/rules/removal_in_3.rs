@@ -65,7 +65,9 @@ impl Violation for Airflow3Removal {
             | Replacement::SourceModuleMovedToSDK {
                 module: _, name: _, ..
             }
-            | Replacement::InternalModule { module: _, name: _ } => {
+            | Replacement::SourceModuleMovedWithMessage {
+                module: _, name: _, ..
+            } => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
             }
         }
@@ -90,9 +92,13 @@ impl Violation for Airflow3Removal {
             } => Some(format!(
                 "`{name}` has been moved to `{module}` since Airflow 3.0 (with apache-airflow-task-sdk>={version})."
             )),
-            Replacement::InternalModule { module, name } => Some(format!(
-                "`{name}` has been moved to `{module}` since Airflow 3.0. \
-                This is an internal module which is not supposed to be used and is subject to change without notice."
+            Replacement::SourceModuleMovedWithMessage {
+                module,
+                name,
+                message,
+                ..
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0. {message}"
             )),
         }
     }
@@ -685,10 +691,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ),
 
         // airflow.hooks
-        ["airflow", "hooks", "base_hook", "BaseHook"] => Replacement::Rename {
-            module: "airflow.hooks.base",
-            name: "BaseHook",
-        },
+        ["airflow", "hooks", "base_hook", "BaseHook"] => {
+            Replacement::SourceModuleMovedWithMessage {
+                module: "airflow.hooks.base",
+                name: "BaseHook".to_string(),
+                message: "Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1.",
+                suggest_fix: true,
+            }
+        }
 
         // airflow.lineage.hook
         ["airflow", "lineage", "hook", "DatasetLineageInfo"] => Replacement::Rename {
@@ -1013,6 +1023,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         Replacement::Rename { module, name } => (module, *name),
         Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
         Replacement::SourceModuleMovedToSDK { module, name, .. } => (module, name.as_str()),
+        Replacement::SourceModuleMovedWithMessage {
+            module,
+            name,
+            suggest_fix,
+            ..
+        } if *suggest_fix => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(
                 Airflow3Removal {

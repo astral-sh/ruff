@@ -10,7 +10,7 @@ AIR321 `airflow.utils.setup_teardown.BaseSetupTeardownContext` is removed in Air
    | ^^^^^^^^^^^^^^^^^^^^^^^^
 10 | SetupTeardownContext()
    |
-help: `BaseSetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` since Airflow 3.1. This is an internal module which is not supposed to be used and is subject to change without notice.
+help: `BaseSetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
 
 AIR321 `airflow.utils.setup_teardown.SetupTeardownContext` is removed in Airflow 3.1
   --> AIR321_names.py:10:1
@@ -21,7 +21,7 @@ AIR321 `airflow.utils.setup_teardown.SetupTeardownContext` is removed in Airflow
 11 |
 12 | # airflow.utils.xcom
    |
-help: `SetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` since Airflow 3.1. This is an internal module which is not supposed to be used and is subject to change without notice.
+help: `SetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
 
 AIR321 `airflow.utils.xcom.XCOM_RETURN_KEY` is removed in Airflow 3.1
   --> AIR321_names.py:15:1
@@ -33,7 +33,7 @@ AIR321 `airflow.utils.xcom.XCOM_RETURN_KEY` is removed in Airflow 3.1
 16 |
 17 | # airflow.utils.task_group
    |
-help: `XCOM_RETURN_KEY` has been moved to `airflow.models.xcom` since Airflow 3.1. This is an internal module which is not supposed to be used and is subject to change without notice.
+help: `XCOM_RETURN_KEY` has been moved to `airflow.models.xcom` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
 
 AIR321 [*] `airflow.utils.task_group.TaskGroup` is removed in Airflow 3.1
   --> AIR321_names.py:20:1
@@ -238,7 +238,7 @@ AIR321 `airflow.utils.decorators.remove_task_decorator` is removed in Airflow 3.
    | ^^^^^^^^^^^^^^^^^^^^^
 51 | fixup_decorator_warning_stack()
    |
-help: `remove_task_decorator` has been moved to `airflow.sdk.definitions._internal.decorators` since Airflow 3.1. This is an internal module which is not supposed to be used and is subject to change without notice.
+help: `remove_task_decorator` has been moved to `airflow.sdk.definitions._internal.decorators` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
 
 AIR321 `airflow.utils.decorators.fixup_decorator_warning_stack` is removed in Airflow 3.1
   --> AIR321_names.py:51:1
@@ -249,7 +249,7 @@ AIR321 `airflow.utils.decorators.fixup_decorator_warning_stack` is removed in Ai
 52 |
 53 | # airflow.models.abstractoperator
    |
-help: `fixup_decorator_warning_stack` has been moved to `airflow.sdk.definitions._internal.decorators` since Airflow 3.1. This is an internal module which is not supposed to be used and is subject to change without notice.
+help: `fixup_decorator_warning_stack` has been moved to `airflow.sdk.definitions._internal.decorators` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
 
 AIR321 `airflow.models.abstractoperator.AbstractOperator` is removed in Airflow 3.1
   --> AIR321_names.py:60:1
@@ -261,7 +261,7 @@ AIR321 `airflow.models.abstractoperator.AbstractOperator` is removed in Airflow 
 61 | NotMapped()
 62 | TaskStateChangeCallback()
    |
-help: `AbstractOperator` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not supposed to be used and is subject to change without notice.
+help: `AbstractOperator` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
 
 AIR321 `airflow.models.abstractoperator.NotMapped` is removed in Airflow 3.1
   --> AIR321_names.py:61:1
@@ -271,7 +271,7 @@ AIR321 `airflow.models.abstractoperator.NotMapped` is removed in Airflow 3.1
    | ^^^^^^^^^
 62 | TaskStateChangeCallback()
    |
-help: `NotMapped` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not supposed to be used and is subject to change without notice.
+help: `NotMapped` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
 
 AIR321 `airflow.models.abstractoperator.TaskStateChangeCallback` is removed in Airflow 3.1
   --> AIR321_names.py:62:1
@@ -283,7 +283,7 @@ AIR321 `airflow.models.abstractoperator.TaskStateChangeCallback` is removed in A
 63 |
 64 | # airflow.models.baseoperator
    |
-help: `TaskStateChangeCallback` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not supposed to be used and is subject to change without notice.
+help: `TaskStateChangeCallback` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
 
 AIR321 [*] `airflow.models.baseoperator.BaseOperator` is removed in Airflow 3.1
   --> AIR321_names.py:67:1
@@ -467,18 +467,39 @@ help: `Properties` has been moved to `airflow.sdk.io` since Airflow 3.1 (with ap
 note: This is an unsafe fix and may change runtime behavior
 
 AIR321 [*] `airflow.secrets.cache.SecretCache` is removed in Airflow 3.1
-  --> AIR321_names.py:98:1
-   |
-96 | # airflow.secrets.cache
-97 | from airflow.secrets.cache import SecretCache
-98 | SecretCache()
-   | ^^^^^^^^^^^
-   |
+   --> AIR321_names.py:98:1
+    |
+ 96 | # airflow.secrets.cache
+ 97 | from airflow.secrets.cache import SecretCache
+ 98 | SecretCache()
+    | ^^^^^^^^^^^
+ 99 |
+100 | # airflow.hooks
+    |
 help: `SecretCache` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
-94 | Properties()
-95 | 
-96 | # airflow.secrets.cache
-   - from airflow.secrets.cache import SecretCache
-97 + from airflow.sdk import SecretCache
-98 | SecretCache()
+94  | Properties()
+95  | 
+96  | # airflow.secrets.cache
+    - from airflow.secrets.cache import SecretCache
+97  + from airflow.sdk import SecretCache
+98  | SecretCache()
+99  | 
+100 | # airflow.hooks
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.hooks.base.BaseHook` is removed in Airflow 3.1
+   --> AIR321_names.py:102:1
+    |
+100 | # airflow.hooks
+101 | from airflow.hooks.base import BaseHook
+102 | BaseHook()
+    | ^^^^^^^^
+    |
+help: `BaseHook` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+98  | SecretCache()
+99  | 
+100 | # airflow.hooks
+    - from airflow.hooks.base import BaseHook
+101 + from airflow.sdk import BaseHook
+102 | BaseHook()
 note: This is an unsafe fix and may change runtime behavior

@@ -57,7 +57,9 @@ impl Violation for Airflow31Removal {
             | Replacement::SourceModuleMovedToSDK {
                 module: _, name: _, ..
             }
-            | Replacement::InternalModule { module: _, name: _ } => {
+            | Replacement::SourceModuleMovedWithMessage {
+                module: _, name: _, ..
+            } => {
                 format!("`{deprecated}` is removed in Airflow 3.1")
             }
         }
@@ -82,9 +84,13 @@ impl Violation for Airflow31Removal {
             } => Some(format!(
                 "`{name}` has been moved to `{module}` since Airflow 3.1 (with apache-airflow-task-sdk>={version})."
             )),
-            Replacement::InternalModule { module, name } => Some(format!(
-                "`{name}` has been moved to `{module}` since Airflow 3.1. \
-                This is an internal module which is not supposed to be used and is subject to change without notice."
+            Replacement::SourceModuleMovedWithMessage {
+                module,
+                name,
+                message,
+                ..
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.1. {message}"
             )),
         }
     }
@@ -136,27 +142,37 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "utils",
             "setup_teardown",
             rest @ ("BaseSetupTeardownContext" | "SetupTeardownContext"),
-        ] => Replacement::InternalModule {
+        ] => Replacement::SourceModuleMovedWithMessage {
             module: "airflow.sdk.definitions._internal.setup_teardown",
             name: rest.to_string(),
+            message: "This is an internal module which is not suggested to be used and is subject to change without notice.",
+            suggest_fix: false,
         },
+
         // airflow.secrets
         ["airflow", "secrets", "cache", "SecretCache"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "SecretCache".to_string(),
             version: "1.1.6",
         },
+
         // airflow.utils.xcom
-        ["airflow", "utils", "xcom", "XCOM_RETURN_KEY"] => Replacement::InternalModule {
-            module: "airflow.models.xcom",
-            name: "XCOM_RETURN_KEY".to_string(),
-        },
+        ["airflow", "utils", "xcom", "XCOM_RETURN_KEY"] => {
+            Replacement::SourceModuleMovedWithMessage {
+                module: "airflow.models.xcom",
+                name: "XCOM_RETURN_KEY".to_string(),
+                message: "This is an internal module which is not suggested to be used and is subject to change without notice.",
+                suggest_fix: false,
+            }
+        }
+
         // airflow.utils.task_group
         ["airflow", "utils", "task_group", "TaskGroup"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "TaskGroup".to_string(),
             version: "1.1.6",
         },
+
         // airflow.utils.timezone
         [
             "airflow",
@@ -169,26 +185,33 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             name: rest.to_string(),
             version: "1.1.6",
         },
+
         // airflow.utils.decorators
         [
             "airflow",
             "utils",
             "decorators",
             rest @ ("remove_task_decorator" | "fixup_decorator_warning_stack"),
-        ] => Replacement::InternalModule {
+        ] => Replacement::SourceModuleMovedWithMessage {
             module: "airflow.sdk.definitions._internal.decorators",
             name: rest.to_string(),
+            message: "This is an internal module which is not suggested to be used and is subject to change without notice.",
+            suggest_fix: false,
         },
+
         // airflow.models.abstractoperator
         [
             "airflow",
             "models",
             "abstractoperator",
             rest @ ("AbstractOperator" | "NotMapped" | "TaskStateChangeCallback"),
-        ] => Replacement::InternalModule {
+        ] => Replacement::SourceModuleMovedWithMessage {
             module: "airflow.sdk.definitions._internal.abstractoperator",
             name: rest.to_string(),
+            message: "This is an internal module which is not suggested to be used and is subject to change without notice.",
+            suggest_fix: false,
         },
+
         // airflow.models.baseoperator
         ["airflow", "models", "baseoperator", "BaseOperator"] => {
             Replacement::SourceModuleMovedToSDK {
@@ -197,6 +220,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 version: "1.1.6",
             }
         }
+
         // airflow.macros
         [
             "airflow",
@@ -207,6 +231,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             name: rest.to_string(),
             version: "1.1.6",
         },
+
         // airflow.io
         ["airflow", "io", rest @ ("get_fs" | "has_fs" | "Properties")] => {
             Replacement::SourceModuleMovedToSDK {
@@ -215,6 +240,13 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 version: "1.1.6",
             }
         }
+
+        // airflow.hooks
+        ["airflow", "hooks", "base", "BaseHook"] => Replacement::SourceModuleMovedToSDK {
+            module: "airflow.sdk",
+            name: "BaseHook".to_string(),
+            version: "1.1.6",
+        },
         _ => return,
     };
 
@@ -222,6 +254,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         Replacement::Rename { module, name } => (module, *name),
         Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
         Replacement::SourceModuleMovedToSDK { module, name, .. } => (module, name.as_str()),
+        Replacement::SourceModuleMovedWithMessage {
+            module,
+            name,
+            suggest_fix,
+            ..
+        } if *suggest_fix => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(
                 Airflow31Removal {

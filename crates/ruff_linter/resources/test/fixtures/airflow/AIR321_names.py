@@ -96,3 +96,7 @@ Properties()
 # airflow.secrets.cache
 from airflow.secrets.cache import SecretCache
 SecretCache()
+
+# airflow.hooks
+from airflow.hooks.base import BaseHook
+BaseHook()
