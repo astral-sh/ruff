@@ -141,10 +141,10 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
 
     let applicability = if matches!(maybe_number, Expr::NumberLiteral(_)) {
         if checker.comment_ranges().intersects(subscript.range()) {
-			Applicability::Unsafe
-		} else {
-			Applicability::Safe
-		}
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        }
     } else {
         Applicability::DisplayOnly
     };
