@@ -10,7 +10,6 @@ use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
 };
 use crate::prelude::*;
-use crate::preview::is_fluent_layout_split_first_call_enabled;
 
 #[derive(Default)]
 pub struct FormatExprAttribute {
@@ -113,28 +112,13 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // and the value either requires parenthesizing or is a call or subscript expression
             // (it's a fluent chain but not the first element).
             //
-            // In preview we also break _at_ the first call in the chain.
+            // We also break _at_ the first call in the chain.
             // For example:
-            //
-            // ```diff
-            // # stable formatting vs. preview
-            //  x = (
-            // -    df.merge()
-            // +    df
-            // +    .merge()
-            //      .groupby()
-            //      .agg()
-            //      .filter()
-            //  )
-            // ```
             else if call_chain_layout.is_fluent() {
                 if parenthesize_value
                     || value.is_call_expr()
                     || value.is_subscript_expr()
-                    // Remember to update the doc-comment above when
-                    // stabilizing this behavior.
-                    || (is_fluent_layout_split_first_call_enabled(f.context())
-                        && call_chain_layout.is_first_call_like())
+                    || call_chain_layout.is_first_call_like()
                 {
                     soft_line_break().fmt(f)?;
                 }
