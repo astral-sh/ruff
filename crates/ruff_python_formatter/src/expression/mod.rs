@@ -19,7 +19,6 @@ use crate::expression::parentheses::{
     optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
-use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -1297,7 +1296,7 @@ pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> 
         | Expr::Dict(_)
         | Expr::ListComp(_)
         | Expr::SetComp(_)
-        | Expr::DictComp(_) => is_hug_parens_with_braces_and_square_brackets_enabled(context),
+        | Expr::DictComp(_) => true,
 
         Expr::Starred(ast::ExprStarred { value, .. }) => is_expression_huggable(value, context),
 
