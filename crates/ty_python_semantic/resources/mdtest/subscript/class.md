@@ -126,3 +126,34 @@ def g(x: Baz):
         # error: [invalid-argument-type]
         reveal_type(x["hello"])  # revealed: str
 ```
+
+When both elements have `__getitem__` but both fail, we report errors for each element.
+
+```py
+class A:
+    def __getitem__(self, key: int) -> str:
+        return ""
+
+class B:
+    def __getitem__(self, key: str) -> int:
+        return 0
+
+def h(x: A):
+    if isinstance(x, B):
+        # x is A & B. A expects int, B expects str. A list satisfies neither.
+        # error: [invalid-argument-type]
+        # error: [invalid-argument-type]
+        reveal_type(x[[]])  # revealed: Never
+```
+
+When we have an intersection with only negative elements (e.g., `~int & ~str`), the type is
+implicitly `object & ~int & ~str`. Subscripting such a type should use `object` as the positive
+element, which is not subscriptable.
+
+```py
+def i(x: object):
+    if not isinstance(x, (int, str)):
+        # x is object & ~int & ~str, which simplifies to ~int & ~str with implicit object
+        # error: [not-subscriptable]
+        reveal_type(x[0])  # revealed: Unknown
+```

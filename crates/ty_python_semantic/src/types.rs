@@ -12493,7 +12493,10 @@ impl<'db> IntersectionType<'db> {
 
     /// Returns an iterator over the positive elements of the intersection. If
     /// there are no positive elements, returns a single `object` type.
-    fn positive_elements_or_object(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+    pub(crate) fn positive_elements_or_object(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = Type<'db>> {
         if self.positive(db).is_empty() {
             Either::Left(std::iter::once(Type::object()))
         } else {

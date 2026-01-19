@@ -376,6 +376,74 @@ where
     }
 }
 
+fn map_intersection_subscript<'db, F>(
+    db: &'db dyn Db,
+    elements: impl Iterator<Item = Type<'db>>,
+    mut map_fn: F,
+) -> Result<Type<'db>, SubscriptError<'db>>
+where
+    F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
+{
+    let mut results = Vec::new();
+    let mut errors = Vec::new();
+
+    for element in elements {
+        match map_fn(element) {
+            Ok(result) => results.push(result),
+            Err(error) => errors.push(error),
+        }
+    }
+
+    // If any element succeeded, return the intersection of successful results.
+    if !results.is_empty() {
+        let mut builder = IntersectionBuilder::new(db);
+        for result in results {
+            builder = builder.add_positive(result);
+        }
+        return Ok(builder.build());
+    }
+
+    // All elements failed. Check if any element has the method available
+    // (even if the call failed). If so, filter out `NotSubscriptable` errors
+    // for elements that lack the method.
+    let any_has_method = errors.iter().any(SubscriptError::any_method_available);
+
+    if any_has_method {
+        let mut builder = IntersectionBuilder::new(db);
+        let mut filtered_errors = Vec::new();
+
+        for error in errors {
+            if error.any_method_available() {
+                builder = builder.add_positive(error.result_type());
+                filtered_errors.extend(
+                    error
+                        .into_errors()
+                        .into_iter()
+                        .filter(SubscriptErrorKind::method_available),
+                );
+            }
+        }
+
+        return Err(SubscriptError::with_errors(
+            builder.build(),
+            filtered_errors,
+        ));
+    }
+
+    // No element has the method. Combine all errors.
+    let Some(first) = errors.first() else {
+        unreachable!("intersection should have at least one positive element")
+    };
+
+    let result_ty = first.result_type();
+    let all_errors = errors
+        .into_iter()
+        .flat_map(SubscriptError::into_errors)
+        .collect();
+
+    Err(SubscriptError::with_errors(result_ty, all_errors))
+}
+
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
@@ -383,71 +451,6 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
-        fn try_intersection<'db, F>(
-            db: &'db dyn Db,
-            elements: impl Iterator<Item = Type<'db>>,
-            mut op: F,
-        ) -> Result<Type<'db>, SubscriptError<'db>>
-        where
-            F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
-        {
-            let mut results = Vec::new();
-            let mut errors = Vec::new();
-
-            for element in elements {
-                match op(element) {
-                    Ok(result) => results.push(result),
-                    Err(error) => errors.push(error),
-                }
-            }
-
-            if results.is_empty() {
-                // Check if any element has the method (even if call failed).
-                // If so, we should only report errors for those elements and use their
-                // return types, filtering out `NotSubscriptable` errors for elements
-                // that lack the method.
-                let any_has_method = errors.iter().any(SubscriptError::any_method_available);
-
-                if any_has_method {
-                    let mut builder = IntersectionBuilder::new(db);
-                    let mut filtered_errors = Vec::new();
-
-                    for error in errors {
-                        if error.any_method_available() {
-                            builder = builder.add_positive(error.result_type());
-                            filtered_errors.extend(
-                                error
-                                    .into_errors()
-                                    .into_iter()
-                                    .filter(SubscriptErrorKind::method_available),
-                            );
-                        }
-                    }
-
-                    return Err(SubscriptError::with_errors(
-                        builder.build(),
-                        filtered_errors,
-                    ));
-                }
-
-                if let Some(first) = errors.pop() {
-                    let result_ty = first.result_type();
-                    let mut all_errors = first.into_errors();
-                    for error in errors {
-                        all_errors.extend(error.into_errors());
-                    }
-                    return Err(SubscriptError::with_errors(result_ty, all_errors));
-                }
-                return Ok(Type::unknown());
-            }
-
-            let mut builder = IntersectionBuilder::new(db);
-            for result in results {
-                builder = builder.add_positive(result);
-            }
-            Ok(builder.build())
-        }
-
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
@@ -470,13 +473,13 @@ impl<'db> Type<'db> {
             })),
 
             (Type::Intersection(intersection), _) => {
-                Some(try_intersection(db, intersection.iter_positive(db), |element| {
+                Some(map_intersection_subscript(db, intersection.positive_elements_or_object(db), |element| {
                     element.subscript(db, slice_ty, expr_context)
                 }))
             }
 
             (_, Type::Intersection(intersection)) => {
-                Some(try_intersection(db, intersection.iter_positive(db), |element| {
+                Some(map_intersection_subscript(db, intersection.positive_elements_or_object(db), |element| {
                     value_ty.subscript(db, element, expr_context)
                 }))
             }
