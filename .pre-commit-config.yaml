@@ -35,7 +35,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.41.0
+    rev: v1.42.0
     hooks:
       - id: typos
         priority: 0
@@ -60,7 +60,7 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.19.0
+    rev: v1.20.0
     hooks:
       - id: zizmor
         priority: 0
@@ -83,7 +83,7 @@ repos:
       - id: mdformat
         language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
-          - mdformat-mkdocs==5.0.0
+          - mdformat-mkdocs==5.1.2
           - mdformat-footnote==0.1.2
         exclude: |
           (?x)^(
@@ -93,7 +93,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.10
+    rev: v0.14.11
     hooks:
       - id: ruff-format
         priority: 0
