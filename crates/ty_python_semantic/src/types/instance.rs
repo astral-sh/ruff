@@ -81,7 +81,7 @@ impl<'db> Type<'db> {
         Type::tuple_instance(tuple)
     }
 
-    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+    pub fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
         Type::tuple_instance(TupleType::homogeneous(db, element))
     }
 

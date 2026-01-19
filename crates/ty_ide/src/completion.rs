@@ -393,14 +393,14 @@ impl<'db> CompletionBuilder<'db> {
         if let Some(ty) = self.ty {
             self.is_type_check_only = ty.is_type_check_only(db);
             // Tags completions with context-specific if they are
-            // known to be usable in a `raise` context and we have
-            // determined a raisable type `raisable_ty`.
+            // known to be usable in an exception context and we have
+            // determined an `exception_ty`.
             //
-            // It's possible that some completions are usable in a `raise`
+            // It's possible that some completions are usable in an exception
             // but aren't marked here. That is, false negatives are
             // possible but false positives are not.
-            if let Some(raisable_ty) = ctx.raisable_ty {
-                self.is_context_specific |= ty.is_assignable_to(db, raisable_ty);
+            if let Some(exception_ty) = ctx.exception_ty {
+                self.is_context_specific |= ty.is_assignable_to(db, exception_ty);
             }
             if ctx.is_in_class_def {
                 self.is_context_specific |= ty.is_class_literal()
@@ -606,18 +606,10 @@ impl<'m> Context<'m> {
         match self.kind {
             ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
-                let is_raising_exception = self.cursor.is_raising_exception();
+                let exception_ty = self.cursor.exception_ty(db);
                 CollectionContext {
-                    raisable_ty: is_raising_exception.then(|| {
-                        UnionType::from_elements(
-                            db,
-                            [
-                                KnownClass::BaseException.to_subclass_of(db),
-                                KnownClass::BaseException.to_instance(db),
-                            ],
-                        )
-                    }),
-                    is_raising_exception,
+                    exception_ty,
+                    is_raising_exception: exception_ty.is_some(),
                     is_in_class_def: self.cursor.is_in_class_def(),
                     valid_keywords: self.cursor.valid_keywords(),
                 }
@@ -822,28 +814,47 @@ impl<'m> ContextCursor<'m> {
         })
     }
 
-    /// Returns true when the cursor is after a `raise` keyword.
-    fn is_raising_exception(&self) -> bool {
-        /// The maximum number of tokens we're willing to
-        /// look-behind to find a `raise` keyword.
-        const LIMIT: usize = 10;
+    /// Returns the expected type when the cursor sits inside
+    /// a `raise` or `except` expression.
+    ///
+    /// The return value is always `None` if the cursor is not
+    /// inside a `raise` or `except` context.
+    fn exception_ty<'db>(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db);
+        let base_exception_instance = KnownClass::BaseException.to_instance(db);
+        let raise_ty = UnionType::from_elements(db, [base_exception_ty, base_exception_instance]);
+        let cause_ty = UnionType::from_elements(db, [raise_ty, Type::none(db)]);
+        let except_ty = UnionType::from_elements(
+            db,
+            [
+                base_exception_ty,
+                Type::homogeneous_tuple(db, base_exception_ty),
+            ],
+        );
 
-        // This only looks for things like `raise foo.bar.baz.qu<CURSOR>`.
-        // Technically, any kind of expression is allowed after `raise`.
-        // But we may not always want to treat it specially. So we're
-        // rather conservative about what we consider "raising an
-        // exception" to be for the purposes of completions. The failure
-        // mode here is that we may wind up suggesting things that
-        // shouldn't be raised. The benefit is that when this heuristic
-        // does work, we won't suggest things that shouldn't be raised.
-        for token in self.tokens_before.iter().rev().take(LIMIT) {
-            match token.kind() {
-                TokenKind::Name | TokenKind::Dot => continue,
-                TokenKind::Raise => return true,
-                _ => return false,
+        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
+
+        for node in self.covering_node.ancestors() {
+            match node {
+                ast::AnyNodeRef::StmtRaise(stmt) => {
+                    if stmt.exc.as_deref().is_some_and(contains) {
+                        return Some(raise_ty);
+                    } else if stmt.cause.as_deref().is_some_and(contains) {
+                        return Some(cause_ty);
+                    }
+                }
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
+                    if handler.type_.as_deref().is_some_and(contains) {
+                        return Some(except_ty);
+                    }
+                }
+                _ => {}
+            }
+            if node.is_statement() {
+                return None;
             }
         }
-        false
+        None
     }
 
     /// Returns true when the curser is within the
@@ -1049,12 +1060,11 @@ impl UserQuery {
 #[derive(Clone, Debug, Default)]
 struct CollectionContext<'db> {
     /// A pre-computed type corresponding to what is
-    /// expected for the type of valuables that are
-    /// raisable.
+    /// expected in an exception expression.
     ///
     /// This is only `Some` when `is_raising_exception` is `true`.
-    raisable_ty: Option<Type<'db>>,
-    /// Whether we're in a `raise <EXPR>` context or not.
+    exception_ty: Option<Type<'db>>,
+    /// Whether we're in an exception context (`raise` or `except`) or not.
     is_raising_exception: bool,
     /// Whether we're in a class definition context or not.
     is_in_class_def: bool,
@@ -8180,6 +8190,62 @@ re.match('', '', fla<CURSOR>
         assert_snapshot!(
             builder.skip_auto_import().skip_builtins().build().snapshot(),
             @"flags=",
+        );
+    }
+
+    // Ideally, we should favour completions that are definitely raisable
+    // here. However, doing so would require `exception_ty` to fall back to
+    // token matching when AST-matching fails, making the function signficantly
+    // more complex. At the time of writing, this trade-off was not
+    // considered worthwhile.
+    //
+    // Note that this only applies to bare raise/raise-from statements with no
+    // characters typed after it. It does not apply to `raise A<CURSOR>`.
+    #[test]
+    fn empty_raise_statement() {
+        let builder = completion_test_builder(
+            r#"
+raise <CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().skip_builtins().build().snapshot(),
+            @r"
+            and
+            as
+            assert
+            async
+            await
+            break
+            case
+            class
+            continue
+            def
+            del
+            elif
+            else
+            except
+            finally
+            for
+            from
+            global
+            if
+            import
+            in
+            is
+            lambda
+            match
+            nonlocal
+            not
+            or
+            pass
+            raise
+            return
+            try
+            while
+            with
+            yield
+            ",
         );
     }
 
