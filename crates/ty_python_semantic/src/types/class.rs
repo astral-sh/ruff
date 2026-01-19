@@ -5497,23 +5497,26 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     /// Compute the MRO for this namedtuple.
     ///
-    /// The MRO is `[self, tuple[field_types...], object]`.
-    /// For example, `namedtuple("Point", [("x", int), ("y", int)])` has MRO
-    /// `[Point, tuple[int, int], object]`.
+    /// The MRO is the MRO of the class's tuple base class, prepended by `self`.
+    /// For example, `namedtuple("Point", [("x", int), ("y", int)])` has the following MRO:
+    ///
+    /// 1. <class 'Point'>
+    /// 2. <class 'tuple[int, int]'>
+    /// 3. <class 'Sequence[int]'>
+    /// 4. <class 'Reversible[int]'>
+    /// 5. <class 'Collection[int]'>
+    /// 6. <class 'Iterable[int]'>
+    /// 7. <class 'Container[int]'>
+    /// 8. typing.Protocol
+    /// 9. typing.Generic
+    /// 10. <class 'object'>
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let tuple_class = self.tuple_base_class(db);
-        let object_class = KnownClass::Object
-            .to_class_literal(db)
-            .as_class_literal()
-            .expect("object should be a class literal")
-            .default_specialization(db);
-        Mro::from([
-            self_base,
-            ClassBase::Class(tuple_class),
-            ClassBase::Class(object_class),
-        ])
+        std::iter::once(self_base)
+            .chain(tuple_class.iter_mro(db))
+            .collect()
     }
 
     /// Get the metaclass of this dynamic namedtuple.
