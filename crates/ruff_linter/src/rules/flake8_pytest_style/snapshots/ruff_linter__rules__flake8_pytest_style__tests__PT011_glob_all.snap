@@ -87,3 +87,12 @@ PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use
    |                        ^^^^^^^^^^
 49 |         raise ValueError("Can't divide 1 by 0")
    |
+
+PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:62:24
+   |
+61 | def test_error_check_is_none():
+62 |     with pytest.raises(ValueError, check=None):
+   |                        ^^^^^^^^^^
+63 |         raise ValueError("Can't divide 1 by 0")
+   |
