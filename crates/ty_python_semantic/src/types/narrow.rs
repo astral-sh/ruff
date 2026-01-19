@@ -29,7 +29,7 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
-use smallvec::{SmallVec, smallvec};
+use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
 
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
@@ -328,7 +328,7 @@ impl<'db> NarrowingConstraint<'db> {
     fn replacement(constraint: Type<'db>) -> Self {
         Self {
             intersection_disjunct: None,
-            replacement_disjuncts: smallvec![constraint],
+            replacement_disjuncts: smallvec_inline![constraint],
         }
     }
 
