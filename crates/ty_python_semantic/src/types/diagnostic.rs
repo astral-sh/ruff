@@ -330,7 +330,7 @@ declare_lint! {
     /// ```
     pub(crate) static CYCLIC_TYPE_ALIAS_DEFINITION = {
         summary: "detects cyclic type alias definitions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.29"),
         default_level: Level::Error,
     }
 }
@@ -352,7 +352,7 @@ declare_lint! {
     /// ```
     pub(crate) static DIVISION_BY_ZERO = {
         summary: "detects division by zero",
-        status: LintStatus::preview("0.0.1-alpha.1"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Ignore,
     }
 }
@@ -452,7 +452,7 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_DATACLASS_OVERRIDE = {
         summary: "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.13"),
         default_level: Level::Error,
     }
 }
@@ -483,7 +483,7 @@ declare_lint! {
     /// [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
     pub(crate) static INVALID_DATACLASS = {
         summary: "detects invalid `@dataclass` applications",
-        status: LintStatus::preview("0.0.12"),
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Error,
     }
 }
@@ -932,7 +932,7 @@ declare_lint! {
     /// [`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base
     pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
         summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Ignore,
     }
 }
@@ -1182,7 +1182,7 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_NEWTYPE = {
         summary: "detects invalid NewType definitions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.27"),
         default_level: Level::Error,
     }
 }
@@ -1872,7 +1872,7 @@ declare_lint! {
     /// ```
     pub(crate) static INEFFECTIVE_FINAL = {
         summary: "detects calls to `final()` that type checkers cannot interpret",
-        status: LintStatus::preview("0.0.1-alpha.33"),
+        status: LintStatus::stable("0.0.1-alpha.33"),
         default_level: Level::Warn,
     }
 }
@@ -2017,7 +2017,7 @@ declare_lint! {
     /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
     pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
         summary: "detects `super()` calls in methods of `NamedTuple` classes",
-        status: LintStatus::preview("0.0.1-alpha.30"),
+        status: LintStatus::stable("0.0.1-alpha.30"),
         default_level: Level::Error,
     }
 }
