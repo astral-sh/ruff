@@ -609,9 +609,14 @@ class Bar(Foo):
 
 ## A `@final` class must implement all abstract methods
 
-A class decorated with `@final` cannot be subclassed. Therefore, if such a class inherits from an
-abstract base class or a Protocol with abstract methods, those methods must be implemented in the
-final class itself - there's no other way to provide implementations.
+A class decorated with `@final` cannot be subclassed. Therefore, if such a class has abstract
+methods, those methods must be implemented in the final class itself - there's no other way to
+provide implementations.
+
+At runtime, instantiation of classes with unimplemented abstract methods is only prevented for
+classes that have `ABCMeta` (or a subclass of it) as their metaclass. However, type checkers also
+enforce this for classes that do not use `ABCMeta`, since the intent for the class to be abstract is
+clear from the use of `@abstractmethod`.
 
 ### Basic case with ABC
 

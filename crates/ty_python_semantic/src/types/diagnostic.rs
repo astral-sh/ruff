@@ -1883,10 +1883,14 @@ declare_lint! {
     /// Checks for `@final` classes that have unimplemented abstract methods.
     ///
     /// ## Why is this bad?
-    /// A class decorated with `@final` cannot be subclassed. If such a class inherits from
-    /// an abstract base class (ABC) or a Protocol with abstract methods that are not implemented,
-    /// the class can never be properly instantiated, as the abstract methods can never be
-    /// implemented (since subclassing is prohibited).
+    /// A class decorated with `@final` cannot be subclassed. If such a class has abstract
+    /// methods that are not implemented, the class can never be properly instantiated, as
+    /// the abstract methods can never be implemented (since subclassing is prohibited).
+    ///
+    /// At runtime, instantiation of classes with unimplemented abstract methods is only
+    /// prevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.
+    /// However, type checkers also enforce this for classes that do not use `ABCMeta`, since
+    /// the intent for the class to be abstract is clear from the use of `@abstractmethod`.
     ///
     /// ## Example
     ///
