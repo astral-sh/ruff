@@ -2686,9 +2686,11 @@ reveal_type(C().x)  # revealed: int
 
 ### Attributes defined in methods with unknown decorators
 
-When an attribute is defined in a method that is decorated with an unknown decorator, we consider it
-to be accessible on both the class itself and instances of that class. This is consistent with the
-gradual guarantee, because the unknown decorator *could* be an alias for `builtins.classmethod`.
+When an attribute is defined in a method that is decorated with an unknown decorator, the method is
+treated as a regular instance method. The attribute is accessible on instances but not on the class
+itself. We don't assume that an unknown decorator might be an alias for `@classmethod`, because that
+would cause the attribute to pollute class-level lookups and potentially override instance-level
+declarations.
 
 ```py
 # error: [unresolved-import]
@@ -2699,8 +2701,47 @@ class C:
     def f(self):
         self.x: int = 1
 
-reveal_type(C.x)  # revealed: int
+# error: [unresolved-attribute]
+reveal_type(C.x)  # revealed: Unknown
 reveal_type(C().x)  # revealed: int
+```
+
+### Attributes declared in `__init__` but also assigned in a decorated method
+
+When an attribute is declared with a type annotation in `__init__`, and then assigned (without
+annotation) in a method decorated with a known decorator like `@cache`, we should respect the
+declared type from `__init__`. The decorated method's assignment should not cause the type to
+include `Unknown`.
+
+```py
+from functools import cache
+
+class C:
+    def __init__(self) -> None:
+        self.x: int = 0
+
+    @cache
+    def method(self) -> None:
+        self.x = 1
+
+def f(c: C) -> None:
+    reveal_type(c.x)  # revealed: int
+```
+
+### Attributes defined in a property
+
+Instance attributes can be defined in a `@property` getter. Properties are still instance methods
+that take `self`, so attribute assignments in them should be recognized.
+
+```py
+class C:
+    @property
+    def prop(self) -> int:
+        self.x: int = 1
+        return self.x
+
+def f(c: C) -> None:
+    reveal_type(c.x)  # revealed: int
 ```
 
 ## Enum classes
