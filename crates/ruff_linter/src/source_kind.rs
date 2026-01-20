@@ -130,6 +130,8 @@ impl SourceKind {
             Ok(notebook
                 .is_python_notebook()
                 .then_some(Self::IpyNotebook(Box::new(notebook))))
+        } else if source_type.is_markdown() {
+            Ok(Some(Self::Markdown(source_code)))
         } else {
             Ok(Some(Self::Python(source_code)))
         }
