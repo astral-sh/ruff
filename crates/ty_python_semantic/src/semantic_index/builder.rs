@@ -3501,3 +3501,56 @@ fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
         }) if is_if_type_checking(operand)
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ruff_python_parser::parse_module;
+    use ruff_python_trivia::textwrap::dedent;
+
+    fn collect_bindings(loop_body: &str) -> Vec<String> {
+        let parsed = parse_module(loop_body).expect("valid Python code");
+        let places = LoopBindingCollector::collect(parsed.suite());
+        places
+            .into_iter()
+            .map(|place| match place {
+                PlaceExpr::Symbol(sym) => sym.name().to_string(),
+                PlaceExpr::Member(member) => member.to_string(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_collect_bindings_one_assignment() {
+        let bindings = collect_bindings("x = 1");
+        assert_eq!(bindings, vec!["x"]);
+    }
+
+    #[test]
+    fn test_collect_bindings_multiple_assignments() {
+        let bindings = collect_bindings(&dedent(
+            "
+            x = 1
+            y = 2
+            x = 3
+        ",
+        ));
+        assert_eq!(bindings, vec!["x", "y", "x"]);
+    }
+
+    #[test]
+    fn test_collect_bindings_nested_ifs_and_loops() {
+        let bindings = collect_bindings(&dedent(
+            "
+            a = 1
+            if some_condition:
+                b = 2
+            while some_condition:
+                c = 3
+            for d in e:
+                f = 4
+        ",
+        ));
+        assert_eq!(bindings, vec!["a", "b", "c", "d", "f"]);
+    }
+}
