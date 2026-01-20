@@ -3451,9 +3451,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         // SAFETY: `bindings` was created from a single `CallableBinding` above.
-        let Some(callable_binding) = bindings.single_element() else {
-            unreachable!("ParamSpec sub-call should only contain a single CallableBinding");
-        };
+        let callable_binding = bindings
+            .single_element()
+            .expect("ParamSpec sub-call should only contain a single CallableBinding");
 
         match callable_binding.matching_overload_index() {
             MatchingOverloadIndex::None => {

@@ -694,6 +694,7 @@ def foo(int_or_str: int | str):
     reveal_type(with_parameters(int_int, int_or_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
 # Keyword argument matching should also work
+# TODO: This should reveal the matching overload instead
 reveal_type(with_parameters(int_int, x=1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 reveal_type(with_parameters(int_int, x="a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
@@ -731,6 +732,7 @@ reveal_type(run(multi, 1, 2))  # revealed: int | str
 reveal_type(run(multi, "a", "b"))  # revealed: int | str
 
 # Mixed positional and keyword
+# TODO: both should reveal `int`
 reveal_type(run(multi, 1, y=2))  # revealed: int | str
 reveal_type(run(multi, x=1, y=2))  # revealed: int | str
 
