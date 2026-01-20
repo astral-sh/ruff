@@ -318,3 +318,106 @@ def _(x: object):
     if (type(y := x)) is bool:
         reveal_type(y)  # revealed: bool
 ```
+
+## Narrowing where the right-hand side is not a class literal
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+
+class Foo: ...
+
+def f(x: Foo, y: type[int]):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo & int
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo & int
+
+@final
+class Bar: ...
+
+def g(x: object, y: type[Bar]):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Bar
+    else:
+        # `Bar` is `@final`, so we can do `else`-branch narrowing here
+        reveal_type(x)  # revealed: ~Bar
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: ~Bar
+    else:
+        reveal_type(x)  # revealed: Bar
+
+def j[T: int](x: Foo, y: type[T]):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo & int
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo & int
+
+def k[T: type[int]](x: Foo, y: T):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo & int
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo & int
+
+type IntClassAlias = type[int]
+
+def strange(x: Foo, y: IntClassAlias):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo & int
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo & int
+
+class Spam[T]: ...
+
+def h(x: Foo, y: type[Spam[int]]):
+    # no narrowing can occur, because `Spam[int]` is a generic class,
+    # and `if type(x) is Y` is not a valid operation if `Y` could be
+    # a generic alias.
+
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo
+
+def i[T](x: Foo, y: type[Spam[T]]):
+    # same here: no  narrowing can occur
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo
+```
