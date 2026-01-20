@@ -20,14 +20,15 @@ use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, sema
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
-use crate::types::infer::{infer_deferred_types, infer_scope_types};
+use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, todo_type,
+    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, infer_complete_scope_types,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -54,7 +55,7 @@ fn function_signature_expression_type<'db>(
         infer_deferred_types(db, definition).expression_type(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
-        infer_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(expression)
     }
 }
 
