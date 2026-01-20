@@ -43,7 +43,7 @@ use crate::place::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::ScopeId;
+use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -5619,6 +5619,63 @@ impl<'db> Type<'db> {
                         });
                     };
 
+                    // Check for invalid `Self` usage in method contexts.
+                    // `Self` is always bound to the outermost method in the containing class.
+                    // We mirror the logic in `bind_typevar`: first try scope walking to find
+                    // the outermost method, then fall back to `typevar_binding_context`.
+                    let binding_definition = index
+                        .ancestor_scopes(scope_id.file_scope_id(db))
+                        .tuple_windows()
+                        .find_map(|((_, inner), (_, outer))| {
+                            if outer.kind().is_class() {
+                                if let NodeWithScopeKind::Function(func_node) = inner.node() {
+                                    return Some(index.expect_single_definition(func_node));
+                                }
+                            }
+                            None
+                        })
+                        .or(typevar_binding_context);
+
+                    // `Self` cannot be used in a static method.
+                    if let Some(definition) = binding_definition {
+                        if definition.kind(db).is_function_def() {
+                            let inference = infer::infer_definition_types(db, definition);
+                            let function = inference
+                                .undecorated_type()
+                                .or_else(|| {
+                                    Some(inference.declaration_type(definition).inner_type())
+                                })
+                                .and_then(Type::as_function_literal);
+
+                            if let Some(func) = function {
+                                if func.has_known_decorator(db, FunctionDecorators::STATICMETHOD) {
+                                    return Err(InvalidTypeExpressionError {
+                                        fallback_type: Type::unknown(),
+                                        invalid_expressions: smallvec_inline![
+                                            InvalidTypeExpression::SelfInStaticMethod
+                                        ],
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    // `Self` cannot be used in a metaclass (methods or class-level attributes).
+                    if let Some(type_class) =
+                        KnownClass::Type.to_class_literal(db).to_class_type(db)
+                    {
+                        if !class.is_known(db, KnownClass::Type)
+                            && class.is_subclass_of(db, None, type_class)
+                        {
+                            return Err(InvalidTypeExpressionError {
+                                fallback_type: Type::unknown(),
+                                invalid_expressions: smallvec_inline![
+                                    InvalidTypeExpression::SelfInMetaclass
+                                ],
+                            });
+                        }
+                    }
+
                     Ok(
                         typing_self(db, scope_id, typevar_binding_context, class.into())
                             .map(Type::TypeVar)
@@ -7510,6 +7567,10 @@ enum InvalidTypeExpression<'db> {
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(SpecialFormType),
+    /// `typing.Self` cannot be used in a static method
+    SelfInStaticMethod,
+    /// `typing.Self` cannot be used in a metaclass
+    SelfInMetaclass,
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }
@@ -7578,6 +7639,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
+                    InvalidTypeExpression::SelfInStaticMethod => {
+                        f.write_str("`Self` cannot be used in a static method")
+                    }
+                    InvalidTypeExpression::SelfInMetaclass => {
+                        f.write_str("`Self` cannot be used in a metaclass")
+                    }
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,

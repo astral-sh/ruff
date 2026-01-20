@@ -573,20 +573,77 @@ class Foo:
         return Foo()
 
     @staticmethod
-    # TODO: The usage of `Self` here should be rejected because this is a static method
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
     def make() -> Self:
-        # error: [invalid-return-type]
         return Foo()
 
 class Bar(Generic[T]): ...
 
 # error: [invalid-type-form]
 class Baz(Bar[Self]): ...
+```
+
+## Static method edge cases
+
+`Self` cannot be used anywhere in a static method, including parameters, return types, nested
+functions, and default argument values.
+
+```py
+from typing import Self
+
+class StaticMethodTests:
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_return() -> Self:
+        pass
+
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_param(x: Self) -> None:
+        pass
+
+    @staticmethod
+    def with_nested_function() -> None:
+        # `Self` in nested function inside static method is also invalid
+        # because `Self` binds to the outermost method (the static method).
+        # error: [invalid-type-form] "`Self` cannot be used in a static method"
+        def inner() -> Self:
+            pass
+
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_default(x: int = 0, y: "Self | None" = None) -> None:
+        pass
+```
+
+## Metaclass edge cases
+
+`Self` cannot be used in a metaclass because the semantics are confusing: in a metaclass, `self`
+refers to a class (the metaclass instance), not a regular object instance.
+
+```py
+from typing import Self
 
 class MyMetaclass(type):
-    # TODO: reject the Self usage. because self cannot be used within a metaclass.
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    registry: list[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
     def __new__(cls, name, bases, dct) -> Self:
         return cls(name, bases, dct)
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def instance_method(self) -> Self:
+        return self
+
+    @classmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def metaclass_classmethod(cls) -> Self:
+        return cls("", (), {})
+    # Note: static methods in metaclasses get the static method error, not metaclass error
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def metaclass_staticmethod() -> Self:
+        pass
 ```
 
 ## Explicit annotations override implicit `Self`
