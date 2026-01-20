@@ -388,6 +388,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
+# TODO: The revealed type in the error message should be `C[str]`.
 # error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
@@ -404,6 +405,7 @@ reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
 
+# TODO: The revealed type in the error message should be `D[str]`.
 # error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
