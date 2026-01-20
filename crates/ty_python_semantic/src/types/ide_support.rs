@@ -276,26 +276,112 @@ pub fn definitions_for_attribute<'db>(
             _ => continue,
         };
 
-        // Walk the MRO: include class and its ancestors, but stop when we find a match
-        'scopes: for ancestor in class_literal
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
-        {
-            let class_scope = ancestor.body_scope(db);
-            let class_place_table = crate::semantic_index::place_table(db, class_scope);
+        resolved.extend(definitions_for_attribute_in_class_hierarchy(
+            &class_literal,
+            model,
+            name_str,
+        ));
 
-            // Look for class-level declarations and bindings
-            if let Some(place_id) = class_place_table.symbol_id(name_str) {
-                let use_def = use_def_map(db, class_scope);
+        // The metaclass of a derived class must be a subclass of the metaclasses of all of
+        // its base classes. This is why we only have to look at the metaclass of the
+        // class_literal.
+        // Only look up definitions on the metaclass if the type is a class object to begin with in
+        // order to prevent looking up instance members on the class metaclass
+        if resolved.is_empty()
+            && matches!(
+                ty,
+                Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_)
+            )
+        {
+            let meta_type = class_literal.metaclass(db);
+
+            let class_literal = match meta_type {
+                Type::ClassLiteral(class_literal) => class_literal,
+                Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
+                    Some(cls) => match cls.static_class_literal(db) {
+                        Some((lit, _)) => ClassLiteral::Static(lit),
+                        None => continue,
+                    },
+                    None => continue,
+                },
+                _ => continue,
+            };
+
+            resolved.extend(definitions_for_attribute_in_class_hierarchy(
+                &class_literal,
+                model,
+                name_str,
+            ));
+        }
+    }
+
+    resolved
+}
+
+fn definitions_for_attribute_in_class_hierarchy<'db>(
+    class_literal: &ClassLiteral<'db>,
+    model: &SemanticModel<'db>,
+    attribute_name: &str,
+) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
+    let mut resolved = Vec::new();
+    'scopes: for ancestor in class_literal
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
+    {
+        let class_scope = ancestor.body_scope(db);
+        let class_place_table = crate::semantic_index::place_table(db, class_scope);
+
+        // Look for class-level declarations and bindings
+        if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
+            let use_def = use_def_map(db, class_scope);
+
+            // Check declarations first
+            for decl in use_def.reachable_symbol_declarations(place_id) {
+                if let Some(def) = decl.declaration.definition() {
+                    resolved.extend(resolve_definition(
+                        db,
+                        def,
+                        Some(attribute_name),
+                        ImportAliasResolution::ResolveAliases,
+                    ));
+                    break 'scopes;
+                }
+            }
+
+            // If no declarations found, check bindings
+            for binding in use_def.reachable_symbol_bindings(place_id) {
+                if let Some(def) = binding.binding.definition() {
+                    resolved.extend(resolve_definition(
+                        db,
+                        def,
+                        Some(attribute_name),
+                        ImportAliasResolution::ResolveAliases,
+                    ));
+                    break 'scopes;
+                }
+            }
+        }
+
+        // Look for instance attributes in method scopes (e.g., self.x = 1)
+        let file = class_scope.file(db);
+        let index = semantic_index(db, file);
+
+        for function_scope_id in attribute_scopes(db, class_scope) {
+            if let Some(place_id) = index
+                .place_table(function_scope_id)
+                .member_id_by_instance_attribute_name(attribute_name)
+            {
+                let use_def = index.use_def_map(function_scope_id);
 
                 // Check declarations first
-                for decl in use_def.reachable_symbol_declarations(place_id) {
+                for decl in use_def.reachable_member_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
                         resolved.extend(resolve_definition(
                             db,
                             def,
-                            Some(name_str),
+                            Some(attribute_name),
                             ImportAliasResolution::ResolveAliases,
                         ));
                         break 'scopes;
@@ -303,59 +389,18 @@ pub fn definitions_for_attribute<'db>(
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.reachable_symbol_bindings(place_id) {
+                for binding in use_def.reachable_member_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
                         resolved.extend(resolve_definition(
                             db,
                             def,
-                            Some(name_str),
+                            Some(attribute_name),
                             ImportAliasResolution::ResolveAliases,
                         ));
                         break 'scopes;
                     }
                 }
             }
-
-            // Look for instance attributes in method scopes (e.g., self.x = 1)
-            let file = class_scope.file(db);
-            let index = semantic_index(db, file);
-
-            for function_scope_id in attribute_scopes(db, class_scope) {
-                if let Some(place_id) = index
-                    .place_table(function_scope_id)
-                    .member_id_by_instance_attribute_name(name_str)
-                {
-                    let use_def = index.use_def_map(function_scope_id);
-
-                    // Check declarations first
-                    for decl in use_def.reachable_member_declarations(place_id) {
-                        if let Some(def) = decl.declaration.definition() {
-                            resolved.extend(resolve_definition(
-                                db,
-                                def,
-                                Some(name_str),
-                                ImportAliasResolution::ResolveAliases,
-                            ));
-                            break 'scopes;
-                        }
-                    }
-
-                    // If no declarations found, check bindings
-                    for binding in use_def.reachable_member_bindings(place_id) {
-                        if let Some(def) = binding.binding.definition() {
-                            resolved.extend(resolve_definition(
-                                db,
-                                def,
-                                Some(name_str),
-                                ImportAliasResolution::ResolveAliases,
-                            ));
-                            break 'scopes;
-                        }
-                    }
-                }
-            }
-
-            // TODO: Add support for metaclass attribute lookups
         }
     }
 
