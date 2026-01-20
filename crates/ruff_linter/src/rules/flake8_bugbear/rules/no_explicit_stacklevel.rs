@@ -21,7 +21,6 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// In Python 3.12 and higher, one may also use `skip_file_prefixes` to specify
 /// which file prefixes are ignored when counting the stack level. This implicitly overrides the `stacklevel` to be
 /// at least 2, according to the [Python documentation].
-/// 
 /// ## Example
 /// ```python
 /// import warnings
@@ -43,7 +42,9 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// higher stacklevel to address the diagnostic.
 ///
 /// ## References
-/// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
+/// - [Python documentation: `warnings.warn`][Python documentation]
+///
+///[Python documentation]: https://docs.python.org/3/library/warnings.html#warnings.warn
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct NoExplicitStacklevel;
