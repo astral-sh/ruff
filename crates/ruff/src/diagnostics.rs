@@ -241,7 +241,10 @@ pub(crate) fn lint_path(
 
     // Extract the sources from the file.
     let source_kind = match SourceKind::from_path(path, source_type) {
-        Ok(Some(source_kind)) => source_kind,
+        Ok(Some(source_kind)) => match source_kind {
+            SourceKind::Markdown(_) => return Ok(Diagnostics::default()), // skip linting markdown
+            _ => source_kind,
+        },
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
