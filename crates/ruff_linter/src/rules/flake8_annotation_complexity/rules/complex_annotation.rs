@@ -24,6 +24,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from dataclasses import dataclass
 ///
+///
 /// @dataclass
 /// class Cat:
 ///     name: str
@@ -36,8 +37,8 @@ use crate::checkers::ast::Checker;
 /// Or consider user a type alias:
 ///
 /// ```python
-///
 /// TaskUserMap = dict[str, str]
+///
 ///
 /// def example_fn(complex_argument: dict[str, list[TaskUserMap]]) -> None: ...
 /// ```
