@@ -364,6 +364,7 @@ When an incompatible lint rule or setting is enabled, `ruff format` will emit a 
 `ruff format` exits with the following status codes:
 
 - `0` if Ruff terminates successfully, regardless of whether any files were formatted.
+- `1` if Ruff terminates successfully, one or more files were formatted, and --exit-non-zero-on-format was specified.
 - `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an
     internal error.
 
@@ -375,10 +376,6 @@ Meanwhile, `ruff format --check` exits with the following status codes:
     not specified.
 - `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an
     internal error.
-
-`ruff format` supports the `--exit-non-zero-on-format` command-line flag that alters its exit code behavior:
-
-- `--exit-non-zero-on-format` will cause Ruff to exit with a status code of `1` if any files were formatted, _even if_ formatting was successful. Note that the use of `--exit-non-zero-on-format` can result in a non-zero exit code even if all files were formatted correctly.
 
 ## Style Guide <span id="black-compatibility"></span>
 
