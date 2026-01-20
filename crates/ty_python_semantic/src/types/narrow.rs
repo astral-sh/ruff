@@ -1184,6 +1184,50 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
+        // Narrow unions of string literals based on substring containment:
+        //
+        // def _(x: Literal["abc", "def"]):
+        //     if "a" in x:
+        //         reveal_type(x)  # revealed: Literal["abc"]
+        //     else:
+        //         reveal_type(x)  # revealed: Literal["def"]
+        if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
+            && let Type::StringLiteral(needle) = inference.expression_type(&**left)
+            && let Some(rhs_place_expr) = PlaceExpr::try_from_expr(&comparators[0])
+            && let rhs_type = inference.expression_type(&comparators[0])
+            && is_string_literal_or_union_thereof(self.db, rhs_type)
+        {
+            let is_positive_check = is_positive == (ops[0] == ast::CmpOp::In);
+            let needle_str = needle.value(self.db);
+
+            let contains_needle = |haystack: &str| -> bool { haystack.contains(needle_str) };
+
+            let narrowed = match rhs_type {
+                Type::StringLiteral(lit) => {
+                    let haystack = lit.value(self.db);
+                    if is_positive_check == contains_needle(haystack) {
+                        rhs_type
+                    } else {
+                        Type::Never
+                    }
+                }
+                Type::Union(union) => union.filter(self.db, |ty| {
+                    if let Type::StringLiteral(lit) = ty {
+                        is_positive_check == contains_needle(lit.value(self.db))
+                    } else {
+                        // Keep non-string-literal types (they can't be narrowed here)
+                        true
+                    }
+                }),
+                _ => rhs_type,
+            };
+
+            if narrowed != rhs_type {
+                let place = self.expect_place(&rhs_place_expr);
+                constraints.insert(place, NarrowingConstraint::replacement(narrowed));
+            }
+        }
+
         let mut last_rhs_ty: Option<Type> = None;
 
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
@@ -1801,6 +1845,18 @@ fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) ->
             .elements(db)
             .iter()
             .any(|union_member_ty| is_typeddict_or_union_with_typeddicts(db, *union_member_ty)),
+        _ => false,
+    }
+}
+
+/// Returns `true` if `ty` is a string literal or a union containing only string literals.
+fn is_string_literal_or_union_thereof<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::StringLiteral(_) => true,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| matches!(element, Type::StringLiteral(_))),
         _ => false,
     }
 }
