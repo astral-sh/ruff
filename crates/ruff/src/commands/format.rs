@@ -493,6 +493,9 @@ pub(crate) fn format_source(
             )))
         }
         SourceKind::Markdown(unformatted_document) => {
+            // TODO: account for ~~~ and arbitrary length code fences
+            // TODO: support code blocks nested inside block quotes, etc
+            // TODO: support unlabeled code blocks
             static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
                 // adapted from blacken-docs
                 // https://github.com/adamchainz/blacken-docs/blob/fb107c1dce25f9206e29297aaa1ed7afc2980a5a/src/blacken_docs/__init__.py#L17
