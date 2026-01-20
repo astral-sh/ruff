@@ -2385,3 +2385,96 @@ fn stable_output_format_warning() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn markdown_formatting_preview_disabled() -> Result<()> {
+    let test = CliTest::new()?;
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = crate_root.join("resources").join("test").join("fixtures");
+    let unformatted = fixtures.join("unformatted.md");
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--no-preview", "--diff"])
+        .arg(unformatted),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: formatting markdown files is experimental, use --preview to enable
+    1 file already formatted
+    ");
+    Ok(())
+}
+
+#[test]
+fn markdown_formatting_preview_enabled() -> Result<()> {
+    let test = CliTest::new()?;
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = crate_root.join("resources").join("test").join("fixtures");
+    let unformatted = fixtures.join("unformatted.md");
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--preview", "--diff"])
+        .arg(unformatted),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- /Users/amethyst/workspace/ruff/crates/ruff/resources/test/fixtures/unformatted.md
+    +++ /Users/amethyst/workspace/ruff/crates/ruff/resources/test/fixtures/unformatted.md
+    @@ -17,15 +17,20 @@
+     Labeled Python code:
+     
+     ```py
+    -print( "hello" )
+    -def foo(): pass
+    +print("hello")
+    +
+    +
+    +def foo():
+    +    pass
+     ```
+     
+     Labeled Python stub:
+     
+     ```pyi
+    -print( "hello" )
+    -def foo(): pass
+    +print("hello")
+    +
+    +def foo():
+    +    pass
+     ```
+     
+     Labeled Rust code:
+    @@ -40,7 +45,7 @@
+     * List item
+     
+       ```py
+    -  print( "hello" )
+    +  print("hello")
+       ```
+     
+     Block quoted code blocks may not be supported:
+    @@ -56,10 +61,10 @@
+     
+     <!-- blacken-docs:off -->
+     ```py
+    -print( "hello" )
+    +print("hello")
+     ```
+     <!-- blacken-docs:on -->
+     
+     ```py
+    -print( "hello" )
+    +print("hello")
+     ```
+
+
+    ----- stderr -----
+    1 file would be reformatted
+    "#);
+    Ok(())
+}
