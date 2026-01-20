@@ -797,6 +797,35 @@ class OuterMeta(type):
             return self
 ```
 
+## `builtins.staticmethod`
+
+Using the fully qualified `builtins.staticmethod` should also be detected:
+
+```py
+from typing import Self
+import builtins
+
+class BuiltinsStaticMethod:
+    @builtins.staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def method() -> Self:
+        pass
+```
+
+## EnumMeta is a metaclass
+
+`enum.EnumMeta` (or `enum.EnumType` in Python 3.11+) is a metaclass, so `Self` should be invalid:
+
+```py
+from typing import Self
+from enum import EnumMeta
+
+class CustomEnumMeta(EnumMeta):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def custom_method(self) -> Self:
+        return self
+```
+
 ## Explicit annotations override implicit `Self`
 
 If the first parameter is explicitly annotated, that annotation takes precedence over the implicit
