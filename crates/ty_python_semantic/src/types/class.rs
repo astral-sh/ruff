@@ -4216,11 +4216,9 @@ impl<'db> StaticClassLiteral<'db> {
         let is_valid_scope = |method_scope: &Scope| {
             if let Some(method_def) = method_scope.node().as_function() {
                 let method_name = method_def.node(&module).name.as_str();
-                match class_member(db, class_body_scope, method_name)
-                    .inner
-                    .place
-                    .ignore_possibly_undefined()
-                {
+                let member_result = class_member(db, class_body_scope, method_name);
+                let member_type = member_result.inner.place.ignore_possibly_undefined();
+                match member_type {
                     Some(Type::FunctionLiteral(method_type)) => {
                         let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
                         if method_decorator != Ok(target_method_decorator) {
@@ -4236,7 +4234,24 @@ impl<'db> StaticClassLiteral<'db> {
                             return false;
                         }
                     }
-                    _ => {}
+                    Some(ty) => {
+                        // For methods wrapped by decorators (like `@cache`, `@lru_cache`, etc.),
+                        // the method type is no longer a `FunctionLiteral`. In this case, we can't
+                        // determine the original decorator type.
+                        //
+                        // For `target_method_decorator == None`, we include these wrapped methods
+                        // since they can still assign instance attributes.
+                        //
+                        // For `ClassMethod` or `StaticMethod` targets, we need to be careful:
+                        // - If the type is dynamic (Unknown), the decorator could be anything,
+                        //   including a classmethod alias, so we're permissive and include it.
+                        // - If the type is a known non-classmethod type (like `_lru_cache_wrapper`),
+                        //   we reject it because we know it's not a classmethod/staticmethod.
+                        if target_method_decorator != MethodDecorator::None && !ty.is_dynamic() {
+                            return false;
+                        }
+                    }
+                    None => {}
                 }
             }
             true
