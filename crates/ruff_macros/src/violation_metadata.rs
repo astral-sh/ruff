@@ -133,7 +133,7 @@ fn parse_attr<'a, const LEN: usize>(
 }
 
 fn parse_version(meta: &ParseNestedMeta) -> syn::Result<LitStr> {
-    /// Match either a semantic version with a optional `v` prefix for versions before 0.5.0
+    /// Match either a semantic version with an optional `v` prefix for versions before 0.5.0
     /// (`v0.2.3`, `0.12.34`) or the special `NEXT_RUFF_VERSION` placeholder that is updated by
     /// rooster in releases.
     static VERSION: LazyLock<Regex> =
