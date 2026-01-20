@@ -2171,22 +2171,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // (a variable might be assigned multiple times in the loop body).
                 let mut loop_header_places: FxHashSet<ScopedPlaceId> = FxHashSet::default();
 
-                // Create loop header definitions for places that are bound before the loop.
-                // The loop header type will be the union of the seed type (before loop)
-                // and all types assigned in the loop body.
+                // Create loop header definitions for all places assigned in the loop body.
+                // The loop header type will be the union of the seed type (before loop,
+                // which may be Unbound) and all types assigned in the loop body.
                 // These must be created BEFORE visiting the test expression so that
                 // uses in the test see the loop header bindings.
-                //
-                // We only create loop headers for places that are already bound. Places
-                // that are only assigned inside the loop don't need loop headers because
-                // there's no pre-existing value that could be modified across iterations.
                 for place_expr in bound_places {
                     let place_id = self.add_place(place_expr);
-                    // Only create a loop header if the place is already bound before the loop
-                    // and we haven't already created one for this place
-                    if self.current_use_def_map().place_has_bindings(place_id)
-                        && loop_header_places.insert(place_id)
-                    {
+                    // Only create one loop header per place (a variable might be assigned
+                    // multiple times in the loop body)
+                    if loop_header_places.insert(place_id) {
                         let loop_header_ref = LoopHeaderDefinitionNodeRef {
                             while_stmt,
                             place: place_id,
