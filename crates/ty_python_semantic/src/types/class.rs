@@ -1067,9 +1067,10 @@ impl<'db> ClassType<'db> {
         self.class_literal(db).is_final(db)
     }
 
-    /// Returns a map of abstract method names to the class that defines them.
+    /// Returns a map of abstract method names to the class that originally defines them.
     ///
-    /// This includes abstract methods defined on the class itself and any of its superclasses.
+    /// Only returns methods that are still abstract on `self` (i.e., have not been overridden
+    /// with a concrete implementation anywhere in the MRO).
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxHashMap<Name, ClassType<'db>> {
         fn is_abstract(db: &dyn Db, ty: Type) -> bool {
@@ -1093,8 +1094,23 @@ impl<'db> ClassType<'db> {
             }
         }
 
+        fn is_method_like(ty: Type) -> bool {
+            matches!(
+                ty,
+                Type::FunctionLiteral(_)
+                    | Type::BoundMethod(_)
+                    | Type::PropertyInstance(_)
+                    | Type::KnownBoundMethod(_)
+                    | Type::WrapperDescriptor(_)
+                    | Type::Callable(_)
+                    | Type::DataclassDecorator(_)
+                    | Type::DataclassTransformer(_)
+            )
+        }
+
         let mut abstract_methods = FxHashMap::<Name, ClassType<'db>>::default();
 
+        // Collect all abstract methods defined anywhere in the MRO.
         for class_base in self.iter_mro(db) {
             let class = match class_base {
                 ClassBase::Class(class) => class,
@@ -1115,6 +1131,41 @@ impl<'db> ClassType<'db> {
                 }
             }
         }
+
+        // Get `self`'s body scope for checking non-callable bindings.
+        let self_body_scope = self
+            .static_class_literal(db)
+            .map(|(class_literal, _)| class_literal.body_scope(db));
+
+        // Filter out methods that have been overridden with concrete implementations.
+        abstract_methods.retain(|method_name, _| {
+            let member = self.class_member(db, method_name, MemberLookupPolicy::default());
+            match member.place {
+                Place::Defined(defined) => {
+                    if is_method_like(defined.ty) {
+                        // For method-like types, check if it's still abstract.
+                        is_abstract(db, defined.ty)
+                    } else {
+                        // For non-callable types, check if there's a binding in `self`'s
+                        // scope. A binding (like `f = 42` or `f: int = 42`) overrides
+                        // the abstract method, but a declaration-only (like `f: int`) does not.
+                        let Some(body_scope) = self_body_scope else {
+                            return true;
+                        };
+                        let table = place_table(db, body_scope);
+                        let has_binding = table.symbol_id(method_name).is_some_and(|symbol_id| {
+                            let use_def = use_def_map(db, body_scope);
+                            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                            !place_from_bindings(db, bindings).place.is_undefined()
+                        });
+                        // If there's a binding, the method is implemented (not abstract).
+                        // If there's no binding, the method is still abstract.
+                        !has_binding
+                    }
+                }
+                Place::Undefined => true,
+            }
+        });
 
         abstract_methods
     }

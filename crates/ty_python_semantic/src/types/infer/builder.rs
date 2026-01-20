@@ -52,7 +52,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, use_def_map,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
@@ -1307,53 +1307,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         class: StaticClassLiteral<'db>,
         class_node: &ast::StmtClassDef,
     ) {
-        /// Check if a type is a method-like callable (function, method, or property).
-        fn is_method_like(ty: Type) -> bool {
-            matches!(
-                ty,
-                Type::FunctionLiteral(_)
-                    | Type::BoundMethod(_)
-                    | Type::PropertyInstance(_)
-                    | Type::KnownBoundMethod(_)
-                    | Type::WrapperDescriptor(_)
-                    | Type::Callable(_)
-                    | Type::DataclassDecorator(_)
-                    | Type::DataclassTransformer(_)
-            )
-        }
-
-        /// Check if a type is a concrete (non-abstract) implementation of a method.
-        ///
-        /// Returns `true` if the type is callable and not decorated with `@abstractmethod`.
-        /// Returns `false` for abstract methods and for non-callable types.
-        fn is_concrete_method(db: &dyn Db, ty: Type) -> bool {
-            match ty {
-                Type::FunctionLiteral(function) => {
-                    !function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
-                }
-                Type::BoundMethod(method) => !method
-                    .function(db)
-                    .has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD),
-                Type::PropertyInstance(property) => {
-                    // A property is concrete only if both getter and setter (if present) are concrete.
-                    property
-                        .getter(db)
-                        .is_some_and(|getter| is_concrete_method(db, getter))
-                        && property
-                            .setter(db)
-                            .is_none_or(|setter| is_concrete_method(db, setter))
-                }
-                // Other callable types (builtins, wrapper descriptors, etc.) are always concrete.
-                Type::KnownBoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::Callable(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_) => true,
-                // Non-callable types don't count as method implementations.
-                _ => false,
-            }
-        }
-
         let db = self.db();
 
         // Only check if the class is final.
@@ -1363,56 +1316,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class_type = class.identity_specialization(db);
 
-        // For each abstract method, check if the class provides a concrete implementation
-        // anywhere in the MRO (including dynamic classes).
+        // Report an error for each abstract method that is not implemented.
         for (method_name, defining_class) in class_type.abstract_methods(db) {
-            let member = class_type.class_member(db, &method_name, MemberLookupPolicy::default());
-
-            // Check if the resolved member implements the abstract method.
-            // A member implements an abstract method if:
-            // 1. It's a concrete (non-abstract) callable, OR
-            // 2. It's a non-callable binding that overrides the name with a value.
-            //
-            // For example:
-            // - `def f(self): ...` (concrete method) implements the abstract method.
-            // - `f = 42` or `f: int = 42` (binding) overrides an abstract property.
-            // - `f: int` (declaration only) does NOT implement the abstract method.
-            let is_implemented = match &member.place {
-                Place::Defined(defined) => {
-                    if is_method_like(defined.ty) {
-                        // For callable types, check if it's concrete (not abstract).
-                        is_concrete_method(db, defined.ty)
-                    } else {
-                        // For non-callable types, check if there's a binding in the class's
-                        // own scope. A binding (like `f = 42` or `f: int = 42`) overrides
-                        // the abstract method, but a declaration-only (like `f: int`) does not.
-                        let body_scope = class.body_scope(db);
-                        let table = place_table(db, body_scope);
-                        table.symbol_id(&method_name).is_some_and(|symbol_id| {
-                            let use_def = use_def_map(db, body_scope);
-                            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                            !place_from_bindings(db, bindings).place.is_undefined()
-                        })
-                    }
-                }
-                Place::Undefined => false,
+            let Some(builder) = self
+                .context
+                .report_lint(&UNIMPLEMENTED_ABSTRACT_METHOD, &class_node.name)
+            else {
+                continue;
             };
 
-            if !is_implemented
-                && let Some(builder) = self
-                    .context
-                    .report_lint(&UNIMPLEMENTED_ABSTRACT_METHOD, &class_node.name)
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Final class `{}` does not implement abstract method `{}`",
-                    class.name(db),
-                    method_name
-                ));
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Final class `{}` does not implement abstract method `{}`",
+                class.name(db),
+                method_name
+            ));
 
-                // Add secondary annotation pointing to the abstract method definition.
-                let abstract_method =
-                    defining_class.class_member(db, &method_name, MemberLookupPolicy::default());
-                let function = abstract_method
+            // Add secondary annotation pointing to the abstract method definition.
+            let abstract_method =
+                defining_class.class_member(db, &method_name, MemberLookupPolicy::default());
+            let function =
+                abstract_method
                     .place
                     .ignore_possibly_undefined()
                     .and_then(|ty| match ty {
@@ -1422,17 +1345,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         _ => None,
                     });
-                if let Some(function) = function {
-                    let overload = function.literal(db).last_definition(db);
-                    let module = parsed_module(db, function.file(db)).load(db);
-                    diagnostic.annotate(
-                        Annotation::secondary(Span::from(overload.focus_range(db, &module)))
-                            .message(format_args!(
-                                "`{method_name}` defined as abstract on superclass `{defining_class}`",
-                                defining_class = defining_class.name(db)
-                            )),
-                    );
-                }
+            if let Some(function) = function {
+                let overload = function.literal(db).last_definition(db);
+                let module = parsed_module(db, function.file(db)).load(db);
+                diagnostic.annotate(
+                    Annotation::secondary(Span::from(overload.focus_range(db, &module))).message(
+                        format_args!(
+                            "`{method_name}` defined as abstract on superclass `{defining_class}`",
+                            defining_class = defining_class.name(db)
+                        ),
+                    ),
+                );
             }
         }
     }
