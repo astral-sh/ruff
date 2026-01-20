@@ -57,29 +57,29 @@ use crate::semantic_index::{
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::DynamicNamedTupleLiteral;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, FieldKind, MetaclassErrorKind, MethodDecorator,
 };
+use crate::types::class::{DynamicNamedTupleLiteral, NamedTupleField};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
     DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
-    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases,
-    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
+    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT,
+    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
+    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
+    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -128,7 +128,7 @@ use crate::types::{
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type,
-    definition_expression_type, infer_scope_types, todo_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -431,6 +431,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
+        self.expressions.extend(inference.expressions.iter());
+
+        if let Some(extra) = &inference.extra {
+            self.context.extend(&extra.diagnostics);
+            self.extend_cycle_recovery(extra.cycle_recovery);
+            self.string_annotations
+                .extend(extra.string_annotations.iter().copied());
+        }
+    }
+
     fn file(&self) -> File {
         self.context.file()
     }
@@ -524,17 +535,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let file_scope = self.index.expression_scope_id(expression);
         let expr_scope = file_scope.to_scope_id(self.db(), self.file());
         match self.region {
-            InferenceRegion::Scope(scope) if scope == expr_scope => {
+            InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.expression_type(expression)
             }
-            _ => infer_scope_types(self.db(), expr_scope).expression_type(expression),
+            _ => infer_complete_scope_types(self.db(), expr_scope).expression_type(expression),
         }
     }
 
     /// Infers types in the given [`InferenceRegion`].
     fn infer_region(&mut self) {
         match self.region {
-            InferenceRegion::Scope(scope) => self.infer_region_scope(scope),
+            InferenceRegion::Scope(scope, tcx) => self.infer_region_scope(scope, tcx),
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
             InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
             InferenceRegion::Expression(expression, tcx) => {
@@ -543,7 +554,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_region_scope(&mut self, scope: ScopeId<'db>) {
+    fn infer_region_scope(&mut self, scope: ScopeId<'db>, tcx: TypeContext<'db>) {
         let node = scope.node(self.db());
         match node {
             NodeWithScopeKind::Module => {
@@ -567,13 +578,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_type_alias(type_alias.node(self.module()));
             }
             NodeWithScopeKind::ListComprehension(comprehension) => {
-                self.infer_list_comprehension_expression_scope(comprehension.node(self.module()));
+                self.infer_list_comprehension_expression_scope(
+                    comprehension.node(self.module()),
+                    tcx,
+                );
             }
             NodeWithScopeKind::SetComprehension(comprehension) => {
-                self.infer_set_comprehension_expression_scope(comprehension.node(self.module()));
+                self.infer_set_comprehension_expression_scope(
+                    comprehension.node(self.module()),
+                    tcx,
+                );
             }
             NodeWithScopeKind::DictComprehension(comprehension) => {
-                self.infer_dict_comprehension_expression_scope(comprehension.node(self.module()));
+                self.infer_dict_comprehension_expression_scope(
+                    comprehension.node(self.module()),
+                    tcx,
+                );
             }
             NodeWithScopeKind::GeneratorExpression(generator) => {
                 self.infer_generator_expression_scope(generator.node(self.module()));
@@ -698,9 +718,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let is_protocol = class.is_protocol(self.db());
 
+            // (4) Check for invalid `@dataclass` applications.
+            if class.dataclass_params(self.db()).is_some() {
+                if class.has_named_tuple_class_in_mro(self.db()) {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "`NamedTuple` class `{}` cannot be decorated with `@dataclass`",
+                            class.name(self.db()),
+                        ));
+                        diagnostic.info(
+                            "An exception will be raised when instantiating the class at runtime",
+                        );
+                    }
+                } else if class.is_typed_dict(self.db()) {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "`TypedDict` class `{}` cannot be decorated with `@dataclass`",
+                            class.name(self.db()),
+                        ));
+                        diagnostic.info(
+                            "An exception will often be raised when instantiating the class at runtime",
+                        );
+                    }
+                } else if is_enum_class_by_inheritance(self.db(), class) {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Enum class `{}` cannot be decorated with `@dataclass`",
+                            class.name(self.db()),
+                        ));
+                        diagnostic
+                            .info("Applying `@dataclass` to an enum is not supported at runtime");
+                    }
+                } else if is_protocol {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_DATACLASS, class.header_range(self.db()))
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Protocol class `{}` cannot be decorated with `@dataclass`",
+                            class.name(self.db()),
+                        ));
+                        diagnostic.info(
+                            "Protocols define abstract interfaces and cannot be instantiated",
+                        );
+                    }
+                }
+            }
+
             let mut disjoint_bases = IncompatibleBases::default();
 
-            // (4) Iterate through the class's explicit bases to check for various possible errors:
+            // (5) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
@@ -814,7 +890,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (4.5) Check for starred variable-length tuples that cannot be unpacked
+            // (6) Check for starred variable-length tuples that cannot be unpacked
             let class_definition = self.index.expect_single_definition(class_node);
             for base in class_node.bases() {
                 if let ast::Expr::Starred(starred) = base
@@ -827,7 +903,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (5) Check that the class's MRO is resolvable
+            // (7) Check that the class's MRO is resolvable
             match class.try_mro(self.db(), None) {
                 Err(mro_error) => match mro_error.reason() {
                     StaticMroErrorKind::DuplicateBases(duplicates) => {
@@ -898,7 +974,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) Check that @total_ordering has a valid ordering method in the MRO
+            // (8) Check that @total_ordering has a valid ordering method in the MRO
             if class.total_ordering(self.db()) && !class.has_ordering_method_in_mro(self.db(), None)
             {
                 // Find the @total_ordering decorator to report the diagnostic at its location
@@ -917,7 +993,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (7) Check that the class's metaclass can be determined without error.
+            // (9) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Cycle => {
@@ -993,7 +1069,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (8) Check that the class arguments matches the arguments of the
+            // (10) Check that the class arguments matches the arguments of the
             // base class `__init_subclass__` method.
             if let Some(args) = class_node.arguments.as_deref() {
                 let call_args: CallArguments = args
@@ -1033,7 +1109,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (9) If the class is generic, verify that its generic context does not violate any of
+            // (11) If the class is generic, verify that its generic context does not violate any of
             // the typevar scoping rules.
             if let (Some(legacy), Some(inherited)) = (
                 class.legacy_generic_context(self.db()),
@@ -1111,7 +1187,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (10) Check that a dataclass does not have more than one `KW_ONLY`.
+            // (12) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class.into(), None)
             {
@@ -1146,7 +1222,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (11) Check for violations of the Liskov Substitution Principle,
+            // (13) Check for violations of the Liskov Substitution Principle,
             // and for violations of other rules relating to invalid overrides of some sort.
             overrides::check_class(&self.context, class);
 
@@ -1154,7 +1230,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 protocol.validate_members(&self.context);
             }
 
-            // (12) If it's a `TypedDict` class, check that it doesn't include any invalid
+            // (14) If it's a `TypedDict` class, check that it doesn't include any invalid
             // statements: https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
             //
             //     The body of the class definition defines the items of the `TypedDict` type. It
@@ -1212,6 +1288,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            class.validate_members(&self.context);
         }
     }
 
@@ -2534,58 +2612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.undecorated_type = Some(inferred_ty);
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            inferred_ty = match decorator_ty
-                .try_call(self.db(), &CallArguments::positional([inferred_ty]))
-                .map(|bindings| bindings.return_type(self.db()))
-            {
-                Ok(return_ty) => {
-                    fn propagate_callable_kind<'d>(
-                        db: &'d dyn Db,
-                        ty: Type<'d>,
-                        kind: CallableTypeKind,
-                    ) -> Option<Type<'d>> {
-                        match ty {
-                            Type::Callable(callable) => Some(Type::Callable(CallableType::new(
-                                db,
-                                callable.signatures(db),
-                                kind,
-                            ))),
-                            Type::Union(union) => union
-                                .try_map(db, |element| propagate_callable_kind(db, *element, kind)),
-                            // Intersections are currently not handled here because that would require
-                            // the decorator to be explicitly annotated as returning an intersection.
-                            _ => None,
-                        }
-                    }
-
-                    let propagatable_kind = inferred_ty
-                        .try_upcast_to_callable(self.db())
-                        .and_then(CallableTypes::exactly_one)
-                        .and_then(|callable| match callable.kind(self.db()) {
-                            kind @ (CallableTypeKind::FunctionLike
-                            | CallableTypeKind::StaticMethodLike
-                            | CallableTypeKind::ClassMethodLike) => Some(kind),
-                            _ => None,
-                        });
-
-                    if let Some(return_ty_modified) = propagatable_kind
-                        .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
-                    {
-                        // When a method on a class is decorated with a function that returns a
-                        // `Callable`, assume that the returned callable is also function-like (or
-                        // classmethod-like or staticmethod-like). See "Decorating a method with
-                        // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
-                        // extended explanation.
-                        return_ty_modified
-                    } else {
-                        return_ty
-                    }
-                }
-                Err(CallError(_, bindings)) => {
-                    bindings.report_diagnostics(&self.context, (*decorator_node).into());
-                    bindings.return_type(self.db())
-                }
-            };
+            inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
         }
 
         self.add_declaration_with_binding(
@@ -2769,6 +2796,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !default_ty.is_assignable_to(self.db(), declared_ty)
                     && !((self.in_stub()
                         || self.in_function_overload_or_abstractmethod()
+                        || self.scope().scope(self.db()).in_type_checking_block()
                         || self
                             .class_context_of_current_method()
                             .is_some_and(|class| class.is_protocol(self.db())))
@@ -6090,7 +6118,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return error(
                 &self.context,
                 format!(
-                    "Wrong number of arguments in `NewType` creation, expected 2, found {}",
+                    "Wrong number of arguments in `NewType` creation: expected 2, found {}",
                     arguments.args.len()
                 ),
                 call_expr,
@@ -6154,7 +6182,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let known_class = func_ty
             .as_class_literal()
             .and_then(|cls| cls.known(self.db()));
-        if let Some(KnownClass::NewType) = known_class {
+        if known_class == Some(KnownClass::NewType) {
             self.infer_newtype_assignment_deferred(arguments);
             return;
         }
@@ -6180,7 +6208,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
         let inferred = self.infer_type_expression(&arguments.args[1]);
         match inferred {
-            Type::NominalInstance(_) | Type::NewTypeInstance(_) => return,
+            Type::NewTypeInstance(_) => return,
+            Type::NominalInstance(instance) => {
+                match instance.class(self.db()) {
+                    ClassType::NonGeneric(_) => {}
+                    ClassType::Generic(alias) => {
+                        let spec = alias.specialization(self.db());
+                        if spec.types(self.db()).iter().any(|t| {
+                            matches!(t, Type::KnownInstance(KnownInstanceType::TypeVar(_)))
+                        }) && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
+                        {
+                            let mut diag =
+                                builder.into_diagnostic("invalid base for `typing.NewType`");
+                            diag.set_primary_message("A `NewType` base cannot be generic");
+                        }
+                    }
+                }
+                return;
+            }
             // There are exactly two union types allowed as bases for NewType: `int | float` and
             // `int | float | complex`. These are allowed because that's what `float` and `complex`
             // expand into in type position. We don't currently ask whether the union was implicit
@@ -6511,7 +6558,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This method *does not* call `infer_expression` on the object being called;
     /// it is assumed that the type for this AST node has already been inferred before this method is called.
-    #[expect(clippy::type_complexity)]
     fn infer_namedtuple_call_expression(
         &mut self,
         call_expr: &ast::ExprCall,
@@ -6550,8 +6596,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
         }
 
-        // Need at least typename and fields/field_names.
-        let [name_arg, fields_arg, rest @ ..] = &**args else {
+        // Extract typename and fields from positional or keyword arguments.
+        // For `collections.namedtuple`, both `typename` and `field_names` can be keyword arguments.
+        // For `typing.NamedTuple`, only positional arguments are supported.
+        let (name_arg, fields_arg, rest, name_from_keyword, fields_from_keyword): (
+            Option<&ast::Expr>,
+            Option<&ast::Expr>,
+            &[ast::Expr],
+            bool,
+            bool,
+        ) = match kind {
+            NamedTupleKind::Collections => {
+                let find_keyword = |name: &str| -> Option<&ast::Keyword> {
+                    keywords
+                        .iter()
+                        .find(|kw| kw.arg.as_ref().is_some_and(|arg| arg.id.as_str() == name))
+                };
+                let typename_kw = find_keyword("typename");
+                let field_names_kw = find_keyword("field_names");
+
+                match &**args {
+                    [name, fields, rest @ ..] => (Some(name), Some(fields), rest, false, false),
+                    [name, rest @ ..] => (
+                        Some(name),
+                        field_names_kw.map(|kw| &kw.value),
+                        rest,
+                        false,
+                        field_names_kw.is_some(),
+                    ),
+                    [] => (
+                        typename_kw.map(|kw| &kw.value),
+                        field_names_kw.map(|kw| &kw.value),
+                        &[],
+                        typename_kw.is_some(),
+                        field_names_kw.is_some(),
+                    ),
+                }
+            }
+            NamedTupleKind::Typing => match &**args {
+                [name, fields, rest @ ..] => (Some(name), Some(fields), rest, false, false),
+                [name, rest @ ..] => (Some(name), None, rest, false, false),
+                [] => (None, None, &[], false, false),
+            },
+        };
+
+        // Check if we have both required arguments.
+        let (Some(name_arg), Some(fields_arg)) = (name_arg, fields_arg) else {
             for arg in args {
                 self.infer_expression(arg, TypeContext::default());
             }
@@ -6560,19 +6650,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if !has_starred && !has_double_starred {
-                let fields_param = match kind {
+                let fields_param_name = match kind {
                     NamedTupleKind::Typing => "fields",
                     NamedTupleKind::Collections => "field_names",
                 };
-                let missing = if args.is_empty() {
-                    format!("`typename` and `{fields_param}`")
-                } else {
-                    format!("`{fields_param}`")
+                let missing = match (name_arg.is_none(), fields_arg.is_none()) {
+                    (true, true) => format!("`typename` and `{fields_param_name}`"),
+                    (true, false) => "`typename`".to_string(),
+                    (false, true) => format!("`{fields_param_name}`"),
+                    (false, false) => unreachable!(),
                 };
+                let plural = name_arg.is_none() && fields_arg.is_none();
                 if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
                     builder.into_diagnostic(format_args!(
                         "Missing required argument{} {missing} to `{kind}()`",
-                        if args.is_empty() { "s" } else { "" }
+                        if plural { "s" } else { "" }
                     ));
                 }
             }
@@ -6614,11 +6706,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut rename_type = None;
 
         for kw in keywords {
+            // `kw.arg` is `None` for double-starred kwargs (`**kwargs`), but we already
+            // returned early above if there were any, so this should always be `Some`.
+            let arg = kw
+                .arg
+                .as_ref()
+                .expect("double-starred kwargs should have been handled above");
+
+            // Skip keywords that were used for the required arguments (already inferred above).
+            // These flags are only true for `collections.namedtuple`.
+            if name_from_keyword && arg.id.as_str() == "typename" {
+                continue;
+            }
+            if fields_from_keyword && arg.id.as_str() == "field_names" {
+                continue;
+            }
+
             let kw_type = self.infer_expression(&kw.value, TypeContext::default());
 
-            let Some(arg) = &kw.arg else {
-                continue;
-            };
             match arg.id.as_str() {
                 "defaults" if kind.is_collections() => {
                     defaults_kw = Some(kw);
@@ -6711,6 +6816,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
+                // `typename` is valid as a keyword argument only for `collections.namedtuple`.
+                // If it was already provided positionally, emit an error.
+                "typename" if kind.is_collections() => {
+                    if !args.is_empty() {
+                        if let Some(builder) =
+                            self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Multiple values provided for parameter `typename` of `{kind}`"
+                            ));
+                        }
+                    }
+                }
+                // `field_names` is valid only for `collections.namedtuple`.
+                // If it was already provided positionally, emit an error.
+                "field_names" if kind.is_collections() => {
+                    if args.len() >= 2 {
+                        if let Some(builder) =
+                            self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Multiple values provided for parameter `field_names` of `{kind}`"
+                            ));
+                        }
+                    }
+                }
                 unknown_kwarg => {
                     // Report unknown keyword argument.
                     if let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw) {
@@ -6742,204 +6873,205 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Handle fields based on which namedtuple variant.
-        let (fields, has_known_fields): (Box<[(Name, Type<'db>, Option<Type<'db>>)]>, bool) =
-            match kind {
-                NamedTupleKind::Typing => {
-                    let fields = self
-                        .extract_typing_namedtuple_fields(fields_arg, fields_type)
-                        .or_else(|| self.extract_typing_namedtuple_fields_from_ast(fields_arg));
+        let (fields, has_known_fields): (Box<[NamedTupleField<'db>]>, bool) = match kind {
+            NamedTupleKind::Typing => {
+                let fields = self
+                    .extract_typing_namedtuple_fields(fields_arg, fields_type)
+                    .or_else(|| self.extract_typing_namedtuple_fields_from_ast(fields_arg));
 
-                    // Validate field names if we have known fields.
-                    if let Some(ref fields) = fields {
-                        let field_names: Vec<_> =
-                            fields.iter().map(|(name, _, _)| name.clone()).collect();
-                        self.report_invalid_namedtuple_field_names(
-                            &field_names,
-                            fields_arg,
-                            NamedTupleKind::Typing,
-                        );
-                    }
+                // Validate field names if we have known fields.
+                if let Some(ref fields) = fields {
+                    let field_names: Vec<_> =
+                        fields.iter().map(|field| field.name.clone()).collect();
+                    self.report_invalid_namedtuple_field_names(
+                        &field_names,
+                        fields_arg,
+                        NamedTupleKind::Typing,
+                    );
+                }
 
-                    // Emit diagnostic if the type is outright invalid (not an iterable) or
-                    // if we have a list/tuple literal with invalid field specs.
-                    if fields.is_none() {
-                        let iterable_any =
-                            KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                        if !fields_type.is_assignable_to(db, iterable_any) {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-                            {
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Invalid argument to parameter `fields` of `NamedTuple()`"
-                                ));
-                                diagnostic.set_primary_message(format_args!(
-                                    "Expected an iterable of `(name, type)` pairs, found `{}`",
-                                    fields_type.display(db)
-                                ));
-                            }
-                        } else {
-                            // Check if we have a list/tuple literal with invalid elements
-                            // (e.g., strings instead of (name, type) tuples).
-                            let elements: Option<&[ast::Expr]> = match fields_arg {
-                                ast::Expr::List(list) => Some(&list.elts),
-                                ast::Expr::Tuple(tuple) => Some(&tuple.elts),
-                                _ => None,
-                            };
-                            if let Some(elements) = elements {
-                                for elt in elements {
-                                    let is_valid_field_spec = matches!(
-                                        elt,
-                                        ast::Expr::Tuple(t) if t.elts.len() == 2
-                                    ) || matches!(
-                                        elt,
-                                        ast::Expr::List(l) if l.elts.len() == 2
-                                    );
-                                    if !is_valid_field_spec {
-                                        let elt_type = self.expression_type(elt);
-                                        if let Some(builder) =
-                                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, elt)
-                                        {
-                                            let mut diagnostic =
-                                                builder.into_diagnostic(format_args!(
-                                                    "Invalid `NamedTuple()` field definition"
-                                                ));
-                                            diagnostic.set_primary_message(format_args!(
-                                                "Expected a `(name, type)` tuple, found `{}`",
-                                                elt_type.display(db)
-                                            ));
-                                        }
+                // Emit diagnostic if the type is outright invalid (not an iterable) or
+                // if we have a list/tuple literal with invalid field specs.
+                if fields.is_none() {
+                    let iterable_any =
+                        KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+                    if !fields_type.is_assignable_to(db, iterable_any) {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Invalid argument to parameter `fields` of `NamedTuple()`"
+                            ));
+                            diagnostic.set_primary_message(format_args!(
+                                "Expected an iterable of `(name, type)` pairs, found `{}`",
+                                fields_type.display(db)
+                            ));
+                        }
+                    } else {
+                        // Check if we have a list/tuple literal with invalid elements
+                        // (e.g., strings instead of (name, type) tuples).
+                        let elements: Option<&[ast::Expr]> = match fields_arg {
+                            ast::Expr::List(list) => Some(&list.elts),
+                            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+                            _ => None,
+                        };
+                        if let Some(elements) = elements {
+                            for elt in elements {
+                                let is_valid_field_spec = matches!(
+                                    elt,
+                                    ast::Expr::Tuple(t) if t.elts.len() == 2
+                                ) || matches!(
+                                    elt,
+                                    ast::Expr::List(l) if l.elts.len() == 2
+                                );
+                                if !is_valid_field_spec {
+                                    let elt_type = self.expression_type(elt);
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, elt)
+                                    {
+                                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                                            "Invalid `NamedTuple()` field definition"
+                                        ));
+                                        diagnostic.set_primary_message(format_args!(
+                                            "Expected a `(name, type)` tuple, found `{}`",
+                                            elt_type.display(db)
+                                        ));
                                     }
                                 }
                             }
                         }
                     }
-
-                    let has_known_fields = fields.is_some();
-                    (fields.unwrap_or_default(), has_known_fields)
                 }
-                NamedTupleKind::Collections => {
-                    // `collections.namedtuple`: `field_names` is a list or tuple of strings, or a space or
-                    // comma-separated string.
 
-                    // Check for `rename=True`. Use `is_always_true()` to handle truthy values
-                    // (e.g., `rename=1`), though we'd still want a diagnostic for non-bool types.
-                    let rename = rename_type.is_some_and(|ty| ty.bool(db).is_always_true());
+                let has_known_fields = fields.is_some();
+                (fields.unwrap_or_default(), has_known_fields)
+            }
+            NamedTupleKind::Collections => {
+                // `collections.namedtuple`: `field_names` is a list or tuple of strings, or a space or
+                // comma-separated string.
 
-                    // Extract field names, first from the inferred type, then from the AST.
-                    let maybe_field_names: Option<Box<[Name]>> =
-                        if let Type::StringLiteral(string_literal) = fields_type {
-                            // Handle space/comma-separated string.
-                            Some(
-                                string_literal
-                                    .value(db)
-                                    .replace(',', " ")
-                                    .split_whitespace()
-                                    .map(Name::new)
-                                    .collect(),
-                            )
-                        } else if let Some(tuple_spec) = fields_type.tuple_instance_spec(db)
-                            && let Some(fixed_tuple) = tuple_spec.as_fixed_length()
-                        {
-                            // Handle list/tuple of strings (must be fixed-length).
-                            fixed_tuple
-                                .all_elements()
-                                .iter()
-                                .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
-                                .collect()
-                        } else {
-                            self.extract_collections_namedtuple_fields_from_ast(fields_arg)
-                        };
+                // Check for `rename=True`. Use `is_always_true()` to handle truthy values
+                // (e.g., `rename=1`), though we'd still want a diagnostic for non-bool types.
+                let rename = rename_type.is_some_and(|ty| ty.bool(db).is_always_true());
 
-                    if maybe_field_names.is_none() {
-                        // Emit diagnostic if the type is outright invalid (not str | Iterable[str]).
-                        let iterable_str =
-                            KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                        let valid_type = UnionType::from_elements(
-                            db,
-                            [KnownClass::Str.to_instance(db), iterable_str],
-                        );
-                        if !fields_type.is_assignable_to(db, valid_type)
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Invalid argument to parameter `field_names` of `namedtuple()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Expected `str` or an iterable of strings, found `{}`",
-                                fields_type.display(db)
-                            ));
-                        }
-                    }
-
-                    if let Some(mut field_names) = maybe_field_names {
-                        // When `rename` is false (or not specified), emit diagnostics for invalid
-                        // field names. These all raise ValueError at runtime. When `rename=True`,
-                        // invalid names are automatically replaced with `_0`, `_1`, etc., so no
-                        // diagnostic is needed.
-                        if !rename {
-                            self.report_invalid_namedtuple_field_names(
-                                &field_names,
-                                fields_arg,
-                                NamedTupleKind::Collections,
-                            );
-                        } else {
-                            // Apply rename logic.
-                            let mut seen_names = FxHashSet::<&str>::default();
-                            for (i, field_name) in field_names.iter_mut().enumerate() {
-                                let name_str = field_name.as_str();
-                                let needs_rename = name_str.starts_with('_')
-                                    || is_keyword(name_str)
-                                    || !is_identifier(name_str)
-                                    || seen_names.contains(name_str);
-                                if needs_rename {
-                                    *field_name = Name::new(format!("_{i}"));
-                                }
-                                seen_names.insert(field_name.as_str());
-                            }
-                        }
-
-                        let num_fields = field_names.len();
-                        let defaults_count = default_types.len();
-
-                        if defaults_count > num_fields
-                            && let Some(defaults_kw) = defaults_kw
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_NAMED_TUPLE, defaults_kw)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Too many defaults for `namedtuple()`"
-                            ));
-                            diagnostic.set_primary_message(format_args!(
-                                "Got {defaults_count} default values but only {num_fields} field names"
-                            ));
-                            diagnostic.info("This will raise `TypeError` at runtime");
-                        }
-
-                        let defaults_count = defaults_count.min(num_fields);
-                        let fields = field_names
+                // Extract field names, first from the inferred type, then from the AST.
+                let maybe_field_names: Option<Box<[Name]>> =
+                    if let Type::StringLiteral(string_literal) = fields_type {
+                        // Handle space/comma-separated string.
+                        Some(
+                            string_literal
+                                .value(db)
+                                .replace(',', " ")
+                                .split_whitespace()
+                                .map(Name::new)
+                                .collect(),
+                        )
+                    } else if let Some(tuple_spec) = fields_type.tuple_instance_spec(db)
+                        && let Some(fixed_tuple) = tuple_spec.as_fixed_length()
+                    {
+                        // Handle list/tuple of strings (must be fixed-length).
+                        fixed_tuple
+                            .all_elements()
                             .iter()
-                            .enumerate()
-                            .map(|(i, field_name)| {
-                                let default =
-                                    if defaults_count > 0 && i >= num_fields - defaults_count {
-                                        // Index into default_types: first default corresponds to first
-                                        // field that has a default.
-                                        let default_idx = i - (num_fields - defaults_count);
-                                        Some(default_types[default_idx])
-                                    } else {
-                                        None
-                                    };
-                                (field_name.clone(), Type::any(), default)
-                            })
-                            .collect();
-                        (fields, true)
+                            .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
+                            .collect()
                     } else {
-                        // Couldn't determine fields statically; attribute lookups will return Any.
-                        (Box::new([]), false)
+                        self.extract_collections_namedtuple_fields_from_ast(fields_arg)
+                    };
+
+                if maybe_field_names.is_none() {
+                    // Emit diagnostic if the type is outright invalid (not str | Iterable[str]).
+                    let iterable_str =
+                        KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
+                    let valid_type = UnionType::from_elements(
+                        db,
+                        [KnownClass::Str.to_instance(db), iterable_str],
+                    );
+                    if !fields_type.is_assignable_to(db, valid_type)
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid argument to parameter `field_names` of `namedtuple()`"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected `str` or an iterable of strings, found `{}`",
+                            fields_type.display(db)
+                        ));
                     }
                 }
-            };
+
+                if let Some(mut field_names) = maybe_field_names {
+                    // When `rename` is false (or not specified), emit diagnostics for invalid
+                    // field names. These all raise ValueError at runtime. When `rename=True`,
+                    // invalid names are automatically replaced with `_0`, `_1`, etc., so no
+                    // diagnostic is needed.
+                    if !rename {
+                        self.report_invalid_namedtuple_field_names(
+                            &field_names,
+                            fields_arg,
+                            NamedTupleKind::Collections,
+                        );
+                    } else {
+                        // Apply rename logic.
+                        let mut seen_names = FxHashSet::<&str>::default();
+                        for (i, field_name) in field_names.iter_mut().enumerate() {
+                            let name_str = field_name.as_str();
+                            let needs_rename = name_str.starts_with('_')
+                                || is_keyword(name_str)
+                                || !is_identifier(name_str)
+                                || seen_names.contains(name_str);
+                            if needs_rename {
+                                *field_name = Name::new(format!("_{i}"));
+                            }
+                            seen_names.insert(field_name.as_str());
+                        }
+                    }
+
+                    let num_fields = field_names.len();
+                    let defaults_count = default_types.len();
+
+                    if defaults_count > num_fields
+                        && let Some(defaults_kw) = defaults_kw
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_NAMED_TUPLE, defaults_kw)
+                    {
+                        let mut diagnostic = builder
+                            .into_diagnostic(format_args!("Too many defaults for `namedtuple()`"));
+                        diagnostic.set_primary_message(format_args!(
+                            "Got {defaults_count} default values but only {num_fields} field names"
+                        ));
+                        diagnostic.info("This will raise `TypeError` at runtime");
+                    }
+
+                    let defaults_count = defaults_count.min(num_fields);
+                    let fields = field_names
+                        .iter()
+                        .enumerate()
+                        .map(|(i, field_name)| {
+                            let default = if defaults_count > 0 && i >= num_fields - defaults_count
+                            {
+                                // Index into default_types: first default corresponds to first
+                                // field that has a default.
+                                let default_idx = i - (num_fields - defaults_count);
+                                Some(default_types[default_idx])
+                            } else {
+                                None
+                            };
+                            NamedTupleField {
+                                name: field_name.clone(),
+                                ty: Type::any(),
+                                default,
+                            }
+                        })
+                        .collect();
+                    (fields, true)
+                } else {
+                    // Couldn't determine fields statically; attribute lookups will return Any.
+                    (Box::new([]), false)
+                }
+            }
+        };
 
         let scope = self.scope();
 
@@ -6969,12 +7101,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Extract fields from a typing.NamedTuple fields argument.
-    #[expect(clippy::type_complexity)]
     fn extract_typing_namedtuple_fields(
         &mut self,
         fields_arg: &ast::Expr,
         fields_type: Type<'db>,
-    ) -> Option<Box<[(Name, Type<'db>, Option<Type<'db>>)]>> {
+    ) -> Option<Box<[NamedTupleField<'db>]>> {
         let db = self.db();
         let scope_id = self.scope();
         let typevar_binding_context = self.typevar_binding_context;
@@ -7009,7 +7140,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             error.fallback_type
                         }
                     };
-                Some((Name::new(name.value(self.db())), resolved_ty, None))
+                Some(NamedTupleField {
+                    name: Name::new(name.value(db)),
+                    ty: resolved_ty,
+                    default: None,
+                })
             })
             .collect();
 
@@ -7065,11 +7200,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Extract fields from a typing.NamedTuple fields argument by looking at the AST directly.
     /// This handles list/tuple literals that contain (name, type) pairs.
-    #[expect(clippy::type_complexity)]
     fn extract_typing_namedtuple_fields_from_ast(
         &mut self,
         fields_arg: &ast::Expr,
-    ) -> Option<Box<[(Name, Type<'db>, Option<Type<'db>>)]>> {
+    ) -> Option<Box<[NamedTupleField<'db>]>> {
         let db = self.db();
         let scope_id = self.scope();
         let typevar_binding_context = self.typevar_binding_context;
@@ -7119,7 +7253,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         error.fallback_type
                     });
 
-                Some((field_name, field_ty, None))
+                Some(NamedTupleField {
+                    name: field_name,
+                    ty: field_ty,
+                    default: None,
+                })
             })
             .collect();
 
@@ -7432,6 +7570,85 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
+        /// Simple syntactic validation for the right-hand sides of PEP-613 type aliases.
+        ///
+        /// TODO: this is far from exhaustive and should be improved.
+        const fn alias_syntax_validation(expr: &ast::Expr) -> bool {
+            const fn inner(expr: &ast::Expr, allow_context_dependent: bool) -> bool {
+                match expr {
+                    ast::Expr::Name(_)
+                    | ast::Expr::StringLiteral(_)
+                    | ast::Expr::NoneLiteral(_) => true,
+                    ast::Expr::Attribute(ast::ExprAttribute {
+                        value,
+                        attr: _,
+                        node_index: _,
+                        range: _,
+                        ctx: _,
+                    }) => inner(value, allow_context_dependent),
+                    ast::Expr::Subscript(ast::ExprSubscript {
+                        value,
+                        slice,
+                        node_index: _,
+                        range: _,
+                        ctx: _,
+                    }) => {
+                        if !inner(value, allow_context_dependent) {
+                            return false;
+                        }
+                        match &**slice {
+                            ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                match elts.as_slice() {
+                                    [first, ..] => inner(first, true),
+                                    _ => true,
+                                }
+                            }
+                            _ => inner(slice, true),
+                        }
+                    }
+                    ast::Expr::BinOp(ast::ExprBinOp {
+                        left,
+                        op,
+                        right,
+                        range: _,
+                        node_index: _,
+                    }) => {
+                        op.is_bit_or()
+                            && inner(left, allow_context_dependent)
+                            && inner(right, allow_context_dependent)
+                    }
+                    ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                        op,
+                        operand,
+                        range: _,
+                        node_index: _,
+                    }) => {
+                        allow_context_dependent
+                            && matches!(op, ast::UnaryOp::UAdd | ast::UnaryOp::USub)
+                            && matches!(
+                                &**operand,
+                                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                    value: ast::Number::Int(_),
+                                    ..
+                                })
+                            )
+                    }
+                    ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value,
+                        node_index: _,
+                        range: _,
+                    }) => allow_context_dependent && value.is_int(),
+                    ast::Expr::EllipsisLiteral(_)
+                    | ast::Expr::BytesLiteral(_)
+                    | ast::Expr::BooleanLiteral(_)
+                    | ast::Expr::Starred(_)
+                    | ast::Expr::List(_) => allow_context_dependent,
+                    _ => false,
+                }
+            }
+            inner(expr, false)
+        }
+
         let annotation = assignment.annotation(self.module());
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
@@ -7440,6 +7657,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
+
+        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
+
+        if is_pep_613_type_alias
+            && let Some(value) = value
+            && !alias_syntax_validation(value)
+            && let Some(builder) = self.context.report_lint(
+                &INVALID_TYPE_FORM,
+                definition.full_range(self.db(), self.module()),
+            )
+        {
+            // TODO: better error message; full type-expression validation; etc.
+            let mut diagnostic = builder
+                .into_diagnostic("Invalid right-hand side for `typing.TypeAlias` assignment");
+            diagnostic.help(
+                "See https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+            );
+        }
 
         if !declared.qualifiers.is_empty() {
             let current_scope_id = self.scope().file_scope_id(self.db());
@@ -7486,10 +7721,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             declared.inner = Type::BooleanLiteral(true);
         }
-
-        // Check if this is a PEP 613 `TypeAlias`. (This must come below the SpecialForm handling
-        // immediately below, since that can overwrite the type to be `TypeAlias`.)
-        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr()
@@ -8592,6 +8823,86 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_expression(expression, TypeContext::default())
     }
 
+    /// Apply a decorator to a function or class type and return the resulting type.
+    ///
+    /// When the decorator is a class (or generic alias, or `type[]`), this uses the constructor
+    /// call logic to properly validate `__new__` and `__init__` signatures. For other decorator
+    /// types, it uses the regular call logic.
+    fn apply_decorator(
+        &mut self,
+        decorator_ty: Type<'db>,
+        decorated_ty: Type<'db>,
+        decorator_node: &ast::Decorator,
+    ) -> Type<'db> {
+        fn propagate_callable_kind<'d>(
+            db: &'d dyn Db,
+            ty: Type<'d>,
+            kind: CallableTypeKind,
+        ) -> Option<Type<'d>> {
+            match ty {
+                Type::Callable(callable) => Some(Type::Callable(CallableType::new(
+                    db,
+                    callable.signatures(db),
+                    kind,
+                ))),
+                Type::Union(union) => {
+                    union.try_map(db, |element| propagate_callable_kind(db, *element, kind))
+                }
+                // Intersections are currently not handled here because that would require
+                // the decorator to be explicitly annotated as returning an intersection.
+                _ => None,
+            }
+        }
+
+        let propagatable_kind = decorated_ty
+            .try_upcast_to_callable(self.db())
+            .and_then(CallableTypes::exactly_one)
+            .and_then(|callable| match callable.kind(self.db()) {
+                kind @ (CallableTypeKind::FunctionLike
+                | CallableTypeKind::StaticMethodLike
+                | CallableTypeKind::ClassMethodLike) => Some(kind),
+                _ => None,
+            });
+
+        // Check if this is a class-like type that should use constructor call handling.
+        let class = match decorator_ty {
+            Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
+            Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
+            Type::SubclassOf(subclass) => subclass.subclass_of().into_class(self.db()),
+            _ => None,
+        };
+
+        let use_constructor_call =
+            class.is_some_and(|class| class.should_use_constructor_call(self.db()));
+
+        let call_arguments = CallArguments::positional([decorated_ty]);
+        let return_ty = if use_constructor_call {
+            decorator_ty
+                .try_call_constructor(self.db(), |_| call_arguments, TypeContext::default())
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, decorator_ty, decorator_node.into());
+                    err.return_type()
+                })
+        } else {
+            decorator_ty
+                .try_call(self.db(), &call_arguments)
+                .map(|bindings| bindings.return_type(self.db()))
+                .unwrap_or_else(|CallError(_, bindings)| {
+                    bindings.report_diagnostics(&self.context, decorator_node.into());
+                    bindings.return_type(self.db())
+                })
+        };
+
+        // When a method on a class is decorated with a function that returns a
+        // `Callable`, assume that the returned callable is also function-like (or
+        // classmethod-like or staticmethod-like). See "Decorating a method with
+        // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
+        // extended explanation.
+        propagatable_kind
+            .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
+            .unwrap_or(return_ty)
+    }
+
     /// Infer the argument types for a single binding.
     fn infer_argument_types<'a>(
         &mut self,
@@ -9472,9 +9783,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = list;
 
         let mut elts = elts.iter().map(|elt| [Some(elt)]);
-        let infer_elt_ty =
-            &mut |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(&mut elts, tcx, infer_elt_ty, KnownClass::List)
+        let mut infer_elt_ty =
+            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+
+        self.infer_collection_literal(KnownClass::List, &mut elts, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -9488,9 +9800,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = set;
 
         let mut elts = elts.iter().map(|elt| [Some(elt)]);
-        let infer_elt_ty =
-            &mut |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-        self.infer_collection_literal(&mut elts, tcx, infer_elt_ty, KnownClass::Set)
+        let mut infer_elt_ty =
+            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+
+        self.infer_collection_literal(KnownClass::Set, &mut elts, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
             })
@@ -9580,14 +9893,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid inferring the items multiple times if we already attempted to infer the
         // dictionary literal as a `TypedDict`. This also allows us to infer using the
         // type context of the expected `TypedDict` field.
-        let infer_elt_ty = &mut |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
+        let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
             item_types
                 .get(&elt.node_index().load())
                 .copied()
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
-        self.infer_collection_literal(&mut items, tcx, infer_elt_ty, KnownClass::Dict)
+        self.infer_collection_literal(KnownClass::Dict, &mut items, &mut infer_elt_ty, tcx)
             .unwrap_or_else(|| {
                 KnownClass::Dict
                     .to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()])
@@ -9638,10 +9951,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     // Infer the type of a collection literal expression.
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
-        elts: &mut dyn Iterator<Item = [Option<&'expr ast::Expr>; N]>,
-        tcx: TypeContext<'db>,
-        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         collection_class: KnownClass,
+        elts: &mut dyn Iterator<Item = [Option<&'expr ast::Expr>; N]>,
+        infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
+        tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
@@ -9662,7 +9975,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let Some((collection_alias, generic_context, elt_tys)) = elt_tys(collection_class) else {
-            // Infer the element types without type context, and fallback to unknown for
+            // Infer the element types without type context, and fallback to `Unknown` for
             // custom typesheds.
             for (i, elt) in elts.flatten().flatten().enumerate() {
                 infer_elt_expression(self, (i, elt, TypeContext::default()));
@@ -9684,10 +9997,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Collect type constraints from the declared element types.
         let (elt_tcx_constraints, elt_tcx_variance) = {
-            let mut builder = SpecializationBuilder::new(
-                self.db(),
-                generic_context.inferable_typevars(self.db()),
-            );
+            let mut builder = SpecializationBuilder::new(self.db(), inferable);
 
             // For a given type variable, we keep track of the variance of any assignments to
             // that type variable in the type context.
@@ -9876,7 +10186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope);
+        let inference = infer_scope_types(self.db(), scope, TypeContext::default());
         let yield_type = inference.expression_type(elt.as_ref());
 
         if evaluation_mode.is_async() {
@@ -9892,47 +10202,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Return a specialization of the collection class (list, dict, set) based on the type context and the inferred
     /// element / key-value types from the comprehension expression.
-    fn infer_comprehension_specialization(
-        &self,
+    fn infer_comprehension_specialization<const N: usize>(
+        &mut self,
         collection_class: KnownClass,
-        inferred_element_types: &[Type<'db>],
+        elements: &[Option<&ast::Expr>; N],
+        inference: &ScopeInference<'db>,
         tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        // Remove any union elements of that are unrelated to the collection type.
-        let tcx = tcx.map(|annotation| {
-            annotation.filter_disjoint_elements(
-                self.db(),
-                collection_class.to_instance(self.db()),
-                InferableTypeVars::None,
-            )
-        });
+    ) -> Option<Type<'db>> {
+        let mut elements = [elements].into_iter().copied();
+        let mut infer_element_ty =
+            |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
 
-        if let Some(annotated_element_types) = tcx
-            .known_specialization(self.db(), collection_class)
-            .map(|specialization| specialization.types(self.db()))
-            && annotated_element_types
-                .iter()
-                .zip(inferred_element_types.iter())
-                .all(|(annotated, inferred)| inferred.is_assignable_to(self.db(), *annotated))
-        {
-            collection_class.to_specialized_instance(self.db(), annotated_element_types)
-        } else {
-            collection_class.to_specialized_instance(
-                self.db(),
-                inferred_element_types
-                    .iter()
-                    .map(|ty| {
-                        UnionType::from_elements(
-                            self.db(),
-                            [
-                                ty.promote_literals(self.db(), TypeContext::default()),
-                                Type::unknown(),
-                            ],
-                        )
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        }
+        self.infer_collection_literal(collection_class, &mut elements, &mut infer_element_ty, tcx)
     }
 
     fn infer_list_comprehension_expression(
@@ -9956,10 +10237,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope);
-        let element_type = inference.expression_type(elt.as_ref());
+        let inference = infer_scope_types(self.db(), scope, tcx);
+        self.extend_scope(inference);
 
-        self.infer_comprehension_specialization(KnownClass::List, &[element_type], tcx)
+        self.infer_comprehension_specialization(KnownClass::List, &[Some(elt)], inference, tcx)
+            .unwrap_or_else(|| {
+                KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()])
+            })
+    }
+
+    fn infer_set_comprehension_expression(
+        &mut self,
+        setcomp: &ast::ExprSetComp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let ast::ExprSetComp {
+            range: _,
+            node_index: _,
+            elt,
+            generators,
+        } = setcomp;
+
+        self.infer_first_comprehension_iter(generators);
+
+        let Some(scope_id) = self
+            .index
+            .try_node_scope(NodeWithScopeRef::SetComprehension(setcomp))
+        else {
+            return Type::unknown();
+        };
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let inference = infer_scope_types(self.db(), scope, tcx);
+        self.extend_scope(inference);
+
+        self.infer_comprehension_specialization(KnownClass::Set, &[Some(elt)], inference, tcx)
+            .unwrap_or_else(|| {
+                KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()])
+            })
     }
 
     fn infer_dict_comprehension_expression(
@@ -9984,38 +10298,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope);
-        let key_type = inference.expression_type(key.as_ref());
-        let value_type = inference.expression_type(value.as_ref());
+        let inference = infer_scope_types(self.db(), scope, tcx);
+        self.extend_scope(inference);
 
-        self.infer_comprehension_specialization(KnownClass::Dict, &[key_type, value_type], tcx)
-    }
-
-    fn infer_set_comprehension_expression(
-        &mut self,
-        setcomp: &ast::ExprSetComp,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        let ast::ExprSetComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = setcomp;
-
-        self.infer_first_comprehension_iter(generators);
-
-        let Some(scope_id) = self
-            .index
-            .try_node_scope(NodeWithScopeRef::SetComprehension(setcomp))
-        else {
-            return Type::unknown();
-        };
-        let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope);
-        let element_type = inference.expression_type(elt.as_ref());
-
-        self.infer_comprehension_specialization(KnownClass::Set, &[element_type], tcx)
+        self.infer_comprehension_specialization(
+            KnownClass::Dict,
+            &[Some(key), Some(value)],
+            inference,
+            tcx,
+        )
+        .unwrap_or_else(|| {
+            KnownClass::Dict.to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()])
+        })
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
@@ -10031,7 +10325,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_comprehensions(generators);
     }
 
-    fn infer_list_comprehension_expression_scope(&mut self, listcomp: &ast::ExprListComp) {
+    fn infer_list_comprehension_expression_scope(
+        &mut self,
+        listcomp: &ast::ExprListComp,
+        tcx: TypeContext<'db>,
+    ) {
         let ast::ExprListComp {
             range: _,
             node_index: _,
@@ -10039,11 +10337,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             generators,
         } = listcomp;
 
-        self.infer_expression(elt, TypeContext::default());
+        // Infer the element type using the outer type context.
+        let mut elts = [[Some(elt.as_ref())]].into_iter();
+        let mut infer_elt_ty =
+            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+        self.infer_collection_literal(KnownClass::List, &mut elts, &mut infer_elt_ty, tcx);
+
         self.infer_comprehensions(generators);
     }
 
-    fn infer_dict_comprehension_expression_scope(&mut self, dictcomp: &ast::ExprDictComp) {
+    fn infer_set_comprehension_expression_scope(
+        &mut self,
+        setcomp: &ast::ExprSetComp,
+        tcx: TypeContext<'db>,
+    ) {
+        let ast::ExprSetComp {
+            range: _,
+            node_index: _,
+            elt,
+            generators,
+        } = setcomp;
+
+        // Infer the element type using the outer type context.
+        let mut elts = [[Some(elt.as_ref())]].into_iter();
+        let mut infer_elt_ty =
+            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+        self.infer_collection_literal(KnownClass::Set, &mut elts, &mut infer_elt_ty, tcx);
+
+        self.infer_comprehensions(generators);
+    }
+
+    fn infer_dict_comprehension_expression_scope(
+        &mut self,
+        dictcomp: &ast::ExprDictComp,
+        tcx: TypeContext<'db>,
+    ) {
         let ast::ExprDictComp {
             range: _,
             node_index: _,
@@ -10052,20 +10380,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             generators,
         } = dictcomp;
 
-        self.infer_expression(key, TypeContext::default());
-        self.infer_expression(value, TypeContext::default());
-        self.infer_comprehensions(generators);
-    }
+        // Infer the key and value types using the outer type context.
+        let mut elts = [[Some(key.as_ref()), Some(value.as_ref())]].into_iter();
+        let mut infer_elt_ty =
+            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+        self.infer_collection_literal(KnownClass::Dict, &mut elts, &mut infer_elt_ty, tcx);
 
-    fn infer_set_comprehension_expression_scope(&mut self, setcomp: &ast::ExprSetComp) {
-        let ast::ExprSetComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = setcomp;
-
-        self.infer_expression(elt, TypeContext::default());
         self.infer_comprehensions(generators);
     }
 
@@ -10251,28 +10571,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .posonlyargs
                 .iter()
                 .map(|param| {
-                    let mut parameter = Parameter::positional_only(Some(param.name().id.clone()));
-                    if let Some(default) = param.default() {
-                        parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
-                        );
-                    }
-                    parameter
+                    Parameter::positional_only(Some(param.name().id.clone()))
+                        .with_optional_default_type(param.default().map(|default_expr| {
+                            self.infer_expression(default_expr, TypeContext::default())
+                                .replace_parameter_defaults(self.db())
+                        }))
                 })
                 .collect::<Vec<_>>();
             let positional_or_keyword = parameters
                 .args
                 .iter()
                 .map(|param| {
-                    let mut parameter = Parameter::positional_or_keyword(param.name().id.clone());
-                    if let Some(default) = param.default() {
-                        parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
-                        );
-                    }
-                    parameter
+                    Parameter::positional_or_keyword(param.name().id.clone())
+                        .with_optional_default_type(param.default().map(|default_expr| {
+                            self.infer_expression(default_expr, TypeContext::default())
+                                .replace_parameter_defaults(self.db())
+                        }))
                 })
                 .collect::<Vec<_>>();
             let variadic = parameters
@@ -10283,14 +10597,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .kwonlyargs
                 .iter()
                 .map(|param| {
-                    let mut parameter = Parameter::keyword_only(param.name().id.clone());
-                    if let Some(default) = param.default() {
-                        parameter = parameter.with_default_type(
-                            self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
-                        );
-                    }
-                    parameter
+                    Parameter::keyword_only(param.name().id.clone()).with_optional_default_type(
+                        param.default().map(|default_expr| {
+                            self.infer_expression(default_expr, TypeContext::default())
+                                .replace_parameter_defaults(self.db())
+                        }),
+                    )
                 })
                 .collect::<Vec<_>>();
             let keyword_variadic = parameters
@@ -10529,42 +10841,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the `try_call` path below.
             // TODO: it should be possible to move these special cases into the `try_call_constructor`
             // path instead, or even remove some entirely once we support overloads fully.
-            let has_special_cased_constructor = matches!(
-                class.known(self.db()),
-                Some(
-                    KnownClass::Bool
-                        | KnownClass::Str
-                        | KnownClass::Type
-                        | KnownClass::Object
-                        | KnownClass::Property
-                        | KnownClass::Super
-                        | KnownClass::TypeAliasType
-                        | KnownClass::Deprecated
-                )
-            ) || (
-                // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
-                // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
-                // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
-                // in `ClassType::own_class_member()`).
-                class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
-            ) || class
-                .static_class_literal(self.db())
-                .is_some_and(|(class_literal, specialization)| {
-                    CodeGeneratorKind::TypedDict.matches(
-                        self.db(),
-                        class_literal.into(),
-                        specialization,
-                    )
-                });
-
-            // temporary special-casing for all subclasses of `enum.Enum`
-            // until we support the functional syntax for creating enum classes
-            if !has_special_cased_constructor
-                && KnownClass::Enum
-                    .to_class_literal(self.db())
-                    .to_class_type(self.db())
-                    .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
-            {
+            if class.should_use_constructor_call(self.db()) {
                 // Inference of correctly-placed `TypeVar`, `ParamSpec`, and `NewType` definitions
                 // is done in `infer_legacy_typevar`, `infer_paramspec`, and
                 // `infer_newtype_expression`, and doesn't use the full call-binding machinery. If

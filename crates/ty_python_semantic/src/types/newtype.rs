@@ -206,6 +206,13 @@ impl<'db> NewType<'db> {
         self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
             .unwrap()
     }
+
+    pub(crate) fn base_is_union(self, db: &'db dyn Db) -> bool {
+        match self.base(db) {
+            NewTypeBase::ClassType(_) | NewTypeBase::NewType(_) => false,
+            NewTypeBase::Float | NewTypeBase::Complex => true,
+        }
+    }
 }
 
 pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(

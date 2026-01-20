@@ -20,12 +20,22 @@ def _(x: A | B, y: A | C):
         # to infer the full union type:
         reveal_type(x)  # revealed: A | B
 
+    if A is type(x):
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: A | B
+
     if type(y) is C:
         reveal_type(y)  # revealed: C
     else:
         # here, however, inferring `A` is fine,
         # because `C` is `@final`: no subclass of `A`
         # and `C` could exist
+        reveal_type(y)  # revealed: A
+
+    if C is type(y):
+        reveal_type(y)  # revealed: C
+    else:
         reveal_type(y)  # revealed: A
 
     if type(y) is A:
@@ -35,6 +45,11 @@ def _(x: A | B, y: A | C):
         # in which case the `type(y) is A` call would evaluate
         # to `False` even if `y` was an instance of `A`,
         # so narrowing cannot occur
+        reveal_type(y)  # revealed: A | C
+
+    if A is type(y):
+        reveal_type(y)  # revealed: A
+    else:
         reveal_type(y)  # revealed: A | C
 ```
 
@@ -302,4 +317,107 @@ def _(x: object):
         reveal_type(y)  # revealed: <class 'bool'>
     if (type(y := x)) is bool:
         reveal_type(y)  # revealed: bool
+```
+
+## Narrowing where the right-hand side is not a class literal
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+
+class Foo: ...
+
+def f(x: Foo, y: type[int]):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo & int
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo & int
+
+@final
+class Bar: ...
+
+def g(x: object, y: type[Bar]):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Bar
+    else:
+        # `Bar` is `@final`, so we can do `else`-branch narrowing here
+        reveal_type(x)  # revealed: ~Bar
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: ~Bar
+    else:
+        reveal_type(x)  # revealed: Bar
+
+def j[T: int](x: Foo, y: type[T]):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo & int
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo & int
+
+def k[T: type[int]](x: Foo, y: T):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo & int
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo & int
+
+type IntClassAlias = type[int]
+
+def strange(x: Foo, y: IntClassAlias):
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo & int
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo & int
+
+class Spam[T]: ...
+
+def h(x: Foo, y: type[Spam[int]]):
+    # no narrowing can occur, because `Spam[int]` is a generic class,
+    # and `if type(x) is Y` is not a valid operation if `Y` could be
+    # a generic alias.
+
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo
+
+def i[T](x: Foo, y: type[Spam[T]]):
+    # same here: no  narrowing can occur
+    if type(x) is y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo
+
+    if type(x) is not y:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo
 ```

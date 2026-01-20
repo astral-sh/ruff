@@ -51,6 +51,6 @@ reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 ## Dict comprehensions
 
 ```py
-# revealed: dict[int | Unknown, int | Unknown]
+# revealed: dict[Unknown | int, Unknown | int]
 reveal_type({x: y for x, y in enumerate(range(42))})
 ```

@@ -93,3 +93,30 @@ help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.
 37 | 
 38 | # Regression test for https://github.com/astral-sh/ruff/issues/18778
 39 | d = {}
+
+SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
+  --> SIM911.py:45:23
+   |
+43 |   flag_stars = {"USA": 50, "Slovenia": 3, "Panama": 2, "Australia": 6}
+44 |
+45 |   for country, stars in zip(
+   |  _______________________^
+46 | |         flag_stars.keys(),
+47 | |         # text
+48 | |         flag_stars.values(),
+49 | | ):
+   | |_^
+50 |       print(f"{country}'s flag has {stars} stars.")
+   |
+help: Replace `zip(dict.keys(), dict.values())` with `dict.items()`
+42 | 
+43 | flag_stars = {"USA": 50, "Slovenia": 3, "Panama": 2, "Australia": 6}
+44 | 
+   - for country, stars in zip(
+   -         flag_stars.keys(),
+   -         # text
+   -         flag_stars.values(),
+   - ):
+45 + for country, stars in flag_stars.items():
+46 |     print(f"{country}'s flag has {stars} stars.")
+note: This is an unsafe fix and may change runtime behavior

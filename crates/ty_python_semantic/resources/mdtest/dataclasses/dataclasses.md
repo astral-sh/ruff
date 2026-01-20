@@ -443,7 +443,7 @@ frozen_instance = MyFrozenClass(1)
 frozen_instance.x = 2  # error: [invalid-assignment]
 ```
 
-If `__setattr__()` or `__delattr__()` is defined in the class, we should emit a diagnostic.
+If `__setattr__()` or `__delattr__()` is defined in the class, a diagnostic is emitted.
 
 ```py
 from dataclasses import dataclass
@@ -452,10 +452,10 @@ from dataclasses import dataclass
 class MyFrozenClass:
     x: int
 
-    # TODO: Emit a diagnostic here
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__setattr__` in class `MyFrozenClass`"
     def __setattr__(self, name: str, value: object) -> None: ...
 
-    # TODO: Emit a diagnostic here
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__delattr__` in class `MyFrozenClass`"
     def __delattr__(self, name: str) -> None: ...
 ```
 
@@ -1720,4 +1720,228 @@ DynamicChild = type("DynamicChild", (Base,), {})
 DynamicChild = dataclass(DynamicChild)
 
 reveal_type(DynamicChild.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+```
+
+## Invalid `@dataclass` applications
+
+### NamedTuple classes (functional form)
+
+Applying `@dataclass` to a `namedtuple` class created via the functional form is problematic because
+the namedtuple machinery conflicts with dataclass semantics:
+
+```py
+from collections import namedtuple
+from dataclasses import dataclass
+
+NT = namedtuple("NT", "x y")
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(NT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(NT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(namedtuple("Inline1", "a b"))
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(namedtuple("Inline2", "a b"))
+```
+
+The same applies to `typing.NamedTuple` used in functional form:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+TNT = NamedTuple("TNT", [("x", int), ("y", int)])
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(TNT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(TNT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(NamedTuple("Inline1", [("a", str)]))
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(NamedTuple("Inline2", [("a", str)]))
+```
+
+### Enum classes (functional form)
+
+Applying `@dataclass` to a functional `Enum` class should also be detected:
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+E = Enum("E", "A B C")
+
+# TODO: should emit `invalid-dataclass`
+dataclass(E)
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(E)
+
+# TODO: should emit `invalid-dataclass`
+dataclass(Enum("Inline1", "X Y"))
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(Enum("Inline2", "X Y"))
+```
+
+### TypedDict classes (functional form)
+
+Applying `@dataclass` to a functional `TypedDict` class should also be detected:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+TD = TypedDict("TD", {"x": int})
+
+# TODO: should emit `invalid-dataclass`
+dataclass(TD)
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(TD)
+
+# TODO: should emit `invalid-dataclass`
+dataclass(TypedDict("Inline1", {"a": str}))
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(TypedDict("Inline2", {"a": str}))
+```
+
+### Enum classes
+
+Applying `@dataclass` to an enum class is
+[explicitly not supported](https://docs.python.org/3/howto/enum.html#dataclass-support):
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+@dataclass
+# error: [invalid-dataclass] "Enum class `Color` cannot be decorated with `@dataclass`"
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+This also applies to classes that inherit from an enum class:
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+class BaseColor(Enum):
+    def fancy_mixin_method(self) -> str:
+        return "hi"
+
+@dataclass
+# error: [invalid-dataclass]
+class Color(BaseColor):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+### Protocol classes
+
+Applying `@dataclass` to a protocol class is invalid because protocols define abstract interfaces
+and cannot be instantiated:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+@dataclass
+# error: [invalid-dataclass] "Protocol class `Greeter` cannot be decorated with `@dataclass`"
+class Greeter(Protocol):
+    def greet(self) -> str: ...
+```
+
+This also applies to classes that extend a protocol while remaining a protocol themselves:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+class BaseProtocol(Protocol):
+    def method(self) -> None: ...
+
+@dataclass
+# error: [invalid-dataclass]
+class ExtendedProtocol(BaseProtocol, Protocol):
+    def other_method(self) -> None: ...
+```
+
+However, concrete classes that implement a protocol (without inheriting from `Protocol` directly)
+can be decorated with `@dataclass`:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+class Greetable(Protocol):
+    name: str
+    def greet(self) -> str: ...
+
+@dataclass
+class Person(Greetable):
+    name: str
+    def greet(self) -> str:
+        return f"Hello, {self.name}!"
+
+reveal_type(Person)  # revealed: <class 'Person'>
+```
+
+### Using `dataclass()` as a function
+
+The same restrictions apply when using `dataclass()` as a function call instead of a decorator:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, TypedDict, Protocol
+from enum import Enum
+
+class MyTuple(NamedTuple):
+    x: int
+
+class MyDict(TypedDict):
+    x: int
+
+class MyEnum(Enum):
+    A = 1
+
+class MyProtocol(Protocol):
+    def method(self) -> None: ...
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(MyTuple)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(MyTuple)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
+dataclass(MyDict)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
+dataclass()(MyDict)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
+dataclass(MyEnum)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
+dataclass()(MyEnum)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
+dataclass(MyProtocol)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
+dataclass()(MyProtocol)
 ```

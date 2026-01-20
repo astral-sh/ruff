@@ -79,3 +79,10 @@ setattr(foo, "__debug__", 0)
 # Example: the long s character "ſ" normalizes to "s" under NFKC.
 getattr(foo, "ſ")
 setattr(foo, "ſ", 1)
+
+
+getattr(
+    obj,
+    # text
+    "foo",
+)

@@ -37,22 +37,26 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
+from collections.abc import Sequence, Set as AbstractSet
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
 from functools import reduce
-from itertools import groupby
+from itertools import chain, groupby
 from operator import attrgetter, or_
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, assert_never
 
 # The conformance tests include 4 types of errors:
 # 1. Required errors (E): The type checker must raise an error on this line
 # 2. Optional errors (E?): The type checker may raise an error on this line
-# 3. Tagged errors (E[tag]): The type checker must raise at most one error on any of the lines in a file with matching tags
-# 4. Tagged multi-errors (E[tag+]): The type checker should raise one or more errors on any of the tagged lines
-# This regex pattern parses the error lines in the conformance tests, but the following
-# implementation treats all errors as required errors.
+# 3. Tagged errors (E[tag]): The type checker must raise at most one error
+#    on a set of lines with a matching tag
+# 4. Tagged multi-errors (E[tag+]): The type checker should raise one or
+#    more errors on a set of lines with a matching tag
+# This regex pattern parses the error lines in the conformance tests,
+# but the following implementation currently ignores error tags.
 CONFORMANCE_ERROR_PATTERN = re.compile(
     r"""
     \#\s*E                  # "# E" begins each error
@@ -74,7 +78,7 @@ CONFORMANCE_SUITE_COMMIT = os.environ.get("CONFORMANCE_SUITE_COMMIT", "main")
 CONFORMANCE_DIR_WITH_README = (
     f"https://github.com/python/typing/blob/{CONFORMANCE_SUITE_COMMIT}/conformance/"
 )
-CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "/tests/{filename}#L{line}"
+CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
 
 class Source(Flag):
@@ -99,6 +103,21 @@ class Classification(StrEnum):
                 return "False positives removed"
             case Classification.FALSE_NEGATIVE:
                 return "True positives removed"
+
+
+class Change(StrEnum):
+    ADDED = auto()
+    REMOVED = auto()
+    UNCHANGED = auto()
+
+    def into_title(self) -> str:
+        match self:
+            case Change.ADDED:
+                return "Optional Diagnostics Added"
+            case Change.REMOVED:
+                return "Optional Diagnostics Removed"
+            case Change.UNCHANGED:
+                return "Optional Diagnostics Unchanged"
 
 
 @dataclass(kw_only=True, slots=True)
@@ -136,6 +155,13 @@ class Diagnostic:
     fingerprint: str | None
     location: Location
     source: Source
+    optional: bool
+
+    def __post_init__(self, *args, **kwargs) -> None:
+        # Remove check name prefix from description
+        self.description = self.description.replace(f"{self.check_name}: ", "")
+        # Escape pipe characters for GitHub markdown tables
+        self.description = self.description.replace("|", "\\|")
 
     def __str__(self) -> str:
         return (
@@ -169,6 +195,7 @@ class Diagnostic:
                 ),
             ),
             source=source,
+            optional=False,
         )
 
     @property
@@ -193,12 +220,6 @@ class GroupedDiagnostics:
     expected: Diagnostic | None
 
     @property
-    def changed(self) -> bool:
-        return (Source.OLD in self.sources or Source.NEW in self.sources) and not (
-            Source.OLD in self.sources and Source.NEW in self.sources
-        )
-
-    @property
     def classification(self) -> Classification:
         if Source.NEW in self.sources and Source.EXPECTED in self.sources:
             return Classification.TRUE_POSITIVE
@@ -208,6 +229,19 @@ class GroupedDiagnostics:
             return Classification.FALSE_NEGATIVE
         else:
             return Classification.TRUE_NEGATIVE
+
+    @property
+    def change(self) -> Change:
+        if Source.NEW in self.sources and Source.OLD not in self.sources:
+            return Change.ADDED
+        elif Source.OLD in self.sources and Source.NEW not in self.sources:
+            return Change.REMOVED
+        else:
+            return Change.UNCHANGED
+
+    @property
+    def optional(self) -> bool:
+        return self.expected is not None and self.expected.optional
 
     def _render_row(self, diagnostic: Diagnostic):
         return f"| {diagnostic.location.as_link()} | {diagnostic.check_name} | {diagnostic.description} |"
@@ -263,17 +297,19 @@ class Statistics:
         return self.true_positives + self.false_positives
 
 
-def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
+def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
-    for file in path.resolve().rglob("*.py"):
+    for file in test_files:
         for idx, line in enumerate(file.read_text().splitlines(), 1):
             if error := re.search(CONFORMANCE_ERROR_PATTERN, line):
                 diagnostics.append(
                     Diagnostic(
                         check_name="conformance",
-                        description=error.group("description")
-                        or error.group("tag")
-                        or "Missing",
+                        description=(
+                            error.group("description")
+                            or error.group("tag")
+                            or "Missing"
+                        ),
                         severity="major",
                         fingerprint=None,
                         location=Location(
@@ -290,6 +326,7 @@ def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
                             ),
                         ),
                         source=Source.EXPECTED,
+                        optional=error.group("optional") is not None,
                     )
                 )
 
@@ -300,7 +337,7 @@ def collect_expected_diagnostics(path: Path) -> list[Diagnostic]:
 def collect_ty_diagnostics(
     ty_path: list[str],
     source: Source,
-    tests_path: str = ".",
+    test_files: Sequence[Path],
     python_version: str = "3.12",
 ) -> list[Diagnostic]:
     process = subprocess.run(
@@ -310,7 +347,7 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--exit-zero",
-            tests_path,
+            *map(str, test_files),
         ],
         capture_output=True,
         text=True,
@@ -325,6 +362,7 @@ def collect_ty_diagnostics(
     return [
         Diagnostic.from_gitlab_output(dct, source=source)
         for dct in json.loads(process.stdout)
+        if dct["severity"] == "major"
     ]
 
 
@@ -336,6 +374,7 @@ def group_diagnostics_by_key(
         *new,
         *expected,
     ]
+
     sorted_diagnostics = sorted(diagnostics, key=attrgetter("key"))
 
     grouped = []
@@ -358,7 +397,8 @@ def group_diagnostics_by_key(
 
 
 def compute_stats(
-    grouped_diagnostics: list[GroupedDiagnostics], source: Source
+    grouped_diagnostics: list[GroupedDiagnostics],
+    source: Source,
 ) -> Statistics:
     if source == source.EXPECTED:
         # ty currently raises a false positive here due to incomplete enum.Flag support
@@ -381,6 +421,8 @@ def compute_stats(
             statistics.false_negatives += 1
         return statistics
 
+    grouped_diagnostics = [diag for diag in grouped_diagnostics if not diag.optional]
+
     return reduce(increment, grouped_diagnostics, Statistics())
 
 
@@ -391,11 +433,21 @@ def render_grouped_diagnostics(
     format: Literal["diff", "github"] = "diff",
 ) -> str:
     if changed_only:
-        grouped = [diag for diag in grouped if diag.changed]
+        grouped = [
+            diag for diag in grouped if diag.change in (Change.ADDED, Change.REMOVED)
+        ]
 
-    sorted_by_class = sorted(
-        grouped,
-        key=attrgetter("classification"),
+    get_change = attrgetter("change")
+    get_classification = attrgetter("classification")
+
+    optional_diagnostics = sorted(
+        (diag for diag in grouped if diag.optional),
+        key=get_change,
+        reverse=True,
+    )
+    required_diagnostics = sorted(
+        (diag for diag in grouped if not diag.optional),
+        key=get_classification,
         reverse=True,
     )
 
@@ -413,17 +465,16 @@ def render_grouped_diagnostics(
             raise ValueError("format must be one of 'diff' or 'github'")
 
     lines = []
-    for classification, group in groupby(
-        sorted_by_class, key=attrgetter("classification")
+    for group, diagnostics in chain(
+        groupby(required_diagnostics, key=get_classification),
+        groupby(optional_diagnostics, key=get_change),
     ):
-        group = list(group)
-
-        lines.append(f"### {classification.into_title()}")
+        lines.append(f"### {group.into_title()}")
         lines.extend(["", "<details>", ""])
 
         lines.extend(header)
 
-        for diag in group:
+        for diag in diagnostics:
             lines.append(diag.display(format=format))
 
         lines.append(footer)
@@ -437,7 +488,7 @@ def diff_format(
     *,
     greater_is_better: bool = True,
     neutral: bool = False,
-):
+) -> str:
     if diff == 0:
         return ""
 
@@ -456,9 +507,16 @@ def diff_format(
             return f"{down}{bad}"
         case (False, False):
             return f"{down}{good}"
+        case _:
+            # The ty false positive seems to be due to insufficient type narrowing for tuples;
+            # possibly related to https://github.com/astral-sh/ty/issues/493 and/or
+            # https://github.com/astral-sh/ty/issues/887
+            assert_never((greater_is_better, increased))  # ty: ignore[type-assertion-failure]
 
 
-def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
+def render_summary(
+    grouped_diagnostics: list[GroupedDiagnostics], *, force_summary_table: bool
+) -> str:
     def format_metric(diff: float, old: float, new: float):
         if diff > 0:
             return f"increased from {old:.2%} to {new:.2%}"
@@ -470,7 +528,7 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
     new = compute_stats(grouped_diagnostics, source=Source.NEW)
 
     assert new.true_positives > 0, (
-        "Expected ty to have at least one true positive "
+        "Expected ty to have at least one true positive.\n"
         f"Sample of grouped diagnostics: {grouped_diagnostics[:5]}"
     )
 
@@ -483,13 +541,8 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
 
     base_header = f"[Typing conformance results]({CONFORMANCE_DIR_WITH_README})"
 
-    if (
-        precision_change == 0
-        and recall_change == 0
-        and true_pos_change == 0
-        and false_pos_change == 0
-        and false_neg_change == 0
-        and total_change == 0
+    if not force_summary_table and all(
+        diag.change is Change.UNCHANGED for diag in grouped_diagnostics
     ):
         return dedent(
             f"""
@@ -537,12 +590,35 @@ def render_summary(grouped_diagnostics: list[GroupedDiagnostics]):
         | True Positives  | {old.true_positives} | {new.true_positives} | {true_pos_change:+} | {true_pos_diff} |
         | False Positives | {old.false_positives} | {new.false_positives} | {false_pos_change:+} | {false_pos_diff} |
         | False Negatives | {old.false_negatives} | {new.false_negatives} | {false_neg_change:+} | {false_neg_diff} |
-        | Total Diagnostics | {old.total} | {new.total} | {total_change} | {total_diff} |
+        | Total Diagnostics | {old.total} | {new.total} | {total_change:+} | {total_diff} |
         | Precision | {old.precision:.2%} | {new.precision:.2%} | {precision_change:+.2%} | {precision_diff} |
         | Recall | {old.recall:.2%} | {new.recall:.2%} | {recall_change:+.2%} | {recall_diff} |
 
         """
     )
+
+
+def get_test_groups(root_dir: Path) -> AbstractSet[str]:
+    """Adapted from typing/conformance/test_groups.py."""
+    # Read the TOML file that defines the test groups. Each test
+    # group has a name that associated test cases must start with.
+    test_group_file = root_dir / "src" / "test_groups.toml"
+    with open(test_group_file, "rb") as f:
+        return tomllib.load(f).keys()
+
+
+def get_test_cases(
+    test_group_names: AbstractSet[str], tests_dir: Path
+) -> Sequence[Path]:
+    """Adapted from typing/conformance/test_groups.py."""
+    # Filter test cases based on test group names. Files that do
+    # not begin with a known test group name are assumed to be
+    # files that support one or more tests.
+    return [
+        p
+        for p in chain(tests_dir.glob("*.py"), tests_dir.glob("*.pyi"))
+        if p.name.split("_")[0] in test_group_names
+    ]
 
 
 def parse_args():
@@ -567,8 +643,8 @@ def parse_args():
     parser.add_argument(
         "--tests-path",
         type=Path,
-        default=Path("typing/conformance/tests"),
-        help="Path to conformance tests directory (default: typing/conformance/tests)",
+        default=Path("typing/conformance"),
+        help="Path to conformance tests directory (default: typing/conformance)",
     )
 
     parser.add_argument(
@@ -594,6 +670,12 @@ def parse_args():
         help="Write output to file instead of stdout",
     )
 
+    parser.add_argument(
+        "--force-summary-table",
+        action="store_true",
+        help="Always print the summary table, even if no changes were detected",
+    )
+
     args = parser.parse_args()
 
     if args.old_ty is None:
@@ -604,21 +686,21 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    tests_path = args.tests_path.resolve().absolute()
-
-    expected = collect_expected_diagnostics(tests_path)
+    tests_dir = args.tests_path.resolve().absolute()
+    test_groups = get_test_groups(tests_dir)
+    test_files = get_test_cases(test_groups, tests_dir / "tests")
+    expected = collect_expected_diagnostics(test_files)
 
     old = collect_ty_diagnostics(
         ty_path=args.old_ty,
-        tests_path=str(tests_path),
+        test_files=test_files,
         source=Source.OLD,
         python_version=args.python_version,
     )
 
     new = collect_ty_diagnostics(
         ty_path=args.new_ty,
-        tests_path=str(tests_path),
+        test_files=test_files,
         source=Source.NEW,
         python_version=args.python_version,
     )
@@ -631,7 +713,7 @@ def main():
 
     rendered = "\n\n".join(
         [
-            render_summary(grouped),
+            render_summary(grouped, force_summary_table=args.force_summary_table),
             render_grouped_diagnostics(
                 grouped, changed_only=not args.all, format=args.format
             ),

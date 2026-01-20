@@ -804,3 +804,12 @@ transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).betwe
         x
     )
 )
+
+lambda x: (
+    x := 1
+)
+
+(
+    lambda  # dangling header comment
+    : (x := 1)
+)

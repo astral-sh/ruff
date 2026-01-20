@@ -145,6 +145,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         let fmt_body = FormatBody {
             body,
             dangling_header_comments,
+            needs_parentheses: body.needs_parentheses(item.into(), f.context()),
         };
 
         match self.layout {
@@ -262,6 +263,7 @@ struct FormatBody<'a> {
     /// )
     /// ```
     dangling_header_comments: &'a [SourceComment],
+    needs_parentheses: OptionalParentheses,
 }
 
 impl Format<PyFormatContext<'_>> for FormatBody<'_> {
@@ -269,6 +271,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         let FormatBody {
             dangling_header_comments,
             body,
+            needs_parentheses,
         } = self;
 
         let body = *body;
@@ -437,6 +440,14 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         // ```
         else if has_own_parentheses(body, f.context()).is_some() {
             body.format().fmt(f)
+        }
+        // Include parentheses for cases that always require them, such as named expressions:
+        //
+        // ```py
+        // lambda x: (y := x + 1)
+        // ```
+        else if matches!(needs_parentheses, OptionalParentheses::Always) {
+            body.format().with_options(Parentheses::Always).fmt(f)
         }
         // Finally, for expressions without their own parentheses, use
         // `parenthesize_if_expands` to add parentheses around the body, only if it expands

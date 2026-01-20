@@ -74,6 +74,7 @@ use std::ops::Range;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
+use smallvec::SmallVec;
 
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::visitor::{
@@ -2179,7 +2180,7 @@ impl<'db> InteriorNode<'db> {
         // sequent map. This ensures that constraints appear in the sequent map in a stable order.
         // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
         // unstable sort is fine.
-        let mut constraints = Vec::new();
+        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
         Node::Interior(self).for_each_constraint(db, &mut |constraint, source_order| {
             constraints.push((constraint, source_order));
         });

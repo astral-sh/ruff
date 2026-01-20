@@ -317,3 +317,28 @@ help: Use removesuffix instead of assignment conditional upon endswith.
     -         a = a[: -len("foo")]
 205 +     a = a.removesuffix("foo")
 206 |     print(a)
+207 | 
+208 | 
+
+FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+   --> FURB188.py:212:9
+    |
+210 |   def example(filename: str, text: str):
+211 |       filename = (
+212 | /         filename[:-4]  # text
+213 | |         if filename.endswith(".txt")  # text
+214 | |         else filename
+    | |_____________________^
+215 |       )
+    |
+help: Use removesuffix instead of ternary expression conditional upon endswith.
+209 | 
+210 | def example(filename: str, text: str):
+211 |     filename = (
+    -         filename[:-4]  # text
+    -         if filename.endswith(".txt")  # text
+    -         else filename
+212 +         filename.removesuffix(".txt")
+213 |     )
+214 | 
+note: This is an unsafe fix and may change runtime behavior
