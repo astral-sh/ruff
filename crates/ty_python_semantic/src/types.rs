@@ -43,7 +43,7 @@ use crate::place::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -5619,25 +5619,14 @@ impl<'db> Type<'db> {
                         });
                     };
 
-                    // Check for invalid `Self` usage in method contexts.
-                    // `Self` is always bound to the outermost method in the containing class.
-                    // We mirror the logic in `bind_typevar`: first try scope walking to find
-                    // the outermost method, then fall back to `typevar_binding_context`.
-                    let binding_definition = index
-                        .ancestor_scopes(scope_id.file_scope_id(db))
-                        .tuple_windows()
-                        .find_map(|((_, inner), (_, outer))| {
-                            if outer.kind().is_class() {
-                                if let NodeWithScopeKind::Function(func_node) = inner.node() {
-                                    return Some(index.expect_single_definition(func_node));
-                                }
-                            }
-                            None
-                        })
-                        .or(typevar_binding_context);
+                    // Create the bound Self type variable.
+                    let bound_self =
+                        typing_self(db, scope_id, typevar_binding_context, class.into());
 
                     // `Self` cannot be used in a static method.
-                    if let Some(definition) = binding_definition {
+                    if let Some(definition) =
+                        bound_self.and_then(|bound| bound.binding_context(db).definition())
+                    {
                         if infer::is_function_staticmethod(db, definition) {
                             return Err(InvalidTypeExpressionError {
                                 fallback_type: Type::unknown(),
@@ -5648,7 +5637,7 @@ impl<'db> Type<'db> {
                         }
                     }
 
-                    // `Self` cannot be used in a metaclass (methods or class-level attributes).
+                    // `Self` cannot be used in a metaclass.
                     if let Some(type_class) =
                         KnownClass::Type.to_class_literal(db).to_class_type(db)
                     {
@@ -5664,11 +5653,7 @@ impl<'db> Type<'db> {
                         }
                     }
 
-                    Ok(
-                        typing_self(db, scope_id, typevar_binding_context, class.into())
-                            .map(Type::TypeVar)
-                            .unwrap_or(*self),
-                    )
+                    Ok(bound_self.map(Type::TypeVar).unwrap_or(*self))
                 }
                 // We ensure that `typing.TypeAlias` used in the expected position (annotating an
                 // annotated assignment statement) doesn't reach here. Using it in any other type
