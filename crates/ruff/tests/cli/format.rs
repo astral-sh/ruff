@@ -2410,8 +2410,11 @@ fn markdown_formatting_preview_disabled() -> Result<()> {
 
 #[test]
 fn markdown_formatting_preview_enabled() -> Result<()> {
-    let test = CliTest::new()?;
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let test = CliTest::with_settings(|_, mut settings| {
+        settings.add_filter(&tempdir_filter(crate_root.to_str().unwrap()), "CRATE_ROOT/");
+        settings
+    })?;
     let fixtures = crate_root.join("resources").join("test").join("fixtures");
     let unformatted = fixtures.join("unformatted.md");
 
@@ -2422,8 +2425,8 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    --- /Users/amethyst/workspace/ruff/crates/ruff/resources/test/fixtures/unformatted.md
-    +++ /Users/amethyst/workspace/ruff/crates/ruff/resources/test/fixtures/unformatted.md
+    --- CRATE_ROOT/resources/test/fixtures/unformatted.md
+    +++ CRATE_ROOT/resources/test/fixtures/unformatted.md
     @@ -17,15 +17,20 @@
      Labeled Python code:
      
