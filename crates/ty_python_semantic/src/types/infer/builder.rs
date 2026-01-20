@@ -8131,10 +8131,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Searched in the following paths during module resolution:"
         ));
 
-        let mut search_paths = search_paths.enumerate();
+        let mut search_paths = search_paths.enumerate().peekable();
 
         while let Some((index, path)) = search_paths.next() {
-            if index > 4 && !verbose {
+            if index > 4 && !verbose && search_paths.peek().is_some() {
                 let more = search_paths.count() + 1;
                 diagnostic.info(format_args!(
                     "  ... and {more} more paths. Run with `-v` to see all paths."
