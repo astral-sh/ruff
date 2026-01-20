@@ -95,7 +95,7 @@ pub(crate) fn complex_annotation_function(checker: &Checker, function_def: &Stmt
 
     if let Some(return_annotation) = &function_def.returns {
         let annotation_complexity =
-            get_annotation_complexity(&annotation_resolver, &return_annotation);
+            get_annotation_complexity(&annotation_resolver, return_annotation);
         if annotation_complexity > max_complexity {
             checker.report_diagnostic(
                 ComplexAnnotation {
@@ -151,7 +151,7 @@ where
     checker: &'a Checker<'b>,
 }
 
-impl<'checker, 'b> AnnotationResolver for CheckerAnnotationResolver<'checker, 'b> {
+impl AnnotationResolver for CheckerAnnotationResolver<'_, '_> {
     fn is_annotated_type(&self, expr: &Expr) -> bool {
         self.checker
             .semantic()
@@ -165,9 +165,9 @@ impl<'checker, 'b> AnnotationResolver for CheckerAnnotationResolver<'checker, 'b
     }
 }
 
-/// Flattens a left-associative BinOp list into an iterator a vector of non-bin-op expressions.
+/// Flattens a left-associative `BinOp` list into an iterator a vector of non-bin-op expressions.
 /// This is useful for flattening PEP-604 Unions into a list of types.
-fn flatten_bin_op_expr<'a>(expr: &'a ExprBinOp) -> Vec<&'a Expr> {
+fn flatten_bin_op_expr(expr: &ExprBinOp) -> Vec<&Expr> {
     let mut looking_at = expr;
     let mut result: Vec<&Expr> = vec![&looking_at.right];
 
@@ -192,7 +192,7 @@ where
         && let Ok(inner_expr) = parse_expression(&literal_value.value)
     {
         return get_annotation_complexity(annotation_resolver, &inner_expr.into_expr());
-    };
+    }
 
     if let Some(expr_bin_op) = expr.as_bin_op_expr() {
         return flatten_bin_op_expr(expr_bin_op)
@@ -264,16 +264,16 @@ mod tests {
         expected_complexity: usize,
     ) {
         let expr = parse_expression(annotation).unwrap();
-        let complexity = get_annotation_complexity(&FromTypingResolver {}, &expr.expr());
+        let complexity = get_annotation_complexity(&FromTypingResolver {}, expr.expr());
         assert_eq!(complexity, expected_complexity);
     }
 
     #[test]
     fn test_flatten_bin_op_expr() {
         let expr = parse_expression("hello | there | my | friend").unwrap();
-        let flattened: Vec<_> = flatten_bin_op_expr(&expr.expr().as_bin_op_expr().unwrap())
+        let flattened: Vec<_> = flatten_bin_op_expr(expr.expr().as_bin_op_expr().unwrap())
             .iter()
-            .flat_map(|node| node.as_name_expr().map(|x| x.id.as_str()))
+            .filter_map(|node| node.as_name_expr().map(|x| x.id.as_str()))
             .collect();
 
         // Note: left-associativity reverses the expected liet
