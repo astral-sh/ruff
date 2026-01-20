@@ -4,9 +4,19 @@ use crate::display_settings;
 use ruff_macros::CacheKey;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, Default, CacheKey)]
+pub const DEFAULT_MAX_ANNOTATION_COMPLEXITY: usize = 2;
+
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub max_annotation_complexity: usize,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            max_annotation_complexity: DEFAULT_MAX_ANNOTATION_COMPLEXITY,
+        }
+    }
 }
 
 impl Display for Settings {

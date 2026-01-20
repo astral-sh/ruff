@@ -22,10 +22,10 @@ use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
-    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    flake8_annotation_complexity, flake8_copyright, flake8_errmsg, flake8_gettext,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
+    pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
@@ -556,6 +556,7 @@ pub struct LintOptions {
     pub future_annotations: Option<bool>,
 
     /// Options for the `flake8-annotation-complexity` plugin
+    #[option_group]
     pub flake8_annotation_complexity: Option<Flake8AnnotationComplexityOptions>,
 }
 
@@ -1019,7 +1020,7 @@ pub struct LintCommonOptions {
 pub struct Flake8AnnotationComplexityOptions {
     /// Maximum annotation complexity
     #[option(
-        default = "3",
+        default = "2",
         value_type = "int",
         example = "max_annotation_complexity = 4"
     )]
@@ -1031,7 +1032,9 @@ impl Flake8AnnotationComplexityOptions {
         self,
     ) -> ruff_linter::rules::flake8_annotation_complexity::settings::Settings {
         ruff_linter::rules::flake8_annotation_complexity::settings::Settings {
-            max_annotation_complexity: self.max_annotation_complexity.unwrap_or(3),
+            max_annotation_complexity: self.max_annotation_complexity.unwrap_or(
+                flake8_annotation_complexity::settings::DEFAULT_MAX_ANNOTATION_COMPLEXITY,
+            ),
         }
     }
 }
