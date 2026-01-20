@@ -1203,13 +1203,13 @@ impl<'db> Node<'db> {
         //
         // Walking through the example above, our vector ends up looking like:
         //
-        //                                   a/0
-        //                        a/0 b/0 => a∨b/1
-        //                                   a∨b/1 c/0
-        //   a∨b/1 c/0 d/0 => a∨b/1 c∨d/1 => a∨b∨c∨d/2
-        //                                   a∨b∨c∨d/2 e/0
-        //              a∨b∨c∨d/2 e/0 f/0 => a∨b∨c∨d/2 e∨f/1
-        //                                   a∨b∨c∨d/2 e∨f/1 g/0
+        //                                a/0
+        //                     a/0 b/0 => ab/1
+        //                                ab/1 c/0
+        //   ab/1 c/0 d/0 => ab/1 cd/1 => abcd/2
+        //                                abcd/2 e/0
+        //              abcd/2 e/0 f/0 => abcd/2 ef/1
+        //                                abcd/2 ef/1 g/0
         //
         // We use a SmallVec for the accumulator so that we don't have to spill over to the heap
         // until the iterator passes 256 elements.
