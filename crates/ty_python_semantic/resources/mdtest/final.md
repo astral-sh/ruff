@@ -838,6 +838,25 @@ class Bad(Base):  # error: [unimplemented-abstract-method]
     pass
 ```
 
+### Binding overrides abstract property
+
+A binding like `f = 42` does override an abstract property, because the class attribute provides a
+concrete value that will be returned when accessing the property.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def f(self) -> int: ...
+
+@final
+class Child(Base):
+    f = 42  # OK: binding overrides the abstract property
+```
+
 ### Annotation doesn't override abstract method
 
 A simple annotation like `method: int` shadows the name but doesn't actually implement the abstract
@@ -854,4 +873,20 @@ class Base(ABC):
 @final
 class Bad(Base):  # error: [unimplemented-abstract-method]
     method: int
+```
+
+The same applies to abstract properties:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def f(self) -> int: ...
+
+@final
+class BadChild(Base):  # error: [unimplemented-abstract-method]
+    f: int
 ```

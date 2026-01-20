@@ -1227,14 +1227,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // and for violations of other rules relating to invalid overrides of some sort.
             overrides::check_class(&self.context, class);
 
-            // (13b) Check for unimplemented abstract methods on final classes.
+            // (14) Check for unimplemented abstract methods on final classes.
             self.check_final_class_abstract_methods(class, class_node);
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
             }
 
-            // (14) If it's a `TypedDict` class, check that it doesn't include any invalid
+            // (15) If it's a `TypedDict` class, check that it doesn't include any invalid
             // statements: https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
             //
             //     The body of the class definition defines the items of the `TypedDict` type. It
@@ -1307,11 +1307,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         class: StaticClassLiteral<'db>,
         class_node: &ast::StmtClassDef,
     ) {
+        /// Check if a type is a method-like callable (function, method, or property).
+        fn is_method_like(ty: Type) -> bool {
+            matches!(
+                ty,
+                Type::FunctionLiteral(_)
+                    | Type::BoundMethod(_)
+                    | Type::PropertyInstance(_)
+                    | Type::KnownBoundMethod(_)
+                    | Type::WrapperDescriptor(_)
+                    | Type::Callable(_)
+                    | Type::DataclassDecorator(_)
+                    | Type::DataclassTransformer(_)
+            )
+        }
+
         /// Check if a type is a concrete (non-abstract) implementation of a method.
         ///
         /// Returns `true` if the type is callable and not decorated with `@abstractmethod`.
-        /// Returns `false` for abstract methods and for non-callable types (like plain
-        /// annotations `method: int` which don't actually implement an abstract method).
+        /// Returns `false` for abstract methods and for non-callable types.
         fn is_concrete_method(db: &dyn Db, ty: Type) -> bool {
             match ty {
                 Type::FunctionLiteral(function) => {
@@ -1327,7 +1341,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .is_some_and(|getter| is_concrete_method(db, getter))
                         && property
                             .setter(db)
-                            .map_or(true, |setter| is_concrete_method(db, setter))
+                            .is_none_or(|setter| is_concrete_method(db, setter))
                 }
                 // Other callable types (builtins, wrapper descriptors, etc.) are always concrete.
                 Type::KnownBoundMethod(_)
@@ -1335,7 +1349,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Callable(_)
                 | Type::DataclassDecorator(_)
                 | Type::DataclassTransformer(_) => true,
-                // Non-callable types (like `int`) don't implement abstract methods.
+                // Non-callable types don't count as method implementations.
                 _ => false,
             }
         }
@@ -1354,11 +1368,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (method_name, defining_class) in class_type.abstract_methods(db) {
             let member = class_type.class_member(db, &method_name, MemberLookupPolicy::default());
 
-            // Check if the resolved member is a concrete (non-abstract) callable.
-            let is_implemented = member
-                .place
-                .ignore_possibly_undefined()
-                .is_some_and(|ty| is_concrete_method(db, ty));
+            // Check if the resolved member implements the abstract method.
+            // A member implements an abstract method if:
+            // 1. It's a concrete (non-abstract) callable, OR
+            // 2. It's a non-callable binding that overrides the name with a value.
+            //
+            // For example:
+            // - `def f(self): ...` (concrete method) implements the abstract method.
+            // - `f = 42` (binding) overrides an abstract property with a value.
+            // - `f: int` (declaration only) does NOT implement the abstract method.
+            let is_implemented = match &member.place {
+                Place::Defined(defined) => {
+                    if is_method_like(defined.ty) {
+                        // For callable types, check if it's concrete (not abstract).
+                        is_concrete_method(db, defined.ty)
+                    } else {
+                        // For non-callable types, a binding overrides the abstract method,
+                        // but a declaration-only does not.
+                        !defined.origin.is_declared()
+                    }
+                }
+                Place::Undefined => false,
+            };
 
             if !is_implemented
                 && let Some(builder) = self
