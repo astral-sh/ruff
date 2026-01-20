@@ -1421,7 +1421,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     diagnostic.annotate(
                         Annotation::secondary(Span::from(overload.focus_range(db, &module)))
                             .message(format_args!(
-                                "`{defining_class}.{method_name}` defined here",
+                                "`{method_name}` defined as abstract on superclass `{defining_class}`",
                                 defining_class = defining_class.name(db)
                             )),
                     );

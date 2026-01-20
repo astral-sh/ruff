@@ -42,7 +42,7 @@ error[unimplemented-abstract-method]: Final class `Derived` does not implement a
  4 | class Base(ABC):
  5 |     @abstractmethod
  6 |     def foo(self) -> int:
-   |         --- `Base.foo` defined here
+   |         --- `foo` defined as abstract on superclass `Base`
  7 |         raise NotImplementedError
    |
 info: rule `unimplemented-abstract-method` is enabled by default
