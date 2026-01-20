@@ -718,6 +718,31 @@ class Child(Parent):  # error: [unimplemented-abstract-method]
     pass
 ```
 
+### Abstract method re-abstracted after concrete implementation
+
+An abstract method can be overridden as concrete in a middle class, then re-declared as abstract
+in a subclass. A `@final` class inheriting from that subclass must implement it.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class GreatGrandparent(ABC):
+    @abstractmethod
+    def f(self): ...
+
+class Grandparent(GreatGrandparent):
+    def f(self): ...
+
+class Parent(Grandparent):
+    @abstractmethod
+    def f(self): ...
+
+@final
+class Child(Parent):  # error: [unimplemented-abstract-method]
+    pass
+```
+
 ### Abstract method implemented via dynamic class
 
 A dynamic class created with `type()` can provide concrete implementations of abstract methods.
