@@ -122,6 +122,9 @@ version_files = [
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
     "crates/ruff_linter/Cargo.toml",
+    # Note that the value being replaced here needs to be kept in sync with the
+    # validation regex in the `violation_metadata` macro.
+    { target = "crates/ruff_linter/src/rules/**/*.rs", replace = "NEXT_RUFF_VERSION" },
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
 ]
