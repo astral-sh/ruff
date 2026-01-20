@@ -72,6 +72,12 @@ impl Violation for NeverUnion {
 
 /// RUF020
 pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     match expr {
         // Ex) `typing.NoReturn | int`
         Expr::BinOp(ExprBinOp {
@@ -96,11 +102,6 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                 // as `Union[None, None]` is valid Python.
                 // See https://github.com/astral-sh/ruff/issues/14567.
                 if !is_pep604_union_with_bare_none(checker.semantic()) {
-                    let applicability = if checker.comment_ranges().intersects(expr.range()) {
-                        Applicability::Unsafe
-                    } else {
-                        Applicability::Safe
-                    };
                     diagnostic.set_fix(Fix::applicable_edit(
                         Edit::range_replacement(
                             checker.locator().slice(right.as_ref()).to_string(),
@@ -121,11 +122,6 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                     right.range(),
                 );
                 if !is_pep604_union_with_bare_none(checker.semantic()) {
-                    let applicability = if checker.comment_ranges().intersects(expr.range()) {
-                        Applicability::Unsafe
-                    } else {
-                        Applicability::Safe
-                    };
                     diagnostic.set_fix(Fix::applicable_edit(
                         Edit::range_replacement(
                             checker.locator().slice(left.as_ref()).to_string(),
@@ -171,12 +167,6 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         },
                         elt.range(),
                     );
-
-                    let applicability = if checker.comment_ranges().intersects(expr.range()) {
-                        Applicability::Unsafe
-                    } else {
-                        Applicability::Safe
-                    };
 
                     diagnostic.set_fix(Fix::applicable_edit(
                         Edit::range_replacement(
