@@ -512,6 +512,13 @@ pub(crate) fn format_source(
                 .unwrap()
             });
 
+            if !settings.preview.is_enabled() {
+                warn_user_once!(
+                    "formatting markdown files is experimental, use --preview to enable"
+                );
+                return Ok(FormattedSource::Unchanged);
+            }
+
             let mut changed = false;
             let formatted_document =
                 MARKDOWN_CODE_BLOCK.replace_all(unformatted_document, |capture: &Captures| {
