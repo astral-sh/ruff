@@ -6694,8 +6694,14 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, typevar),
             Type::Callable(callable_type) => callable_type.signatures(db).variance_of(db, typevar),
             // A type variable is always covariant in itself.
-            Type::TypeVar(other_typevar) if other_typevar == typevar => {
-                // type variables are covariant in themselves
+            // This also includes ParamSpec components (P.args, P.kwargs) which are covariant
+            // in their base ParamSpec P.
+            Type::TypeVar(other_typevar)
+                if other_typevar == typevar
+                    || (other_typevar.is_paramspec(db)
+                        && other_typevar.paramspec_attr(db).is_some()
+                        && other_typevar.without_paramspec_attr(db) == typevar) =>
+            {
                 TypeVarVariance::Covariant
             }
             Type::ProtocolInstance(protocol_instance_type) => {
