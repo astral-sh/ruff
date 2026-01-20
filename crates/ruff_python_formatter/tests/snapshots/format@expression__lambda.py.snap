@@ -813,6 +813,11 @@ transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).betwe
 lambda x: (
     x := 1
 )
+
+(
+    lambda  # dangling header comment
+    : (x := 1)
+)
 ```
 
 ## Output
@@ -1654,6 +1659,11 @@ transform = (
 )
 
 lambda x: (x := 1)
+
+(
+    lambda:  # dangling header comment
+    (x := 1)
+)
 ```
 
 
@@ -2571,5 +2581,15 @@ lambda x: (x := 1)
 +    lambda: (  # dangling-end-of-line  # leading-body-end-of-line
          x
      )
+ )
+@@ -837,6 +854,7 @@
+ lambda x: (x := 1)
+ 
+ (
+-    lambda:  # dangling header comment
+-    (x := 1)
++    lambda: (  # dangling header comment
++        x := 1
++    )
  )
 ```
