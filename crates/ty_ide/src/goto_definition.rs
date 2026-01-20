@@ -1792,7 +1792,7 @@ p = Poi<CURSOR>nt(1, 2)
         "#);
     }
 
-    /// Goto-definition should work when accessing type attributes on class objects
+    /// Goto-definition works when accessing type attributes on class objects.
     #[test]
     fn goto_definition_for_type_attributes_on_class_objects() {
         let test = CursorTest::builder()
@@ -1828,7 +1828,7 @@ p = Poi<CURSOR>nt(1, 2)
         "#);
     }
 
-    /// Goto-definition should look up class attributes on the metaclass
+    /// Goto-definition performs lookups on the metaclass when attributes are not found.
     #[test]
     fn goto_definition_performs_lookups_on_metaclass() {
         let test = CursorTest::builder()
@@ -1864,7 +1864,7 @@ p = Poi<CURSOR>nt(1, 2)
         "#);
     }
 
-    /// Goto-definition should not lookup instance members on the metaclass
+    /// Goto-definition does not look up instance members on the metaclass.
     #[test]
     fn goto_definition_on_members_of_class_instances() {
         let test = CursorTest::builder()
