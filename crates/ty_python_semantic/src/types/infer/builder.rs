@@ -1315,48 +1315,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let class_type = class.identity_specialization(db);
+        let abstract_methods = class_type.abstract_methods(db);
 
-        // Report an error for each abstract method that is not implemented.
-        for (method_name, defining_class) in class_type.abstract_methods(db) {
-            let Some(builder) = self
-                .context
-                .report_lint(&UNIMPLEMENTED_ABSTRACT_METHOD, &class_node.name)
-            else {
-                continue;
-            };
+        // If there are no abstract methods, we're done.
+        let Some((first_method_name, first_defining_class)) = abstract_methods.iter().next() else {
+            return;
+        };
 
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Final class `{}` does not implement abstract method `{}`",
-                class.name(db),
-                method_name
-            ));
+        let Some(builder) = self
+            .context
+            .report_lint(&UNIMPLEMENTED_ABSTRACT_METHOD, &class_node.name)
+        else {
+            return;
+        };
 
-            // Add secondary annotation pointing to the abstract method definition.
-            let abstract_method =
-                defining_class.class_member(db, &method_name, MemberLookupPolicy::default());
-            let function =
-                abstract_method
-                    .place
-                    .ignore_possibly_undefined()
-                    .and_then(|ty| match ty {
-                        Type::FunctionLiteral(f) => Some(f),
-                        Type::PropertyInstance(p) => {
-                            p.getter(db).and_then(Type::as_function_literal)
-                        }
-                        _ => None,
-                    });
-            if let Some(function) = function {
-                let overload = function.literal(db).last_definition(db);
-                let module = parsed_module(db, function.file(db)).load(db);
-                diagnostic.annotate(
-                    Annotation::secondary(Span::from(overload.focus_range(db, &module))).message(
-                        format_args!(
-                            "`{method_name}` defined as abstract on superclass `{defining_class}`",
-                            defining_class = defining_class.name(db)
-                        ),
-                    ),
-                );
+        let method_list = abstract_methods
+            .iter()
+            .map(|(name, _)| format!("`{name}`"))
+            .join(", ");
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Final class `{}` does not implement abstract {}",
+            class.name(db),
+            if abstract_methods.len() == 1 {
+                format!("method {method_list}")
+            } else {
+                format!("methods {method_list}")
             }
+        ));
+
+        // Add secondary annotation pointing to the first abstract method definition.
+        let abstract_method =
+            first_defining_class.class_member(db, first_method_name, MemberLookupPolicy::default());
+        let function = abstract_method
+            .place
+            .ignore_possibly_undefined()
+            .and_then(|ty| match ty {
+                Type::FunctionLiteral(f) => Some(f),
+                Type::PropertyInstance(p) => p.getter(db).and_then(Type::as_function_literal),
+                _ => None,
+            });
+        if let Some(function) = function {
+            let overload = function.literal(db).last_definition(db);
+            let module = parsed_module(db, function.file(db)).load(db);
+            diagnostic.annotate(
+                Annotation::secondary(Span::from(overload.focus_range(db, &module))).message(
+                    format_args!(
+                        "`{first_method_name}` defined as abstract on superclass `{defining_class}`",
+                        defining_class = first_defining_class.name(db)
+                    ),
+                ),
+            );
         }
     }
 

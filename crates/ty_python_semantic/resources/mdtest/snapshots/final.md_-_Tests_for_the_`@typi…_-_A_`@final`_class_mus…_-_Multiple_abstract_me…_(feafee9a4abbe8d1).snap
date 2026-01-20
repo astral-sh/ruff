@@ -25,31 +25,28 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 10 |     def baz(self) -> None: ...
 11 | 
 12 | @final
-13 | # error: [unimplemented-abstract-method]
-14 | # error: [unimplemented-abstract-method]
-15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
-16 |     pass
-17 | 
-18 | @final
-19 | class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
-20 |     def foo(self) -> int:
-21 |         return 42
-22 | 
-23 |     def bar(self) -> str:
-24 |         return "hello"
+13 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
+14 |     pass
+15 | 
+16 | @final
+17 | class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
+18 |     def foo(self) -> int:
+19 |         return 42
+20 | 
+21 |     def bar(self) -> str:
+22 |         return "hello"
 ```
 
 # Diagnostics
 
 ```
-error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract method `foo`
-  --> src/mdtest_snippet.py:15:7
+error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract methods `foo`, `bar`, `baz`
+  --> src/mdtest_snippet.py:13:7
    |
-13 | # error: [unimplemented-abstract-method]
-14 | # error: [unimplemented-abstract-method]
-15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
+12 | @final
+13 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
    |       ^^^^^^^^^^
-16 |     pass
+14 |     pass
    |
   ::: src/mdtest_snippet.py:6:9
    |
@@ -65,57 +62,14 @@ info: rule `unimplemented-abstract-method` is enabled by default
 ```
 
 ```
-error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract method `baz`
-  --> src/mdtest_snippet.py:10:9
-   |
- 8 |     def bar(self) -> str: ...
- 9 |     @abstractmethod
-10 |     def baz(self) -> None: ...
-   |         --- `baz` defined as abstract on superclass `Base`
-11 |
-12 | @final
-13 | # error: [unimplemented-abstract-method]
-14 | # error: [unimplemented-abstract-method]
-15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
-   |       ^^^^^^^^^^
-16 |     pass
-   |
-info: rule `unimplemented-abstract-method` is enabled by default
-
-```
-
-```
-error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract method `bar`
-  --> src/mdtest_snippet.py:15:7
-   |
-13 | # error: [unimplemented-abstract-method]
-14 | # error: [unimplemented-abstract-method]
-15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
-   |       ^^^^^^^^^^
-16 |     pass
-   |
-  ::: src/mdtest_snippet.py:8:9
-   |
- 6 |     def foo(self) -> int: ...
- 7 |     @abstractmethod
- 8 |     def bar(self) -> str: ...
-   |         --- `bar` defined as abstract on superclass `Base`
- 9 |     @abstractmethod
-10 |     def baz(self) -> None: ...
-   |
-info: rule `unimplemented-abstract-method` is enabled by default
-
-```
-
-```
 error[unimplemented-abstract-method]: Final class `PartiallyImplemented` does not implement abstract method `baz`
-  --> src/mdtest_snippet.py:19:7
+  --> src/mdtest_snippet.py:17:7
    |
-18 | @final
-19 | class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
+16 | @final
+17 | class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
    |       ^^^^^^^^^^^^^^^^^^^^
-20 |     def foo(self) -> int:
-21 |         return 42
+18 |     def foo(self) -> int:
+19 |         return 42
    |
   ::: src/mdtest_snippet.py:10:9
    |

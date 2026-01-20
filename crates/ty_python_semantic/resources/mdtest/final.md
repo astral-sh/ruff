@@ -653,8 +653,6 @@ class Base(ABC):
     def baz(self) -> None: ...
 
 @final
-# error: [unimplemented-abstract-method]
-# error: [unimplemented-abstract-method]
 class MissingAll(Base):  # error: [unimplemented-abstract-method]
     pass
 

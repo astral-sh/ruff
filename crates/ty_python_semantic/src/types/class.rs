@@ -77,7 +77,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 
 fn explicit_bases_cycle_initial<'db>(
@@ -1072,7 +1072,7 @@ impl<'db> ClassType<'db> {
     /// Only returns methods that are still abstract on `self` (i.e., have not been overridden
     /// with a concrete implementation anywhere in the MRO).
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxHashMap<Name, ClassType<'db>> {
+    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, ClassType<'db>> {
         fn is_abstract(db: &dyn Db, ty: Type) -> bool {
             match ty {
                 Type::FunctionLiteral(function) => {
@@ -1108,7 +1108,7 @@ impl<'db> ClassType<'db> {
             )
         }
 
-        let mut abstract_methods = FxHashMap::<Name, ClassType<'db>>::default();
+        let mut abstract_methods = FxIndexMap::<Name, ClassType<'db>>::default();
 
         // Collect all abstract methods defined anywhere in the MRO.
         for class_base in self.iter_mro(db) {
