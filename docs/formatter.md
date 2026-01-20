@@ -376,6 +376,10 @@ Meanwhile, `ruff format --check` exits with the following status codes:
 - `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an
     internal error.
 
+`ruff format` supports the `--exit-non-zero-on-format` command-line flag that alters its exit code behavior:
+
+- `--exit-non-zero-on-format` will cause Ruff to exit with a status code of `1` if any files were formatted, _even if_ formatting was successful. Note that the use of `--exit-non-zero-on-format` can result in a non-zero exit code even if all files were formatted correctly.
+
 ## Style Guide <span id="black-compatibility"></span>
 
 The formatter is designed to be a drop-in replacement for [Black](https://github.com/psf/black).
