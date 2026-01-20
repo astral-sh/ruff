@@ -417,4 +417,24 @@ help: Remove empty string
 24 + print(end="bar")
 25 | 
 26 | # OK.
-27 |
+27 | 
+
+FURB105 [*] Unnecessary empty string passed to `print`
+  --> FURB105.py:42:1
+   |
+42 | / print(
+43 | |     # text
+44 | |     ""
+45 | | )
+   | |_^
+   |
+help: Remove empty string
+39 | print(f"foo")
+40 | 
+41 | 
+   - print(
+   -     # text
+   -     ""
+   - )
+42 + print()
+note: This is an unsafe fix and may change runtime behavior
