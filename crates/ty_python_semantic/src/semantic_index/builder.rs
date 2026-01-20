@@ -142,17 +142,18 @@ impl<'ast> Visitor<'ast> for LoopBindingCollector {
                 }
             }
 
-            // For loop target is bound.
-            // Don't recurse into nested loop body - assignments there have their own
-            // loop header and can't flow back to the outer loop. But do visit orelse.
+            // For loop target is bound. Recurse into nested loop body because
+            // assignments there can flow back to the outer loop after the inner loop completes.
             ast::Stmt::For(node) => {
                 self.add_place_from_target(&node.target);
+                self.visit_body(&node.body);
                 self.visit_body(&node.orelse);
             }
 
-            // Don't recurse into nested while loop body - assignments there have their
-            // own loop header and can't flow back to the outer loop. But do visit orelse.
+            // Recurse into nested while loop body because assignments there can flow
+            // back to the outer loop after the inner loop completes.
             ast::Stmt::While(node) => {
+                self.visit_body(&node.body);
                 self.visit_body(&node.orelse);
             }
 
@@ -3549,8 +3550,9 @@ mod tests {
                 c = 3
             for d in e:
                 f = 4
+            [g := 42 for _ in [h := 99 for _ in 'hello world']]
         ",
         ));
-        assert_eq!(bindings, vec!["a", "b", "c", "d", "f"]);
+        assert_eq!(bindings, vec!["a", "b", "c", "d", "f", "h", "g"]);
     }
 }
