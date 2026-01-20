@@ -160,7 +160,10 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-    `#[derive(ViolationMetadata)]` to see examples.
+    `#[derive(ViolationMetadata)]` to see examples. You also need to add a
+    `#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]` attribute on your
+    `ViolationMetadata` struct. This adds the rule in preview, and the version will be filled in
+    automatically in the next release.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
@@ -174,8 +177,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). New rules
-    should be added in `RuleGroup::Preview`.
+1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -187,7 +189,8 @@ defined therein is a Python AST visitor, which iterates over the AST, building u
 and calling out to lint rule analyzer functions as it goes.
 
 If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
-for the `Diagnostic::new` invocations to understand how other, similar rules are implemented.
+for the `Checker::report_diagnostic` invocations to understand how other, similar rules
+are implemented.
 
 Once you're satisfied with your code, add tests for your rule
 (see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
