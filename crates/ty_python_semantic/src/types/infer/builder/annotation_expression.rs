@@ -86,6 +86,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             builder: &TypeInferenceBuilder<'db, '_>,
             pep_613_policy: PEP613Policy,
         ) -> TypeAndQualifiers<'db> {
+            if builder.report_invalid_self_type(ty, annotation) {
+                return TypeAndQualifiers::declared(Type::unknown());
+            }
             match ty {
                 Type::SpecialForm(SpecialFormType::ClassVar) => TypeAndQualifiers::new(
                     Type::unknown(),
