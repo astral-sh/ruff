@@ -76,3 +76,9 @@ a10: Optional[NamedTupleTE] = None
 nested_optional: Optional[Optional[str]] = None
 nested_optional_typing: typing.Optional[Optional[int]] = None
 triple_nested_optional: Optional[Optional[Optional[str]]] = None
+
+
+foo: Optional[
+    int
+    # text
+] = None

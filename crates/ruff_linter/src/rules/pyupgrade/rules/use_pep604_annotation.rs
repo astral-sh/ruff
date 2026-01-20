@@ -152,7 +152,9 @@ pub(crate) fn non_pep604_annotation(
         && is_allowed_value(slice)
         && !is_optional_none(operator, slice);
 
-    let applicability = if checker.target_version() >= PythonVersion::PY310 {
+    let has_comments = checker.comment_ranges().intersects(expr.range());
+
+    let applicability = if checker.target_version() >= PythonVersion::PY310 && !has_comments {
         Applicability::Safe
     } else {
         Applicability::Unsafe
