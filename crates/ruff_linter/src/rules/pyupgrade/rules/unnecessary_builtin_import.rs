@@ -97,24 +97,6 @@ pub(crate) fn unnecessary_builtin_import(
             )
         })
         .filter(|alias| alias.asname.is_none())
-        // Check that the import isn't shadowing a non-builtin value.
-        .filter(|alias| {
-            // Always flag `*` imports.
-            if &alias.name == "*" {
-                return true;
-            }
-            let Some(binding_id) = semantic.lookup_symbol(alias.name.as_str()) else {
-                return false;
-            };
-            let binding = semantic.binding(binding_id);
-            let scope = &semantic.scopes[binding.scope];
-            // If the import isn't shadowing anything, it's definitely unnecessary.
-            let Some(shadowed_binding_id) = scope.shadowed_binding(binding_id) else {
-                return true;
-            };
-            let shadowed_binding = semantic.binding(shadowed_binding_id);
-            shadowed_binding.kind.is_builtin()
-        })
         .filter(|alias| {
             matches!(
                 (module, alias.name.as_str()),
@@ -147,6 +129,24 @@ pub(crate) fn unnecessary_builtin_import(
                     | ("six", "callable" | "next")
                     | ("six.moves", "filter" | "input" | "map" | "range" | "zip")
             )
+        })
+        // Check that the import isn't shadowing a non-builtin value.
+        .filter(|alias| {
+            // Always flag `*` imports.
+            if &alias.name == "*" {
+                return true;
+            }
+            let Some(binding_id) = semantic.lookup_symbol(alias.name.as_str()) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            let scope = &semantic.scopes[binding.scope];
+            // If the import isn't shadowing anything, it's definitely unnecessary.
+            let Some(shadowed_binding_id) = scope.shadowed_binding(binding_id) else {
+                return true;
+            };
+            let shadowed_binding = semantic.binding(shadowed_binding_id);
+            shadowed_binding.kind.is_builtin()
         })
         .collect();
 
