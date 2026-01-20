@@ -169,7 +169,7 @@ c.attr = 1
 
 # TODO: An error should be emitted here.
 # See https://github.com/astral-sh/ruff/issues/16298 for more details.
-reveal_type(c.attr)  # revealed: Unknown
+reveal_type(c.attr)  # revealed: Never
 ```
 
 ### Wrong setter signature
@@ -208,7 +208,7 @@ class C:
     attr = property(attr_getter)
 
 c = C()
-reveal_type(c.attr)  # revealed: Unknown | int
+reveal_type(c.attr)  # revealed: int
 ```
 
 But note that we return `Unknown | int` because we did not declare the `attr` attribute. This is

@@ -121,22 +121,24 @@ class C:
 
         # However, for non-data descriptors, instance attributes do take precedence.
         # So it is possible to override them.
+        # error: [invalid-assignment]
         self.non_data_descriptor = 1
 
 c = C()
 
-reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
+reveal_type(c.data_descriptor)  # revealed: Literal["data"]
 
-reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data", 1]
+reveal_type(c.non_data_descriptor)  # revealed: Literal["non-data", 1] | Unknown
 
-reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data"]
+reveal_type(C.data_descriptor)  # revealed: Literal["data"]
 
-reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
+reveal_type(C.non_data_descriptor)  # revealed: Literal["non-data"]
 
 # It is possible to override data descriptors via class objects. The following
 # assignment does not call `DataDescriptor.__set__`. For this reason, we infer
 # `Unknown | …` for all (descriptor) attributes.
-C.data_descriptor = "something else"  # This is okay
+# error: [invalid-assignment]
+C.data_descriptor = "something else"
 ```
 
 ### Partial fall back
@@ -173,7 +175,7 @@ def f1(flag: bool):
             # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
             self.attr = "normal"
 
-    reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
+    reveal_type(C1().attr)  # revealed: Literal["data", "normal"] | Unknown
 
     # Assigning to the attribute also causes no `possibly-unbound` diagnostic:
     C1().attr = 1
@@ -185,12 +187,14 @@ descriptor here:
 ```py
 class C2:
     def f(self):
+        # error: [invalid-assignment]
         self.attr = "normal"
     attr = NonDataDescriptor()
 
-reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
+reveal_type(C2().attr)  # revealed: Literal["non-data", "normal"] | Unknown
 
 # Assignments always go to the instance attribute in this case
+# error: [invalid-assignment]
 C2().attr = 1
 ```
 
@@ -797,8 +801,9 @@ class Descriptor:
 class C:
     descriptor = Descriptor()
 
+# error: [invalid-assignment]
 C.descriptor = "something else"
-reveal_type(C.descriptor)  # revealed: Literal["something else"]
+reveal_type(C.descriptor)  # revealed: int
 ```
 
 ### Possibly unbound descriptor attributes

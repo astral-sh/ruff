@@ -14,11 +14,12 @@ class A:
 
 a = A()
 a.x = 0
+# error: [invalid-assignment]
 a.y = 0
 a.z = 0
 
 reveal_type(a.x)  # revealed: Literal[0]
-reveal_type(a.y)  # revealed: Literal[0]
+reveal_type(a.y)  # revealed: None
 reveal_type(a.z)  # revealed: Literal[0]
 
 # Make sure that we infer the narrowed type for eager
@@ -26,41 +27,42 @@ reveal_type(a.z)  # revealed: Literal[0]
 # public type for lazy scopes (function)
 class _:
     reveal_type(a.x)  # revealed: Literal[0]
-    reveal_type(a.y)  # revealed: Literal[0]
+    reveal_type(a.y)  # revealed: None
     reveal_type(a.z)  # revealed: Literal[0]
 
 [reveal_type(a.x) for _ in range(1)]  # revealed: Literal[0]
-[reveal_type(a.y) for _ in range(1)]  # revealed: Literal[0]
+[reveal_type(a.y) for _ in range(1)]  # revealed: None
 [reveal_type(a.z) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
     reveal_type(a.x)  # revealed: int | None
-    reveal_type(a.y)  # revealed: Unknown | None
+    reveal_type(a.y)  # revealed: None
     reveal_type(a.z)  # revealed: Unknown | None
 
 if False:
     a = A()
 reveal_type(a.x)  # revealed: Literal[0]
-reveal_type(a.y)  # revealed: Literal[0]
+reveal_type(a.y)  # revealed: None
 reveal_type(a.z)  # revealed: Literal[0]
 
 if True:
     a = A()
 reveal_type(a.x)  # revealed: int | None
-reveal_type(a.y)  # revealed: Unknown | None
+reveal_type(a.y)  # revealed: None
 reveal_type(a.z)  # revealed: Unknown | None
 
 a.x = 0
+# error: [invalid-assignment]
 a.y = 0
 a.z = 0
 reveal_type(a.x)  # revealed: Literal[0]
-reveal_type(a.y)  # revealed: Literal[0]
+reveal_type(a.y)  # revealed: None
 reveal_type(a.z)  # revealed: Literal[0]
 
 class _:
     a = A()
     reveal_type(a.x)  # revealed: int | None
-    reveal_type(a.y)  # revealed: Unknown | None
+    reveal_type(a.y)  # revealed: None
     reveal_type(a.z)  # revealed: Unknown | None
 
 def cond() -> bool:
@@ -70,13 +72,13 @@ class _:
     if False:
         a = A()
     reveal_type(a.x)  # revealed: Literal[0]
-    reveal_type(a.y)  # revealed: Literal[0]
+    reveal_type(a.y)  # revealed: None
     reveal_type(a.z)  # revealed: Literal[0]
 
     if cond():
         a = A()
     reveal_type(a.x)  # revealed: int | None
-    reveal_type(a.y)  # revealed: Unknown | None
+    reveal_type(a.y)  # revealed: None
     reveal_type(a.z)  # revealed: Unknown | None
 
 class _:
@@ -84,7 +86,7 @@ class _:
 
     class Inner:
         reveal_type(a.x)  # revealed: int | None
-        reveal_type(a.y)  # revealed: Unknown | None
+        reveal_type(a.y)  # revealed: None
         reveal_type(a.z)  # revealed: Unknown | None
 
 a = A()

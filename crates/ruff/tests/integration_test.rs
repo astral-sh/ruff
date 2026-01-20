@@ -1727,7 +1727,7 @@ fn unreadable_dir() -> Result<()> {
     All checks passed!
 
     ----- stderr -----
-    warning: Encountered error: Permission denied (os error 13)
+    warning: No Python files found under the given path(s)
     ");
     Ok(())
 }

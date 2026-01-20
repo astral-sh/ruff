@@ -11242,7 +11242,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let ty =
-            resolved_after_fallback.unwrap_with_diagnostic(db, |lookup_error| match lookup_error {
+            resolved_after_fallback.unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Undefined(qualifiers) => {
                     self.report_unresolved_reference(name_node);
                     TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
@@ -11791,7 +11791,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let attr_name = &attr.id;
         let resolved_type =
-            fallback_place.unwrap_with_diagnostic(db, |lookup_err| match lookup_err {
+            fallback_place.unwrap_with_diagnostic(|lookup_err| match lookup_err {
                 LookupError::Undefined(_) => {
                     let fallback = || {
                         TypeAndQualifiers::new(

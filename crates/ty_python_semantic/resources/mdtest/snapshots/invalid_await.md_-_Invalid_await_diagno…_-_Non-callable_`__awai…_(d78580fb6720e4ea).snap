@@ -24,13 +24,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 
 ```
 error[invalid-await]: `NonCallableAwait` is not awaitable
- --> src/mdtest_snippet.py:5:11
-  |
-4 | async def main() -> None:
-5 |     await NonCallableAwait()  # error: [invalid-await]
-  |           ^^^^^^^^^^^^^^^^^^
-  |
-info: `__await__` is possibly not callable
+   --> src/mdtest_snippet.py:5:11
+    |
+  4 | async def main() -> None:
+  5 |     await NonCallableAwait()  # error: [invalid-await]
+    |           ^^^^^^^^^^^^^^^^^^
+    |
+   ::: stdlib/builtins.pyi:348:7
+    |
+347 | @disjoint_base
+348 | class int:
+    |       --- attribute defined here
+349 |     """int([x]) -> integer
+350 |     int(x, base=10) -> integer
+    |
+info: `__await__` is not callable
 info: rule `invalid-await` is enabled by default
 
 ```

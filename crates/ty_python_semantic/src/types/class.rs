@@ -53,8 +53,8 @@ use crate::types::{
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
     place::{
-        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, Widening,
-        known_module_symbol, place_from_bindings, place_from_declarations,
+        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, known_module_symbol,
+        place_from_bindings, place_from_declarations,
     },
     semantic_index::{
         attribute_assignments,
@@ -4583,7 +4583,6 @@ impl<'db> StaticClassLiteral<'db> {
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
-                                        widening: Widening::None,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
@@ -4627,7 +4626,6 @@ impl<'db> StaticClassLiteral<'db> {
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
-                                        widening: Widening::None,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
@@ -5829,7 +5827,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ty,
                                 origin,
                                 definedness: boundness,
-                                ..
                             }),
                         qualifiers,
                     } = class.own_instance_member(db, name).inner
@@ -5873,7 +5870,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ty: union.build(),
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
-                widening: Widening::None,
             })
             .with_qualifiers(union_qualifiers)
         };

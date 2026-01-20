@@ -259,11 +259,10 @@ class A:
 class B:
     __add__ = A()
 
-reveal_type(B() + B())  # revealed: Unknown | int
+reveal_type(B() + B())  # revealed: int
 ```
 
-Note that we union with `Unknown` here because `__add__` is not declared. We do infer just `int` if
-the callable is declared:
+For declared attributes, we also infer `int`:
 
 ```py
 class B2:

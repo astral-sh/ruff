@@ -1328,7 +1328,82 @@ mod tests {
         --> test.py:1:1
         info: This indicates a bug in Ruff.
         info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
-        info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
+        info: Backtrace:
+           0: ruff_db::panic::install_hook::{{closure}}::{{closure}}
+                     at /home/user/ruff/crates/ruff_db/src/panic.rs:114:34
+           1: <alloc::boxed::Box<F,A> as core::ops::function::Fn<Args>>::call
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/boxed.rs:2019:9
+           2: std::panicking::panic_with_hook
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:842:13
+           3: std::panicking::panic_handler::{{closure}}
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:700:13
+           4: std::sys::backtrace::__rust_end_short_backtrace
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sys/backtrace.rs:174:18
+           5: __rustc::rust_begin_unwind
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:698:5
+           6: core::panicking::panic_fmt
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/panicking.rs:80:14
+           7: ruff::commands::format::tests::error_diagnostics::{{closure}}
+                     at ./src/commands/format.rs:1254:13
+           8: std::panicking::catch_unwind::do_call
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:590:40
+           9: __rust_try
+          10: std::panicking::catch_unwind
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:553:19
+          11: std::panic::catch_unwind
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panic.rs:359:14
+          12: ruff_db::panic::catch_unwind
+                     at /home/user/ruff/crates/ruff_db/src/panic.rs:145:18
+          13: ruff::commands::format::tests::error_diagnostics
+                     at ./src/commands/format.rs:1253:27
+          14: ruff::commands::format::tests::error_diagnostics::{{closure}}
+                     at ./src/commands/format.rs:1249:31
+          15: core::ops::function::FnOnce::call_once
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/ops/function.rs:250:5
+          16: core::ops::function::FnOnce::call_once
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/ops/function.rs:250:5
+          17: test::__rust_begin_short_backtrace
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/test/src/lib.rs:663:18
+          18: test::run_test_in_process::{{closure}}
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/test/src/lib.rs:686:74
+          19: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/panic/unwind_safe.rs:274:9
+          20: std::panicking::catch_unwind::do_call
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:590:40
+          21: std::panicking::catch_unwind
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:553:19
+          22: std::panic::catch_unwind
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panic.rs:359:14
+          23: test::run_test_in_process
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/test/src/lib.rs:686:27
+          24: test::run_test::{{closure}}
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/test/src/lib.rs:607:43
+          25: test::run_test::{{closure}}
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/test/src/lib.rs:637:41
+          26: std::sys::backtrace::__rust_begin_short_backtrace
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sys/backtrace.rs:158:18
+          27: std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/thread/mod.rs:562:17
+          28: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/panic/unwind_safe.rs:274:9
+          29: std::panicking::catch_unwind::do_call
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:590:40
+          30: std::panicking::catch_unwind
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:553:19
+          31: std::panic::catch_unwind
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panic.rs:359:14
+          32: std::thread::Builder::spawn_unchecked_::{{closure}}
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/thread/mod.rs:560:30
+          33: core::ops::function::FnOnce::call_once{{vtable.shim}}
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/ops/function.rs:250:5
+          34: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/boxed.rs:2005:9
+          35: std::sys::thread::unix::Thread::new::thread_start
+                     at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sys/thread/unix.rs:126:17
+          36: start_thread
+                     at ./nptl/pthread_create.c:447:8
+          37: clone3
+                     at ./misc/../sysdeps/unix/sysv/linux/x86_64/clone3.S:78:0
         ");
 
         Ok(())

@@ -110,6 +110,7 @@ def _(flag: bool):
             __getitem__ = external_getitem1
 
         def __init__(self):
+            # error: [invalid-assignment]
             self.__getitem__ = external_getitem2
 
     this_fails = ThisFails()
@@ -119,7 +120,7 @@ def _(flag: bool):
     # that the cause of the error was a possibly missing `__getitem__` method
     #
     # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `ThisFails` may be missing"
-    reveal_type(this_fails[0])  # revealed: Unknown | str
+    reveal_type(this_fails[0])  # revealed: str
 ```
 
 ### Dunder methods as class-level annotations with no value

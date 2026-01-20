@@ -200,7 +200,7 @@ def square_then(c: Callable[[float], int]) -> Callable[[float], int]:
 class Calculator:
     square_then_round = square_then(round)
 
-reveal_type(Calculator().square_then_round(3.14))  # revealed: Unknown | int
+reveal_type(Calculator().square_then_round(3.14))  # revealed: int
 ```
 
 ## Use case: Treating dunder methods as bound-method descriptors

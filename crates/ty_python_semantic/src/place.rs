@@ -61,40 +61,12 @@ impl TypeOrigin {
     }
 }
 
-/// Whether a place's type should be widened with `Unknown` when accessed publicly.
-///
-/// For undeclared public symbols (e.g., class attributes without type annotations),
-/// the gradual typing guarantee requires that we consider them as potentially
-/// modified externally, so their type is widened to a union with `Unknown`.
-///
-/// This enum tracks whether such widening should be applied, allowing callers
-/// to access either the raw inferred type or the widened public type.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default, get_size2::GetSize)]
-pub(crate) enum Widening {
-    /// The type should not be widened with `Unknown`.
-    #[default]
-    None,
-    /// The type should be widened with `Unknown` when accessed publicly.
-    WithUnknown,
-}
-
-impl Widening {
-    /// Apply widening to the type if this is `WithUnknown`.
-    pub(crate) fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        match self {
-            Self::None => ty,
-            Self::WithUnknown => UnionType::from_elements(db, [Type::unknown(), ty]),
-        }
-    }
-}
-
-/// A defined place with its type, origin, definedness, and widening information.
+/// A defined place with its type, origin, and definedness information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinedPlace<'db> {
     pub(crate) ty: Type<'db>,
     pub(crate) origin: TypeOrigin,
     pub(crate) definedness: Definedness,
-    pub(crate) widening: Widening,
 }
 
 impl<'db> DefinedPlace<'db> {
@@ -103,7 +75,6 @@ impl<'db> DefinedPlace<'db> {
             ty,
             origin: TypeOrigin::Inferred,
             definedness: Definedness::AlwaysDefined,
-            widening: Widening::None,
         }
     }
 
@@ -114,11 +85,6 @@ impl<'db> DefinedPlace<'db> {
 
     pub(crate) fn with_definedness(mut self, definedness: Definedness) -> Self {
         self.definedness = definedness;
-        self
-    }
-
-    pub(crate) fn with_widening(mut self, widening: Widening) -> Self {
-        self.widening = widening;
         self
     }
 
@@ -196,10 +162,7 @@ impl<'db> Place<'db> {
         }
     }
 
-    /// Returns the type of the place without widening applied.
-    ///
-    /// The stored type is always the unwidened type. Widening (union with `Unknown`)
-    /// is applied lazily when converting to `LookupResult`.
+    /// Returns the type of the place.
     pub(crate) fn unwidened_type(&self) -> Option<Type<'db>> {
         match self {
             Place::Defined(defined) => Some(defined.ty),
@@ -221,15 +184,6 @@ impl<'db> Place<'db> {
                 ty: f(defined.ty),
                 ..defined
             }),
-            Place::Undefined => Place::Undefined,
-        }
-    }
-
-    /// Set the widening mode for this place.
-    #[must_use]
-    pub(crate) fn with_widening(self, new_widening: Widening) -> Place<'db> {
-        match self {
-            Place::Defined(defined) => Place::Defined(defined.with_widening(new_widening)),
             Place::Undefined => Place::Undefined,
         }
     }
@@ -322,7 +276,7 @@ impl<'db> LookupError<'db> {
         db: &'db dyn Db,
         fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
-        let fallback = fallback.into_lookup_result(db);
+        let fallback = fallback.into_lookup_result();
         match (&self, &fallback) {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
@@ -757,17 +711,14 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// Transform place and qualifiers into a [`LookupResult`],
     /// a [`Result`] type in which the `Ok` variant represents a definitely defined place
     /// and the `Err` variant represents a place that is either definitely or possibly undefined.
-    ///
-    /// For places marked with `Widening::WithUnknown`, this applies the gradual typing guarantee
-    /// by creating a union with `Unknown`.
-    pub(crate) fn into_lookup_result(self, db: &'db dyn Db) -> LookupResult<'db> {
+    pub(crate) fn into_lookup_result(self) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
                 place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = place.widening.apply_if_needed(db, place.ty);
-                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers);
+                let type_and_qualifiers =
+                    TypeAndQualifiers::new(place.ty, place.origin, qualifiers);
                 match place.definedness {
                     Definedness::AlwaysDefined => Ok(type_and_qualifiers),
                     Definedness::PossiblyUndefined => {
@@ -790,10 +741,9 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// to ensure that a diagnostic is emitted if the place is possibly or definitely unbound.
     pub(crate) fn unwrap_with_diagnostic(
         self,
-        db: &'db dyn Db,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
-        self.into_lookup_result(db).unwrap_or_else(diagnostic_fn)
+        self.into_lookup_result().unwrap_or_else(diagnostic_fn)
     }
 
     /// Fallback (partially or fully) to another place if `self` is partially or fully unbound.
@@ -812,7 +762,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         db: &'db dyn Db,
         fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
-        self.into_lookup_result(db)
+        self.into_lookup_result()
             .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
             .into()
     }
@@ -939,7 +889,6 @@ pub(crate) fn place_by_id<'db>(
                     ty: Type::Dynamic(DynamicType::Unknown),
                     origin,
                     definedness,
-                    ..
                 }),
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
@@ -949,19 +898,16 @@ pub(crate) fn place_by_id<'db>(
                     ty: inferred,
                     origin,
                     definedness: boundness,
-                    ..
                 }) => Place::Defined(DefinedPlace {
                     ty: UnionType::from_elements(db, [Type::unknown(), inferred]),
                     origin,
                     definedness: boundness,
-                    widening: Widening::None,
                 })
                 .with_qualifiers(qualifiers),
                 Place::Undefined => Place::Defined(DefinedPlace {
                     ty: Type::unknown(),
                     origin,
                     definedness,
-                    widening: Widening::None,
                 })
                 .with_qualifiers(qualifiers),
             }
@@ -970,8 +916,9 @@ pub(crate) fn place_by_id<'db>(
         place_and_quals @ PlaceAndQualifiers {
             place:
                 Place::Defined(DefinedPlace {
+                    ty: _,
+                    origin: _,
                     definedness: Definedness::AlwaysDefined,
-                    ..
                 }),
             qualifiers: _,
         } => place_and_quals,
@@ -982,7 +929,6 @@ pub(crate) fn place_by_id<'db>(
                     ty: declared_ty,
                     origin,
                     definedness: Definedness::PossiblyUndefined,
-                    ..
                 }),
             qualifiers,
         } => {
@@ -1000,7 +946,6 @@ pub(crate) fn place_by_id<'db>(
                         ty: declared_ty,
                         origin,
                         definedness: Definedness::AlwaysDefined,
-                        widening: Widening::None,
                     })
                 }
                 // Place is possibly undeclared and (possibly) bound
@@ -1008,7 +953,6 @@ pub(crate) fn place_by_id<'db>(
                     ty: inferred_ty,
                     origin,
                     definedness: boundness,
-                    ..
                 }) => Place::Defined(DefinedPlace {
                     ty: UnionType::from_elements(db, [inferred_ty, declared_ty]),
                     origin,
@@ -1017,7 +961,6 @@ pub(crate) fn place_by_id<'db>(
                     } else {
                         boundness
                     },
-                    widening: Widening::None,
                 }),
             };
 
@@ -1042,55 +985,7 @@ pub(crate) fn place_by_id<'db>(
                 }
             }
 
-            // `__slots__` is a symbol with special behavior in Python's runtime. It can be
-            // modified externally, but those changes do not take effect. We therefore issue
-            // a diagnostic if we see it being modified externally. In type inference, we
-            // can assign a "narrow" type to it even if it is not *declared*. This means, we
-            // do not have to union with `Unknown`.
-            //
-            // `TYPE_CHECKING` is a special variable that should only be assigned `False`
-            // at runtime, but is always considered `True` in type checking.
-            // See mdtest/known_constants.md#user-defined-type_checking for details.
-            let is_considered_non_modifiable = place_id.as_symbol().is_some_and(|symbol_id| {
-                matches!(
-                    place_table(db, scope).symbol(symbol_id).name().as_str(),
-                    "__slots__" | "TYPE_CHECKING"
-                )
-            });
-
-            // Module-level globals can be mutated externally. A `MY_CONSTANT = 1` global might
-            // be changed to `"some string"` from code outside of the module that we're looking
-            // at, and so from a gradual-guarantee perspective, it makes sense to infer a type
-            // of `Literal[1] | Unknown` for global symbols. This allows the code that does the
-            // mutation to type check correctly, and for code that uses the global, it accurately
-            // reflects the lack of knowledge about the type.
-            //
-            // However, external modifications (or modifications through `global` statements) that
-            // would require a wider type are relatively rare. From a practical perspective, we can
-            // therefore achieve a better user experience by trusting the inferred type. Users who
-            // need the external mutation to work can always annotate the global with the wider
-            // type. And everyone else benefits from more precise type inference.
-            let is_module_global = scope.node(db).scope_kind().is_module();
-
-            // If the visibility of the scope is private (like for a function scope), we also do
-            // not union with `Unknown`, because the symbol cannot be modified externally.
-            let scope_has_private_visibility = scope.scope(db).visibility().is_private();
-
-            // We generally trust undeclared places in stubs and do not union with `Unknown`.
-            let in_stub_file = scope.file(db).is_stub(db);
-
-            if is_considered_non_modifiable
-                || is_module_global
-                || scope_has_private_visibility
-                || in_stub_file
-            {
-                inferred.into()
-            } else {
-                // Gradual typing guarantee: Mark undeclared public symbols for widening.
-                // The actual union with `Unknown` is applied lazily when converting to
-                // LookupResult via `into_lookup_result`.
-                inferred.with_widening(Widening::WithUnknown).into()
-            }
+            inferred.into()
         }
     }
 
@@ -1940,7 +1835,6 @@ mod tests {
                 ty: ty1,
                 origin: Inferred,
                 definedness: PossiblyUndefined,
-                widening: Widening::None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -1949,7 +1843,6 @@ mod tests {
                 ty: ty2,
                 origin: Inferred,
                 definedness: PossiblyUndefined,
-                widening: Widening::None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -1959,7 +1852,6 @@ mod tests {
                 ty: ty1,
                 origin: Inferred,
                 definedness: AlwaysDefined,
-                widening: Widening::None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -1968,7 +1860,6 @@ mod tests {
                 ty: ty2,
                 origin: Inferred,
                 definedness: AlwaysDefined,
-                widening: Widening::None,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -1992,7 +1883,6 @@ mod tests {
                 ty: UnionType::from_elements(&db, [ty1, ty2]),
                 origin: Inferred,
                 definedness: PossiblyUndefined,
-                widening: Widening::None
             })
             .into()
         );
@@ -2002,7 +1892,6 @@ mod tests {
                 ty: UnionType::from_elements(&db, [ty1, ty2]),
                 origin: Inferred,
                 definedness: AlwaysDefined,
-                widening: Widening::None
             })
             .into()
         );

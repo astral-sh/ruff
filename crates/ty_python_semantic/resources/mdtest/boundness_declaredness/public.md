@@ -5,10 +5,7 @@ that is, a use of a symbol from another scope. If a symbol has a declared type i
 (e.g. `int`), we use that as the symbol's "public type" (the type of the symbol from the perspective
 of other scopes) even if there is a more precise local inferred type for the symbol (`Literal[1]`).
 
-If a symbol has no declared type, we use the union of `Unknown` with the inferred type as the public
-type. If there is no declaration, then the symbol can be reassigned to any type from another scope;
-the union with `Unknown` reflects that its type must at least be as large as the type of the
-assigned value, but could be arbitrarily larger.
+If a symbol has no declared type, we use the inferred type as the public type.
 
 We test the whole matrix of possible boundness and declaredness states. The current behavior is
 summarized in the following table, while the tests below demonstrate each case. Note that some of
@@ -17,11 +14,11 @@ this behavior is questionable and might change in the future. See the TODOs in `
 In particular, we should raise errors in the "possibly-undeclared-and-unbound" as well as the
 "undeclared-and-possibly-unbound" cases (marked with a "?").
 
-| **Public type**  | declared     | possibly-undeclared        | undeclared              |
-| ---------------- | ------------ | -------------------------- | ----------------------- |
-| bound            | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
-| possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
-| unbound          | `T_declared` | `T_declared`               | `Unknown`               |
+| **Public type**  | declared     | possibly-undeclared        | undeclared    |
+| ---------------- | ------------ | -------------------------- | ------------- |
+| bound            | `T_declared` | `T_declared \| T_inferred` | `T_inferred`  |
+| possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `T_inferred`  |
+| unbound          | `T_declared` | `T_declared`               | `Unknown`     |
 
 | **Diagnostic**   | declared | possibly-undeclared       | undeclared          |
 | ---------------- | -------- | ------------------------- | ------------------- |
@@ -190,9 +187,9 @@ Public.a = None
 
 ### Undeclared but bound
 
-If a symbol is *undeclared*, we use the union of `Unknown` with the inferred type. Note that we
-treat this case differently from the case where a symbol is implicitly declared with `Unknown`,
-possibly due to the usage of an unknown name in the annotation:
+If a symbol is *undeclared*, we use the inferred type. Note that we treat this case differently
+from the case where a symbol is implicitly declared with `Unknown`, possibly due to the usage of an
+unknown name in the annotation:
 
 ```py
 class Public:
@@ -202,10 +199,11 @@ class Public:
     # Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
     b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: Literal[1]
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# External modifications of `a` that violate the inferred type are not allowed:
+# error: [invalid-assignment]
 Public.a = None
 ```
 
@@ -225,10 +223,11 @@ class Public:
 
 # TODO: these should raise an error. Once we fix this, update the section description and the table
 # on top of this document.
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: Literal[1]
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# External modifications of `a` that violate the inferred type are not allowed:
+# error: [invalid-assignment]
 Public.a = None
 ```
 
@@ -251,8 +250,7 @@ Public.a = None
 
 ## In stub files
 
-In stub files, we have a minor modification to the rules above: we do not union with `Unknown` for
-undeclared symbols.
+In stub files, we apply the same rules as for regular files.
 
 ### Undeclared and bound
 
