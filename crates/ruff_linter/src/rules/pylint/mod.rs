@@ -235,6 +235,7 @@ mod tests {
     )]
     #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
     #[test_case(Rule::MissingMaxsplitArg, Path::new("missing_maxsplit_arg.py"))]
+    #[test_case(Rule::UnusedPrivateMember, Path::new("unused_private_member.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -311,6 +311,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0131") => rules::pylint::rules::NamedExprWithoutContext,
         (Pylint, "W0133") => rules::pylint::rules::UselessExceptionStatement,
         (Pylint, "W0211") => rules::pylint::rules::BadStaticmethodArgument,
+        (Pylint, "W0238") => rules::pylint::rules::UnusedPrivateMember,
         (Pylint, "W0244") => rules::pylint::rules::RedefinedSlotsInSubclass,
         (Pylint, "W0245") => rules::pylint::rules::SuperWithoutBrackets,
         (Pylint, "W0406") => rules::pylint::rules::ImportSelf,

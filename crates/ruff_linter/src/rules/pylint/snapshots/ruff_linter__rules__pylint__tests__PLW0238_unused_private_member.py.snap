@@ -1,0 +1,460 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 253
+---
+PLW0238 Unused private member `UnusedMethod.__unused`
+  --> unused_private_member.py:10:9
+   |
+ 8 | # Case 1: Unused private method (should flag)
+ 9 | class UnusedMethod:
+10 |     def __unused(self):  # PLW0238
+   |         ^^^^^^^^
+11 |         pass
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `UnusedClassVar.__unused_var`
+  --> unused_private_member.py:28:5
+   |
+26 | # Case 3: Unused private class variable (should flag)
+27 | class UnusedClassVar:
+28 |     __unused_var = 42  # PLW0238
+   |     ^^^^^^^^^^^^
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `MultipleUnused.__unused1`
+  --> unused_private_member.py:33:5
+   |
+31 | # Case 4: Multiple unused members in same class (should flag all)
+32 | class MultipleUnused:
+33 |     __unused1 = 1  # PLW0238
+   |     ^^^^^^^^^
+34 |     __unused2 = 2  # PLW0238
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `MultipleUnused.__unused2`
+  --> unused_private_member.py:34:5
+   |
+32 | class MultipleUnused:
+33 |     __unused1 = 1  # PLW0238
+34 |     __unused2 = 2  # PLW0238
+   |     ^^^^^^^^^
+35 |
+36 |     def __unused_method1(self):  # PLW0238
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `MultipleUnused.__unused_method1`
+  --> unused_private_member.py:36:9
+   |
+34 |     __unused2 = 2  # PLW0238
+35 |
+36 |     def __unused_method1(self):  # PLW0238
+   |         ^^^^^^^^^^^^^^^^
+37 |         pass
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `MultipleUnused.__unused_method2`
+  --> unused_private_member.py:39:9
+   |
+37 |         pass
+38 |
+39 |     def __unused_method2(self):  # PLW0238
+   |         ^^^^^^^^^^^^^^^^
+40 |         pass
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `TrailingUnderscore.__private_`
+  --> unused_private_member.py:45:5
+   |
+43 | # Case 5: Edge case - name with trailing underscore (should flag if unused)
+44 | class TrailingUnderscore:
+45 |     __private_ = 1  # PLW0238 - unused (not a dunder)
+   |     ^^^^^^^^^^
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `PrivateStaticMethod.__unused_static`
+  --> unused_private_member.py:51:9
+   |
+49 | class PrivateStaticMethod:
+50 |     @staticmethod
+51 |     def __unused_static():  # PLW0238
+   |         ^^^^^^^^^^^^^^^
+52 |         pass
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `PrivateClassMethod.__unused_classmethod`
+  --> unused_private_member.py:58:9
+   |
+56 | class PrivateClassMethod:
+57 |     @classmethod
+58 |     def __unused_classmethod(cls):  # PLW0238
+   |         ^^^^^^^^^^^^^^^^^^^^
+59 |         pass
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `PrivateDecorated.__decorated_unused`
+  --> unused_private_member.py:68:9
+   |
+67 |     @some_decorator
+68 |     def __decorated_unused(self):  # PLW0238
+   |         ^^^^^^^^^^^^^^^^^^
+69 |         pass
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `ClassA.__private_a`
+  --> unused_private_member.py:74:5
+   |
+72 | # Case 9: Multiple classes - isolation test
+73 | class ClassA:
+74 |     __private_a = 1  # PLW0238 - unused
+   |     ^^^^^^^^^^^
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `ClassB.__private_b`
+  --> unused_private_member.py:78:5
+   |
+77 | class ClassB:
+78 |     __private_b = 2  # PLW0238 - unused
+   |     ^^^^^^^^^^^
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `OuterWithNested.__outer_unused`
+  --> unused_private_member.py:83:5
+   |
+81 | # Case 10: Nested class with unused private member
+82 | class OuterWithNested:
+83 |     __outer_unused = 1  # PLW0238
+   |     ^^^^^^^^^^^^^^
+84 |
+85 |     class Inner:
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `Inner.__inner_unused`
+  --> unused_private_member.py:86:9
+   |
+85 |     class Inner:
+86 |         __inner_unused = 2  # PLW0238
+   |         ^^^^^^^^^^^^^^
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `PrivateCallingPrivate.__helper`
+  --> unused_private_member.py:91:9
+   |
+89 | # Case 11: Private method that calls another private method (both unused at class level)
+90 | class PrivateCallingPrivate:
+91 |     def __helper(self):  # PLW0238
+   |         ^^^^^^^^
+92 |         return 1
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `PrivateCallingPrivate.__main_private`
+  --> unused_private_member.py:94:9
+   |
+92 |         return 1
+93 |
+94 |     def __main_private(self):  # PLW0238
+   |         ^^^^^^^^^^^^^^
+95 |         return self.__helper()
+   |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `UsedMethodViaSelf.__used`
+   --> unused_private_member.py:118:9
+    |
+116 | # Case 13: Used private method via self (currently flagged - known limitation)
+117 | class UsedMethodViaSelf:
+118 |     def __used(self):  # PLW0238 (limitation: self.__used() not tracked as reference)
+    |         ^^^^^^
+119 |         pass
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `UsedClassVarViaSelf.__used_var`
+   --> unused_private_member.py:127:5
+    |
+125 | # Case 14: Used private class variable via self (currently flagged - known limitation)
+126 | class UsedClassVarViaSelf:
+127 |     __used_var = 42  # PLW0238 (limitation: self.__used_var not tracked as reference)
+    |     ^^^^^^^^^^
+128 |
+129 |     def get_var(self):
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `MangledAccess.__private`
+   --> unused_private_member.py:135:5
+    |
+133 | # Case 15: Name-mangled access from outside class (currently flagged - known limitation)
+134 | class MangledAccess:
+135 |     __private = 1  # PLW0238 (limitation: mangled access not tracked)
+    |     ^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `AbstractExample.__abstract_unused`
+   --> unused_private_member.py:152:9
+    |
+150 | class AbstractExample(ABC):
+151 |     @abstractmethod
+152 |     def __abstract_unused(self):  # PLW0238 - abstract but still unused
+    |         ^^^^^^^^^^^^^^^^^
+153 |         pass
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `Base1.__base1_unused`
+   --> unused_private_member.py:158:5
+    |
+156 | # Case 17: Multiple inheritance
+157 | class Base1:
+158 |     __base1_unused = 1  # PLW0238
+    |     ^^^^^^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `Base2.__base2_unused`
+   --> unused_private_member.py:162:5
+    |
+161 | class Base2:
+162 |     __base2_unused = 2  # PLW0238
+    |     ^^^^^^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `MultiInherit.__multi_unused`
+   --> unused_private_member.py:166:5
+    |
+165 | class MultiInherit(Base1, Base2):
+166 |     __multi_unused = 3  # PLW0238
+    |     ^^^^^^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `WithSlots.__unused_in_slots_class`
+   --> unused_private_member.py:172:5
+    |
+170 | class WithSlots:
+171 |     __slots__ = ("__private_slot",)  # OK - __slots__ is a dunder
+172 |     __unused_in_slots_class = 1  # PLW0238
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `MultiDecorated.__multi_decorated_unused`
+   --> unused_private_member.py:185:9
+    |
+183 |     @decorator1
+184 |     @decorator2
+185 |     def __multi_decorated_unused(self):  # PLW0238
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+186 |         pass
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `AsyncExample.__async_unused`
+   --> unused_private_member.py:191:15
+    |
+189 | # Case 20: Private async method
+190 | class AsyncExample:
+191 |     async def __async_unused(self):  # PLW0238
+    |               ^^^^^^^^^^^^^^
+192 |         pass
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `GeneratorExample.__generator_unused`
+   --> unused_private_member.py:197:9
+    |
+195 | # Case 21: Private generator method
+196 | class GeneratorExample:
+197 |     def __generator_unused(self):  # PLW0238
+    |         ^^^^^^^^^^^^^^^^^^
+198 |         yield 1
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `ArgsKwargsExample.__complex_signature`
+   --> unused_private_member.py:203:9
+    |
+201 | # Case 22: Private method with *args and **kwargs
+202 | class ArgsKwargsExample:
+203 |     def __complex_signature(self, *args, **kwargs):  # PLW0238
+    |         ^^^^^^^^^^^^^^^^^^^
+204 |         pass
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `TypeAnnotated.__typed_unused`
+   --> unused_private_member.py:221:5
+    |
+219 | # Case 24: Private class variable with type annotation
+220 | class TypeAnnotated:
+221 |     __typed_unused: int = 42  # PLW0238
+    |     ^^^^^^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `ComplexReturn.__returns_dict`
+   --> unused_private_member.py:226:9
+    |
+224 | # Case 25: Private method returning complex type
+225 | class ComplexReturn:
+226 |     def __returns_dict(self) -> dict[str, int]:  # PLW0238
+    |         ^^^^^^^^^^^^^^
+227 |         return {}
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `DataclassExample.__class_var_unused`
+   --> unused_private_member.py:236:5
+    |
+234 | @dataclass
+235 | class DataclassExample:
+236 |     __class_var_unused = "default"  # PLW0238
+    |     ^^^^^^^^^^^^^^^^^^
+237 |     public_field: str = "value"
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `EnumLike.__PRIVATE_CONST`
+   --> unused_private_member.py:242:5
+    |
+240 | # Case 27: Enum-like class with private members
+241 | class EnumLike:
+242 |     __PRIVATE_CONST = 100  # PLW0238
+    |     ^^^^^^^^^^^^^^^
+243 |     PUBLIC_CONST = 200
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `LambdaExample.__lambda_unused`
+   --> unused_private_member.py:248:5
+    |
+246 | # Case 28: Private method that's a lambda assigned to class variable
+247 | class LambdaExample:
+248 |     __lambda_unused = lambda self: 42  # PLW0238
+    |     ^^^^^^^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `Level1.__level1_unused`
+   --> unused_private_member.py:253:5
+    |
+251 | # Case 29: Deeply nested class
+252 | class Level1:
+253 |     __level1_unused = 1  # PLW0238
+    |     ^^^^^^^^^^^^^^^
+254 |
+255 |     class Level2:
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `Level2.__level2_unused`
+   --> unused_private_member.py:256:9
+    |
+255 |     class Level2:
+256 |         __level2_unused = 2  # PLW0238
+    |         ^^^^^^^^^^^^^^^
+257 |
+258 |         class Level3:
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `Level3.__level3_unused`
+   --> unused_private_member.py:259:13
+    |
+258 |         class Level3:
+259 |             __level3_unused = 3  # PLW0238
+    |             ^^^^^^^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `DefaultArg.__with_default`
+   --> unused_private_member.py:264:9
+    |
+262 | # Case 30: Private method with default argument
+263 | class DefaultArg:
+264 |     def __with_default(self, x=10):  # PLW0238
+    |         ^^^^^^^^^^^^^^
+265 |         return x
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `ShadowsBuiltin.__len`
+   --> unused_private_member.py:270:9
+    |
+268 | # Case 31: Private method that shadows builtin
+269 | class ShadowsBuiltin:
+270 |     def __len(self):  # PLW0238 - not __len__, so it's private
+    |         ^^^^^
+271 |         return 0
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `TripleUnderscore.___triple`
+   --> unused_private_member.py:284:5
+    |
+282 | # Case 33: Triple underscore (edge case - still private, not dunder)
+283 | class TripleUnderscore:
+284 |     ___triple = 1  # PLW0238 - starts with __ but doesn't end with __
+    |     ^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `PropertyNoSetter.__unused_prop`
+   --> unused_private_member.py:304:9
+    |
+302 | class PropertyNoSetter:
+303 |     @property
+304 |     def __unused_prop(self):  # PLW0238 - unused property (no setter referencing it)
+    |         ^^^^^^^^^^^^^
+305 |         return 42
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `CachedPropertyExample.__cached_unused`
+   --> unused_private_member.py:314:9
+    |
+312 | class CachedPropertyExample:
+313 |     @cached_property
+314 |     def __cached_unused(self):  # PLW0238 - unused cached property
+    |         ^^^^^^^^^^^^^^^
+315 |         return 42
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `WithAllExport.__exported_private`
+   --> unused_private_member.py:321:5
+    |
+319 | # Note: Including private members in __all__ is unusual but valid Python
+320 | class WithAllExport:
+321 |     __exported_private = 1  # PLW0238 - still flagged (class-level binding unused)
+    |     ^^^^^^^^^^^^^^^^^^
+    |
+help: Consider removing this unused private member or making it public
+
+PLW0238 Unused private member `UsedViaCls.__class_var`
+   --> unused_private_member.py:329:5
+    |
+327 | # Case 37: Private method used via cls in classmethod (known limitation)
+328 | class UsedViaCls:
+329 |     __class_var = 100  # PLW0238 (limitation: cls.__class_var not tracked)
+    |     ^^^^^^^^^^^
+330 |
+331 |     @classmethod
+    |
+help: Consider removing this unused private member or making it public
