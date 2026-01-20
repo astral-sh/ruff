@@ -782,14 +782,11 @@ class Derived(Base):  # No error - not final, can be subclassed
 
 Enum classes cannot be subclassed if they have any members, so they are treated as final.
 
-Due to metaclass conflicts between ABC and Enum, we use a Protocol-based approach here.
-
 ```py
 from abc import abstractmethod
 from enum import Enum
-from typing import Protocol
 
-class Stringable(Protocol):
+class Stringable:
     @abstractmethod
     def stringify(self) -> str: ...
 
