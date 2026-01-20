@@ -378,6 +378,32 @@ impl fmt::Display for DocstringCode {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum MarkdownCode {
+    #[default]
+    Disabled,
+
+    Enabled,
+}
+
+impl MarkdownCode {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, MarkdownCode::Enabled)
+    }
+}
+
+impl fmt::Display for MarkdownCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Disabled => write!(f, "disabled"),
+            Self::Enabled => write!(f, "enabled"),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Default, Eq, PartialEq, CacheKey)]
 #[cfg_attr(
     feature = "serde",

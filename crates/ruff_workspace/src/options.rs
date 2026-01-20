@@ -3832,6 +3832,49 @@ pub struct FormatOptions {
         "#
     )]
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
+
+    /// Whether to format code blocks in markdown documents.
+    ///
+    /// When this is enabled, Python code blocks within markdown files
+    /// are automatically reformatted.
+    ///
+    /// For example, when this is enabled, the following document:
+    ///
+    /// ````markdown
+    /// # Document
+    ///
+    /// This is plain text preceding a code block:
+    ///
+    /// ```py
+    /// f(  x  )
+    /// ```
+    /// ````
+    ///
+    /// ... will be reformatted (assuming the rest of the options are set to
+    /// their defaults) as:
+    ///
+    /// ````markdown
+    /// # Document
+    ///
+    /// This is plain text preceding a code block:
+    ///
+    /// ```py
+    /// f(x)
+    /// ```
+    /// ````
+    ///
+    /// If a code block in a document contains invalid Python code or if the
+    /// formatter would otherwise write invalid Python code, then the code
+    /// example is ignored by the formatter and kept as-is.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable reformatting of code blocks in markdown files.
+            markdown-code-format = true
+        "#
+    )]
+    pub markdown_code_format: Option<bool>,
 }
 
 /// Configures Ruff's `analyze` command.
