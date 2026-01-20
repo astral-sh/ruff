@@ -720,8 +720,8 @@ class Child(Parent):  # error: [unimplemented-abstract-method]
 
 ### Abstract method re-abstracted after concrete implementation
 
-An abstract method can be overridden as concrete in a middle class, then re-declared as abstract
-in a subclass. A `@final` class inheriting from that subclass must implement it.
+An abstract method can be overridden as concrete in a middle class, then re-declared as abstract in
+a subclass. A `@final` class inheriting from that subclass must implement it.
 
 ```py
 from abc import ABC, abstractmethod
@@ -860,6 +860,32 @@ class Good(Base):
 
 @final
 class Bad(Base):  # error: [unimplemented-abstract-method]
+    pass
+```
+
+Similarly, a property with an abstract deleter is also abstract. However, we don't yet support
+property deleters, so this is a TODO test:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    def value(self) -> int:
+        return 42
+
+    @value.setter
+    def value(self, v: int) -> None:
+        pass
+
+    @value.deleter
+    @abstractmethod
+    def value(self) -> None: ...
+
+@final
+# TODO: should emit [unimplemented-abstract-method]
+class Bad(Base):
     pass
 ```
 
