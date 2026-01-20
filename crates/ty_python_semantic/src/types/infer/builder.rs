@@ -52,7 +52,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, use_def_map,
 };
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
@@ -1375,7 +1375,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //
             // For example:
             // - `def f(self): ...` (concrete method) implements the abstract method.
-            // - `f = 42` (binding) overrides an abstract property with a value.
+            // - `f = 42` or `f: int = 42` (binding) overrides an abstract property.
             // - `f: int` (declaration only) does NOT implement the abstract method.
             let is_implemented = match &member.place {
                 Place::Defined(defined) => {
@@ -1383,9 +1383,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // For callable types, check if it's concrete (not abstract).
                         is_concrete_method(db, defined.ty)
                     } else {
-                        // For non-callable types, a binding overrides the abstract method,
-                        // but a declaration-only does not.
-                        !defined.origin.is_declared()
+                        // For non-callable types, check if there's a binding in the class's
+                        // own scope. A binding (like `f = 42` or `f: int = 42`) overrides
+                        // the abstract method, but a declaration-only (like `f: int`) does not.
+                        let body_scope = class.body_scope(db);
+                        let table = place_table(db, body_scope);
+                        table.symbol_id(&method_name).is_some_and(|symbol_id| {
+                            let use_def = use_def_map(db, body_scope);
+                            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                            !place_from_bindings(db, bindings).place.is_undefined()
+                        })
                     }
                 }
                 Place::Undefined => false,

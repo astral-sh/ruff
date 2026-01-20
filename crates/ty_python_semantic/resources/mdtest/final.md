@@ -892,7 +892,8 @@ class Bad(Base):
 ### Binding overrides abstract property
 
 A binding like `f = 42` does override an abstract property, because the class attribute provides a
-concrete value that will be returned when accessing the property.
+concrete value that will be returned when accessing the property. An annotated assignment with a
+value (`f: int = 42`) also overrides the abstract property.
 
 ```py
 from abc import ABC, abstractmethod
@@ -904,8 +905,12 @@ class Base(ABC):
     def f(self) -> int: ...
 
 @final
-class Child(Base):
+class Child1(Base):
     f = 42  # OK: binding overrides the abstract property
+
+@final
+class Child2(Base):
+    f: int = 42  # OK: annotated assignment with value also overrides
 ```
 
 ### Annotation doesn't override abstract method
