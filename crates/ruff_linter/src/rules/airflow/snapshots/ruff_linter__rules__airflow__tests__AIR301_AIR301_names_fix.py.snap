@@ -318,7 +318,7 @@ AIR301 [*] `airflow.operators.python.get_current_context` is removed in Airflow 
 48 |
 49 | # airflow.providers.mysql
    |
-help: `get_current_context` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.6).
+help: `get_current_context` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
 42 | 
 43 | 
 44 | # airflow.operators.python
@@ -402,7 +402,7 @@ AIR301 [*] `airflow.notifications.basenotifier.BaseNotifier` is removed in Airfl
 68 |
 69 | # airflow.auth.manager
    |
-help: `BaseNotifier` has been moved to `airflow.sdk.bases.notifier` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.6).
+help: `BaseNotifier` has been moved to `airflow.sdk.bases.notifier` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
 62 | sanitize_uri
 63 | 
 64 | # airflow.notifications.basenotifier
@@ -617,7 +617,7 @@ AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
 92 |
 93 | from airflow.sensors.base_sensor_operator import BaseSensorOperator
    |
-help: `BaseHook` has been moved to `airflow.hooks.base` since Airflow 3.0. Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1.
+help: `BaseHook` has been moved to `airflow.hooks.base` since Airflow 3.0. Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1. Follow the instructions of AIR321 if you're using 3.1+.
 85 | 
 86 | # airflow.configuration
 87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -636,7 +636,7 @@ AIR301 [*] `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed 
    | ^^^^^^^^^^^^^^^^^^
 97 | BaseHook()
    |
-help: `BaseSensorOperator` has been moved to `airflow.sdk.bases.sensor` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.6).
+help: `BaseSensorOperator` has been moved to `airflow.sdk.bases.sensor` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
 90 | # airflow.hooks
 91 | BaseHook()
 92 | 
@@ -657,7 +657,7 @@ AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
 98 |
 99 | from airflow.utils.helpers import chain as helper_chain
    |
-help: `BaseHook` has been moved to `airflow.hooks.base` since Airflow 3.0. Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1.
+help: `BaseHook` has been moved to `airflow.hooks.base` since Airflow 3.0. Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1. Follow the instructions of AIR321 if you're using 3.1+.
 85 | 
 86 | # airflow.configuration
 87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -681,7 +681,7 @@ AIR301 [*] `airflow.utils.helpers.chain` is removed in Airflow 3.0
     | ^^^^^^^^^^^^
 104 | helper_cross_downstream
     |
-help: `chain` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.6).
+help: `chain` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
 98  | 
 99  | from airflow.utils.helpers import chain as helper_chain
 100 | from airflow.utils.helpers import cross_downstream as helper_cross_downstream
@@ -704,7 +704,7 @@ AIR301 [*] `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
 105 |
 106 | # airflow.utils.file
     |
-help: `cross_downstream` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.6).
+help: `cross_downstream` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
 98  | 
 99  | from airflow.utils.helpers import chain as helper_chain
 100 | from airflow.utils.helpers import cross_downstream as helper_cross_downstream
@@ -746,7 +746,7 @@ AIR301 [*] `airflow.utils.log.secrets_masker` is removed in Airflow 3.0
 114 | secrets_masker
     | ^^^^^^^^^^^^^^
     |
-help: `secrets_masker` has been moved to `airflow.sdk.execution_time` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.6).
+help: `secrets_masker` has been moved to `airflow.sdk.execution_time` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
 108 | 
 109 | TemporaryDirectory()
 110 | 

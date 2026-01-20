@@ -45,7 +45,7 @@ AIR321 [*] `airflow.utils.task_group.TaskGroup` is removed in Airflow 3.1
 21 |
 22 | # airflow.utils.timezone
    |
-help: `TaskGroup` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `TaskGroup` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 15 | XCOM_RETURN_KEY
 16 | 
 17 | # airflow.utils.task_group
@@ -66,7 +66,7 @@ AIR321 [*] `airflow.utils.timezone.coerce_datetime` is removed in Airflow 3.1
 37 | convert_to_utc(current_time)
 38 | datetime(2026, 1, 1, 21, 30, 0)
    |
-help: `coerce_datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `coerce_datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 22 | # airflow.utils.timezone
 23 | from datetime import datetime as dt
 24 | from airflow.utils.timezone import (
@@ -93,7 +93,7 @@ AIR321 [*] `airflow.utils.timezone.convert_to_utc` is removed in Airflow 3.1
 38 | datetime(2026, 1, 1, 21, 30, 0)
 39 | make_naive(current_time, tz=None)
    |
-help: `convert_to_utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `convert_to_utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 23 | from datetime import datetime as dt
 24 | from airflow.utils.timezone import (
 25 |     coerce_datetime,
@@ -120,7 +120,7 @@ AIR321 [*] `airflow.utils.timezone.datetime` is removed in Airflow 3.1
 39 | make_naive(current_time, tz=None)
 40 | parse("2026-01-01 21:30:00")
    |
-help: `datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 24 | from airflow.utils.timezone import (
 25 |     coerce_datetime,
 26 |     convert_to_utc,
@@ -146,7 +146,7 @@ AIR321 [*] `airflow.utils.timezone.make_naive` is removed in Airflow 3.1
 40 | parse("2026-01-01 21:30:00")
 41 | utc
    |
-help: `make_naive` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `make_naive` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 25 |     coerce_datetime,
 26 |     convert_to_utc,
 27 |     datetime,
@@ -171,7 +171,7 @@ AIR321 [*] `airflow.utils.timezone.parse` is removed in Airflow 3.1
 41 | utc
 42 | utcnow()
    |
-help: `parse` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `parse` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 26 |     convert_to_utc,
 27 |     datetime,
 28 |     make_naive,
@@ -194,7 +194,7 @@ AIR321 [*] `airflow.utils.timezone.utc` is removed in Airflow 3.1
    | ^^^
 42 | utcnow()
    |
-help: `utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 27 |     datetime,
 28 |     make_naive,
 29 |     parse,
@@ -217,7 +217,7 @@ AIR321 [*] `airflow.utils.timezone.utcnow` is removed in Airflow 3.1
 43 |
 44 | # airflow.utils.decorators
    |
-help: `utcnow` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `utcnow` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 28 |     make_naive,
 29 |     parse,
 30 |     utc,
@@ -295,7 +295,7 @@ AIR321 [*] `airflow.models.baseoperator.BaseOperator` is removed in Airflow 3.1
 68 |
 69 | # airflow.macros
    |
-help: `BaseOperator` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `BaseOperator` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 62 | TaskStateChangeCallback()
 63 | 
 64 | # airflow.models.baseoperator
@@ -316,7 +316,7 @@ AIR321 [*] `airflow.macros.ds_add` is removed in Airflow 3.1
 78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
 79 | datetime_diff_for_humans(
    |
-help: `ds_add` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `ds_add` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 68 | 
 69 | # airflow.macros
 70 | from airflow.macros import (
@@ -340,7 +340,7 @@ AIR321 [*] `airflow.macros.ds_format` is removed in Airflow 3.1
 79 | datetime_diff_for_humans(
 80 |     dt(2026, 1, 1, 21, 30, 0),
    |
-help: `ds_format` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `ds_format` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 69 | # airflow.macros
 70 | from airflow.macros import (
 71 |     ds_add,
@@ -364,7 +364,7 @@ AIR321 [*] `airflow.macros.datetime_diff_for_humans` is removed in Airflow 3.1
 80 |     dt(2026, 1, 1, 21, 30, 0),
 81 |     since=dt(2026, 1, 2, 21, 30, 0)
    |
-help: `datetime_diff_for_humans` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `datetime_diff_for_humans` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 70 | from airflow.macros import (
 71 |     ds_add,
 72 |     ds_format,
@@ -387,7 +387,7 @@ AIR321 [*] `airflow.macros.ds_format_locale` is removed in Airflow 3.1
 84 |
 85 | # airflow.io
    |
-help: `ds_format_locale` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `ds_format_locale` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 71 |     ds_add,
 72 |     ds_format,
 73 |     datetime_diff_for_humans,
@@ -409,7 +409,7 @@ AIR321 [*] `airflow.io.get_fs` is removed in Airflow 3.1
 93 | has_fs()
 94 | Properties()
    |
-help: `get_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `get_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 84 | 
 85 | # airflow.io
 86 | from airflow.io import (
@@ -431,7 +431,7 @@ AIR321 [*] `airflow.io.has_fs` is removed in Airflow 3.1
    | ^^^^^^
 94 | Properties()
    |
-help: `has_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `has_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 85 | # airflow.io
 86 | from airflow.io import (
 87 |     get_fs,
@@ -454,7 +454,7 @@ AIR321 [*] `airflow.io.Properties` is removed in Airflow 3.1
 95 |
 96 | # airflow.secrets.cache
    |
-help: `Properties` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `Properties` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 86 | from airflow.io import (
 87 |     get_fs,
 88 |     has_fs,
@@ -476,7 +476,7 @@ AIR321 [*] `airflow.secrets.cache.SecretCache` is removed in Airflow 3.1
  99 |
 100 | # airflow.hooks
     |
-help: `SecretCache` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `SecretCache` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 94  | Properties()
 95  | 
 96  | # airflow.secrets.cache
@@ -495,7 +495,7 @@ AIR321 [*] `airflow.hooks.base.BaseHook` is removed in Airflow 3.1
 102 | BaseHook()
     | ^^^^^^^^
     |
-help: `BaseHook` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.6).
+help: `BaseHook` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
 98  | SecretCache()
 99  | 
 100 | # airflow.hooks

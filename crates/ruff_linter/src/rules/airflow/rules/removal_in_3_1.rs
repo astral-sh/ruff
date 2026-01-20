@@ -153,7 +153,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "secrets", "cache", "SecretCache"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "SecretCache".to_string(),
-            version: "1.1.6",
+            version: "1.1.0",
         },
 
         // airflow.utils.xcom
@@ -170,7 +170,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "utils", "task_group", "TaskGroup"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "TaskGroup".to_string(),
-            version: "1.1.6",
+            version: "1.1.0",
         },
 
         // airflow.utils.timezone
@@ -183,7 +183,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.timezone",
             name: rest.to_string(),
-            version: "1.1.6",
+            version: "1.1.0",
         },
 
         // airflow.utils.decorators
@@ -217,7 +217,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
                 name: "BaseOperator".to_string(),
-                version: "1.1.6",
+                version: "1.1.0",
             }
         }
 
@@ -229,7 +229,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.execution_time.macros",
             name: rest.to_string(),
-            version: "1.1.6",
+            version: "1.1.0",
         },
 
         // airflow.io
@@ -237,7 +237,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk.io",
                 name: rest.to_string(),
-                version: "1.1.6",
+                version: "1.1.0",
             }
         }
 
@@ -245,7 +245,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "hooks", "base", "BaseHook"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "BaseHook".to_string(),
-            version: "1.1.6",
+            version: "1.1.0",
         },
         _ => return,
     };
