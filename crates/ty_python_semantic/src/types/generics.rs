@@ -96,7 +96,14 @@ pub(crate) fn typing_self<'db>(
     let identity = TypeVarIdentity::new(
         db,
         ast::name::Name::new_static("Self"),
-        Some(class.definition(db)),
+        // `Self` has a different upper bound dependent on the containing class,
+        // so pointing to the definition of the symbol `typing.Self` itself is
+        // not useful here. We could point to the class definition, but the full
+        // range of the class definition is much larger than the full range of a
+        // TypeVar would usually be, which leads to bugs like
+        // https://github.com/astral-sh/ty/issues/2514. So we just pass `None`
+        // for the definition field here.
+        None,
         TypeVarKind::TypingSelf,
     );
     let bounds = TypeVarBoundOrConstraints::UpperBound(Type::instance(

@@ -52,6 +52,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&CALL_TOP_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
+    registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
+    registry.register_lint(&INVALID_DATACLASS);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
@@ -73,6 +75,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
@@ -103,6 +106,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
+    registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -326,7 +330,7 @@ declare_lint! {
     /// ```
     pub(crate) static CYCLIC_TYPE_ALIAS_DEFINITION = {
         summary: "detects cyclic type alias definitions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.29"),
         default_level: Level::Error,
     }
 }
@@ -348,7 +352,7 @@ declare_lint! {
     /// ```
     pub(crate) static DIVISION_BY_ZERO = {
         summary: "detects division by zero",
-        status: LintStatus::preview("0.0.1-alpha.1"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Ignore,
     }
 }
@@ -423,6 +427,63 @@ declare_lint! {
     pub(crate) static DUPLICATE_KW_ONLY = {
         summary: "detects dataclass definitions with more than one usage of `KW_ONLY`",
         status: LintStatus::stable("0.0.1-alpha.12"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or
+    /// `__delattr__` method defined.
+    ///
+    /// ## Why is this bad?
+    /// Frozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a
+    /// `FrozenInstanceError` to emulate immutability.
+    ///
+    /// Overriding either of these methods raises a runtime error.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass(frozen=True)
+    /// class A:
+    ///     def __setattr__(self, name: str, value: object) -> None: ...
+    /// ```
+    pub(crate) static INVALID_DATACLASS_OVERRIDE = {
+        summary: "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
+        status: LintStatus::stable("0.0.13"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid applications of the `@dataclass` decorator.
+    ///
+    /// ## Why is this bad?
+    /// Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
+    /// `Enum`, or `Protocol` is invalid:
+    ///
+    /// - `NamedTuple` and `TypedDict` classes will raise an exception at runtime when
+    ///   instantiating the class.
+    /// - `Enum` classes with `@dataclass` are [explicitly not supported].
+    /// - `Protocol` classes define interfaces and cannot be instantiated.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from dataclasses import dataclass
+    /// from typing import NamedTuple
+    ///
+    /// @dataclass  # error: [invalid-dataclass]
+    /// class Foo(NamedTuple):
+    ///     x: int
+    /// ```
+    ///
+    /// [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
+    pub(crate) static INVALID_DATACLASS = {
+        summary: "detects invalid `@dataclass` applications",
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Error,
     }
 }
@@ -871,7 +932,7 @@ declare_lint! {
     /// [`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base
     pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
         summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Ignore,
     }
 }
@@ -952,6 +1013,48 @@ declare_lint! {
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for enum classes that are also generic.
+    ///
+    /// ## Why is this bad?
+    /// Enum classes cannot be generic. Python does not support generic enums:
+    /// attempting to create one will either result in an immediate `TypeError`
+    /// at runtime, or will create a class that cannot be specialized in the way
+    /// that a normal generic class can.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from enum import Enum
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")
+    ///
+    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
+    /// class E[T](Enum):
+    ///     A = 1
+    ///
+    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
+    /// class F(Enum, Generic[T]):
+    ///     A = 1
+    ///
+    /// # error: enum class cannot be generic -- the class creation does not immediately fail...
+    /// class G(Generic[T], Enum):
+    ///     A = 1
+    ///
+    /// # ...but this raises `KeyError`:
+    /// x: G[int]
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: Enum](https://docs.python.org/3/library/enum.html)
+    pub(crate) static INVALID_GENERIC_ENUM = {
+        summary: "detects generic enum classes",
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Error,
     }
 }
@@ -1079,7 +1182,7 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_NEWTYPE = {
         summary: "detects invalid NewType definitions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.27"),
         default_level: Level::Error,
     }
 }
@@ -1748,6 +1851,34 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for calls to `final()` that type checkers cannot interpret.
+    ///
+    /// ## Why is this bad?
+    /// The `final()` function is designed to be used as a decorator. When called directly
+    /// as a function (e.g., `final(type(...))`), type checkers will not understand the
+    /// application of `final` and will not prevent subclassing.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// # Incorrect: type checkers will not prevent subclassing
+    /// MyClass = final(type("MyClass", (), {}))
+    ///
+    /// # Correct: use `final` as a decorator
+    /// @final
+    /// class MyClass: ...
+    /// ```
+    pub(crate) static INEFFECTIVE_FINAL = {
+        summary: "detects calls to `final()` that type checkers cannot interpret",
+        status: LintStatus::stable("0.0.1-alpha.33"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for methods that are decorated with `@override` but do not override any method in a superclass.
     ///
     /// ## Why is this bad?
@@ -1886,7 +2017,7 @@ declare_lint! {
     /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
     pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
         summary: "detects `super()` calls in methods of `NamedTuple` classes",
-        status: LintStatus::preview("0.0.1-alpha.30"),
+        status: LintStatus::stable("0.0.1-alpha.30"),
         default_level: Level::Error,
     }
 }
@@ -3009,16 +3140,15 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
 
 pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
-    class: StaticClassLiteral,
-    node: &ast::StmtClassDef,
+    header_range: TextRange,
+    base_nodes: Option<&[ast::Expr]>,
     disjoint_bases: &IncompatibleBases,
 ) {
     debug_assert!(disjoint_bases.len() > 1);
 
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, class.header_range(db))
-    else {
+    let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, header_range) else {
         return;
     };
 
@@ -3042,9 +3172,14 @@ pub(crate) fn report_instance_layout_conflict(
             originating_base,
         } = disjoint_base_info;
 
-        let span = context.span(&node.bases()[*node_index]);
+        // Get the span for this base from the AST (if available)
+        let Some(base_node) = base_nodes.and_then(|nodes| nodes.get(*node_index)) else {
+            continue;
+        };
+
+        let span = context.span(base_node);
         let mut annotation = Annotation::secondary(span.clone());
-        if originating_base.as_static() == Some(disjoint_base.class) {
+        if *originating_base == disjoint_base.class {
             match disjoint_base.kind {
                 DisjointBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
@@ -3168,11 +3303,10 @@ impl<'db> IncompatibleBases<'db> {
                     .keys()
                     .filter(|other_base| other_base != disjoint_base)
                     .all(|other_base| {
-                        !disjoint_base.class.is_subclass_of(
-                            db,
-                            None,
-                            other_base.class.default_specialization(db),
-                        )
+                        !disjoint_base
+                            .class
+                            .default_specialization(db)
+                            .is_subclass_of(db, other_base.class.default_specialization(db))
                     })
             })
             .map(|(base, info)| (*base, *info))
@@ -3639,7 +3773,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
     }
 }
 
-fn report_unsupported_base(
+pub(crate) fn report_unsupported_base(
     context: &InferContext,
     base_node: &ast::Expr,
     base_type: Type,

@@ -456,6 +456,40 @@ reveal_type(int_container)  # revealed: Container[int]
 reveal_type(int_container.set_value(1))  # revealed: Container[int]
 ```
 
+## Generic class with bounded type variable
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/2467>.
+
+Calling a method on a generic class instance should work when the type parameter is specialized with
+a type that satisfies a bound.
+
+```py
+from typing import NewType
+
+class Base: ...
+
+class C[T: Base]:
+    x: T
+
+    def g(self) -> None:
+        pass
+
+# Calling a method on a specialized instance should not produce an error
+C[Base]().g()
+
+# Test with a NewType bound
+K = NewType("K", int)
+
+class D[T: K]:
+    x: T
+
+    def h(self) -> None:
+        pass
+
+# Calling a method on a specialized instance should not produce an error
+D[K]().h()
+```
+
 ## Protocols
 
 TODO: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
@@ -551,8 +585,8 @@ class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):
     # TODO: reject the Self usage. because self cannot be used within a metaclass.
-    def __new__(cls) -> Self:
-        return super().__new__(cls)
+    def __new__(cls, name, bases, dct) -> Self:
+        return cls(name, bases, dct)
 ```
 
 ## Explicit annotations override implicit `Self`

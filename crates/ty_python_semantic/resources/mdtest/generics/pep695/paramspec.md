@@ -681,11 +681,64 @@ reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, 
 # error: [invalid-argument-type]
 reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
-# TODO: Both of these shouldn't raise an error
-# error: [invalid-argument-type]
+# TODO: This should reveal the matching overload instead
 reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-# error: [invalid-argument-type]
 reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# error: [invalid-argument-type] "Argument to function `with_parameters` is incorrect: Expected `int`, found `None`"
+reveal_type(with_parameters(int_int, None))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+def foo(int_or_str: int | str):
+    # Argument type expansion leads to matching both overloads.
+    # TODO: Should this be an error instead?
+    reveal_type(with_parameters(int_int, int_or_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# Keyword argument matching should also work
+# TODO: This should reveal the matching overload instead
+reveal_type(with_parameters(int_int, x=1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(with_parameters(int_int, x="a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# No matching overload should error
+# error: [invalid-argument-type]
+reveal_type(with_parameters(int_int, 1.5))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+```
+
+### Overloads with multiple parameters
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def multi(x: int, y: int) -> int: ...
+@overload
+def multi(x: str, y: str) -> str: ...
+```
+
+```py
+from typing import Callable
+from overloaded import multi
+
+def run[**P, R](f: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return f(*args, **kwargs)
+
+# Both arguments match first overload
+# TODO: should reveal `int`
+reveal_type(run(multi, 1, 2))  # revealed: int | str
+
+# Both arguments match second overload
+# TODO: should reveal `str`
+reveal_type(run(multi, "a", "b"))  # revealed: int | str
+
+# Mixed positional and keyword
+# TODO: both should reveal `int`
+reveal_type(run(multi, 1, y=2))  # revealed: int | str
+reveal_type(run(multi, x=1, y=2))  # revealed: int | str
+
+# No matching overload (int, str doesn't match either overload of `multi`)
+# error: [invalid-argument-type]
+reveal_type(run(multi, 1, "b"))  # revealed: int | str
 ```
 
 ### Overloads with subtitution of `P.args` and `P.kwargs`

@@ -978,3 +978,39 @@ from ty_extensions import has_member, static_assert
 # TODO: this should ideally not be available:
 static_assert(not has_member(3, "__annotations__"))  # error: [static-assert-error]
 ```
+
+### `ModuleType` attributes are available on modules
+
+`namespace_package/foo.py`:
+
+```py
+```
+
+`regular_module.py`:
+
+```py
+```
+
+`regular_package/__init__.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import namespace_package
+import regular_module
+import regular_package
+from ty_extensions import static_assert, has_member
+
+static_assert(has_member(namespace_package, "__file__"))
+static_assert(has_member(namespace_package, "__name__"))
+static_assert(has_member(namespace_package, "__eq__"))
+static_assert(has_member(regular_module, "__file__"))
+static_assert(has_member(regular_module, "__name__"))
+static_assert(has_member(regular_module, "__eq__"))
+static_assert(has_member(regular_package, "__file__"))
+static_assert(has_member(regular_package, "__name__"))
+static_assert(has_member(regular_package, "__eq__"))
+```

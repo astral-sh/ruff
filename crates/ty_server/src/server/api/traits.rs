@@ -116,7 +116,10 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 
         if let Err(err) = &result {
             tracing::error!("An error occurred with request ID {id}: {err}");
-            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+            client.show_error_message(format!(
+                "ty encountered a problem. {}",
+                snapshot.client_name().log_guidance()
+            ));
         }
 
         client.respond(id, result);
@@ -153,7 +156,10 @@ pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
 
         if let Err(err) = &result {
             tracing::error!("An error occurred with request ID {id}: {err}");
-            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+            client.show_error_message(format!(
+                "ty encountered a problem. {}",
+                snapshot.client_name().log_guidance()
+            ));
         }
 
         client.respond(id, result);

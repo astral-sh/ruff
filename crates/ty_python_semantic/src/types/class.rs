@@ -5,7 +5,7 @@ use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
+    BoundTypeVarInstance, MemberLookupPolicy, Mro, MroIterator, SpecialFormType, StaticMroError,
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
@@ -20,8 +20,8 @@ use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
-    report_conflicting_metaclass_from_bases,
+    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE,
+    SUPER_CALL_IN_NAMED_TUPLE_METHOD, report_conflicting_metaclass_from_bases,
 };
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
@@ -39,7 +39,7 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{Tuple, TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
@@ -60,7 +60,7 @@ use crate::{
         attribute_assignments,
         definition::{DefinitionKind, TargetKind},
         place_table,
-        scope::{FileScopeId, ScopeId},
+        scope::ScopeId,
         semantic_index, use_def_map,
     },
     types::{
@@ -69,12 +69,12 @@ use crate::{
     },
 };
 use indexmap::IndexSet;
-use itertools::Itertools as _;
+use itertools::{Either, Itertools as _};
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
@@ -128,8 +128,8 @@ fn try_mro_cycle_initial<'db>(
     _id: salsa::Id,
     self_: StaticClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
-) -> Result<Mro<'db>, MroError<'db>> {
-    Err(MroError::cycle(
+) -> Result<Mro<'db>, StaticMroError<'db>> {
+    Err(StaticMroError::cycle(
         db,
         self_.apply_optional_specialization(db, specialization),
     ))
@@ -194,6 +194,7 @@ impl<'db> CodeGeneratorKind<'db> {
                 Self::from_static_class(db, static_class, specialization)
             }
             ClassLiteral::Dynamic(dynamic_class) => Self::from_dynamic_class(db, dynamic_class),
+            ClassLiteral::DynamicNamedTuple(_) => Some(Self::NamedTuple),
         }
     }
 
@@ -463,6 +464,8 @@ pub enum ClassLiteral<'db> {
     Static(StaticClassLiteral<'db>),
     /// A class created dynamically via `type(name, bases, dict)`.
     Dynamic(DynamicClassLiteral<'db>),
+    /// A class created via `collections.namedtuple()` or `typing.NamedTuple()`.
+    DynamicNamedTuple(DynamicNamedTupleLiteral<'db>),
 }
 
 impl<'db> ClassLiteral<'db> {
@@ -471,6 +474,7 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.name(db),
             Self::Dynamic(class) => class.name(db),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.name(db),
         }
     }
 
@@ -495,6 +499,7 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.metaclass(db),
             Self::Dynamic(class) => class.metaclass(db),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.metaclass(db),
         }
     }
 
@@ -508,6 +513,7 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.class_member(db, name, policy),
             Self::Dynamic(class) => class.class_member(db, name, policy),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, name, policy),
         }
     }
 
@@ -523,7 +529,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::Static(class) => class.class_member_from_mro(db, name, policy, mro_iter),
-            Self::Dynamic(_) => {
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => {
                 // Dynamic classes don't have inherited generic context and are never `object`.
                 let result = MroLookup::new(db, mro_iter).class_member(name, policy, None, false);
                 match result {
@@ -549,7 +555,7 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.default_specialization(db),
-            Self::Dynamic(_) => ClassType::NonGeneric(self),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -557,34 +563,25 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.identity_specialization(db),
-            Self::Dynamic(_) => ClassType::NonGeneric(self),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => ClassType::NonGeneric(self),
         }
     }
 
     /// Returns the generic context if this is a generic class.
-    ///
-    // TODO: We should emit a diagnostic if a dynamic class (created via `type()`) attempts
-    // to inherit from `Generic[T]`, since dynamic classes can't be generic. See also: `is_protocol`.
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.as_static().and_then(|class| class.generic_context(db))
     }
 
     /// Returns whether this class is a protocol.
-    ///
-    // TODO: We should emit a diagnostic if a dynamic class (created via `type()`) attempts
-    // to inherit from `Protocol`, since dynamic classes can't be protocols. See also: `generic_context`.
     pub(crate) fn is_protocol(self, db: &'db dyn Db) -> bool {
         self.as_static().is_some_and(|class| class.is_protocol(db))
     }
 
     /// Returns whether this class is a `TypedDict`.
-    // TODO: We should emit a diagnostic if a dynamic class (created via `type()`) attempts
-    // to inherit from `TypedDict`. To create a dynamic TypedDict, you should invoke
-    // `TypedDict` as a function, not `type`. See also: `generic_context`, `is_protocol`.
     pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => class.is_typed_dict(db),
-            Self::Dynamic(_) => false,
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => false,
         }
     }
 
@@ -592,7 +589,7 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => class.is_tuple(db),
-            Self::Dynamic(_) => false,
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => false,
         }
     }
 
@@ -613,7 +610,8 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn file(self, db: &dyn Db) -> File {
         match self {
             Self::Static(class) => class.file(db),
-            Self::Dynamic(class) => class.file(db),
+            Self::Dynamic(class) => class.scope(db).file(db),
+            Self::DynamicNamedTuple(class) => class.scope(db).file(db),
         }
     }
 
@@ -625,6 +623,7 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.header_range(db),
             Self::Dynamic(class) => class.header_range(db),
+            Self::DynamicNamedTuple(class) => class.header_range(db),
         }
     }
 
@@ -634,56 +633,61 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns whether this class is final.
-    // TODO: Support `@final` on dynamic classes, e.g. `X = final(type("X", (), {}))`.
-    // We should either recognize and track this, or emit a diagnostic if unsupported.
     pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
-        self.as_static().is_some_and(|class| class.is_final(db))
+        match self {
+            Self::Static(class) => class.is_final(db),
+            // Dynamic classes created via `type()`, `collections.namedtuple()`, etc. cannot be
+            // marked as final.
+            Self::Dynamic(_) => false,
+            Self::DynamicNamedTuple(_) => false,
+        }
     }
 
     /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
     /// `__ge__`) in its own body (not inherited). Used by `@total_ordering` to determine if
     /// synthesis is valid.
-    // TODO: A dynamic class could provide ordering methods in the namespace dictionary:
-    // ```python
-    // >>> X = type("X", (), {"__lt__": lambda self, other: True})
-    // ```
+    ///
+    /// For dynamic classes, this checks if any ordering methods are provided in the namespace
+    /// dictionary:
+    /// ```python
+    /// X = type("X", (), {"__lt__": lambda self, other: True})
+    /// ```
     pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
-        self.as_static()
-            .is_some_and(|class| class.has_own_ordering_method(db))
+        match self {
+            Self::Static(class) => class.has_own_ordering_method(db),
+            Self::Dynamic(class) => class.has_own_ordering_method(db),
+            Self::DynamicNamedTuple(_) => false,
+        }
     }
 
     /// Returns the static class definition if this is one.
     pub(crate) fn as_static(self) -> Option<StaticClassLiteral<'db>> {
         match self {
             Self::Static(class) => Some(class),
-            Self::Dynamic(_) => None,
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => None,
         }
     }
 
-    /// Returns an unknown specialization for this class.
-    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+    /// Returns the definition of this class, if available.
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
-            Self::Static(class) => class.unknown_specialization(db),
-            Self::Dynamic(_) => ClassType::NonGeneric(self),
-        }
-    }
-
-    /// Returns the definition of this class.
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        match self {
-            Self::Static(class) => class.definition(db),
+            Self::Static(class) => Some(class.definition(db)),
             Self::Dynamic(class) => class.definition(db),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.definition(db),
         }
     }
 
     /// Returns the type definition for this class.
     ///
     /// For static classes, returns `TypeDefinition::StaticClass`.
-    /// For dynamic classes, returns `TypeDefinition::DynamicClass`.
-    pub(crate) fn type_definition(self, db: &'db dyn Db) -> TypeDefinition<'db> {
+    /// For dynamic classes, returns `TypeDefinition::DynamicClass` if a definition is available.
+    pub(crate) fn type_definition(self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
         match self {
-            Self::Static(class) => TypeDefinition::StaticClass(class.definition(db)),
-            Self::Dynamic(class) => TypeDefinition::DynamicClass(class.definition(db)),
+            Self::Static(class) => Some(TypeDefinition::StaticClass(class.definition(db))),
+            Self::Dynamic(class) => class.definition(db).map(TypeDefinition::DynamicClass),
+            Self::DynamicNamedTuple(namedtuple) => {
+                namedtuple.definition(db).map(TypeDefinition::DynamicClass)
+            }
         }
     }
 
@@ -700,31 +704,44 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.header_span(db),
             Self::Dynamic(class) => class.header_span(db),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.header_span(db),
         }
     }
 
     /// Returns whether this class is a disjoint base.
-    // TODO: A dynamic class could provide __slots__ in the namespace dictionary, which would make
-    // it a disjoint base:
-    // ```python
-    // >>> X = type("X", (), {"__slots__": ("a",)})
-    // >>> class Foo(int, X): ...
-    // ...
-    // Traceback (most recent call last):
-    //   File "<python-input-4>", line 1, in <module>
-    //     class Foo(int, X): ...
-    // TypeError: multiple bases have instance lay-out conflict
-    // ```
+    ///
+    /// A class is considered a disjoint base if:
+    /// - It has the `@disjoint_base` decorator (static classes only), or
+    /// - It defines non-empty `__slots__`
+    ///
+    /// For dynamic classes created via `type()`, we check if `__slots__` is provided
+    /// in the namespace dictionary:
+    /// ```python
+    /// >>> X = type("X", (), {"__slots__": ("a",)})
+    /// >>> class Foo(int, X): ...
+    /// ...
+    /// Traceback (most recent call last):
+    ///   File "<python-input-4>", line 1, in <module>
+    ///     class Foo(int, X): ...
+    /// TypeError: multiple bases have instance lay-out conflict
+    /// ```
     pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
-        self.as_static()
-            .and_then(|class| class.as_disjoint_base(db))
+        match self {
+            Self::Static(class) => class.as_disjoint_base(db),
+            Self::Dynamic(class) => class.as_disjoint_base(db),
+            // Dynamic namedtuples define `__slots__ = ()`, but `__slots__` must be
+            // non-empty for a class to be a disjoint base.
+            Self::DynamicNamedTuple(_) => None,
+        }
     }
 
     /// Returns a non-generic instance of this class.
     pub(crate) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Static(class) => class.to_non_generic_instance(db),
-            Self::Dynamic(_) => Type::instance(db, ClassType::NonGeneric(self)),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => {
+                Type::instance(db, ClassType::NonGeneric(self))
+            }
         }
     }
 
@@ -745,7 +762,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.apply_specialization(db, f),
-            Self::Dynamic(_) => ClassType::NonGeneric(self),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -759,6 +776,7 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.instance_member(db, specialization, name),
             Self::Dynamic(class) => class.instance_member(db, name),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, name),
         }
     }
 
@@ -766,7 +784,7 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Static(class) => class.top_materialization(db),
-            Self::Dynamic(_) => ClassType::NonGeneric(self),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -780,7 +798,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::Static(class) => class.typed_dict_member(db, specialization, name, policy),
-            Self::Dynamic(_) => Place::Undefined.into(),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => Place::Undefined.into(),
         }
     }
 
@@ -795,6 +813,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(class) => {
                 Self::Dynamic(class.with_dataclass_params(db, dataclass_params))
             }
+            Self::DynamicNamedTuple(_) => self,
         }
     }
 }
@@ -808,6 +827,12 @@ impl<'db> From<StaticClassLiteral<'db>> for ClassLiteral<'db> {
 impl<'db> From<DynamicClassLiteral<'db>> for ClassLiteral<'db> {
     fn from(literal: DynamicClassLiteral<'db>) -> Self {
         ClassLiteral::Dynamic(literal)
+    }
+}
+
+impl<'db> From<DynamicNamedTupleLiteral<'db>> for ClassLiteral<'db> {
+    fn from(literal: DynamicNamedTupleLiteral<'db>) -> Self {
+        ClassLiteral::DynamicNamedTuple(literal)
     }
 }
 
@@ -903,7 +928,7 @@ impl<'db> ClassType<'db> {
     ) -> Option<(StaticClassLiteral<'db>, Option<Specialization<'db>>)> {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => Some((class, None)),
-            Self::NonGeneric(ClassLiteral::Dynamic(_)) => None,
+            Self::NonGeneric(ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_)) => None,
             Self::Generic(generic) => Some((generic.origin(db), Some(generic.specialization(db)))),
         }
     }
@@ -917,7 +942,7 @@ impl<'db> ClassType<'db> {
     ) -> Option<(StaticClassLiteral<'db>, Option<Specialization<'db>>)> {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => Some((class, None)),
-            Self::NonGeneric(ClassLiteral::Dynamic(_)) => None,
+            Self::NonGeneric(ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_)) => None,
             Self::Generic(generic) => Some((
                 generic.origin(db),
                 Some(
@@ -941,13 +966,13 @@ impl<'db> ClassType<'db> {
         self.class_literal(db).known(db)
     }
 
-    /// Returns the definition for this class.
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+    /// Returns the definition for this class, if available.
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         self.class_literal(db).definition(db)
     }
 
     /// Returns the type definition for this class.
-    pub(crate) fn type_definition(self, db: &'db dyn Db) -> TypeDefinition<'db> {
+    pub(crate) fn type_definition(self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
         self.class_literal(db).type_definition(db)
     }
 
@@ -1174,6 +1199,7 @@ impl<'db> ClassType<'db> {
     /// Return the [`DisjointBase`] that appears first in the MRO of this class.
     ///
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -1323,8 +1349,15 @@ impl<'db> ClassType<'db> {
             Signature::new(parameters, return_annotation)
         }
 
-        let Some((class_literal, specialization)) = self.static_class_literal(db) else {
-            return Member::unbound();
+        let (class_literal, specialization) = match self {
+            Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
+                return dynamic.own_class_member(db, name);
+            }
+            Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
+                return namedtuple.own_class_member(db, name);
+            }
+            Self::NonGeneric(ClassLiteral::Static(class)) => (class, None),
+            Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
         };
 
         let fallback_member_lookup = || {
@@ -1613,6 +1646,9 @@ impl<'db> ClassType<'db> {
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Dynamic(class)) => class.instance_member(db, name),
+            Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
+                namedtuple.instance_member(db, name)
+            }
             Self::NonGeneric(ClassLiteral::Static(class)) => {
                 if class.is_typed_dict(db) {
                     return Place::Undefined.into();
@@ -1637,12 +1673,24 @@ impl<'db> ClassType<'db> {
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let Some((class_literal, specialization)) = self.static_class_literal(db) else {
-            return Member::unbound();
-        };
-        class_literal
-            .own_instance_member(db, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        match self {
+            Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
+                dynamic.own_instance_member(db, name)
+            }
+            Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
+                namedtuple.own_instance_member(db, name)
+            }
+            Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
+                class_literal.own_instance_member(db, name)
+            }
+            Self::Generic(generic) => {
+                let specialization = generic.specialization(db);
+                generic
+                    .origin(db)
+                    .own_instance_member(db, name)
+                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+            }
+        }
     }
 
     /// Return a callable type (or union of callable types) that represents the callable
@@ -1847,6 +1895,49 @@ impl<'db> ClassType<'db> {
     pub(super) fn definition_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).header_span(db)
     }
+
+    /// Returns `true` if calls to this class type should use constructor call handling
+    /// (via `try_call_constructor`) rather than the regular `try_call` path.
+    ///
+    /// Some known classes have manual signatures defined in `bindings()` and should use
+    /// the `try_call` path. For all other class types, we use `try_call_constructor`
+    /// to properly validate `__new__`/`__init__` signatures.
+    pub(super) fn should_use_constructor_call(self, db: &'db dyn Db) -> bool {
+        // For some known classes we have manual signatures defined and use the regular
+        // `try_call` path instead of constructor call handling.
+        let has_special_cased_constructor = matches!(
+            self.known(db),
+            Some(
+                KnownClass::Bool
+                    | KnownClass::Str
+                    | KnownClass::Type
+                    | KnownClass::Object
+                    | KnownClass::Property
+                    | KnownClass::Super
+                    | KnownClass::TypeAliasType
+                    | KnownClass::Deprecated
+            )
+        ) || (
+            // Constructor calls to `tuple` and subclasses of `tuple` are handled in
+            // `Type::bindings`, but constructor calls to `tuple[int]`, `tuple[int, ...]`,
+            // `tuple[int, *tuple[str, ...]]` (etc.) are handled by the default constructor-call
+            // logic (we synthesize a `__new__` method for them in `ClassType::own_class_member`).
+            self.is_known(db, KnownClass::Tuple) && !self.is_generic()
+        ) || self.static_class_literal(db).is_some_and(
+            |(class_literal, specialization)| {
+                CodeGeneratorKind::TypedDict.matches(db, class_literal.into(), specialization)
+            },
+        );
+
+        // Use regular `try_call` for all subclasses of `enum.Enum`. This is a temporary
+        // special-casing until we support the functional syntax for creating enum classes.
+        let is_enum_subclass = KnownClass::Enum
+            .to_class_literal(db)
+            .to_class_type(db)
+            .is_some_and(|enum_class| self.is_subclass_of(db, enum_class));
+
+        !has_special_cased_constructor && !is_enum_subclass
+    }
 }
 
 fn into_callable_cycle_initial<'db>(
@@ -1894,7 +1985,9 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, typevar),
-            Self::NonGeneric(ClassLiteral::Dynamic(_)) => TypeVarVariance::Bivariant,
+            Self::NonGeneric(ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_)) => {
+                TypeVarVariance::Bivariant
+            }
             Self::Generic(generic) => generic.variance_of(db, typevar),
         }
     }
@@ -2051,6 +2144,20 @@ impl<'db> StaticClassLiteral<'db> {
         self.is_known(db, KnownClass::Tuple)
     }
 
+    /// Returns `true` if this class inherits from a functional namedtuple
+    /// (`DynamicNamedTupleLiteral`) that has unknown fields.
+    ///
+    /// When the base namedtuple's fields were determined dynamically (e.g., from a variable),
+    /// we can't synthesize precise method signatures and should fall back to `NamedTupleFallback`.
+    pub(crate) fn namedtuple_base_has_unknown_fields(self, db: &'db dyn Db) -> bool {
+        self.explicit_bases(db).iter().any(|base| match base {
+            Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
+                !namedtuple.has_known_fields(db)
+            }
+            _ => false,
+        })
+    }
+
     /// Returns a new [`StaticClassLiteral`] with the given dataclass params, preserving all other fields.
     pub(crate) fn with_dataclass_params(
         self,
@@ -2111,16 +2218,29 @@ impl<'db> StaticClassLiteral<'db> {
                 let Some(base_class) = base.into_class() else {
                     continue;
                 };
-                let Some((base_literal, base_specialization)) = base_class.static_class_literal(db)
-                else {
-                    continue;
-                };
-                if base_literal.is_known(db, KnownClass::Object) {
-                    continue;
-                }
-                let member = class_member(db, base_literal.body_scope(db), name);
-                if let Some(ty) = member.ignore_possibly_undefined() {
-                    return Some(ty.apply_optional_specialization(db, base_specialization));
+                match base_class.class_literal(db) {
+                    ClassLiteral::Static(base_literal) => {
+                        if base_literal.is_known(db, KnownClass::Object) {
+                            continue;
+                        }
+                        let member = class_member(db, base_literal.body_scope(db), name);
+                        if let Some(ty) = member.ignore_possibly_undefined() {
+                            let base_specialization = base_class
+                                .static_class_literal(db)
+                                .and_then(|(_, spec)| spec);
+                            return Some(ty.apply_optional_specialization(db, base_specialization));
+                        }
+                    }
+                    ClassLiteral::Dynamic(dynamic) => {
+                        // Dynamic classes (created with `type()`) can also define ordering methods
+                        // in their namespace dict.
+                        let member = dynamic.own_class_member(db, name);
+                        if let Some(ty) = member.ignore_possibly_undefined() {
+                            return Some(ty);
+                        }
+                    }
+                    // Dynamic namedtuples don't define their own ordering methods.
+                    ClassLiteral::DynamicNamedTuple(_) => {}
                 }
             }
         }
@@ -2344,6 +2464,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
+
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
@@ -2363,7 +2484,27 @@ impl<'db> StaticClassLiteral<'db> {
             _ => class_stmt
                 .bases()
                 .iter()
-                .map(|base_node| definition_expression_type(db, class_definition, base_node))
+                .flat_map(|base_node| {
+                    if let ast::Expr::Starred(starred) = base_node {
+                        let starred_ty =
+                            definition_expression_type(db, class_definition, &starred.value);
+                        // If the starred expression is a fixed-length tuple, unpack it.
+                        if let Some(Tuple::Fixed(tuple)) = starred_ty
+                            .tuple_instance_spec(db)
+                            .map(std::borrow::Cow::into_owned)
+                        {
+                            return Either::Left(tuple.owned_elements().into_vec().into_iter());
+                        }
+                        // Otherwise, we can't statically determine the bases.
+                        Either::Right(std::iter::once(Type::unknown()))
+                    } else {
+                        Either::Right(std::iter::once(definition_expression_type(
+                            db,
+                            class_definition,
+                            base_node,
+                        )))
+                    }
+                })
                 .collect(),
         }
     }
@@ -2376,7 +2517,9 @@ impl<'db> StaticClassLiteral<'db> {
         {
             Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
-            Some(DisjointBase::due_to_dunder_slots(self))
+            Some(DisjointBase::due_to_dunder_slots(ClassLiteral::Static(
+                self,
+            )))
         } else {
             None
         }
@@ -2498,7 +2641,7 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> Result<Mro<'db>, MroError<'db>> {
+    ) -> Result<Mro<'db>, StaticMroError<'db>> {
         tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
         Mro::of_static_class(db, self, specialization)
     }
@@ -2546,6 +2689,21 @@ impl<'db> StaticClassLiteral<'db> {
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
+    /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
+    /// `typing.NamedTuple`, either directly or indirectly, including functional forms like
+    /// `NamedTuple("X", ...)`).
+    pub(crate) fn has_named_tuple_class_in_mro(self, db: &'db dyn Db) -> bool {
+        self.iter_mro(db, None)
+            .filter_map(ClassBase::into_class)
+            .any(|base| match base.class_literal(db) {
+                ClassLiteral::DynamicNamedTuple(_) => true,
+                ClassLiteral::Dynamic(_) => false,
+                ClassLiteral::Static(class) => class
+                    .explicit_bases(db)
+                    .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),
+            })
+    }
+
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
     fn typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
         if !self.is_typed_dict(db) {
@@ -2555,6 +2713,69 @@ impl<'db> StaticClassLiteral<'db> {
         let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
         Some(typed_dict_params_from_class_def(class_stmt))
+    }
+
+    /// Returns dataclass params for this class, sourced from both dataclass params and dataclass
+    /// transform params
+    fn merged_dataclass_params(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> (Option<DataclassParams<'db>>, Option<DataclassParams<'db>>) {
+        let dataclass_params = self.dataclass_params(db);
+
+        let mut transformer_params =
+            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
+                Some(DataclassParams::from_transformer_params(
+                    db,
+                    transformer_params,
+                ))
+            } else {
+                None
+            };
+
+        // Dataclass transformer flags can be overwritten using class arguments.
+        if let Some(transformer_params) = transformer_params.as_mut() {
+            if let Some(class_def) = self.definition(db).kind(db).as_class() {
+                let module = parsed_module(db, self.file(db)).load(db);
+
+                if let Some(arguments) = &class_def.node(&module).arguments {
+                    let mut flags = transformer_params.flags(db);
+
+                    for keyword in &arguments.keywords {
+                        if let Some(arg_name) = &keyword.arg {
+                            if let Some(is_set) =
+                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
+                            {
+                                for (flag_name, flag) in DATACLASS_FLAGS {
+                                    if arg_name.as_str() == *flag_name {
+                                        flags.set(*flag, is_set);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    *transformer_params =
+                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
+                }
+            }
+        }
+
+        (dataclass_params, transformer_params)
+    }
+
+    /// Checks if the given dataclass parameter flag is set for this class.
+    /// This checks both the `dataclass_params` and `transformer_params`.
+    fn has_dataclass_param(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+        param: DataclassFlags,
+    ) -> bool {
+        let (dataclass_params, transformer_params) = self.merged_dataclass_params(db, field_policy);
+        dataclass_params.is_some_and(|params| params.flags(db).contains(param))
+            || transformer_params.is_some_and(|params| params.flags(db).contains(param))
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -2605,7 +2826,7 @@ impl<'db> StaticClassLiteral<'db> {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
-        if self.try_mro(db, None).is_err_and(MroError::is_cycle) {
+        if self.try_mro(db, None).is_err_and(StaticMroError::is_cycle) {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
@@ -2905,8 +3126,6 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
-        let dataclass_params = self.dataclass_params(db);
-
         // Handle `@functools.total_ordering`: synthesize comparison methods
         // for classes that have `@total_ordering` and define at least one
         // ordering method. The decorator requires at least one of __lt__,
@@ -2956,53 +3175,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let field_policy = CodeGeneratorKind::from_class(db, self.into(), specialization)?;
-
-        let mut transformer_params =
-            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
-                Some(DataclassParams::from_transformer_params(
-                    db,
-                    transformer_params,
-                ))
-            } else {
-                None
-            };
-
-        // Dataclass transformer flags can be overwritten using class arguments.
-        // TODO this should be done more generally, not just in `own_synthesized_member`, so that
-        // `dataclass_params` always reflects the transformer params.
-        if let Some(transformer_params) = transformer_params.as_mut() {
-            if let Some(class_def) = self.definition(db).kind(db).as_class() {
-                let module = parsed_module(db, self.file(db)).load(db);
-
-                if let Some(arguments) = &class_def.node(&module).arguments {
-                    let mut flags = transformer_params.flags(db);
-
-                    for keyword in &arguments.keywords {
-                        if let Some(arg_name) = &keyword.arg {
-                            if let Some(is_set) =
-                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
-                            {
-                                for (flag_name, flag) in DATACLASS_FLAGS {
-                                    if arg_name.as_str() == *flag_name {
-                                        flags.set(*flag, is_set);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    *transformer_params =
-                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
-                }
-            }
-        }
-
-        let has_dataclass_param = |param| {
-            dataclass_params.is_some_and(|params| params.flags(db).contains(param))
-                // TODO if we were correctly initializing `dataclass_params` from the
-                // transformer params, this fallback shouldn't be needed here.
-                || transformer_params.is_some_and(|params| params.flags(db).contains(param))
-        };
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -3096,14 +3268,14 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 .with_annotated_type(field_ty);
 
-                if matches!(name, "__replace__" | "_replace") {
+                parameter = if matches!(name, "__replace__" | "_replace") {
                     // When replacing, we know there is a default value for the field
                     // (the value that is currently assigned to the field)
                     // assume this to be the declared type of the field
-                    parameter = parameter.with_default_type(field_ty);
-                } else if let Some(default_ty) = default_ty {
-                    parameter = parameter.with_default_type(default_ty);
-                }
+                    parameter.with_default_type(field_ty)
+                } else {
+                    parameter.with_optional_default_type(default_ty)
+                };
 
                 parameters.push(parameter);
             }
@@ -3125,7 +3297,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         match (field_policy, name) {
             (CodeGeneratorKind::DataclassLike(_), "__init__") => {
-                if !has_dataclass_param(DataclassFlags::INIT) {
+                if !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT) {
                     return None;
                 }
 
@@ -3134,40 +3306,54 @@ impl<'db> StaticClassLiteral<'db> {
                     .with_annotated_type(instance_ty);
                 signature_from_fields(vec![self_parameter], Type::none(db))
             }
-            (CodeGeneratorKind::NamedTuple, "__new__") => {
-                let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
-                    .with_annotated_type(KnownClass::Type.to_instance(db));
-                signature_from_fields(vec![cls_parameter], Type::none(db))
+            (
+                CodeGeneratorKind::NamedTuple,
+                "__new__" | "__init__" | "_replace" | "__replace__" | "_fields",
+            ) if self.namedtuple_base_has_unknown_fields(db) => {
+                // When the namedtuple base has unknown fields, fall back to NamedTupleFallback
+                // which has generic signatures that accept any arguments.
+                KnownClass::NamedTupleFallback
+                    .to_class_literal(db)
+                    .as_class_literal()?
+                    .as_static()?
+                    .own_class_member(db, inherited_generic_context, None, name)
+                    .ignore_possibly_undefined()
+                    .map(|ty| {
+                        ty.apply_type_mapping(
+                            db,
+                            &TypeMapping::ReplaceSelf {
+                                new_upper_bound: instance_ty,
+                            },
+                            TypeContext::default(),
+                        )
+                    })
             }
-            (CodeGeneratorKind::NamedTuple, "_replace" | "__replace__") => {
-                if name == "__replace__"
-                    && Program::get(db).python_version(db) < PythonVersion::PY313
-                {
-                    return None;
-                }
-                // Use `Self` type variable as return type so that subclasses get the correct
-                // return type when calling `_replace`. For example, if `IntBox` inherits from
-                // `Box[int]` (a NamedTuple), then `IntBox(1)._replace(content=42)` should return
-                // `IntBox`, not `Box[int]`.
-                let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
-                    db,
-                    instance_ty,
-                    BindingContext::Synthetic,
-                ));
-                let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
-                    .with_annotated_type(self_ty);
-                signature_from_fields(vec![self_parameter], self_ty)
-            }
-            (CodeGeneratorKind::NamedTuple, "_fields") => {
-                // Synthesize a precise tuple type for _fields using literal string types.
-                // For example, a NamedTuple with `name` and `age` fields gets
-                // `tuple[Literal["name"], Literal["age"]]`.
+            (
+                CodeGeneratorKind::NamedTuple,
+                "__new__" | "_replace" | "__replace__" | "_fields" | "__slots__",
+            ) => {
                 let fields = self.fields(db, specialization, field_policy);
-                let field_types = fields.keys().map(|name| Type::string_literal(db, name));
-                Some(Type::heterogeneous_tuple(db, field_types))
+                let fields_iter = fields.iter().map(|(name, field)| {
+                    let default_ty = match &field.kind {
+                        FieldKind::NamedTuple { default_ty } => *default_ty,
+                        _ => None,
+                    };
+                    NamedTupleField {
+                        name: name.clone(),
+                        ty: field.declared_ty,
+                        default: default_ty,
+                    }
+                });
+                synthesize_namedtuple_class_member(
+                    db,
+                    name,
+                    instance_ty,
+                    fields_iter,
+                    specialization.map(|s| s.generic_context(db)),
+                )
             }
             (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
-                if !has_dataclass_param(DataclassFlags::ORDER) {
+                if !self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER) {
                     return None;
                 }
 
@@ -3189,9 +3375,10 @@ impl<'db> StaticClassLiteral<'db> {
                 Some(Type::function_like_callable(db, signature))
             }
             (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
-                let unsafe_hash = has_dataclass_param(DataclassFlags::UNSAFE_HASH);
-                let frozen = has_dataclass_param(DataclassFlags::FROZEN);
-                let eq = has_dataclass_param(DataclassFlags::EQ);
+                let unsafe_hash =
+                    self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH);
+                let frozen = self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN);
+                let eq = self.has_dataclass_param(db, field_policy, DataclassFlags::EQ);
 
                 if unsafe_hash || (frozen && eq) {
                     let signature = Signature::new(
@@ -3214,11 +3401,12 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__match_args__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
-                if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
+                if !self.has_dataclass_param(db, field_policy, DataclassFlags::MATCH_ARGS) {
                     return None;
                 }
 
-                let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
+                let kw_only_default =
+                    self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY);
 
                 let fields = self.fields(db, specialization, field_policy);
                 let match_args = fields
@@ -3236,8 +3424,8 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__weakref__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
             {
-                if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
-                    || !has_dataclass_param(DataclassFlags::SLOTS)
+                if !self.has_dataclass_param(db, field_policy, DataclassFlags::WEAKREF_SLOT)
+                    || !self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
                 {
                     return None;
                 }
@@ -3280,7 +3468,7 @@ impl<'db> StaticClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if has_dataclass_param(DataclassFlags::FROZEN) {
+                if self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN) {
                     let signature = Signature::new(
                         Parameters::new(
                             db,
@@ -3301,11 +3489,12 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__slots__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
-                has_dataclass_param(DataclassFlags::SLOTS).then(|| {
-                    let fields = self.fields(db, specialization, field_policy);
-                    let slots = fields.keys().map(|name| Type::string_literal(db, name));
-                    Type::heterogeneous_tuple(db, slots)
-                })
+                self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
+                    .then(|| {
+                        let fields = self.fields(db, specialization, field_policy);
+                        let slots = fields.keys().map(|name| Type::string_literal(db, name));
+                        Type::heterogeneous_tuple(db, slots)
+                    })
             }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
@@ -3747,6 +3936,41 @@ impl<'db> StaticClassLiteral<'db> {
             .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
+    }
+
+    pub(crate) fn validate_members(self, context: &InferContext<'db, '_>) {
+        let db = context.db();
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+            return;
+        };
+        let class_body_scope = self.body_scope(db);
+        let table = place_table(db, class_body_scope);
+        let use_def = use_def_map(db, class_body_scope);
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            let result = place_from_declarations(db, declarations.clone());
+            let attr = result.ignore_conflicting_declarations();
+            let symbol = table.symbol(symbol_id);
+            let name = symbol.name();
+            if let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
+                && matches!(name.as_str(), "__setattr__" | "__delattr__")
+            {
+                if let CodeGeneratorKind::DataclassLike(_) = field_policy
+                    && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
+                {
+                    if let Some(builder) = context.report_lint(
+                        &INVALID_DATACLASS_OVERRIDE,
+                        literal.node(db, context.file(), context.module()),
+                    ) {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Cannot overwrite attribute `{}` in class `{}`",
+                            name,
+                            self.name(db)
+                        ));
+                        diagnostic.info(name);
+                    }
+                }
+            }
+        }
     }
 
     /// Returns a list of all annotated attributes defined in the body of this class. This is similar
@@ -4649,7 +4873,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
             Self::Static(class) => class.variance_of(db, typevar),
-            Self::Dynamic(_) => TypeVarVariance::Bivariant,
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => TypeVarVariance::Bivariant,
         }
     }
 }
@@ -4665,27 +4889,13 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// - name: "Foo"
 /// - bases: [Base]
 ///
-/// # Limitations
-///
-/// TODO: Attributes from the namespace dict (third argument to `type()`) are not tracked.
-/// This matches Pyright's behavior. For example:
-///
-/// ```python
-/// Foo = type("Foo", (), {"attr": 42})
-/// Foo().attr  # Error: no attribute 'attr'
-/// ```
-///
-/// Supporting namespace dict attributes would require parsing dict literals and tracking
-/// the attribute types, similar to how TypedDict handles its fields.
+/// This is called "dynamic" because the class is created dynamically at runtime
+/// via a function call rather than a class statement.
 ///
 /// # Salsa interning
 ///
-/// Each `type()` call is uniquely identified by its [`Definition`], which provides
-/// stable identity without depending on AST node indices that can change when code
-/// is inserted above the call site.
-///
-/// Two different `type()` calls always produce distinct `DynamicClassLiteral`
-/// instances, even if they have the same name and bases:
+/// This is a Salsa-interned struct. Two different `type()` calls always produce
+/// distinct `DynamicClassLiteral` instances, even if they have the same name and bases:
 ///
 /// ```python
 /// Foo1 = type("Foo", (Base,), {})
@@ -4693,9 +4903,11 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// # Foo1 and Foo2 are distinct types
 /// ```
 ///
-/// Note: Only assigned `type()` calls are currently supported (e.g., `Foo = type(...)`).
-/// Inline calls like `process(type(...))` fall back to normal call handling.
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+/// The `anchor` field provides stable identity:
+/// - For assigned `type()` calls, the `Definition` uniquely identifies the class.
+/// - For dangling `type()` calls, a relative node offset anchored to the enclosing scope
+///   provides stable identity that only changes when the scope itself changes.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DynamicClassLiteral<'db> {
     /// The name of the class (from the first argument to `type()`).
@@ -4706,46 +4918,110 @@ pub struct DynamicClassLiteral<'db> {
     #[returns(deref)]
     pub bases: Box<[ClassBase<'db>]>,
 
-    /// The definition where this class is created.
-    pub definition: Definition<'db>,
+    /// The anchor for this dynamic class, providing stable identity.
+    ///
+    /// - `Definition`: The `type()` call is assigned to a variable. The definition
+    ///   uniquely identifies this class and can be used to find the `type()` call.
+    /// - `ScopeOffset`: The `type()` call is "dangling" (not assigned). The offset
+    ///   is relative to the enclosing scope's anchor node index.
+    pub anchor: DynamicClassAnchor<'db>,
+
+    /// The class members from the namespace dict (third argument to `type()`).
+    /// Each entry is a (name, type) pair extracted from the dict literal.
+    #[returns(deref)]
+    pub members: Box<[(Name, Type<'db>)]>,
+
+    /// Whether the namespace dict (third argument) is dynamic (not a literal dict,
+    /// or contains non-string-literal keys). When true, attribute lookups on this
+    /// class and its instances return `Unknown` instead of failing.
+    pub has_dynamic_namespace: bool,
 
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
     /// or passed to `dataclass()` as a function.
     pub dataclass_params: Option<DataclassParams<'db>>,
 }
 
+/// Anchor for identifying a dynamic class literal.
+///
+/// This enum provides stable identity for `DynamicClassLiteral`:
+/// - For assigned calls, the `Definition` uniquely identifies the class.
+/// - For dangling calls, a relative offset provides stable identity.
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
+)]
+pub enum DynamicClassAnchor<'db> {
+    /// The `type()` call is assigned to a variable.
+    ///
+    /// The `Definition` uniquely identifies this class. The `type()` call expression
+    /// is the `value` of the assignment, so we can get its range from the definition.
+    Definition(Definition<'db>),
+
+    /// The `type()` call is "dangling" (not assigned to a variable).
+    ///
+    /// The offset is relative to the enclosing scope's anchor node index.
+    /// For module scope, this is equivalent to an absolute index (anchor is 0).
+    ScopeOffset { scope: ScopeId<'db>, offset: u32 },
+}
+
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> DynamicClassLiteral<'db> {
+    /// Returns the definition where this class is created, if it was assigned to a variable.
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => Some(definition),
+            DynamicClassAnchor::ScopeOffset { .. } => None,
+        }
+    }
+
+    /// Returns the scope in which this dynamic class was created.
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => definition.scope(db),
+            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
+        }
+    }
+
     /// Returns a [`Span`] with the range of the `type()` call expression.
     ///
     /// See [`Self::header_range`] for more details.
     pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
-        Span::from(self.file(db)).with_range(self.header_range(db))
+        Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
     /// Returns the range of the `type()` call expression that created this class.
     pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
-        let definition = self.definition(db);
-        let file = definition.file(db);
+        let scope = self.scope(db);
+        let file = scope.file(db);
         let module = parsed_module(db, file).load(db);
 
-        // Dynamic classes are only created from regular assignments (e.g., `Foo = type(...)`).
-        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-            unreachable!("DynamicClassLiteral should only be created from Assignment definitions");
-        };
-        assignment.value(&module).range()
-    }
+        match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => {
+                // For definitions, get the range from the definition's value.
+                // The `type()` call is the value of the assignment.
+                definition
+                    .kind(db)
+                    .value(&module)
+                    .expect("DynamicClassAnchor::Definition should only be used for assignments")
+                    .range()
+            }
+            DynamicClassAnchor::ScopeOffset { offset, .. } => {
+                // For dangling `type()` calls, compute the absolute index from the offset.
+                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+                let anchor_u32 = scope_anchor
+                    .as_u32()
+                    .expect("anchor should not be NodeIndex::NONE");
+                let absolute_index = NodeIndex::from(anchor_u32 + offset);
 
-    /// Returns the file containing the `type()` call.
-    pub(crate) fn file(self, db: &'db dyn Db) -> File {
-        self.definition(db).file(db)
-    }
-
-    /// Returns the scope containing the `type()` call.
-    pub(crate) fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
-        self.definition(db).file_scope(db)
+                // Get the node and return its range.
+                let node: &ast::ExprCall = module
+                    .get_by_index(absolute_index)
+                    .try_into()
+                    .expect("scope offset should point to ExprCall");
+                node.range()
+            }
+        }
     }
 
     /// Get the metaclass of this dynamic class.
@@ -4900,6 +5176,29 @@ impl<'db> DynamicClassLiteral<'db> {
         }
     }
 
+    /// Look up a class member defined directly on this class (not inherited).
+    ///
+    /// Returns [`Member::unbound`] if the member is not found in the namespace dict,
+    /// unless the namespace is dynamic, in which case returns `Unknown`.
+    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        // If the namespace is dynamic (not a literal dict) and the name isn't in `self.members`,
+        // return Unknown since we can't know what attributes might be defined.
+        self.members(db)
+            .iter()
+            .find_map(|(member_name, ty)| (name == member_name).then_some(*ty))
+            .or_else(|| self.has_dynamic_namespace(db).then(Type::unknown))
+            .map(Member::definitely_declared)
+            .unwrap_or_default()
+    }
+
+    /// Look up an instance member defined directly on this class (not inherited).
+    ///
+    /// For dynamic classes, instance members are the same as class members
+    /// since they come from the namespace dict.
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        self.own_class_member(db, name)
+    }
+
     /// Try to compute the MRO for this dynamic class.
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
@@ -4907,6 +5206,50 @@ impl<'db> DynamicClassLiteral<'db> {
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic_class(db, self)
+    }
+
+    /// Return `Some()` if this dynamic class is known to be a [`DisjointBase`].
+    ///
+    /// A dynamic class is a disjoint base if `__slots__` is defined in the namespace
+    /// dictionary and is non-empty. Example:
+    /// ```python
+    /// X = type("X", (), {"__slots__": ("a",)})
+    /// ```
+    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+        // Check if __slots__ is in the members
+        for (name, ty) in self.members(db) {
+            if name.as_str() == "__slots__" {
+                // Check if the slots are non-empty
+                let is_non_empty = match ty {
+                    // __slots__ = ("a", "b")
+                    Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|spec| {
+                        spec.len().into_fixed_length().is_some_and(|len| len > 0)
+                    }),
+                    // __slots__ = "abc"  # Same as ("abc",)
+                    Type::StringLiteral(_) => true,
+                    // Other types are considered dynamic/unknown
+                    _ => false,
+                };
+                if is_non_empty {
+                    return Some(DisjointBase::due_to_dunder_slots(ClassLiteral::Dynamic(
+                        self,
+                    )));
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns `true` if this dynamic class defines any ordering method (`__lt__`, `__le__`,
+    /// `__gt__`, `__ge__`) in its namespace dictionary. Used by `@total_ordering` to determine
+    /// if synthesis is valid.
+    ///
+    /// If the namespace is dynamic, returns `true` since we can't know if ordering methods exist.
+    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+        const ORDERING_METHODS: &[&str] = &["__lt__", "__le__", "__gt__", "__ge__"];
+        ORDERING_METHODS
+            .iter()
+            .any(|name| !self.own_class_member(db, name).is_undefined())
     }
 
     /// Returns a new [`DynamicClassLiteral`] with the given dataclass params, preserving all other fields.
@@ -4919,7 +5262,9 @@ impl<'db> DynamicClassLiteral<'db> {
             db,
             self.name(db).clone(),
             self.bases(db),
-            self.definition(db),
+            self.anchor(db),
+            self.members(db),
+            self.has_dynamic_namespace(db),
             dataclass_params,
         )
     }
@@ -4936,6 +5281,422 @@ pub(crate) struct DynamicMetaclassConflict<'db> {
     /// The second conflicting metaclass and its originating base class.
     pub(crate) metaclass2: ClassType<'db>,
     pub(crate) base2: ClassBase<'db>,
+}
+
+/// Create a property type for a namedtuple field.
+fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db> {
+    let property_getter_signature = Signature::new(
+        Parameters::new(
+            db,
+            [Parameter::positional_only(Some(Name::new_static("self")))],
+        ),
+        field_ty,
+    );
+    let property_getter = Type::single_callable(db, property_getter_signature);
+    let property = PropertyInstanceType::new(db, Some(property_getter), None);
+    Type::PropertyInstance(property)
+}
+
+/// Synthesize a namedtuple class member given the field information.
+///
+/// This is used by both `DynamicNamedTupleLiteral` and `StaticClassLiteral` (for declarative
+/// namedtuples) to avoid duplicating the synthesis logic.
+///
+/// The `inherited_generic_context` parameter is used for declarative namedtuples to preserve
+/// generic context in the synthesized `__new__` signature.
+fn synthesize_namedtuple_class_member<'db>(
+    db: &'db dyn Db,
+    name: &str,
+    instance_ty: Type<'db>,
+    fields: impl Iterator<Item = NamedTupleField<'db>>,
+    inherited_generic_context: Option<GenericContext<'db>>,
+) -> Option<Type<'db>> {
+    match name {
+        "__new__" => {
+            // __new__(cls, field1, field2, ...) -> Self
+            let self_typevar =
+                BoundTypeVarInstance::synthetic_self(db, instance_ty, BindingContext::Synthetic);
+            let self_ty = Type::TypeVar(self_typevar);
+
+            let variables = inherited_generic_context
+                .iter()
+                .flat_map(|ctx| ctx.variables(db))
+                .chain(std::iter::once(self_typevar));
+
+            let generic_context = GenericContext::from_typevar_instances(db, variables);
+
+            let first_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
+                .with_annotated_type(SubclassOfType::from(db, self_typevar));
+
+            let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {
+                Parameter::positional_or_keyword(field.name)
+                    .with_annotated_type(field.ty)
+                    .with_optional_default_type(field.default)
+            }));
+
+            let signature = Signature::new_generic(
+                Some(generic_context),
+                Parameters::new(db, parameters),
+                self_ty,
+            );
+            Some(Type::function_like_callable(db, signature))
+        }
+        "_fields" => {
+            // _fields: tuple[Literal["field1"], Literal["field2"], ...]
+            let field_types = fields.map(|field| Type::string_literal(db, &field.name));
+            Some(Type::heterogeneous_tuple(db, field_types))
+        }
+        "__slots__" => {
+            // __slots__: tuple[()] - always empty for namedtuples
+            Some(Type::empty_tuple(db))
+        }
+        "_replace" | "__replace__" => {
+            if name == "__replace__" && Program::get(db).python_version(db) < PythonVersion::PY313 {
+                return None;
+            }
+
+            // _replace(self, *, field1=..., field2=...) -> Self
+            let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                db,
+                instance_ty,
+                BindingContext::Synthetic,
+            ));
+
+            let first_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+                .with_annotated_type(self_ty);
+
+            let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {
+                Parameter::keyword_only(field.name)
+                    .with_annotated_type(field.ty)
+                    .with_default_type(field.ty)
+            }));
+
+            let signature = Signature::new(Parameters::new(db, parameters), self_ty);
+            Some(Type::function_like_callable(db, signature))
+        }
+        "__init__" => {
+            // Namedtuples don't have a custom __init__. All construction happens in __new__.
+            None
+        }
+        _ => {
+            // Fall back to NamedTupleFallback for other synthesized methods.
+            KnownClass::NamedTupleFallback
+                .to_class_literal(db)
+                .as_class_literal()?
+                .as_static()?
+                .own_class_member(db, inherited_generic_context, None, name)
+                .ignore_possibly_undefined()
+        }
+    }
+}
+
+#[derive(Debug, salsa::Update, get_size2::GetSize, Clone, PartialEq, Eq, Hash)]
+pub struct NamedTupleField<'db> {
+    pub(crate) name: Name,
+    pub(crate) ty: Type<'db>,
+    pub(crate) default: Option<Type<'db>>,
+}
+
+/// A namedtuple created via the functional form `namedtuple(name, fields)` or
+/// `NamedTuple(name, fields)`.
+///
+/// For example:
+/// ```python
+/// from collections import namedtuple
+/// Point = namedtuple("Point", ["x", "y"])
+///
+/// from typing import NamedTuple
+/// Person = NamedTuple("Person", [("name", str), ("age", int)])
+/// ```
+///
+/// The type of `Point` would be `type[Point]` where `Point` is a `DynamicNamedTupleLiteral`.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct DynamicNamedTupleLiteral<'db> {
+    /// The name of the namedtuple (from the first argument).
+    #[returns(ref)]
+    pub name: Name,
+
+    /// The fields as (name, type, default) tuples.
+    /// For `collections.namedtuple`, all types are `Any`.
+    /// For `typing.NamedTuple`, types come from the field definitions.
+    /// The third element is the default type, if any.
+    #[returns(deref)]
+    pub fields: Box<[NamedTupleField<'db>]>,
+
+    /// Whether the fields are known statically.
+    ///
+    /// When `true`, the fields were determined from a literal (list or tuple).
+    /// When `false`, the fields argument was dynamic (e.g., a variable),
+    /// and attribute lookups should return `Any` instead of failing.
+    pub has_known_fields: bool,
+
+    /// The anchor for this dynamic namedtuple, providing stable identity.
+    ///
+    /// - `Definition`: The call is assigned to a variable. The definition
+    ///   uniquely identifies this namedtuple and can be used to find the call.
+    /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
+    ///   is relative to the enclosing scope's anchor node index.
+    pub anchor: DynamicClassAnchor<'db>,
+}
+
+impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
+
+#[salsa::tracked]
+impl<'db> DynamicNamedTupleLiteral<'db> {
+    /// Returns the definition where this namedtuple is created, if it was assigned to a variable.
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => Some(definition),
+            DynamicClassAnchor::ScopeOffset { .. } => None,
+        }
+    }
+
+    /// Returns the scope in which this dynamic class was created.
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => definition.scope(db),
+            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
+        }
+    }
+
+    /// Returns an instance type for this dynamic namedtuple.
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
+        Type::instance(db, ClassType::NonGeneric(self.into()))
+    }
+
+    /// Returns the range of the namedtuple call expression.
+    pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
+        let scope = self.scope(db);
+        let file = scope.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => {
+                // For definitions, get the range from the definition's value.
+                // The namedtuple call is the value of the assignment.
+                definition
+                    .kind(db)
+                    .value(&module)
+                    .expect("DynamicClassAnchor::Definition should only be used for assignments")
+                    .range()
+            }
+            DynamicClassAnchor::ScopeOffset { offset, .. } => {
+                // For dangling calls, compute the absolute index from the offset.
+                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+                let anchor_u32 = scope_anchor
+                    .as_u32()
+                    .expect("anchor should not be NodeIndex::NONE");
+                let absolute_index = NodeIndex::from(anchor_u32 + offset);
+
+                // Get the node and return its range.
+                let node: &ast::ExprCall = module
+                    .get_by_index(absolute_index)
+                    .try_into()
+                    .expect("scope offset should point to ExprCall");
+                node.range()
+            }
+        }
+    }
+
+    /// Returns a [`Span`] pointing to the namedtuple call expression.
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
+    }
+
+    /// Compute the MRO for this namedtuple.
+    ///
+    /// The MRO is the MRO of the class's tuple base class, prepended by `self`.
+    /// For example, `namedtuple("Point", [("x", int), ("y", int)])` has the following MRO:
+    ///
+    /// 1. `<class 'Point'>`
+    /// 2. `<class 'tuple[int, int]'>`
+    /// 3. `<class 'Sequence[int]'>`
+    /// 4. `<class 'Reversible[int]'>`
+    /// 5. `<class 'Collection[int]'>`
+    /// 6. `<class 'Iterable[int]'>`
+    /// 7. `<class 'Container[int]'>`
+    /// 8. `typing.Protocol`
+    /// 9. `typing.Generic`
+    /// 10. `<class 'object'>`
+    #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
+    pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
+        let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
+        let tuple_class = self.tuple_base_class(db);
+        std::iter::once(self_base)
+            .chain(tuple_class.iter_mro(db))
+            .collect()
+    }
+
+    /// Get the metaclass of this dynamic namedtuple.
+    ///
+    /// Namedtuples always have `type` as their metaclass.
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        let _ = self;
+        KnownClass::Type.to_class_literal(db)
+    }
+
+    /// Compute the specialized tuple class that this namedtuple inherits from.
+    ///
+    /// For example, `namedtuple("Point", [("x", int), ("y", int)])` inherits from `tuple[int, int]`.
+    pub(crate) fn tuple_base_class(self, db: &'db dyn Db) -> ClassType<'db> {
+        // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
+        // like index-out-of-bounds errors.
+        if !self.has_known_fields(db) {
+            return TupleType::homogeneous(db, Type::unknown()).to_class_type(db);
+        }
+
+        let field_types = self.fields(db).iter().map(|field| field.ty);
+        TupleType::heterogeneous(db, field_types)
+            .map(|t| t.to_class_type(db))
+            .unwrap_or_else(|| {
+                KnownClass::Tuple
+                    .to_class_literal(db)
+                    .as_class_literal()
+                    .expect("tuple should be a class literal")
+                    .default_specialization(db)
+            })
+    }
+
+    /// Look up an instance member defined directly on this class (not inherited).
+    ///
+    /// For dynamic namedtuples, instance members are the field names.
+    /// If fields are unknown (dynamic), returns `Any` for any attribute.
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        for field in self.fields(db) {
+            if field.name == name {
+                return Member::definitely_declared(field.ty);
+            }
+        }
+
+        if !self.has_known_fields(db) {
+            return Member::definitely_declared(Type::any());
+        }
+
+        Member::unbound()
+    }
+
+    /// Look up an instance member by name (including superclasses).
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        // First check own instance members.
+        let result = self.own_instance_member(db, name);
+        if !result.is_undefined() {
+            return result.inner;
+        }
+
+        // Fall back to the tuple base type for other attributes.
+        Type::instance(db, self.tuple_base_class(db)).instance_member(db, name)
+    }
+
+    /// Look up a class-level member by name.
+    pub(crate) fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        // First check synthesized members and fields.
+        let member = self.own_class_member(db, name);
+        if !member.is_undefined() {
+            return member.inner;
+        }
+
+        // Fall back to tuple class members.
+        let result = self
+            .tuple_base_class(db)
+            .class_literal(db)
+            .class_member(db, name, policy);
+
+        // If fields are unknown (dynamic) and the attribute wasn't found,
+        // return `Any` instead of failing.
+        if !self.has_known_fields(db) && result.place.is_undefined() {
+            return Place::bound(Type::any()).into();
+        }
+
+        result
+    }
+
+    /// Look up a class-level member defined directly on this class (not inherited).
+    ///
+    /// This only checks synthesized members and field properties, without falling
+    /// back to tuple or other base classes.
+    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        // Handle synthesized namedtuple attributes.
+        if let Some(ty) = self.synthesized_class_member(db, name) {
+            return Member::definitely_declared(ty);
+        }
+
+        // Check if it's a field name (returns a property descriptor).
+        for field in self.fields(db) {
+            if field.name == name {
+                return Member::definitely_declared(create_field_property(db, field.ty));
+            }
+        }
+
+        Member::default()
+    }
+
+    /// Generate synthesized class members for namedtuples.
+    fn synthesized_class_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let instance_ty = self.to_instance(db);
+
+        // When fields are unknown, handle constructor and field-specific methods specially.
+        if !self.has_known_fields(db) {
+            match name {
+                // For constructors, return a gradual signature that accepts any arguments.
+                "__new__" | "__init__" => {
+                    let signature = Signature::new(Parameters::gradual_form(), instance_ty);
+                    return Some(Type::function_like_callable(db, signature));
+                }
+                // For other field-specific methods, fall through to NamedTupleFallback.
+                "_fields" | "_replace" | "__replace__" => {
+                    return KnownClass::NamedTupleFallback
+                        .to_class_literal(db)
+                        .as_class_literal()?
+                        .as_static()?
+                        .own_class_member(db, None, None, name)
+                        .ignore_possibly_undefined()
+                        .map(|ty| {
+                            ty.apply_type_mapping(
+                                db,
+                                &TypeMapping::ReplaceSelf {
+                                    new_upper_bound: instance_ty,
+                                },
+                                TypeContext::default(),
+                            )
+                        });
+                }
+                _ => {}
+            }
+        }
+
+        let result = synthesize_namedtuple_class_member(
+            db,
+            name,
+            instance_ty,
+            self.fields(db).iter().cloned(),
+            None,
+        );
+        // For fallback members from NamedTupleFallback, apply type mapping to handle
+        // `Self` types. The explicitly synthesized members (__new__, _fields, _replace,
+        // __replace__) don't need this mapping.
+        if matches!(
+            name,
+            "__new__" | "_fields" | "_replace" | "__replace__" | "__slots__"
+        ) {
+            result
+        } else {
+            result.map(|ty| {
+                ty.apply_type_mapping(
+                    db,
+                    &TypeMapping::ReplaceSelf {
+                        new_upper_bound: instance_ty,
+                    },
+                    TypeContext::default(),
+                )
+            })
+        }
+    }
 }
 
 /// Performs member lookups over an MRO (Method Resolution Order).
@@ -5211,7 +5972,13 @@ impl<'db> QualifiedClassName<'db> {
             }
             ClassLiteral::Dynamic(class) => {
                 // Dynamic classes don't have a body scope; start from the enclosing scope.
-                (class.file(self.db), class.file_scope(self.db), 0)
+                let scope = class.scope(self.db);
+                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+            }
+            ClassLiteral::DynamicNamedTuple(namedtuple) => {
+                // Dynamic namedtuples don't have a body scope; start from the enclosing scope.
+                let scope = namedtuple.scope(self.db);
+                (scope.file(self.db), scope.file_scope_id(self.db), 0)
             }
         };
 
@@ -5294,9 +6061,9 @@ impl InheritanceCycle {
 /// `TypeError`s resulting from class definitions.
 ///
 /// [PEP 800]: https://peps.python.org/pep-0800/
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, get_size2::GetSize, salsa::Update)]
 pub(super) struct DisjointBase<'db> {
-    pub(super) class: StaticClassLiteral<'db>,
+    pub(super) class: ClassLiteral<'db>,
     pub(super) kind: DisjointBaseKind,
 }
 
@@ -5305,14 +6072,14 @@ impl<'db> DisjointBase<'db> {
     /// because it has the `@disjoint_base` decorator on its definition
     fn due_to_decorator(class: StaticClassLiteral<'db>) -> Self {
         Self {
-            class,
+            class: ClassLiteral::Static(class),
             kind: DisjointBaseKind::DisjointBaseDecorator,
         }
     }
 
     /// Creates a [`DisjointBase`] instance where we know the class is a disjoint base
     /// because of its `__slots__` definition.
-    fn due_to_dunder_slots(class: StaticClassLiteral<'db>) -> Self {
+    fn due_to_dunder_slots(class: ClassLiteral<'db>) -> Self {
         Self {
             class,
             kind: DisjointBaseKind::DefinesSlots,
@@ -5324,14 +6091,16 @@ impl<'db> DisjointBase<'db> {
         self == other
             || self
                 .class
-                .is_subclass_of(db, None, other.class.default_specialization(db))
+                .default_specialization(db)
+                .is_subclass_of(db, other.class.default_specialization(db))
             || other
                 .class
-                .is_subclass_of(db, None, self.class.default_specialization(db))
+                .default_specialization(db)
+                .is_subclass_of(db, self.class.default_specialization(db))
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub(super) enum DisjointBaseKind {
     /// We know the class is a disjoint base because it's either hardcoded in ty
     /// or has the `@disjoint_base` decorator.
@@ -5423,6 +6192,7 @@ pub enum KnownClass {
     SupportsIndex,
     Iterable,
     Iterator,
+    Sequence,
     Mapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
@@ -5539,6 +6309,7 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
@@ -5627,6 +6398,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -5714,6 +6486,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -5801,6 +6574,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -5920,7 +6694,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
-            | Self::Mapping => false,
+            | Self::Mapping
+            | Self::Sequence => false,
         }
     }
 
@@ -5994,6 +6769,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Sequence
             | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -6086,6 +6862,7 @@ impl KnownClass {
             Self::Super => "super",
             Self::Iterable => "Iterable",
             Self::Iterator => "Iterator",
+            Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
@@ -6428,6 +7205,7 @@ impl KnownClass {
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             | Self::ProtocolMeta
             | Self::SupportsIndex => KnownModule::Typing,
@@ -6567,6 +7345,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
@@ -6659,6 +7438,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
@@ -6723,6 +7503,7 @@ impl KnownClass {
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
             "Iterable" => &[Self::Iterable],
             "Iterator" => &[Self::Iterator],
+            "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
@@ -6866,6 +7647,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Mapping
             | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),

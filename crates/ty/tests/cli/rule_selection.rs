@@ -796,12 +796,12 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     3 | division-by-zero = "error"
     4 |
     5 | [[tool.ty.overrides]]
-      | ^^^^^^^^^^^^^^^^^^^^^ This overrides section configures no rules
+      | ^^^^^^^^^^^^^^^^^^^^^ This overrides section overrides no settings
     6 | include = ["*.py"]  # Has patterns but no rule overrides
     7 | # Missing [tool.ty.overrides.rules] section entirely
       |
-    info: It has no `rules` table
-    info: Add a `[overrides.rules]` table...
+    info: It has no `rules` or `analysis` table
+    info: Add a `[overrides.rules]` or `[overrides.analysis]` table...
     info: or remove the `[[overrides]]` section if there's nothing to override
 
     error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero

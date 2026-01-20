@@ -20,16 +20,13 @@ class Base: ...
 class Mixin: ...
 
 # We synthesize a class type using the name argument
-Foo = type("Foo", (), {})
-reveal_type(Foo)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (), {}))  # revealed: <class 'Foo'>
 
 # With a single base class
-Foo2 = type("Foo", (Base,), {"attr": 1})
-reveal_type(Foo2)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: <class 'Foo'>
 
 # With multiple base classes
-Foo3 = type("Foo", (Base, Mixin), {})
-reveal_type(Foo3)  # revealed: <class 'Foo'>
+reveal_type(type("Foo", (Base, Mixin), {}))  # revealed: <class 'Foo'>
 
 # The inferred type is assignable to type[Base] since Foo inherits from Base
 tests: list[type[Base]] = []
@@ -77,9 +74,9 @@ def takes_foo2(x: Foo2) -> None: ...
 takes_foo1(foo1)  # OK
 takes_foo2(foo2)  # OK
 
-# error: [invalid-argument-type] "Argument to function `takes_foo1` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:5`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:6`"
+# error: [invalid-argument-type] "Argument to function `takes_foo1` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:5:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`"
 takes_foo1(foo2)
-# error: [invalid-argument-type] "Argument to function `takes_foo2` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:6`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:5`"
+# error: [invalid-argument-type] "Argument to function `takes_foo2` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:5:8`"
 takes_foo2(foo1)
 ```
 
@@ -115,17 +112,116 @@ reveal_type(bar.base_attr)  # revealed: int
 reveal_type(bar.mixin_attr)  # revealed: str
 ```
 
-Attributes from the namespace dict (third argument) are not tracked. Like Pyright, we error when
-attempting to access them:
+Attributes from the namespace dict (third argument) are tracked:
 
 ```py
 class Base: ...
 
 Foo = type("Foo", (Base,), {"custom_attr": 42})
-foo = Foo()
 
-# error: [unresolved-attribute] "Object of type `Foo` has no attribute `custom_attr`"
-reveal_type(foo.custom_attr)  # revealed: Unknown
+# Class attribute access
+reveal_type(Foo.custom_attr)  # revealed: Literal[42]
+
+# Instance attribute access
+foo = Foo()
+reveal_type(foo.custom_attr)  # revealed: Literal[42]
+```
+
+When the namespace dict is not a literal (e.g., passed as a parameter), attribute access returns
+`Unknown` since we can't know what attributes might be defined:
+
+```py
+from typing import Any
+
+class DynamicBase: ...
+
+def f(attributes: dict[str, Any]):
+    X = type("X", (DynamicBase,), attributes)
+
+    reveal_type(X)  # revealed: <class 'X'>
+
+    # Attribute access returns Unknown since the namespace is dynamic
+    reveal_type(X.foo)  # revealed: Unknown
+
+    x = X()
+    reveal_type(x.bar)  # revealed: Unknown
+```
+
+When a namespace dictionary is partially dynamic (e.g., a dict literal with spread or non-literal
+keys), static attributes have precise types while unknown attributes return `Unknown`:
+
+```py
+from typing import Any
+
+def f(extra_attrs: dict[str, Any], y: str):
+    X = type("X", (), {"a": 42, **extra_attrs})
+
+    # Static attributes in the namespace dictionary have precise types,
+    # but the dictionary was not entirely static, so other attributes
+    # are still available and resolve to `Unknown`:
+    reveal_type(X().a)  # revealed: Literal[42]
+    reveal_type(X().whatever)  # revealed: Unknown
+
+    Y = type("Y", (), {"a": 56, y: 72})
+    reveal_type(Y().a)  # revealed: Literal[56]
+    reveal_type(Y().whatever)  # revealed: Unknown
+```
+
+When a `TypedDict` is passed as the namespace argument, we synthesize a class type with the known
+keys from the `TypedDict` as attributes. Since `TypedDict` instances are "open" (they can have
+arbitrary additional string keys), unknown attributes return `Unknown`:
+
+```py
+from typing import TypedDict
+
+class Namespace(TypedDict):
+    z: int
+
+def g(attributes: Namespace):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+
+    # Known keys from the TypedDict are tracked as attributes
+    reveal_type(Y.z)  # revealed: int
+
+    y = Y()
+    reveal_type(y.z)  # revealed: int
+
+    # Unknown attributes return Unknown since TypedDicts are open
+    reveal_type(Y.unknown)  # revealed: Unknown
+    reveal_type(y.unknown)  # revealed: Unknown
+```
+
+## Closed TypedDicts (PEP-728)
+
+TODO: We don't support the PEP-728 `closed=True` keyword argument to `TypedDict` yet. When we do, a
+closed TypedDict namespace should NOT be marked as dynamic, and accessing unknown attributes should
+emit an error instead of returning `Unknown`.
+
+```py
+from typing import TypedDict
+
+class ClosedNamespace(TypedDict, closed=True):
+    x: int
+    y: str
+
+def h(ns: ClosedNamespace):
+    X = type("X", (), ns)
+
+    reveal_type(X)  # revealed: <class 'X'>
+
+    # Known keys from the TypedDict are tracked as attributes
+    reveal_type(X.x)  # revealed: int
+    reveal_type(X.y)  # revealed: str
+
+    x = X()
+    reveal_type(x.x)  # revealed: int
+    reveal_type(x.y)  # revealed: str
+
+    # TODO: Once we support `closed=True`, these should emit errors instead of returning Unknown
+    reveal_type(X.unknown)  # revealed: Unknown
+    reveal_type(x.unknown)  # revealed: Unknown
 ```
 
 ## Inheritance from dynamic classes
@@ -400,39 +496,38 @@ Other numbers of arguments are invalid:
 
 ```py
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Foo", ()))  # revealed: Unknown
+reveal_type(type("Foo", ()))  # revealed: type[Unknown]
 
 # TODO: the keyword arguments for `Foo`/`Bar`/`Baz` here are invalid
-# (you cannot pass `metaclass=` to `type()`, and none of them have
-# base classes with `__init_subclass__` methods),
-# but `type[Unknown]` would be better than `Unknown` here
+# (none of them have base classes with `__init_subclass__` methods).
 #
+# The intent to create a new class is however clear,
+# so we still infer these as class-literal types.
+reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: <class 'Foo'>
+reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: <class 'Bar'>
+
+# You can't pass `metaclass=` to the `type()` constructor, but the intent is clear,
+# so we infer `<class 'Baz'>` here rather than `type[Unknown]`
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Foo", (), {}, weird_other_arg=42))  # revealed: Unknown
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: Unknown
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: Unknown
+reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: <class 'Baz'>
 ```
 
-The following calls are also invalid, due to incorrect argument types.
-
-Inline calls (not assigned to a variable) fall back to regular `type` overload matching, which
-produces slightly different error messages than assigned dynamic class creation:
+The following calls are also invalid, due to incorrect argument types:
 
 ```py
 class Base: ...
 
-# error: 6 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `Literal[b"Foo"]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 1 (`name`) of `type()`: Expected `str`, found `Literal[b"Foo"]`"
 type(b"Foo", (), {})
 
-# error: 13 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
 type("Foo", Base, {})
 
-# error: 13 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `tuple[Literal[1], Literal[2]]`"
+# error: 14 [invalid-base] "Invalid class base with type `Literal[1]`"
+# error: 17 [invalid-base] "Invalid class base with type `Literal[2]`"
 type("Foo", (1, 2), {})
 
-# error: 22 [invalid-argument-type] "Argument to class `type` is incorrect: Expected `dict[str, Any]`, found `dict[str | bytes, Any]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[Unknown | bytes, Unknown | int]`"
 type("Foo", (Base,), {b"attr": 1})
 ```
 
@@ -499,6 +594,19 @@ class Y(C, B): ...
 Conflict = type("Conflict", (X, Y), {})
 ```
 
+## MRO error highlighting (snapshot)
+
+<!-- snapshot-diagnostics -->
+
+This snapshot test documents the diagnostic highlighting range for dynamic class literals.
+Currently, the entire `type()` call expression is highlighted:
+
+```py
+class A: ...
+
+Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
+```
+
 ## Metaclass conflicts
 
 Metaclass conflicts are detected and reported:
@@ -513,7 +621,129 @@ class B(metaclass=Meta2): ...
 Bad = type("Bad", (A, B), {})
 ```
 
-## Cyclic dynamic class definitions
+## `__slots__` in namespace dictionary
+
+Dynamic classes can define `__slots__` in the namespace dictionary. Non-empty `__slots__` makes the
+class a "disjoint base", which prevents it from being used alongside other disjoint bases in a class
+hierarchy:
+
+```py
+# Dynamic class with non-empty __slots__
+Slotted = type("Slotted", (), {"__slots__": ("x", "y")})
+slotted = Slotted()
+reveal_type(slotted)  # revealed: Slotted
+
+# Classes with empty __slots__ are not disjoint bases
+EmptySlots = type("EmptySlots", (), {"__slots__": ()})
+
+# Classes with no __slots__ are not disjoint bases
+NoSlots = type("NoSlots", (), {})
+
+# String __slots__ are treated as a single slot (non-empty)
+StringSlots = type("StringSlots", (), {"__slots__": "x"})
+```
+
+Dynamic classes with non-empty `__slots__` cannot coexist with other disjoint bases:
+
+```py
+class RegularSlotted:
+    __slots__ = ("a",)
+
+DynSlotted = type("DynSlotted", (), {"__slots__": ("b",)})
+
+# error: [instance-layout-conflict]
+class Conflict(
+    RegularSlotted,
+    DynSlotted,
+): ...
+```
+
+Two dynamic classes with non-empty `__slots__` also conflict:
+
+```py
+A = type("A", (), {"__slots__": ("x",)})
+B = type("B", (), {"__slots__": ("y",)})
+
+# error: [instance-layout-conflict]
+class Conflict(
+    A,
+    B,
+): ...
+```
+
+`instance-layout-conflict` errors are also emitted for classes that inherit from dynamic classes
+with disjoint bases:
+
+```py
+from typing import Any
+
+class DisjointBase1:
+    __slots__ = ("a",)
+
+class DisjointBase2:
+    __slots__ = ("b",)
+
+def f(ns: dict[str, Any]):
+    cls1 = type("cls1", (DisjointBase1,), ns)
+    cls2 = type("cls2", (DisjointBase2,), ns)
+
+    # error: [instance-layout-conflict]
+    cls3 = type("cls3", (cls1, cls2), {})
+
+    # error: [instance-layout-conflict]
+    class Cls4(cls1, cls2): ...
+```
+
+When the namespace dictionary is dynamic (not a literal), we can't determine if `__slots__` is
+defined, so no diagnostic is emitted:
+
+```py
+from typing import Any
+
+class SlottedBase:
+    __slots__ = ("a",)
+
+def f(ns: dict[str, Any]):
+    # The namespace might or might not contain __slots__, so no error is emitted
+    Dynamic = type("Dynamic", (), ns)
+
+    # No error: we can't prove there's a conflict since ns might not have __slots__
+    class MaybeConflict(SlottedBase, Dynamic): ...
+```
+
+## `instance-layout-conflict` diagnostic snapshots
+
+<!-- snapshot-diagnostics -->
+
+When the bases are a tuple literal, the diagnostic includes annotations for each conflicting base:
+
+```py
+class A:
+    __slots__ = ("x",)
+
+class B:
+    __slots__ = ("y",)
+
+# error: [instance-layout-conflict]
+X = type("X", (A, B), {})
+```
+
+When the bases are not a tuple literal (e.g., a variable), the diagnostic is emitted without
+per-base annotations:
+
+```py
+class C:
+    __slots__ = ("x",)
+
+class D:
+    __slots__ = ("y",)
+
+bases: tuple[type[C], type[D]] = (C, D)
+# error: [instance-layout-conflict]
+Y = type("Y", bases, {})
+```
+
+## Cyclic functional class definitions
 
 Self-referential class definitions using `type()` are detected. The name being defined is referenced
 in the bases tuple before it's available:
@@ -541,7 +771,7 @@ def make_classes(name1: str, name2: str):
 
     def inner(x: cls1): ...
 
-    # error: [invalid-argument-type] "Argument to function `inner` is incorrect: Expected `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:8`, found `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:9`"
+    # error: [invalid-argument-type] "Argument to function `inner` is incorrect: Expected `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:8:12`, found `mdtest_snippet.<locals of function 'make_classes'>.<unknown> @ src/mdtest_snippet.py:9:12`"
     inner(cls2())
 ```
 
@@ -613,7 +843,7 @@ class Base: ...
 bases_tuple = (Base,)
 Cls1 = type("Cls1", (*bases_tuple,), {})
 reveal_type(Cls1)  # revealed: <class 'Cls1'>
-reveal_mro(Cls1)  # revealed: (<class 'Cls1'>, @Todo(StarredExpression), <class 'object'>)
+reveal_mro(Cls1)  # revealed: (<class 'Cls1'>, <class 'Base'>, <class 'object'>)
 
 # Unpacking a dict for the namespace - the dict contents are not tracked anyway
 namespace = {"attr": 1}
@@ -632,55 +862,77 @@ def f(*args, **kwargs):
 
     # Has a string first arg, but unknown additional args from *args
     B = type("B", *args, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(B)  # revealed: <class 'str'>
+    reveal_type(B)  # revealed: type[Unknown]
 
     # Has string and tuple, but unknown additional args
     C = type("C", (), *args, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(C)  # revealed: type
+    reveal_type(C)  # revealed: type[Unknown]
 
     # All three positional args provided, only **kwargs unknown
     D = type("D", (), {}, **kwargs)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(D)  # revealed: type
+    reveal_type(D)  # revealed: <class 'D'>
 
     # Three starred expressions - we can't know how they expand
     a = ("E",)
     b = ((),)
     c = ({},)
     E = type(*a, *b, *c)
-    # TODO: `type[Unknown]` would cause fewer false positives
-    reveal_type(E)  # revealed: type
+    reveal_type(E)  # revealed: type[Unknown]
 ```
 
 ## Explicit type annotations
 
-TODO: Annotated assignments with `type()` calls don't currently synthesize the specific class type.
-This will be fixed when we support all `type()` calls (including inline) via generic handling.
+When an explicit type annotation is provided, the inferred type is checked against it:
 
 ```py
+# The annotation `type` is compatible with the inferred class literal type
+T: type = type("T", (), {})
+reveal_type(T)  # revealed: <class 'T'>
+
+# The annotation `type[Base]` is compatible with the inferred type
 class Base: ...
 
-# TODO: Should infer `<class 'T'>` instead of `type`
-T: type = type("T", (), {})
-reveal_type(T)  # revealed: type
-
-# TODO: Should infer `<class 'Derived'>` instead of `type[Base]}
-# error: [invalid-assignment] "Object of type `type` is not assignable to `type[Base]`"
 Derived: type[Base] = type("Derived", (Base,), {})
-reveal_type(Derived)  # revealed: type[Base]
+reveal_type(Derived)  # revealed: <class 'Derived'>
+
+# Incompatible annotation produces an error
+class Unrelated: ...
+
+# error: [invalid-assignment]
+Bad: type[Unrelated] = type("Bad", (Base,), {})
 ```
 
 ## Special base classes
 
 Some special base classes work with dynamic class creation, but special semantics may not be fully
-synthesized:
+synthesized.
+
+### Invalid special bases
+
+Dynamic classes cannot directly inherit from `Generic`, `Protocol`, or `TypedDict`. These special
+forms require class syntax for their semantics to be properly applied:
+
+```py
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+# error: [invalid-base] "Invalid base for class created via `type()`"
+GenericClass = type("GenericClass", (Generic[T],), {})
+
+# error: [unsupported-dynamic-base] "Unsupported base for class created via `type()`"
+ProtocolClass = type("ProtocolClass", (Protocol,), {})
+
+# error: [invalid-base] "Invalid base for class created via `type()`"
+TypedDictClass = type("TypedDictClass", (TypedDict,), {})
+```
 
 ### Protocol bases
 
+Inheriting from a class that is itself a protocol is valid:
+
 ```py
-# Protocol bases work - the class is created as a subclass of the protocol
 from typing import Protocol
 from ty_extensions import reveal_mro
 
@@ -697,8 +949,9 @@ reveal_type(instance)  # revealed: ProtoImpl
 
 ### TypedDict bases
 
+Inheriting from a class that is itself a TypedDict is valid:
+
 ```py
-# TypedDict bases work but TypedDict semantics aren't applied to dynamic subclasses
 from typing_extensions import TypedDict
 from ty_extensions import reveal_mro
 
@@ -731,26 +984,26 @@ reveal_mro(Point3D)  # revealed: (<class 'Point3D'>, <class 'Point'>, <class 'tu
 
 ### Enum bases
 
+Creating a class via `type()` that inherits from any Enum class fails at runtime because `EnumMeta`
+expects special attributes in the class dict that `type()` doesn't provide:
+
 ```py
-# Enum subclassing via type() is not supported - EnumMeta requires special dict handling
-# that type() cannot provide. This applies even to empty enums.
 from enum import Enum
 
 class Color(Enum):
     RED = 1
     GREEN = 2
 
+# Enums with members are final and cannot be subclassed
+# error: [subclass-of-final-class]
+ExtendedColor = type("ExtendedColor", (Color,), {})
+
 class EmptyEnum(Enum):
     pass
 
-# TODO: We should emit a diagnostic here - type() cannot create Enum subclasses
-ExtendedColor = type("ExtendedColor", (Color,), {})
-reveal_type(ExtendedColor)  # revealed: <class 'ExtendedColor'>
-
-# Even empty enums fail - EnumMeta requires special dict handling
-# TODO: We should emit a diagnostic here too
-ValidExtension = type("ValidExtension", (EmptyEnum,), {})
-reveal_type(ValidExtension)  # revealed: <class 'ValidExtension'>
+# Empty enums fail because EnumMeta requires special dict handling
+# error: [invalid-base] "Invalid base for class created via `type()`"
+InvalidExtension = type("InvalidExtension", (EmptyEnum,), {})
 ```
 
 ## `__init_subclass__` keyword arguments
@@ -771,9 +1024,6 @@ class Child(Base, required_arg="value"):
 # The dynamically assigned attribute has Unknown in its type
 reveal_type(Child.config)  # revealed: Unknown | str
 
-# Dynamic class creation - keyword arguments are not yet supported
-# TODO: This should work: type("DynamicChild", (Base,), {}, required_arg="value")
-# error: [no-matching-overload]
 DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 ```
 
@@ -812,4 +1062,28 @@ reveal_type(Dynamic)  # revealed: <class 'Dynamic'>
 
 # Metaclass attributes are accessible on the class
 reveal_type(Dynamic.custom_attr)  # revealed: str
+```
+
+## `final()` on dynamic classes
+
+Using `final()` as a function (not a decorator) on dynamic classes will not be understood by type
+checkers. The class is passed through unchanged, and subclassing will not be prevented:
+
+```py
+from typing import final
+
+# error: [ineffective-final]
+FinalClass = final(type("FinalClass", (), {}))
+reveal_type(FinalClass)  # revealed: <class 'FinalClass'>
+
+# Subclassing is allowed because type checkers don't understand `final()` called as a function
+class Child(FinalClass): ...
+
+# Same with base classes
+class Base: ...
+
+# error: [ineffective-final]
+FinalDerived = final(type("FinalDerived", (Base,), {}))
+
+class Child2(FinalDerived): ...
 ```
