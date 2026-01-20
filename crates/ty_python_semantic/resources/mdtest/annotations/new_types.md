@@ -637,3 +637,18 @@ class Invalid: ...
 
 bad = N(Invalid())  # error: [invalid-argument-type]
 ```
+
+## `typing.Self` respects `NewType` subtypes
+
+```py
+from typing_extensions import NewType, Self
+
+class C:
+    def copy(self) -> Self:
+        return self
+
+NT = NewType("NT", C)
+
+x = NT(C())
+reveal_type(x.copy())  # revealed: NT
+```
