@@ -44,12 +44,12 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
-use crate::types::function::FunctionType;
+use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -223,6 +223,21 @@ fn scope_cycle_initial<'db>(
     _input: InferScope<'db>,
 ) -> ScopeInference<'db> {
     ScopeInference::cycle_initial(Type::divergent(id))
+}
+
+/// Check if a function definition is decorated with `@staticmethod`.
+pub(crate) fn is_function_staticmethod<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let DefinitionKind::Function(_) = definition.kind(db) else {
+        return false;
+    };
+
+    let inference = infer_definition_types(db, definition);
+    let function = inference
+        .undecorated_type()
+        .or_else(|| Some(inference.declaration_type(definition).inner_type()))
+        .and_then(Type::as_function_literal);
+
+    function.is_some_and(|func| func.has_known_decorator(db, FunctionDecorators::STATICMETHOD))
 }
 
 /// Infer all types for an [`Expression`] (including sub-expressions).

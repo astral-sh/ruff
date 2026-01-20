@@ -5638,25 +5638,13 @@ impl<'db> Type<'db> {
 
                     // `Self` cannot be used in a static method.
                     if let Some(definition) = binding_definition {
-                        if definition.kind(db).is_function_def() {
-                            let inference = infer::infer_definition_types(db, definition);
-                            let function = inference
-                                .undecorated_type()
-                                .or_else(|| {
-                                    Some(inference.declaration_type(definition).inner_type())
-                                })
-                                .and_then(Type::as_function_literal);
-
-                            if let Some(func) = function {
-                                if func.has_known_decorator(db, FunctionDecorators::STATICMETHOD) {
-                                    return Err(InvalidTypeExpressionError {
-                                        fallback_type: Type::unknown(),
-                                        invalid_expressions: smallvec_inline![
-                                            InvalidTypeExpression::SelfInStaticMethod
-                                        ],
-                                    });
-                                }
-                            }
+                        if infer::is_function_staticmethod(db, definition) {
+                            return Err(InvalidTypeExpressionError {
+                                fallback_type: Type::unknown(),
+                                invalid_expressions: smallvec_inline![
+                                    InvalidTypeExpression::SelfInStaticMethod
+                                ],
+                            });
                         }
                     }
 
