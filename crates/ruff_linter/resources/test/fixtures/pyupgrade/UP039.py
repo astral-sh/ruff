@@ -41,3 +41,8 @@ class A:
 @decorator
 class A:
     pass
+
+
+class Foo(
+    # text
+): ...
