@@ -6642,6 +6642,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
 
+        // The fallback type reflects the fact that if the call were successful,
+        // it would return a class that:
+        //
+        // - Would be a subclass of `tuple[Unknown, ...]`
+        // - Would have all the generated methods included on the `NamedTupleLike` protocol
+        // - Would have a constructor method that would accept an unknown set of positional
+        //   and keyword arguments
+        let fallback = || {
+            IntersectionType::from_elements(
+                db,
+                [
+                    Type::homogeneous_tuple(db, Type::unknown()).to_meta_type(db),
+                    KnownClass::NamedTupleLike.to_subclass_of(db),
+                    Type::unknown(),
+                ],
+            )
+        };
+
         let ast::Arguments {
             args,
             keywords,
@@ -6683,13 +6701,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bool,
         ) = match kind {
             NamedTupleKind::Collections => {
-                let find_keyword = |name: &str| -> Option<&ast::Keyword> {
-                    keywords
-                        .iter()
-                        .find(|kw| kw.arg.as_ref().is_some_and(|arg| arg.id.as_str() == name))
-                };
-                let typename_kw = find_keyword("typename");
-                let field_names_kw = find_keyword("field_names");
+                let typename_kw = call_expr.arguments.find_keyword("typename");
+                let field_names_kw = call_expr.arguments.find_keyword("field_names");
 
                 match &**args {
                     [name, fields, rest @ ..] => (Some(name), Some(fields), rest, false, false),
@@ -6744,7 +6757,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
                 }
             }
-            return KnownClass::NamedTupleFallback.to_subclass_of(self.db());
+            return fallback();
         };
 
         let name_type = self.infer_expression(name_arg, TypeContext::default());
@@ -6759,7 +6772,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for kw in keywords {
                 self.infer_expression(&kw.value, TypeContext::default());
             }
-            return KnownClass::NamedTupleFallback.to_subclass_of(self.db());
+            return fallback();
         }
 
         // Check for excess positional arguments (only `typename` and `fields` are expected).
