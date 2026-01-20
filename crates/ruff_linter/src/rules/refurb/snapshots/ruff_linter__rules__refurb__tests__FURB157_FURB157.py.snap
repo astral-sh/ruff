@@ -728,6 +728,7 @@ help: Replace with `-1`
 91 + Decimal(-1)      # Should flag as verbose
 92 | Decimal("_+1")      # Should flag as verbose
 93 | Decimal("_-1_000")  # Should flag as verbose
+94 | 
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:92:9
@@ -745,6 +746,8 @@ help: Replace with `+1`
    - Decimal("_+1")      # Should flag as verbose
 92 + Decimal(+1)      # Should flag as verbose
 93 | Decimal("_-1_000")  # Should flag as verbose
+94 | 
+95 | 
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:93:9
@@ -760,3 +763,29 @@ help: Replace with `-1_000`
 92 | Decimal("_+1")      # Should flag as verbose
    - Decimal("_-1_000")  # Should flag as verbose
 93 + Decimal(-1_000)  # Should flag as verbose
+94 | 
+95 | 
+96 | Decimal(
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+   --> FURB157.py:97:5
+    |
+ 96 |   Decimal(
+ 97 | /     float(
+ 98 | |         # text
+ 99 | |         "Infinity"
+100 | |     )
+    | |_____^
+101 |   )
+    |
+help: Replace with `"Infinity"`
+94 | 
+95 | 
+96 | Decimal(
+   -     float(
+   -         # text
+   -         "Infinity"
+   -     )
+97 +     "Infinity"
+98 | )
+note: This is an unsafe fix and may change runtime behavior
