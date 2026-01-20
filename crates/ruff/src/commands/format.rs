@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io;
 use std::io::{Write, stderr, stdout};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -492,26 +493,28 @@ pub(crate) fn format_source(
             )))
         }
         SourceKind::Markdown(unformatted_document) => {
-            // adapted from blacken-docs
-            // https://github.com/adamchainz/blacken-docs/blob/fb107c1dce25f9206e29297aaa1ed7afc2980a5a/src/blacken_docs/__init__.py#L17
-            let code_block_regex = Regex::new(
-                r"(?imsx)
-                (?<before>
-                    ^(?<indent>\ *)```[^\S\r\n]*
-                    (?<lang>python|py|python3|py3|pyi)
-                    (?:\ .*?)?\n
+            static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
+                // adapted from blacken-docs
+                // https://github.com/adamchainz/blacken-docs/blob/fb107c1dce25f9206e29297aaa1ed7afc2980a5a/src/blacken_docs/__init__.py#L17
+                Regex::new(
+                    r"(?imsx)
+                    (?<before>
+                        ^(?<indent>\ *)```[^\S\r\n]*
+                        (?<lang>python|py|python3|py3|pyi)
+                        (?:\ .*?)?\n
+                    )
+                    (?<code>.*?)
+                    (?<after>
+                        ^\ *```[^\S\r\n]*$
+                    )
+                    ",
                 )
-                (?<code>.*?)
-                (?<after>
-                    ^\ *```[^\S\r\n]*$
-                )
-                ",
-            )
-            .unwrap();
+                .unwrap()
+            });
 
             let mut changed = false;
             let formatted_document =
-                code_block_regex.replace_all(unformatted_document, |capture: &Captures| {
+                MARKDOWN_CODE_BLOCK.replace_all(unformatted_document, |capture: &Captures| {
                     let (original, [before, code_indent, code_lang, unformatted_code, after]) =
                         capture.extract();
 
