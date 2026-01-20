@@ -141,6 +141,21 @@ while random():
     reveal_type(i)  # revealed: int
 ```
 
+A binding that didn't exist before the loop started:
+
+```py
+i = 0
+while i < 1_000_000:
+    if i > 0:
+        loop_only += 1  # error: [possibly-unresolved-reference]
+    if i == 0:
+        loop_only = 0
+    i += 1
+reveal_type(i)  # revealed: int
+# error: [possibly-unresolved-reference]
+reveal_type(loop_only)  # revealed: int
+```
+
 A more complex example, where the loop condition narrows both the loop-back value and the
 end-of-loop value.
 
