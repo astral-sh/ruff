@@ -772,3 +772,86 @@ class MyEnum(Stringable, Enum):  # error: [unimplemented-abstract-method]
     A = 1
     B = 2
 ```
+
+### A `@final` class that directly defines an abstract method
+
+A `@final` class that directly defines an `@abstractmethod` is equally invalid, since the method can
+never be implemented by a subclass.
+
+```py
+from abc import abstractmethod
+from typing import final
+
+@final
+class Broken:  # error: [unimplemented-abstract-method]
+    @abstractmethod
+    def foo(self) -> int: ...
+```
+
+### Abstract property
+
+A `@final` class must also implement abstract properties.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def value(self) -> int: ...
+
+@final
+class Good(Base):
+    @property
+    def value(self) -> int:
+        return 42
+
+@final
+class Bad(Base):  # error: [unimplemented-abstract-method]
+    pass
+```
+
+A property with an abstract setter (but concrete getter) is also abstract:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    def value(self) -> int:
+        return 42
+
+    @value.setter
+    @abstractmethod
+    def value(self, v: int) -> None: ...
+
+@final
+class Good(Base):
+    @Base.value.setter
+    def value(self, v: int) -> None:
+        pass
+
+@final
+class Bad(Base):  # error: [unimplemented-abstract-method]
+    pass
+```
+
+### Annotation doesn't override abstract method
+
+A simple annotation like `method: int` shadows the name but doesn't actually implement the abstract
+method. Attempting to instantiate the class will still fail at runtime.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+@final
+class Bad(Base):  # error: [unimplemented-abstract-method]
+    method: int
+```

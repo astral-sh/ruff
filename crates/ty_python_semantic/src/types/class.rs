@@ -27,12 +27,13 @@ use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, KnownFunction,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
+use crate::types::list_members::all_end_of_scope_members;
 use crate::types::member::{Member, class_member};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::relation::{
@@ -76,7 +77,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_module_resolver::{KnownModule, file_to_module};
 
 fn explicit_bases_cycle_initial<'db>(
@@ -1064,6 +1065,58 @@ impl<'db> ClassType<'db> {
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.class_literal(db).is_final(db)
+    }
+
+    /// Returns a map of abstract method names to the class that defines them.
+    ///
+    /// This includes abstract methods defined on the class itself and any of its superclasses.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxHashMap<Name, ClassType<'db>> {
+        fn is_abstract(db: &dyn Db, ty: Type) -> bool {
+            match ty {
+                Type::FunctionLiteral(function) => {
+                    function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                }
+                Type::BoundMethod(method) => method
+                    .function(db)
+                    .has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD),
+                Type::PropertyInstance(property) => {
+                    // A property is abstract if either its getter or setter is abstract.
+                    property
+                        .getter(db)
+                        .is_some_and(|getter| is_abstract(db, getter))
+                        || property
+                            .setter(db)
+                            .is_some_and(|setter| is_abstract(db, setter))
+                }
+                _ => false,
+            }
+        }
+
+        let mut abstract_methods = FxHashMap::<Name, ClassType<'db>>::default();
+
+        for class_base in self.iter_mro(db) {
+            let class = match class_base {
+                ClassBase::Class(class) => class,
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => continue,
+                ClassBase::Dynamic(_) => continue,
+            };
+
+            // Skip dynamic classes; they can't define abstract methods.
+            let Some((class_literal, _)) = class.static_class_literal(db) else {
+                continue;
+            };
+
+            let class_scope = class_literal.body_scope(db);
+
+            for member in all_end_of_scope_members(db, class_scope) {
+                if is_abstract(db, member.member.ty) {
+                    abstract_methods.entry(member.member.name).or_insert(class);
+                }
+            }
+        }
+
+        abstract_methods
     }
 
     /// Returns `true` if any class in this class's MRO (excluding `object`) defines an ordering

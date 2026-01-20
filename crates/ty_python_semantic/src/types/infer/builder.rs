@@ -1307,6 +1307,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         class: StaticClassLiteral<'db>,
         class_node: &ast::StmtClassDef,
     ) {
+        /// Check if a type is a concrete (non-abstract) implementation of a method.
+        ///
+        /// Returns `true` if the type is callable and not decorated with `@abstractmethod`.
+        /// Returns `false` for abstract methods and for non-callable types (like plain
+        /// annotations `method: int` which don't actually implement an abstract method).
+        fn is_concrete_method(db: &dyn Db, ty: Type) -> bool {
+            match ty {
+                Type::FunctionLiteral(function) => {
+                    !function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                }
+                Type::BoundMethod(method) => !method
+                    .function(db)
+                    .has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD),
+                Type::PropertyInstance(property) => {
+                    // A property is concrete only if both getter and setter (if present) are concrete.
+                    property
+                        .getter(db)
+                        .is_some_and(|getter| is_concrete_method(db, getter))
+                        && property
+                            .setter(db)
+                            .map_or(true, |setter| is_concrete_method(db, setter))
+                }
+                // Other callable types (builtins, wrapper descriptors, etc.) are always concrete.
+                Type::KnownBoundMethod(_)
+                | Type::WrapperDescriptor(_)
+                | Type::Callable(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_) => true,
+                // Non-callable types (like `int`) don't implement abstract methods.
+                _ => false,
+            }
+        }
+
         let db = self.db();
 
         // Only check if the class is final.
@@ -1316,75 +1349,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class_type = class.identity_specialization(db);
 
-        let is_abstract = |ty: Type<'db>| -> bool {
-            match ty {
-                Type::FunctionLiteral(function) => {
-                    function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
-                }
-                Type::BoundMethod(method) => method
-                    .function(db)
-                    .has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD),
-                _ => false,
-            }
-        };
-
-        // Collect abstract method names and their defining class from the MRO.
-        //
-        // We only check static classes for abstract methods. Dynamic classes created with
-        // `type()` cannot define abstract methods since `@abstractmethod` requires decorator
-        // syntax. However, when checking if methods are *implemented*, we use `class_member`
-        // which properly handles the full MRO including dynamic classes.
-        let mut abstract_methods = FxHashMap::<Name, ClassType<'db>>::default();
-
-        for class_base in class_type.iter_mro(db).skip(1) {
-            let superclass = match class_base {
-                ClassBase::Class(class) => class,
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => continue,
-                ClassBase::Dynamic(_) => continue,
-            };
-
-            // Skip dynamic classes; they can't define abstract methods.
-            let Some((superclass_literal, _)) = superclass.static_class_literal(db) else {
-                continue;
-            };
-
-            let superclass_scope = superclass_literal.body_scope(db);
-
-            for member in crate::types::list_members::all_end_of_scope_members(db, superclass_scope)
-            {
-                if is_abstract(member.member.ty) {
-                    abstract_methods
-                        .entry(member.member.name)
-                        .or_insert(superclass);
-                }
-            }
-        }
-
         // For each abstract method, check if the class provides a concrete implementation
         // anywhere in the MRO (including dynamic classes).
-        for (method_name, defining_class) in abstract_methods {
+        for (method_name, defining_class) in class_type.abstract_methods(db) {
             let member = class_type.class_member(db, &method_name, MemberLookupPolicy::default());
 
-            // If the resolved member is still abstract, report it.
+            // Check if the resolved member is a concrete (non-abstract) callable.
             let is_implemented = member
                 .place
                 .ignore_possibly_undefined()
-                .is_some_and(|ty| !is_abstract(ty));
+                .is_some_and(|ty| is_concrete_method(db, ty));
 
-            if !is_implemented {
-                if let Some(builder) = self
+            if !is_implemented
+                && let Some(builder) = self
                     .context
                     .report_lint(&UNIMPLEMENTED_ABSTRACT_METHOD, &class_node.name)
-                {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Final class `{}` does not implement abstract method `{}`",
-                        class.name(db),
-                        method_name
-                    ));
-                    diagnostic.info(format_args!(
-                        "Abstract method `{method_name}` is defined on `{defining_class}`",
-                        defining_class = defining_class.name(db)
-                    ));
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Final class `{}` does not implement abstract method `{}`",
+                    class.name(db),
+                    method_name
+                ));
+
+                // Add secondary annotation pointing to the abstract method definition.
+                let abstract_method =
+                    defining_class.class_member(db, &method_name, MemberLookupPolicy::default());
+                let function = abstract_method
+                    .place
+                    .ignore_possibly_undefined()
+                    .and_then(|ty| match ty {
+                        Type::FunctionLiteral(f) => Some(f),
+                        Type::PropertyInstance(p) => {
+                            p.getter(db).and_then(Type::as_function_literal)
+                        }
+                        _ => None,
+                    });
+                if let Some(function) = function {
+                    let overload = function.literal(db).last_definition(db);
+                    let module = parsed_module(db, function.file(db)).load(db);
+                    diagnostic.annotate(
+                        Annotation::secondary(Span::from(overload.focus_range(db, &module)))
+                            .message(format_args!(
+                                "`{defining_class}.{method_name}` defined here",
+                                defining_class = defining_class.name(db)
+                            )),
+                    );
                 }
             }
         }

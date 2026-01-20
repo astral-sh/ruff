@@ -51,22 +51,35 @@ error[unimplemented-abstract-method]: Final class `MissingAll` does not implemen
    |       ^^^^^^^^^^
 16 |     pass
    |
-info: Abstract method `foo` is defined on `Base`
+  ::: src/mdtest_snippet.py:6:9
+   |
+ 4 | class Base(ABC):
+ 5 |     @abstractmethod
+ 6 |     def foo(self) -> int: ...
+   |         --- `Base.foo` defined here
+ 7 |     @abstractmethod
+ 8 |     def bar(self) -> str: ...
+   |
 info: rule `unimplemented-abstract-method` is enabled by default
 
 ```
 
 ```
 error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract method `baz`
-  --> src/mdtest_snippet.py:15:7
+  --> src/mdtest_snippet.py:10:9
    |
+ 8 |     def bar(self) -> str: ...
+ 9 |     @abstractmethod
+10 |     def baz(self) -> None: ...
+   |         --- `Base.baz` defined here
+11 |
+12 | @final
 13 | # error: [unimplemented-abstract-method]
 14 | # error: [unimplemented-abstract-method]
 15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
    |       ^^^^^^^^^^
 16 |     pass
    |
-info: Abstract method `baz` is defined on `Base`
 info: rule `unimplemented-abstract-method` is enabled by default
 
 ```
@@ -81,7 +94,15 @@ error[unimplemented-abstract-method]: Final class `MissingAll` does not implemen
    |       ^^^^^^^^^^
 16 |     pass
    |
-info: Abstract method `bar` is defined on `Base`
+  ::: src/mdtest_snippet.py:8:9
+   |
+ 6 |     def foo(self) -> int: ...
+ 7 |     @abstractmethod
+ 8 |     def bar(self) -> str: ...
+   |         --- `Base.bar` defined here
+ 9 |     @abstractmethod
+10 |     def baz(self) -> None: ...
+   |
 info: rule `unimplemented-abstract-method` is enabled by default
 
 ```
@@ -96,7 +117,15 @@ error[unimplemented-abstract-method]: Final class `PartiallyImplemented` does no
 20 |     def foo(self) -> int:
 21 |         return 42
    |
-info: Abstract method `baz` is defined on `Base`
+  ::: src/mdtest_snippet.py:10:9
+   |
+ 8 |     def bar(self) -> str: ...
+ 9 |     @abstractmethod
+10 |     def baz(self) -> None: ...
+   |         --- `Base.baz` defined here
+11 |
+12 | @final
+   |
 info: rule `unimplemented-abstract-method` is enabled by default
 
 ```

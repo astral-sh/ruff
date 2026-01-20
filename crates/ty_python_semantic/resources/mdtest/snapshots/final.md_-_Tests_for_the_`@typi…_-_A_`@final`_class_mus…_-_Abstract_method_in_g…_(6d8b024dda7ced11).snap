@@ -39,7 +39,15 @@ error[unimplemented-abstract-method]: Final class `Child` does not implement abs
    |       ^^^^^
 13 |     pass
    |
-info: Abstract method `method` is defined on `GrandParent`
+  ::: src/mdtest_snippet.py:6:9
+   |
+ 4 | class GrandParent(ABC):
+ 5 |     @abstractmethod
+ 6 |     def method(self) -> int: ...
+   |         ------ `GrandParent.method` defined here
+ 7 |
+ 8 | class Parent(GrandParent):
+   |
 info: rule `unimplemented-abstract-method` is enabled by default
 
 ```
