@@ -606,3 +606,169 @@ class Bar(Foo):
     @overload
     def method2(self, x: str) -> str: ...
 ```
+
+## A `@final` class must implement all abstract methods
+
+A class decorated with `@final` cannot be subclassed. Therefore, if such a class inherits from an
+abstract base class or a Protocol with abstract methods, those methods must be implemented in the
+final class itself - there's no other way to provide implementations.
+
+### Basic case with ABC
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int:
+        raise NotImplementedError
+
+@final
+class Derived(Base):  # error: [unimplemented-abstract-method] "Final class `Derived` does not implement abstract method `foo`"
+    pass
+```
+
+### Multiple abstract methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+    @abstractmethod
+    def bar(self) -> str: ...
+    @abstractmethod
+    def baz(self) -> None: ...
+
+@final
+# error: [unimplemented-abstract-method]
+# error: [unimplemented-abstract-method]
+class MissingAll(Base):  # error: [unimplemented-abstract-method]
+    pass
+
+@final
+class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
+    def foo(self) -> int:
+        return 42
+
+    def bar(self) -> str:
+        return "hello"
+```
+
+### Protocol with abstract methods
+
+```py
+from abc import abstractmethod
+from typing import Protocol, final
+
+class MyProtocol(Protocol):
+    @abstractmethod
+    def method(self) -> int: ...
+
+@final
+class Implementer(MyProtocol):  # error: [unimplemented-abstract-method]
+    pass
+```
+
+### Fully implemented final class is fine
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+    @abstractmethod
+    def bar(self) -> str: ...
+
+@final
+class FullyImplemented(Base):
+    def foo(self) -> int:
+        return 42
+
+    def bar(self) -> str:
+        return "hello"
+```
+
+### Abstract method in grandparent class
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class GrandParent(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+class Parent(GrandParent):
+    pass
+
+@final
+class Child(Parent):  # error: [unimplemented-abstract-method]
+    pass
+```
+
+### Abstract method implemented via dynamic class
+
+A dynamic class created with `type()` can provide concrete implementations of abstract methods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+
+DynamicMiddle = type("DynamicMiddle", (Base,), {"foo": lambda self: 42})
+
+@final
+class Final(DynamicMiddle):  # No error; `foo` is implemented by `DynamicMiddle`
+    pass
+```
+
+### Non-final class with unimplemented abstract methods is fine
+
+Non-final classes are allowed to have unimplemented abstract methods, as they can be implemented by
+subclasses.
+
+```py
+from abc import ABC, abstractmethod
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+
+class Derived(Base):  # No error - not final, can be subclassed
+    pass
+```
+
+### Enum classes are implicitly final
+
+Enum classes cannot be subclassed if they have any members, so they are treated as final.
+
+Due to metaclass conflicts between ABC and Enum, we use a Protocol-based approach here.
+
+```py
+from abc import abstractmethod
+from enum import Enum
+from typing import Protocol
+
+class Stringable(Protocol):
+    @abstractmethod
+    def stringify(self) -> str: ...
+
+class MyEnum(Stringable, Enum):  # error: [unimplemented-abstract-method]
+    A = 1
+    B = 2
+```

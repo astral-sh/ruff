@@ -107,6 +107,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&INEFFECTIVE_FINAL);
+    registry.register_lint(&UNIMPLEMENTED_ABSTRACT_METHOD);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -1874,6 +1875,37 @@ declare_lint! {
         summary: "detects calls to `final()` that type checkers cannot interpret",
         status: LintStatus::stable("0.0.1-alpha.33"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `@final` classes that have unimplemented abstract methods.
+    ///
+    /// ## Why is this bad?
+    /// A class decorated with `@final` cannot be subclassed. If such a class inherits from
+    /// an abstract base class (ABC) or a Protocol with abstract methods that are not implemented,
+    /// the class can never be properly instantiated, as the abstract methods can never be
+    /// implemented (since subclassing is prohibited).
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from abc import ABC, abstractmethod
+    /// from typing import final
+    ///
+    /// class Base(ABC):
+    ///     @abstractmethod
+    ///     def method(self) -> int: ...
+    ///
+    /// @final
+    /// class Derived(Base):  # Error: `Derived` does not implement `method`
+    ///     pass
+    /// ```
+    pub(crate) static UNIMPLEMENTED_ABSTRACT_METHOD = {
+        summary: "detects `@final` classes with unimplemented abstract methods",
+        status: LintStatus::stable("0.0.13"),
+        default_level: Level::Error,
     }
 }
 

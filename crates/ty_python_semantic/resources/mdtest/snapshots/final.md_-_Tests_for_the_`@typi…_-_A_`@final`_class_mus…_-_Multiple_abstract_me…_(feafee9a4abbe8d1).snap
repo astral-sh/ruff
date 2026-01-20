@@ -1,0 +1,102 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - A `@final` class must implement all abstract methods - Multiple abstract methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from abc import ABC, abstractmethod
+ 2 | from typing import final
+ 3 | 
+ 4 | class Base(ABC):
+ 5 |     @abstractmethod
+ 6 |     def foo(self) -> int: ...
+ 7 |     @abstractmethod
+ 8 |     def bar(self) -> str: ...
+ 9 |     @abstractmethod
+10 |     def baz(self) -> None: ...
+11 | 
+12 | @final
+13 | # error: [unimplemented-abstract-method]
+14 | # error: [unimplemented-abstract-method]
+15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
+16 |     pass
+17 | 
+18 | @final
+19 | class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
+20 |     def foo(self) -> int:
+21 |         return 42
+22 | 
+23 |     def bar(self) -> str:
+24 |         return "hello"
+```
+
+# Diagnostics
+
+```
+error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract method `foo`
+  --> src/mdtest_snippet.py:15:7
+   |
+13 | # error: [unimplemented-abstract-method]
+14 | # error: [unimplemented-abstract-method]
+15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
+   |       ^^^^^^^^^^
+16 |     pass
+   |
+info: Abstract method `foo` is defined on `Base`
+info: rule `unimplemented-abstract-method` is enabled by default
+
+```
+
+```
+error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract method `baz`
+  --> src/mdtest_snippet.py:15:7
+   |
+13 | # error: [unimplemented-abstract-method]
+14 | # error: [unimplemented-abstract-method]
+15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
+   |       ^^^^^^^^^^
+16 |     pass
+   |
+info: Abstract method `baz` is defined on `Base`
+info: rule `unimplemented-abstract-method` is enabled by default
+
+```
+
+```
+error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract method `bar`
+  --> src/mdtest_snippet.py:15:7
+   |
+13 | # error: [unimplemented-abstract-method]
+14 | # error: [unimplemented-abstract-method]
+15 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
+   |       ^^^^^^^^^^
+16 |     pass
+   |
+info: Abstract method `bar` is defined on `Base`
+info: rule `unimplemented-abstract-method` is enabled by default
+
+```
+
+```
+error[unimplemented-abstract-method]: Final class `PartiallyImplemented` does not implement abstract method `baz`
+  --> src/mdtest_snippet.py:19:7
+   |
+18 | @final
+19 | class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
+   |       ^^^^^^^^^^^^^^^^^^^^
+20 |     def foo(self) -> int:
+21 |         return 42
+   |
+info: Abstract method `baz` is defined on `Base`
+info: rule `unimplemented-abstract-method` is enabled by default
+
+```

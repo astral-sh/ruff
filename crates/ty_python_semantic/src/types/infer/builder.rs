@@ -77,9 +77,10 @@ use crate::types::diagnostic::{
     IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
     PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
     POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
-    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
-    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNIMPLEMENTED_ABSTRACT_METHOD, UNKNOWN_ARGUMENT,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -1226,6 +1227,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // and for violations of other rules relating to invalid overrides of some sort.
             overrides::check_class(&self.context, class);
 
+            // (13b) Check for unimplemented abstract methods on final classes.
+            self.check_final_class_abstract_methods(class, class_node);
+
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
             }
@@ -1290,6 +1294,99 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             class.validate_members(&self.context);
+        }
+    }
+
+    /// Check that a `@final` class does not have unimplemented abstract methods.
+    ///
+    /// A final class cannot be subclassed, so if it inherits abstract methods without
+    /// implementing them, those methods can never be implemented, making the class
+    /// effectively broken.
+    fn check_final_class_abstract_methods(
+        &self,
+        class: StaticClassLiteral<'db>,
+        class_node: &ast::StmtClassDef,
+    ) {
+        let db = self.db();
+
+        // Only check if the class is final.
+        if !class.is_final(db) {
+            return;
+        }
+
+        let class_type = class.identity_specialization(db);
+
+        let is_abstract = |ty: Type<'db>| -> bool {
+            match ty {
+                Type::FunctionLiteral(function) => {
+                    function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                }
+                Type::BoundMethod(method) => method
+                    .function(db)
+                    .has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD),
+                _ => false,
+            }
+        };
+
+        // Collect abstract method names and their defining class from the MRO.
+        //
+        // We only check static classes for abstract methods. Dynamic classes created with
+        // `type()` cannot define abstract methods since `@abstractmethod` requires decorator
+        // syntax. However, when checking if methods are *implemented*, we use `class_member`
+        // which properly handles the full MRO including dynamic classes.
+        let mut abstract_methods = FxHashMap::<Name, ClassType<'db>>::default();
+
+        for class_base in class_type.iter_mro(db).skip(1) {
+            let superclass = match class_base {
+                ClassBase::Class(class) => class,
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => continue,
+                ClassBase::Dynamic(_) => continue,
+            };
+
+            // Skip dynamic classes; they can't define abstract methods.
+            let Some((superclass_literal, _)) = superclass.static_class_literal(db) else {
+                continue;
+            };
+
+            let superclass_scope = superclass_literal.body_scope(db);
+
+            for member in crate::types::list_members::all_end_of_scope_members(db, superclass_scope)
+            {
+                if is_abstract(member.member.ty) {
+                    abstract_methods
+                        .entry(member.member.name)
+                        .or_insert(superclass);
+                }
+            }
+        }
+
+        // For each abstract method, check if the class provides a concrete implementation
+        // anywhere in the MRO (including dynamic classes).
+        for (method_name, defining_class) in abstract_methods {
+            let member = class_type.class_member(db, &method_name, MemberLookupPolicy::default());
+
+            // If the resolved member is still abstract, report it.
+            let is_implemented = member
+                .place
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| !is_abstract(ty));
+
+            if !is_implemented {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&UNIMPLEMENTED_ABSTRACT_METHOD, &class_node.name)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Final class `{}` does not implement abstract method `{}`",
+                        class.name(db),
+                        method_name
+                    ));
+                    diagnostic.info(format_args!(
+                        "Abstract method `{method_name}` is defined on `{defining_class}`",
+                        defining_class = defining_class.name(db)
+                    ));
+                }
+            }
         }
     }
 
