@@ -173,10 +173,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            // Avoid inferring the types of invalid type expressions that have been parsed from a
-            // string annotation, as they are not present in the semantic index.
-            _ if self.deferred_state.in_string_annotation() => Type::unknown(),
-
             // =====================================================================================
             // Forms which are invalid in the context of annotation expressions: we infer their
             // nested expressions as normal expressions, but the type of the top-level expression is
@@ -308,7 +304,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::BoolOp(bool_op) => {
-                self.infer_boolean_expression(bool_op);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_boolean_expression(bool_op);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Boolean operations are not allowed in type expressions"),
@@ -317,7 +315,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Named(named) => {
-                self.infer_named_expression(named);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_named_expression(named);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Named expressions are not allowed in type expressions"),
@@ -326,7 +326,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::UnaryOp(unary) => {
-                self.infer_unary_expression(unary);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_unary_expression(unary);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Unary operations are not allowed in type expressions"),
@@ -335,7 +337,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Lambda(lambda_expression) => {
-                self.infer_lambda_expression(lambda_expression);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_lambda_expression(lambda_expression);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("`lambda` expressions are not allowed in type expressions"),
@@ -344,7 +348,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::If(if_expression) => {
-                self.infer_if_expression(if_expression, TypeContext::default());
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_if_expression(if_expression, TypeContext::default());
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("`if` expressions are not allowed in type expressions"),
@@ -353,7 +359,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Dict(dict) => {
-                self.infer_dict_expression(dict, TypeContext::default());
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_dict_expression(dict, TypeContext::default());
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Dict literals are not allowed in type expressions"),
@@ -362,7 +370,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Set(set) => {
-                self.infer_set_expression(set, TypeContext::default());
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_set_expression(set, TypeContext::default());
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Set literals are not allowed in type expressions"),
@@ -371,7 +381,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::DictComp(dictcomp) => {
-                self.infer_dict_comprehension_expression(dictcomp, TypeContext::default());
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_dict_comprehension_expression(dictcomp, TypeContext::default());
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Dict comprehensions are not allowed in type expressions"),
@@ -380,7 +392,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::ListComp(listcomp) => {
-                self.infer_list_comprehension_expression(listcomp, TypeContext::default());
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_list_comprehension_expression(listcomp, TypeContext::default());
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("List comprehensions are not allowed in type expressions"),
@@ -389,7 +403,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::SetComp(setcomp) => {
-                self.infer_set_comprehension_expression(setcomp, TypeContext::default());
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_set_comprehension_expression(setcomp, TypeContext::default());
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Set comprehensions are not allowed in type expressions"),
@@ -398,7 +414,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Generator(generator) => {
-                self.infer_generator_expression(generator);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_generator_expression(generator);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Generator expressions are not allowed in type expressions"),
@@ -407,7 +425,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Await(await_expression) => {
-                self.infer_await_expression(await_expression);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_await_expression(await_expression);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("`await` expressions are not allowed in type expressions"),
@@ -416,7 +436,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Yield(yield_expression) => {
-                self.infer_yield_expression(yield_expression);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_yield_expression(yield_expression);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("`yield` expressions are not allowed in type expressions"),
@@ -425,7 +447,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::YieldFrom(yield_from) => {
-                self.infer_yield_from_expression(yield_from);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_yield_from_expression(yield_from);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("`yield from` expressions are not allowed in type expressions"),
@@ -434,7 +458,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Compare(compare) => {
-                self.infer_compare_expression(compare);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_compare_expression(compare);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Comparison expressions are not allowed in type expressions"),
@@ -443,7 +469,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Call(call_expr) => {
-                self.infer_call_expression(call_expr, TypeContext::default());
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_call_expression(call_expr, TypeContext::default());
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Function calls are not allowed in type expressions"),
@@ -452,7 +480,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::FString(fstring) => {
-                self.infer_fstring_expression(fstring);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_fstring_expression(fstring);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("F-strings are not allowed in type expressions"),
@@ -461,7 +491,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::TString(tstring) => {
-                self.infer_tstring_expression(tstring);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_tstring_expression(tstring);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("T-strings are not allowed in type expressions"),
@@ -470,7 +502,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Slice(slice) => {
-                self.infer_slice_expression(slice);
+                if !self.deferred_state.in_string_annotation() {
+                    self.infer_slice_expression(slice);
+                }
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Slices are not allowed in type expressions"),
