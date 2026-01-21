@@ -174,7 +174,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
                 }
 
                 // All codes are unused
-                let Some(diag) = context.report_unchecked(&unused_lint, suppression.comment_range)
+                let Some(diag) = context.report_unchecked(unused_lint, suppression.comment_range)
                 else {
                     continue;
                 };
@@ -185,7 +185,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
                 ))
             }
             SuppressionTarget::Empty => {
-                let Some(diag) = context.report_unchecked(&unused_lint, suppression.range) else {
+                let Some(diag) = context.report_unchecked(unused_lint, suppression.range) else {
                     continue;
                 };
                 diag.into_diagnostic(format_args!(

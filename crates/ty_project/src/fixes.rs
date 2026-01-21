@@ -14,7 +14,7 @@ use rustc_hash::FxHashSet;
 use salsa::Setter as _;
 use std::collections::BTreeMap;
 use thiserror::Error;
-use ty_python_semantic::{is_unused_ignore_comment_id, suppress_all};
+use ty_python_semantic::{is_unused_ignore_comment_lint, suppress_all};
 
 use crate::Db;
 
@@ -50,7 +50,10 @@ pub fn suppress_all_diagnostics(
             .primary_span()
             .and_then(|span| span.range())
             .is_some()
-            && is_unused_ignore_comment_id(diagnostic.id())
+            && diagnostic
+                .id()
+                .as_lint()
+                .is_some_and(|name| !is_unused_ignore_comment_lint(name))
     });
 
     // Early return if there are no diagnostics that can be suppressed to avoid all the heavy work below.
@@ -105,7 +108,7 @@ pub fn suppress_all_diagnostics(
                 let lint_id = diagnostic.id().as_lint()?;
 
                 // Don't suppress unused ignore comments.
-                if is_unused_ignore_comment_id(diagnostic.id()) {
+                if is_unused_ignore_comment_lint(lint_id) {
                     return None;
                 }
 

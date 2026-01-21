@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 use std::fmt;
 
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span,
+    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_ast::token::TokenKind;
@@ -130,12 +130,8 @@ declare_lint! {
     }
 }
 
-pub fn is_unused_ignore_comment_id(id: DiagnosticId) -> bool {
-    if let DiagnosticId::Lint(lint_id) = id {
-        lint_id == UNUSED_IGNORE_COMMENT.name() || lint_id == UNUSED_TYPE_IGNORE_COMMENT.name()
-    } else {
-        false
-    }
+pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
+    name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]

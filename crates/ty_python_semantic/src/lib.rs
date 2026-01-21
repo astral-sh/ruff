@@ -17,7 +17,7 @@ pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
 pub use suppression::{
-    UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_id, suppress_all, suppress_single,
+    UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all, suppress_single,
 };
 pub use ty_module_resolver::MisconfigurationMode;
 pub use ty_site_packages::{
