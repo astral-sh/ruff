@@ -223,9 +223,9 @@ class Diagnostic:
 class GroupedDiagnostics:
     key: str
     sources: AbstractSet[Source]
-    old: list[Diagnostic] | None
-    new: list[Diagnostic] | None
-    expected: list[Diagnostic] | None
+    old: list[Diagnostic]
+    new: list[Diagnostic]
+    expected: list[Diagnostic]
 
     @property
     def change(self) -> Change:
@@ -251,11 +251,11 @@ class GroupedDiagnostics:
     def diagnostics_by_source(self, source: Source) -> list[Diagnostic]:
         match source:
             case Source.NEW:
-                return self.new or []
+                return self.new
             case Source.OLD:
-                return self.old or []
+                return self.old
             case Source.EXPECTED:
-                return self.expected or []
+                return self.expected
             case _:
                 raise ValueError(f"Invalid source: {source}")
 
@@ -317,12 +317,7 @@ class GroupedDiagnostics:
                 )
 
             case Classification.FALSE_NEGATIVE | Classification.TRUE_NEGATIVE:
-                diagnostics = list(
-                    filter(
-                        lambda d: d is not None,
-                        (*(self.old or []), *(self.expected or [])),
-                    )
-                )
+                diagnostics = self.old if self.old else self.expected
 
                 return (
                     self._render_diff(diagnostics, removed=True)
@@ -381,10 +376,10 @@ def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]
                         source=Source.EXPECTED,
                         optional=error.group("optional") is not None,
                         tag=(
-                        	f"{file.name}:{error.group('tag')}"
-                        	if error.group("tag")
-                        	else None
-                      	),
+                            f"{file.name}:{error.group('tag')}"
+                            if error.group("tag")
+                            else None
+                        ),
                         multi=error.group("multi") is not None,
                     )
                 )
@@ -502,9 +497,11 @@ def compute_stats(
         statistics.total_diagnostics += len(grouped.diagnostics_by_source(source))
         return statistics
 
-    grouped_diagnostics = [diag for diag in grouped_diagnostics if not diag.optional]
+    non_optional_diagnostics = [
+        diag for diag in grouped_diagnostics if not diag.optional
+    ]
 
-    return reduce(increment, grouped_diagnostics, Statistics())
+    return reduce(increment, non_optional_diagnostics, Statistics())
 
 
 def render_grouped_diagnostics(
