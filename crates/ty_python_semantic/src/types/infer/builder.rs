@@ -65,9 +65,9 @@ use crate::types::class::{DynamicNamedTupleLiteral, NamedTupleField};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
-    self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
-    DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
+    self, ABSTRACT_METHOD_IN_FINAL_CLASS, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS,
+    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO,
+    DUPLICATE_BASE, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
@@ -1226,11 +1226,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // and for violations of other rules relating to invalid overrides of some sort.
             overrides::check_class(&self.context, class);
 
+            // (14) Check for unimplemented abstract methods on final classes.
+            self.check_final_class_abstract_methods(class, class_node);
+
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
             }
 
-            // (14) If it's a `TypedDict` class, check that it doesn't include any invalid
+            // (15) If it's a `TypedDict` class, check that it doesn't include any invalid
             // statements: https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
             //
             //     The body of the class definition defines the items of the `TypedDict` type. It
@@ -1290,6 +1293,73 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             class.validate_members(&self.context);
+        }
+    }
+
+    /// Check that a `@final` class does not have unimplemented abstract methods.
+    ///
+    /// A final class cannot be subclassed, so if it inherits abstract methods without
+    /// implementing them, those methods can never be implemented, making the class
+    /// effectively broken.
+    fn check_final_class_abstract_methods(
+        &self,
+        class: StaticClassLiteral<'db>,
+        class_node: &ast::StmtClassDef,
+    ) {
+        let db = self.db();
+
+        // Only check if the class is final.
+        if !class.is_final(db) {
+            return;
+        }
+
+        let class_type = class.identity_specialization(db);
+        let abstract_methods = class_type.abstract_methods(db);
+
+        // If there are no abstract methods, we're done.
+        let Some((first_method_name, first_defining_class)) = abstract_methods.iter().next() else {
+            return;
+        };
+
+        let Some(builder) = self
+            .context
+            .report_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS, &class_node.name)
+        else {
+            return;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Final class `{}` does not implement abstract {}",
+            class.name(db),
+            if abstract_methods.len() == 1 {
+                format!("method `{first_method_name}`")
+            } else {
+                format!("methods {}", format_enumeration(abstract_methods.keys()))
+            }
+        ));
+
+        // Add secondary annotation pointing to the first abstract method definition.
+        let abstract_method =
+            first_defining_class.class_member(db, first_method_name, MemberLookupPolicy::default());
+        let function = abstract_method
+            .place
+            .ignore_possibly_undefined()
+            .and_then(|ty| match ty {
+                Type::FunctionLiteral(f) => Some(f),
+                Type::PropertyInstance(p) => p.getter(db).and_then(Type::as_function_literal),
+                _ => None,
+            });
+        if let Some(function) = function {
+            let overload = function.literal(db).last_definition(db);
+            let module = parsed_module(db, function.file(db)).load(db);
+            diagnostic.annotate(
+                Annotation::secondary(Span::from(overload.focus_range(db, &module))).message(
+                    format_args!(
+                        "`{first_method_name}` defined as abstract on superclass `{defining_class}`",
+                        defining_class = first_defining_class.name(db)
+                    ),
+                ),
+            );
         }
     }
 

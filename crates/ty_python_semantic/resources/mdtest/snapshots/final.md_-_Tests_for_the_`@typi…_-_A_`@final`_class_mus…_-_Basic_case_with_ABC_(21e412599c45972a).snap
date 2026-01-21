@@ -1,0 +1,50 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - A `@final` class must implement all abstract methods - Basic case with ABC
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from abc import ABC, abstractmethod
+ 2 | from typing import final
+ 3 | 
+ 4 | class Base(ABC):
+ 5 |     @abstractmethod
+ 6 |     def foo(self) -> int:
+ 7 |         raise NotImplementedError
+ 8 | 
+ 9 | @final
+10 | class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
+11 |     pass
+```
+
+# Diagnostics
+
+```
+error[abstract-method-in-final-class]: Final class `Derived` does not implement abstract method `foo`
+  --> src/mdtest_snippet.py:10:7
+   |
+ 9 | @final
+10 | class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
+   |       ^^^^^^^
+11 |     pass
+   |
+  ::: src/mdtest_snippet.py:6:9
+   |
+ 4 | class Base(ABC):
+ 5 |     @abstractmethod
+ 6 |     def foo(self) -> int:
+   |         --- `foo` defined as abstract on superclass `Base`
+ 7 |         raise NotImplementedError
+   |
+info: rule `abstract-method-in-final-class` is enabled by default
+
+```

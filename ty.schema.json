@@ -340,6 +340,16 @@
     "Rules": {
       "type": "object",
       "properties": {
+        "abstract-method-in-final-class": {
+          "title": "detects `@final` classes with unimplemented abstract methods",
+          "description": "## What it does\nChecks for `@final` classes that have unimplemented abstract methods.\n\n## Why is this bad?\nA class decorated with `@final` cannot be subclassed. If such a class has abstract\nmethods that are not implemented, the class can never be properly instantiated, as\nthe abstract methods can never be implemented (since subclassing is prohibited).\n\nAt runtime, instantiation of classes with unimplemented abstract methods is only\nprevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.\nHowever, type checkers also enforce this for classes that do not use `ABCMeta`, since\nthe intent for the class to be abstract is clear from the use of `@abstractmethod`.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\nclass Base(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n@final\nclass Derived(Base):  # Error: `Derived` does not implement `method`\n    pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "ambiguous-protocol-member": {
           "title": "detects protocol classes with ambiguous interfaces",
           "description": "## What it does\nChecks for protocol classes with members that will lead to ambiguous interfaces.\n\n## Why is this bad?\nAssigning to an undeclared variable in a protocol class leads to an ambiguous\ninterface which may lead to the type checker inferring unexpected things. It's\nrecommended to ensure that all members of a protocol class are explicitly declared.\n\n## Examples\n\n```py\nfrom typing import Protocol\n\nclass BaseProto(Protocol):\n    a: int                               # fine (explicitly declared as `int`)\n    def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration\n    c = \"some variable\"                  # error: no explicit declaration, leading to ambiguity\n    b = method_member                    # error: no explicit declaration, leading to ambiguity\n\n    # error: this creates implicit assignments of `d` and `e` in the protocol class body.\n    # Were they really meant to be considered protocol members?\n    for d, e in enumerate(range(42)):\n        pass\n\nclass SubProto(BaseProto, Protocol):\n    a = 42  # fine (declared in superclass)\n```",
