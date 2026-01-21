@@ -5625,22 +5625,10 @@ impl<'db> Type<'db> {
                     if let Some(definition) =
                         bound_self.and_then(|bound| bound.binding_context(db).definition())
                     {
-                        // Quick check: if the function has no decorators, it can't be a staticmethod.
-                        let is_staticmethod =
-                            if let DefinitionKind::Function(func_node) = definition.kind(db) {
-                                let module = parsed_module(db, definition.file(db)).load(db);
-                                let func = func_node.node(&module);
-                                !func.decorator_list.is_empty()
-                                    && infer::function_type_from_definition(db, definition)
-                                        .is_some_and(|func| {
-                                            func.has_known_decorator(
-                                                db,
-                                                FunctionDecorators::STATICMETHOD,
-                                            )
-                                        })
-                            } else {
-                                false
-                            };
+                        let is_staticmethod = infer::function_type_from_definition(db, definition)
+                            .is_some_and(|func| {
+                                func.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+                            });
 
                         if is_staticmethod {
                             return Err(InvalidTypeExpressionError {
