@@ -40,8 +40,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe if it would delete any comments
-/// within the exception expression range, as removing comments may lose important
-/// documentation or annotations.
+/// within the exception expression range.
 ///
 /// ## References
 /// - [Python documentation: `TimeoutError`](https://docs.python.org/3/library/exceptions.html#TimeoutError)
