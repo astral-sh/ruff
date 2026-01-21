@@ -653,6 +653,7 @@ jobs:
         with:
           name: ecosystem-result
           path: ecosystem-result
+          if-no-files-found: "error"
 
   fuzz-ty:
     name: "Fuzz for new ty panics"
@@ -1019,7 +1020,8 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: benchmarks-instrumented-ty-binary
-          path: target/codspeed/simulation/ruff_benchmark
+          path: target/codspeed/analysis/ruff_benchmark
+          if-no-files-found: "error"
           retention-days: 1
 
   benchmarks-instrumented-ty-run:
@@ -1107,6 +1109,7 @@ jobs:
         with:
           name: benchmarks-walltime-binary
           path: target/codspeed/walltime/ruff_benchmark
+          if-no-files-found: "error"
           retention-days: 1
 
   benchmarks-walltime-run:
