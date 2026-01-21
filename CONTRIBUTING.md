@@ -188,9 +188,9 @@ to call your new function at the appropriate time and with the appropriate input
 defined therein is a Python AST visitor, which iterates over the AST, building up a semantic model,
 and calling out to lint rule analyzer functions as it goes.
 
-If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
-for the `Checker::report_diagnostic` invocations to understand how other, similar rules
-are implemented.
+If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file or use the AST
+panel in the [playground](https://play.ruff.rs/?secondary=AST). Grep for the
+`Checker::report_diagnostic` invocations to understand how other, similar rules are implemented.
 
 Once you're satisfied with your code, add tests for your rule
 (see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
