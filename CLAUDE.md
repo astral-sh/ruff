@@ -28,7 +28,7 @@ Run a single mdtest file:
 cargo nextest run -p ty_python_semantic --test mdtest -- mdtest::<path/to/mdtest_file.md>
 ```
 
-Run a specific mdtest within a file (use a substring of the Markdown header text) -- this is usually not needed:
+To run a specific mdtest within a file, use a substring of the Markdown header text as `MDTEST_TEST_FILTER`. Only use this if it's necessary to isolate a single test case:
 
 ```sh
 MDTEST_TEST_FILTER="<filter>" cargo nextest run -p ty_python_semantic --test mdtest -- mdtest::<path/to/mdtest_file.md>
