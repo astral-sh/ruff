@@ -137,6 +137,53 @@ fn negative_constraints_for_expression_cycle_initial<'db>(
     None
 }
 
+enum TypedDictTypes<'db> {
+    OneOrZero(Option<TypedDictType<'db>>),
+    Many {
+        db: &'db dyn Db,
+        iter: indexmap::set::Iter<'db, Type<'db>>,
+    },
+}
+
+impl<'db> Iterator for TypedDictTypes<'db> {
+    type Item = TypedDictType<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::OneOrZero(slot) => slot.take(),
+            Self::Many { db, iter } => {
+                for element in iter.by_ref() {
+                    if let Some(td) = match element {
+                        Type::TypedDict(td) => Some(*td),
+                        Type::TypeAlias(alias) => alias.value_type(*db).as_typed_dict(),
+                        _ => None,
+                    } {
+                        return Some(td);
+                    }
+                }
+                None
+            }
+        }
+    }
+}
+
+/// Extract `TypedDictType`s from `ty`.
+/// That is, if the type is `TypedDictType`, get it;
+/// if it is `Intersection`, get all `TypedDictType`s within it;
+/// if it is `TypeAlias`, get it if its value type is `TypedDictType`.
+/// Note that this does nothing for `Union`.
+fn typed_dict_types<'db>(db: &'db dyn Db, ty: Type<'db>) -> TypedDictTypes<'db> {
+    match ty {
+        Type::TypedDict(td) => TypedDictTypes::OneOrZero(Some(td)),
+        Type::Intersection(intersection) => TypedDictTypes::Many {
+            db,
+            iter: intersection.positive(db).iter(),
+        },
+        Type::TypeAlias(alias) => TypedDictTypes::OneOrZero(alias.value_type(db).as_typed_dict()),
+        _ => TypedDictTypes::OneOrZero(None),
+    }
+}
+
 /// Functions that can be used to narrow the type of a first argument using a "classinfo" second argument.
 ///
 /// A "classinfo" argument is either a class or a tuple of classes, or a tuple of tuples of classes
@@ -1167,40 +1214,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 };
 
                 let narrowed = match rhs_type {
-                    Type::TypedDict(td) => {
-                        if requires_key(td) {
-                            Type::Never
-                        } else {
-                            rhs_type
-                        }
-                    }
-                    Type::Intersection(intersection) => {
-                        if intersection
-                            .positive(self.db)
-                            .iter()
-                            .copied()
-                            .filter_map(Type::as_typed_dict)
-                            .any(requires_key)
-                        {
-                            Type::Never
-                        } else {
-                            rhs_type
-                        }
-                    }
                     Type::Union(union) => {
                         // remove all members of the union that would require the key
-                        union.filter(self.db, |ty| match ty {
-                            Type::TypedDict(td) => !requires_key(*td),
-                            Type::Intersection(intersection) => !intersection
-                                .positive(self.db)
-                                .iter()
-                                .copied()
-                                .filter_map(Type::as_typed_dict)
-                                .any(requires_key),
-                            _ => true,
+                        union.filter(self.db, |ty| {
+                            !typed_dict_types(self.db, *ty).any(requires_key)
                         })
                     }
-                    _ => rhs_type,
+                    _ => {
+                        if typed_dict_types(self.db, rhs_type).any(requires_key) {
+                            Type::Never
+                        } else {
+                            rhs_type
+                        }
+                    }
                 };
 
                 if narrowed != rhs_type {
@@ -1827,6 +1853,7 @@ fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) ->
             .elements(db)
             .iter()
             .any(|union_member_ty| is_typeddict_or_union_with_typeddicts(db, *union_member_ty)),
+        Type::TypeAlias(alias) => is_typeddict_or_union_with_typeddicts(db, alias.value_type(db)),
         _ => false,
     }
 }
@@ -1846,7 +1873,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     ty: Type<'db>,
     field_name: &str,
 ) -> bool {
-    let matching_field_is_literal = |typeddict: &TypedDictType<'db>| {
+    let matching_field_is_literal = |typeddict: TypedDictType<'db>| {
         // There's no matching field to check if `.get()` returns `None`.
         typeddict
             .items(db)
@@ -1855,24 +1882,12 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     };
 
     match ty {
-        Type::TypedDict(td) => matching_field_is_literal(&td),
-        Type::Union(union) => {
-            union
-                .elements(db)
-                .iter()
-                .all(|union_member_ty| match union_member_ty {
-                    Type::TypedDict(td) => matching_field_is_literal(td),
-                    Type::Intersection(intersection) => {
-                        intersection
-                            .positive(db)
-                            .iter()
-                            .all(|intersection_member_ty| match intersection_member_ty {
-                                Type::TypedDict(td) => matching_field_is_literal(td),
-                                _ => true,
-                            })
-                    }
-                    _ => true,
-                })
+        Type::TypedDict(td) => matching_field_is_literal(td),
+        Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
+            typed_dict_types(db, *union_member_ty).all(matching_field_is_literal)
+        }),
+        Type::TypeAlias(alias) => {
+            all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
         }
         _ => true,
     }

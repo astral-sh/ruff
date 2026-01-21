@@ -189,7 +189,7 @@ static PYDANTIC: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY39,
     },
-    4635,
+    3200,
 );
 
 static SYMPY: Benchmark = Benchmark::new(
