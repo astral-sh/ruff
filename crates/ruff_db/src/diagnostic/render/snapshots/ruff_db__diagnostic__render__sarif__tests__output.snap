@@ -128,30 +128,42 @@ expression: output
           "name": "ty",
           "rules": [
             {
+              "help": {
+                "text": "`os` imported but unused"
+              },
               "helpUri": "https://docs.astral.sh/ruff/rules/unused-import",
               "id": "F401",
               "properties": {
-                "id": "F401"
+                "id": "F401",
+                "problem.severity": "error"
               },
               "shortDescription": {
                 "text": "`os` imported but unused"
               }
             },
             {
+              "help": {
+                "text": "Undefined name `a`"
+              },
               "helpUri": "https://docs.astral.sh/ruff/rules/undefined-name",
               "id": "F821",
               "properties": {
-                "id": "F821"
+                "id": "F821",
+                "problem.severity": "error"
               },
               "shortDescription": {
                 "text": "Undefined name `a`"
               }
             },
             {
+              "help": {
+                "text": "Local variable `x` is assigned to but never used"
+              },
               "helpUri": "https://docs.astral.sh/ruff/rules/unused-variable",
               "id": "F841",
               "properties": {
-                "id": "F841"
+                "id": "F841",
+                "problem.severity": "error"
               },
               "shortDescription": {
                 "text": "Local variable `x` is assigned to but never used"

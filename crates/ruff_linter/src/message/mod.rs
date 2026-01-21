@@ -9,8 +9,9 @@ use rustc_hash::FxHashMap;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
     DisplayDiagnostics, DisplayGithubDiagnostics, DisplaySarifDiagnostics, FileResolver,
-    GithubRenderer, Input, LintName, SarifRenderer, SarifToolInfo, SecondaryCode, Severity, Span,
-    SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    GithubRenderer, Input, LintName, RuleMetadata, RuleMetadataProvider, SarifRenderer,
+    SarifToolInfo, SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+    UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -20,7 +21,7 @@ use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Fix;
-use crate::registry::Rule;
+use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::settings::types::{OutputFormat, RuffOutputFormat};
 
 mod grouped;
@@ -194,6 +195,58 @@ impl<'a> EmitterContext<'a> {
     }
 }
 
+struct RuffRuleMetadata {
+    rule: Rule,
+    code: String,
+    linter_name: &'static str,
+    url: Option<String>,
+}
+
+impl RuleMetadata for RuffRuleMetadata {
+    fn code(&self) -> &str {
+        &self.code
+    }
+
+    fn name(&self) -> Option<&str> {
+        Some(self.rule.into())
+    }
+
+    fn linter(&self) -> Option<&str> {
+        Some(self.linter_name)
+    }
+
+    fn summary(&self) -> &str {
+        self.rule.message_formats()[0]
+    }
+
+    fn explanation(&self) -> Option<&str> {
+        self.rule.explanation()
+    }
+
+    fn url(&self) -> Option<&str> {
+        self.url.as_deref()
+    }
+}
+
+struct RuffMetadataProvider;
+
+impl RuleMetadataProvider for RuffMetadataProvider {
+    fn get_metadata<'a>(&'a self, code: &'a SecondaryCode) -> Option<Box<dyn RuleMetadata + 'a>> {
+        let code_str = code.as_str();
+        let (linter, suffix) = Linter::parse_code(code_str)?;
+        let rule: Rule = linter
+            .all_rules()
+            .find(|rule| rule.noqa_code().suffix() == suffix)?;
+
+        Some(Box::new(RuffRuleMetadata {
+            rule,
+            code: code_str.to_string(),
+            linter_name: linter.name(),
+            url: rule.url(),
+        }))
+    }
+}
+
 pub fn render_diagnostics(
     writer: &mut dyn Write,
     format: OutputFormat,
@@ -219,7 +272,8 @@ pub fn render_diagnostics(
                     name: "Ruff",
                     information_uri: "https://github.com/astral-sh/ruff",
                 },
-            );
+            )
+            .with_metadata_provider(&RuffMetadataProvider);
             let value = DisplaySarifDiagnostics::new(&renderer, diagnostics);
             write!(writer, "{value}")?;
         }

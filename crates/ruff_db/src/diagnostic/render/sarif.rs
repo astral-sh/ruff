@@ -6,6 +6,25 @@ use serde::{Serialize, Serializer};
 use serde_json::json;
 use std::collections::HashMap;
 
+pub trait RuleMetadata {
+    fn code(&self) -> &str;
+    fn name(&self) -> Option<&str> {
+        None
+    }
+    fn linter(&self) -> Option<&str> {
+        None
+    }
+    fn summary(&self) -> &str;
+    fn explanation(&self) -> Option<&str> {
+        None
+    }
+    fn url(&self) -> Option<&str> {
+        None
+    }
+}
+pub trait RuleMetadataProvider {
+    fn get_metadata<'a>(&'a self, code: &'a SecondaryCode) -> Option<Box<dyn RuleMetadata + 'a>>;
+}
 pub struct SarifToolInfo {
     pub name: &'static str,
     pub information_uri: &'static str,
@@ -14,11 +33,20 @@ pub struct SarifToolInfo {
 pub struct SarifRenderer<'a> {
     resolver: &'a dyn FileResolver,
     tool: SarifToolInfo,
+    metadata_provider: Option<&'a dyn RuleMetadataProvider>,
 }
 
 impl<'a> SarifRenderer<'a> {
     pub fn new(resolver: &'a dyn FileResolver, tool: SarifToolInfo) -> Self {
-        Self { resolver, tool }
+        Self {
+            resolver,
+            tool,
+            metadata_provider: None,
+        }
+    }
+    pub fn with_metadata_provider(mut self, provider: &'a dyn RuleMetadataProvider) -> Self {
+        self.metadata_provider = Some(provider);
+        self
     }
 }
 
@@ -32,25 +60,27 @@ impl SarifRenderer<'_> {
             .iter()
             .map(|diagnostic| SarifResult::from_diagnostic(diagnostic, self.resolver))
             .collect::<Vec<_>>();
-
-        let unique_rules: HashMap<&SecondaryCode, SarifRuleInfo> = diagnostics
+        let unique_rules: HashMap<String, SarifRule> = diagnostics
             .iter()
             .filter_map(|d| {
                 d.secondary_code().map(|code| {
-                    (
-                        code,
-                        SarifRuleInfo {
-                            code,
-                            message: d.primary_message(),
-                            url: d.documentation_url(),
-                        },
-                    )
+                    let rule = if let Some(provider) = self.metadata_provider {
+                        if let Some(metadata) = provider.get_metadata(code) {
+                            SarifRule::from_metadata(metadata.as_ref())
+                        } else {
+                            SarifRule::from_diagnostic(d, code)
+                        }
+                    } else {
+                        SarifRule::from_diagnostic(d, code)
+                    };
+
+                    (code.as_str().to_string(), rule)
                 })
             })
             .collect();
 
-        let mut rules: Vec<SarifRule> = unique_rules.into_values().map(SarifRule::from).collect();
-        rules.sort_by(|a, b| a.info.code.cmp(b.info.code));
+        let mut rules: Vec<SarifRule> = unique_rules.into_values().collect();
+        rules.sort_by(|a, b| a.id.cmp(&b.id));
 
         let output = serde_json::json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -309,42 +339,79 @@ struct SarifRegion {
     end_column: OneIndexed,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-struct SarifRuleInfo<'a> {
-    code: &'a SecondaryCode,
-    message: &'a str,
-    url: Option<&'a str>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct SarifRule<'a> {
-    info: SarifRuleInfo<'a>,
+struct SarifRule {
+    id: String,
+    name: Option<String>,
+    linter: Option<String>,
+    summary: String,
+    explanation: Option<String>,
+    url: Option<String>,
 }
 
-impl<'a> From<SarifRuleInfo<'a>> for SarifRule<'a> {
-    fn from(info: SarifRuleInfo<'a>) -> Self {
-        Self { info }
+impl SarifRule {
+    fn from_metadata(metadata: &dyn RuleMetadata) -> Self {
+        Self {
+            id: metadata.code().to_string(),
+            name: metadata.name().map(ToString::to_string),
+            linter: metadata.linter().map(ToString::to_string),
+            summary: metadata.summary().to_string(),
+            explanation: metadata.explanation().map(ToString::to_string),
+            url: metadata.url().map(ToString::to_string),
+        }
+    }
+
+    fn from_diagnostic(diagnostic: &Diagnostic, code: &SecondaryCode) -> Self {
+        Self {
+            id: code.as_str().to_string(),
+            name: None,
+            linter: None,
+            summary: diagnostic.primary_message().to_string(),
+            explanation: None,
+            url: diagnostic.documentation_url().map(ToString::to_string),
+        }
     }
 }
-
-impl Serialize for SarifRule<'_> {
+impl Serialize for SarifRule {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut rule = json!({
-            "id": self.info.code,
+            "id": self.id,
             "shortDescription": {
-                "text": self.info.message,
+                "text": self.summary,
             },
             "properties": {
-                "id": self.info.code,
+                "id": self.id,
             },
         });
 
-        if let Some(url) = self.info.url {
+        if let Some(explanation) = &self.explanation {
+            rule["fullDescription"] = json!({
+                "text": explanation,
+            });
+        }
+
+        if let Some(summary) = &Some(&self.summary) {
+            rule["help"] = json!({
+                "text": summary,
+            });
+        }
+
+        if let Some(url) = &self.url {
             rule["helpUri"] = json!(url);
         }
+
+        if let Some(name) = &self.name {
+            rule["properties"]["name"] = json!(name);
+        }
+
+        if let Some(linter) = &self.linter {
+            rule["properties"]["kind"] = json!(linter);
+        }
+
+        rule["properties"]["problem.severity"] = json!("error");
 
         rule.serialize(serializer)
     }
