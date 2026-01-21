@@ -632,7 +632,7 @@ class Base(ABC):
         raise NotImplementedError
 
 @final
-class Derived(Base):  # error: [unimplemented-abstract-method] "Final class `Derived` does not implement abstract method `foo`"
+class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
     pass
 ```
 
@@ -653,11 +653,11 @@ class Base(ABC):
     def baz(self) -> None: ...
 
 @final
-class MissingAll(Base):  # error: [unimplemented-abstract-method]
+class MissingAll(Base):  # error: [abstract-method-in-final-class]
     pass
 
 @final
-class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
+class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
     def foo(self) -> int:
         return 42
 
@@ -676,7 +676,7 @@ class MyProtocol(Protocol):
     def method(self) -> int: ...
 
 @final
-class Implementer(MyProtocol):  # error: [unimplemented-abstract-method]
+class Implementer(MyProtocol):  # error: [abstract-method-in-final-class]
     pass
 ```
 
@@ -717,7 +717,7 @@ class Parent(GrandParent):
     pass
 
 @final
-class Child(Parent):  # error: [unimplemented-abstract-method]
+class Child(Parent):  # error: [abstract-method-in-final-class]
     pass
 ```
 
@@ -742,7 +742,7 @@ class Parent(Grandparent):
     def f(self): ...
 
 @final
-class Child(Parent):  # error: [unimplemented-abstract-method]
+class Child(Parent):  # error: [abstract-method-in-final-class]
     pass
 ```
 
@@ -793,7 +793,7 @@ class Stringable:
     @abstractmethod
     def stringify(self) -> str: ...
 
-class MyEnum(Stringable, Enum):  # error: [unimplemented-abstract-method]
+class MyEnum(Stringable, Enum):  # error: [abstract-method-in-final-class]
     A = 1
     B = 2
 ```
@@ -808,7 +808,7 @@ from abc import abstractmethod
 from typing import final
 
 @final
-class Broken:  # error: [unimplemented-abstract-method]
+class Broken:  # error: [abstract-method-in-final-class]
     @abstractmethod
     def foo(self) -> int: ...
 ```
@@ -833,7 +833,7 @@ class Good(Base):
         return 42
 
 @final
-class Bad(Base):  # error: [unimplemented-abstract-method]
+class Bad(Base):  # error: [abstract-method-in-final-class]
     pass
 ```
 
@@ -859,7 +859,7 @@ class Good(Base):
         pass
 
 @final
-class Bad(Base):  # error: [unimplemented-abstract-method]
+class Bad(Base):  # error: [abstract-method-in-final-class]
     pass
 ```
 
@@ -884,7 +884,7 @@ class Base(ABC):
     def value(self) -> None: ...
 
 @final
-# TODO: should emit [unimplemented-abstract-method]
+# TODO: should emit [abstract-method-in-final-class]
 class Bad(Base):
     pass
 ```
@@ -927,7 +927,7 @@ class Base(ABC):
     def method(self) -> int: ...
 
 @final
-class Bad(Base):  # error: [unimplemented-abstract-method]
+class Bad(Base):  # error: [abstract-method-in-final-class]
     method: int
 ```
 
@@ -943,6 +943,87 @@ class Base(ABC):
     def f(self) -> int: ...
 
 @final
-class BadChild(Base):  # error: [unimplemented-abstract-method]
+class BadChild(Base):  # error: [abstract-method-in-final-class]
     f: int
+```
+
+### Abstract classmethod
+
+A `@final` class must also implement abstract classmethods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @classmethod
+    @abstractmethod
+    def make(cls) -> "Base": ...
+
+@final
+class Good(Base):
+    @classmethod
+    def make(cls) -> "Good":
+        return cls()
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Abstract staticmethod
+
+A `@final` class must also implement abstract staticmethods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @staticmethod
+    @abstractmethod
+    def create() -> int: ...
+
+@final
+class Good(Base):
+    @staticmethod
+    def create() -> int:
+        return 42
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Deprecated abstract decorators
+
+The `abc.abstractproperty`, `abc.abstractclassmethod`, and `abc.abstractstaticmethod` decorators are
+deprecated since Python 3.3 and not currently detected in `@final` classes.
+
+```py
+from abc import (
+    ABC,
+    abstractproperty,  # error: [deprecated]
+    abstractclassmethod,  # error: [deprecated]
+    abstractstaticmethod,  # error: [deprecated]
+)
+from typing import final
+
+class Base(ABC):
+    @abstractproperty  # error: [deprecated]
+    def value(self) -> int:
+        return 0
+
+    @abstractclassmethod  # error: [deprecated]
+    def make(cls) -> "Base":
+        raise NotImplementedError
+
+    @abstractstaticmethod  # error: [deprecated]
+    def create() -> int:
+        return 0
+
+@final
+# TODO: should emit [abstract-method-in-final-class] for `value`, `make`, and `create`
+class Bad(Base):
+    pass
 ```

@@ -25,11 +25,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 10 |     def baz(self) -> None: ...
 11 | 
 12 | @final
-13 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
+13 | class MissingAll(Base):  # error: [abstract-method-in-final-class]
 14 |     pass
 15 | 
 16 | @final
-17 | class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
+17 | class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
 18 |     def foo(self) -> int:
 19 |         return 42
 20 | 
@@ -40,11 +40,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 # Diagnostics
 
 ```
-error[unimplemented-abstract-method]: Final class `MissingAll` does not implement abstract methods `foo`, `bar`, `baz`
+error[abstract-method-in-final-class]: Final class `MissingAll` does not implement abstract methods `foo`, `bar` and `baz`
   --> src/mdtest_snippet.py:13:7
    |
 12 | @final
-13 | class MissingAll(Base):  # error: [unimplemented-abstract-method]
+13 | class MissingAll(Base):  # error: [abstract-method-in-final-class]
    |       ^^^^^^^^^^
 14 |     pass
    |
@@ -57,16 +57,16 @@ error[unimplemented-abstract-method]: Final class `MissingAll` does not implemen
  7 |     @abstractmethod
  8 |     def bar(self) -> str: ...
    |
-info: rule `unimplemented-abstract-method` is enabled by default
+info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
 
 ```
-error[unimplemented-abstract-method]: Final class `PartiallyImplemented` does not implement abstract method `baz`
+error[abstract-method-in-final-class]: Final class `PartiallyImplemented` does not implement abstract method `baz`
   --> src/mdtest_snippet.py:17:7
    |
 16 | @final
-17 | class PartiallyImplemented(Base):  # error: [unimplemented-abstract-method]
+17 | class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
    |       ^^^^^^^^^^^^^^^^^^^^
 18 |     def foo(self) -> int:
 19 |         return 42
@@ -80,6 +80,6 @@ error[unimplemented-abstract-method]: Final class `PartiallyImplemented` does no
 11 |
 12 | @final
    |
-info: rule `unimplemented-abstract-method` is enabled by default
+info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

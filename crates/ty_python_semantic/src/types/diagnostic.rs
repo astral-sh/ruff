@@ -107,7 +107,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&INEFFECTIVE_FINAL);
-    registry.register_lint(&UNIMPLEMENTED_ABSTRACT_METHOD);
+    registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -1906,7 +1906,7 @@ declare_lint! {
     /// class Derived(Base):  # Error: `Derived` does not implement `method`
     ///     pass
     /// ```
-    pub(crate) static UNIMPLEMENTED_ABSTRACT_METHOD = {
+    pub(crate) static ABSTRACT_METHOD_IN_FINAL_CLASS = {
         summary: "detects `@final` classes with unimplemented abstract methods",
         status: LintStatus::stable("0.0.13"),
         default_level: Level::Error,

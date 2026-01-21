@@ -22,18 +22,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
  7 |         raise NotImplementedError
  8 | 
  9 | @final
-10 | class Derived(Base):  # error: [unimplemented-abstract-method] "Final class `Derived` does not implement abstract method `foo`"
+10 | class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
 11 |     pass
 ```
 
 # Diagnostics
 
 ```
-error[unimplemented-abstract-method]: Final class `Derived` does not implement abstract method `foo`
+error[abstract-method-in-final-class]: Final class `Derived` does not implement abstract method `foo`
   --> src/mdtest_snippet.py:10:7
    |
  9 | @final
-10 | class Derived(Base):  # error: [unimplemented-abstract-method] "Final class `Derived` does not implement abstract method `foo`"
+10 | class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
    |       ^^^^^^^
 11 |     pass
    |
@@ -45,6 +45,6 @@ error[unimplemented-abstract-method]: Final class `Derived` does not implement a
    |         --- `foo` defined as abstract on superclass `Base`
  7 |         raise NotImplementedError
    |
-info: rule `unimplemented-abstract-method` is enabled by default
+info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

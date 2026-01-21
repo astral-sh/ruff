@@ -2,6 +2,47 @@
 
 # Rules
 
+## `abstract-method-in-final-class`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.13">0.0.13</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20abstract-method-in-final-class" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1881" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for `@final` classes that have unimplemented abstract methods.
+
+**Why is this bad?**
+
+A class decorated with `@final` cannot be subclassed. If such a class has abstract
+methods that are not implemented, the class can never be properly instantiated, as
+the abstract methods can never be implemented (since subclassing is prohibited).
+
+At runtime, instantiation of classes with unimplemented abstract methods is only
+prevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.
+However, type checkers also enforce this for classes that do not use `ABCMeta`, since
+the intent for the class to be abstract is clear from the use of `@abstractmethod`.
+
+**Example**
+
+
+```python
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+@final
+class Derived(Base):  # Error: `Derived` does not implement `method`
+    pass
+```
+
 ## `ambiguous-protocol-member`
 
 <small>
@@ -2775,47 +2816,6 @@ Using `reveal_type` without importing it will raise a `NameError` at runtime.
 
 ```python
 reveal_type(1)  # NameError: name 'reveal_type' is not defined
-```
-
-## `unimplemented-abstract-method`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.13">0.0.13</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unimplemented-abstract-method" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1881" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for `@final` classes that have unimplemented abstract methods.
-
-**Why is this bad?**
-
-A class decorated with `@final` cannot be subclassed. If such a class has abstract
-methods that are not implemented, the class can never be properly instantiated, as
-the abstract methods can never be implemented (since subclassing is prohibited).
-
-At runtime, instantiation of classes with unimplemented abstract methods is only
-prevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.
-However, type checkers also enforce this for classes that do not use `ABCMeta`, since
-the intent for the class to be abstract is clear from the use of `@abstractmethod`.
-
-**Example**
-
-
-```python
-from abc import ABC, abstractmethod
-from typing import final
-
-class Base(ABC):
-    @abstractmethod
-    def method(self) -> int: ...
-
-@final
-class Derived(Base):  # Error: `Derived` does not implement `method`
-    pass
 ```
 
 ## `unknown-argument`
