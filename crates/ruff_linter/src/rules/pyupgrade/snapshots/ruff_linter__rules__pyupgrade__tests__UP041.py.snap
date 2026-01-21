@@ -133,3 +133,24 @@ help: Replace with builtin `TimeoutError`
 43 |     pass
 44 | 
 45 | # These should not change
+
+UP041 [*] Replace aliased errors with `TimeoutError`
+  --> UP041.py:72:5
+   |
+71 |   raise (
+72 | /     asyncio.
+73 | |     # text
+74 | |        TimeoutError
+   | |___________________^
+75 |   )
+   |
+help: Replace `asyncio.TimeoutError` with builtin `TimeoutError`
+69 | 
+70 | 
+71 | raise (
+   -     asyncio.
+   -     # text
+   -        TimeoutError
+72 +     TimeoutError
+73 | )
+note: This is an unsafe fix and may change runtime behavior

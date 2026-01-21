@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -36,6 +37,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// raise TimeoutError
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if it would delete any comments
+/// within the exception expression range.
 ///
 /// ## References
 /// - [Python documentation: `TimeoutError`](https://docs.python.org/3/library/exceptions.html#TimeoutError)
@@ -98,9 +103,17 @@ fn atom_diagnostic(checker: &Checker, target: &Expr) {
             target.start(),
             checker.semantic(),
         )?;
-        Ok(Fix::safe_edits(
+
+        let applicability = if checker.comment_ranges().intersects(target.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(Fix::applicable_edits(
             Edit::range_replacement(binding, target.range()),
             import_edit,
+            applicability,
         ))
     });
 }
@@ -149,10 +162,19 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
             format!("({})", checker.generator().expr(&node.into()))
         };
 
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            pad(content, tuple.range(), checker.locator()),
-            tuple.range(),
-        )));
+        let applicability = if checker.comment_ranges().intersects(tuple.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(
+                pad(content, tuple.range(), checker.locator()),
+                tuple.range(),
+            ),
+            applicability,
+        ));
     }
 }
 
