@@ -680,6 +680,22 @@ Miscellaneous:
           Exit with a non-zero status code if any files were modified via fix,
           even if no lint violations remain
 
+External linter options:
+      --list-external-linters
+          List configured external AST linters and exit
+      --select-external <LINTER>
+          Restrict linting to the given external linter IDs
+      --extend-select-external <LINTER>
+          Enable additional external linter IDs or rule codes without replacing
+          existing selections
+      --ignore-external <LINTER>
+          Disable the given external linter IDs or rule codes
+      --extend-ignore-external <LINTER>
+          Disable additional external linter IDs or rule codes without
+          replacing existing ignores
+      --verify-external-linters
+          Validate external linter definitions without running lint checks
+
 Log levels:
   -v, --verbose  Enable verbose logging
   -q, --quiet    Print diagnostics, but nothing else

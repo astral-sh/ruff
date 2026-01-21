@@ -558,6 +558,8 @@ pub struct LintOptions {
         "#
     )]
     pub future_annotations: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_ast: Option<BTreeMap<String, ExternalAstLinterOptions>>,
 }
 
 pub fn validate_required_version(required_version: &RequiredVersion) -> anyhow::Result<()> {
@@ -582,6 +584,23 @@ impl OptionsMetadata for DeprecatedTopLevelLintOptions {
         // This doesn't create an empty 'common' option  because the field in the `Options` struct is marked with `#[serde(flatten)]`.
         // Meaning, the code here flattens no-properties into the parent, which is what we want.
     }
+}
+
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, OptionsMetadata, CombineOptions, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct ExternalAstLinterOptions {
+    /// Path to the TOML file containing external lint rule definitions.
+    #[option(
+        default = "null",
+        value_type = "path",
+        example = r#"path = "lint/custom_rules.toml""#
+    )]
+    pub path: Option<PathBuf>,
+    /// Whether this external linter should be considered during lint runs.
+    #[option(default = "true", value_type = "bool", example = "enabled = false")]
+    #[serde(default)]
+    pub enabled: Option<bool>,
 }
 
 #[cfg(feature = "schemars")]
@@ -681,6 +700,45 @@ pub struct LintCommonOptions {
         "#
     )]
     pub extend_select: Option<Vec<RuleSelector>>,
+    /// A list of external linter IDs or rule codes to enable. When omitted, external linters remain disabled.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            # Enable the `logging_interpolation` external linter by default.
+            select-external = ["logging_interpolation"]
+        "#
+    )]
+    pub select_external: Option<Vec<String>>,
+    /// A list of external linter IDs or rule codes to enable, in addition to those specified by [`select-external`](#lint_select-external).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            # Enable the `logging_interpolation` external linter alongside those specified by `select-external`.
+            extend-select-external = ["logging_interpolation"]
+        "#
+    )]
+    pub extend_select_external: Option<Vec<String>>,
+    /// A list of external linter IDs or rule codes to ignore. Prefixes are not supported.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            # Suppress the `logging_interpolation.dangerous` rule, even if the linter is otherwise enabled.
+            ignore-external = ["logging_interpolation.dangerous"]
+        "#
+    )]
+    pub ignore_external: Option<Vec<String>>,
+    /// A list of external linter IDs or rule codes to ignore, in addition to those specified by [`ignore-external`](#lint_ignore-external).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            extend-ignore-external = ["logging_interpolation.dangerous"]
+        "#
+    )]
+    pub extend_ignore_external: Option<Vec<String>>,
 
     /// A list of rule codes or prefixes to consider fixable, in addition to those
     /// specified by [`fixable`](#lint_fixable).
@@ -3943,9 +4001,14 @@ pub struct LintOptionsWire {
     dummy_variable_rgx: Option<String>,
     extend_ignore: Option<Vec<RuleSelector>>,
     extend_select: Option<Vec<RuleSelector>>,
+    select_external: Option<Vec<String>>,
+    extend_select_external: Option<Vec<String>>,
+    ignore_external: Option<Vec<String>>,
+    extend_ignore_external: Option<Vec<String>>,
     extend_fixable: Option<Vec<RuleSelector>>,
     extend_unfixable: Option<Vec<RuleSelector>>,
     external: Option<Vec<String>>,
+    external_ast: Option<BTreeMap<String, ExternalAstLinterOptions>>,
     fixable: Option<Vec<RuleSelector>>,
     ignore: Option<Vec<RuleSelector>>,
     extend_safe_fixes: Option<Vec<RuleSelector>>,
@@ -4000,9 +4063,14 @@ impl From<LintOptionsWire> for LintOptions {
             dummy_variable_rgx,
             extend_ignore,
             extend_select,
+            select_external,
+            extend_select_external,
+            ignore_external,
+            extend_ignore_external,
             extend_fixable,
             extend_unfixable,
             external,
+            external_ast,
             fixable,
             ignore,
             extend_safe_fixes,
@@ -4056,6 +4124,10 @@ impl From<LintOptionsWire> for LintOptions {
                 dummy_variable_rgx,
                 extend_ignore,
                 extend_select,
+                select_external,
+                extend_select_external,
+                ignore_external,
+                extend_ignore_external,
                 extend_fixable,
                 extend_unfixable,
                 external,
@@ -4103,6 +4175,7 @@ impl From<LintOptionsWire> for LintOptions {
             ruff,
             preview,
             typing_extensions,
+            external_ast,
             future_annotations,
         }
     }

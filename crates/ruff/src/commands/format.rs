@@ -596,7 +596,7 @@ impl<'a> FormatResults<'a> {
             .iter()
             .map(Diagnostic::from)
             .chain(self.to_diagnostics(&mut notebook_index))
-            .sorted_unstable_by(Diagnostic::ruff_start_ordering)
+            .sorted_by(Diagnostic::ruff_start_ordering)
             .collect();
 
         let context = EmitterContext::new(&notebook_index);
