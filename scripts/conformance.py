@@ -486,13 +486,13 @@ def compute_stats(
     source = Source.NEW if ty_version == "new" else Source.OLD
 
     def increment(statistics: Statistics, grouped: GroupedDiagnostics) -> Statistics:
-        classification = grouped.classify(source)
-        if classification == Classification.TRUE_POSITIVE:
-            statistics.true_positives += 1
-        elif classification == Classification.FALSE_POSITIVE:
-            statistics.false_positives += 1
-        elif classification == Classification.FALSE_NEGATIVE:
-            statistics.false_negatives += 1
+        match grouped.classify(source):
+            case Classification.TRUE_POSITIVE:
+                statistics.true_positives += 1
+            case Classification.FALSE_POSITIVE:
+                statistics.false_positives += 1
+            case Classification.FALSE_NEGATIVE:
+                statistics.false_negatives += 1
 
         statistics.total_diagnostics += len(grouped.diagnostics_by_source(source))
         return statistics
