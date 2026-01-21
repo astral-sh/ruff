@@ -12573,6 +12573,68 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // When the left operand is a constrained TypeVar (e.g., `T: (int, float)`) and the
+            // right operand is not a TypeVar, we check if each constraint supports the operation
+            // with the right operand. For example, `T * 2` where `T: (int, float)` should check
+            // `int * 2` and `float * 2`, both of which work.
+            //
+            // TODO: We expect to replace this with more general support once we migrate to the new
+            // solver.
+            (Type::TypeVar(left_tvar), rhs, _) if !rhs.is_type_var() => {
+                match left_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        Self::map_constrained_typevar_constraints(
+                            self.db(),
+                            left_ty,
+                            constraints,
+                            |constraint| {
+                                self.infer_binary_expression_type(
+                                    node,
+                                    emitted_division_by_zero_diagnostic,
+                                    constraint,
+                                    rhs,
+                                    op,
+                                )
+                            },
+                        )
+                    }
+                    // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
+                    _ => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
+                        .map(|outcome| outcome.return_type(self.db()))
+                        .ok(),
+                }
+            }
+
+            // When the right operand is a constrained TypeVar and the left operand is not a TypeVar,
+            // we check if each constraint supports the operation with the left operand.
+            (lhs, Type::TypeVar(right_tvar), _) if !lhs.is_type_var() => {
+                match right_tvar
+                    .typevar(self.db())
+                    .bound_or_constraints(self.db())
+                {
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        Self::map_constrained_typevar_constraints(
+                            self.db(),
+                            right_ty,
+                            constraints,
+                            |constraint| {
+                                self.infer_binary_expression_type(
+                                    node,
+                                    emitted_division_by_zero_diagnostic,
+                                    lhs,
+                                    constraint,
+                                    op,
+                                )
+                            },
+                        )
+                    }
+                    // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
+                    _ => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
+                        .map(|outcome| outcome.return_type(self.db()))
+                        .ok(),
+                }
+            }
+
             // `try_call_bin_op` works for almost all `NewType`s, but not for `NewType`s of `float`
             // and `complex`, where the concrete base type is a union. In that case it turns out
             // the `self` types of the dunder methods in typeshed don't match, because they don't
