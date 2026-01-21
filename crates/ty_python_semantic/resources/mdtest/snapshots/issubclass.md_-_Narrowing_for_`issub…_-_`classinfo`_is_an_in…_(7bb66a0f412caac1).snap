@@ -18,18 +18,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/narrow/issubclass.md
  3 | def _(x: type[int | list | bytes]):
  4 |     # error: [invalid-argument-type]
  5 |     if issubclass(x, int | list[int]):
- 6 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+ 6 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
  7 |     # TODO: This should be an error
  8 |     elif isinstance(x, (list[int] | bytes, int)):
- 9 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+ 9 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 10 |     # TODO: This should be an error
 11 |     elif isinstance(x, (int, str | Literal[42])):
-12 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+12 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 13 |     # TODO: This should be an error
 14 |     elif isinstance(x, (int, (str, (bytes, memoryview | Literal[42])))):
-15 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+15 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 16 |     else:
-17 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+17 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 ```
 
 # Diagnostics
@@ -44,7 +44,7 @@ error[invalid-argument-type]: Invalid second argument to `issubclass`
   |        ^^^^^^^^^^^^^^---------------^
   |                      |
   |                      This `UnionType` instance contains non-class elements
-6 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+6 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 7 |     # TODO: This should be an error
   |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects

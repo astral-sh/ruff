@@ -867,7 +867,7 @@ class ClassWithOverloadedInit[T]:
 # overload. We would then also have to determine that R must be equal to the return type of **P's
 # solution.
 
-# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
+# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(into_callable(ClassWithOverloadedInit))
 # TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
 # revealed: Overload[(x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], (x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
@@ -888,7 +888,7 @@ class GenericClass[T]:
 def _(x: list[str]):
     # TODO: This fails because we are not propagating GenericClass's generic context into the
     # Callable that we create for it.
-    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(into_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_callable(GenericClass)))
@@ -905,6 +905,23 @@ def _(x: list[str]):
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     reveal_type(accepts_callable(GenericClass)(x, x))
+```
+
+### `Callable`s that return union types
+
+```py
+from typing import Callable
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def my_iter[T](f: Callable[[], T | None]) -> Box[T]:
+    return Box()
+
+def get_int() -> int | None: ...
+
+reveal_type(my_iter(get_int))  # revealed: Box[int]
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times
@@ -949,3 +966,29 @@ class Builder(Generic[TMsg]):
     def _handler(self, stream: Stream[Msg]) -> Stream[Msg]:
         return stream
 ```
+
+## Regressions
+
+### Only consider fully static types as pivots for transitivity
+
+This is a regression test for [ty#2371]. When working with constraint sets, we track transitive
+relationships between the constraints in the set. For instance, in `S ≤ int ∧ int ≤ T`, we can infer
+that `S ≤ T`. However, we should only consider fully static types when looking for a "pivot" for
+this kind of transitive relationship. The same pattern does not hold for `S ≤ Any ∧ Any ≤ T`;
+because the two `Any`s can materialize to different types, we cannot infer that `S ≤ T`.
+
+We have lower level tests of this in [`type_properties/implies_subtype_of.md`][implies_subtype_of].
+`functools.reduce` has a signature that exercises this behavior, as well, so we also include this
+regression test.
+
+```py
+from functools import reduce
+
+def _(keys: list[str]):
+    # TODO: revealed: int
+    # revealed: Unknown | Literal[0]
+    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+```
+
+[implies_subtype_of]: ../../type_properties/implies_subtype_of.md
+[ty#2371]: https://github.com/astral-sh/ty/issues/2371

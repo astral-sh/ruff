@@ -7,8 +7,8 @@ use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicClassLiteral,
+    DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
     NormalizedVisitor, SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     TypedDictType, UnionType, todo_type,
 };
@@ -334,7 +334,7 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.subclass_of
             .into_class(db)
-            .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+            .is_some_and(|class| class.class_literal(db).is_typed_dict(db))
     }
 }
 
@@ -532,5 +532,11 @@ impl<'db> From<SubclassOfType<'db>> for Type<'db> {
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
         }
+    }
+}
+
+impl<'db> From<DynamicClassLiteral<'db>> for SubclassOfInner<'db> {
+    fn from(value: DynamicClassLiteral<'db>) -> Self {
+        SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(value)))
     }
 }

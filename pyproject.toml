@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.14.10"
+version = "0.14.13"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -93,6 +93,7 @@ ignore = [
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+combine-as-imports = true
 
 [tool.ruff.per-file-target-version]
 "crates/ty_python_semantic/mdtest.py" = "py310"
@@ -121,6 +122,9 @@ version_files = [
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
     "crates/ruff_linter/Cargo.toml",
+    # Note that the value being replaced here needs to be kept in sync with the
+    # validation regex in the `violation_metadata` macro.
+    { target = "crates/ruff_linter/src/rules/**/*.rs", replace = "NEXT_RUFF_VERSION" },
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
 ]

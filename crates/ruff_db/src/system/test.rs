@@ -205,12 +205,16 @@ impl WritableSystem for TestSystem {
         self.system().create_new_file(path)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
-        self.system().write_file(path, content)
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        self.system().write_file_bytes(path, content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         self.system().create_directory_all(path)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }
 
@@ -283,7 +287,11 @@ pub trait DbWithTestSystem: Db + Sized {
     ///
     /// ## Panics
     /// If the db isn't using the [`InMemorySystem`].
-    fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+    fn write_virtual_file(
+        &mut self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl AsRef<[u8]>,
+    ) {
         let path = path.as_ref();
         self.test_system()
             .memory_file_system()
@@ -322,23 +330,23 @@ where
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct InMemorySystem {
-    user_config_directory: Mutex<Option<SystemPathBuf>>,
+    user_config_directory: Arc<Mutex<Option<SystemPathBuf>>>,
     memory_fs: MemoryFileSystem,
 }
 
 impl InMemorySystem {
     pub fn new(cwd: SystemPathBuf) -> Self {
         Self {
-            user_config_directory: Mutex::new(None),
+            user_config_directory: Mutex::new(None).into(),
             memory_fs: MemoryFileSystem::with_current_directory(cwd),
         }
     }
 
     pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
         Self {
-            user_config_directory: Mutex::new(None),
+            user_config_directory: Mutex::new(None).into(),
             memory_fs,
         }
     }
@@ -440,10 +448,7 @@ impl System for InMemorySystem {
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {
-        Box::new(Self {
-            user_config_directory: Mutex::new(self.user_config_directory.lock().unwrap().clone()),
-            memory_fs: self.memory_fs.clone(),
-        })
+        Box::new(self.clone())
     }
 }
 
@@ -452,11 +457,15 @@ impl WritableSystem for InMemorySystem {
         self.memory_fs.create_new_file(path)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         self.memory_fs.write_file(path, content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         self.memory_fs.create_directory_all(path)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }

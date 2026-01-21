@@ -12,7 +12,7 @@ use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
 ///
 /// ## Example
 /// ```python
-/// ruff: disable  # missing codes
+/// # ruff: disable  # missing codes
 /// ```
 ///
 /// Use instead:

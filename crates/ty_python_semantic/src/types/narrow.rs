@@ -29,7 +29,7 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
-use smallvec::{SmallVec, smallvec};
+use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
 
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
@@ -155,7 +155,7 @@ impl ClassInfoConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
-        let constraint_fn = |class: ClassLiteral<'db>| match self {
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
                 Type::instance(db, class.top_materialization(db))
             }
@@ -166,9 +166,11 @@ impl ClassInfoConstraintFunction {
 
         match classinfo {
             Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
-            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal)),
+            Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
+                SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
+                    Some(constraint_from_class_literal(class_literal))
+                }
                 // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
                 // e.g. `isinstance(x, list[int])` fails at runtime.
                 SubclassOfInner::Class(ClassType::Generic(_)) => None,
@@ -279,104 +281,117 @@ impl ClassInfoConstraintFunction {
 /// Represents narrowing constraints in Disjunctive Normal Form (DNF).
 ///
 /// This is a disjunction (OR) of conjunctions (AND) of constraints.
-/// The DNF representation allows us to properly track `TypeGuard` constraints
-/// through boolean operations.
+/// The DNF representation allows us to properly track "replacement" constraints
+/// (created by `TypeGuard` types and similar) through boolean operations.
 ///
 /// For example:
 /// - `f(x) and g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
 ///   => and
-///   ===> `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [] }`
-///   ===> `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
-///   => `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
+///   ===> `NarrowingConstraint { intersection_disjunct: Some(A), replacement_disjuncts: [] }`
+///   ===> `NarrowingConstraint { intersection_disjunct: None, replacement_disjuncts: [B] }`
+///   => `NarrowingConstraint { intersection_disjunct: None, replacement_disjuncts: [B] }`
 ///   => evaluates to `B` (`TypeGuard` clobbers any previous type information)
 ///
 /// - `f(x) or g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
 ///   => or
-///   ===> `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [] }`
-///   ===> `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
-///   => `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [B] }`
+///   ===> `NarrowingConstraint { intersection_disjunct: Some(A), replacement_disjuncts: [] }`
+///   ===> `NarrowingConstraint { intersection_disjunct: None, replacement_disjuncts: [B] }`
+///   => `NarrowingConstraint { intersection_disjunct: Some(A), replacement_disjuncts: [B] }`
 ///   => evaluates to `(P & A) | B`, where `P` is our previously-known type
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
 pub(crate) struct NarrowingConstraint<'db> {
-    /// Regular constraint (from narrowing comparisons or `TypeIs`). We can use a single type here
-    /// because we can eagerly union disjunctions and eagerly intersect conjunctions.
-    regular_disjunct: Option<Type<'db>>,
+    /// Intersection constraint (from `isinstance()` narrowing comparisons, `TypeIs`, and
+    /// similar). We can use a single type here because we can eagerly union disjunctions
+    /// and eagerly intersect conjunctions.
+    intersection_disjunct: Option<Type<'db>>,
 
-    /// `TypeGuard` constraints. We can't eagerly union disjunctions because `TypeGuard` clobbers
-    /// the previously-known type; within each `TypeGuard` disjunct, we may eagerly intersect
-    /// conjunctions with a later regular narrowing.
-    typeguard_disjuncts: SmallVec<[Type<'db>; 1]>,
+    /// "Replacement" constraints: instead of intersecting the previous type with a new type,
+    /// the previous type is simply replaced wholesale with the new type. A common use case for
+    /// these constraints is `typing.TypeGuard`. We can't eagerly union disjunctions because
+    /// `TypeGuard` clobbers the previously-known type; within each replacement disjunct, however,
+    /// we may eagerly intersect conjunctions with a later intersection narrowing.
+    replacement_disjuncts: SmallVec<[Type<'db>; 1]>,
 }
 
 impl<'db> NarrowingConstraint<'db> {
-    /// Create a constraint from a regular (non-`TypeGuard`) type
-    pub(crate) fn regular(constraint: Type<'db>) -> Self {
+    /// Create an "intersection" constraint: the previous type will be
+    /// intersected with this constraint
+    pub(crate) fn intersection(constraint: Type<'db>) -> Self {
         Self {
-            regular_disjunct: Some(constraint),
-            typeguard_disjuncts: smallvec![],
+            intersection_disjunct: Some(constraint),
+            replacement_disjuncts: smallvec![],
         }
     }
 
-    /// Create a constraint from a `TypeGuard` type
-    fn typeguard(constraint: Type<'db>) -> Self {
+    /// Create a "replacement" constraint: the previous type will be
+    /// replaced wholesale with this constraint
+    fn replacement(constraint: Type<'db>) -> Self {
         Self {
-            regular_disjunct: None,
-            typeguard_disjuncts: smallvec![constraint],
+            intersection_disjunct: None,
+            replacement_disjuncts: smallvec_inline![constraint],
         }
     }
 
-    /// Merge two constraints, taking their intersection but respecting `TypeGuard` semantics (with
+    /// Merge two constraints, taking their intersection but respecting "replacement" semantics (with
     /// `other` winning)
     pub(crate) fn merge_constraint_and(&self, other: Self, db: &'db dyn Db) -> Self {
         // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
         // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
         //
-        // In our representation, the RHS `typeguard_disjuncts` will all clobber the LHS disjuncts
-        // when they are anded, so they'll just stay as is.
+        // In our representation, the RHS `replacement_disjuncts` will all clobber the LHS disjuncts
+        // when they are `and`ed, so they'll just stay as is.
         //
-        // The thing we actually need to deal with is the RHS `regular_disjunct`. It gets
-        // intersected with the LHS `regular_disjunct` to form the new `regular_disjunct`, and
-        // intersected with each LHS `typeguard_disjunct` to form new additional
-        // `typeguard_disjuncts`.
-        let Some(other_regular_disjunct) = other.regular_disjunct else {
+        // The thing we actually need to deal with is the RHS `intersection_disjunct`. It gets
+        // intersected with the LHS `intersection_disjunct` to form the new `intersection_disjunct`,
+        // and intersected with each LHS `replacement_disjunct` to form new additional
+        // `replacement_disjuncts`.
+        let Some(other_intersection_disjunct) = other.intersection_disjunct else {
             return other;
         };
 
-        let new_regular_disjunct = self.regular_disjunct.map(|regular_disjunct| {
-            IntersectionType::from_elements(db, [regular_disjunct, other_regular_disjunct])
+        let new_intersection_disjunct = self.intersection_disjunct.map(|intersection_disjunct| {
+            IntersectionType::from_elements(
+                db,
+                [intersection_disjunct, other_intersection_disjunct],
+            )
         });
 
-        let additional_typeguard_disjuncts =
-            self.typeguard_disjuncts.iter().map(|typeguard_disjunct| {
-                IntersectionType::from_elements(db, [*typeguard_disjunct, other_regular_disjunct])
-            });
+        let additional_replacement_disjuncts =
+            self.replacement_disjuncts
+                .iter()
+                .map(|replacement_disjunct| {
+                    IntersectionType::from_elements(
+                        db,
+                        [*replacement_disjunct, other_intersection_disjunct],
+                    )
+                });
 
-        let mut new_typeguard_disjuncts = other.typeguard_disjuncts;
+        let mut new_replacement_disjuncts = other.replacement_disjuncts;
 
-        new_typeguard_disjuncts.extend(additional_typeguard_disjuncts);
+        new_replacement_disjuncts.extend(additional_replacement_disjuncts);
 
         NarrowingConstraint {
-            regular_disjunct: new_regular_disjunct,
-            typeguard_disjuncts: new_typeguard_disjuncts,
+            intersection_disjunct: new_intersection_disjunct,
+            replacement_disjuncts: new_replacement_disjuncts,
         }
     }
 
     /// Evaluate the type this effectively constrains to
     ///
-    /// Forgets whether each constraint originated from a `TypeGuard` or not
+    /// Forgets whether each constraint originated from a `replacement` disjunct or not
     pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
         UnionType::from_elements(
             db,
-            self.typeguard_disjuncts
+            self.replacement_disjuncts
                 .into_iter()
-                .chain(self.regular_disjunct),
+                .chain(self.intersection_disjunct),
         )
     }
 }
 
 impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
     fn from(constraint: Type<'db>) -> Self {
-        Self::regular(constraint)
+        Self::intersection(constraint)
     }
 }
 
@@ -389,7 +404,7 @@ type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, NarrowingConstraint<'d
 /// `(A | B) & (C | D)` becomes `(A & C) | (A & D) | (B & C) | (B & D)`
 ///
 /// For each conjunction pair, we:
-/// - Take the right conjunct if it has a `TypeGuard`
+/// - Take the right conjunct if it has a `replacement`
 /// - Intersect the constraints normally otherwise
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
@@ -429,10 +444,10 @@ fn merge_constraints_or<'db>(
         match into.entry(key) {
             Entry::Occupied(mut entry) => {
                 let into_constraint = entry.get_mut();
-                // Union the regular constraints
-                into_constraint.regular_disjunct = match (
-                    into_constraint.regular_disjunct,
-                    from_constraint.regular_disjunct,
+                // Union the intersection constraints
+                into_constraint.intersection_disjunct = match (
+                    into_constraint.intersection_disjunct,
+                    from_constraint.intersection_disjunct,
                 ) {
                     (Some(a), Some(b)) => Some(UnionType::from_elements(db, [a, b])),
                     (Some(a), None) => Some(a),
@@ -440,22 +455,15 @@ fn merge_constraints_or<'db>(
                     (None, None) => None,
                 };
 
-                // Concatenate typeguard disjuncts
+                // Concatenate replacement disjuncts
                 into_constraint
-                    .typeguard_disjuncts
-                    .extend(from_constraint.typeguard_disjuncts);
+                    .replacement_disjuncts
+                    .extend(from_constraint.replacement_disjuncts);
             }
             Entry::Vacant(_) => {
                 // Place only appears in `from`, not in `into`. No constraint needed.
             }
         }
-    }
-}
-
-fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
-    match expr {
-        ast::Expr::Named(named) => PlaceExpr::try_from_expr(named.target.as_ref()),
-        _ => PlaceExpr::try_from_expr(expr),
     }
 }
 
@@ -629,13 +637,24 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     /// Check if a type is directly narrowable by `len()` (without considering unions or intersections).
     ///
-    /// These are types where we know `__bool__` and `__len__` are consistent and the type
-    /// cannot be subclassed with a `__bool__` that disagrees.
+    /// In order for this to return `true`, we must know that the truthiness of the object returned by
+    /// `len(obj)` will always be consistent with the truthiness of `obj` for all `obj`s of type `ty`.
+    ///
+    /// We know that this is true for:
+    /// - Certain `Literal` types where we know that `__len__` is always well-behaved, and where we
+    ///   know that the type cannot be subclassed (because it's a `Literal` type).
+    /// - Tuple types (we generally assume that tuples have well-behaved `__len__` methods,
+    ///   and much of our special-casing for tuples elsewhere depends on this assumption).
+    /// - Arbitrary user types that return `Literal` types from both `__len__` and `__bool__`,
+    ///   where the returned `Literal` types are mutually consistent in their truthiness.
     fn is_base_type_narrowable_by_len(db: &'db dyn Db, ty: Type<'db>) -> bool {
         match ty {
             Type::StringLiteral(_) | Type::LiteralString | Type::BytesLiteral(_) => true,
-            Type::NominalInstance(instance) => instance.tuple_spec(db).is_some(),
-            _ => false,
+            Type::NominalInstance(instance) if instance.tuple_spec(db).is_some() => true,
+            _ => ty.len(db).is_some_and(|len_ty| {
+                let len_ty_bool = len_ty.bool(db);
+                len_ty_bool != Truthiness::Ambiguous && len_ty_bool == ty.bool(db)
+            }),
         }
     }
 
@@ -708,7 +727,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr: &ast::Expr,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let target = place_expr(expr)?;
+        let target = PlaceExpr::try_from_expr(expr)?;
         let place = self.expect_place(&target);
 
         let ty = if is_positive {
@@ -719,7 +738,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         Some(NarrowingConstraints::from_iter([(
             place,
-            NarrowingConstraint::regular(ty),
+            NarrowingConstraint::intersection(ty),
         )]))
     }
 
@@ -977,6 +996,32 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             )
         }
 
+        /// Attempt to find an underlying class literal for purposes of `if type(x) is Y` narrowing.
+        ///
+        /// We deliberately return `None` for generic-alias types, since narrowing based
+        /// on `if type(x) is Y[int]` isn't valid (this expression will never return `true`
+        /// at runtime). Similarly, we return `None` for `type[Y[int]]`, type variables
+        /// bound to `type[Y[int]]`, and type aliases where the underlying value is a
+        /// generic class.
+        fn find_underlying_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
+            match ty {
+                Type::ClassLiteral(class) => Some(class),
+                Type::SubclassOf(subclass_of) => {
+                    match subclass_of.subclass_of().with_transposed_type_var(db) {
+                        SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(class),
+                        SubclassOfInner::Class(ClassType::Generic(_))
+                        | SubclassOfInner::Dynamic(_) => None,
+                        SubclassOfInner::TypeVar(tvar) => {
+                            find_underlying_class(db, tvar.typevar(db).upper_bound(db)?)
+                        }
+                    }
+                }
+                Type::TypeVar(tvar) => find_underlying_class(db, tvar.typevar(db).upper_bound(db)?),
+                Type::TypeAlias(alias) => find_underlying_class(db, alias.value_type(db)),
+                _ => None,
+            }
+        }
+
         let ast::ExprCompare {
             range: _,
             node_index: _,
@@ -1017,15 +1062,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
             && let ast::Expr::Subscript(subscript) = &**left
             && let Type::Union(union) = inference.expression_type(&*subscript.value)
-            && let Some(subscript_place_expr) = place_expr(&subscript.value)
+            && let Some(subscript_place_expr) = PlaceExpr::try_from_expr(&subscript.value)
             && let Type::IntLiteral(index) = inference.expression_type(&*subscript.slice)
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
             && rhs_ty.is_singleton(self.db)
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
-            let filtered: Vec<_> = union
-                .elements(self.db)
+            let union_elements = union.elements(self.db);
+            let filtered: Vec<_> = union_elements
                 .iter()
                 .filter(|elem| {
                     elem.as_nominal_instance()
@@ -1043,11 +1088,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 })
                 .copied()
                 .collect();
-            if filtered.len() < union.elements(self.db).len() {
+            if filtered.len() < union_elements.len() {
                 let place = self.expect_place(&subscript_place_expr);
                 constraints.insert(
                     place,
-                    NarrowingConstraint::regular(UnionType::from_elements(self.db, filtered)),
+                    NarrowingConstraint::replacement(UnionType::from_elements(self.db, filtered)),
                 );
             }
         }
@@ -1109,7 +1154,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //         reveal_type(u)  # revealed: Bar
         if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
             && let Type::StringLiteral(key) = inference.expression_type(&**left)
-            && let Some(rhs_place_expr) = place_expr(&comparators[0])
+            && let Some(rhs_place_expr) = PlaceExpr::try_from_expr(&comparators[0])
             && let rhs_type = inference.expression_type(&comparators[0])
             && is_typeddict_or_union_with_typeddicts(self.db, rhs_type)
         {
@@ -1160,7 +1205,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 if narrowed != rhs_type {
                     let place = self.expect_place(&rhs_place_expr);
-                    constraints.insert(place, NarrowingConstraint::typeguard(narrowed));
+                    constraints.insert(place, NarrowingConstraint::replacement(narrowed));
                 }
             }
         }
@@ -1172,23 +1217,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             let rhs_ty = inference.expression_type(right);
             last_rhs_ty = Some(rhs_ty);
 
-            match left {
-                ast::Expr::Name(_)
-                | ast::Expr::Attribute(_)
-                | ast::Expr::Subscript(_)
-                | ast::Expr::Named(_) => {
-                    if let Some(left) = place_expr(left)
-                        && let Some(ty) =
-                            self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
-                    {
-                        let place = self.expect_place(&left);
-                        constraints.insert(place, NarrowingConstraint::regular(ty));
-                    }
-                }
-                ast::Expr::Call(ast::ExprCall {
+            // Narrowing for:
+            // - `if type(x) is Y`
+            // - `if type(x) is not Y`
+            // - `if Y is type(x)`
+            // - `if Y is not type(x)`
+            if let (ast::Expr::Call(call), _, _, other) | (_, other, ast::Expr::Call(call), _) =
+                (left, lhs_ty, right, rhs_ty)
+            {
+                let ast::ExprCall {
                     range: _,
                     node_index: _,
-                    func: callable,
+                    func,
                     arguments:
                         ast::Arguments {
                             args,
@@ -1196,48 +1236,83 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             range: _,
                             node_index: _,
                         },
-                }) if keywords.is_empty() => {
-                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
-                        continue;
-                    };
+                } = call;
 
-                    let target = match &**args {
-                        [first] => match place_expr(first) {
-                            Some(target) => target,
-                            None => continue,
-                        },
-                        _ => continue,
-                    };
+                // If this is `None`, it indicates that we cannot do `if type(x) is Y`
+                // narrowing: we can only do narrowing for `if type(x) is Y` and
+                // `if type(x) is not Y`, not for `if type(x) == Y` or `if type(x) != Y`.
+                let is_positive = match op {
+                    ast::CmpOp::Is => Some(is_positive),
+                    ast::CmpOp::IsNot => Some(!is_positive),
+                    _ => None,
+                };
 
-                    let is_positive = if is_positive {
-                        op == &ast::CmpOp::Is
-                    } else {
-                        op == &ast::CmpOp::IsNot
-                    };
-
+                if let Some(is_positive) = is_positive
+                    && keywords.is_empty()
+                    && let [single_argument] = &**args
+                    && let Some(target) = PlaceExpr::try_from_expr(single_argument)
+                    && let Type::ClassLiteral(called_class) = inference.expression_type(func)
+                    && called_class.is_known(self.db, KnownClass::Type)
+                    && let Some(other_class) = find_underlying_class(self.db, other)
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
                     // if `Y` is a final class
-                    if !rhs_class.is_final(self.db) && !is_positive {
-                        continue;
-                    }
-
-                    let callable_type = inference.expression_type(&**callable);
-
-                    if callable_type
-                        .as_class_literal()
-                        .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
-                    {
-                        let place = self.expect_place(&target);
-                        constraints.insert(
-                            place,
-                            NarrowingConstraint::regular(
-                                Type::instance(self.db, rhs_class.unknown_specialization(self.db))
-                                    .negate_if(self.db, !is_positive),
-                            ),
-                        );
-                    }
+                    && (is_positive || other_class.is_final(self.db))
+                {
+                    let place = self.expect_place(&target);
+                    constraints.insert(
+                        place,
+                        NarrowingConstraint::intersection(
+                            Type::instance(self.db, other_class.top_materialization(self.db))
+                                .negate_if(self.db, !is_positive),
+                        ),
+                    );
+                    continue;
                 }
-                _ => {}
+            }
+
+            // Left-hand-side narrowing for:
+            // - `if x == y`
+            // - `if x != y`
+            // - `if x is y`
+            // - `if x is not y`
+            // - `if x in y`
+            // - `if x not in y`
+            //
+            // Right-hand side narrowing for:
+            // - `if y == x`
+            // - `if y != x`
+            // - `if y is x`
+            // - `if y is not x`
+            if let (
+                narrowable @ (ast::Expr::Name(_)
+                | ast::Expr::Attribute(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::Named(_)),
+                narrowable_type,
+                _,
+                other_type,
+            )
+            | (
+                _,
+                other_type,
+                narrowable @ (ast::Expr::Name(_)
+                | ast::Expr::Attribute(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::Named(_)),
+                narrowable_type,
+            ) = (left, lhs_ty, right, rhs_ty)
+            {
+                // The right-hand side can only be narrowed for a symmetric operator.
+                // `in` and `not in` are not symmetric.
+                if (narrowable == left || !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn))
+                    && let Some(narrowable) = PlaceExpr::try_from_expr(narrowable)
+                    && let Some(ty) =
+                        self.evaluate_expr_compare_op(narrowable_type, other_type, *op, is_positive)
+                {
+                    let place = self.expect_place(&narrowable);
+                    constraints.insert(place, NarrowingConstraint::intersection(ty));
+                    continue;
+                }
             }
         }
         Some(constraints)
@@ -1279,11 +1354,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 // Narrow only the parts of the type that are safe to narrow based on len().
                 if let Some(narrowed_ty) = Self::narrow_type_by_len(self.db, arg_ty, is_positive) {
-                    let target = place_expr(arg)?;
+                    let target = PlaceExpr::try_from_expr(arg)?;
                     let place = self.expect_place(&target);
                     Some(NarrowingConstraints::from_iter([(
                         place,
-                        NarrowingConstraint::regular(narrowed_ty),
+                        NarrowingConstraint::intersection(narrowed_ty),
                     )]))
                 } else {
                     None
@@ -1293,7 +1368,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = place_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(self.db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -1314,7 +1389,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                     return Some(NarrowingConstraints::from_iter([(
                         place,
-                        NarrowingConstraint::regular(constraint.negate_if(self.db, !is_positive)),
+                        NarrowingConstraint::intersection(
+                            constraint.negate_if(self.db, !is_positive),
+                        ),
                     )]));
                 }
 
@@ -1327,7 +1404,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .map(|constraint| {
                         NarrowingConstraints::from_iter([(
                             place,
-                            NarrowingConstraint::regular(
+                            NarrowingConstraint::intersection(
                                 constraint.negate_if(self.db, !is_positive),
                             ),
                         )])
@@ -1364,7 +1441,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let (_, place) = type_is.place_info(self.db)?;
                 Some((
                     place,
-                    NarrowingConstraint::regular(
+                    NarrowingConstraint::intersection(
                         type_is
                             .return_type(self.db)
                             .negate_if(self.db, !is_positive),
@@ -1376,7 +1453,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let (_, place) = type_guard.place_info(self.db)?;
                 Some((
                     place,
-                    NarrowingConstraint::typeguard(type_guard.return_type(self.db)),
+                    NarrowingConstraint::replacement(type_guard.return_type(self.db)),
                 ))
             }
             _ => None,
@@ -1391,7 +1468,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         singleton: ast::Singleton,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
         let ty = match singleton {
@@ -1402,7 +1479,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let ty = ty.negate_if(self.db, !is_positive);
         Some(NarrowingConstraints::from_iter([(
             place,
-            NarrowingConstraint::regular(ty),
+            NarrowingConstraint::intersection(ty),
         )]))
     }
 
@@ -1420,7 +1497,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
         let class_type =
@@ -1438,7 +1515,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         Some(NarrowingConstraints::from_iter([(
             place,
-            NarrowingConstraint::regular(narrowed_type),
+            NarrowingConstraint::intersection(narrowed_type),
         )]))
     }
 
@@ -1450,7 +1527,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let subject_node = subject.node_ref(self.db, self.module);
         let place = {
-            let subject = place_expr(subject_node)?;
+            let subject = PlaceExpr::try_from_expr(subject_node)?;
             self.expect_place(&subject)
         };
         let subject_ty =
@@ -1462,7 +1539,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let mut constraints = self
             .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
             .map(|ty| {
-                NarrowingConstraints::from_iter([(place, NarrowingConstraint::regular(ty))])
+                NarrowingConstraints::from_iter([(place, NarrowingConstraint::intersection(ty))])
             })?;
 
         // Narrow tagged unions of `TypedDict`s with `Literal` keys, for example:
@@ -1602,7 +1679,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         if !is_typeddict_or_union_with_typeddicts(self.db, subscript_value_type) {
             return None;
         }
-        let subscript_place_expr = place_expr(subscript_value_expr)?;
+        let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
         let Type::StringLiteral(key_literal) = subscript_key_type else {
             return None;
         };
@@ -1647,7 +1724,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         // As mentioned above, the synthesized `TypedDict` is always negated.
         let intersection = Type::TypedDict(synthesized_typeddict).negate(self.db);
         let place = self.expect_place(&subscript_place_expr);
-        Some((place, NarrowingConstraint::regular(intersection)))
+        Some((place, NarrowingConstraint::intersection(intersection)))
     }
 
     /// Narrow tagged unions of tuples with `Literal` elements.
@@ -1688,7 +1765,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let subscript_place_expr = place_expr(subscript_value_expr)?;
+        let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
 
         // Skip narrowing if any tuple in the union has an out-of-bounds index.
         // A diagnostic will be emitted elsewhere for the out-of-bounds access.
@@ -1705,8 +1782,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
 
         // Filter the union based on whether each tuple element at the index could match the rhs.
-        let filtered: Vec<_> = union
-            .elements(self.db)
+        let union_elements = union.elements(self.db);
+        let filtered: Vec<_> = union_elements
             .iter()
             .filter(|elem| {
                 elem.as_nominal_instance()
@@ -1726,11 +1803,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .collect();
 
         // Only create a constraint if we actually narrowed something.
-        if filtered.len() < union.elements(self.db).len() {
+        if filtered.len() < union_elements.len() {
             let place = self.expect_place(&subscript_place_expr);
             Some((
                 place,
-                NarrowingConstraint::regular(UnionType::from_elements(self.db, filtered)),
+                NarrowingConstraint::replacement(UnionType::from_elements(self.db, filtered)),
             ))
         } else {
             None

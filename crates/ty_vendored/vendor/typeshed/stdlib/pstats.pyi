@@ -103,7 +103,7 @@ class Stats:
     sort_arg_dict_default: _SortArgDict
     def __init__(
         self,
-        arg: None | str | Profile | _cProfile = ...,
+        arg: None | str | Profile | _cProfile = None,
         /,
         *args: None | str | Profile | _cProfile | Self,
         stream: IO[Any] | None = None,

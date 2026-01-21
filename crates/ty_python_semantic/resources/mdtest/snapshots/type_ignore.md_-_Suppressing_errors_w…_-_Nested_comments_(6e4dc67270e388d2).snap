@@ -32,7 +32,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/suppressions/type_ignore
 # Diagnostics
 
 ```
-info[unused-ignore-comment]: Unused `ty: ignore` directive
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
   --> src/mdtest_snippet.py:10:9
    |
  8 | a = (3
@@ -55,7 +55,7 @@ help: Remove the unused suppression comment
 ```
 
 ```
-info[unused-ignore-comment]: Unused `ty: ignore` directive
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
   --> src/mdtest_snippet.py:14:21
    |
 12 | a = (3

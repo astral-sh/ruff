@@ -13,54 +13,6 @@ bool(1, 2)
 bool(NotBool())
 ```
 
-## Calls to `type()`
-
-A single-argument call to `type()` returns an object that has the argument's meta-type. (This is
-tested more extensively in `crates/ty_python_semantic/resources/mdtest/attributes.md`, alongside the
-tests for the `__class__` attribute.)
-
-```py
-reveal_type(type(1))  # revealed: <class 'int'>
-```
-
-But a three-argument call to type creates a dynamic instance of the `type` class:
-
-```py
-class Base: ...
-
-reveal_type(type("Foo", (), {}))  # revealed: type
-
-reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: type
-```
-
-Other numbers of arguments are invalid
-
-```py
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-type("Foo", ())
-
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-type("Foo", (), {}, weird_other_arg=42)
-```
-
-The following calls are also invalid, due to incorrect argument types:
-
-```py
-class Base: ...
-
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `Literal[b"Foo"]`"
-type(b"Foo", (), {})
-
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `<class 'Base'>`"
-type("Foo", Base, {})
-
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `tuple[Literal[1], Literal[2]]`"
-type("Foo", (1, 2), {})
-
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `dict[str, Any]`, found `dict[str | bytes, Any]`"
-type("Foo", (Base,), {b"attr": 1})
-```
-
 ## Calls to `str()`
 
 ### Valid calls

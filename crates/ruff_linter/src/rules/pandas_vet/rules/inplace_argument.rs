@@ -24,12 +24,17 @@ use ruff_python_semantic::Modules;
 ///
 /// ## Example
 /// ```python
-/// df.sort_values("col1", inplace=True)
+/// import pandas as pd
+///
+/// students = pd.read_csv("students.csv")
+/// students.sort_values("name", inplace=True)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// sorted_df = df.sort_values("col1")
+/// import pandas as pd
+///
+/// students = pd.read_csv("students.csv").sort_values("name")
 /// ```
 ///
 /// ## References

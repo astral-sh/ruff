@@ -359,6 +359,51 @@ reveal_type(GenericCircle[int].bar())  # revealed: GenericCircle[int]
 reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 ```
 
+### Calling `super()` in overridden methods with `Self` return type
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/2122>.
+
+When a child class overrides a parent method with a `Self` return type and calls `super().method()`,
+the return type should be the child's `Self` type variable, not the concrete child class type.
+
+```py
+from typing import Self
+
+class Parent:
+    def copy(self) -> Self:
+        return self
+
+class Child(Parent):
+    def copy(self) -> Self:
+        result = super().copy()
+        reveal_type(result)  # revealed: Self@copy
+        return result
+
+# When called on concrete types, Self is substituted correctly.
+reveal_type(Child().copy())  # revealed: Child
+```
+
+The same applies to classmethods with `Self` return types:
+
+```py
+from typing import Self
+
+class Parent:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Parent):
+    @classmethod
+    def create(cls) -> Self:
+        result = super().create()
+        reveal_type(result)  # revealed: Self@create
+        return result
+
+# When called on concrete types, Self is substituted correctly.
+reveal_type(Child.create())  # revealed: Child
+```
+
 ## Attributes
 
 TODO: The use of `Self` to annotate the `next_node` attribute should be
@@ -409,6 +454,40 @@ class Container(Generic[T]):
 int_container: Container[int] = Container[int]()
 reveal_type(int_container)  # revealed: Container[int]
 reveal_type(int_container.set_value(1))  # revealed: Container[int]
+```
+
+## Generic class with bounded type variable
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/2467>.
+
+Calling a method on a generic class instance should work when the type parameter is specialized with
+a type that satisfies a bound.
+
+```py
+from typing import NewType
+
+class Base: ...
+
+class C[T: Base]:
+    x: T
+
+    def g(self) -> None:
+        pass
+
+# Calling a method on a specialized instance should not produce an error
+C[Base]().g()
+
+# Test with a NewType bound
+K = NewType("K", int)
+
+class D[T: K]:
+    x: T
+
+    def h(self) -> None:
+        pass
+
+# Calling a method on a specialized instance should not produce an error
+D[K]().h()
 ```
 
 ## Protocols
@@ -506,8 +585,8 @@ class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):
     # TODO: reject the Self usage. because self cannot be used within a metaclass.
-    def __new__(cls) -> Self:
-        return super().__new__(cls)
+    def __new__(cls, name, bases, dct) -> Self:
+        return cls(name, bases, dct)
 ```
 
 ## Explicit annotations override implicit `Self`

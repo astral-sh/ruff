@@ -156,9 +156,10 @@ impl<'db> DefinedPlace<'db> {
 /// bound_or_declared:   Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
 /// non_existent:        Place::Undefined,
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum Place<'db> {
     Defined(DefinedPlace<'db>),
+    #[default]
     Undefined,
 }
 
@@ -426,20 +427,14 @@ pub(crate) fn global_symbol<'db>(
 ///
 /// If `requires_explicit_reexport` is [`None`], it will be inferred from the file's source type.
 /// For stub files, explicit re-export will be required, while for non-stub files, it will not.
+///
+/// `None` should be passed for the `file` parameter if looking up a symbol on a namespace package.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: Option<File>,
     name: &str,
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> PlaceAndQualifiers<'db> {
-    let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-        if file.is_stub(db) {
-            RequiresExplicitReExport::Yes
-        } else {
-            RequiresExplicitReExport::No
-        }
-    });
-
     // If it's not found in the global scope, check if it's present as an instance on
     // `types.ModuleType` or `builtins.object`.
     //
@@ -455,22 +450,49 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    symbol_impl(
-        db,
-        global_scope(db, file),
-        name,
-        requires_explicit_reexport,
-        ConsideredDefinitions::EndOfScope,
-    )
+    file.map(|file| {
+        let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
+            if file.is_stub(db) {
+                RequiresExplicitReExport::Yes
+            } else {
+                RequiresExplicitReExport::No
+            }
+        });
+
+        symbol_impl(
+            db,
+            global_scope(db, file),
+            name,
+            requires_explicit_reexport,
+            ConsideredDefinitions::EndOfScope,
+        )
+    })
+    .unwrap_or_default()
     .or_fall_back_to(db, || {
-        if name == "__getattr__" {
-            Place::Undefined.into()
-        } else if name == "__builtins__" {
-            Place::bound(Type::any()).into()
-        } else {
-            KnownClass::ModuleType
+        match name {
+            "__file__" => {
+                // We special-case `__file__` here because we know that for a successfully imported
+                // non-namespace-package Python module, that hasn't been explicitly overridden it
+                // is always a string, even though typeshed says `str | None`. For a namespace package,
+                // meanwhile, it will always be `None`.
+                //
+                // Note that C-extension modules (stdlib examples include `sys`, `itertools`, etc.)
+                //  may not have a `__file__` attribute at runtime at all, but that doesn't really
+                // affect the *type* of the attribute, just the *boundness*. There's no way for us
+                // to know right now whether a stub represents a C extension or not, so for now we
+                // do not attempt to detect this; we just infer `str` still. This matches the
+                // behaviour of other major type checkers.
+                if file.is_some() {
+                    Place::bound(KnownClass::Str.to_instance(db)).into()
+                } else {
+                    Place::bound(Type::none(db)).into()
+                }
+            }
+            "__getattr__" => Place::Undefined.into(),
+            "__builtins__" => Place::bound(Type::any()).into(),
+            _ => KnownClass::ModuleType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_GETATTR_LOOKUP)
+                .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_GETATTR_LOOKUP),
         }
     })
 }
@@ -520,7 +542,7 @@ pub(crate) fn known_module_symbol<'db>(
     resolve_module_confident(db, &known_module.name())
         .and_then(|module| {
             let file = module.file(db)?;
-            Some(imported_symbol(db, file, symbol, None))
+            Some(imported_symbol(db, Some(file), symbol, None))
         })
         .unwrap_or_default()
 }
@@ -592,6 +614,7 @@ type DeclaredTypeAndConflictingTypes<'db> = (
 );
 
 /// The result of looking up a declared type from declarations; see [`place_from_declarations`].
+#[derive(Debug, Default)]
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
     place_and_quals: PlaceAndQualifiers<'db>,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
@@ -641,19 +664,10 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
-}
-
-impl Default for PlaceAndQualifiers<'_> {
-    fn default() -> Self {
-        PlaceAndQualifiers {
-            place: Place::Undefined,
-            qualifiers: TypeQualifiers::empty(),
-        }
-    }
 }
 
 impl<'db> PlaceAndQualifiers<'db> {
@@ -669,10 +683,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     }
 
     pub(crate) fn unbound() -> Self {
-        PlaceAndQualifiers {
-            place: Place::Undefined,
-            qualifiers: TypeQualifiers::empty(),
-        }
+        Self::default()
     }
 
     pub(crate) fn is_undefined(&self) -> bool {
@@ -1567,11 +1578,7 @@ fn place_from_declarations_impl<'db>(
             }
         }
     } else {
-        PlaceFromDeclarationsResult {
-            place_and_quals: Place::Undefined.into(),
-            conflicting_types: None,
-            first_declaration: None,
-        }
+        PlaceFromDeclarationsResult::default()
     }
 }
 
@@ -1597,7 +1604,7 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     all_names.contains(symbol_name)
 }
 
-mod implicit_globals {
+pub(crate) mod implicit_globals {
     use ruff_python_ast as ast;
     use ruff_python_ast::name::Name;
 
@@ -1606,7 +1613,9 @@ mod implicit_globals {
     use crate::place::{Definedness, PlaceAndQualifiers};
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
-    use crate::types::{KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type};
+    use crate::types::{
+        ClassLiteral, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
+    };
     use ruff_python_ast::PythonVersion;
 
     use super::{DefinedPlace, Place, place_from_declarations};
@@ -1625,7 +1634,10 @@ mod implicit_globals {
         else {
             return Place::Undefined.into();
         };
-        let module_type_scope = module_type_class.body_scope(db);
+        let Some(class) = module_type_class.as_static() else {
+            return Place::Undefined.into();
+        };
+        let module_type_scope = class.body_scope(db);
         let place_table = place_table(db, module_type_scope);
         let Some(symbol_id) = place_table.symbol_id(name) else {
             return Place::Undefined.into();
@@ -1671,7 +1683,7 @@ mod implicit_globals {
                 Place::Defined(
                     DefinedPlace::new(KnownClass::Dict.to_specialized_instance(
                         db,
-                        [Type::any(), KnownClass::Int.to_instance(db)],
+                        &[Type::any(), KnownClass::Int.to_instance(db)],
                     ))
                     .with_definedness(Definedness::PossiblyUndefined),
                 )
@@ -1687,10 +1699,10 @@ mod implicit_globals {
                         [Parameter::positional_only(Some(Name::new_static("format")))
                             .with_annotated_type(KnownClass::Int.to_instance(db))],
                     ),
-                    Some(KnownClass::Dict.to_specialized_instance(
+                    KnownClass::Dict.to_specialized_instance(
                         db,
-                        [KnownClass::Str.to_instance(db), Type::any()],
-                    )),
+                        &[KnownClass::Str.to_instance(db), Type::any()],
+                    ),
                 );
                 Place::Defined(
                     DefinedPlace::new(Type::function_like_callable(db, signature))
@@ -1753,8 +1765,10 @@ mod implicit_globals {
             return smallvec::SmallVec::default();
         };
 
-        let module_type_scope = module_type.body_scope(db);
-        let module_type_symbol_table = place_table(db, module_type_scope);
+        let ClassLiteral::Static(module_type) = module_type else {
+            return smallvec::SmallVec::default();
+        };
+        let module_type_symbol_table = place_table(db, module_type.body_scope(db));
 
         module_type_symbol_table
             .symbols()
@@ -1775,6 +1789,32 @@ mod implicit_globals {
         _id: salsa::Id,
     ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         smallvec::SmallVec::default()
+    }
+
+    /// Returns an iterator over all implicit module global symbols and their types.
+    ///
+    /// This is used for completions in the global scope of a module. It returns
+    /// the correct types for special-cased symbols like `__file__` (which is `str`
+    /// for the current module, not `str | None`).
+    pub(crate) fn all_implicit_module_globals(
+        db: &dyn Db,
+    ) -> impl Iterator<Item = (Name, Type<'_>)> + '_ {
+        // Special-cased implicit globals that are not in `module_type_symbols`
+        let special_cased = ["__builtins__", "__debug__", "__warningregistry__"]
+            .into_iter()
+            .map(Name::new_static);
+
+        // All symbols from ModuleType (already includes `__file__`, `__name__`, etc.)
+        let module_type_syms = module_type_symbols(db).iter().cloned();
+
+        // Combine and map to (name, type) pairs
+        special_cased
+            .chain(module_type_syms)
+            .filter_map(move |name| {
+                let place = module_type_implicit_global_symbol(db, name.as_str());
+                // Only include bound symbols
+                place.place.ignore_possibly_undefined().map(|ty| (name, ty))
+            })
     }
 
     #[cfg(test)]
@@ -1893,7 +1933,7 @@ mod tests {
         let ty1 = Type::IntLiteral(1);
         let ty2 = Type::IntLiteral(2);
 
-        let unbound = || Place::Undefined.with_qualifiers(TypeQualifiers::empty());
+        let unbound = || PlaceAndQualifiers::default();
 
         let possibly_unbound_ty1 = || {
             Place::Defined(DefinedPlace {

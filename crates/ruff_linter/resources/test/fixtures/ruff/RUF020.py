@@ -15,3 +15,10 @@ z: None | (Never | None)
 
 a: int | Never | None
 b: Never | Never | None
+
+
+def func() -> (
+        Never  # text
+        | # text
+        int
+): ...

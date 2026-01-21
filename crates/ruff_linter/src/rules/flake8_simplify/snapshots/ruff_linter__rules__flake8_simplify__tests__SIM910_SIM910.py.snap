@@ -170,3 +170,26 @@ help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
 58 | 
 59 | 
 60 | # https://github.com/astral-sh/ruff/issues/20341
+
+SIM910 [*] Use `dict.get()` without default value
+  --> SIM910.py:87:7
+   |
+87 |   age = ages.get(
+   |  _______^
+88 | |     "Cat",
+89 | |     # text
+90 | |     None,
+91 | | )
+   | |_^
+   |
+help: Remove default value
+84 | age = ages.get(get_key(), None)
+85 | 
+86 | 
+   - age = ages.get(
+   -     "Cat",
+   -     # text
+   -     None,
+   - )
+87 + age = ages.get("Cat")
+note: This is an unsafe fix and may change runtime behavior

@@ -398,3 +398,139 @@ d = D()
 if d.c is not None and d.c[0].x[0] is not None:
     reveal_type(d.c[0].x[0])  # revealed: int
 ```
+
+## Narrowing with negative subscripts
+
+Narrowing should work with negative subscripts like `x[-1]`:
+
+```py
+def _(x: list[int | None]):
+    if x[-1] is not None:
+        reveal_type(x[-1])  # revealed: int
+
+def _(x: list[str | None]):
+    if x[-1] is None:
+        reveal_type(x[-1])  # revealed: None
+    else:
+        reveal_type(x[-1])  # revealed: str
+```
+
+Nested negative subscripts should also work:
+
+```py
+def _(x: list[list[int | None]]):
+    if x[-1][-1] is not None:
+        reveal_type(x[-1][-1])  # revealed: int
+```
+
+Mixed positive and negative subscripts:
+
+```py
+def _(x: list[list[int | None]]):
+    if x[0][-1] is not None:
+        reveal_type(x[0][-1])  # revealed: int
+
+    if x[-1][0] is not None:
+        reveal_type(x[-1][0])  # revealed: int
+```
+
+Attribute access combined with negative subscripts:
+
+```py
+class Container:
+    items: list[int | None]
+
+def _(c: Container):
+    if c.items[-1] is not None:
+        reveal_type(c.items[-1])  # revealed: int
+```
+
+Multiple conditions in an `and` chain:
+
+```py
+def _(x: list[int | None]):
+    # Narrowing should persist through `and` chains
+    if x[-1] is not None and x[-1] > 0:
+        reveal_type(x[-1])  # revealed: int
+```
+
+Negative indices with tuples:
+
+```py
+def _(t: tuple[int, str, None] | tuple[None, None, int]):
+    if t[-1] is not None:
+        reveal_type(t)  # revealed: tuple[None, None, int]
+    else:
+        reveal_type(t)  # revealed: tuple[int, str, None]
+
+    if t[-3] is not None:
+        reveal_type(t)  # revealed: tuple[int, str, None]
+```
+
+## Narrowing with explicit positive subscripts
+
+Narrowing should work with explicit positive subscripts like `x[+1]`:
+
+```py
+def _(x: list[int | None]):
+    if x[+0] is not None:
+        reveal_type(x[+0])  # revealed: int
+
+    if x[+1] is not None:
+        reveal_type(x[+1])  # revealed: int
+```
+
+## Narrowing with boolean subscripts
+
+Narrowing should work with boolean subscripts like `x[True]` and `x[False]`. We treat `bool`
+subscripts the same as `int` subscripts because `True` always has the same hash and index value as
+`1`, and `False` always has the same hash and index value as `0`:
+
+```py
+def _(x: tuple[object, object]):
+    if isinstance(x[True], str):
+        reveal_type(x[True])  # revealed: str
+        reveal_type(x[1])  # revealed: str
+
+def _(x: list[int | None]):
+    # x[True] is equivalent to x[1]
+    if x[True] is not None:
+        reveal_type(x[True])  # revealed: int
+
+    # x[False] is equivalent to x[0]
+    if x[False] is not None:
+        reveal_type(x[False])  # revealed: int
+```
+
+Combined with other subscript types:
+
+```py
+def _(x: list[list[int | None]]):
+    if x[True][-1] is not None:
+        reveal_type(x[True][-1])  # revealed: int
+
+    if x[False][0] is not None:
+        reveal_type(x[False][0])  # revealed: int
+```
+
+## Narrowing with bytes literal subscripts
+
+Narrowing should work with bytes literal subscripts like `x[b"key"]`:
+
+```py
+def _(d: dict[bytes, str | None]):
+    if d[b"key"] is not None:
+        reveal_type(d[b"key"])  # revealed: str
+        reveal_type(d[b"other"])  # revealed: str | None
+```
+
+Combined with attribute access:
+
+```py
+class Container:
+    data: dict[bytes, int | None]
+
+def _(c: Container):
+    if c.data[b"key"] is not None:
+        reveal_type(c.data[b"key"])  # revealed: int
+```

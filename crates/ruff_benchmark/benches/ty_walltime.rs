@@ -71,6 +71,8 @@ impl Display for Benchmark<'_> {
     }
 }
 
+#[track_caller]
+#[expect(clippy::cast_precision_loss)]
 fn check_project(db: &ProjectDatabase, project_name: &str, max_diagnostics: usize) {
     let result = db.check();
     let diagnostics = result.len();
@@ -79,6 +81,12 @@ fn check_project(db: &ProjectDatabase, project_name: &str, max_diagnostics: usiz
         diagnostics > 1 && diagnostics <= max_diagnostics,
         "Expected between 1 and {max_diagnostics} diagnostics on project '{project_name}' but got {diagnostics}",
     );
+
+    if (max_diagnostics - diagnostics) as f64 / max_diagnostics as f64 > 0.10 {
+        tracing::warn!(
+            "The expected diagnostics for project `{project_name}` can be reduced: expected {max_diagnostics} but got {diagnostics}"
+        );
+    }
 }
 
 static ALTAIR: Benchmark = Benchmark::new(
@@ -101,7 +109,7 @@ static ALTAIR: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    1000,
+    850,
 );
 
 static COLOUR_SCIENCE: Benchmark = Benchmark::new(
@@ -120,7 +128,7 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY310,
     },
-    1070,
+    350,
 );
 
 static FREQTRADE: Benchmark = Benchmark::new(
@@ -163,7 +171,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    4000,
+    3800,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -181,7 +189,7 @@ static PYDANTIC: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY39,
     },
-    7000,
+    3200,
 );
 
 static SYMPY: Benchmark = Benchmark::new(
@@ -194,7 +202,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    13117,
+    13400,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
@@ -207,7 +215,7 @@ static TANJUN: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    320,
+    110,
 );
 
 static STATIC_FRAME: Benchmark = Benchmark::new(
@@ -223,7 +231,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: "2025-08-09",
         python_version: PythonVersion::PY311,
     },
-    1100,
+    1700,
 );
 
 #[track_caller]

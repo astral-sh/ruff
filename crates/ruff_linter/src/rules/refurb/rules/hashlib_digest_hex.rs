@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
@@ -27,6 +28,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// hashed = sha512(b"some data").hexdigest()
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
 /// - [Python documentation: `hashlib`](https://docs.python.org/3/library/hashlib.html)
@@ -112,10 +116,18 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
     {
         let mut diagnostic = checker.report_diagnostic(HashlibDigestHex, call.range());
         if arguments.is_empty() {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                ".hexdigest".to_string(),
-                TextRange::new(value.end(), call.func.end()),
-            )));
+            let replacement_range = TextRange::new(value.end(), call.func.end());
+
+            let applicability = if checker.comment_ranges().intersects(replacement_range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(".hexdigest".to_string(), replacement_range),
+                applicability,
+            ));
         }
     }
 }

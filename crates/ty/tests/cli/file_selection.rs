@@ -160,6 +160,65 @@ fn configuration_include() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Files without extensions can be included by adding a literal glob to `include` that matches
+/// the path exactly. A literal glob is a glob without any meta characters.
+#[test]
+fn configuration_include_no_extension() -> anyhow::Result<()> {
+    let case = CliTest::with_files([(
+        "src/main",
+        r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+    )])?;
+
+    // By default, `src/main` is excluded because the file has no supported extension.
+    case.write_file(
+        "ty.toml",
+        r#"
+        [src]
+        include = ["src"]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    // The file can be included by adding an exactly matching pattern
+    case.write_file(
+        "ty.toml",
+        r#"
+        [src]
+        include = ["src", "src/main"]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// Test configuration file exclude functionality
 #[test]
 fn configuration_exclude() -> anyhow::Result<()> {
@@ -706,6 +765,77 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Test that `--force-exclude` respects exclude patterns even for explicitly passed files.
+#[test]
+fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "out/amd64/install/_setup_util.py",
+            r#"
+            base_path: str = "/path"
+            if base_path not in CMAKE_PREFIX_PATH:
+                CMAKE_PREFIX_PATH.insert(0, base_path)
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            exclude = ["out"]
+            "#,
+        ),
+    ])?;
+
+    // Without --force-exclude, explicitly passed file overrides exclude.
+    assert_cmd_snapshot!(case.command().arg("out/amd64/install/_setup_util.py"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
+     --> out/amd64/install/_setup_util.py:3:21
+      |
+    2 | base_path: str = "/path"
+    3 | if base_path not in CMAKE_PREFIX_PATH:
+      |                     ^^^^^^^^^^^^^^^^^
+    4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
+     --> out/amd64/install/_setup_util.py:4:5
+      |
+    2 | base_path: str = "/path"
+    3 | if base_path not in CMAKE_PREFIX_PATH:
+    4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
+      |     ^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    // With --force-exclude, the exclude pattern is enforced even for explicit paths.
+    assert_cmd_snapshot!(case.command().arg("--force-exclude").arg("out/amd64/install/_setup_util.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
     ");
 
     Ok(())

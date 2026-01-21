@@ -42,6 +42,12 @@ def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 
 l5: int | list[int] = f(1, True)
+
+a: list[int] = [1, 2, *(3, 4, 5)]
+reveal_type(a)  # revealed: list[int]
+
+b: list[list[int]] = [[1], [2], *([3], [4])]
+reveal_type(b)  # revealed: list[list[int]]
 ```
 
 `typed_dict.py`:
@@ -265,7 +271,7 @@ def f[T](x: T) -> list[T]:
 
 class A:
     def __new__(cls, value: list[int | str]):
-        return super().__new__(cls, value)
+        return super().__new__(cls)
 
     def __init__(self, value: list[int | None]): ...
 
@@ -295,6 +301,33 @@ def _(flag: bool):
 
     x2: list[int | None] = f(1) if flag else f(2)
     reveal_type(x2)  # revealed: list[int | None]
+```
+
+## Dunder Calls
+
+The key and value parameters types are used as type context for `__setitem__` dunder calls:
+
+```py
+from typing import TypedDict
+
+class Bar(TypedDict):
+    baz: float
+
+def _(x: dict[str, Bar]):
+    x["foo"] = reveal_type({"baz": 2})  # revealed: Bar
+
+class X:
+    def __setitem__(self, key: Bar, value: Bar): ...
+
+def _(x: X):
+    # revealed: Bar
+    x[reveal_type({"baz": 1})] = reveal_type({"baz": 2})  # revealed: Bar
+
+# TODO: Support type context with union subscripting.
+def _(x: X | dict[Bar, Bar]):
+    # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    x[{"baz": 1}] = {"baz": 2}
 ```
 
 ## Multi-inference diagnostics

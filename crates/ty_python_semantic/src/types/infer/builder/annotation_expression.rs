@@ -167,9 +167,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::StringLiteral(string) => self.infer_string_annotation_expression(string),
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
-            ast::Expr::Starred(starred) => {
-                TypeAndQualifiers::declared(self.infer_starred_expression(starred))
-            }
+            ast::Expr::Starred(starred) => TypeAndQualifiers::declared(
+                self.infer_starred_expression(starred, TypeContext::default()),
+            ),
 
             ast::Expr::BytesLiteral(bytes) => {
                 if let Some(builder) = self

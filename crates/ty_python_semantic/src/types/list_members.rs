@@ -21,8 +21,9 @@ use crate::{
         semantic_index, use_def_map,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, SubclassOfInner, Type,
-        TypeVarBoundOrConstraints, class::CodeGeneratorKind, generics::Specialization,
+        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral,
+        SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
+        generics::Specialization,
     },
 };
 
@@ -163,14 +164,33 @@ impl<'db> AllMembers<'db> {
 
     fn extend_with_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
-            Type::Union(union) => self.members.extend(
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|ty| AllMembers::of(db, *ty).members)
-                    .reduce(|acc, members| acc.intersection(&members).cloned().collect())
-                    .unwrap_or_default(),
-            ),
+            Type::Union(union) => {
+                fn is_dynamic(db: &dyn Db, ty: Type<'_>) -> bool {
+                    // We don't need to use recursion here because
+                    // `Type` guarantees that unions/intersections
+                    // are kept in DNF (i.e., they are flattened).
+                    ty.is_dynamic()
+                        || match ty {
+                            Type::Intersection(intersection) => {
+                                intersection.positive(db).iter().any(Type::is_dynamic)
+                            }
+                            _ => false,
+                        }
+                }
+
+                let union = match union.filter(db, |&ty| !is_dynamic(db, ty)) {
+                    Type::Union(union) => union,
+                    ty => return self.extend_with_type(db, ty),
+                };
+                self.members.extend(
+                    union
+                        .elements(db)
+                        .iter()
+                        .map(|ty| AllMembers::of(db, *ty).members)
+                        .reduce(|acc, members| acc.intersection(&members).cloned().collect())
+                        .unwrap_or_default(),
+                );
+            }
 
             Type::Intersection(intersection) => self.members.extend(
                 intersection
@@ -182,9 +202,20 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, specialization) = instance.class(db).class_literal(db);
-                self.extend_with_instance_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, specialization);
+                let class = instance.class(db);
+                if let Some((class_literal, specialization)) = class.static_class_literal(db) {
+                    self.extend_with_instance_members(db, ty, class_literal);
+                    self.extend_with_synthetic_members(
+                        db,
+                        ty,
+                        ClassLiteral::Static(class_literal),
+                        specialization,
+                    );
+                } else {
+                    // For dynamic classes, we can't enumerate instance members (requires body scope),
+                    // but we can still add synthetic members for dataclass-like classes.
+                    self.extend_with_synthetic_members(db, ty, class.class_literal(db), None);
+                }
             }
 
             Type::NewTypeInstance(newtype) => {
@@ -213,8 +244,13 @@ impl<'db> AllMembers<'db> {
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
-                self.extend_with_class_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, None);
+                self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
+                self.extend_with_synthetic_members(
+                    db,
+                    ty,
+                    ClassLiteral::Static(class_literal),
+                    None,
+                );
                 if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
                     self.extend_with_class_members(db, ty, metaclass);
                 }
@@ -226,11 +262,23 @@ impl<'db> AllMembers<'db> {
                 }
                 _ => {
                     if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
-                        let (class_literal, specialization) = class_type.class_literal(db);
-                        self.extend_with_class_members(db, ty, class_literal);
-                        self.extend_with_synthetic_members(db, ty, class_literal, specialization);
-                        if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                            self.extend_with_class_members(db, ty, metaclass);
+                        if let Some((class_literal, specialization)) =
+                            class_type.static_class_literal(db)
+                        {
+                            self.extend_with_class_members(
+                                db,
+                                ty,
+                                ClassLiteral::Static(class_literal),
+                            );
+                            self.extend_with_synthetic_members(
+                                db,
+                                ty,
+                                ClassLiteral::Static(class_literal),
+                                specialization,
+                            );
+                            if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
+                                self.extend_with_class_members(db, ty, metaclass);
+                            }
                         }
                     }
                 }
@@ -289,13 +337,15 @@ impl<'db> AllMembers<'db> {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
                 Type::SubclassOf(subclass_of) => {
-                    if let Some(class) = subclass_of.subclass_of().into_class(db) {
-                        self.extend_with_class_members(db, ty, class.class_literal(db).0);
+                    if let Some(class) = subclass_of.subclass_of().into_class(db)
+                        && let Some((class_literal, _)) = class.static_class_literal(db)
+                    {
+                        self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
                     }
                 }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
-                    self.extend_with_class_members(db, ty, class_literal);
+                    self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
                 }
                 _ => {}
             },
@@ -305,7 +355,7 @@ impl<'db> AllMembers<'db> {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
 
-                if let Type::ClassLiteral(class) =
+                if let Type::ClassLiteral(ClassLiteral::Static(class)) =
                     KnownClass::TypedDictFallback.to_class_literal(db)
                 {
                     self.extend_with_instance_members(db, ty, class);
@@ -313,6 +363,19 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::ModuleLiteral(literal) => {
+                // Looking up `__file__` on `types.ModuleType` will not give as precise a type
+                // as we infer in type inference, but it's confuisng if autocomplete etc.
+                // shows a different type in the tooltip to the one inferred by the type checker.
+                let dunder_file_type = if literal.module(db).file(db).is_some() {
+                    KnownClass::Str.to_instance(db)
+                } else {
+                    Type::none(db)
+                };
+                self.members.insert(Member {
+                    name: Name::new_static("__file__"),
+                    ty: dunder_file_type,
+                });
+
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
                 let module = literal.module(db);
 
@@ -327,7 +390,7 @@ impl<'db> AllMembers<'db> {
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(DefinedPlace { ty, .. }) =
-                        imported_symbol(db, file, symbol_name, None).place
+                        imported_symbol(db, Some(file), symbol_name, None).place
                     else {
                         continue;
                     };
@@ -411,9 +474,9 @@ impl<'db> AllMembers<'db> {
         class_literal: ClassLiteral<'db>,
     ) {
         for parent in class_literal
-            .iter_mro(db, None)
+            .iter_mro(db)
             .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
+            .filter_map(|class| class.static_class_literal(db).map(|(lit, _)| lit))
         {
             let parent_scope = parent.body_scope(db);
             for memberdef in all_end_of_scope_members(db, parent_scope) {
@@ -429,50 +492,62 @@ impl<'db> AllMembers<'db> {
         }
     }
 
-    fn extend_with_instance_members(
+    /// Extend with instance members from a single class (not its MRO).
+    fn extend_with_instance_members_for_class(
         &mut self,
         db: &'db dyn Db,
         ty: Type<'db>,
-        class_literal: ClassLiteral<'db>,
+        class_literal: StaticClassLiteral<'db>,
     ) {
-        for parent in class_literal
-            .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
-        {
-            let class_body_scope = parent.body_scope(db);
-            let file = class_body_scope.file(db);
-            let index = semantic_index(db, file);
-            for function_scope_id in attribute_scopes(db, class_body_scope) {
-                for place_expr in index.place_table(function_scope_id).members() {
-                    let Some(name) = place_expr.as_instance_attribute() else {
-                        continue;
-                    };
-                    let result = ty.member(db, name);
-                    let Some(ty) = result.place.ignore_possibly_undefined() else {
-                        continue;
-                    };
-                    self.members.insert(Member {
-                        name: Name::new(name),
-                        ty,
-                    });
-                }
-            }
-
-            // This is very similar to `extend_with_class_members`,
-            // but uses the type of the class instance to query the
-            // class member. This gets us the right type for each
-            // member, e.g., `SomeClass.__delattr__` is not a bound
-            // method, but `instance_of_SomeClass.__delattr__` is.
-            for memberdef in all_end_of_scope_members(db, class_body_scope) {
-                let result = ty.member(db, memberdef.member.name.as_str());
+        let class_body_scope = class_literal.body_scope(db);
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+        for function_scope_id in attribute_scopes(db, class_body_scope) {
+            for place_expr in index.place_table(function_scope_id).members() {
+                let Some(name) = place_expr.as_instance_attribute() else {
+                    continue;
+                };
+                let result = ty.member(db, name);
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
                 };
                 self.members.insert(Member {
-                    name: memberdef.member.name,
+                    name: Name::new(name),
                     ty,
                 });
+            }
+        }
+
+        // This is very similar to `extend_with_class_members`,
+        // but uses the type of the class instance to query the
+        // class member. This gets us the right type for each
+        // member, e.g., `SomeClass.__delattr__` is not a bound
+        // method, but `instance_of_SomeClass.__delattr__` is.
+        for memberdef in all_end_of_scope_members(db, class_body_scope) {
+            let result = ty.member(db, memberdef.member.name.as_str());
+            let Some(ty) = result.place.ignore_possibly_undefined() else {
+                continue;
+            };
+            self.members.insert(Member {
+                name: memberdef.member.name,
+                ty,
+            });
+        }
+    }
+
+    /// Extend with instance members from a class and all classes in its MRO.
+    fn extend_with_instance_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        class_literal: StaticClassLiteral<'db>,
+    ) {
+        for class in class_literal
+            .iter_mro(db, None)
+            .filter_map(ClassBase::into_class)
+        {
+            if let Some((class_literal, _)) = class.static_class_literal(db) {
+                self.extend_with_instance_members_for_class(db, ty, class_literal);
             }
         }
     }

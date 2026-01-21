@@ -5,22 +5,21 @@
 use std::hash::BuildHasherDefault;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
-use crate::suppression::{
-    IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_IGNORE_COMMENT,
-};
+use crate::suppression::{IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT};
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
-pub use program::{
-    Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
-};
+pub use program::{Program, ProgramSettings};
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
-pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
-pub use suppression::create_suppression_fix;
+pub use suppression::{UNUSED_IGNORE_COMMENT, suppress_all, suppress_single};
 pub use ty_module_resolver::MisconfigurationMode;
+pub use ty_site_packages::{
+    PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
+    SitePackagesPaths, SysPrefixPathOrigin,
+};
 pub use types::DisplaySettings;
 pub use types::ide_support::{
     ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,
@@ -40,7 +39,6 @@ mod python_platform;
 mod rank;
 pub mod semantic_index;
 mod semantic_model;
-pub(crate) mod site_packages;
 mod subscript;
 mod suppression;
 pub mod types;

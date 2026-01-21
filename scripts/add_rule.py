@@ -110,7 +110,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "TODO: current version + 1")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct {name};
 
 impl Violation for {name} {{

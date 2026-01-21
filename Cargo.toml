@@ -43,12 +43,14 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
 ty_combine = { path = "crates/ty_combine" }
+ty_completion_bench = { path = "crates/ty_completion_bench" }
 ty_completion_eval = { path = "crates/ty_completion_eval" }
 ty_ide = { path = "crates/ty_ide" }
 ty_module_resolver = { path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
 ty_server = { path = "crates/ty_server" }
+ty_site_packages = { path = "crates/ty_site_packages" }
 ty_static = { path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
@@ -150,7 +152,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "309c249088fdeef0129606fa34ec2eefc74736ff", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "9860ff6ca0f1f8f3a8d6b832020002790b501254", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -215,6 +217,7 @@ ignored = [
     "ruff_options_metadata",
     "uuid",
     "get-size2",
+    "ty_completion_bench",
     "ty_completion_eval",
 ]
 
