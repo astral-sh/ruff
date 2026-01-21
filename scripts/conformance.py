@@ -380,9 +380,11 @@ def collect_expected_diagnostics(test_files: Sequence[Path]) -> list[Diagnostic]
                         ),
                         source=Source.EXPECTED,
                         optional=error.group("optional") is not None,
-                        tag=f"{file.name}:{error.group('tag')}"
-                        if error.group("tag")
-                        else None,
+                        tag=(
+                        	f"{file.name}:{error.group('tag')}"
+                        	if error.group("tag")
+                        	else None
+                      	),
                         multi=error.group("multi") is not None,
                     )
                 )
