@@ -358,4 +358,4 @@ FAST002 FastAPI dependency without `Annotated`
 72 |     pass
    |
 help: Replace with `typing_extensions.Annotated`
-info: Automatic fix is not available because a required parameter comes after an optional parameter.
+info: Automatic fix unavailable: a required parameter comes after an optional parameter. Consider reordering arguments to enable the fix.
