@@ -486,13 +486,9 @@ def group_diagnostics_by_key_or_tag(
 
 def compute_stats(
     grouped_diagnostics: list[GroupedDiagnostics],
-    source: Source,
+    ty_version: Literal["new", "old"],
 ) -> Statistics:
-    if source == source.EXPECTED:
-        num_errors = sum(1 for g in grouped_diagnostics if source.EXPECTED in g.sources)
-        return Statistics(
-            true_positives=num_errors, false_positives=0, false_negatives=0
-        )
+    source = Source.NEW if ty_version == "new" else Source.OLD
 
     def increment(statistics: Statistics, grouped: GroupedDiagnostics) -> Statistics:
         classification = grouped.classify(source)
@@ -611,8 +607,8 @@ def render_summary(
             return f"decreased from {old:.2%} to {new:.2%}"
         return f"held steady at {old:.2%}"
 
-    old = compute_stats(grouped_diagnostics, source=Source.OLD)
-    new = compute_stats(grouped_diagnostics, source=Source.NEW)
+    old = compute_stats(grouped_diagnostics, ty_version="old")
+    new = compute_stats(grouped_diagnostics, ty_version="new")
 
     assert new.true_positives > 0, (
         "Expected ty to have at least one true positive.\n"
