@@ -453,23 +453,31 @@ def group_diagnostics_by_key_or_tag(
         *expected,
     ]
 
-    # group diagnostics either by a path and a line or a path and a tag
+    # group diagnostics by a key which may be a path and a line or a path and a tag
     diagnostics = sorted(diagnostics, key=attrgetter("key"))
     grouped_diagnostics = []
     for key, group in groupby(diagnostics, key=attrgetter("key")):
-        group = list(group)
-        old_group = list(filter(lambda diag: diag.source == Source.OLD, group))
-        new_group = list(filter(lambda diag: diag.source == Source.NEW, group))
-        expected_group = list(
-            filter(lambda diag: diag.source == Source.EXPECTED, group)
-        )
+        old_diagnostics: list[Diagnostic] = []
+        new_diagnostics: list[Diagnostic] = []
+        expected_diagnostics: list[Diagnostic] = []
+        sources: set[Source] = set()
+
+        for diag in group:
+            sources.add(diag.source)
+            match diag.source:
+                case Source.OLD:
+                    old_diagnostics.append(diag)
+                case Source.NEW:
+                    new_diagnostics.append(diag)
+                case Source.EXPECTED:
+                    expected_diagnostics.append(diag)
 
         grouped = GroupedDiagnostics(
             key=key,
-            sources={d.source for d in group},
-            old=old_group,
-            new=new_group,
-            expected=expected_group,
+            sources=sources,
+            old=old_diagnostics,
+            new=new_diagnostics,
+            expected=expected_diagnostics,
         )
         grouped_diagnostics.append(grouped)
 
