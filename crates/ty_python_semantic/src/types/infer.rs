@@ -534,11 +534,15 @@ fn unpack_cycle_recover<'db>(
 /// scope is a type-parameters scope and the grandparent scope is a class.
 ///
 /// Returns `None` if no enclosing class is found.
+///
+/// This is a Salsa-tracked query to avoid repeated scope walking when called multiple
+/// times for the same scope (e.g., multiple `Self` usages in the same method).
+#[salsa::tracked]
 pub(crate) fn nearest_enclosing_class<'db>(
     db: &'db dyn Db,
-    semantic: &SemanticIndex<'db>,
-    scope: ScopeId,
+    scope: ScopeId<'db>,
 ) -> Option<StaticClassLiteral<'db>> {
+    let semantic = semantic_index(db, scope.file(db));
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {

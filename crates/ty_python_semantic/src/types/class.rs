@@ -2486,6 +2486,18 @@ impl<'db> StaticClassLiteral<'db> {
         scope.node(db).expect_class().node(module)
     }
 
+    /// Returns `true` if this class has any explicit base classes in the AST.
+    ///
+    /// This is a cheap check that doesn't trigger type inference. A class with no
+    /// explicit bases only inherits from `object`.
+    ///
+    /// ## Note
+    /// Only call this function from queries in the same file or your
+    /// query depends on the AST of another file (bad!).
+    fn has_explicit_bases(self, db: &'db dyn Db, module: &ParsedModuleRef) -> bool {
+        !self.node(db, module).bases().is_empty()
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.file(db));
@@ -2815,7 +2827,8 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         // Quick check: if no explicit bases, can't be a metaclass.
-        if self.explicit_bases(db).is_empty() {
+        let module = parsed_module(db, self.file(db)).load(db);
+        if !self.has_explicit_bases(db, &module) {
             return false;
         }
 
@@ -7998,8 +8011,7 @@ impl KnownClass {
                 //   2. The first parameter of the current function (typically `self` or `cls`)
                 match overload.parameter_types() {
                     [] => {
-                        let Some(enclosing_class) = nearest_enclosing_class(db, index, scope)
-                        else {
+                        let Some(enclosing_class) = nearest_enclosing_class(db, scope) else {
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());
                             overload.set_return_type(Type::unknown());
@@ -8060,7 +8072,7 @@ impl KnownClass {
                     }
                     [Some(pivot_class_type), Some(owner_type)] => {
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
-                        if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
+                        if let Some(enclosing_class) = nearest_enclosing_class(db, scope) {
                             if CodeGeneratorKind::NamedTuple.matches(
                                 db,
                                 enclosing_class.into(),

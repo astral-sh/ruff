@@ -561,8 +561,7 @@ impl<'db> OverloadLiteral<'db> {
             if method_has_explicit_self || class_is_generic || class_is_fallback {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
-                let index = semantic_index(db, scope_id.file(db));
-                let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+                let class = nearest_enclosing_class(db, scope_id).unwrap();
 
                 let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
                     .expect(

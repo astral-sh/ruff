@@ -1,5 +1,4 @@
 use compact_str::{CompactString, ToCompactString};
-use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
 
@@ -5609,8 +5608,7 @@ impl<'db> Type<'db> {
                     ],
                 )),
                 SpecialFormType::TypingSelf => {
-                    let index = semantic_index(db, scope_id.file(db));
-                    let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
+                    let Some(class) = infer::nearest_enclosing_class(db, scope_id) else {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
                             invalid_expressions: smallvec_inline![
@@ -5627,12 +5625,24 @@ impl<'db> Type<'db> {
                     if let Some(definition) =
                         bound_self.and_then(|bound| bound.binding_context(db).definition())
                     {
-                        let is_staticmethod = infer::function_type_from_definition(db, definition)
-                            .is_some_and(|func| {
-                                func.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
-                            });
+                        // Quick check: if the function has no decorators, it can't be a staticmethod.
+                        let dominated_by_staticmethod =
+                            if let DefinitionKind::Function(func_node) = definition.kind(db) {
+                                let module = parsed_module(db, definition.file(db)).load(db);
+                                let func = func_node.node(&module);
+                                !func.decorator_list.is_empty()
+                                    && infer::function_type_from_definition(db, definition)
+                                        .is_some_and(|func| {
+                                            func.has_known_decorator(
+                                                db,
+                                                FunctionDecorators::STATICMETHOD,
+                                            )
+                                        })
+                            } else {
+                                false
+                            };
 
-                        if is_staticmethod {
+                        if dominated_by_staticmethod {
                             return Err(InvalidTypeExpressionError {
                                 fallback_type: Type::unknown(),
                                 invalid_expressions: smallvec_inline![
