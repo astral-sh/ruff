@@ -179,8 +179,8 @@ A(x=C(x=A(x=None)))
 
 ### Functional syntax as base class (dangling call)
 
-When NamedTuple is used directly as a base class without being assigned to a variable first, it's a
-"dangling call". The types are still properly inferred:
+When `NamedTuple` is used directly as a base class without being assigned to a variable first, it's
+a "dangling call". The types are still properly inferred:
 
 ```py
 from typing import NamedTuple
@@ -228,7 +228,7 @@ internal NamedTuple name (if different from the class name) won't work:
 ```py
 from typing import NamedTuple
 
-# The string "X" refers to the internal name, not "BadNode", so it won't resolve:
+# The string "X" in "next"'s type refers to the internal name, not "BadNode", so it won't resolve:
 #
 # error: [unresolved-reference] "Name `X` used when not defined"
 class BadNode(NamedTuple("X", [("value", int), ("next", "X | None")])):
