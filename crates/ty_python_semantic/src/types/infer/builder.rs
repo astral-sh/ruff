@@ -7283,6 +7283,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_newtype_assignment_deferred(arguments);
             return;
         }
+        if known_class == Some(KnownClass::Type) {
+            // Infer the `bases` argument for three-argument `type()` calls.
+            // This is deferred to break cycles for self-referential definitions
+            // like `X = type("X", (tuple["X | None"],), {})`.
+            if arguments.args.len() >= 2 {
+                self.infer_expression(&arguments.args[1], TypeContext::default());
+            }
+            return;
+        }
         let mut constraint_tys = Vec::new();
         for arg in arguments.args.iter().skip(1) {
             let constraint = self.infer_type_expression(arg);
@@ -7485,7 +7494,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let name_type = self.infer_expression(name_arg, TypeContext::default());
-        let bases_type = self.infer_expression(bases_arg, TypeContext::default());
+        // For assigned `type()` calls, defer bases inference to break cycles for self-referential
+        // definitions like `X = type("X", (tuple["X | None"],), {})`. The bases will be inferred
+        // later via `DynamicClassLiteral::explicit_bases()`.
+        let bases_type = if definition.is_some() {
+            None
+        } else {
+            Some(self.infer_expression(bases_arg, TypeContext::default()))
+        };
         let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
 
         // TODO: validate other keywords against `__init_subclass__` methods of superclasses
@@ -7584,9 +7600,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::name::Name::new_static("<unknown>")
         };
 
-        let (bases, mut disjoint_bases) =
-            self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
-
         let scope = self.scope();
 
         // Create the anchor for identifying this dynamic class.
@@ -7611,17 +7624,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let dynamic_class = DynamicClassLiteral::new(
             db,
-            name,
-            bases,
+            name.clone(),
             anchor,
             members,
             has_dynamic_namespace,
             None,
         );
 
+        // For assigned `type()` calls, the bases are inferred via deferred inference after the
+        // class is created. For dangling calls, `bases_type` is already available from immediate
+        // inference.
+        let bases_type =
+            bases_type.unwrap_or_else(|| self.infer_expression(bases_arg, TypeContext::default()));
+
+        // Extract and validate bases for diagnostics.
+        let (_, mut disjoint_bases) = self.extract_dynamic_type_bases(bases_arg, bases_type, &name);
+
         // Check for MRO errors.
         match dynamic_class.try_mro(db) {
             Err(error) => match error.reason() {
+                DynamicMroErrorKind::InvalidBases(invalid_bases) => {
+                    for (_, invalid_type) in invalid_bases {
+                        if let Some(builder) = self.context.report_lint(&INVALID_BASE, call_expr) {
+                            builder.into_diagnostic(format_args!(
+                                "Invalid class base with type `{}` (all bases must be a class, \
+                                    `Any`, `Unknown` or `Todo`)",
+                                invalid_type.display(db),
+                            ));
+                        }
+                    }
+                }
                 DynamicMroErrorKind::DuplicateBases(duplicates) => {
                     if let Some(builder) = self.context.report_lint(&DUPLICATE_BASE, call_expr) {
                         builder.into_diagnostic(format_args!(
@@ -7642,7 +7674,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 for class `{}` with bases `[{}]`",
                             dynamic_class.name(db),
                             dynamic_class
-                                .bases(db)
+                                .explicit_bases(db)
                                 .iter()
                                 .map(|base| base.display(db))
                                 .join(", ")

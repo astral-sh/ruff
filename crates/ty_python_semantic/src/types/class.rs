@@ -20,8 +20,9 @@ use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE,
-    SUPER_CALL_IN_NAMED_TUPLE_METHOD, report_conflicting_metaclass_from_bases,
+    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE, INVALID_DATACLASS_OVERRIDE,
+    INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
+    report_conflicting_metaclass_from_bases,
 };
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
@@ -33,7 +34,10 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
-use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
+use crate::types::infer::{
+    infer_complete_scope_types, infer_expression_type, infer_unpack_types, nearest_enclosing_class,
+};
+use crate::types::list_members::all_end_of_scope_members;
 use crate::types::member::{Member, class_member};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::relation::{
@@ -80,6 +84,22 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 
+fn static_class_explicit_bases_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: StaticClassLiteral<'db>,
+) -> Box<[Type<'db>]> {
+    Box::default()
+}
+
+fn inheritance_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: StaticClassLiteral<'db>,
+) -> Option<InheritanceCycle> {
+    None
+}
+
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -108,7 +128,7 @@ fn implicit_attribute_cycle_recover<'db>(
     Member { inner }
 }
 
-fn try_mro_cycle_initial<'db>(
+fn static_class_try_mro_cycle_initial<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
     self_: StaticClassLiteral<'db>,
@@ -129,6 +149,46 @@ fn try_metaclass_cycle_initial<'db>(
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
+}
+
+fn decorators_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: StaticClassLiteral<'db>,
+) -> Box<[Type<'db>]> {
+    Box::default()
+}
+
+fn fields_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: StaticClassLiteral<'db>,
+    _specialization: Option<Specialization<'db>>,
+    _field_policy: CodeGeneratorKind<'db>,
+) -> FxIndexMap<Name, Field<'db>> {
+    FxIndexMap::default()
+}
+
+fn dynamic_class_explicit_bases_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: DynamicClassLiteral<'db>,
+) -> Box<[Type<'db>]> {
+    Box::default()
+}
+
+#[expect(clippy::unnecessary_wraps)]
+fn dynamic_class_try_mro_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    self_: DynamicClassLiteral<'db>,
+) -> Result<Mro<'db>, DynamicMroError<'db>> {
+    // When there's a cycle, return a minimal MRO with just the class itself and object.
+    // This breaks the cycle and allows type checking to continue.
+    Ok(Mro::from([
+        ClassBase::Class(ClassType::NonGeneric(self_.into())),
+        ClassBase::object(db),
+    ]))
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -2461,7 +2521,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=static_class_explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!(
             "StaticClassLiteral::explicit_bases_query: {}",
@@ -2642,7 +2702,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_initial=try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(as_ref), cycle_initial=static_class_try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -5036,10 +5096,6 @@ pub struct DynamicClassLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    /// The base classes (from the second argument to `type()`).
-    #[returns(deref)]
-    pub bases: Box<[ClassBase<'db>]>,
-
     /// The anchor for this dynamic class, providing stable identity.
     ///
     /// - `Definition`: The `type()` call is assigned to a variable. The definition
@@ -5105,6 +5161,73 @@ impl<'db> DynamicClassLiteral<'db> {
         }
     }
 
+    /// Returns the explicit base classes of this dynamic class.
+    ///
+    /// The bases are computed lazily from the `type()` call expression. For assigned
+    /// `type()` calls, this uses deferred inference to handle forward references
+    /// (e.g., `X = type("X", (tuple["X | None"],), {})`).
+    ///
+    /// Returns an empty slice if the bases cannot be computed (e.g., due to a cycle)
+    /// or if the bases argument is not a tuple.
+    #[salsa::tracked(returns(deref), cycle_initial=dynamic_class_explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        let scope = self.scope(db);
+        let file = scope.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        // Get the `type()` call expression and extract the `bases` argument.
+        let call_expr = match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => {
+                let value = definition
+                    .kind(db)
+                    .value(&module)
+                    .expect("DynamicClassAnchor::Definition should only be used for assignments");
+                value
+                    .as_call_expr()
+                    .expect("Definition value should be a call expression")
+            }
+            DynamicClassAnchor::ScopeOffset { offset, .. } => {
+                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+                let anchor_u32 = scope_anchor
+                    .as_u32()
+                    .expect("anchor should not be NodeIndex::NONE");
+                let absolute_index = NodeIndex::from(anchor_u32 + offset);
+                module
+                    .get_by_index(absolute_index)
+                    .try_into()
+                    .expect("scope offset should point to ExprCall")
+            }
+        };
+
+        // The `bases` argument is the second positional argument.
+        let Some(bases_arg) = call_expr.arguments.args.get(1) else {
+            return Box::default();
+        };
+
+        // Infer the `bases` type.
+        let bases_type = match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => {
+                // Use `definition_expression_type` for deferred inference support.
+                definition_expression_type(db, definition, bases_arg)
+            }
+            DynamicClassAnchor::ScopeOffset { .. } => {
+                // For dangling calls, the bases were already inferred as part of the scope.
+                infer_complete_scope_types(db, scope).expression_type(bases_arg)
+            }
+        };
+
+        // For variable-length tuples (like `tuple[type, ...]`), we can't statically
+        // determine the bases, so return a single Unknown base.
+        let Some(tuple_spec) = bases_type.tuple_instance_spec(db) else {
+            return Box::from([Type::unknown()]);
+        };
+        let Some(elements) = tuple_spec.as_fixed_length() else {
+            return Box::from([Type::unknown()]);
+        };
+
+        elements.elements_slice().iter().copied().collect()
+    }
+
     /// Returns a [`Span`] with the range of the `type()` call expression.
     ///
     /// See [`Self::header_range`] for more details.
@@ -5167,12 +5290,12 @@ impl<'db> DynamicClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
-        let bases = self.bases(db);
+        let base_types = self.explicit_bases(db);
 
         // If no bases, metaclass is `type`.
         // To dynamically create a class with no bases that has a custom metaclass,
         // you have to invoke that metaclass rather than `type()`.
-        if bases.is_empty() {
+        if base_types.is_empty() {
             return Ok(KnownClass::Type.to_class_literal(db));
         }
 
@@ -5180,6 +5303,17 @@ impl<'db> DynamicClassLiteral<'db> {
         if self.try_mro(db).is_err() {
             return Ok(SubclassOfType::subclass_of_unknown());
         }
+
+        // Convert types to ClassBases. Use a placeholder class for conversion.
+        let placeholder_class: ClassLiteral<'db> =
+            KnownClass::Object.try_to_class_literal(db).unwrap().into();
+        let bases: Vec<ClassBase<'db>> = base_types
+            .iter()
+            .map(|ty| {
+                ClassBase::try_from_type(db, *ty, placeholder_class)
+                    .unwrap_or_else(ClassBase::unknown)
+            })
+            .collect();
 
         // Start with the first base's metaclass as the candidate.
         let mut candidate = bases[0].metaclass(db);
@@ -5325,7 +5459,7 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
     /// an error (duplicate bases or C3 linearization failure).
-    #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=dynamic_class_try_mro_cycle_initial, heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic_class(db, self)
     }
@@ -5383,7 +5517,6 @@ impl<'db> DynamicClassLiteral<'db> {
         Self::new(
             db,
             self.name(db).clone(),
-            self.bases(db),
             self.anchor(db),
             self.members(db),
             self.has_dynamic_namespace(db),
@@ -8114,6 +8247,19 @@ impl KnownClass {
                     // Check for MRO errors
                     if let Err(error) = dynamic_class.try_mro(db) {
                         match error.reason() {
+                            DynamicMroErrorKind::InvalidBases(invalid_bases) => {
+                                for (_, invalid_type) in invalid_bases {
+                                    if let Some(builder) =
+                                        context.report_lint(&INVALID_BASE, call_expression)
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Invalid class base with type `{}` (all bases must be a class, \
+                                                `Any`, `Unknown` or `Todo`)",
+                                            invalid_type.display(db),
+                                        ));
+                                    }
+                                }
+                            }
                             DynamicMroErrorKind::DuplicateBases(duplicates) => {
                                 if let Some(builder) =
                                     context.report_lint(&DUPLICATE_BASE, call_expression)
@@ -8138,7 +8284,7 @@ impl KnownClass {
                                             for class `{}` with bases `[{}]`",
                                         dynamic_class.name(db),
                                         dynamic_class
-                                            .bases(db)
+                                            .explicit_bases(db)
                                             .iter()
                                             .map(|base| base.display(db))
                                             .join(", ")

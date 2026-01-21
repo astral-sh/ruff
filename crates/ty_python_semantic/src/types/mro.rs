@@ -8,7 +8,7 @@ use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{
-    ClassLiteral, ClassType, DynamicClassLiteral, KnownInstanceType, SpecialFormType,
+    ClassLiteral, ClassType, DynamicClassLiteral, KnownClass, KnownInstanceType, SpecialFormType,
     StaticClassLiteral, Type,
 };
 
@@ -334,17 +334,40 @@ impl<'db> Mro<'db> {
         db: &'db dyn Db,
         dynamic: DynamicClassLiteral<'db>,
     ) -> Result<Self, DynamicMroError<'db>> {
-        let bases = dynamic.bases(db);
+        let base_types = dynamic.explicit_bases(db);
 
-        // Check for duplicate bases first, but skip dynamic bases like `Unknown` or `Any`.
+        // Convert types to ClassBases and track invalid ones.
+        // Use a placeholder class for conversion (the actual class doesn't matter for validity).
+        let placeholder_class: ClassLiteral<'db> =
+            KnownClass::Object.try_to_class_literal(db).unwrap().into();
+
+        let mut bases = Vec::with_capacity(base_types.len());
+        let mut invalid_bases = Vec::new();
+
+        for (index, &base_type) in base_types.iter().enumerate() {
+            match ClassBase::try_from_type(db, base_type, placeholder_class) {
+                Some(base) => bases.push(base),
+                None => invalid_bases.push((index, base_type)),
+            }
+        }
+
+        // Report invalid bases as an error.
+        if !invalid_bases.is_empty() {
+            return Err(
+                DynamicMroErrorKind::InvalidBases(invalid_bases.into_boxed_slice())
+                    .into_error(db, dynamic),
+            );
+        }
+
+        // Check for duplicate bases, but skip dynamic bases like `Unknown` or `Any`.
         let mut seen = FxHashSet::default();
         let mut duplicates = Vec::new();
-        for base in bases {
+        for &base in &bases {
             if matches!(base, ClassBase::Dynamic(_)) {
                 continue;
             }
-            if !seen.insert(*base) {
-                duplicates.push(*base);
+            if !seen.insert(base) {
+                duplicates.push(base);
             }
         }
         if !duplicates.is_empty() {
@@ -355,9 +378,7 @@ impl<'db> Mro<'db> {
         }
 
         // Check if any bases are dynamic, like `Unknown` or `Any`.
-        let has_dynamic_bases = bases
-            .iter()
-            .any(|base| matches!(base, ClassBase::Dynamic(_)));
+        let has_dynamic_bases = bases.iter().any(|base| matches!(base, ClassBase::Dynamic(_)));
 
         // Compute MRO using C3 linearization.
         let mro_bases = if bases.is_empty() {
@@ -371,7 +392,7 @@ impl<'db> Mro<'db> {
             let mut seqs: Vec<VecDeque<ClassBase<'db>>> = Vec::with_capacity(bases.len() + 1);
 
             // Add each base's MRO.
-            for base in bases {
+            for base in &bases {
                 seqs.push(base.mro(db, None).collect());
             }
 
@@ -408,7 +429,13 @@ impl<'db> Mro<'db> {
         let mut seen = FxHashSet::default();
         seen.insert(self_base);
 
-        for base in dynamic.bases(db) {
+        // Convert types to ClassBases for fallback MRO computation.
+        let placeholder_class: ClassLiteral<'db> =
+            KnownClass::Object.try_to_class_literal(db).unwrap().into();
+
+        for &base_type in &*dynamic.explicit_bases(db) {
+            let base = ClassBase::try_from_type(db, base_type, placeholder_class)
+                .unwrap_or_else(ClassBase::unknown);
             for item in base.mro(db, None) {
                 if seen.insert(item) {
                     result.push(item);
@@ -777,6 +804,9 @@ impl<'db> DynamicMroError<'db> {
 /// These mirror the relevant variants from `MroErrorKind` for static classes.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum DynamicMroErrorKind<'db> {
+    /// One or more base types are not valid bases for a class.
+    InvalidBases(Box<[(usize, Type<'db>)]>),
+
     /// The class has duplicate bases in its bases tuple.
     DuplicateBases(Box<[ClassBase<'db>]>),
 

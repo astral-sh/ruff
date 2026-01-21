@@ -793,6 +793,35 @@ in the bases tuple before it's available:
 X = type("X", (X,), {})
 ```
 
+String literals in the bases tuple are not valid class bases:
+
+```py
+# error: [invalid-base] "Invalid class base with type `Literal["X"]`"
+X = type("X", ("X",), {})
+```
+
+However, forward references via string annotations are supported, similar to regular class
+definitions. This works with `NamedTuple` where field annotations can be forward references:
+
+```py
+from typing import NamedTuple
+
+# Forward reference in NamedTuple field annotation
+X = type("X", (NamedTuple("NT", [("field", "X | int")]),), {})
+reveal_type(X)  # revealed: <class 'X'>
+```
+
+Forward references also work when a static class inherits from a dynamic class that references it:
+
+```py
+from typing import NamedTuple
+
+# Static class inheriting from dynamic class with forward ref back to static class
+class Y(type("X", (NamedTuple("NT", [("field", "Y | int")]),), {})): ...
+
+reveal_type(Y)  # revealed: <class 'Y'>
+```
+
 ## Dynamic class names (non-literal strings)
 
 When the class name is not a string literal, we still create a class literal type but with a
