@@ -234,7 +234,7 @@ impl<'a> ProjectFilesWalker<'a> {
                                         };
 
 
-                                        if source_type.is_none()
+                                        if matches!(source_type, None | Some(PySourceType::Markdown))
                                         {
                                             return WalkState::Skip;
                                         }
