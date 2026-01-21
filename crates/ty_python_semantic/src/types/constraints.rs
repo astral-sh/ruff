@@ -727,16 +727,23 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// and working with BDDs. We don't do that, but we have tried to make some simple choices that
     /// have clear wins.
     ///
-    /// In particular, we compare the _typevars_ of each constraint first, so that all constraints
-    /// for a single typevar are guaranteed to be adjacent in the BDD structure. There are several
-    /// simplifications that we perform that operate on constraints with the same typevar, and this
-    /// ensures that we can find all candidate simplifications more easily.
-    fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        (
-            self.typevar(db).binding_context(db),
-            self.typevar(db).identity(db),
-            self.as_id(),
-        )
+    /// In particular, we use the IDs that salsa assigns to each constraint as it is created. This
+    /// tends to ensure that constraints that are close to each other in the source are also close
+    /// to each other in the BDD structure.
+    ///
+    /// As an optimization, we also _reverse_ this ordering, so that constraints that appear
+    /// earlier in the source appear "lower" (closer to the terminal nodes) in the BDD. Since we
+    /// build up BDDs by combining smaller BDDs (which will have been constructed from expressions
+    /// earlier in the source), this tends to minimize the amount of "node shuffling" that we have
+    /// to do when combining BDDs.
+    ///
+    /// Previously, we tried to be more clever — for instance, by comparing the typevars of each
+    /// constraint first, in an attempt to keep all of the constraints for a single typevar
+    /// adjacent in the BDD structure. However, this proved to be counterproductive; we've found
+    /// empirically that we get smaller BDDs with an ordering that is more aligned with source
+    /// order.
+    fn ordering(self, _db: &'db dyn Db) -> impl Ord {
+        std::cmp::Reverse(self.as_id())
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -3995,28 +4002,28 @@ mod tests {
     #[test]
     fn test_display_graph_output() {
         let expected = indoc! {r#"
-            (T = str) 3/4
-            ┡━₁ (T = bool) 4/4
-            │   ┡━₁ (U = str) 1/2
-            │   │   ┡━₁ (U = bool) 2/2
+            (U = bool) 2/4
+            ┡━₁ (U = str) 1/4
+            │   ┡━₁ (T = bool) 4/4
+            │   │   ┡━₁ (T = str) 3/3
             │   │   │   ┡━₁ always
             │   │   │   └─₀ always
-            │   │   └─₀ (U = bool) 2/2
+            │   │   └─₀ (T = str) 3/3
             │   │       ┡━₁ always
             │   │       └─₀ never
-            │   └─₀ (U = str) 1/2
-            │       ┡━₁ (U = bool) 2/2
+            │   └─₀ (T = bool) 4/4
+            │       ┡━₁ (T = str) 3/3
             │       │   ┡━₁ always
             │       │   └─₀ always
-            │       └─₀ (U = bool) 2/2
+            │       └─₀ (T = str) 3/3
             │           ┡━₁ always
             │           └─₀ never
-            └─₀ (T = bool) 4/4
-                ┡━₁ (U = str) 1/2
-                │   ┡━₁ (U = bool) 2/2
+            └─₀ (U = str) 1/4
+                ┡━₁ (T = bool) 4/4
+                │   ┡━₁ (T = str) 3/3
                 │   │   ┡━₁ always
                 │   │   └─₀ always
-                │   └─₀ (U = bool) 2/2
+                │   └─₀ (T = str) 3/3
                 │       ┡━₁ always
                 │       └─₀ never
                 └─₀ never

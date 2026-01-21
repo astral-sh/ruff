@@ -27,12 +27,14 @@ use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, KnownFunction,
+    is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
+use crate::types::list_members::all_end_of_scope_members;
 use crate::types::member::{Member, class_member};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::relation::{
@@ -1064,6 +1066,109 @@ impl<'db> ClassType<'db> {
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.class_literal(db).is_final(db)
+    }
+
+    /// Returns a map of abstract method names to the class that originally defines them.
+    ///
+    /// Only returns methods that are still abstract on `self` (i.e., have not been overridden
+    /// with a concrete implementation anywhere in the MRO).
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, ClassType<'db>> {
+        fn is_abstract(db: &dyn Db, ty: Type) -> bool {
+            match ty {
+                Type::FunctionLiteral(function) => {
+                    function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                }
+                Type::BoundMethod(method) => method
+                    .function(db)
+                    .has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD),
+                Type::PropertyInstance(property) => {
+                    // A property is abstract if either its getter or setter is abstract.
+                    property
+                        .getter(db)
+                        .is_some_and(|getter| is_abstract(db, getter))
+                        || property
+                            .setter(db)
+                            .is_some_and(|setter| is_abstract(db, setter))
+                }
+                _ => false,
+            }
+        }
+
+        fn is_method_like(ty: Type) -> bool {
+            matches!(
+                ty,
+                Type::FunctionLiteral(_)
+                    | Type::BoundMethod(_)
+                    | Type::PropertyInstance(_)
+                    | Type::KnownBoundMethod(_)
+                    | Type::WrapperDescriptor(_)
+                    | Type::Callable(_)
+                    | Type::DataclassDecorator(_)
+                    | Type::DataclassTransformer(_)
+            )
+        }
+
+        let mut abstract_methods = FxIndexMap::<Name, ClassType<'db>>::default();
+
+        // Collect all abstract methods defined anywhere in the MRO.
+        for class_base in self.iter_mro(db) {
+            let class = match class_base {
+                ClassBase::Class(class) => class,
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => continue,
+                ClassBase::Dynamic(_) => continue,
+            };
+
+            // Skip dynamic classes; they can't define abstract methods.
+            let Some((class_literal, _)) = class.static_class_literal(db) else {
+                continue;
+            };
+
+            let class_scope = class_literal.body_scope(db);
+
+            for member in all_end_of_scope_members(db, class_scope) {
+                if is_abstract(db, member.member.ty) {
+                    abstract_methods.entry(member.member.name).or_insert(class);
+                }
+            }
+        }
+
+        // Get `self`'s body scope for checking non-callable bindings.
+        let self_body_scope = self
+            .static_class_literal(db)
+            .map(|(class_literal, _)| class_literal.body_scope(db));
+
+        // Filter out methods that have been overridden with concrete implementations.
+        abstract_methods.retain(|method_name, _| {
+            let member = self.class_member(db, method_name, MemberLookupPolicy::default());
+            match member.place {
+                Place::Defined(defined) => {
+                    if is_method_like(defined.ty) {
+                        // For method-like types, check if it's still abstract.
+                        is_abstract(db, defined.ty)
+                    } else {
+                        // For non-callable types, check if there's a binding in `self`'s
+                        // scope. A binding (like `f = 42` or `f: int = 42`) overrides
+                        // the abstract method, but a declaration-only (like `f: int`) does not.
+                        let Some(body_scope) = self_body_scope else {
+                            return true;
+                        };
+                        let table = place_table(db, body_scope);
+                        let has_binding = table.symbol_id(method_name).is_some_and(|symbol_id| {
+                            let use_def = use_def_map(db, body_scope);
+                            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                            !place_from_bindings(db, bindings).place.is_undefined()
+                        });
+                        // If there's a binding, the method is implemented (not abstract).
+                        // If there's no binding, the method is still abstract.
+                        !has_binding
+                    }
+                }
+                Place::Undefined => true,
+            }
+        });
+
+        abstract_methods
     }
 
     /// Returns `true` if any class in this class's MRO (excluding `object`) defines an ordering
@@ -4214,32 +4319,45 @@ impl<'db> StaticClassLiteral<'db> {
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
         let is_valid_scope = |method_scope: &Scope| {
-            if let Some(method_def) = method_scope.node().as_function() {
-                let method_name = method_def.node(&module).name.as_str();
-                match class_member(db, class_body_scope, method_name)
-                    .inner
-                    .place
-                    .ignore_possibly_undefined()
-                {
-                    Some(Type::FunctionLiteral(method_type)) => {
-                        let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
-                        if method_decorator != Ok(target_method_decorator) {
-                            return false;
-                        }
+            let Some(method_def) = method_scope.node().as_function() else {
+                return true;
+            };
+
+            // Check the decorators directly on the AST node to determine if this method
+            // is a classmethod or staticmethod. This is more reliable than checking the
+            // final evaluated type, which may be wrapped by other decorators like @cache.
+            let function_node = method_def.node(&module);
+            let definition = index.expect_single_definition(method_def);
+
+            let mut is_classmethod = false;
+            let mut is_staticmethod = false;
+
+            for decorator in &function_node.decorator_list {
+                let decorator_ty =
+                    definition_expression_type(db, definition, &decorator.expression);
+                if let Type::ClassLiteral(class) = decorator_ty {
+                    match class.known(db) {
+                        Some(KnownClass::Classmethod) => is_classmethod = true,
+                        Some(KnownClass::Staticmethod) => is_staticmethod = true,
+                        _ => {}
                     }
-                    Some(Type::PropertyInstance(_)) => {
-                        // Property getters and setters have their own scopes. They take `self`
-                        // as the first parameter (like regular instance methods), so they're
-                        // included when looking for `MethodDecorator::None`. However, they're
-                        // not classmethods or staticmethods, so exclude them for those cases.
-                        if target_method_decorator != MethodDecorator::None {
-                            return false;
-                        }
-                    }
-                    _ => {}
                 }
             }
-            true
+
+            // Also check for implicit classmethods/staticmethods based on method name
+            let method_name = function_node.name.as_str();
+            if is_implicit_classmethod(method_name) {
+                is_classmethod = true;
+            }
+            if is_implicit_staticmethod(method_name) {
+                is_staticmethod = true;
+            }
+
+            match target_method_decorator {
+                MethodDecorator::None => !is_classmethod && !is_staticmethod,
+                MethodDecorator::ClassMethod => is_classmethod,
+                MethodDecorator::StaticMethod => is_staticmethod,
+            }
         };
 
         // First check declarations
@@ -5417,27 +5535,14 @@ pub struct DynamicNamedTupleLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    /// The fields as (name, type, default) tuples.
-    /// For `collections.namedtuple`, all types are `Any`.
-    /// For `typing.NamedTuple`, types come from the field definitions.
-    /// The third element is the default type, if any.
-    #[returns(deref)]
-    pub fields: Box<[NamedTupleField<'db>]>,
-
-    /// Whether the fields are known statically.
-    ///
-    /// When `true`, the fields were determined from a literal (list or tuple).
-    /// When `false`, the fields argument was dynamic (e.g., a variable),
-    /// and attribute lookups should return `Any` instead of failing.
-    pub has_known_fields: bool,
-
     /// The anchor for this dynamic namedtuple, providing stable identity.
     ///
     /// - `Definition`: The call is assigned to a variable. The definition
     ///   uniquely identifies this namedtuple and can be used to find the call.
     /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
     ///   is relative to the enclosing scope's anchor node index.
-    pub anchor: DynamicClassAnchor<'db>,
+    #[returns(ref)]
+    pub anchor: DynamicNamedTupleAnchor<'db>,
 }
 
 impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
@@ -5447,16 +5552,18 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// Returns the definition where this namedtuple is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => Some(definition),
-            DynamicClassAnchor::ScopeOffset { .. } => None,
+            DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
+            | DynamicNamedTupleAnchor::TypingDefinition(definition) => Some(*definition),
+            DynamicNamedTupleAnchor::ScopeOffset { .. } => None,
         }
     }
 
     /// Returns the scope in which this dynamic class was created.
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => definition.scope(db),
-            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
+            DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
+            | DynamicNamedTupleAnchor::TypingDefinition(definition) => definition.scope(db),
+            DynamicNamedTupleAnchor::ScopeOffset { scope, .. } => *scope,
         }
     }
 
@@ -5472,7 +5579,8 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         let module = parsed_module(db, file).load(db);
 
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => {
+            DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
+            | DynamicNamedTupleAnchor::TypingDefinition(definition) => {
                 // For definitions, get the range from the definition's value.
                 // The namedtuple call is the value of the assignment.
                 definition
@@ -5481,7 +5589,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                     .expect("DynamicClassAnchor::Definition should only be used for assignments")
                     .range()
             }
-            DynamicClassAnchor::ScopeOffset { offset, .. } => {
+            DynamicNamedTupleAnchor::ScopeOffset { offset, .. } => {
                 // For dangling calls, compute the absolute index from the offset.
                 let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
                 let anchor_u32 = scope_anchor
@@ -5519,7 +5627,11 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// 8. `typing.Protocol`
     /// 9. `typing.Generic`
     /// 10. `<class 'object'>`
-    #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(ref),
+        heap_size=ruff_memory_usage::heap_size,
+        cycle_initial=dynamic_namedtuple_mro_cycle_initial
+    )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let tuple_class = self.tuple_base_class(db);
@@ -5697,7 +5809,184 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             })
         }
     }
+
+    fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
+        #[salsa::tracked(cycle_initial=deferred_spec_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
+            let module = parsed_module(db, definition.file(db)).load(db);
+            let node = definition
+                .kind(db)
+                .value(&module)
+                .expect("Expected `NamedTuple` definition to be an assignment")
+                .as_call_expr()
+                .expect("Expected `NamedTuple` definition r.h.s. to be a call expression");
+            match definition_expression_type(db, definition, &node.arguments.args[1]) {
+                Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)) => spec,
+                _ => NamedTupleSpec::unknown(db),
+            }
+        }
+
+        fn deferred_spec_initial<'db>(
+            db: &'db dyn Db,
+            _id: salsa::Id,
+            _definition: Definition<'db>,
+        ) -> NamedTupleSpec<'db> {
+            NamedTupleSpec::unknown(db)
+        }
+
+        match self.anchor(db) {
+            DynamicNamedTupleAnchor::CollectionsDefinition { spec, .. }
+            | DynamicNamedTupleAnchor::ScopeOffset { spec, .. } => *spec,
+            DynamicNamedTupleAnchor::TypingDefinition(definition) => deferred_spec(db, *definition),
+        }
+    }
+
+    fn fields(self, db: &'db dyn Db) -> &'db [NamedTupleField<'db>] {
+        self.spec(db).fields(db)
+    }
+
+    fn has_known_fields(self, db: &'db dyn Db) -> bool {
+        self.spec(db).has_known_fields(db)
+    }
 }
+
+fn dynamic_namedtuple_mro_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    self_: DynamicNamedTupleLiteral<'db>,
+) -> Mro<'db> {
+    Mro::from_error(
+        db,
+        ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
+    )
+}
+
+/// Anchor for identifying a dynamic `namedtuple`/`NamedTuple` class literal.
+///
+/// This enum provides stable identity for `DynamicNamedTupleLiteral` instances:
+/// - For assigned calls, the `Definition` uniquely identifies the class.
+/// - For dangling calls, a relative offset provides stable identity.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub enum DynamicNamedTupleAnchor<'db> {
+    /// We're dealing with a `collections.namedtuple()` call
+    /// that's assigned to a variable.
+    ///
+    /// The `Definition` uniquely identifies this class. The `namedtuple()`
+    /// call expression is the `value` of the assignment, so we can get its
+    /// range from the definition.
+    CollectionsDefinition {
+        definition: Definition<'db>,
+        spec: NamedTupleSpec<'db>,
+    },
+
+    /// We're dealing with a `typing.NamedTuple()` call
+    /// that's assigned to a variable.
+    ///
+    /// The `Definition` uniquely identifies this class. The `NamedTuple()`
+    /// call expression is the `value` of the assignment, so we can get its
+    /// range from the definition.
+    ///
+    /// Unlike the `CollectionsDefinition` variant, this variant does not
+    /// hold a `NamedTupleSpec`. This is because the spec for a
+    /// `typing.NamedTuple` call can contain forward references and recursive
+    /// references that must be evaluated lazily. The spec is computed
+    /// on-demand from the definition.
+    TypingDefinition(Definition<'db>),
+
+    /// We're dealing with a `namedtuple()` or `NamedTuple` call that is
+    /// "dangling" (not assigned to a variable).
+    ///
+    /// The offset is relative to the enclosing scope's anchor node index.
+    /// For module scope, this is equivalent to an absolute index (anchor is 0).
+    ///
+    /// Dangling calls can always store the spec. They *can* contain
+    /// forward references if they appear in class bases:
+    ///
+    /// ```python
+    /// from typing import NamedTuple
+    ///
+    /// class F(NamedTuple("F", [("x", "F | None")]):
+    ///     pass
+    /// ```
+    ///
+    /// But this doesn't matter, because all class bases are deferred in their
+    /// entirety during type inference.
+    ScopeOffset {
+        scope: ScopeId<'db>,
+        offset: u32,
+        spec: NamedTupleSpec<'db>,
+    },
+}
+
+/// A specification describing the fields of a dynamic `namedtuple`
+/// or `NamedTuple` class.
+///
+/// # Ordering
+///
+/// Ordering is based on the spec's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the spec was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct NamedTupleSpec<'db> {
+    #[returns(deref)]
+    pub(crate) fields: Box<[NamedTupleField<'db>]>,
+
+    pub(crate) has_known_fields: bool,
+}
+
+impl<'db> NamedTupleSpec<'db> {
+    /// Create a [`NamedTupleSpec`] with the given fields.
+    pub(crate) fn known(db: &'db dyn Db, fields: Box<[NamedTupleField<'db>]>) -> Self {
+        Self::new(db, fields, true)
+    }
+
+    /// Create a [`NamedTupleSpec`] that indicates a namedtuple class has unknown fields.
+    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
+        Self::new(db, Box::default(), false)
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let fields: Box<_> = self
+            .fields(db)
+            .iter()
+            .map(|f| NamedTupleField {
+                name: f.name.clone(),
+                ty: f.ty.normalized_impl(db, visitor),
+                default: None,
+            })
+            .collect();
+
+        Self::new(db, fields, self.has_known_fields(db))
+    }
+
+    pub(crate) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let fields = self
+            .fields(db)
+            .iter()
+            .map(|f| {
+                Some(NamedTupleField {
+                    name: f.name.clone(),
+                    ty: if nested {
+                        f.ty.recursive_type_normalized_impl(db, div, nested)?
+                    } else {
+                        f.ty.recursive_type_normalized_impl(db, div, nested)
+                            .unwrap_or(div)
+                    },
+                    default: None,
+                })
+            })
+            .collect::<Option<Box<_>>>()?;
+
+        Some(Self::new(db, fields, self.has_known_fields(db)))
+    }
+}
+
+impl get_size2::GetSize for NamedTupleSpec<'_> {}
 
 /// Performs member lookups over an MRO (Method Resolution Order).
 ///

@@ -296,11 +296,15 @@ impl<'db> Place<'db> {
 impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
     fn from(value: LookupResult<'db>) -> Self {
         match value {
-            Ok(type_and_qualifiers) => Place::bound(type_and_qualifiers.inner_type())
-                .with_qualifiers(type_and_qualifiers.qualifiers()),
+            Ok(type_and_qualifiers) => Place::Defined(
+                DefinedPlace::new(type_and_qualifiers.inner_type())
+                    .with_origin(type_and_qualifiers.origin()),
+            )
+            .with_qualifiers(type_and_qualifiers.qualifiers()),
             Err(LookupError::Undefined(qualifiers)) => Place::Undefined.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUndefined(type_and_qualifiers)) => Place::Defined(
                 DefinedPlace::new(type_and_qualifiers.inner_type())
+                    .with_origin(type_and_qualifiers.origin())
                     .with_definedness(Definedness::PossiblyUndefined),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers()),

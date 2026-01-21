@@ -56,7 +56,7 @@ class AlsoBad(Generic[T], Generic[S]): ...  # error: [duplicate-base]
 You cannot use the same typevar more than once.
 
 ```py
-# TODO: error
+# error: [invalid-generic-class]
 class RepeatedTypevar(Generic[T, T]): ...
 ```
 
