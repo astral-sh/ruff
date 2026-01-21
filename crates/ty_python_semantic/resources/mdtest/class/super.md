@@ -497,7 +497,7 @@ def f(flag: bool):
 
     reveal_type(s)  # revealed: <super: <class 'B'>, B> | <super: <class 'D'>, D>
 
-    reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(s.x)  # revealed: Literal[1, 2]
     reveal_type(s.y)  # revealed: int | str
 
     # error: [possibly-missing-attribute] "Attribute `a` may be missing on object of type `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"

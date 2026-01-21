@@ -53,9 +53,10 @@ def unknown() -> Unknown:
     return 1
 
 d = D()
-reveal_type(d.x)  # revealed: Unknown | None
+reveal_type(d.x)  # revealed: None
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `x` of type `None`"
 d.x = 1
-reveal_type(d.x)  # revealed: Literal[1]
+reveal_type(d.x)  # revealed: None
 d.x = unknown()
 reveal_type(d.x)  # revealed: Unknown
 

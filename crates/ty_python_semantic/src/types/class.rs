@@ -53,8 +53,8 @@ use crate::types::{
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
     place::{
-        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, Widening,
-        known_module_symbol, place_from_bindings, place_from_declarations,
+        Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, known_module_symbol,
+        place_from_bindings, place_from_declarations,
     },
     semantic_index::{
         attribute_assignments,
@@ -3106,7 +3106,7 @@ impl<'db> StaticClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        if let Some(ty) = member.inner.place.unwidened_type() {
+        if let Some(ty) = member.inner.place.ignore_possibly_undefined() {
             if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
                 if is_enum_class_by_inheritance(db, self) {
                     return Member::definitely_declared(value_ty);
@@ -4200,10 +4200,10 @@ impl<'db> StaticClassLiteral<'db> {
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
-        // any method, we build a union of `Unknown` with the inferred types of all bindings of
-        // that attribute. We include `Unknown` in that union to account for the fact that the
-        // attribute might be externally modified.
-        let mut union_of_inferred_types = UnionBuilder::new(db);
+        // any method, we build a union of the inferred types of all bindings of that attribute.
+        // We include `Unknown` in that union to help cycles converge during fixpoint iteration
+        // for recursive attribute definitions.
+        let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
@@ -4295,10 +4295,6 @@ impl<'db> StaticClassLiteral<'db> {
 
                 return Member { inner: annotation };
             }
-        }
-
-        if !qualifiers.contains(TypeQualifiers::FINAL) {
-            union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
         }
 
         for (attribute_assignments, attribute_binding_scope_id) in
@@ -4583,7 +4579,6 @@ impl<'db> StaticClassLiteral<'db> {
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
-                                        widening: Widening::None,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
@@ -4627,7 +4622,6 @@ impl<'db> StaticClassLiteral<'db> {
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
-                                        widening: Widening::None,
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
@@ -5829,7 +5823,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ty,
                                 origin,
                                 definedness: boundness,
-                                ..
                             }),
                         qualifiers,
                     } = class.own_instance_member(db, name).inner
@@ -5873,7 +5866,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ty: union.build(),
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
-                widening: Widening::None,
             })
             .with_qualifiers(union_qualifiers)
         };

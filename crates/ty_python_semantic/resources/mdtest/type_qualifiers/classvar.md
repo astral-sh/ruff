@@ -23,9 +23,9 @@ class C:
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
-reveal_type(C.d)  # revealed: Unknown | Literal[1]
+reveal_type(C.d)  # revealed: Literal[1]
 reveal_type(C.e)  # revealed: int
-reveal_type(C.f)  # revealed: Unknown | Literal[1]
+reveal_type(C.f)  # revealed: Literal[1]
 
 c = C()
 

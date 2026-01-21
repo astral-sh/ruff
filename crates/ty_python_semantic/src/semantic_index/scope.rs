@@ -175,10 +175,6 @@ impl ScopeVisibility {
     pub(crate) const fn is_public(self) -> bool {
         matches!(self, ScopeVisibility::Public)
     }
-
-    pub(crate) const fn is_private(self) -> bool {
-        matches!(self, ScopeVisibility::Private)
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, get_size2::GetSize)]
