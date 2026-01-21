@@ -1294,11 +1294,11 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
-                Some(Truthiness::AlwaysTrue) => {
-                    unreachable!(
-                        "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
-                    )
-                }
+                // If UNBOUND is definitely visible alongside real bindings, this can happen
+                // with loop headers where the variable might not be assigned on all paths
+                // (e.g., breaking out of the loop before assignment). In this case, the
+                // variable is possibly undefined.
+                Some(Truthiness::AlwaysTrue) => Definedness::PossiblyUndefined,
                 Some(Truthiness::AlwaysFalse) | None => Definedness::AlwaysDefined,
                 Some(Truthiness::Ambiguous) => Definedness::PossiblyUndefined,
             },

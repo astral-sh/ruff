@@ -925,30 +925,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE
     }
 
-    /// Check if a place has any real bindings (not just the implicit "unbound" binding).
-    ///
-    /// This is used to determine whether a loop header definition is needed for a place.
-    /// Loop headers are only needed for places that were bound before the loop, since
-    /// they track how values might change across loop iterations.
-    pub(super) fn place_has_bindings(&self, place: ScopedPlaceId) -> bool {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => {
-                if let Some(state) = self.symbol_states.get(symbol) {
-                    !state.is_only_unbound()
-                } else {
-                    false
-                }
-            }
-            ScopedPlaceId::Member(member) => {
-                if let Some(state) = self.member_states.get(member) {
-                    !state.is_only_unbound()
-                } else {
-                    false
-                }
-            }
-        }
-    }
-
     pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
         match place {
             ScopedPlaceId::Symbol(symbol) => {
@@ -997,6 +973,54 @@ impl<'db> UseDefMapBuilder<'db> {
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
         place_state.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            place.is_symbol(),
+        );
+
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => {
+                &mut self.reachable_symbol_definitions[symbol].bindings
+            }
+            ScopedPlaceId::Member(member) => {
+                &mut self.reachable_member_definitions[member].bindings
+            }
+        };
+
+        bindings.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            place.is_symbol(),
+            PreviousDefinitions::AreKept,
+        );
+    }
+
+    /// Record a binding while keeping previous bindings (including UNBOUND) visible.
+    /// This is used for loop headers, where UNBOUND should remain visible as a possible state
+    /// for places first assigned inside the loop body.
+    pub(super) fn record_binding_keeping_unbound(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+    ) {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        self.bindings_by_definition
+            .insert(binding, bindings.clone());
+
+        let def_id = self.all_definitions.push(DefinitionState::Defined(binding));
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+        self.declarations_by_binding
+            .insert(binding, place_state.declarations().clone());
+        place_state.record_binding_keeping_unbound(
             def_id,
             self.reachability,
             self.is_class_scope,

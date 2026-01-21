@@ -973,6 +973,64 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (definition, num_definitions)
     }
 
+    /// Push a loop header definition, keeping UNBOUND visible as a possible state.
+    /// This is used for places first assigned inside a loop body, where the place
+    /// may be unbound on the first iteration.
+    fn push_loop_header_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize) {
+        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
+
+        let category = kind.category(self.source_type.is_stub(), self.module);
+        let is_reexported = kind.is_reexported();
+
+        let definition: Definition<'db> = Definition::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            place,
+            kind,
+            is_reexported,
+        );
+
+        let num_definitions = {
+            let definitions = self.add_entry_for_definition_key(definition_node.key());
+            definitions.push(definition);
+            definitions.len()
+        };
+
+        if category.is_binding() {
+            self.mark_place_bound(place);
+        }
+        if category.is_declaration() {
+            self.mark_place_declared(place);
+        }
+
+        // For loop headers, use record_binding_keeping_unbound to preserve UNBOUND
+        // as a possible state for places first assigned inside the loop body.
+        let use_def = self.current_use_def_map_mut();
+        debug_assert!(category.is_binding());
+        use_def.record_binding_keeping_unbound(place, definition);
+        self.delete_associated_bindings(place);
+
+        if category.is_binding() {
+            if let Some(id) = place.as_symbol() {
+                self.update_lazy_snapshots(id);
+            }
+        }
+
+        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
+        try_node_stack_manager.record_definition(self);
+        self.try_node_context_stack_manager = try_node_stack_manager;
+
+        (definition, num_definitions)
+    }
+
     fn record_expression_narrowing_constraint(
         &mut self,
         predicate_node: &ast::Expr,
@@ -2186,7 +2244,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             place: place_id,
                             loop_header,
                         };
-                        self.push_additional_definition(place_id, loop_header_ref);
+                        // Use push_loop_header_definition to preserve UNBOUND as a possible
+                        // state for places first assigned inside the loop body. This ensures
+                        // that if we break out of the loop before assigning the variable,
+                        // UNBOUND remains visible.
+                        self.push_loop_header_definition(place_id, loop_header_ref);
                     }
                 }
 
@@ -2195,6 +2257,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(test);
 
                 let predicate = self.record_expression_narrowing_constraint(test);
+                self.record_narrowing_constraint(predicate);
                 self.record_reachability_constraint(predicate);
 
                 let outer_loop = self.push_loop();

@@ -176,7 +176,7 @@ x = "A"
 while x != "E":
     reveal_type(x)  # revealed: Literal["A", "C", "D"]
     while x != "C":
-        reveal_type(x)  # revealed: Literal["A", "B", "D"]
+        reveal_type(x)  # revealed: Literal["A", "D", "B"]
         if random():
             x = "B"
         else:

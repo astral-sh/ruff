@@ -3833,10 +3833,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let use_def = self.index.use_def_map(file_scope);
         let seed_bindings = use_def.bindings_at_definition(definition);
         let seed_place = place_from_bindings(db, seed_bindings);
-        let seed_ty = match seed_place.place {
-            Place::Defined(defined) => defined.ty,
-            Place::Undefined => Type::unknown(),
-        };
 
         // Get the loop-back bindings that were captured during semantic index building.
         // These are the bindings visible at the end of the loop body for this place.
@@ -3844,8 +3840,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place = loop_header_kind.place();
         let loop_back_bindings = bindings_from_loop_header(db, loop_header);
 
-        // Start with the seed type
-        let mut all_types = vec![seed_ty];
+        // Start with the seed type if defined. If the seed is undefined (place was
+        // unbound before the loop), we don't include Unknown in the type - the UNBOUND
+        // binding is preserved separately and handles the possibly-unbound case.
+        let mut all_types = match seed_place.place {
+            Place::Defined(defined) => vec![defined.ty],
+            Place::Undefined => vec![],
+        };
 
         // Add types from all loop-back bindings for this place, applying narrowing
         for loop_back_binding in loop_back_bindings.bindings_for_place(place) {

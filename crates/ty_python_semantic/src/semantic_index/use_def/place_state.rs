@@ -253,14 +253,6 @@ impl Bindings {
         }
     }
 
-    /// Check if this place has only the implicit "unbound" binding.
-    ///
-    /// Returns `true` if the only live binding is the initial unbound binding,
-    /// meaning the place has never been assigned a value.
-    pub(super) fn is_only_unbound(&self) -> bool {
-        self.live_bindings.len() == 1 && self.live_bindings[0].binding.is_unbound()
-    }
-
     /// Record a newly-encountered binding for this place.
     pub(super) fn record_binding(
         &mut self,
@@ -382,14 +374,6 @@ impl PlaceState {
         }
     }
 
-    /// Check if this place has only the implicit "unbound" binding.
-    ///
-    /// Returns `true` if the place has never been assigned a value in any reachable
-    /// control flow path.
-    pub(super) fn is_only_unbound(&self) -> bool {
-        self.bindings.is_only_unbound()
-    }
-
     /// Record a newly-encountered binding for this place.
     pub(super) fn record_binding(
         &mut self,
@@ -405,6 +389,26 @@ impl PlaceState {
             is_class_scope,
             is_place_name,
             PreviousDefinitions::AreShadowed,
+        );
+    }
+
+    /// Record a newly-encountered binding for this place, keeping previous bindings visible.
+    /// This is used for loop headers, where UNBOUND should remain visible as a possible state
+    /// (for places first assigned inside the loop body).
+    pub(super) fn record_binding_keeping_unbound(
+        &mut self,
+        binding_id: ScopedDefinitionId,
+        reachability_constraint: ScopedReachabilityConstraintId,
+        is_class_scope: bool,
+        is_place_name: bool,
+    ) {
+        debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
+        self.bindings.record_binding(
+            binding_id,
+            reachability_constraint,
+            is_class_scope,
+            is_place_name,
+            PreviousDefinitions::AreKept,
         );
     }
 

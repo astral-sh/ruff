@@ -273,7 +273,10 @@ def resolved_reference(cond: bool) -> str:
         else:
             break
         return x
-    return x  # error: [unresolved-reference]
+    # TODO: ideally this would be `unresolved-reference` since x is definitely
+    # unresolved at this point, but with loop headers, UNBOUND coexists with the
+    # loop header binding (which has type Never), resulting in `possibly-unresolved-reference`
+    return x  # error: [possibly-unresolved-reference]
 
 def break_in_then_branch(cond: bool, i: int):
     x = "before"
