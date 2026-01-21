@@ -5,7 +5,9 @@
 use std::hash::BuildHasherDefault;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
-use crate::suppression::{IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT};
+use crate::suppression::{
+    IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
+};
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use program::{Program, ProgramSettings};
@@ -14,7 +16,9 @@ use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
-pub use suppression::{UNUSED_IGNORE_COMMENT, suppress_all, suppress_single};
+pub use suppression::{
+    UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_id, suppress_all, suppress_single,
+};
 pub use ty_module_resolver::MisconfigurationMode;
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
@@ -68,6 +72,7 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
+    registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
 }

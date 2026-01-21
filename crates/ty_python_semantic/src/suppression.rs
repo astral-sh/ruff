@@ -24,10 +24,10 @@ use crate::{Db, declare_lint, lint::LintId};
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `ty: ignore` or `type: ignore` directives that are no longer applicable.
+    /// Checks for `type: ignore` directives that are no longer applicable.
     ///
     /// ## Why is this bad?
-    /// A `ty: ignore` directive that no longer matches any diagnostic violations is likely
+    /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
     /// included by mistake, and should be removed to avoid confusion.
     ///
     /// ## Examples
@@ -45,8 +45,38 @@ declare_lint! {
     /// Set [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
     /// to `false` to prevent this rule from reporting unused `type: ignore` comments.
     pub static UNUSED_IGNORE_COMMENT = {
-        summary: "detects unused `ty: ignore` and `type: ignore` comments",
+        summary: "detects unused `ty: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `type: ignore` directives that are no longer applicable.
+    ///
+    /// ## Why is this bad?
+    /// A `ty: ignore` directive that no longer matches any diagnostic violations is likely
+    /// included by mistake, and should be removed to avoid confusion.
+    ///
+    /// ## Examples
+    /// ```py
+    /// a = 20 / 2  # type: ignore
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```py
+    /// a = 20 / 2
+    /// ```
+    ///
+    /// ## Options
+    ///
+    /// This rule is skipped if [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
+    /// to `false`.
+    pub(crate) static UNUSED_TYPE_IGNORE_COMMENT = {
+        summary: "detects unused `type: ignore` comments",
+        status: LintStatus::stable("0.0.14"),
         default_level: Level::Warn,
     }
 }
@@ -97,6 +127,14 @@ declare_lint! {
         summary: "detects ignore comments that use invalid syntax",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
+    }
+}
+
+pub fn is_unused_ignore_comment_id(id: DiagnosticId) -> bool {
+    if let DiagnosticId::Lint(lint_id) = id {
+        lint_id == UNUSED_IGNORE_COMMENT.name() || lint_id == UNUSED_TYPE_IGNORE_COMMENT.name()
+    } else {
+        false
     }
 }
 
