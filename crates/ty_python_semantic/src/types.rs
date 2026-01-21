@@ -5627,7 +5627,12 @@ impl<'db> Type<'db> {
                     if let Some(definition) =
                         bound_self.and_then(|bound| bound.binding_context(db).definition())
                     {
-                        if infer::is_function_staticmethod(db, definition) {
+                        let is_staticmethod = infer::function_type_from_definition(db, definition)
+                            .is_some_and(|func| {
+                                func.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+                            });
+
+                        if is_staticmethod {
                             return Err(InvalidTypeExpressionError {
                                 fallback_type: Type::unknown(),
                                 invalid_expressions: smallvec_inline![

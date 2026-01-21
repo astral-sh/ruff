@@ -651,10 +651,10 @@ class AliasedStaticMethod:
         pass
 ```
 
-## `__new__` is not a static method
+## `__new__` allows `Self`
 
-`__new__` is special and is _not_ decorated with `@staticmethod`, even though it receives the class
-as its first argument. `Self` should be valid in `__new__`:
+`__new__` is implicitly a static method, but unlike regular static methods, `Self` is valid in
+`__new__` because it receives a `cls` argument with type `type[Self]` and typically returns `Self`:
 
 ```py
 from typing import Self
