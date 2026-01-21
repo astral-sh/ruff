@@ -36,7 +36,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe in the event that the body of the
-/// `if` expression contains side effects.
+/// `if` expression contains side effects, or if it removes comments.
 ///
 /// For example, `foo` will be called twice in `foo() if foo() else bar()`
 /// (assuming `foo()` returns a truthy value), but only once in
