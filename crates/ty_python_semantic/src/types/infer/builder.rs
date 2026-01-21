@@ -12311,6 +12311,88 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
                 .negate()
                 .into_type(self.db()),
+            // Handle constrained TypeVars specially: check each constraint individually.
+            //
+            // TODO: We expect to replace this with more general support once we migrate to the new
+            // solver.
+            (
+                op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
+                Type::TypeVar(tvar),
+            ) => {
+                let unary_dunder_method = match op {
+                    ast::UnaryOp::Invert => "__invert__",
+                    ast::UnaryOp::UAdd => "__pos__",
+                    ast::UnaryOp::USub => "__neg__",
+                    ast::UnaryOp::Not => unreachable!(),
+                };
+
+                match tvar.typevar(self.db()).bound_or_constraints(self.db()) {
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        let db = self.db();
+                        match Self::map_constrained_typevar_constraints(
+                            db,
+                            operand_type,
+                            constraints,
+                            |constraint| {
+                                constraint
+                                    .try_call_dunder(
+                                        db,
+                                        unary_dunder_method,
+                                        CallArguments::none(),
+                                        TypeContext::default(),
+                                    )
+                                    .map(|outcome| outcome.return_type(db))
+                                    .ok()
+                            },
+                        ) {
+                            Some(ty) => ty,
+                            None => {
+                                // At least one constraint failed; report error.
+                                if let Some(builder) =
+                                    self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Unary operator `{op}` is not supported for object of type `{}`",
+                                        operand_type.display(db),
+                                    ));
+                                }
+                                operand_type
+                                    .try_call_dunder(
+                                        db,
+                                        unary_dunder_method,
+                                        CallArguments::none(),
+                                        TypeContext::default(),
+                                    )
+                                    .map_or_else(
+                                        |e| e.fallback_return_type(db),
+                                        |b| b.return_type(db),
+                                    )
+                            }
+                        }
+                    }
+                    // For bounded TypeVars or unconstrained TypeVars, fall through to default handling.
+                    _ => match operand_type.try_call_dunder(
+                        self.db(),
+                        unary_dunder_method,
+                        CallArguments::none(),
+                        TypeContext::default(),
+                    ) {
+                        Ok(outcome) => outcome.return_type(self.db()),
+                        Err(e) => {
+                            if let Some(builder) =
+                                self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Unary operator `{op}` is not supported for object of type `{}`",
+                                    operand_type.display(self.db()),
+                                ));
+                            }
+                            e.fallback_return_type(self.db())
+                        }
+                    },
+                }
+            }
+
             (
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
@@ -12338,7 +12420,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
-                | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)

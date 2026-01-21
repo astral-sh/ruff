@@ -301,6 +301,24 @@ def typevar_times_literal(t: S) -> S:
 
 def literal_times_typevar(t: S) -> S:
     return 2 * t
+
+def negate_typevar(t: S) -> S:
+    return -t
+
+def positive_typevar(t: S) -> S:
+    return +t
+```
+
+Unary operations that are not supported by all constraints should error:
+
+```py
+from typing import TypeVar
+
+U = TypeVar("U", int, float)
+
+def invert_typevar(t: U) -> int:
+    # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `U@invert_typevar`"
+    return ~t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two
