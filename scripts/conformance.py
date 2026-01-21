@@ -40,10 +40,10 @@ import sys
 import tomllib
 from collections.abc import Sequence, Set as AbstractSet
 from dataclasses import dataclass
-from enum import Flag, StrEnum, auto
+from enum import StrEnum, auto
 from functools import reduce
 from itertools import chain, groupby
-from operator import attrgetter, or_
+from operator import attrgetter
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Literal, Self, assert_never
@@ -81,7 +81,7 @@ CONFORMANCE_DIR_WITH_README = (
 CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
 
-class Source(Flag):
+class Source(StrEnum):
     OLD = auto()
     NEW = auto()
     EXPECTED = auto()
@@ -205,7 +205,11 @@ class Diagnostic:
     @property
     def key(self) -> str:
         """Key to group diagnostics by path and beginning line."""
-        return f"{self.location.path.as_posix()}:{self.location.positions.begin.line}"
+        return (
+            f"{self.location.path.as_posix()}:{self.location.positions.begin.line}"
+            if self.tag is None
+            else f"{self.location.path.as_posix()}:{self.tag}"
+        )
 
     @property
     def severity_for_display(self) -> str:
@@ -218,21 +222,10 @@ class Diagnostic:
 @dataclass(kw_only=True, slots=True)
 class GroupedDiagnostics:
     key: str
-    sources: Source
+    sources: AbstractSet[Source]
     old: list[Diagnostic] | None
     new: list[Diagnostic] | None
     expected: list[Diagnostic] | None
-
-    @property
-    def classification(self) -> Classification:
-        if Source.NEW in self.sources and Source.EXPECTED in self.sources:
-            return Classification.TRUE_POSITIVE
-        elif Source.NEW in self.sources and Source.EXPECTED not in self.sources:
-            return Classification.FALSE_POSITIVE
-        elif Source.EXPECTED in self.sources:
-            return Classification.FALSE_NEGATIVE
-        else:
-            return Classification.TRUE_NEGATIVE
 
     @property
     def change(self) -> Change:
@@ -249,6 +242,12 @@ class GroupedDiagnostics:
             diagnostic.optional for diagnostic in self.expected
         )
 
+    @property
+    def multi(self) -> bool:
+        return bool(self.expected) and all(
+            diagnostic.multi for diagnostic in self.expected
+        )
+
     def diagnostics_by_source(self, source: Source) -> list[Diagnostic]:
         match source:
             case Source.NEW:
@@ -259,6 +258,25 @@ class GroupedDiagnostics:
                 return self.expected or []
             case _:
                 raise ValueError(f"Invalid source: {source}")
+
+    def classify(self, source: Source) -> Classification:
+        if source in self.sources and Source.EXPECTED in self.sources:
+            assert self.expected is not None
+            diagnostics = self.diagnostics_by_source(source)
+            expected_max = len(self.expected) if self.multi else 1
+            if 1 <= len(diagnostics) <= expected_max:
+                return Classification.TRUE_POSITIVE
+            else:
+                return Classification.FALSE_POSITIVE
+
+        elif source in self.sources and Source.EXPECTED not in self.sources:
+            return Classification.FALSE_POSITIVE
+
+        elif Source.EXPECTED in self.sources:
+            return Classification.FALSE_NEGATIVE
+
+        else:
+            return Classification.TRUE_NEGATIVE
 
     def _render_row(self, diagnostics: list[Diagnostic]):
         locs = []
@@ -282,7 +300,7 @@ class GroupedDiagnostics:
         return "\n".join(f"{sign} {diagnostic}" for diagnostic in diagnostics)
 
     def display(self, format: Literal["diff", "github"]) -> str:
-        match self.classification:
+        match self.classify(Source.NEW):
             case Classification.TRUE_POSITIVE | Classification.FALSE_POSITIVE:
                 assert self.new is not None
                 return (
@@ -398,138 +416,55 @@ def collect_ty_diagnostics(
     ]
 
 
-def group_diagnostics_by_key(
-    old: list[Diagnostic], new: list[Diagnostic], expected: list[Diagnostic]
+def group_diagnostics_by_key_or_tag(
+    old: list[Diagnostic],
+    new: list[Diagnostic],
+    expected: list[Diagnostic],
 ) -> list[GroupedDiagnostics]:
+    # propagate tags from expected diagnostics to old and new diagnostics
+    tagged_lines = {
+        (d.location.path.name, d.location.positions.begin.line): d.tag
+        for d in expected
+        if d.tag is not None
+    }
+
+    for diag in old:
+        diag.tag = tagged_lines.get(
+            (diag.location.path.name, diag.location.positions.begin.line), None
+        )
+
+    for diag in new:
+        diag.tag = tagged_lines.get(
+            (diag.location.path.name, diag.location.positions.begin.line), None
+        )
+
     diagnostics = [
         *old,
         *new,
         *expected,
     ]
 
-    sorted_diagnostics = sorted(diagnostics, key=attrgetter("key"))
-
-    grouped = []
-    for key, group in groupby(sorted_diagnostics, key=attrgetter("key")):
+    # group diagnostics either by a path and a line or a path and a tag
+    diagnostics = sorted(diagnostics, key=attrgetter("key"))
+    grouped_diagnostics = []
+    for key, group in groupby(diagnostics, key=attrgetter("key")):
         group = list(group)
-        sources: Source = reduce(or_, (diag.source for diag in group))
-        grouped.append(
-            GroupedDiagnostics(
-                key=key,
-                sources=sources,
-                old=list(filter(lambda diag: diag.source == Source.OLD, group)),
-                new=list(filter(lambda diag: diag.source == Source.NEW, group)),
-                expected=list(
-                    filter(lambda diag: diag.source == Source.EXPECTED, group)
-                ),
-            )
+        old_group = list(filter(lambda diag: diag.source == Source.OLD, group))
+        new_group = list(filter(lambda diag: diag.source == Source.NEW, group))
+        expected_group = list(
+            filter(lambda diag: diag.source == Source.EXPECTED, group)
         )
 
-    return grouped
-
-
-def split_expected_by_tag(
-    expected: list[Diagnostic],
-) -> tuple[list[Diagnostic], dict[str, list[Diagnostic]]]:
-    untagged: list[Diagnostic] = []
-    tagged: dict[str, list[Diagnostic]] = {}
-
-    for d in expected:
-        if d.tag is None:
-            untagged.append(d)
-        else:
-            tagged.setdefault(d.tag, []).append(d)
-
-    return untagged, tagged
-
-
-def index_observed_by_path(
-    diagnostics: list[Diagnostic],
-) -> dict[Path, list[Diagnostic]]:
-    index: dict[Path, list[Diagnostic]] = {}
-    for d in diagnostics:
-        index.setdefault(d.location.path, []).append(d)
-    return index
-
-
-def tagged_locations(
-    tagged_expected: dict[str, list[Diagnostic]],
-) -> set[tuple[Path, int]]:
-    locations: set[tuple[Path, int]] = set()
-    for diags in tagged_expected.values():
-        for d in diags:
-            locations.add((d.location.path, d.location.positions.begin.line))
-    return locations
-
-
-def filter_out_tagged(
-    diagnostics: list[Diagnostic],
-    *,
-    tagged_locs: set[tuple[Path, int]],
-) -> list[Diagnostic]:
-    return [
-        d
-        for d in diagnostics
-        if (d.location.path, d.location.positions.begin.line) not in tagged_locs
-    ]
-
-
-def condense_tagged_groups(
-    *,
-    tagged_expected: dict[str, list[Diagnostic]],
-    old: list[Diagnostic],
-    new: list[Diagnostic],
-) -> list[GroupedDiagnostics]:
-    old_by_path = index_observed_by_path(old)
-    new_by_path = index_observed_by_path(new)
-
-    results: list[GroupedDiagnostics] = []
-
-    for tag, expected_diags in tagged_expected.items():
-        exemplar = expected_diags[0]
-        path = exemplar.location.path
-        lines = {d.location.positions.begin.line for d in expected_diags}
-
-        def count_hits(path: Path, lines: set[int], observed: list[Diagnostic]) -> int:
-            return sum(
-                1
-                for d in observed
-                if d.location.path == path and d.location.positions.begin.line in lines
-            )
-
-        old_hits = count_hits(path, lines, old_by_path.get(path, []))
-        new_hits = count_hits(path, lines, new_by_path.get(path, []))
-
-        expected_max = len(expected_diags) if exemplar.multi else 1
-
-        sources = Source.EXPECTED
-        if 1 <= old_hits <= expected_max:
-            sources |= Source.OLD
-        if 1 <= new_hits <= expected_max:
-            sources |= Source.NEW
-
-        old_diagnostics = [
-            d
-            for d in old_by_path.get(path, [])
-            if d.location.positions.begin.line in lines
-        ]
-        new_diagnostics = [
-            d
-            for d in new_by_path.get(path, [])
-            if d.location.positions.begin.line in lines
-        ]
-
-        results.append(
-            GroupedDiagnostics(
-                key=f"{tag}",
-                sources=sources,
-                old=old_diagnostics,
-                new=new_diagnostics,
-                expected=expected_diags,
-            )
+        grouped = GroupedDiagnostics(
+            key=key,
+            sources={d.source for d in group},
+            old=old_group,
+            new=new_group,
+            expected=expected_group,
         )
+        grouped_diagnostics.append(grouped)
 
-    return results
+    return grouped_diagnostics
 
 
 def compute_stats(
@@ -537,23 +472,18 @@ def compute_stats(
     source: Source,
 ) -> Statistics:
     if source == source.EXPECTED:
-        # ty currently raises a false positive here due to incomplete enum.Flag support
-        # see https://github.com/astral-sh/ty/issues/876
-        num_errors = sum(
-            1
-            for g in grouped_diagnostics
-            if source.EXPECTED in g.sources  # ty:ignore[unsupported-operator]
-        )
+        num_errors = sum(1 for g in grouped_diagnostics if source.EXPECTED in g.sources)
         return Statistics(
             true_positives=num_errors, false_positives=0, false_negatives=0
         )
 
     def increment(statistics: Statistics, grouped: GroupedDiagnostics) -> Statistics:
-        if (source in grouped.sources) and (Source.EXPECTED in grouped.sources):
+        classification = grouped.classify(source)
+        if classification == Classification.TRUE_POSITIVE:
             statistics.true_positives += 1
-        elif source in grouped.sources:
+        elif classification == Classification.FALSE_POSITIVE:
             statistics.false_positives += 1
-        elif Source.EXPECTED in grouped.sources:
+        elif classification == Classification.FALSE_NEGATIVE:
             statistics.false_negatives += 1
 
         statistics.total_diagnostics += len(grouped.diagnostics_by_source(source))
@@ -826,9 +756,7 @@ def main():
     test_groups = get_test_groups(tests_dir)
     test_files = get_test_cases(test_groups, tests_dir / "tests")
 
-    expected_all = collect_expected_diagnostics(test_files)
-    expected_untagged, expected_tagged = split_expected_by_tag(expected_all)
-    tagged_locs = tagged_locations(expected_tagged)
+    expected = collect_expected_diagnostics(test_files)
 
     old = collect_ty_diagnostics(
         ty_path=args.old_ty,
@@ -844,29 +772,11 @@ def main():
         python_version=args.python_version,
     )
 
-    old_untagged = filter_out_tagged(
-        old,
-        tagged_locs=tagged_locs,
-    )
-
-    new_untagged = filter_out_tagged(
-        new,
-        tagged_locs=tagged_locs,
-    )
-
-    grouped_tagged = condense_tagged_groups(
-        tagged_expected=expected_tagged,
+    grouped = group_diagnostics_by_key_or_tag(
         old=old,
         new=new,
+        expected=expected,
     )
-
-    grouped_untagged = group_diagnostics_by_key(
-        old=old_untagged,
-        new=new_untagged,
-        expected=expected_untagged,
-    )
-
-    grouped = [*grouped_untagged, *grouped_tagged]
 
     rendered = "\n\n".join(
         [
