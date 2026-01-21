@@ -14941,7 +14941,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         typevars: Type<'db>,
         origin: LegacyGenericBase,
     ) -> Result<GenericContext<'db>, GenericContextError> {
-        let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(self.db());
+        let db = self.db();
+        let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(db);
 
         let typevars = if let Some(tuple_spec) = typevars_class_tuple_spec.as_deref() {
             match tuple_spec {
@@ -14953,64 +14954,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             std::slice::from_ref(&typevars)
         };
 
-        let mut validated_typevars = Ok(FxOrderSet::default());
+        let mut validated_typevars = FxOrderSet::default();
 
         for typevar in typevars {
-            let Ok(typevars) = &mut validated_typevars else {
-                break;
-            };
             if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = typevar {
                 let bound = bind_typevar(
-                    self.db(),
+                    db,
                     self.index,
-                    self.scope().file_scope_id(self.db()),
+                    self.scope().file_scope_id(db),
                     self.typevar_binding_context,
                     *typevar,
                 );
                 if let Some(bound) = bound {
-                    if !typevars.insert(bound) {
+                    if !validated_typevars.insert(bound) {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_GENERIC_CLASS, subscript)
                         {
                             builder.into_diagnostic(format_args!(
                                 "Type parameter `{}` cannot appear multiple times \
                                 in `{origin}` subscription",
-                                typevar.name(self.db()),
+                                typevar.name(db),
                             ));
                         }
-                        validated_typevars = Err(GenericContextError::InvalidArgument);
+                        return Err(GenericContextError::InvalidArgument);
                     }
                 } else {
-                    validated_typevars = Err(GenericContextError::InvalidArgument);
+                    return Err(GenericContextError::InvalidArgument);
                 }
             } else if any_over_type(
-                self.db(),
+                db,
                 *typevar,
                 &|ty| match ty {
                     Type::Dynamic(DynamicType::TodoUnpack | DynamicType::TodoStarredExpression) => {
                         true
                     }
                     Type::NominalInstance(nominal) => {
-                        nominal.has_known_class(self.db(), KnownClass::TypeVarTuple)
+                        nominal.has_known_class(db, KnownClass::TypeVarTuple)
                     }
                     _ => false,
                 },
                 true,
             ) {
-                validated_typevars = Err(GenericContextError::NotYetSupported);
+                return Err(GenericContextError::NotYetSupported);
             } else {
                 if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, subscript) {
                     builder.into_diagnostic(format_args!(
                         "`{}` is not a valid argument to `{origin}`",
-                        typevar.display(self.db()),
+                        typevar.display(db),
                     ));
                 }
-                validated_typevars = Err(GenericContextError::InvalidArgument);
+                return Err(GenericContextError::InvalidArgument);
             }
         }
 
-        validated_typevars
-            .map(|typevars| GenericContext::from_typevar_instances(self.db(), typevars))
+        let ctx = GenericContext::from_typevar_instances(db, validated_typevars);
+        Ok(ctx)
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
