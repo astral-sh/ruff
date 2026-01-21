@@ -45,8 +45,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors when
 /// alongside libraries that rely on runtime type annotations, like Pydantic,
 /// on Python versions prior to Python 3.10, or as it may remove comments if they
-/// are present within the type annotation being rewritten. It may also lead to 
-/// runtime errors in unusual and likely incorrect type annotations where the type 
+/// are present within the type annotation being rewritten. It may also lead to
+/// runtime errors in unusual and likely incorrect type annotations where the type
 /// does not  support the `|` operator.
 ///
 /// ## Options
@@ -103,7 +103,7 @@ impl Violation for NonPEP604AnnotationUnion {
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors
 /// using libraries that rely on runtime type annotations, like Pydantic,
 /// on Python versions prior to Python 3.10, or as it may remove comments if they
-/// are present within the type annotation being rewritten. It may also lead to runtime 
+/// are present within the type annotation being rewritten. It may also lead to runtime
 /// errors in unusual and likely incorrect type annotations where the type does not
 /// support the `|` operator.
 ///
