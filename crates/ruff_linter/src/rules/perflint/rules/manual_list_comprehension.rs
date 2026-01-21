@@ -1,10 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
-use crate::{Edit, Fix, FixAvailability, Violation};
-use crate::{
-    checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
-    rules::perflint::helpers::statement_deletion_range,
+use crate::checkers::ast::Checker;
+use crate::preview::{
+    is_fix_manual_list_comprehension_enabled, is_perf401_tuple_unpacking_enabled,
 };
+use crate::rules::perflint::helpers::statement_deletion_range;
+use crate::{Edit, Fix, FixAvailability, Violation};
 use anyhow::{Result, anyhow};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
@@ -98,6 +99,9 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     let targets = match &*for_stmt.target {
         name @ Expr::Name(_) => std::slice::from_ref(name),
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            if !is_perf401_tuple_unpacking_enabled(checker.settings()) {
+                return;
+            }
             elts.as_slice()
         }
         _ => return,
@@ -335,14 +339,22 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 .any(|text_range| from_assign_to_loop.contains_range(text_range))
         });
 
+    // Ensure the list isn't modified anywhere else
+    let is_only_modified_here = list_binding.references().all(|ref_id| {
+        let reference = checker.semantic().reference(ref_id);
+
+        if reference.is_load() {
+            return true;
+        }
+        range.contains_range(reference.range())
+    });
+
     // A list extend works in every context, while a list comprehension only works when all the criteria are true
     let comprehension_type = if binding_is_empty_list
         && assignment_in_same_statement
         && binding_has_one_target
         && binding_unused_between
-        // Check if the list is only referenced here.
-        // if it has > 1 reference, it's being used elsewhere
-        && list_binding.references().count() <= 1
+        && is_only_modified_here
     {
         ComprehensionType::ListComprehension
     } else {

@@ -418,7 +418,7 @@ help: Replace for loop with list comprehension
 223 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
-PERF401 [*] Use `list.extend` to create a transformed list
+PERF401 [*] Use a list comprehension to create a transformed list
    --> PERF401.py:229:9
     |
 227 |     result = []
@@ -427,16 +427,17 @@ PERF401 [*] Use `list.extend` to create a transformed list
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 230 |     return result
     |
-help: Replace for loop with list.extend
+help: Replace for loop with list comprehension
+224 | 
 225 | def f():
 226 |     a, b = [1, 2, 3], [4, 5, 6]
-227 |     result = []
+    -     result = []
     -     for i in a, b:
     -         result.append(i[0] + i[1])  # PERF401
-228 +     result.extend(i[0] + i[1] for i in (a, b))  # PERF401
-229 |     return result
+227 +     result = [i[0] + i[1] for i in (a, b)]  # PERF401
+228 |     return result
+229 | 
 230 | 
-231 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PERF401 [*] Use a list comprehension to create a transformed list
@@ -534,7 +535,7 @@ help: Replace for loop with list comprehension
 270 |     src = [1]
 note: This is an unsafe fix and may change runtime behavior
 
-PERF401 [*] Use `list.extend` to create a transformed list
+PERF401 [*] Use a list comprehension to create a transformed list
    --> PERF401.py:276:13
     |
 274 |     for i in src:
@@ -544,17 +545,19 @@ PERF401 [*] Use `list.extend` to create a transformed list
 277 |
 278 |     for i in src:
     |
-help: Replace for loop with list.extend
+help: Replace for loop with list comprehension
+269 | 
+270 | def f():
 271 |     src = [1]
-272 |     dst = []
-273 | 
+    -     dst = []
+272 | 
     -     for i in src:
     -         if True if True else False:
     -             dst.append(i)
-274 +     dst.extend(i for i in src if (True if True else False))
-275 | 
-276 |     for i in src:
-277 |         if lambda: 0:
+273 +     dst = [i for i in src if (True if True else False)]
+274 | 
+275 |     for i in src:
+276 |         if lambda: 0:
 note: This is an unsafe fix and may change runtime behavior
 
 PERF401 [*] Use `list.extend` to create a transformed list
