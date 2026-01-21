@@ -28,6 +28,11 @@ b = {"c": 3, "d": 4}
 c = {**a, **b}
 reveal_type(c)  # revealed: dict[Unknown | str, Unknown | int]
 
+# revealed: list[int | str]
+# revealed: list[int | str]
+d: dict[str, list[int | str]] = {"a": reveal_type([1, 2]), **{"b": reveal_type([3, 4])}}
+reveal_type(d)  # revealed: dict[str, list[int | str]]
+
 class HasKeysAndGetItem:
     def keys(self) -> KeysView[str]:
         return {}.keys()

@@ -10067,7 +10067,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for elts in elts {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
-                let unpack_ty = infer_elt_expression(self, (1, value_expr, TypeContext::default()));
+                let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
                     unpack_ty.unpack_keys_and_items(self.db())
