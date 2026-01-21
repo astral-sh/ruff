@@ -2090,8 +2090,15 @@ static_assert(is_disjoint_from(TD, dict[str, str]))  # error: [static-assert-err
 
 ## Narrowing tagged unions of `TypedDict`s
 
+### Narrowing tagged unions of `TypedDict`s with equality
+
 In a tagged union of `TypedDict`s, a common field in each member (often `"type"` or `"tag"`) is
 given a distinct `Literal` type/value. We can narrow the union by constraining this field:
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from typing import TypedDict, Literal
@@ -2109,6 +2116,18 @@ class Bing(TypedDict):
     tag: Literal["bing"]
 
 def _(u: Foo | Bar | Baz | Bing):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    elif u["tag"] == 42:
+        reveal_type(u)  # revealed: Bar
+    elif u["tag"] == b"baz":
+        reveal_type(u)  # revealed: Baz
+    else:
+        reveal_type(u)  # revealed: Bing
+
+type TaggedUnion = Foo | Bar | Baz | Bing
+
+def _(u: TaggedUnion):
     if u["tag"] == "foo":
         reveal_type(u)  # revealed: Foo
     elif u["tag"] == 42:
@@ -2187,13 +2206,16 @@ def _(u: Foo | Bar | NotADict):
         reveal_type(u)  # revealed: Bar | NotADict
 ```
 
+### Narrowing tagged unions of `TypedDict`s with `in` and `not in`
+
 It would be nice if we could also narrow `TypedDict` unions by checking whether a key (which only
 shows up in a subset of the union members) is present, but that isn't generally correct, because
 "extra items" are allowed by default. For example, even though `Bar` here doesn't define a `"foo"`
 field, it could be *assigned to* with another `TypedDict` that does:
 
 ```py
-from typing_extensions import Literal
+from typing_extensions import Literal, TypedDict
+from ty_extensions import is_assignable_to, static_assert
 
 class Foo(TypedDict):
     foo: int
