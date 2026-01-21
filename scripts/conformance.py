@@ -306,7 +306,8 @@ class GroupedDiagnostics:
         return "\n".join(f"{sign} {diagnostic}" for diagnostic in diagnostics)
 
     def display(self, format: Literal["diff", "github"]) -> str:
-        match self.classify(Source.NEW):
+        classification = self.classify(Source.NEW)
+        match classification:
             case Classification.TRUE_POSITIVE | Classification.FALSE_POSITIVE:
                 assert self.new is not None
                 return (
@@ -330,7 +331,7 @@ class GroupedDiagnostics:
                 )
 
             case _:
-                raise ValueError(f"Unexpected classification: {self.classification}")
+                raise ValueError(f"Unexpected classification: {classification}")
 
 
 @dataclass(kw_only=True, slots=True)
@@ -512,7 +513,9 @@ def render_grouped_diagnostics(
         ]
 
     get_change = attrgetter("change")
-    get_classification = attrgetter("classification")
+
+    def get_classification(diag) -> Classification:
+        return diag.classify(Source.NEW)
 
     optional_diagnostics = sorted(
         (diag for diag in grouped if diag.optional),
