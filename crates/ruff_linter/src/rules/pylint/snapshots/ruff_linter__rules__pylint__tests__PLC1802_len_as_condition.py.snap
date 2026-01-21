@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 252
 ---
 PLC1802 [*] `len('TEST')` used as condition without comparison
  --> len_as_condition.py:1:4
@@ -550,4 +551,44 @@ help: Remove `len`
     - ):
 247 + if fruits:
 248 |     ...
+249 | 
+250 | # regression tests for https://github.com/astral-sh/ruff/issues/22780
 note: This is an unsafe fix and may change runtime behavior
+
+PLC1802 [*] `len(self.fruits)` used as condition without comparison
+   --> len_as_condition.py:259:12
+    |
+257 |         self.fruits = ["apple", "orange"]
+258 |
+259 |         if len(self.fruits):  # [PLC1802]
+    |            ^^^^^^^^^^^^^^^^
+260 |             ...
+    |
+help: Remove `len`
+256 |     def __init__(self):
+257 |         self.fruits = ["apple", "orange"]
+258 | 
+    -         if len(self.fruits):  # [PLC1802]
+259 +         if self.fruits:  # [PLC1802]
+260 |             ...
+261 | 
+262 |         if not len(self.fruits):  # [PLC1802]
+
+PLC1802 [*] `len(self.fruits)` used as condition without comparison
+   --> len_as_condition.py:262:16
+    |
+260 |             ...
+261 |
+262 |         if not len(self.fruits):  # [PLC1802]
+    |                ^^^^^^^^^^^^^^^^
+263 |             ...
+    |
+help: Remove `len`
+259 |         if len(self.fruits):  # [PLC1802]
+260 |             ...
+261 | 
+    -         if not len(self.fruits):  # [PLC1802]
+262 +         if not self.fruits:  # [PLC1802]
+263 |             ...
+264 | 
+265 |     def check_fruits(self):

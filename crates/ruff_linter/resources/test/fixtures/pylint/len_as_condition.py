@@ -248,3 +248,21 @@ if len(
     fruits  # comment
 ):
     ...
+
+# regression tests for https://github.com/astral-sh/ruff/issues/22780
+class Fruits:
+    fruits: list[str]
+
+    def __init__(self):
+        self.fruits = ["apple", "orange"]
+
+        if len(self.fruits):  # [PLC1802]
+            ...
+
+        if not len(self.fruits):  # [PLC1802]
+            ...
+
+    def check_fruits(self):
+        # This should NOT trigger because we can't trace the assignment
+        if len(self.fruits):
+            ...
