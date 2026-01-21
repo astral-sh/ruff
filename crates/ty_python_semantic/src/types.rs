@@ -5637,20 +5637,15 @@ impl<'db> Type<'db> {
                         }
                     }
 
-                    // `Self` cannot be used in a metaclass.
-                    if let Some(type_class) =
-                        KnownClass::Type.to_class_literal(db).to_class_type(db)
-                    {
-                        if !class.is_known(db, KnownClass::Type)
-                            && class.is_subclass_of(db, None, type_class)
-                        {
-                            return Err(InvalidTypeExpressionError {
-                                fallback_type: Type::unknown(),
-                                invalid_expressions: smallvec_inline![
-                                    InvalidTypeExpression::SelfInMetaclass
-                                ],
-                            });
-                        }
+                    // `Self` cannot be used in a metaclass (subclass of `type`).
+                    // We exclude `type` itself since it's defined in typeshed.
+                    if !class.is_known(db, KnownClass::Type) && class.is_metaclass(db) {
+                        return Err(InvalidTypeExpressionError {
+                            fallback_type: Type::unknown(),
+                            invalid_expressions: smallvec_inline![
+                                InvalidTypeExpression::SelfInMetaclass
+                            ],
+                        });
                     }
 
                     Ok(bound_self.map(Type::TypeVar).unwrap_or(*self))

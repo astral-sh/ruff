@@ -145,6 +145,14 @@ fn is_typed_dict_cycle_initial<'db>(
     false
 }
 
+fn is_metaclass_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: StaticClassLiteral<'db>,
+) -> bool {
+    false
+}
+
 #[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
@@ -2478,6 +2486,16 @@ impl<'db> StaticClassLiteral<'db> {
         scope.node(db).expect_class().node(module)
     }
 
+    /// Returns `true` if this class has any explicit base classes in the AST.
+    ///
+    /// This is a cheap check that doesn't trigger type inference. A class with no
+    /// explicit bases only inherits from `object`.
+    pub(super) fn has_explicit_bases(self, db: &'db dyn Db) -> bool {
+        let module = parsed_module(db, self.file(db)).load(db);
+        let class_stmt = self.node(db, &module);
+        !class_stmt.bases().is_empty()
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.file(db));
@@ -2792,6 +2810,31 @@ impl<'db> StaticClassLiteral<'db> {
 
         self.iter_mro(db, None)
             .any(|base| matches!(base, ClassBase::TypedDict))
+    }
+
+    /// Return `true` if this class is a metaclass (i.e., a subclass of `type`).
+    ///
+    /// This is cached to avoid repeated MRO iteration for the same class.
+    #[salsa::tracked(cycle_initial=is_metaclass_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(super) fn is_metaclass(self, db: &'db dyn Db) -> bool {
+        // The `type` class itself is a metaclass.
+        if self.is_known(db, KnownClass::Type) {
+            return true;
+        }
+
+        // Quick check: if no explicit bases, can't be a metaclass.
+        if !self.has_explicit_bases(db) {
+            return false;
+        }
+
+        // Check if `type` is in the MRO.
+        let Some(type_class) = KnownClass::Type.to_class_literal(db).to_class_type(db) else {
+            return false;
+        };
+
+        self.is_subclass_of(db, None, type_class)
     }
 
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
