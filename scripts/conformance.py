@@ -262,9 +262,15 @@ class GroupedDiagnostics:
     def classify(self, source: Source) -> Classification:
         if source in self.sources and Source.EXPECTED in self.sources:
             assert self.expected is not None
-            diagnostics = self.diagnostics_by_source(source)
+            distinct_lines = len(
+                {
+                    diagnostic.location.positions.begin.line
+                    for diagnostic in self.diagnostics_by_source(source)
+                }
+            )
             expected_max = len(self.expected) if self.multi else 1
-            if 1 <= len(diagnostics) <= expected_max:
+
+            if 1 <= distinct_lines <= expected_max:
                 return Classification.TRUE_POSITIVE
             else:
                 return Classification.FALSE_POSITIVE
