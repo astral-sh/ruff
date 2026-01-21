@@ -2486,18 +2486,6 @@ impl<'db> StaticClassLiteral<'db> {
         scope.node(db).expect_class().node(module)
     }
 
-    /// Returns `true` if this class has any explicit base classes in the AST.
-    ///
-    /// This is a cheap check that doesn't trigger type inference. A class with no
-    /// explicit bases only inherits from `object`.
-    ///
-    /// ## Note
-    /// Only call this function from queries in the same file or your
-    /// query depends on the AST of another file (bad!).
-    fn has_explicit_bases(self, db: &'db dyn Db, module: &ParsedModuleRef) -> bool {
-        !self.node(db, module).bases().is_empty()
-    }
-
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.file(db));
@@ -2827,8 +2815,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         // Quick check: if no explicit bases, can't be a metaclass.
-        let module = parsed_module(db, self.file(db)).load(db);
-        if !self.has_explicit_bases(db, &module) {
+        if self.explicit_bases(db).is_empty() {
             return false;
         }
 
