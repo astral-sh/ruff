@@ -93,7 +93,7 @@ use crate::checkers::ast::Checker;
 /// - [NumPy documentation: `numpy.allclose`](https://numpy.org/doc/stable/reference/generated/numpy.allclose.html#numpy-allclose)
 /// - [PyTorch documentation: `torch.isclose`](https://docs.pytorch.org/docs/stable/generated/torch.isclose.html#torch-isclose)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.12")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct FloatEqualityComparison<'a> {
     pub left: &'a str,
     pub right: &'a str,
