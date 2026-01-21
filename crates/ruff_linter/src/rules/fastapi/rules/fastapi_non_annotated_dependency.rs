@@ -113,10 +113,10 @@ impl AutofixSkipped {
     fn message(&self) -> &'static str {
         match self {
             Self::EllipsisAfterDefault => {
-                "Automatic fix is not available because a required parameter (ellipsis '...') comes after an optional parameter."
+                "Automatic fix unavailable: a required parameter ('...') comes after an optional parameter. Consider reordering arguments to enable the fix."
             }
             Self::RequiredAfterOptional => {
-                "Automatic fix is not available because a required parameter comes after an optional parameter."
+                "Automatic fix unavailable: a required parameter comes after an optional parameter. Consider reordering arguments to enable the fix."
             }
             Self::ImportError => {
                 "Automatic fix is not available because `Annotated` could not be imported."
