@@ -311,7 +311,7 @@ class Base:
 
 class Outer(Base):
     def __init__(self, foo):
-        super(self).__init__(foo)  # Should not trigger UP008
+        super().__init__(foo)  # Should not trigger UP008
 
     class Inner(Base):
         def __init__(self, foo):
