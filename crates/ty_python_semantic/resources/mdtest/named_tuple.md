@@ -129,6 +129,130 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Functional syntax with string annotations
+
+String annotations (forward references) are properly evaluated to types:
+
+```py
+from typing import NamedTuple
+
+Point = NamedTuple("Point", [("x", "int"), ("y", "int")])
+p = Point(1, 2)
+
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+```
+
+Recursive references in functional syntax are supported:
+
+```py
+from typing import NamedTuple
+
+Node = NamedTuple("Node", [("value", int), ("next", "Node | None")])
+n = Node(1, None)
+
+reveal_type(n.value)  # revealed: int
+reveal_type(n.next)  # revealed: Node | None
+
+A = NamedTuple("A", [("x", "B | None")])
+B = NamedTuple("B", [("x", "C")])
+C = NamedTuple("C", [("x", A)])
+
+a = A(x=B(x=C(x=A(x=None))))
+
+reveal_type(a.x)  # revealed: B | None
+
+if a.x:
+    reveal_type(a.x and a.x.x)  # revealed: C
+    reveal_type(a.x and a.x.x.x)  # revealed: A
+    reveal_type(a.x and a.x.x.x.x)  # revealed: B | None
+
+A(x=42)  # error: [invalid-argument-type]
+
+# error: [invalid-argument-type]
+# error: [missing-argument]
+A(x=C())
+
+# error: [invalid-argument-type]
+A(x=C(x=A(x=None)))
+```
+
+### Functional syntax as base class (dangling call)
+
+When `NamedTuple` is used directly as a base class without being assigned to a variable first, it's
+a "dangling call". The types are still properly inferred:
+
+```py
+from typing import NamedTuple
+
+class Point(NamedTuple("Point", [("x", int), ("y", int)])):
+    def magnitude(self) -> float:
+        return (self.x**2 + self.y**2) ** 0.5
+
+p = Point(3, 4)
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+reveal_type(p.magnitude())  # revealed: int | float
+```
+
+String annotations in dangling calls work correctly for forward references to classes defined in the
+same scope. This allows recursive types:
+
+```py
+from typing import NamedTuple
+
+class Node(NamedTuple("Node", [("value", int), ("next", "Node | None")])):
+    pass
+
+n = Node(1, None)
+reveal_type(n.value)  # revealed: int
+reveal_type(n.next)  # revealed: Node | None
+
+class A(NamedTuple("A", [("x", "B | None")])): ...
+class B(NamedTuple("B", [("x", "C")])): ...
+class C(NamedTuple("C", [("x", "A")])): ...
+
+reveal_type(A(x=B(x=C(x=A(x=None)))))  # revealed: A
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `B | None`, found `C`"
+# error: [missing-argument] "No argument provided for required parameter `x`"
+A(x=C())
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `B | None`, found `C`"
+A(x=C(x=A(x=None)))
+```
+
+Note that the string annotation must reference a name that exists in scope. References to the
+internal NamedTuple name (if different from the class name) won't work:
+
+```py
+from typing import NamedTuple
+
+# The string "X" in "next"'s type refers to the internal name, not "BadNode", so it won't resolve:
+#
+# error: [unresolved-reference] "Name `X` used when not defined"
+class BadNode(NamedTuple("X", [("value", int), ("next", "X | None")])):
+    pass
+
+n = BadNode(1, None)
+reveal_type(n.value)  # revealed: int
+# X is not in scope, so it resolves to Unknown; None is correctly resolved
+reveal_type(n.next)  # revealed: Unknown | None
+```
+
+Dangling calls cannot contain other dangling calls; that's an invalid type form:
+
+```py
+from ty_extensions import reveal_mro
+
+# error: [invalid-type-form]
+class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A" | None)]))])):
+    pass
+
+# revealed: (<class 'A'>, <class 'B'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(A)
+```
+
 ### Functional syntax with variable name
 
 When the typename is passed via a variable, we can extract it from the inferred literal string type:
@@ -146,56 +270,70 @@ reveal_type(p.name)  # revealed: str
 
 ### Functional syntax with tuple variable fields
 
-When fields are passed via a tuple variable, we can extract the literal field names and types from
-the inferred tuple type:
+When fields are passed via a tuple variable, we cannot extract the literal field names and types
+from the inferred tuple type. We instead emit a diagnostic:
 
 ```py
 from typing import NamedTuple
 from ty_extensions import static_assert, is_subtype_of, reveal_mro
 
 fields = (("host", str), ("port", int))
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 Url = NamedTuple("Url", fields)
 
 url = Url("localhost", 8080)
-reveal_type(url.host)  # revealed: str
-reveal_type(url.port)  # revealed: int
+reveal_type(url.host)  # revealed: Any
+reveal_type(url.port)  # revealed: Any
 
-# Generic types are also correctly converted to instance types.
 generic_fields = (("items", list[int]), ("mapping", dict[str, bool]))
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 Container = NamedTuple("Container", generic_fields)
 container = Container([1, 2, 3], {"a": True})
-reveal_type(container.items)  # revealed: list[int]
-reveal_type(container.mapping)  # revealed: dict[str, bool]
+reveal_type(container.items)  # revealed: Any
+reveal_type(container.mapping)  # revealed: Any
 
-# MRO includes the properly specialized tuple type.
-# revealed: (<class 'Url'>, <class 'tuple[str, int]'>, <class 'Sequence[str | int]'>, <class 'Reversible[str | int]'>, <class 'Collection[str | int]'>, <class 'Iterable[str | int]'>, <class 'Container[str | int]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'Url'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Url)
 
-static_assert(is_subtype_of(Url, tuple[str, int]))
-
-# Invalid type expressions in fields produce a diagnostic.
 invalid_fields = (("x", 42),)  # 42 is not a valid type
-# error: [invalid-type-form] "Object of type `Literal[42]` is not valid as a `NamedTuple` field type"
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 InvalidNT = NamedTuple("InvalidNT", invalid_fields)
 reveal_type(InvalidNT)  # revealed: <class 'InvalidNT'>
 
-# Unpacking works correctly with the field types.
 host, port = url
-reveal_type(host)  # revealed: str
-reveal_type(port)  # revealed: int
+reveal_type(host)  # revealed: Unknown
+reveal_type(port)  # revealed: Unknown
 
-# error: [invalid-assignment] "Too many values to unpack: Expected 1"
+# fails at runtime but we can't detect that
 (only_one,) = url
 
-# error: [invalid-assignment] "Not enough values to unpack: Expected 3"
+# will error at runtime, but we can't detect that
 a, b, c = url
 
-# Indexing works correctly.
-reveal_type(url[0])  # revealed: str
-reveal_type(url[1])  # revealed: int
+reveal_type(url[0])  # revealed: Unknown
+reveal_type(url[1])  # revealed: Unknown
 
-# error: [index-out-of-bounds]
-url[2]
+# will error at runtime, but we can't detect that
+reveal_type(url[2])  # revealed: Unknown
+```
+
+### Functional syntax with Final variable field names
+
+When field names are `Final` variables, they resolve to their literal string values:
+
+```py
+from typing import Final, NamedTuple
+
+X: Final = "x"
+Y: Final = "y"
+N = NamedTuple("N", [(X, int), (Y, int)])
+
+reveal_type(N(x=3, y=4).x)  # revealed: int
+reveal_type(N(x=3, y=4).y)  # revealed: int
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+N(x="", y="")
 ```
 
 ### Functional syntax with variadic tuple fields
@@ -217,6 +355,7 @@ def get_fields() -> tuple[tuple[str, type[int]], *tuple[tuple[str, type[str]], .
     return (("x", int), ("y", str))
 
 fields = get_fields()
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 NT = NamedTuple("NT", fields)
 
 # Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
@@ -343,6 +482,7 @@ from typing_extensions import Self
 
 fields = [("host", str), ("port", int)]
 
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 class Url(NamedTuple("Url", fields)):
     def with_port(self, port: int) -> Self:
         # Fields are unknown, so attribute access returns Any.
@@ -626,19 +766,18 @@ Bad4 = NamedTuple("Bad4", [("x", int)], defaults=[0])
 Bad5 = NamedTuple("Bad5", [("x", int)], foobarbaz=42)
 
 # Invalid type for `fields` (not an iterable)
-# error: [invalid-argument-type] "Invalid argument to parameter `fields` of `NamedTuple()`"
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 Bad6 = NamedTuple("Bad6", 12345)
 reveal_type(Bad6)  # revealed: <class 'Bad6'>
 
 # Invalid field definitions: strings instead of (name, type) tuples
-# error: [invalid-argument-type] "Invalid `NamedTuple()` field definition"
-# error: [invalid-argument-type] "Invalid `NamedTuple()` field definition"
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a sequence of literal lists or tuples"
 Bad7 = NamedTuple("Bad7", ["a", "b"])
 reveal_type(Bad7)  # revealed: <class 'Bad7'>
 
 # Invalid field definitions: type is not a valid type expression (e.g., int literals)
-# error: [invalid-type-form] "Object of type `Literal[123]` is not valid as a `NamedTuple` field type"
-# error: [invalid-type-form] "Object of type `Literal[456]` is not valid as a `NamedTuple` field type"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 Bad8 = NamedTuple("Bad8", [("a", 123), ("b", 456)])
 reveal_type(Bad8)  # revealed: <class 'Bad8'>
 ```
@@ -958,6 +1097,8 @@ reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
 ```
 
+### Functional syntax with generics
+
 Generic namedtuples can also be defined using the functional syntax with type variables in the field
 types. We don't currently support this, but mypy does:
 
@@ -979,11 +1120,11 @@ reveal_type(Pair(1, 2))  # revealed: Pair
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
-reveal_type(Pair(1, 2).first)  # revealed: T@Pair
+reveal_type(Pair(1, 2).first)  # revealed: TypeVar
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
-reveal_type(Pair(1, 2).second)  # revealed: T@Pair
+reveal_type(Pair(1, 2).second)  # revealed: TypeVar
 ```
 
 ## Attributes on `NamedTuple`
