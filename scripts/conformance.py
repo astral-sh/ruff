@@ -260,22 +260,25 @@ class GroupedDiagnostics:
                 raise ValueError(f"Invalid source: {source}")
 
     def classify(self, source: Source) -> Classification:
-        if source in self.sources and Source.EXPECTED in self.sources:
-            assert self.expected is not None
-            distinct_lines = len(
-                {
-                    diagnostic.location.positions.begin.line
-                    for diagnostic in self.diagnostics_by_source(source)
-                }
-            )
-            expected_max = len(self.expected) if self.multi else 1
+        if source in self.sources:
+            if Source.EXPECTED in self.sources:
+                assert self.expected is not None
+                distinct_lines = len(
+                    {
+                        diagnostic.location.positions.begin.line
+                        for diagnostic in self.diagnostics_by_source(source)
+                    }
+                )
+                expected_max = len(self.expected) if self.multi else 1
 
-            if 1 <= distinct_lines <= expected_max:
-                return Classification.TRUE_POSITIVE
+                if 1 <= distinct_lines <= expected_max:
+                    return Classification.TRUE_POSITIVE
+                else:
+                    return Classification.FALSE_POSITIVE
             else:
                 return Classification.FALSE_POSITIVE
 
-        elif source in self.sources and Source.EXPECTED not in self.sources:
+        elif source in self.sources:
             return Classification.FALSE_POSITIVE
 
         elif Source.EXPECTED in self.sources:
