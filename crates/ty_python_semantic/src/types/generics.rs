@@ -1662,14 +1662,17 @@ impl<'db> SpecializationBuilder<'db> {
 
             for (bound_typevar, bounds) in mappings.drain() {
                 let variance = formal.variance_of(self.db, bound_typevar);
-                let upper = IntersectionType::from_elements(self.db, bounds.upper);
-                if !upper.is_object() {
-                    self.add_type_mapping(bound_typevar, upper, variance, &mut f);
-                    continue;
-                }
+                // Prefer the lower bound (often the concrete actual type seen) over the
+                // upper bound (which may include TypeVar bounds/constraints). The upper bound
+                // should only be used as a fallback when no concrete type was inferred.
                 let lower = UnionType::from_elements(self.db, bounds.lower);
                 if !lower.is_never() {
                     self.add_type_mapping(bound_typevar, lower, variance, &mut f);
+                    continue;
+                }
+                let upper = IntersectionType::from_elements(self.db, bounds.upper);
+                if !upper.is_object() {
+                    self.add_type_mapping(bound_typevar, upper, variance, &mut f);
                 }
             }
         }

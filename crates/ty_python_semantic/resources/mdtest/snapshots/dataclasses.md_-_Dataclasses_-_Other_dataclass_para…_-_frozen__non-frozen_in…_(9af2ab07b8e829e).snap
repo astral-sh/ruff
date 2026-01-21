@@ -61,7 +61,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses/dataclasses.
  6 | 
  7 | @final
  8 | @dataclass(frozen=True)
- 9 | @total_ordering
+ 9 | @total_ordering  # error: [invalid-total-ordering]
 10 | class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
 11 |     y: str
 ```
@@ -127,13 +127,29 @@ info: rule `invalid-frozen-dataclass-subclass` is enabled by default
 ```
 
 ```
+error[invalid-total-ordering]: Class decorated with `@total_ordering` must define at least one ordering method
+  --> src/main.py:9:1
+   |
+ 7 | @final
+ 8 | @dataclass(frozen=True)
+ 9 | @total_ordering  # error: [invalid-total-ordering]
+   | ^^^^^^^^^^^^^^^ `FrozenChild` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`
+10 | class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
+11 |     y: str
+   |
+info: The decorator will raise `ValueError` at runtime
+info: rule `invalid-total-ordering` is enabled by default
+
+```
+
+```
 error[invalid-frozen-dataclass-subclass]: Frozen dataclass cannot inherit from non-frozen dataclass
   --> src/main.py:8:1
    |
  7 | @final
  8 | @dataclass(frozen=True)
    | ----------------------- `FrozenChild` dataclass parameters
- 9 | @total_ordering
+ 9 | @total_ordering  # error: [invalid-total-ordering]
 10 | class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
    |       ^^^^^^^^^^^^-------------^ Subclass `FrozenChild` is frozen but base class `NotFrozenBase` is not
 11 |     y: str
