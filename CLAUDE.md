@@ -22,10 +22,16 @@ Run tests for a specific crate:
 cargo nextest run -p ty_python_semantic
 ```
 
-Run a specific mdtest (use a substring of the test name):
+Run a single mdtest file:
 
 ```sh
-MDTEST_TEST_FILTER="<filter>" cargo nextest run -p ty_python_semantic mdtest
+cargo nextest run -p ty_python_semantic --test mdtest -- mdtest::<path/to/mdtest_file.md>
+```
+
+Run a specific mdtest within a file (use a substring of the Markdown header text) -- this is usually not needed:
+
+```sh
+MDTEST_TEST_FILTER="<filter>" cargo nextest run -p ty_python_semantic --test mdtest -- mdtest::<path/to/mdtest_file.md>
 ```
 
 Update snapshots after running tests:
