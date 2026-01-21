@@ -93,6 +93,7 @@ mod cyclic;
 mod diagnostic;
 mod display;
 mod enums;
+mod equality;
 mod function;
 mod generics;
 pub mod ide_support;
@@ -3250,10 +3251,7 @@ impl<'db> Type<'db> {
                     && Type::ClassLiteral(enum_literal.enum_class(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
             {
-                enum_metadata(db, enum_literal.enum_class(db))
-                    .and_then(|metadata| metadata.members.get(enum_literal.name(db)))
-                    .map_or_else(|| Place::Undefined, Place::bound)
-                    .into()
+                Place::bound(enum_literal.value(db)).into()
             }
 
             Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
@@ -12693,6 +12691,12 @@ impl get_size2::GetSize for EnumLiteralType<'_> {}
 impl<'db> EnumLiteralType<'db> {
     pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db)
+    }
+
+    pub(crate) fn value(self, db: &'db dyn Db) -> Type<'db> {
+        let metadata = enum_metadata(db, self.enum_class(db))
+            .expect("Class of enum literal should be an enum class");
+        metadata.members[self.name(db)]
     }
 }
 
