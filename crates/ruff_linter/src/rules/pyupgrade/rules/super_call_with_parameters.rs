@@ -128,15 +128,18 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     };
 
     let first_arg_id = match first_arg {
+        // Simple case: super(MyClass, self)
         Expr::Name(ast::ExprName { id, .. }) => id,
+        // Nested class case: super(OuterClass.InnerClass, self)
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => &attr.id,
         _ => return,
     };
 
-    let second_arg_id = match second_arg {
-        Expr::Name(ast::ExprName { id, .. }) => id,
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => &attr.id,
-        _ => return,
+    let Expr::Name(ast::ExprName {
+        id: second_arg_id, ..
+    }) = second_arg
+    else {
+        return;
     };
 
     // The `super(__class__, self)` and `super(ParentClass, self)` patterns are redundant in Python 3
