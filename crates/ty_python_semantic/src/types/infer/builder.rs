@@ -14661,7 +14661,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (Type::SpecialForm(SpecialFormType::Protocol), typevars) => Some(
                 self.legacy_generic_class_context(
-                    value_node,
+                    subscript,
                     typevars,
                     LegacyGenericBase::Protocol,
                 )
@@ -14695,7 +14695,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (Type::SpecialForm(SpecialFormType::Generic), typevars) => Some(
-                self.legacy_generic_class_context(value_node, typevars, LegacyGenericBase::Generic)
+                self.legacy_generic_class_context(subscript, typevars, LegacyGenericBase::Generic)
                     .map(|context| {
                         Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context))
                     })
@@ -14937,11 +14937,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn legacy_generic_class_context(
         &self,
-        value_node: &ast::Expr,
+        subscript: &ast::ExprSubscript,
         typevars: Type<'db>,
         origin: LegacyGenericBase,
     ) -> Result<GenericContext<'db>, GenericContextError> {
-        let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(self.db());
+        let db = self.db();
+        let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(db);
 
         let typevars = if let Some(tuple_spec) = typevars_class_tuple_spec.as_deref() {
             match tuple_spec {
@@ -14953,47 +14954,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             std::slice::from_ref(&typevars)
         };
 
-        let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
-            .iter()
-            .map(|typevar| {
-                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = typevar {
-                    bind_typevar(
-                        self.db(),
-                        self.index,
-                        self.scope().file_scope_id(self.db()),
-                        self.typevar_binding_context,
-                        *typevar,
-                    )
-                    .ok_or(GenericContextError::InvalidArgument)
-                } else if any_over_type(
-                    self.db(),
+        let mut validated_typevars = FxOrderSet::default();
+
+        for typevar in typevars {
+            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = typevar {
+                let bound = bind_typevar(
+                    db,
+                    self.index,
+                    self.scope().file_scope_id(db),
+                    self.typevar_binding_context,
                     *typevar,
-                    &|ty| match ty {
-                        Type::Dynamic(
-                            DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
-                        ) => true,
-                        Type::NominalInstance(nominal) => {
-                            nominal.has_known_class(self.db(), KnownClass::TypeVarTuple)
+                );
+                if let Some(bound) = bound {
+                    if !validated_typevars.insert(bound) {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_GENERIC_CLASS, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Type parameter `{}` cannot appear multiple times \
+                                in `{origin}` subscription",
+                                typevar.name(db),
+                            ));
                         }
-                        _ => false,
-                    },
-                    true,
-                ) {
-                    Err(GenericContextError::NotYetSupported)
-                } else {
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "`{}` is not a valid argument to `{origin}`",
-                            typevar.display(self.db()),
-                        ));
+                        return Err(GenericContextError::InvalidArgument);
                     }
-                    Err(GenericContextError::InvalidArgument)
+                } else {
+                    return Err(GenericContextError::InvalidArgument);
                 }
-            })
-            .collect();
-        typevars.map(|typevars| GenericContext::from_typevar_instances(self.db(), typevars))
+            } else if any_over_type(
+                db,
+                *typevar,
+                &|ty| match ty {
+                    Type::Dynamic(DynamicType::TodoUnpack | DynamicType::TodoStarredExpression) => {
+                        true
+                    }
+                    Type::NominalInstance(nominal) => {
+                        nominal.has_known_class(db, KnownClass::TypeVarTuple)
+                    }
+                    _ => false,
+                },
+                true,
+            ) {
+                return Err(GenericContextError::NotYetSupported);
+            } else {
+                if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "`{}` is not a valid argument to `{origin}`",
+                        typevar.display(db),
+                    ));
+                }
+                return Err(GenericContextError::InvalidArgument);
+            }
+        }
+
+        let ctx = GenericContext::from_typevar_instances(db, validated_typevars);
+        Ok(ctx)
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
