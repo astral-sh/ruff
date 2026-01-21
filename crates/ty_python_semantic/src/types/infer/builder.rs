@@ -1,5 +1,3 @@
-use std::iter;
-
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
@@ -10068,21 +10066,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for elts in elts {
             // An unpacking expression for a dictionary.
-            if let &[None, Some(value)] = elts.as_slice() {
-                let inferred_value_ty =
-                    infer_elt_expression(self, (1, value, TypeContext::default()));
+            if let &[None, Some(value_expr)] = elts.as_slice() {
+                let unpack_ty = infer_elt_expression(self, (1, value_expr, TypeContext::default()));
 
-                // Merge the inferred type of the nested dictionary.
-                if let Some(specialization) =
-                    inferred_value_ty.known_specialization(self.db(), KnownClass::Dict)
-                {
-                    for (elt_ty, inferred_elt_ty) in
-                        iter::zip(elt_tys.clone(), specialization.types(self.db()))
+                let Some((unpacked_key_ty, unpacked_value_ty)) =
+                    unpack_ty.unpack_keys_and_items(self.db())
+                else {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_expr)
                     {
-                        builder
-                            .infer(Type::TypeVar(elt_ty), *inferred_elt_ty)
-                            .ok()?;
+                        let mut diag = builder
+                            .into_diagnostic("Argument expression after ** must be a mapping type");
+
+                        diag.set_primary_message(format_args!(
+                            "Found `{}`",
+                            unpack_ty.display(self.db())
+                        ));
                     }
+
+                    continue;
+                };
+
+                let mut elt_tys = elt_tys.clone();
+                if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
+                    builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
+
+                    builder
+                        .infer(Type::TypeVar(value_ty), unpacked_value_ty)
+                        .ok()?;
                 }
 
                 continue;

@@ -21,11 +21,27 @@ reveal_type({1: (1, 2), 2: (3, 4)})  # revealed: dict[Unknown | int, Unknown | t
 ## Unpacked dict
 
 ```py
+from typing import Mapping, KeysView
+
 a = {"a": 1, "b": 2}
 b = {"c": 3, "d": 4}
+c = {**a, **b}
+reveal_type(c)  # revealed: dict[Unknown | str, Unknown | int]
 
-d = {**a, **b}
-reveal_type(d)  # revealed: dict[Unknown | str, Unknown | int]
+class HasKeysAndGetItem:
+    def keys(self) -> KeysView[str]:
+        return {}.keys()
+
+    def __getitem__(self, arg: str) -> int:
+        return 42
+
+def _(a: dict[str, int], b: Mapping[str, int], c: HasKeysAndGetItem, d: object):
+    reveal_type({**a})  # revealed: dict[Unknown | str, Unknown | int]
+    reveal_type({**b})  # revealed: dict[Unknown | str, Unknown | int]
+    reveal_type({**c})  # revealed: dict[Unknown | str, Unknown | int]
+
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `object`"
+    reveal_type({**d})  # revealed: dict[Unknown, Unknown]
 ```
 
 ## Dict of functions

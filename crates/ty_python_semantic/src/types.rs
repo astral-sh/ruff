@@ -3800,6 +3800,60 @@ impl<'db> Type<'db> {
         non_negative_int_literal(db, return_ty)
     }
 
+    /// Returns the key and value types of this object if it was unpacked using `**`,
+    /// or `None` if the object does not support unpacking.
+    fn unpack_keys_and_items(self, db: &'db dyn Db) -> Option<(Type<'db>, Type<'db>)> {
+        let key_ty = match self
+            .member_lookup_with_policy(
+                db,
+                Name::new_static("keys"),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        {
+            Place::Defined(DefinedPlace {
+                ty: keys_method,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => keys_method
+                .try_call(db, &CallArguments::none())
+                .ok()
+                .and_then(|bindings| {
+                    Some(
+                        bindings
+                            .return_type(db)
+                            .try_iterate(db)
+                            .ok()?
+                            .homogeneous_element_type(db),
+                    )
+                })?,
+
+            _ => return None,
+        };
+
+        let value_ty = match self
+            .member_lookup_with_policy(
+                db,
+                Name::new_static("__getitem__"),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        {
+            Place::Defined(DefinedPlace {
+                ty: getitem_method,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => getitem_method
+                .try_call(db, &CallArguments::positional([Type::unknown()]))
+                .ok()
+                .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
+
+            _ => Type::unknown(),
+        };
+
+        Some((key_ty, value_ty))
+    }
+
     /// Returns a [`Bindings`] that can be used to analyze a call to this type. You must call
     /// [`match_parameters`][Bindings::match_parameters] and [`check_types`][Bindings::check_types]
     /// to fully analyze a particular call site.

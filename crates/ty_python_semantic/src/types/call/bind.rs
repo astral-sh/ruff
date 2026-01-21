@@ -3588,41 +3588,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         } else {
             let mut value_type_fallback = |argument_type: Type<'db>| {
-                // TODO: Instead of calling the `keys` and `__getitem__` methods, we should
-                // instead get the constraints which satisfies the `SupportsKeysAndGetItem`
-                // protocol i.e., the key and value type.
-                let key_type = match argument_type
-                    .member_lookup_with_policy(
-                        self.db,
-                        Name::new_static("keys"),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                    )
-                    .place
-                {
-                    Place::Defined(DefinedPlace {
-                        ty: keys_method,
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    }) => keys_method
-                        .try_call(self.db, &CallArguments::none())
-                        .ok()
-                        .and_then(|bindings| {
-                            Some(
-                                bindings
-                                    .return_type(self.db)
-                                    .try_iterate(self.db)
-                                    .ok()?
-                                    .homogeneous_element_type(self.db),
-                            )
-                        }),
-                    _ => None,
-                };
-
-                let Some(key_type) = key_type else {
+                let Some((key_type, value_type)) = argument_type.unpack_keys_and_items(self.db)
+                else {
                     self.errors.push(BindingError::KeywordsNotAMapping {
                         argument_index: adjusted_argument_index,
                         provided_ty: argument_type,
                     });
+
                     return None;
                 };
 
@@ -3640,26 +3612,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     });
                 }
 
-                Some(
-                    match argument_type
-                        .member_lookup_with_policy(
-                            self.db,
-                            Name::new_static("__getitem__"),
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        )
-                        .place
-                    {
-                        Place::Defined(DefinedPlace {
-                            ty: getitem_method,
-                            definedness: Definedness::AlwaysDefined,
-                            ..
-                        }) => getitem_method
-                            .try_call(self.db, &CallArguments::positional([Type::unknown()]))
-                            .ok()
-                            .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
-                        _ => Type::unknown(),
-                    },
-                )
+                Some(value_type)
             };
 
             let value_type = match argument_type {
