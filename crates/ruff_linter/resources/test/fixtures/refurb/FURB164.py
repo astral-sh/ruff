@@ -69,3 +69,9 @@ _ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
 # fixes must be safe
 _ = Fraction.from_float(f=4.2)
 _ = Fraction.from_decimal(dec=4)
+
+_ = (
+    Fraction
+    # text
+    .from_float(4.2)
+)

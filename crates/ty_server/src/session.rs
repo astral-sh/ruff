@@ -13,7 +13,7 @@ use lsp_types::request::{
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
-    DiagnosticRegistrationOptions, DiagnosticServerCapabilities,
+    ClientInfo, DiagnosticRegistrationOptions, DiagnosticServerCapabilities,
     DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
@@ -106,6 +106,9 @@ pub(crate) struct Session {
     /// Registrations is a set of LSP methods that have been dynamically registered with the
     /// client.
     registrations: HashSet<String>,
+
+    /// The name of the client (editor) that connected to this server.
+    client_name: ClientName,
 }
 
 /// LSP State for a Project
@@ -141,6 +144,7 @@ impl Session {
         workspace_urls: Vec<Url>,
         initialization_options: InitializationOptions,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        client_name: ClientName,
         in_test: bool,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new());
@@ -168,6 +172,7 @@ impl Session {
             suspended_workspace_diagnostics_request: None,
             revision: 0,
             registrations: HashSet::new(),
+            client_name,
         })
     }
 
@@ -532,8 +537,8 @@ impl Session {
                     );
 
                     client.show_error_message(format!(
-                        "Failed to load project for workspace {url}. \
-                        Please refer to the logs for more details.",
+                        "Failed to load project for workspace {url}. {}",
+                        self.client_name.log_guidance(),
                     ));
 
                     let db_with_default_settings = ProjectMetadata::from_options(
@@ -819,6 +824,7 @@ impl Session {
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
             document: document_handle,
+            client_name: self.client_name,
         })
     }
 
@@ -837,6 +843,7 @@ impl Session {
             in_test: self.in_test,
             resolved_client_capabilities: self.resolved_client_capabilities,
             revision: self.revision,
+            client_name: self.client_name,
         }
     }
 
@@ -976,6 +983,10 @@ impl Session {
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.position_encoding
     }
+
+    pub(crate) fn client_name(&self) -> ClientName {
+        self.client_name
+    }
 }
 
 /// A guard that holds the only reference to the index and allows modifying it.
@@ -1025,6 +1036,7 @@ pub(crate) struct DocumentSnapshot {
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
     document: DocumentHandle,
+    client_name: ClientName,
 }
 
 impl DocumentSnapshot {
@@ -1071,6 +1083,10 @@ impl DocumentSnapshot {
     pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
         self.document.notebook_or_file_path()
     }
+
+    pub(crate) fn client_name(&self) -> ClientName {
+        self.client_name
+    }
 }
 
 /// An immutable snapshot of the current state of [`Session`].
@@ -1081,6 +1097,7 @@ pub(crate) struct SessionSnapshot {
     resolved_client_capabilities: ResolvedClientCapabilities,
     in_test: bool,
     revision: u64,
+    client_name: ClientName,
 
     /// IMPORTANT: It's important that the databases come last, or at least,
     /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
@@ -1121,6 +1138,42 @@ impl SessionSnapshot {
 
     pub(crate) fn revision(&self) -> u64 {
         self.revision
+    }
+
+    pub(crate) fn client_name(&self) -> ClientName {
+        self.client_name
+    }
+}
+
+/// Represents the client (editor) that's connected to the language server.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ClientName {
+    Zed,
+    Other,
+}
+
+impl From<Option<ClientInfo>> for ClientName {
+    fn from(info: Option<ClientInfo>) -> Self {
+        match info {
+            Some(info) if matches!(info.name.as_str(), "Zed") => ClientName::Zed,
+            _ => ClientName::Other,
+        }
+    }
+}
+
+impl ClientName {
+    /// Returns editor-specific guidance for finding logs.
+    ///
+    /// Different editors have different ways to access language server logs, so we provide tailored
+    /// instructions based on the connected client.
+    pub(crate) fn log_guidance(self) -> &'static str {
+        match self {
+            ClientName::Zed => {
+                "Please refer to the logs for more details \
+                    (command palette: `dev: open language server logs`)."
+            }
+            ClientName::Other => "Please refer to the logs for more details.",
+        }
     }
 }
 

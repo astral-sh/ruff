@@ -42,6 +42,9 @@ impl<'db> Type<'db> {
             ClassLiteral::Dynamic(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
+            ClassLiteral::DynamicNamedTuple(_) => {
+                Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
+            }
             ClassLiteral::Static(class_literal) => {
                 let specialization = class.into_generic_alias().map(|g| g.specialization(db));
                 match class_literal.known(db) {

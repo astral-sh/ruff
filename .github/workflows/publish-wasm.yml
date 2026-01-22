@@ -32,9 +32,9 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - name: "Publish (dry-run)"
         if: ${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}
-        run: npm publish --dry-run pkg
+        run: npm publish --dry-run pkg/
       - name: "Publish"
         if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
-        run: npm publish --provenance --access public pkg
+        run: npm publish --provenance --access public pkg/
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -580,3 +580,19 @@ def test(a: Any, items: list[T]) -> None:
     if isinstance(v, dict):
         cast(T, v)  # no panic
 ```
+
+## Narrowing with named expressions (walrus operator)
+
+When `isinstance()` is used with a named expression, the target of the named expression should be
+narrowed.
+
+```py
+def get_value() -> int | str:
+    return 1
+
+def f():
+    if isinstance(x := get_value(), int):
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: str
+```

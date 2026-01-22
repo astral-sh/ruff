@@ -106,6 +106,16 @@ impl Violation for PytestCompositeAssertion {
 ///     assert exc_info.value.args
 /// ```
 ///
+/// Or, for pytest 8.4.0 and later:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(ZeroDivisionError, check=lambda e: e.args):
+///         1 / 0
+/// ```
+///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]

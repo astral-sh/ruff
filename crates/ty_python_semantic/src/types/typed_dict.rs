@@ -303,14 +303,14 @@ impl<'db> TypedDictType<'db> {
 
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
-            TypedDictType::Class(defining_class) => Some(defining_class.definition(db)),
+            TypedDictType::Class(defining_class) => defining_class.definition(db),
             TypedDictType::Synthesized(_) => None,
         }
     }
 
     pub fn type_definition(self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
         match self {
-            TypedDictType::Class(defining_class) => Some(defining_class.type_definition(db)),
+            TypedDictType::Class(defining_class) => defining_class.type_definition(db),
             TypedDictType::Synthesized(_) => None,
         }
     }

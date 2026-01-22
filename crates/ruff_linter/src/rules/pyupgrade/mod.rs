@@ -100,6 +100,7 @@ mod tests {
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_0.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_2.py"))]
+    #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_3.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
@@ -398,16 +399,16 @@ mod tests {
         1 + from pipes import Template
         2 + from shlex import quote
 
-        I002 [*] Missing required import: `from __future__ import generator_stop`
-        --> <filename>:1:1
-        help: Insert required import: `from __future__ import generator_stop`
-        1 + from __future__ import generator_stop
-        2 | from pipes import quote, Template
-
         I002 [*] Missing required import: `from collections import Sequence`
         --> <filename>:1:1
         help: Insert required import: `from collections import Sequence`
         1 + from collections import Sequence
+        2 | from pipes import quote, Template
+
+        I002 [*] Missing required import: `from __future__ import generator_stop`
+        --> <filename>:1:1
+        help: Insert required import: `from __future__ import generator_stop`
+        1 + from __future__ import generator_stop
         2 | from pipes import quote, Template
         ");
     }
