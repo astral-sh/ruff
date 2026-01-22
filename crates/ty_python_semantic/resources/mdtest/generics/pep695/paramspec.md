@@ -915,6 +915,7 @@ reveal_type(chained_generic("test"))  # revealed: Literal["test"]
 
 ```py
 from typing import Callable
+from ty_extensions import generic_context
 
 def method_decorator[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return func
@@ -925,6 +926,11 @@ class Container:
         return value
 
 c = Container()
+
+# revealed: ty_extensions.GenericContext[T@generic_method]
+reveal_type(generic_context(c.generic_method))
+
+reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
 reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[Unknown | int]
 ```
