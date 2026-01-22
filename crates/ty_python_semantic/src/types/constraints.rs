@@ -2012,10 +2012,10 @@ impl<'db> InteriorNode<'db> {
                 if constraint.typevar(db).identity(db) == bound_typevar {
                     return true;
                 }
-                if any_over_type(db, constraint.lower(db), &mentions_typevar, false) {
+                if any_over_type(db, constraint.lower(db), false, &mentions_typevar) {
                     return true;
                 }
-                if any_over_type(db, constraint.upper(db), &mentions_typevar, false) {
+                if any_over_type(db, constraint.upper(db), false, &mentions_typevar) {
                     return true;
                 }
                 false

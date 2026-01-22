@@ -138,7 +138,7 @@ class C:
         # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Unknown) | ((positional_only=..., /) -> Divergent) | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Unknown) | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only: Unknown = ...) -> Unknown | ((*, kw_only=...) -> Unknown) | ((*, kw_only=...) -> Divergent)
         reveal_type(self.d)
 ```
 

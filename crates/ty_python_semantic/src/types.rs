@@ -2,6 +2,7 @@ use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
+use rustc_hash::FxHashSet;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -75,7 +76,7 @@ use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{any_over_type, any_over_type_mut};
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
@@ -912,8 +913,8 @@ impl<'db> Type<'db> {
         any_over_type(
             db,
             *self,
-            &|ty| matches!(ty, Type::TypeVar(tv) if tv.typevar(db).is_self(db)),
             false,
+            &|ty| matches!(ty, Type::TypeVar(tv) if tv.typevar(db).is_self(db)),
         )
     }
 
@@ -928,6 +929,8 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        let mut cycle_heads: FxHashSet<_> = cycle.head_ids().collect();
+
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -956,26 +959,34 @@ impl<'db> Type<'db> {
             }
 
             _ => {
+                let has_divergent_type_in_cycle = |ty| {
+                    any_over_type(db, ty, false, &|ty| {
+                        ty.as_divergent()
+                            .is_some_and(|DivergentType { id }| cycle.head_ids().contains(&id))
+                    })
+                };
+
                 // Also avoid unioning in a previous type which contains a Divergent from the
                 // current cycle, if the most-recent type does not. This cannot cause an
                 // oscillation, since Divergent is only introduced at the start of fixpoint
                 // iteration.
-                let has_divergent_type_in_cycle = |ty| {
-                    any_over_type(
-                        db,
-                        ty,
-                        &|nested_ty| {
-                            matches!(
-                    nested_ty,
-                    Type::Dynamic(DynamicType::Divergent(DivergentType { id }))
-                    if cycle.head_ids().contains(&id))
-                        },
-                        false,
-                    )
-                };
                 if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
                     self
                 } else {
+                    // Continue to normalize any divergent types that were found in previous
+                    // cycles, as they may also be present in the most-recent type, despite
+                    // the cycle heads having changed.
+                    //
+                    // Without this, we may encounter oscillation as the cycle heads oscillate,
+                    // despite the same divergent types being inferred in each iteration.
+                    any_over_type_mut(db, previous, false, &mut |ty| {
+                        if let Some(DivergentType { id }) = ty.as_divergent() {
+                            cycle_heads.insert(id);
+                        }
+
+                        false
+                    });
+
                     // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
                     // Consider the case where the order of union types is different between the previous and current cycle.
                     // We should use the previous union type as the base and only add new element types in this cycle, if any.
@@ -983,7 +994,7 @@ impl<'db> Type<'db> {
                 }
             }
         }
-        .recursive_type_normalized(db, cycle)
+        .recursive_type_normalized(db, cycle_heads.into_iter())
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -1224,6 +1235,13 @@ impl<'db> Type<'db> {
         )
     }
 
+    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
+        match self {
+            Type::Dynamic(DynamicType::Divergent(divergent)) => Some(divergent),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn is_type_var(self) -> bool {
         matches!(self, Type::TypeVar(_))
     }
@@ -1236,7 +1254,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
+        any_over_type(db, self, false, &|ty| matches!(ty, Type::TypeVar(_)))
     }
 
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
@@ -1738,8 +1756,12 @@ impl<'db> Type<'db> {
     /// If this continues, the query will not converge, so this method is called in the cycle recovery function.
     /// Then `tuple[tuple[Divergent, Literal[1]], Literal[1]]` is replaced with `tuple[Divergent, Literal[1]]` and the query converges.
     #[must_use]
-    pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        cycle.head_ids().fold(self, |ty, id| {
+    pub(crate) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        cycle_heads: impl Iterator<Item = salsa::Id>,
+    ) -> Self {
+        cycle_heads.fold(self, |ty, id| {
             ty.recursive_type_normalized_impl(db, Type::divergent(id), false)
                 .unwrap_or(Type::divergent(id))
         })
@@ -6174,7 +6196,7 @@ impl<'db> Type<'db> {
                     }
                 });
 
-                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), &|ty| ty.is_divergent(), false);
+                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, &|ty| ty.is_divergent());
 
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
                 //
@@ -8095,18 +8117,13 @@ impl<'db> TypeVarInstance<'db> {
 
     fn type_is_self_referential(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         let identity = self.identity(db);
-        any_over_type(
-            db,
-            ty,
-            &|ty| match ty {
-                Type::TypeVar(bound_typevar) => identity == bound_typevar.typevar(db).identity(db),
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                    identity == typevar.identity(db)
-                }
-                _ => false,
-            },
-            false,
-        )
+        any_over_type(db, ty, false, &|ty| match ty {
+            Type::TypeVar(bound_typevar) => identity == bound_typevar.typevar(db).identity(db),
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                identity == typevar.identity(db)
+            }
+            _ => false,
+        })
     }
 
     #[salsa::tracked(
@@ -8323,7 +8340,7 @@ fn lazy_default_cycle_recover<'db>(
     // Normalize the default to ensure cycle convergence.
     match (previous_default, default) {
         (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle)),
-        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle.head_ids())),
         (_, None) => None,
     }
 }
@@ -8965,12 +8982,12 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
     /// See [`Type::recursive_type_normalized`] for more details.
     fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         match self {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                TypeVarBoundOrConstraints::UpperBound(bound.recursive_type_normalized(db, cycle))
-            }
+            TypeVarBoundOrConstraints::UpperBound(bound) => TypeVarBoundOrConstraints::UpperBound(
+                bound.recursive_type_normalized(db, cycle.head_ids()),
+            ),
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 TypeVarBoundOrConstraints::Constraints(
-                    constraints.map(db, |ty| ty.recursive_type_normalized(db, cycle)),
+                    constraints.map(db, |ty| ty.recursive_type_normalized(db, cycle.head_ids())),
                 )
             }
         }

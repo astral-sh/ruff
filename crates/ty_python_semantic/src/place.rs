@@ -842,7 +842,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.recursive_type_normalized(db, cycle),
+                ty: current.ty.recursive_type_normalized(db, cycle.head_ids()),
                 definedness: Definedness::PossiblyUndefined,
                 ..current
             }),
@@ -853,7 +853,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
-                        ty: prev.ty.recursive_type_normalized(db, cycle),
+                        ty: prev.ty.recursive_type_normalized(db, cycle.head_ids()),
                         definedness: Definedness::PossiblyUndefined,
                         ..prev
                     })

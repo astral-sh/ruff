@@ -522,6 +522,7 @@ fn unpack_cycle_recover<'db>(
     result: UnpackResult<'db>,
     _unpack: Unpack<'db>,
 ) -> UnpackResult<'db> {
+    // NOT OSCILLATING
     result.cycle_normalized(db, previous_cycle_result, cycle)
 }
 
@@ -761,7 +762,7 @@ impl<'db> DefinitionInference<'db> {
             {
                 *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
             } else {
-                *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
+                *binding_ty = binding_ty.recursive_type_normalized(db, cycle.head_ids());
             }
         }
         for (declaration, declaration_ty) in &mut self.declarations {
@@ -774,8 +775,8 @@ impl<'db> DefinitionInference<'db> {
                     decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
                 });
             } else {
-                *declaration_ty =
-                    declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
+                *declaration_ty = declaration_ty
+                    .map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle.head_ids()));
             }
         }
 
@@ -919,7 +920,7 @@ impl<'db> ExpressionInference<'db> {
                 }) {
                     *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
                 } else {
-                    *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
+                    *binding_ty = binding_ty.recursive_type_normalized(db, cycle.head_ids());
                 }
             }
         }
