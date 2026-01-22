@@ -16,7 +16,7 @@ use ruff_db::diagnostic::{
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions};
@@ -127,7 +127,7 @@ pub(crate) fn test_path(
     settings: &LinterSettings,
 ) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
-    let source_type = PySourceType::from(&path);
+    let source_type = SourceType::Python(PySourceType::from(&path));
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
     Ok(test_contents(&source_kind, &path, settings).0)
 }

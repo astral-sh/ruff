@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use ruff_diagnostics::SourceMap;
 use ruff_notebook::{Cell, Notebook, NotebookError};
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, SourceType};
 
 use colored::Colorize;
 
@@ -24,6 +24,8 @@ pub enum SourceKind {
     IpyNotebook(Box<Notebook>),
     /// The source contains Markdown text.
     Markdown(String),
+    /// The source contains TOML text.
+    Toml(String),
 }
 
 impl SourceKind {
@@ -34,24 +36,28 @@ impl SourceKind {
     pub fn as_ipy_notebook(&self) -> Option<&Notebook> {
         match self {
             SourceKind::IpyNotebook(notebook) => Some(notebook),
-            SourceKind::Python(_) => None,
-            SourceKind::Markdown(_) => None,
+            _ => None,
         }
     }
 
     pub fn as_python(&self) -> Option<&str> {
         match self {
             SourceKind::Python(code) => Some(code),
-            SourceKind::IpyNotebook(_) => None,
-            SourceKind::Markdown(_) => None,
+            _ => None,
         }
     }
 
     pub fn as_markdown(&self) -> Option<&str> {
         match self {
             SourceKind::Markdown(code) => Some(code),
-            SourceKind::Python(_) => None,
-            SourceKind::IpyNotebook(_) => None,
+            _ => None,
+        }
+    }
+
+    pub fn as_toml(&self) -> Option<&str> {
+        match self {
+            SourceKind::Toml(code) => Some(code),
+            _ => None,
         }
     }
 
@@ -86,35 +92,41 @@ impl SourceKind {
             }
             SourceKind::Python(_) => SourceKind::Python(new_source),
             SourceKind::Markdown(_) => SourceKind::Markdown(new_source),
+            SourceKind::Toml(_) => SourceKind::Toml(new_source),
         }
     }
 
     /// Returns the Python source code for this source kind.
     pub fn source_code(&self) -> &str {
         match self {
-            SourceKind::Python(source) => source,
+            SourceKind::Python(source)
+            | SourceKind::Markdown(source)
+            | SourceKind::Toml(source) => source,
             SourceKind::IpyNotebook(notebook) => notebook.source_code(),
-            SourceKind::Markdown(source) => source,
         }
     }
 
     /// Read the [`SourceKind`] from the given path. Returns `None` if the source is not a Python
     /// source file.
-    pub fn from_path(path: &Path, source_type: PySourceType) -> Result<Option<Self>, SourceError> {
+    pub fn from_path(path: &Path, source_type: SourceType) -> Result<Option<Self>, SourceError> {
         match source_type {
-            PySourceType::Ipynb => {
+            SourceType::Python(PySourceType::Ipynb) => {
                 let notebook = Notebook::from_path(path)?;
                 Ok(notebook
                     .is_python_notebook()
                     .then_some(Self::IpyNotebook(Box::new(notebook))))
             }
-            PySourceType::Markdown => {
+            SourceType::Python(_) => {
+                let contents = std::fs::read_to_string(path)?;
+                Ok(Some(Self::Python(contents)))
+            }
+            SourceType::Markdown => {
                 let contents = std::fs::read_to_string(path)?;
                 Ok(Some(Self::Markdown(contents)))
             }
-            PySourceType::Python | PySourceType::Stub => {
+            SourceType::Toml(_) => {
                 let contents = std::fs::read_to_string(path)?;
-                Ok(Some(Self::Python(contents)))
+                Ok(Some(Self::Toml(contents)))
             }
         }
     }
@@ -123,17 +135,21 @@ impl SourceKind {
     /// Python source code.
     pub fn from_source_code(
         source_code: String,
-        source_type: PySourceType,
+        source_type: SourceType,
     ) -> Result<Option<Self>, SourceError> {
-        if source_type.is_ipynb() {
-            let notebook = Notebook::from_source_code(&source_code)?;
-            Ok(notebook
-                .is_python_notebook()
-                .then_some(Self::IpyNotebook(Box::new(notebook))))
-        } else if source_type.is_markdown() {
-            Ok(Some(Self::Markdown(source_code)))
-        } else {
-            Ok(Some(Self::Python(source_code)))
+        match source_type {
+            SourceType::Python(py_source_type) => {
+                if py_source_type.is_ipynb() {
+                    let notebook = Notebook::from_source_code(&source_code)?;
+                    Ok(notebook
+                        .is_python_notebook()
+                        .then_some(Self::IpyNotebook(Box::new(notebook))))
+                } else {
+                    Ok(Some(Self::Python(source_code)))
+                }
+            }
+            SourceType::Toml(_) => Ok(Some(Self::Toml(source_code))),
+            SourceType::Markdown => Ok(Some(SourceKind::Markdown(source_code))),
         }
     }
 
@@ -142,16 +158,14 @@ impl SourceKind {
     /// For Jupyter notebooks, this will write out the notebook as JSON.
     pub fn write(&self, writer: &mut dyn Write) -> Result<(), SourceError> {
         match self {
-            SourceKind::Python(source) => {
+            SourceKind::Python(source)
+            | SourceKind::Markdown(source)
+            | SourceKind::Toml(source) => {
                 writer.write_all(source.as_bytes())?;
                 Ok(())
             }
             SourceKind::IpyNotebook(notebook) => {
                 notebook.write(writer)?;
-                Ok(())
-            }
-            SourceKind::Markdown(source) => {
-                writer.write_all(source.as_bytes())?;
                 Ok(())
             }
         }
@@ -167,7 +181,7 @@ impl SourceKind {
     ) -> Option<SourceKindDiff<'a>> {
         match (self, other) {
             (SourceKind::Python(src), SourceKind::Python(dst)) => Some(SourceKindDiff {
-                kind: DiffKind::Python(src, dst),
+                kind: DiffKind::Text(src, dst),
                 path,
             }),
             (SourceKind::IpyNotebook(src), SourceKind::IpyNotebook(dst)) => Some(SourceKindDiff {
@@ -175,7 +189,11 @@ impl SourceKind {
                 path,
             }),
             (SourceKind::Markdown(src), SourceKind::Markdown(dst)) => Some(SourceKindDiff {
-                kind: DiffKind::Markdown(src, dst),
+                kind: DiffKind::Text(src, dst),
+                path,
+            }),
+            (SourceKind::Toml(src), SourceKind::Toml(dst)) => Some(SourceKindDiff {
+                kind: DiffKind::Text(src, dst),
                 path,
             }),
             _ => None,
@@ -192,7 +210,7 @@ pub struct SourceKindDiff<'a> {
 impl std::fmt::Display for SourceKindDiff<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.kind {
-            DiffKind::Python(original, modified) => {
+            DiffKind::Text(original, modified) => {
                 let mut diff = CodeDiff::new(original, modified);
 
                 let relative_path = self.path.map(fs::relativize_path);
@@ -250,17 +268,6 @@ impl std::fmt::Display for SourceKindDiff<'_> {
 
                 writeln!(f)?;
             }
-            DiffKind::Markdown(original, modified) => {
-                let mut diff = CodeDiff::new(original, modified);
-
-                let relative_path = self.path.map(fs::relativize_path);
-
-                if let Some(relative_path) = &relative_path {
-                    diff.header(relative_path, relative_path);
-                }
-
-                writeln!(f, "{diff}")?;
-            }
         }
 
         Ok(())
@@ -269,9 +276,8 @@ impl std::fmt::Display for SourceKindDiff<'_> {
 
 #[derive(Debug, Clone, Copy)]
 enum DiffKind<'a> {
-    Python(&'a str, &'a str),
+    Text(&'a str, &'a str),
     IpyNotebook(&'a Notebook, &'a Notebook),
-    Markdown(&'a str, &'a str),
 }
 
 struct CodeDiff<'a> {

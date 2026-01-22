@@ -43,6 +43,8 @@ pub enum SourceType {
     Python(PySourceType),
     /// The file contains TOML.
     Toml(TomlSourceType),
+    /// The file contains Markdown.
+    Markdown,
 }
 
 impl Default for SourceType {
@@ -59,6 +61,7 @@ impl<P: AsRef<Path>> From<P> for SourceType {
             Some(filename) if filename == "poetry.lock" => Self::Toml(TomlSourceType::Poetry),
             _ => match path.as_ref().extension() {
                 Some(ext) if ext == "toml" => Self::Toml(TomlSourceType::Unrecognized),
+                Some(ext) if ext == "md" => Self::Markdown,
                 _ => Self::Python(PySourceType::from(path)),
             },
         }
@@ -89,8 +92,6 @@ pub enum PySourceType {
     Stub,
     /// The source is a Jupyter notebook (`.ipynb`).
     Ipynb,
-    /// The source is a Markdown file (`.md`).
-    Markdown,
 }
 
 impl PySourceType {
@@ -108,7 +109,6 @@ impl PySourceType {
             "pyi" => Self::Stub,
             "pyw" => Self::Python,
             "ipynb" => Self::Ipynb,
-            "md" => Self::Markdown,
             _ => return None,
         };
 
@@ -136,10 +136,6 @@ impl PySourceType {
 
     pub const fn is_ipynb(self) -> bool {
         matches!(self, Self::Ipynb)
-    }
-
-    pub const fn is_markdown(self) -> bool {
-        matches!(self, Self::Markdown)
     }
 }
 

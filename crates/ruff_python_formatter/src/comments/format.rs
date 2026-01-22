@@ -334,7 +334,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
                     PySourceType::Stub => {
                         write!(f, [empty_line()])
                     }
-                    PySourceType::Python | PySourceType::Ipynb | PySourceType::Markdown => {
+                    PySourceType::Python | PySourceType::Ipynb => {
                         write!(f, [empty_line(), empty_line()])
                     }
                 },
