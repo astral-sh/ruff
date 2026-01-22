@@ -86,6 +86,10 @@ impl CliTest {
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
 
         settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
+        settings.add_filter(
+            &tempdir_filter(Self::crate_root().to_str().unwrap()),
+            "CRATE_ROOT/",
+        );
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");
@@ -165,6 +169,21 @@ impl CliTest {
     /// Returns the path to the test directory root.
     pub(crate) fn root(&self) -> &Path {
         &self.project_dir
+    }
+
+    /// Returns the path to the crate root.
+    pub(crate) fn crate_root<'a>() -> &'a Path {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// Returns the path to a fixture file inside the crate root.
+    #[expect(clippy::unused_self)]
+    pub(crate) fn fixture_path(&self, filename: &str) -> PathBuf {
+        Self::crate_root()
+            .join("resources")
+            .join("test")
+            .join("fixtures")
+            .join(filename)
     }
 
     /// Creates a pre-configured ruff command for testing.
