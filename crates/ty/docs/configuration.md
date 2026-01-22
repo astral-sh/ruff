@@ -40,6 +40,41 @@ Valid severities are:
 
 ## `analysis`
 
+### `allowed-unresolved-imports`
+
+A list of module glob patterns for which unresolved import diagnostics should be suppressed.
+
+Supports glob patterns:
+- `*` matches zero or more characters except `.` (e.g., `foo.*` matches `foo.bar` but not `foo.bar.baz`)
+- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
+
 ### `respect-type-ignore-comments`
 
 Whether ty should respect `type: ignore` comments.
@@ -445,6 +480,41 @@ severity levels or disable them entirely.
 ---
 
 ## `overrides.analysis`
+
+#### `allowed-unresolved-imports`
+
+A list of module glob patterns for which unresolved import diagnostics should be suppressed.
+
+Supports glob patterns:
+- `*` matches zero or more characters except `.` (e.g., `foo.*` matches `foo.bar` but not `foo.bar.baz`)
+- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
 
 #### `respect-type-ignore-comments`
 

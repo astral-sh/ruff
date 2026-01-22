@@ -4545,7 +4545,6 @@ dependencies = [
  "rayon",
  "regex",
  "regex-automata",
- "regex-syntax",
  "ruff_cache",
  "ruff_db",
  "ruff_diagnostics",

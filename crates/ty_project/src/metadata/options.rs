@@ -1013,8 +1013,7 @@ fn build_include_filter(
                         DiagnosticId::InvalidGlob,
                         format!("Invalid include pattern `{pattern}`: {err}"),
                         Severity::Error,
-                    )
-                    .with_concise_message("");
+                    );
 
                     diagnostic.with_source_sub(
                         db,
@@ -1273,6 +1272,23 @@ pub struct AnalysisOptions {
     )]
     pub respect_type_ignore_comments: Option<bool>,
 
+    /// A list of module glob patterns for which unresolved import diagnostics should be suppressed.
+    ///
+    /// Supports glob patterns:
+    /// - `*` matches zero or more characters except `.` (e.g., `foo.*` matches `foo.bar` but not `foo.bar.baz`)
+    /// - `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+    /// - Prefix a pattern with `!` to exclude matching modules
+    ///
+    /// When multiple patterns match, later entries take precedence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Suppress errors for all `test` modules except `test.foo`
+            allowed-unresolved-imports = ["test.**", "!test.foo"]
+        "#
+    )]
     pub allowed_unresolved_imports: Option<Vec<RangedValue<String>>>,
 }
 
