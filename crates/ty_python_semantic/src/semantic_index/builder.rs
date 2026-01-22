@@ -2173,8 +2173,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     node_index: _,
                 },
             ) => {
-                let pre_loop = self.flow_snapshot();
-
                 // Collect all places assigned in the loop (test expression and body).
                 // Loop headers are needed for all bindings to track values that could
                 // flow back from previous iterations. The test expression can contain
@@ -2215,6 +2213,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // Visit the test expression AFTER creating loop headers so that
                 // variable uses in the test see the loop header type.
                 self.visit_expr(test);
+
+                // Take the pre_loop snapshot AFTER visiting the test expression.
+                // This ensures that walrus bindings from the test (which are always
+                // evaluated at least once) remain visible after the loop.
+                let pre_loop = self.flow_snapshot();
 
                 let predicate = self.record_expression_narrowing_constraint(test);
                 self.record_narrowing_constraint(predicate);

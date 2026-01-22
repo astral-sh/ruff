@@ -952,6 +952,14 @@ for x in Bar:
     reveal_type(x)  # revealed: Unknown
 ```
 
+## Walrus definitions in the iterator expression are always evaluated
+
+```py
+for _ in (x := []):
+    pass
+reveal_type(x)  # revealed: list[Unknown]
+```
+
 ## Cyclic control flow
 
 ```py

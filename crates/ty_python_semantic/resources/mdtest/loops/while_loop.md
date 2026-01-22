@@ -128,6 +128,14 @@ while NotBoolable():
     ...
 ```
 
+## Walrus definitions in the condition are always evaluated
+
+```py
+while x := False:
+    pass
+reveal_type(x)  # revealed: Literal[False]
+```
+
 ## Cyclic control flow
 
 ```py
