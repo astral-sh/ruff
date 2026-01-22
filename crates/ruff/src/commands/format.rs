@@ -1416,7 +1416,7 @@ mod tests {
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         let _s = settings.bind_to_scope();
 
-        assert_snapshot!(str::from_utf8(&buf)?, @"
+        assert_snapshot!(str::from_utf8(&buf)?, @r"
         io: test.py: Permission denied
         --> test.py:1:1
 
@@ -1432,7 +1432,7 @@ mod tests {
         io: Cannot write to file
         --> test.py:1:1
 
-        invalid-cli-option: Range formatting isn't supported for notebooks.
+        invalid-cli-option: Range formatting isn't supported.
         --> test.py:1:1
 
         panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
