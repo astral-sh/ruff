@@ -394,7 +394,8 @@ fn notebook_without_ipynb_extension() {
         std::fs::canonicalize(PathBuf::from_str(SUPER_RESOLUTION_OVERVIEW_PATH).unwrap()).unwrap();
 
     // Use a .py URL instead of .ipynb to simulate a non-ipynb notebook (like marimo)
-    let py_url = lsp_types::Url::parse("file:///test/notebook.py").unwrap();
+    let workspace_dir = file_path.parent().unwrap();
+    let py_url = lsp_types::Url::from_file_path(workspace_dir.join("notebook.py")).unwrap();
 
     let notebook = create_notebook(&file_path).unwrap();
 
@@ -411,7 +412,7 @@ fn notebook_without_ipynb_extension() {
         ruff_server::PositionEncoding::UTF16,
         global,
         &Workspaces::new(vec![
-            Workspace::new(lsp_types::Url::parse("file:///test").unwrap())
+            Workspace::new(lsp_types::Url::from_file_path(workspace_dir).unwrap())
                 .with_options(ClientOptions::default()),
         ]),
         &client,
