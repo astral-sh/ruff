@@ -2397,13 +2397,12 @@ fn markdown_formatting_preview_disabled() -> Result<()> {
         .args(["--isolated", "--no-preview", "--diff"])
         .arg(unformatted),
         @r"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    warning: formatting markdown files is experimental, use --preview to enable
-    1 file already formatted
+    error: Failed to format /Users/amethyst/workspace/ruff/crates/ruff/resources/test/fixtures/unformatted.md: Markdown formatting is experimental, use --preview mode.
     ");
     Ok(())
 }
