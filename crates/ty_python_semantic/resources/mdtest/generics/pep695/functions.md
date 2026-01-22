@@ -870,7 +870,7 @@ class ClassWithOverloadedInit[T]:
 # revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(into_callable(ClassWithOverloadedInit))
 # TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
-# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], (x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
+# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], [T](x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
 reveal_type(accepts_callable(ClassWithOverloadedInit))
 # TODO: revealed: ClassWithOverloadedInit[int]
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
@@ -886,12 +886,12 @@ class GenericClass[T]:
         raise NotImplementedError
 
 def _(x: list[str]):
-    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(into_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_callable(GenericClass)))
 
-    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(accepts_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(accepts_callable(GenericClass)))
