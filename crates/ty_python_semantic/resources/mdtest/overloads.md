@@ -730,6 +730,17 @@ class Foo:
     @overload
     # error: [invalid-overload]
     def method2(self, x: str) -> str: ...
+
+    @overload
+    def method3(self, x: int) -> int: ...
+    @final
+    @overload
+    def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+    @overload
+    @final
+    def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+    @overload
+    def method3(self, x: bytearray) -> bytearray: ...
 ```
 
 #### `@override`
