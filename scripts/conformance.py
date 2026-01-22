@@ -55,8 +55,6 @@ from typing import Any, Literal, Self, assert_never
 #    on a set of lines with a matching tag
 # 4. Tagged multi-errors (E[tag+]): The type checker should raise one or
 #    more errors on a set of lines with a matching tag
-# This regex pattern parses the error lines in the conformance tests,
-# but the following implementation currently ignores error tags.
 CONFORMANCE_ERROR_PATTERN = re.compile(
     r"""
     \#\s*E                  # "# E" begins each error
@@ -103,6 +101,15 @@ class Classification(StrEnum):
                 return "False positives removed"
             case Classification.FALSE_NEGATIVE:
                 return "True positives removed"
+
+
+@dataclass(kw_only=True, slots=True)
+class Evaluation:
+    classification: Classification
+    true_positives: int = 0
+    false_positives: int = 0
+    true_negatives: int = 0
+    false_negatives: int = 0
 
 
 class Change(StrEnum):
@@ -157,7 +164,7 @@ class Diagnostic:
     optional: bool
     # tag identifying an error that can occur on multiple lines
     tag: str | None
-    # True if the error can occur on multiple lines or only once per tag
+    # True if one or more errors can occur on lines with the same tag
     multi: bool
 
     def __post_init__(self, *args, **kwargs) -> None:
@@ -204,7 +211,7 @@ class Diagnostic:
 
     @property
     def key(self) -> str:
-        """Key to group diagnostics by path and beginning line."""
+        """Key to group diagnostics by path and beginning line or path and tag."""
         return (
             f"{self.location.path.as_posix()}:{self.location.positions.begin.line}"
             if self.tag is None
@@ -256,36 +263,72 @@ class GroupedDiagnostics:
                 return self.old
             case Source.EXPECTED:
                 return self.expected
-            case _:
-                raise ValueError(f"Invalid source: {source}")
 
-    def classify(self, source: Source) -> Classification:
+    def classify(self, source: Source) -> Evaluation:
+        diagnostics = self.diagnostics_by_source(source)
         if source in self.sources:
             if Source.EXPECTED in self.sources:
-                assert self.expected is not None
                 distinct_lines = len(
                     {
                         diagnostic.location.positions.begin.line
-                        for diagnostic in self.diagnostics_by_source(source)
+                        for diagnostic in diagnostics
                     }
                 )
                 expected_max = len(self.expected) if self.multi else 1
 
                 if 1 <= distinct_lines <= expected_max:
-                    return Classification.TRUE_POSITIVE
+                    return Evaluation(
+                        classification=Classification.TRUE_POSITIVE,
+                        true_positives=len(diagnostics),
+                        false_positives=0,
+                        true_negatives=0,
+                        false_negatives=0,
+                    )
                 else:
-                    return Classification.FALSE_POSITIVE
+                    # We select the line with the most diagnostics
+                    # as our true positive, while the rest are false positives
+                    max_line = max(
+                        groupby(
+                            diagnostics, key=lambda d: d.location.positions.begin.line
+                        ),
+                        key=lambda x: len(x[1]),
+                    )
+                    remaining = len(diagnostics) - max_line
+                    # We can never exceed the number of distinct lines
+                    # if the diagnostic is multi, so we ignore that case
+                    return Evaluation(
+                        classification=Classification.FALSE_POSITIVE,
+                        true_positives=max_line,
+                        false_positives=remaining,
+                        true_negatives=0,
+                        false_negatives=0,
+                    )
             else:
-                return Classification.FALSE_POSITIVE
-
-        elif source in self.sources:
-            return Classification.FALSE_POSITIVE
+                return Evaluation(
+                    classification=Classification.FALSE_POSITIVE,
+                    true_positives=0,
+                    false_positives=len(diagnostics),
+                    true_negatives=0,
+                    false_negatives=0,
+                )
 
         elif Source.EXPECTED in self.sources:
-            return Classification.FALSE_NEGATIVE
+            return Evaluation(
+                classification=Classification.FALSE_NEGATIVE,
+                true_positives=0,
+                false_positives=0,
+                true_negatives=0,
+                false_negatives=1,
+            )
 
         else:
-            return Classification.TRUE_NEGATIVE
+            return Evaluation(
+                classification=Classification.TRUE_NEGATIVE,
+                true_positives=0,
+                false_positives=0,
+                true_negatives=1,
+                false_negatives=0,
+            )
 
     def _render_row(self, diagnostics: list[Diagnostic]):
         locs = []
@@ -309,8 +352,8 @@ class GroupedDiagnostics:
         return "\n".join(f"{sign} {diagnostic}" for diagnostic in diagnostics)
 
     def display(self, format: Literal["diff", "github"]) -> str:
-        classification = self.classify(Source.NEW)
-        match classification:
+        eval = self.classify(Source.NEW)
+        match eval.classification:
             case Classification.TRUE_POSITIVE | Classification.FALSE_POSITIVE:
                 assert self.new is not None
                 return (
@@ -327,9 +370,6 @@ class GroupedDiagnostics:
                     if format == "diff"
                     else self._render_row(diagnostics)
                 )
-
-            case _:
-                raise ValueError(f"Unexpected classification: {classification}")
 
 
 @dataclass(kw_only=True, slots=True)
@@ -435,12 +475,7 @@ def group_diagnostics_by_key_or_tag(
         if d.tag is not None
     }
 
-    for diag in old:
-        diag.tag = tagged_lines.get(
-            (diag.location.path.name, diag.location.positions.begin.line), None
-        )
-
-    for diag in new:
+    for diag in chain(old, new):
         diag.tag = tagged_lines.get(
             (diag.location.path.name, diag.location.positions.begin.line), None
         )
@@ -489,14 +524,10 @@ def compute_stats(
     source = Source.NEW if ty_version == "new" else Source.OLD
 
     def increment(statistics: Statistics, grouped: GroupedDiagnostics) -> Statistics:
-        match grouped.classify(source):
-            case Classification.TRUE_POSITIVE:
-                statistics.true_positives += 1
-            case Classification.FALSE_POSITIVE:
-                statistics.false_positives += 1
-            case Classification.FALSE_NEGATIVE:
-                statistics.false_negatives += 1
-
+        eval = grouped.classify(source)
+        statistics.true_positives += eval.true_positives
+        statistics.false_positives += eval.false_positives
+        statistics.false_negatives += eval.false_negatives
         statistics.total_diagnostics += len(grouped.diagnostics_by_source(source))
         return statistics
 
@@ -521,7 +552,7 @@ def render_grouped_diagnostics(
     get_change = attrgetter("change")
 
     def get_classification(diag) -> Classification:
-        return diag.classify(Source.NEW)
+        return diag.classify(Source.NEW).classification
 
     optional_diagnostics = sorted(
         (diag for diag in grouped if diag.optional),
