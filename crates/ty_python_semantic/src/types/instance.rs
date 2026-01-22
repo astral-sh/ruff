@@ -704,7 +704,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _, ()| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
@@ -720,15 +720,6 @@ impl<'db> ProtocolInstanceType<'db> {
                     &IsDisjointVisitor::default(),
                 )
                 .is_always_satisfied(db)
-        }
-
-        fn initial<'db>(
-            _db: &'db dyn Db,
-            _id: salsa::Id,
-            _value: ProtocolInstanceType<'db>,
-            _: (),
-        ) -> bool {
-            true
         }
 
         is_equivalent_to_object_inner(db, self, ())

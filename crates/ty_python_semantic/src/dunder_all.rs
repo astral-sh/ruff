@@ -11,17 +11,9 @@ use crate::Db;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::{Truthiness, Type, TypeContext, infer_expression_types};
 
-fn dunder_all_names_cycle_initial(
-    _db: &dyn Db,
-    _id: salsa::Id,
-    _file: File,
-) -> Option<FxHashSet<Name>> {
-    None
-}
-
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
-#[salsa::tracked(returns(as_ref), cycle_initial=dunder_all_names_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 

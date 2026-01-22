@@ -364,59 +364,6 @@ impl Default for MemberLookupPolicy {
     }
 }
 
-fn member_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(id)).into()
-}
-
-fn member_lookup_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_member: &PlaceAndQualifiers<'db>,
-    member: PlaceAndQualifiers<'db>,
-    _self_type: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    member.cycle_normalized(db, *previous_member, cycle)
-}
-
-fn class_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(id)).into()
-}
-
-fn class_lookup_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_member: &PlaceAndQualifiers<'db>,
-    member: PlaceAndQualifiers<'db>,
-    _self_type: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    member.cycle_normalized(db, *previous_member, cycle)
-}
-
-fn variance_cycle_initial<'db, T>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: T,
-    _typevar: BoundTypeVarInstance<'db>,
-) -> TypeVarVariance {
-    TypeVarVariance::Bivariant
-}
-
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
 #[cfg(debug_assertions)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -2470,7 +2417,13 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
@@ -3020,7 +2973,13 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,
@@ -5919,7 +5878,13 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=apply_specialization_cycle_recover, cycle_initial=apply_specialization_cycle_initial)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -6517,7 +6482,13 @@ impl<'db> Type<'db> {
     }
 
     #[allow(clippy::used_underscore_binding)]
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=expand_eagerly_cycle_recover, cycle_initial=expand_eagerly_cycle_initial)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, ()| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn expand_eagerly_(self, db: &'db dyn Db, _unit: ()) -> Type<'db> {
         self.apply_type_mapping(db, &TypeMapping::EagerExpansion, TypeContext::default())
     }
@@ -6848,46 +6819,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         );
         v
     }
-}
-
-fn apply_specialization_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: Type<'db>,
-    _specialization: Specialization<'db>,
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
-}
-
-fn apply_specialization_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _specialization: Specialization<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn expand_eagerly_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _unit: (),
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn expand_eagerly_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: Type<'db>,
-    _unit: (),
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
@@ -8190,7 +8121,7 @@ impl<'db> TypeVarInstance<'db> {
         Some(TypeVarBoundOrConstraints::Constraints(constraints))
     }
 
-    #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
@@ -8326,15 +8257,6 @@ fn lazy_default_cycle_recover<'db>(
         (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
         (_, None) => None,
     }
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn lazy_default_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: TypeVarInstance<'db>,
-) -> Option<Type<'db>> {
-    Some(Type::divergent(id))
 }
 
 /// Where a type variable is bound and usable.
@@ -11541,7 +11463,13 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
-    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -11591,7 +11519,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         self.specialization(db).is_some()
     }
 
-    #[salsa::tracked(cycle_initial=generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
         let file = scope.file(db);
@@ -11612,32 +11540,6 @@ impl<'db> PEP695TypeAliasType<'db> {
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
         self
     }
-}
-
-fn generic_context_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: PEP695TypeAliasType<'db>,
-) -> Option<GenericContext<'db>> {
-    None
-}
-
-fn value_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: PEP695TypeAliasType<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn value_type_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: PEP695TypeAliasType<'db>,
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
