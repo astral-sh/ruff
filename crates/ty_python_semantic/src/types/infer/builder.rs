@@ -8136,16 +8136,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
+        let module_name = if level == 0 {
+            module.and_then(ModuleName::new)
+        } else {
+            ModuleName::from_identifier_parts(self.db(), self.file(), module, level).ok()
+        };
+
+        let settings = self.db().analysis_settings(self.file());
+
+        if let Some(module_name) = &module_name {
+            if settings
+                .allowed_unresolved_imports
+                .matches(module_name)
+                .is_include()
+            {
+                return;
+            }
+        }
+
         let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
             return;
         };
+
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot resolve imported module `{}`",
             format_import_from_module(level, module)
         ));
 
         if level == 0 {
-            if let Some(module_name) = module.and_then(ModuleName::new) {
+            if let Some(module_name) = module_name {
                 let program = Program::get(self.db());
                 let typeshed_versions = program.search_paths(self.db()).typeshed_versions();
 
@@ -8568,6 +8587,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if !self.is_reachable(import_from) {
+            return;
+        }
+
+        let settings = self.db().analysis_settings(self.file());
+
+        if settings
+            .allowed_unresolved_imports
+            .matches(full_submodule_name.as_ref().unwrap_or(&module_name))
+            .is_include()
+        {
             return;
         }
 

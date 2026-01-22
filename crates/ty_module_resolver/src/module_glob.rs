@@ -20,8 +20,7 @@
 //!
 //! - `test` matches the module `test` exactly (but not `test.foo`).
 //!
-//! - `*` matches any single module component (one or more characters, but not `.`).
-//!   For example, `test.*` matches `test.foo` but not `test` or `test.foo.bar`.
+//! - `*` matches zero or more characters, but not `.`.
 //!
 //! - `**` matches zero or more module components. This sequence **must** form
 //!   a single component, so both `**foo` and `foo**` are invalid and will
@@ -54,8 +53,9 @@ use crate::ModuleName;
 ///
 /// This allows efficient matching of module names against multiple glob patterns,
 /// with support for negated patterns.
-#[derive(Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ModuleGlobSet {
+    #[get_size(ignore)]
     regex_set: RegexSet,
     /// Parsed glob metadata.
     globs: Box<[ModuleGlob]>,
@@ -257,7 +257,7 @@ pub enum ModuleGlobError {
 }
 
 /// A parsed module glob pattern.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 struct ModuleGlob {
     /// The original glob pattern string (including `!` prefix if negated).
     original: Box<str>,

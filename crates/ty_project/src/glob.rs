@@ -9,7 +9,6 @@ pub(crate) use portable::{
 
 mod exclude;
 mod include;
-pub mod module_glob;
 mod portable;
 
 /// Path filtering based on an exclude and include glob pattern set.
