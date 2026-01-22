@@ -1593,7 +1593,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if !overload.has_known_decorator(self.db(), decorator) {
                             continue;
                         }
-                        let function_node = function.node(self.db(), self.file(), self.module());
+                        let function_node = overload.node(self.db(), self.file(), self.module());
                         let Some(builder) = self
                             .context
                             .report_lint(&INVALID_OVERLOAD, &function_node.name)
