@@ -127,6 +127,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
+    registry.register_lint(&INVALID_TYPED_DICT_HEADER);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -2392,6 +2393,35 @@ declare_lint! {
     pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
         summary: "detects invalid statements in `TypedDict` class bodies",
         status: LintStatus::stable("0.0.9"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects errors in `TypedDict` class headers, such as unexpected arguments
+    /// or invalid base classes.
+    ///
+    /// ## Why is this bad?
+    /// The typing spec states that `TypedDict`s are not permitted to have
+    /// custom metaclasses. Using `**` unpacking in a `TypedDict` header
+    /// is also prohibited by ty, as it means that ty cannot statically determine
+    /// whether keys in the `TypedDict` are intended to be required or optional.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]
+    ///     ...
+    ///
+    /// def f(x: dict):
+    ///     class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]
+    ///         ...
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_HEADER = {
+        summary: "detects invalid statements in `TypedDict` class headers",
+        status: LintStatus::stable("0.0.14"),
         default_level: Level::Error,
     }
 }
