@@ -71,13 +71,14 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
     INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT,
-    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
-    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
-    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
-    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_HEADER,
+    INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
+    NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
+    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -674,12 +675,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let is_named_tuple =
-                CodeGeneratorKind::NamedTuple.matches(self.db(), class.into(), None);
+            let class_kind = CodeGeneratorKind::from_class(self.db(), class.into(), None);
 
             // (3) If it's a `NamedTuple` class, check that no field without a default value
             // appears after a field with a default value.
-            if is_named_tuple {
+            if class_kind == Some(CodeGeneratorKind::NamedTuple) {
                 let mut field_with_default_encountered = None;
 
                 for (field_name, field) in
@@ -780,7 +780,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
             //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
-                if is_named_tuple
+                if class_kind == Some(CodeGeneratorKind::NamedTuple)
                     && !matches!(
                         base_class,
                         Type::SpecialForm(SpecialFormType::NamedTuple)
@@ -838,18 +838,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     disjoint_bases.insert(disjoint_base, i, base_class.class_literal(self.db()));
                 }
 
-                if is_protocol
-                    && !(base_class.is_protocol(self.db()) || base_class.is_object(self.db()))
-                {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_PROTOCOL, &class_node.bases()[i])
+                if is_protocol {
+                    if !base_class.is_protocol(self.db())
+                        && !base_class.is_object(self.db())
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_PROTOCOL, &class_node.bases()[i])
                     {
                         builder.into_diagnostic(format_args!(
                             "Protocol class `{}` cannot inherit from non-protocol class `{}`",
                             class.name(self.db()),
                             base_class.name(self.db()),
                         ));
+                    }
+                } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
+                    if !base_class.class_literal(self.db()).is_typed_dict(self.db())
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPED_DICT_HEADER, &class_node.bases()[i])
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "TypedDict class `{}` can only inherit from TypedDict classes",
+                            class.name(self.db()),
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "`{}` is not a `TypedDict` class",
+                            base_class.name(self.db())
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(
+                                base_class.class_literal(self.db()).header_span(self.db()),
+                            )
+                            .message(format_args!(
+                                "`{}` defined here",
+                                base_class.name(self.db())
+                            )),
+                        );
                     }
                 }
 
@@ -1070,39 +1094,95 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (10) Check that the class arguments matches the arguments of the
             // base class `__init_subclass__` method.
             if let Some(args) = class_node.arguments.as_deref() {
-                let call_args: CallArguments = args
-                    .keywords
-                    .iter()
-                    .filter_map(|keyword| match keyword.arg.as_ref() {
-                        // We mimic the runtime behaviour and discard the metaclass argument
-                        Some(name) if name.id.as_str() == "metaclass" => None,
-                        Some(name) => {
-                            let ty = self.expression_type(&keyword.value);
-                            Some((Argument::Keyword(name.id.as_str()), Some(ty)))
+                if class_kind == Some(CodeGeneratorKind::TypedDict) {
+                    for keyword in &args.keywords {
+                        match keyword.arg.as_deref() {
+                            Some(arg_name @ ("total" | "closed")) => {
+                                let passed_type = self.expression_type(&keyword.value);
+                                if !matches!(passed_type, Type::BooleanLiteral(_))
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Invalid argument to parameter `{arg_name}` \
+                                        in `TypedDict` definition",
+                                    ));
+                                    diagnostic.set_primary_message(format_args!(
+                                        "Expected either `True` or `False`, got object of type `{}`",
+                                        passed_type.display(self.db())
+                                    ));
+                                }
+                            }
+                            Some("extra_items") => {
+                                // TODO: validate that passed arguments here are annotation expressions
+                            }
+                            Some("metaclass") => {
+                                if let Some(builder) = self
+                                    .context
+                                    .report_lint(&INVALID_TYPED_DICT_HEADER, keyword)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Custom metaclasses are not supported in `TypedDict` definitions",
+                                    ));
+                                }
+                            }
+                            Some(other) => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&UNKNOWN_ARGUMENT, keyword)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Unknown keyword argument `{other}` \
+                                        in `TypedDict` definition",
+                                    ));
+                                }
+                            }
+                            None => {
+                                if let Some(builder) = self
+                                    .context
+                                    .report_lint(&INVALID_TYPED_DICT_HEADER, keyword)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Keyword-variadic arguments are not supported in `TypedDict` definitions",
+                                    ));
+                                }
+                            }
                         }
-                        None => {
-                            let ty = self.expression_type(&keyword.value);
-                            Some((Argument::Keywords, Some(ty)))
+                    }
+                } else {
+                    let call_args: CallArguments = args
+                        .keywords
+                        .iter()
+                        .filter_map(|keyword| match keyword.arg.as_ref() {
+                            // We mimic the runtime behaviour and discard the metaclass argument
+                            Some(name) if name.id.as_str() == "metaclass" => None,
+                            Some(name) => {
+                                let ty = self.expression_type(&keyword.value);
+                                Some((Argument::Keyword(name.id.as_str()), Some(ty)))
+                            }
+                            None => {
+                                let ty = self.expression_type(&keyword.value);
+                                Some((Argument::Keywords, Some(ty)))
+                            }
+                        })
+                        .collect();
+
+                    let init_subclass_type = class
+                        .class_member_from_mro(
+                            self.db(),
+                            "__init_subclass__",
+                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                            // skip(1) to skip the current class and only consider base classes.
+                            class.iter_mro(self.db(), None).skip(1),
+                        )
+                        .ignore_possibly_undefined();
+
+                    if let Some(init_subclass) = init_subclass_type {
+                        let call_args = call_args.with_self(Some(Type::from(class)));
+                        if let Err(CallError(CallErrorKind::BindingError, bindings)) =
+                            init_subclass.try_call(self.db(), &call_args)
+                        {
+                            bindings.report_diagnostics(&self.context, class_node.into());
                         }
-                    })
-                    .collect();
-
-                let init_subclass_type = class
-                    .class_member_from_mro(
-                        self.db(),
-                        "__init_subclass__",
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                        // skip(1) to skip the current class and only consider base classes.
-                        class.iter_mro(self.db(), None).skip(1),
-                    )
-                    .ignore_possibly_undefined();
-
-                if let Some(init_subclass) = init_subclass_type {
-                    let call_args = call_args.with_self(Some(Type::from(class)));
-                    if let Err(CallError(CallErrorKind::BindingError, bindings)) =
-                        init_subclass.try_call(self.db(), &call_args)
-                    {
-                        bindings.report_diagnostics(&self.context, class_node.into());
                     }
                 }
             }
