@@ -323,6 +323,13 @@ class UsesStringizedAnnotations:
         return self
 
 
+class UsesStringizedForwardReferences:
+    def __new__(cls) -> "UsesStringizedForwardReferences": ...       # PYI034
+    def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+    async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+    def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+
+
 class NonGeneric1(tuple):
     def __new__(cls: type[NonGeneric1], *args, **kwargs) -> NonGeneric1: ...
     def __enter__(self: NonGeneric1) -> NonGeneric1: ...
