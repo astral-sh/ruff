@@ -91,24 +91,24 @@ impl ModuleGlobSet {
     /// Returns whether the given module name matches any pattern in this set.
     ///
     /// Uses "last match wins" semantics (like gitignore):
-    /// - Returns [`Match::Include`] if the last matching pattern is a positive pattern.
-    /// - Returns [`Match::Exclude`] if the last matching pattern is a negative pattern.
-    /// - Returns [`Match::None`] if no pattern matches.
-    pub fn matches(&self, module: &ModuleName) -> Match {
+    /// - Returns [`ModuleNameMatch::Include`] if the last matching pattern is a positive pattern.
+    /// - Returns [`ModuleNameMatch::Exclude`] if the last matching pattern is a negative pattern.
+    /// - Returns [`ModuleNameMatch::None`] if no pattern matches.
+    pub fn matches(&self, module: &ModuleName) -> ModuleNameMatch {
         if self.globs.is_empty() {
-            return Match::None;
+            return ModuleNameMatch::None;
         }
 
         // Find the last matching pattern (by index order, which is the order patterns were added).
         let Some(last_match_index) = self.regex_set.matches(module.as_str()).iter().next_back()
         else {
-            return Match::None;
+            return ModuleNameMatch::None;
         };
 
         if self.globs[last_match_index].negated {
-            Match::Exclude
+            ModuleNameMatch::Exclude
         } else {
-            Match::Include
+            ModuleNameMatch::Include
         }
     }
 }
@@ -197,7 +197,7 @@ impl ModuleGlobSetBuilder {
 
 /// The result of matching a module name against a [`ModuleGlobSet`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Match {
+pub enum ModuleNameMatch {
     /// The module name matches no pattern.
     None,
 
@@ -208,20 +208,20 @@ pub enum Match {
     Exclude,
 }
 
-impl Match {
-    /// Returns `true` if the match result is [`Match::Include`].
+impl ModuleNameMatch {
+    /// Returns `true` if the match result is [`ModuleNameMatch::Include`].
     pub const fn is_include(self) -> bool {
-        matches!(self, Match::Include)
+        matches!(self, ModuleNameMatch::Include)
     }
 
-    /// Returns `true` if the match result is [`Match::Exclude`].
+    /// Returns `true` if the match result is [`ModuleNameMatch::Exclude`].
     pub const fn is_exclude(self) -> bool {
-        matches!(self, Match::Exclude)
+        matches!(self, ModuleNameMatch::Exclude)
     }
 
-    /// Returns `true` if the match result is [`Match::None`].
+    /// Returns `true` if the match result is [`ModuleNameMatch::None`].
     pub const fn is_none(self) -> bool {
-        matches!(self, Match::None)
+        matches!(self, ModuleNameMatch::None)
     }
 }
 
@@ -362,7 +362,7 @@ mod tests {
         let module = ModuleName::new(name).unwrap();
         assert_eq!(
             set.matches(&module),
-            Match::Include,
+            ModuleNameMatch::Include,
             "expected `{name}` to be included"
         );
     }
@@ -372,7 +372,7 @@ mod tests {
         let module = ModuleName::new(name).unwrap();
         assert_eq!(
             set.matches(&module),
-            Match::Exclude,
+            ModuleNameMatch::Exclude,
             "expected `{name}` to be excluded"
         );
     }
@@ -382,7 +382,7 @@ mod tests {
         let module = ModuleName::new(name).unwrap();
         assert_eq!(
             set.matches(&module),
-            Match::None,
+            ModuleNameMatch::None,
             "expected `{name}` not to match"
         );
     }

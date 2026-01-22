@@ -17,7 +17,7 @@ pub use typeshed::{
 };
 
 pub use list::{all_modules, list_modules};
-pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder};
+pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, ModuleNameMatch};
 pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};
 
 mod db;
