@@ -71,6 +71,7 @@ use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
+use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -3658,10 +3659,14 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_) => Truthiness::Ambiguous,
 
-            Type::TypedDict(_) => {
-                // TODO: We could do better here, but it's unclear if this is important.
-                // See existing `TypedDict`-related tests in `truthiness.md`
-                Truthiness::Ambiguous
+            Type::TypedDict(td) => {
+                if td.items(db).values().any(TypedDictField::is_required) {
+                    Truthiness::AlwaysTrue
+                } else {
+                    // We can potentially infer empty typeddicts as always falsy if they're `closed=True`,
+                    // but as of 22-01-26 we don't yet support PEP 728.
+                    Truthiness::Ambiguous
+                }
             }
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
