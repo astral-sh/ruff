@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 use thiserror::Error;
 
-use ruff_diagnostics::{SourceMap, SourceMarker};
+use ruff_diagnostics::SourceMap;
 use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -227,38 +227,37 @@ impl Notebook {
     }
 
     /// Update the cell offsets as per the given [`SourceMap`].
-    fn update_cell_offsets(&mut self, source_map: &SourceMap) {
-        // When there are multiple cells without any edits, the offsets of those
-        // cells will be updated using the same marker. So, we can keep track of
-        // the last marker used to update the offsets and check if it's still
-        // the closest marker to the current offset.
-        let mut last_marker: Option<&SourceMarker> = None;
 
+    fn update_cell_offsets(&mut self, source_map: &SourceMap) {
         // The first offset is always going to be at 0, so skip it.
-        for offset in self.cell_offsets.iter_mut().skip(1).rev() {
-            let closest_marker = match last_marker {
-                Some(marker) if marker.source() <= *offset => marker,
-                _ => {
-                    let Some(marker) = source_map
-                        .markers()
-                        .iter()
-                        .rev()
-                        .find(|marker| marker.source() <= *offset)
-                    else {
-                        // There are no markers above the current offset, so we can
-                        // stop here.
-                        break;
-                    };
-                    last_marker = Some(marker);
-                    marker
-                }
+        for offset in self.cell_offsets.iter_mut().skip(1) {
+            let markers = source_map.markers();
+            // Find the last marker that starts at or before the current offset.
+            let idx = markers.partition_point(|m| m.source() <= *offset);
+            if idx == 0 {
+                // If there are no markers at or before the current offset, we assume that the
+                // offset is unchanged.
+                continue;
+            }
+            let m1_idx = idx - 1;
+            let m1 = &markers[m1_idx];
+
+            let mut new_offset = match m1.source().cmp(&m1.dest()) {
+                Ordering::Less => *offset + (m1.dest() - m1.source()),
+                Ordering::Greater => *offset - (m1.source() - m1.dest()),
+                Ordering::Equal => *offset,
             };
 
-            match closest_marker.source().cmp(&closest_marker.dest()) {
-                Ordering::Less => *offset += closest_marker.dest() - closest_marker.source(),
-                Ordering::Greater => *offset -= closest_marker.source() - closest_marker.dest(),
-                Ordering::Equal => (),
+            // If there's a next marker, we need to ensure that the new offset doesn't go beyond
+            // the start of the next segment. This handles cases where the current segment was
+            // shortened or deleted.
+            if let Some(m2) = markers.get(m1_idx + 1) {
+                if new_offset > m2.dest() {
+                    new_offset = m2.dest();
+                }
             }
+
+            *offset = new_offset;
         }
     }
 
