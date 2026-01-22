@@ -1323,3 +1323,26 @@ def f(**kwargs: _T) -> _T:
 
 reveal_type(f(**Foo(a=1, b="b")))  # revealed: int | str
 ```
+
+## Non-iterable variadic argument
+
+A starred argument must be iterable. If it is not, an error should be reported.
+
+```py
+def some_fn(a: int):
+    pass
+
+# error: [not-iterable] "Object of type `None` is not iterable"
+some_fn(*None)
+```
+
+This also applies when the type might not be iterable:
+
+```py
+def f(*args: int) -> int:
+    return 1
+
+def _(x: int | list[int]):
+    # error: [not-iterable] "Object of type `int | list[int]` may not be iterable"
+    f(*x)
+```
