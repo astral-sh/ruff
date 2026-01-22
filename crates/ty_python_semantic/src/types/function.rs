@@ -68,9 +68,9 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
-    report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
-    report_invalid_total_ordering_call,
+    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
+    report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::display::DisplaySettings;
@@ -1557,8 +1557,13 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
                     return;
                 }
-                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                {
+                let diagnostic =
+                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(db, *asserted_ty) {
+                        &TYPE_ASSERTION_FAILURE
+                    } else {
+                        &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
+                    };
+                if let Some(builder) = context.report_lint(diagnostic, call_expression) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
                         asserted_ty.display(db),

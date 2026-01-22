@@ -360,6 +360,16 @@
             }
           ]
         },
+        "assert-type-unspellable-subtype": {
+          "title": "detects failed type assertions",
+          "description": "## What it does\nChecks for `assert_type()` calls where the actual type\nis an unspellable subtype of the asserted type.\n\n## Why is this bad?\n`assert_type()` is intended to ensure that the inferred type of a value\nis exactly the same as the asserted type. But in some situations, ty\nhas nonstandard extensions to the type system that allow it to infer\nmore precise types than can be expressed in user annotations. ty emits a\ndifferent error code to `type-assertion-failure` in these situations so\nthat users can easily differentiate between the two cases.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    if x:\n        assert_type(x, int)  # error: [assert-type-unspellable-subtype]\n                             # the actual type is `int & ~AlwaysFalsy`,\n                             # which excludes types like `Literal[0]`\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "byte-string-type-annotation": {
           "title": "detects byte strings in type annotation positions",
           "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
