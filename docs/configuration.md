@@ -540,7 +540,7 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help     Print help
+  -h, --help     Print help (see more with '--help')
   -V, --version  Print version
 
 Log levels:
@@ -559,6 +559,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -628,7 +631,7 @@ Options:
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help
+          Print help (see more with '--help')
 
 Rule selection:
       --select <RULE_CODE>
@@ -696,6 +699,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 ```
 
 <!-- End auto-generated check help. -->
@@ -786,6 +792,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 ```
 
 <!-- End auto-generated format help. -->

@@ -67,6 +67,15 @@ pub struct GlobalConfigArgs {
     // we emit an error later on, after the initial parsing by clap.
     #[arg(long, help_heading = "Global options", global = true)]
     pub isolated: bool,
+
+    /// Control when colored output is used.
+    #[arg(
+        long,
+        value_name = "WHEN",
+        help_heading = "Global options",
+        global = true
+    )]
+    pub(crate) color: Option<TerminalColor>,
 }
 
 impl GlobalConfigArgs {
@@ -78,6 +87,20 @@ impl GlobalConfigArgs {
     fn partition(self) -> (LogLevel, Vec<SingleConfigArgument>, bool) {
         (self.log_level(), self.config, self.isolated)
     }
+}
+
+/// Control when colored output is used.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub(crate) enum TerminalColor {
+    /// Display colors if the output goes to an interactive terminal.
+    #[default]
+    Auto,
+
+    /// Always display colors.
+    Always,
+
+    /// Never display colors.
+    Never,
 }
 
 // Configures Clap v3-style help menu colors
