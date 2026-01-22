@@ -301,9 +301,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                 PySourceType::Stub => {
                                     empty_line().fmt(f)?;
                                 }
-                                PySourceType::Python
-                                | PySourceType::Ipynb
-                                | PySourceType::Markdown => {
+                                PySourceType::Python | PySourceType::Ipynb => {
                                     write!(f, [empty_line(), empty_line()])?;
                                 }
                             },
@@ -344,7 +342,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                             PySourceType::Stub => {
                                 empty_line().fmt(f)?;
                             }
-                            PySourceType::Python | PySourceType::Ipynb | PySourceType::Markdown => {
+                            PySourceType::Python | PySourceType::Ipynb => {
                                 write!(f, [empty_line(), empty_line()])?;
                             }
                         },
@@ -396,7 +394,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                             PySourceType::Stub => {
                                 empty_line().fmt(f)?;
                             }
-                            PySourceType::Python | PySourceType::Ipynb | PySourceType::Markdown => {
+                            PySourceType::Python | PySourceType::Ipynb => {
                                 write!(f, [empty_line(), empty_line()])?;
                             }
                         },

@@ -52,17 +52,15 @@ pub(crate) fn format_stdin(
     let settings = &resolver.base_settings().formatter;
 
     let source_type = match path.and_then(|path| settings.extension.get(path)) {
-        None => match path.map(SourceType::from).unwrap_or_default() {
-            SourceType::Python(source_type) => source_type,
-            SourceType::Toml(_) => {
-                if mode.is_write() {
-                    parrot_stdin()?;
-                }
-                return Ok(ExitStatus::Success);
-            }
-        },
-        Some(language) => PySourceType::from(language),
+        None => path.map(SourceType::from).unwrap_or_default(),
+        Some(language) => SourceType::Python(PySourceType::from(language)),
     };
+    if source_type.is_toml() {
+        if mode.is_write() {
+            parrot_stdin()?;
+        }
+        return Ok(ExitStatus::Success);
+    }
 
     // Format the file.
     match format_source_code(path, cli.range, settings, source_type, mode) {
@@ -88,7 +86,7 @@ fn format_source_code(
     path: Option<&Path>,
     range: Option<FormatRange>,
     settings: &FormatterSettings,
-    source_type: PySourceType,
+    source_type: SourceType,
     mode: FormatMode,
 ) -> Result<FormatResult, FormatCommandError> {
     // Read the source from stdin.

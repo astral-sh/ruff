@@ -126,15 +126,13 @@ pub(crate) fn format(
                     let settings = resolver.resolve(path);
 
                     let source_type = match settings.formatter.extension.get(path) {
-                        None => match SourceType::from(path) {
-                            SourceType::Python(source_type) => source_type,
-                            SourceType::Toml(_) => {
-                                // Ignore any non-Python files.
-                                return None;
-                            }
-                        },
-                        Some(language) => PySourceType::from(language),
+                        None => SourceType::from(path),
+                        Some(language) => SourceType::Python(PySourceType::from(language)),
                     };
+                    if source_type.is_toml() {
+                        // Ignore TOML files.
+                        return None;
+                    }
 
                     // Ignore files that are excluded from formatting
                     if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -264,7 +262,7 @@ pub(crate) fn format(
 pub(crate) fn format_path(
     path: &Path,
     settings: &FormatterSettings,
-    source_type: PySourceType,
+    source_type: SourceType,
     mode: FormatMode,
     range: Option<FormatRange>,
     cache: Option<&Cache>,
@@ -360,14 +358,15 @@ impl From<FormattedSource> for FormatResult {
 /// unchanged.
 pub(crate) fn format_source(
     source_kind: &SourceKind,
-    source_type: PySourceType,
+    source_type: SourceType,
     path: Option<&Path>,
     settings: &FormatterSettings,
     range: Option<FormatRange>,
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
         SourceKind::Python(unformatted) => {
-            let options = settings.to_format_options(source_type, unformatted, path);
+            let py_source_type = source_type.expect_python();
+            let options = settings.to_format_options(py_source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -417,7 +416,8 @@ pub(crate) fn format_source(
                 ));
             }
 
-            let options = settings.to_format_options(source_type, notebook.source_code(), path);
+            let options =
+                settings.to_format_options(PySourceType::Ipynb, notebook.source_code(), path);
 
             let mut output: Option<String> = None;
             let mut last: Option<TextSize> = None;
@@ -569,6 +569,9 @@ pub(crate) fn format_source(
             } else {
                 Ok(FormattedSource::Unchanged)
             }
+        }
+        SourceKind::Toml(_) => {
+            unimplemented!()
         }
     }
 }
