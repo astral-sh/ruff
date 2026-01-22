@@ -210,6 +210,16 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    fn with_support(db: &'db dyn Db, node: Node<'db>, support: Support<'db>) -> Self {
+        // The support should only contain constraints that participate in making a constraint set
+        // satisfiable.
+        let node = node.prune_impossible_paths(db, support);
+        if node == Node::AlwaysFalse {
+            return Self::never();
+        }
+        Self { node, support }
+    }
+
     /// Returns a constraint set that constraints a typevar to a particular range of types.
     pub(crate) fn constrain_typevar(
         db: &'db dyn Db,
@@ -220,9 +230,7 @@ impl<'db> ConstraintSet<'db> {
         let mut support = FxOrderSet::default();
         let node =
             ConstrainedTypeVar::new_node_with_support(db, &mut support, typevar, lower, upper);
-        let support = Support::new(db, support);
-        let node = node.prune_impossible_paths(db, support);
-        Self { node, support }
+        Self::with_support(db, node, Support::new(db, support))
     }
 
     /// Returns whether this constraint set never holds
@@ -357,11 +365,7 @@ impl<'db> ConstraintSet<'db> {
             _ => panic!("at least one type should be a typevar"),
         };
         let support = self.support.union(db, Support::new(db, support));
-        let node = self
-            .node
-            .implies_subtype_of(db, lhs, rhs)
-            .prune_impossible_paths(db, support);
-        Self { node, support }
+        Self::with_support(db, self.node.implies_subtype_of(db, lhs, rhs), support)
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -401,30 +405,23 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.support = self.support.union(db, other.support);
-        self.node = self
-            .node
-            .or(db, other.node)
-            .prune_impossible_paths(db, self.support);
+        let support = self.support.union(db, other.support);
+        let node = self.node.or(db, other.node);
+        *self = Self::with_support(db, node, support);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.support = self.support.union(db, other.support);
-        self.node = self
-            .node
-            .and(db, other.node)
-            .prune_impossible_paths(db, self.support);
+        let support = self.support.union(db, other.support);
+        let node = self.node.and(db, other.node);
+        *self = Self::with_support(db, node, support);
         *self
     }
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
-        Self {
-            node: self.node.negate(db),
-            support: self.support,
-        }
+        Self::with_support(db, self.node.negate(db), self.support)
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -455,11 +452,8 @@ impl<'db> ConstraintSet<'db> {
     /// Returns a constraint set encoding that this constraint set is equivalent to another.
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         let support = self.support.union(db, other.support);
-        let node = self
-            .node
-            .iff(db, other.node)
-            .prune_impossible_paths(db, support);
-        ConstraintSet { node, support }
+        let node = self.node.iff(db, other.node);
+        Self::with_support(db, node, support)
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -498,10 +492,7 @@ impl<'db> ConstraintSet<'db> {
                 true
             })
             .collect();
-        Self {
-            node,
-            support: Support::new(db, support_constraints),
-        }
+        Self::with_support(db, node, Support::new(db, support_constraints))
     }
 
     pub(crate) fn for_each_path(self, db: &'db dyn Db, f: impl FnMut(&PathAssignments<'db>)) {
