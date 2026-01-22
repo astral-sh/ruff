@@ -7,13 +7,12 @@
 //! # Examples
 //!
 //! ```
-//! use ty_project::glob::module_glob::{ModuleGlobSet, Match};
-//! use ty_module_resolver::ModuleName;
+//! use ty_module_resolver::{ModuleGlobSet, ModuleName};
 //!
 //! let set = ModuleGlobSet::from_patterns(["test.*", "!test.internal"]).unwrap();
 //!
-//! assert_eq!(set.matches(&ModuleName::new("test.foo").unwrap()), Match::Include);
-//! assert_eq!(set.matches(&ModuleName::new("test.internal").unwrap()), Match::Exclude);
+//! assert!(set.matches(&ModuleName::new("test.foo").unwrap()).is_include());
+//! assert!(set.matches(&ModuleName::new("test.internal").unwrap()).is_exclude());
 //! ```
 //!
 //! # Pattern Syntax
