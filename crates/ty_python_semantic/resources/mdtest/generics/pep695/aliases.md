@@ -328,3 +328,37 @@ def _(x: DivergentList[int]):
     d1: DivergentList[int] = [x]
     d2: DivergentList[int] = x[0]
 ```
+
+## Solving generics with type alias parameters
+
+A generic function parameter annotated with a PEP 695 type alias that contains a type variable
+should properly infer the specialization from the argument:
+
+```py
+type MyList[T] = list[T]
+type MyDict[K, V] = dict[K, V]
+
+def head[T](my_list: MyList[T]) -> T:
+    return my_list[0]
+
+def get_value[K, V](my_dict: MyDict[K, V], key: K) -> V:
+    return my_dict[key]
+
+reveal_type(head([1, 2]))  # revealed: int
+reveal_type(head(["a", "b"]))  # revealed: str
+
+d: dict[str, int] = {"a": 1}
+reveal_type(get_value(d, "a"))  # revealed: int
+```
+
+It also works in the reverse direction, where the type alias is used as the argument type:
+
+```py
+type MyList[T] = list[T]
+
+def head[T](l: list[T]) -> T:
+    return l[0]
+
+def _(x: MyList[int]):
+    reveal_type(head(x))  # revealed: int
+```

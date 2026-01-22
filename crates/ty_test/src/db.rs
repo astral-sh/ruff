@@ -134,7 +134,7 @@ impl SemanticDb for Db {
         false
     }
 
-    fn analysis_settings(&self) -> &AnalysisSettings {
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         self.settings().analysis(self)
     }
 }

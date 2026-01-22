@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, binary_heap};
 
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -87,7 +88,7 @@ pub fn completion<'db>(
 struct Completions<'db> {
     db: &'db dyn Db,
     context: CollectionContext<'db>,
-    items: Vec<Completion<'db>>,
+    items: BinaryHeap<CompletionRanker<'db>>,
     /// The query used to match against candidate completions.
     ///
     /// If a completion's name doesn't match this query, then
@@ -96,6 +97,13 @@ struct Completions<'db> {
 }
 
 impl<'db> Completions<'db> {
+    /// A limit on the total number of completions we'll return.
+    ///
+    /// A user should refine its completion request if the searched symbol
+    /// doesn't appear in the first 1k results. Serializing/deserializing 1k
+    /// completions can be expensive and result in noticeable lag.
+    const LIMIT: usize = 1_000;
+
     /// Create a new empty collection of completions.
     ///
     /// The given typed text should correspond to what we believe
@@ -106,30 +114,27 @@ impl<'db> Completions<'db> {
         Completions {
             db,
             context,
-            items: vec![],
+            items: BinaryHeap::new(),
             query,
         }
     }
 
     /// Convert this collection into a simple
     /// sequence of completions.
-    fn into_completions(mut self) -> Vec<Completion<'db>> {
-        self.items.sort_by(rank);
+    fn into_completions(self) -> Vec<Completion<'db>> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        // A user should refine its completion request if the searched symbol doesn't appear in the first 1k results.
-        // Serializing/deserializing 1k completions can be expensive and result in noticeable lag.
-        self.items.truncate(1000);
-        self.items
+            .into_sorted_vec()
+            .into_iter()
+            .map(|CompletionRanker(c)| c)
+            .collect()
     }
 
     // Convert this collection into a list of "import..." fixes
-    fn into_imports(mut self) -> Vec<ImportEdit> {
-        self.items.sort_by(rank);
+    fn into_imports(self) -> Vec<ImportEdit> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        self.items
+            .into_sorted_vec()
             .into_iter()
+            .map(|CompletionRanker(c)| c)
             .filter_map(|item| {
                 Some(ImportEdit {
                     label: format!("import {}", item.qualified?),
@@ -140,12 +145,11 @@ impl<'db> Completions<'db> {
     }
 
     // Convert this collection into a list of "qualify..." fixes
-    fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
-        self.items.sort_by(rank);
+    fn into_qualifications(self, range: TextRange) -> Vec<ImportEdit> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        self.items
+            .into_sorted_vec()
             .into_iter()
+            .map(|CompletionRanker(c)| c)
             .filter_map(|item| {
                 // If we would have to actually import something, don't suggest the qualification
                 // (we could, maybe we should, but for now, we don't)
@@ -198,8 +202,16 @@ impl<'db> Completions<'db> {
         if self.context.exclude(self.db, &builder) {
             return false;
         }
-        self.items
-            .push(builder.build(self.db, &self.context, &self.query));
+        let completion = CompletionRanker(builder.build(self.db, &self.context, &self.query));
+        if self.items.len() >= Completions::LIMIT {
+            // OK because `self.items` is guaranteed to be non-empty here.
+            let worst = self.items.peek_mut().unwrap();
+            if *worst <= completion {
+                return false;
+            }
+            binary_heap::PeekMut::pop(worst);
+        }
+        self.items.push(completion);
         true
     }
 }
@@ -1396,11 +1408,11 @@ fn add_function_arg_completions<'db>(
     let Some(sig_help) = signature_help(db, file, cursor.offset) else {
         return;
     };
-    let set_function_args = detect_set_function_args(cursor);
+    let mut set_function_args = detect_set_function_args(cursor);
 
     for sig in &sig_help.signatures {
         for p in &sig.parameters {
-            if p.is_positional_only || set_function_args.contains(&p.name.as_str()) {
+            if p.is_positional_only || !set_function_args.insert(p.name.as_str()) {
                 continue;
             }
             let mut builder = CompletionBuilder::argument(&p.name).ty(p.ty);
@@ -2415,19 +2427,44 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
     imp(db, ty, &CompletionKindVisitor::default())
 }
 
-/// Return an ordering relating the two completions.
+/// Defines an ordering relating the two completions for ranking purposes.
 ///
-/// A `Ordering::Less` is returned when `c1` should be ranked above
-/// `c2`. A `Ordering::Greater` is returned when `c1` should be ranked
-/// below `c2`. In other words, a standard ascending sort used with
-/// this comparison routine will yields the "best ranked" completions
-/// first.
+/// A `Ordering::Less` is returned when `c1` should be ranked above `c2`. A
+/// `Ordering::Greater` is returned when `c1` should be ranked below `c2`.
+/// In other words, an ascending sort used with this comparison routine will
+/// yields the "best ranked" completions first. This scheme was chosen so that
+/// this type works with a max-heap (such as `std::collections::BinaryHeap`).
 ///
-/// Note that this could have been implemented via `Eq` and `Ord`
-/// impls on `Completion`, but is instead a separate function to avoid
-/// conflating relevance ranking with identity.
-fn rank(c1: &Completion<'_>, c2: &Completion<'_>) -> Ordering {
-    (&c1.relevance, &c1.name).cmp(&(&c2.relevance, &c2.name))
+/// Note that this could have been implemented via `Eq` and `Ord` impls on
+/// `Completion` directly, but is instead a separate type to avoid conflating
+/// relevance ranking with identity.
+#[derive(Debug)]
+struct CompletionRanker<'db>(Completion<'db>);
+
+impl Eq for CompletionRanker<'_> {}
+
+impl PartialEq for CompletionRanker<'_> {
+    fn eq(&self, rhs: &CompletionRanker<'_>) -> bool {
+        self.0.relevance == rhs.0.relevance
+            && self.0.name == rhs.0.name
+            && self.0.module_name == rhs.0.module_name
+    }
+}
+
+impl Ord for CompletionRanker<'_> {
+    fn cmp(&self, rhs: &CompletionRanker<'_>) -> Ordering {
+        (&self.0.relevance, &self.0.name, &self.0.module_name).cmp(&(
+            &rhs.0.relevance,
+            &rhs.0.name,
+            &rhs.0.module_name,
+        ))
+    }
+}
+
+impl PartialOrd for CompletionRanker<'_> {
+    fn partial_cmp(&self, rhs: &CompletionRanker<'_>) -> Option<Ordering> {
+        Some(self.cmp(rhs))
+    }
 }
 
 #[cfg(test)]
@@ -8129,6 +8166,20 @@ def f(x: Intersection[int, Any] | str):
         assert_snapshot!(
             builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
             @"__file__ :: None",
+        );
+    }
+
+    #[test]
+    fn no_duplicate_keyword_arg() {
+        let builder = completion_test_builder(
+            r#"
+import re
+re.match('', '', fla<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().skip_builtins().build().snapshot(),
+            @"flags=",
         );
     }
 

@@ -2376,6 +2376,77 @@ class Baz(Bar):
         pass
 ```
 
+## `TypedDict` with `@dataclass` decorator
+
+Applying `@dataclass` to a `TypedDict` class is conceptually incoherent: `TypedDict` defines
+abstract structural types where "instantiating" always gives you a plain `dict` at runtime, whereas
+`@dataclass` is a tool for customising the creation of new nominal types. An exception may be raised
+when instantiating the class at runtime:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+@dataclass
+# error: [invalid-dataclass] "`TypedDict` class `Foo` cannot be decorated with `@dataclass`"
+class Foo(TypedDict):
+    x: int
+    y: str
+```
+
+The same error occurs with `dataclasses.dataclass` used with parentheses:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+@dataclass()
+# error: [invalid-dataclass]
+class Bar(TypedDict):
+    x: int
+```
+
+It also applies when using `frozen=True` or other dataclass parameters:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+@dataclass(frozen=True)
+# error: [invalid-dataclass]
+class Baz(TypedDict):
+    x: int
+```
+
+Classes that inherit from a `TypedDict` subclass (indirectly inheriting from `TypedDict`) are also
+TypedDict classes and cannot be decorated with `@dataclass`:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+class Base(TypedDict):
+    x: int
+
+@dataclass
+# error: [invalid-dataclass]
+class Child(Base):
+    y: str
+```
+
+The functional `TypedDict` syntax is not yet fully supported, so we don't currently emit an error
+for it. Once functional `TypedDict` support is added, this should also emit an error:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+# TODO: This should error once functional TypedDict is supported
+@dataclass
+class Foo(TypedDict("Foo", {"x": int, "y": str})):
+    pass
+```
+
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly
 [subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

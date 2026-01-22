@@ -52,6 +52,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&CALL_TOP_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
+    registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
+    registry.register_lint(&INVALID_DATACLASS);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
@@ -105,6 +107,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&INEFFECTIVE_FINAL);
+    registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -328,7 +331,7 @@ declare_lint! {
     /// ```
     pub(crate) static CYCLIC_TYPE_ALIAS_DEFINITION = {
         summary: "detects cyclic type alias definitions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.29"),
         default_level: Level::Error,
     }
 }
@@ -350,7 +353,7 @@ declare_lint! {
     /// ```
     pub(crate) static DIVISION_BY_ZERO = {
         summary: "detects division by zero",
-        status: LintStatus::preview("0.0.1-alpha.1"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Ignore,
     }
 }
@@ -425,6 +428,63 @@ declare_lint! {
     pub(crate) static DUPLICATE_KW_ONLY = {
         summary: "detects dataclass definitions with more than one usage of `KW_ONLY`",
         status: LintStatus::stable("0.0.1-alpha.12"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or
+    /// `__delattr__` method defined.
+    ///
+    /// ## Why is this bad?
+    /// Frozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a
+    /// `FrozenInstanceError` to emulate immutability.
+    ///
+    /// Overriding either of these methods raises a runtime error.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass(frozen=True)
+    /// class A:
+    ///     def __setattr__(self, name: str, value: object) -> None: ...
+    /// ```
+    pub(crate) static INVALID_DATACLASS_OVERRIDE = {
+        summary: "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
+        status: LintStatus::stable("0.0.13"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid applications of the `@dataclass` decorator.
+    ///
+    /// ## Why is this bad?
+    /// Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
+    /// `Enum`, or `Protocol` is invalid:
+    ///
+    /// - `NamedTuple` and `TypedDict` classes will raise an exception at runtime when
+    ///   instantiating the class.
+    /// - `Enum` classes with `@dataclass` are [explicitly not supported].
+    /// - `Protocol` classes define interfaces and cannot be instantiated.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from dataclasses import dataclass
+    /// from typing import NamedTuple
+    ///
+    /// @dataclass  # error: [invalid-dataclass]
+    /// class Foo(NamedTuple):
+    ///     x: int
+    /// ```
+    ///
+    /// [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
+    pub(crate) static INVALID_DATACLASS = {
+        summary: "detects invalid `@dataclass` applications",
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Error,
     }
 }
@@ -873,7 +933,7 @@ declare_lint! {
     /// [`unsupported-base`]: https://docs.astral.sh/ty/rules/unsupported-base
     pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
         summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.12"),
         default_level: Level::Ignore,
     }
 }
@@ -1123,7 +1183,7 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_NEWTYPE = {
         summary: "detects invalid NewType definitions",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.27"),
         default_level: Level::Error,
     }
 }
@@ -1813,8 +1873,43 @@ declare_lint! {
     /// ```
     pub(crate) static INEFFECTIVE_FINAL = {
         summary: "detects calls to `final()` that type checkers cannot interpret",
-        status: LintStatus::preview("0.0.1-alpha.33"),
+        status: LintStatus::stable("0.0.1-alpha.33"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `@final` classes that have unimplemented abstract methods.
+    ///
+    /// ## Why is this bad?
+    /// A class decorated with `@final` cannot be subclassed. If such a class has abstract
+    /// methods that are not implemented, the class can never be properly instantiated, as
+    /// the abstract methods can never be implemented (since subclassing is prohibited).
+    ///
+    /// At runtime, instantiation of classes with unimplemented abstract methods is only
+    /// prevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.
+    /// However, type checkers also enforce this for classes that do not use `ABCMeta`, since
+    /// the intent for the class to be abstract is clear from the use of `@abstractmethod`.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from abc import ABC, abstractmethod
+    /// from typing import final
+    ///
+    /// class Base(ABC):
+    ///     @abstractmethod
+    ///     def method(self) -> int: ...
+    ///
+    /// @final
+    /// class Derived(Base):  # Error: `Derived` does not implement `method`
+    ///     pass
+    /// ```
+    pub(crate) static ABSTRACT_METHOD_IN_FINAL_CLASS = {
+        summary: "detects `@final` classes with unimplemented abstract methods",
+        status: LintStatus::stable("0.0.13"),
+        default_level: Level::Error,
     }
 }
 
@@ -1958,7 +2053,7 @@ declare_lint! {
     /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
     pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
         summary: "detects `super()` calls in methods of `NamedTuple` classes",
-        status: LintStatus::preview("0.0.1-alpha.30"),
+        status: LintStatus::stable("0.0.1-alpha.30"),
         default_level: Level::Error,
     }
 }

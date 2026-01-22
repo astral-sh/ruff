@@ -334,6 +334,50 @@ Bing() < 3.14  # error: [unsupported-operator]
 3.14 in Bing()  # error: [unsupported-operator]
 ```
 
+Unary operations take a different codepath and need their own test cases:
+
+```py
+reveal_type(-Foo(3.14))  # revealed: int | float
+reveal_type(+Foo(3.14))  # revealed: int | float
+~Foo(3.14)  # error: [unsupported-operator]
+reveal_type(not Foo(3.14))  # revealed: bool
+reveal_type(-Bar(1 + 2j))  # revealed: int | float | complex
+reveal_type(+Bar(1 + 2j))  # revealed: int | float | complex
+~Bar(1 + 2j)  # error: [unsupported-operator]
+reveal_type(not Bar(1 + 2j))  # revealed: bool
+
+class Unary:
+    # __pos__ is deliberately left out, giving an error below.
+    def __neg__(self) -> str:
+        return "negated"
+
+    def __invert__(self) -> list[int]:
+        return [1, 2, 3]
+
+UnaryNT = NewType("UnaryNT", Unary)
+
+reveal_type(-UnaryNT(Unary()))  # revealed: str
++UnaryNT(Unary())  # error: [unsupported-operator]
+reveal_type(~UnaryNT(Unary()))  # revealed: list[int]
+reveal_type(not UnaryNT(Unary()))  # revealed: bool
+```
+
+Make sure we handle the case where a `NewType` of `float` or `complex` participates in a larger
+union:
+
+```py
+def _(x: Foo | float, y: Bar | complex):
+    reveal_type(-x)  # revealed: int | float
+    reveal_type(+x)  # revealed: int | float
+    ~x  # error: [unsupported-operator]
+    reveal_type(not x)  # revealed: bool
+
+    reveal_type(-y)  # revealed: int | float | complex
+    reveal_type(+y)  # revealed: int | float | complex
+    ~y  # error: [unsupported-operator]
+    reveal_type(not y)  # revealed: bool
+```
+
 ## A `NewType` definition must be a simple variable assignment
 
 ```py
@@ -541,7 +585,7 @@ class Foo(TypedDict):
 Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
 ```
 
-## TODO: A `NewType` cannot be generic
+## A `NewType` cannot be generic
 
 ```py
 from typing import Any, NewType, TypeVar
@@ -553,7 +597,14 @@ B = NewType("B", list[Any])
 
 # But a free typevar is not allowed.
 T = TypeVar("T")
-C = NewType("C", list[T])  # TODO: should be "error: [invalid-newtype]"
+C = NewType("C", list[T])  # error: [invalid-newtype]
+
+D = dict[str, T]
+E = NewType("E", D[T])  # error: [invalid-newtype]
+
+# this is fine: omitting the type argument means that this is equivalent
+# to `F = NewType("F", dict[str, Any])
+F = NewType("F", D)
 ```
 
 ## Forward references in stub files
@@ -585,4 +636,19 @@ f(n)  # fine
 class Invalid: ...
 
 bad = N(Invalid())  # error: [invalid-argument-type]
+```
+
+## `typing.Self` respects `NewType` subtypes
+
+```py
+from typing_extensions import NewType, Self
+
+class C:
+    def copy(self) -> Self:
+        return self
+
+NT = NewType("NT", C)
+
+x = NT(C())
+reveal_type(x.copy())  # revealed: NT
 ```
