@@ -2274,13 +2274,13 @@ fn range_formatting_notebook() -> Result<()> {
  "nbformat": 4,
  "nbformat_minor": 5
 }
-"#), @"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to format main.ipynb: Range formatting isn't supported for notebooks.
+    error: Failed to format main.ipynb: Range formatting isn't supported.
     ");
     Ok(())
 }
