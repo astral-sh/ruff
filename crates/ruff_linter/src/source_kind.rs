@@ -149,7 +149,7 @@ impl SourceKind {
                 }
             }
             SourceType::Toml(_) => Ok(Some(Self::Toml(source_code))),
-            SourceType::Markdown => Ok(Some(SourceKind::Markdown(source_code))),
+            SourceType::Markdown => Ok(Some(Self::Markdown(source_code))),
         }
     }
 
