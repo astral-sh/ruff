@@ -266,7 +266,17 @@ class GroupedDiagnostics:
 
     def classify(self, source: Source) -> Evaluation:
         diagnostics = self.diagnostics_by_source(source)
+
         if source in self.sources:
+            if self.optional:
+                return Evaluation(
+                    classification=Classification.TRUE_POSITIVE,
+                    true_positives=len(diagnostics),
+                    false_positives=0,
+                    true_negatives=0,
+                    false_negatives=0,
+                )
+
             if Source.EXPECTED in self.sources:
                 distinct_lines = len(
                     {
@@ -313,6 +323,14 @@ class GroupedDiagnostics:
                 )
 
         elif Source.EXPECTED in self.sources:
+            if self.optional:
+                return Evaluation(
+                    classification=Classification.TRUE_NEGATIVE,
+                    true_positives=0,
+                    false_positives=0,
+                    true_negatives=len(diagnostics),
+                    false_negatives=0,
+                )
             return Evaluation(
                 classification=Classification.FALSE_NEGATIVE,
                 true_positives=0,
@@ -463,7 +481,7 @@ def collect_ty_diagnostics(
     ]
 
 
-def group_diagnostics_by_key_or_tag(
+def group_diagnostics_by_key(
     old: list[Diagnostic],
     new: list[Diagnostic],
     expected: list[Diagnostic],
@@ -486,7 +504,6 @@ def group_diagnostics_by_key_or_tag(
         *expected,
     ]
 
-    # group diagnostics by a key which may be a path and a line or a path and a tag
     diagnostics = sorted(diagnostics, key=attrgetter("key"))
     grouped_diagnostics = []
     for key, group in groupby(diagnostics, key=attrgetter("key")):
@@ -531,11 +548,7 @@ def compute_stats(
         statistics.total_diagnostics += len(grouped.diagnostics_by_source(source))
         return statistics
 
-    non_optional_diagnostics = [
-        diag for diag in grouped_diagnostics if not diag.optional
-    ]
-
-    return reduce(increment, non_optional_diagnostics, Statistics())
+    return reduce(increment, grouped_diagnostics, Statistics())
 
 
 def render_grouped_diagnostics(
@@ -818,7 +831,7 @@ def main():
         python_version=args.python_version,
     )
 
-    grouped = group_diagnostics_by_key_or_tag(
+    grouped = group_diagnostics_by_key(
         old=old,
         new=new,
         expected=expected,
