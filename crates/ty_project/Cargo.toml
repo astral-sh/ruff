@@ -39,6 +39,7 @@ pep440_rs = { workspace = true, features = ["version-ranges"] }
 rayon = { workspace = true }
 regex = { workspace = true }
 regex-automata = { workspace = true }
+regex-syntax = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }

@@ -17,11 +17,13 @@ pub use typeshed::{
 };
 
 pub use list::{all_modules, list_modules};
+pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder};
 pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};
 
 mod db;
 mod list;
 mod module;
+mod module_glob;
 mod module_name;
 mod path;
 mod resolve;

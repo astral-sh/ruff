@@ -69,6 +69,7 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 ## Development Guidelines
 
 - All changes must be tested. If you're not testing your changes, you're not done.
+- Clippy must pass without warnings.
 - Get your tests to pass. If you didn't run the tests, your code does not work.
 - Follow existing code style. Check neighboring files for patterns.
 - Always run `uvx prek run -a` at the end of a task.
