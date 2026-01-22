@@ -411,7 +411,7 @@ pub(crate) fn format_source(
             }
 
             if range.is_some() {
-                return Err(FormatCommandError::RangeFormatNotebook(
+                return Err(FormatCommandError::RangeFormatNotSupported(
                     path.map(Path::to_path_buf),
                 ));
             }
@@ -516,10 +516,15 @@ pub(crate) fn format_source(
             });
 
             if !settings.preview.is_enabled() {
-                warn_user_once!(
-                    "formatting markdown files is experimental, use --preview to enable"
-                );
-                return Ok(FormattedSource::Unchanged);
+                return Err(FormatCommandError::MarkdownExperimental(
+                    path.map(Path::to_path_buf),
+                ));
+            }
+
+            if range.is_some() {
+                return Err(FormatCommandError::RangeFormatNotSupported(
+                    path.map(Path::to_path_buf),
+                ));
             }
 
             let mut changed = false;
@@ -570,9 +575,7 @@ pub(crate) fn format_source(
                 Ok(FormattedSource::Unchanged)
             }
         }
-        SourceKind::Toml(_) => {
-            unimplemented!()
-        }
+        SourceKind::Toml(_) => Ok(FormattedSource::Unchanged),
     }
 }
 
@@ -914,7 +917,8 @@ pub(crate) enum FormatCommandError {
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
-    RangeFormatNotebook(Option<PathBuf>),
+    RangeFormatNotSupported(Option<PathBuf>),
+    MarkdownExperimental(Option<PathBuf>),
 }
 
 impl FormatCommandError {
@@ -932,7 +936,8 @@ impl FormatCommandError {
             | Self::Read(path, _)
             | Self::Format(path, _)
             | Self::Write(path, _)
-            | Self::RangeFormatNotebook(path) => path.as_deref(),
+            | Self::RangeFormatNotSupported(path)
+            | Self::MarkdownExperimental(path) => path.as_deref(),
         }
     }
 }
@@ -964,10 +969,15 @@ impl From<&FormatCommandError> for Diagnostic {
                 Diagnostic::new(DiagnosticId::Io, Severity::Error, source_error)
             }
             FormatCommandError::Format(_, format_module_error) => format_module_error.into(),
-            FormatCommandError::RangeFormatNotebook(_) => Diagnostic::new(
+            FormatCommandError::RangeFormatNotSupported(_) => Diagnostic::new(
                 DiagnosticId::InvalidCliOption,
                 Severity::Error,
-                "Range formatting isn't supported for notebooks.",
+                "Range formatting isn't supported.",
+            ),
+            FormatCommandError::MarkdownExperimental(_) => Diagnostic::new(
+                DiagnosticId::ExperimentalFeature,
+                Severity::Warning,
+                "Markdown formatting is experimental, use --preview mode flag.",
             ),
         };
 
@@ -1046,11 +1056,11 @@ impl Display for FormatCommandError {
                     write!(f, "{header} {err}", header = "Failed to format:".bold())
                 }
             }
-            Self::RangeFormatNotebook(path) => {
+            Self::RangeFormatNotSupported(path) => {
                 if let Some(path) = path {
                     write!(
                         f,
-                        "{header}{path}{colon} Range formatting isn't supported for notebooks.",
+                        "{header}{path}{colon} Range formatting isn't supported.",
                         header = "Failed to format ".bold(),
                         path = fs::relativize_path(path).bold(),
                         colon = ":".bold()
@@ -1058,7 +1068,24 @@ impl Display for FormatCommandError {
                 } else {
                     write!(
                         f,
-                        "{header} Range formatting isn't supported for notebooks",
+                        "{header} Range formatting isn't supported",
+                        header = "Failed to format:".bold()
+                    )
+                }
+            }
+            Self::MarkdownExperimental(path) => {
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{header}{path}{colon} Markdown formatting is experimental, use --preview mode.",
+                        header = "Failed to format ".bold(),
+                        path = fs::relativize_path(path).bold(),
+                        colon = ":".bold()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{header} Markdown formatting is experimental, use --preview mode",
                         header = "Failed to format:".bold()
                     )
                 }
@@ -1374,7 +1401,7 @@ mod tests {
                     "Cannot write to file",
                 )),
             ),
-            FormatCommandError::RangeFormatNotebook(Some(path)),
+            FormatCommandError::RangeFormatNotSupported(Some(path)),
         ];
 
         let results = FormatResults::new(&[], FormatMode::Check);
