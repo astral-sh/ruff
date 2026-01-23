@@ -18,6 +18,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_linter::message::{EmitterContext, create_panic_diagnostic, render_diagnostics};
 use ruff_linter::settings::types::OutputFormat;
+use ruff_markdown::{MarkdownResult, format_code_blocks};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
 use ruff_python_trivia::textwrap::{dedent, indent};
@@ -493,28 +494,6 @@ pub(crate) fn format_source(
             )))
         }
         SourceKind::Markdown(unformatted_document) => {
-            // TODO: account for ~~~ and arbitrary length code fences
-            // TODO: support code blocks nested inside block quotes, etc
-            // TODO: support unlabeled code blocks
-            static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
-                // adapted from blacken-docs
-                // https://github.com/adamchainz/blacken-docs/blob/fb107c1dce25f9206e29297aaa1ed7afc2980a5a/src/blacken_docs/__init__.py#L17
-                Regex::new(
-                    r"(?imsx)
-                    (?<before>
-                        ^(?<indent>\ *)```[^\S\r\n]*
-                        (?<lang>python|py|python3|py3|pyi)
-                        (?:\ .*?)?\n
-                    )
-                    (?<code>.*?)
-                    (?<after>
-                        ^\ *```[^\S\r\n]*$
-                    )
-                    ",
-                )
-                .unwrap()
-            });
-
             if !settings.preview.is_enabled() {
                 return Err(FormatCommandError::MarkdownExperimental(
                     path.map(Path::to_path_buf),
@@ -527,52 +506,11 @@ pub(crate) fn format_source(
                 ));
             }
 
-            let mut changed = false;
-            let formatted_document =
-                MARKDOWN_CODE_BLOCK.replace_all(unformatted_document, |capture: &Captures| {
-                    let (original, [before, code_indent, code_lang, unformatted_code, after]) =
-                        capture.extract();
-
-                    let code_block_source_type = if code_lang == "pyi" {
-                        PySourceType::Stub
-                    } else {
-                        PySourceType::Python
-                    };
-                    let unformatted_code = dedent(unformatted_code);
-                    let options =
-                        settings.to_format_options(code_block_source_type, &unformatted_code, path);
-
-                    let formatted_code = if let Some(_range) = range {
-                        unimplemented!()
-                    } else {
-                        // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
-                        #[expect(clippy::redundant_closure_for_method_calls)]
-                        format_module_source(&unformatted_code, options)
-                            .map(|formatted| formatted.into_code())
-                    };
-
-                    // TODO: figure out how to properly raise errors from inside closure
-                    if let Ok(formatted_code) = formatted_code {
-                        if formatted_code.len() == unformatted_code.len()
-                            && formatted_code == *unformatted_code
-                        {
-                            original.to_string()
-                        } else {
-                            changed = true;
-                            let formatted_code = indent(formatted_code.as_str(), code_indent);
-                            format!("{before}{formatted_code}{after}")
-                        }
-                    } else {
-                        original.to_string()
-                    }
-                });
-
-            if changed {
-                Ok(FormattedSource::Formatted(SourceKind::Markdown(
-                    formatted_document.to_string(),
-                )))
-            } else {
-                Ok(FormattedSource::Unchanged)
+            match format_code_blocks(unformatted_document, path, settings) {
+                MarkdownResult::Formatted(formatted) => Ok(FormattedSource::Formatted(
+                    SourceKind::Markdown(formatted.to_string()),
+                )),
+                MarkdownResult::Unchanged => Ok(FormattedSource::Unchanged),
             }
         }
         SourceKind::Toml(_) => Ok(FormattedSource::Unchanged),
