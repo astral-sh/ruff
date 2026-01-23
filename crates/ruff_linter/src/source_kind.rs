@@ -24,8 +24,6 @@ pub enum SourceKind {
     IpyNotebook(Box<Notebook>),
     /// The source contains Markdown text.
     Markdown(String),
-    /// The source contains TOML text.
-    Toml(String),
 }
 
 impl SourceKind {
@@ -50,13 +48,6 @@ impl SourceKind {
     pub fn as_markdown(&self) -> Option<&str> {
         match self {
             SourceKind::Markdown(code) => Some(code),
-            _ => None,
-        }
-    }
-
-    pub fn as_toml(&self) -> Option<&str> {
-        match self {
-            SourceKind::Toml(code) => Some(code),
             _ => None,
         }
     }
@@ -92,16 +83,13 @@ impl SourceKind {
             }
             SourceKind::Python(_) => SourceKind::Python(new_source),
             SourceKind::Markdown(_) => SourceKind::Markdown(new_source),
-            SourceKind::Toml(_) => SourceKind::Toml(new_source),
         }
     }
 
     /// Returns the Python source code for this source kind.
     pub fn source_code(&self) -> &str {
         match self {
-            SourceKind::Python(source)
-            | SourceKind::Markdown(source)
-            | SourceKind::Toml(source) => source,
+            SourceKind::Python(source) | SourceKind::Markdown(source) => source,
             SourceKind::IpyNotebook(notebook) => notebook.source_code(),
         }
     }
@@ -124,10 +112,7 @@ impl SourceKind {
                 let contents = std::fs::read_to_string(path)?;
                 Ok(Some(Self::Markdown(contents)))
             }
-            SourceType::Toml(_) => {
-                let contents = std::fs::read_to_string(path)?;
-                Ok(Some(Self::Toml(contents)))
-            }
+            SourceType::Toml(_) => Ok(None),
         }
     }
 
@@ -148,7 +133,7 @@ impl SourceKind {
                     Ok(Some(Self::Python(source_code)))
                 }
             }
-            SourceType::Toml(_) => Ok(Some(Self::Toml(source_code))),
+            SourceType::Toml(_) => Ok(None),
             SourceType::Markdown => Ok(Some(Self::Markdown(source_code))),
         }
     }
@@ -158,9 +143,7 @@ impl SourceKind {
     /// For Jupyter notebooks, this will write out the notebook as JSON.
     pub fn write(&self, writer: &mut dyn Write) -> Result<(), SourceError> {
         match self {
-            SourceKind::Python(source)
-            | SourceKind::Markdown(source)
-            | SourceKind::Toml(source) => {
+            SourceKind::Python(source) | SourceKind::Markdown(source) => {
                 writer.write_all(source.as_bytes())?;
                 Ok(())
             }
@@ -189,10 +172,6 @@ impl SourceKind {
                 path,
             }),
             (SourceKind::Markdown(src), SourceKind::Markdown(dst)) => Some(SourceKindDiff {
-                kind: DiffKind::Text(src, dst),
-                path,
-            }),
-            (SourceKind::Toml(src), SourceKind::Toml(dst)) => Some(SourceKindDiff {
                 kind: DiffKind::Text(src, dst),
                 path,
             }),
