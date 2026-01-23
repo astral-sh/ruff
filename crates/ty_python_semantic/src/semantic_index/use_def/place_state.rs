@@ -392,6 +392,26 @@ impl PlaceState {
         );
     }
 
+    /// Record a newly-encountered binding for this place, keeping previous bindings visible.
+    /// This is used for loop headers, where UNBOUND should remain visible as a possible state
+    /// (for places first assigned inside the loop body).
+    pub(super) fn record_binding_keeping_unbound(
+        &mut self,
+        binding_id: ScopedDefinitionId,
+        reachability_constraint: ScopedReachabilityConstraintId,
+        is_class_scope: bool,
+        is_place_name: bool,
+    ) {
+        debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
+        self.bindings.record_binding(
+            binding_id,
+            reachability_constraint,
+            is_class_scope,
+            is_place_name,
+            PreviousDefinitions::AreKept,
+        );
+    }
+
     /// Add given constraint to all live bindings.
     pub(super) fn record_narrowing_constraint(
         &mut self,

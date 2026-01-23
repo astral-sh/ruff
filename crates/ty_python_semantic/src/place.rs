@@ -5,11 +5,12 @@ use ty_module_resolver::{
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, get_loop_header,
+    place_table,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
@@ -1276,6 +1277,32 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
+            // Loop header bindings need a special case here. Consider this example:
+            //
+            // ```py
+            // while random():
+            //     if random():
+            //         x = "foo"
+            //         return
+            // x  # error: [unresolved-reference]
+            // ```
+            //
+            // This loop contains a binding of `x`, so we synthesize a "loop header definition" for
+            // `x` to track the visibility of that binding in later iterations. (We do a naive
+            // pre-walk of the loop to collect bound places, because we need to establish these
+            // definitions before the "real" walk begins and we start processing uses.) However,
+            // the real walk visits the `return` and concludes that `x = "foo"` isn't visible at
+            // the end of the loop, and the loop header definition winds up with no bindings.
+            // Ideally we'd delete that definition entirely, but that would complicate the
+            // `SemanticIndexBuilder`. Instead, we detect this special case and skip these
+            // definitions here.
+            if let DefinitionKind::LoopHeader(loop_header_kind) = binding.kind(db) {
+                // If this loop header definition has no bindings, return `None`.
+                get_loop_header(db, loop_header_kind.loop_token())
+                    .bindings_for_place(loop_header_kind.place())
+                    .next()?;
+            }
+
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
             Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
@@ -1300,13 +1327,15 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
-                Some(Truthiness::AlwaysTrue) => {
-                    unreachable!(
-                        "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
-                    )
-                }
                 Some(Truthiness::AlwaysFalse) | None => Definedness::AlwaysDefined,
                 Some(Truthiness::Ambiguous) => Definedness::PossiblyUndefined,
+                // A place shouldn't be definitely-unbound when there are visible bindings. The
+                // initial UNBOUND definition should either get shadowed by those bindings (if
+                // they're unconditional), or it should have constraints attached to it (if the
+                // other bindings are conditional). However, there's one exception to that
+                // intuitive rule: Loop header definitions don't shadow prior bindings, because
+                // prior bindings are always visible at the start of the first loop iteration.
+                Some(Truthiness::AlwaysTrue) => Definedness::PossiblyUndefined,
             },
         };
 

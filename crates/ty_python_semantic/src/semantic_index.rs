@@ -9,7 +9,10 @@ use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
+use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
+
+use crate::semantic_index::place::ScopedPlaceId;
 
 use crate::Db;
 use crate::node_key::NodeKey;
@@ -93,6 +96,117 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
     Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+}
+
+/// A single binding at the loop-back edge, with its narrowing predicates.
+#[derive(Debug, Clone, PartialEq, Eq, Update, get_size2::GetSize)]
+pub(crate) struct LoopBackBinding<'db> {
+    pub(crate) definition: Definition<'db>,
+    pub(crate) narrowing_predicates:
+        SmallVec<[crate::semantic_index::predicate::Predicate<'db>; 4]>,
+}
+
+/// All the bindings made in a loop, which are visible to the entire loop via "loop header
+/// definitions" (a.k.a. loop-back bindings)
+///
+/// Loop control flow analysis needs a way for uses early in the loop to see bindings that come
+/// later, reflecting the fact that a previous iteration of the loop might've already executed
+/// those bindings. For example:
+///
+/// ```py
+/// x = "A"
+/// while some_condition():
+///     # The loop entry value (in the first iteration) and the following binding (in other
+///     # iterations) are both visible at this use.
+///     reveal_type(x)  # revealed: Literal["A", "B"]
+///     x = "B"
+/// ```
+///
+/// As an important special case, these loop header definitions also combine with fixpoint
+/// iteration to let us infer `int` for loop variables. For example:
+///
+/// ```py
+/// i = 0  # revealed: Literal[0]
+/// while i < 1_000_000:
+///     i += 1  # revealed: int
+/// ```
+///
+/// The add-assign statement `i += 1` is both a use and a binding. The use sees the `i = 0` binding
+/// at the top, and it also sees *itself* via the loop header definition of `i`. When we infer the
+/// type of `i` in or after the loop, fixpoint iteration produces an ever-expanding union of
+/// literals (`Literal[0, 1, 2, ...]`) until we eventually reach the threshold for widening to
+/// `int` and stop iterating. (See `should_widen` and `widen_literal_types`.)
+///
+/// There's a chicken-and-egg problem with synthesizing the `DefinitionKind::LoopHeader`
+/// definitions at the top of the loop, and assembling all the bindings in the `LoopHeader` struct
+/// that they refer to. See `LoopToken` below for how we work around that.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
+pub(crate) struct LoopHeader<'db> {
+    bindings: FxHashMap<ScopedPlaceId, SmallVec<[LoopBackBinding<'db>; 4]>>,
+}
+
+impl<'db> LoopHeader<'db> {
+    pub(crate) fn new() -> Self {
+        Self {
+            bindings: FxHashMap::default(),
+        }
+    }
+
+    pub(crate) fn add_binding(
+        &mut self,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+        narrowing_predicates: SmallVec<[crate::semantic_index::predicate::Predicate<'db>; 4]>,
+    ) {
+        self.bindings
+            .entry(place)
+            .or_default()
+            .push(LoopBackBinding {
+                definition,
+                narrowing_predicates,
+            });
+    }
+
+    pub(crate) fn bindings_for_place(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = &LoopBackBinding<'db>> + '_ {
+        self.bindings
+            .get(&place)
+            .map(|v| v.iter())
+            .into_iter()
+            .flatten()
+    }
+}
+
+/// A Salsa token for retrieving a `LoopHeader`. See `get_loop_header` below.
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LoopToken<'db> {}
+
+impl get_size2::GetSize for LoopToken<'_> {}
+
+/// Loop up a `LoopHeader` given a `LoopToken`.
+///
+/// Loop header definitions are the very first things we encounter (synthesize) when we walk a
+/// loop, and they need to refer to the corresponding the `LoopHeader` struct that records their
+/// bindings, but that struct isn't available until we've finished walking the loop. To make this
+/// work in the largely immutable world of Salsa, we add a layer of indirection using a Salsa
+/// feature called "specify":
+/// <https://salsa-rs.github.io/salsa/overview.html#specify-the-result-of-tracked-functions-for-particular-structs>
+///
+/// When we first encounter a loop, we generate a `LoopToken` that uniquely identifies the loop but
+/// doesn't contain any data. We do a lightweight pre-walk to collect bound places (see
+/// `LoopBindingsVisitor`), and for each bound place we create a loop header definition that stores
+/// the `LoopToken`. Then after we've finished visiting the loop, we call
+/// `get_loop_header::specify` to associate the token with the completed `LoopHeader`. All of this
+/// happens while we're building the semantic index, and nothing needs to call `get_loop_header`
+/// until we get to type inference later, so the order of operations always works out.
+#[salsa::tracked(specify, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn get_loop_header<'db>(
+    _db: &'db dyn Db,
+    _loop_token: LoopToken<'db>,
+) -> LoopHeader<'db> {
+    panic!("should always be set by specify()");
 }
 
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
