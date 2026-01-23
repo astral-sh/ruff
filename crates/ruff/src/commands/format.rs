@@ -3,7 +3,6 @@ use std::fs::File;
 use std::io;
 use std::io::{Write, stderr, stdout};
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -12,7 +11,6 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use regex::{Captures, Regex};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
@@ -21,7 +19,6 @@ use ruff_linter::settings::types::OutputFormat;
 use ruff_markdown::{MarkdownResult, format_code_blocks};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
-use ruff_python_trivia::textwrap::{dedent, indent};
 use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
 use tracing::debug;
@@ -507,9 +504,9 @@ pub(crate) fn format_source(
             }
 
             match format_code_blocks(unformatted_document, path, settings) {
-                MarkdownResult::Formatted(formatted) => Ok(FormattedSource::Formatted(
-                    SourceKind::Markdown(formatted.to_string()),
-                )),
+                MarkdownResult::Formatted(formatted) => {
+                    Ok(FormattedSource::Formatted(SourceKind::Markdown(formatted)))
+                }
                 MarkdownResult::Unchanged => Ok(FormattedSource::Unchanged),
             }
         }

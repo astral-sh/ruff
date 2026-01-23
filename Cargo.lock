@@ -3270,6 +3270,7 @@ dependencies = [
 name = "ruff_markdown"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "regex",
  "ruff_python_ast",
  "ruff_python_formatter",
