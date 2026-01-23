@@ -309,9 +309,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             name: (*rest).to_string(),
         },
 
-        ["airflow", "sensors", "base", "poke_mode_only"] => Replacement::SourceModuleMoved {
+        ["airflow", "sensors", "base", "poke_mode_only"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.bases.sensor",
             name: "poke_mode_only".to_string(),
+            version: "1.0.0",
         },
 
         // airflow.timetables

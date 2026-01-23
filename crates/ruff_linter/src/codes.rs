@@ -1128,7 +1128,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,
         (Airflow, "311") => rules::airflow::rules::Airflow3SuggestedUpdate,
         (Airflow, "312") => rules::airflow::rules::Airflow3SuggestedToMoveToProvider,
-        (Airflow, "321") => rules::airflow::rules::Airflow31Removal,
+        (Airflow, "321") => rules::airflow::rules::Airflow31Moved,
 
         // perflint
         (Perflint, "101") => rules::perflint::rules::UnnecessaryListCast,

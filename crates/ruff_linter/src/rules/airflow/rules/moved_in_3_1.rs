@@ -34,22 +34,22 @@ use ruff_text_size::TextRange;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
-pub(crate) struct Airflow31Removal {
+pub(crate) struct Airflow31Moved {
     deprecated: String,
     replacement: Replacement,
 }
 
-impl Violation for Airflow31Removal {
+impl Violation for Airflow31Moved {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Airflow31Removal { deprecated, .. } = self;
-        format!("`{deprecated}` is removed in Airflow 3.1")
+        let Airflow31Moved { deprecated, .. } = self;
+        format!("`{deprecated}` is moved in Airflow 3.1")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Airflow31Removal { replacement, .. } = self;
+        let Airflow31Moved { replacement, .. } = self;
         match replacement {
             Replacement::None => None,
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
@@ -80,7 +80,7 @@ impl Violation for Airflow31Removal {
 }
 
 /// AIR321
-pub(crate) fn airflow_3_1_removal_expr(checker: &Checker, expr: &Expr) {
+pub(crate) fn airflow_3_1_moved_expr(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -206,10 +206,11 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "macros",
             rest @ ("ds_add" | "ds_format" | "datetime_diff_for_humans" | "ds_format_locale"),
-        ] => Replacement::SourceModuleMovedToSDK {
+        ] => Replacement::SourceModuleMovedWithMessage {
             module: "airflow.sdk.execution_time.macros",
             name: rest.to_string(),
-            version: "1.1.0",
+            message: "With apache-airflow-task-sdk>=1.1.0,<=1.1.6. Please import from `airflow.sdk` for apache-airflow-task-sdk>1.1.6.",
+            suggest_fix: true,
         },
 
         // airflow.io
@@ -242,7 +243,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         } if *suggest_fix => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(
-                Airflow31Removal {
+                Airflow31Moved {
                     deprecated: qualified_name.to_string(),
                     replacement: replacement.clone(),
                 },
@@ -258,7 +259,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
     let import_target = name.split('.').next().unwrap_or(name);
     let mut diagnostic = checker.report_diagnostic(
-        Airflow31Removal {
+        Airflow31Moved {
             deprecated: qualified_name.to_string(),
             replacement: replacement.clone(),
         },

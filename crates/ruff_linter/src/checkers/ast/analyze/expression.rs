@@ -262,8 +262,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::Airflow3Removal) {
                         airflow::rules::airflow_3_removal_expr(checker, expr);
                     }
-                    if checker.is_rule_enabled(Rule::Airflow31Removal) {
-                        airflow::rules::airflow_3_1_removal_expr(checker, expr);
+                    if checker.is_rule_enabled(Rule::Airflow31Moved) {
+                        airflow::rules::airflow_3_1_moved_expr(checker, expr);
                     }
                     if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
                         airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
@@ -490,8 +490,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::Airflow31Removal) {
-                airflow::rules::airflow_3_1_removal_expr(checker, expr);
+            if checker.is_rule_enabled(Rule::Airflow31Moved) {
+                airflow::rules::airflow_3_1_moved_expr(checker, expr);
             }
             if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
                 airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
