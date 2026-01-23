@@ -17,7 +17,6 @@ use crate::comments::{
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::preview::is_blank_line_before_decorated_class_in_stub_enabled;
 use crate::statement::trailing_semicolon;
 use crate::verbatim::{
     write_skipped_statements, write_suppressed_statements_starting_with_leading_comment,
@@ -727,26 +726,6 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
                 && class.decorator_list.is_empty()
         });
 
-    // Black for some reasons accepts decorators in place of empty lines
-    // ```python
-    // def _count1(): ...
-    // @final
-    // class LockType1: ...
-    //
-    // def _count2(): ...
-    //
-    // class LockType2: ...
-    // ```
-    //
-    // However, this behavior is incorrect and should not be replicated in preview mode.
-    // See: https://github.com/astral-sh/ruff/issues/18865
-    let class_decorator_instead_of_empty_line =
-        !is_blank_line_before_decorated_class_in_stub_enabled(f.context())
-            && preceding.is_function_def_stmt()
-            && following
-                .as_class_def_stmt()
-                .is_some_and(|class| !class.decorator_list.is_empty());
-
     // A function definition following a stub function definition
     // ```python
     // def test(): ...
@@ -757,9 +736,7 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
         .is_some_and(|function| contains_only_an_ellipsis(&function.body, f.context().comments()))
         && following.is_function_def_stmt();
 
-    class_sequences_with_ellipsis_only
-        || class_decorator_instead_of_empty_line
-        || function_with_ellipsis
+    class_sequences_with_ellipsis_only || function_with_ellipsis
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
