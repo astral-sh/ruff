@@ -23,8 +23,8 @@ use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
-    DynamicType, IntersectionBuilder, KnownInstanceType, Type, TypeAliasType, UnionBuilder,
-    UnionType, todo_type,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
+    UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -378,7 +378,7 @@ where
 
 fn map_intersection_subscript<'db, F>(
     db: &'db dyn Db,
-    elements: impl Iterator<Item = Type<'db>>,
+    intersection: IntersectionType<'db>,
     mut map_fn: F,
 ) -> Result<Type<'db>, SubscriptError<'db>>
 where
@@ -387,7 +387,10 @@ where
     let mut results = Vec::new();
     let mut errors = Vec::new();
 
-    for element in elements {
+    // Use `positive_elements_or_object` to ensure we always have at least one element.
+    // An intersection with only negative elements (e.g., `~int & ~str`) is implicitly
+    // `object & ~int & ~str`, so we fall back to `object`.
+    for element in intersection.positive_elements_or_object(db) {
         match map_fn(element) {
             Ok(result) => results.push(result),
             Err(error) => errors.push(error),
@@ -431,9 +434,9 @@ where
     }
 
     // No element has the method. Combine all errors.
-    let Some(first) = errors.first() else {
-        unreachable!("intersection should have at least one positive element")
-    };
+    let first = errors
+        .first()
+        .expect("`positive_elements_or_object` guarantees at least one element");
 
     let result_ty = first.result_type();
     let all_errors = errors
@@ -473,13 +476,13 @@ impl<'db> Type<'db> {
             })),
 
             (Type::Intersection(intersection), _) => {
-                Some(map_intersection_subscript(db, intersection.positive_elements_or_object(db), |element| {
+                Some(map_intersection_subscript(db, intersection, |element| {
                     element.subscript(db, slice_ty, expr_context)
                 }))
             }
 
             (_, Type::Intersection(intersection)) => {
-                Some(map_intersection_subscript(db, intersection.positive_elements_or_object(db), |element| {
+                Some(map_intersection_subscript(db, intersection, |element| {
                     value_ty.subscript(db, element, expr_context)
                 }))
             }
