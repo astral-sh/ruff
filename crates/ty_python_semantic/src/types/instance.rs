@@ -39,10 +39,9 @@ impl<'db> Type<'db> {
             // Dynamic classes created via `type()` don't have special instance types.
             // TODO: When we add functional TypedDict support, this branch should check
             // for TypedDict and return `Type::typed_dict(class)` for that case.
-            ClassLiteral::Dynamic(_) => {
-                Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
-            }
-            ClassLiteral::DynamicNamedTuple(_) => {
+            ClassLiteral::Dynamic(_)
+            | ClassLiteral::DynamicNamedTuple(_)
+            | ClassLiteral::DynamicDataclass(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
             ClassLiteral::Static(class_literal) => {
