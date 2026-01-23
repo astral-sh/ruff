@@ -262,6 +262,12 @@ def same_constrained_types[T: (int, str)](t1: T, t2: T) -> T:
 
 def chained_constrained_types[T: (int, float)](t1: T, t2: T, t3: T) -> T:
     return (t1 + t2) * t3
+
+def typevar_times_literal[T: (int, float)](t: T) -> T:
+    return t * 2
+
+def literal_times_typevar[T: (int, float)](t: T) -> T:
+    return 2 * t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two

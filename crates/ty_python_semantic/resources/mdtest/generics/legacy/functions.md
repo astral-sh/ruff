@@ -295,6 +295,12 @@ S = TypeVar("S", int, float)
 
 def chained_constrained_types(t1: S, t2: S, t3: S) -> S:
     return (t1 + t2) * t3
+
+def typevar_times_literal(t: S) -> S:
+    return t * 2
+
+def literal_times_typevar(t: S) -> S:
+    return 2 * t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two
