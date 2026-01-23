@@ -13,6 +13,7 @@ use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    YieldOutsideFunctionKind,
 };
 use ruff_text_size::TextRange;
 use ty_module_resolver::{ModuleName, resolve_module};
@@ -2916,6 +2917,17 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        // TODO(brent) The long-term fix for this is for `YieldOutsideFunction` not to apply to
+        // `await` at all and only to emit the more specific `AwaitOutsideAsyncFunction` instead.
+        // However, to preserve backwards compatibility with the corresponding Ruff rules, we
+        // temporarily filter out the diagnostic for ty instead.
+        if matches!(
+            error.kind,
+            SemanticSyntaxErrorKind::YieldOutsideFunction(YieldOutsideFunctionKind::Await)
+        ) {
+            return;
+        }
+
         if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
