@@ -298,11 +298,22 @@ impl<'db> TypeCollector<'db> {
 pub(super) fn any_over_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    query: &dyn Fn(Type<'db>) -> bool,
     should_visit_lazy_type_attributes: bool,
+    query: &dyn Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_mut(db, ty, should_visit_lazy_type_attributes, &mut |ty| {
+        query(ty)
+    })
+}
+
+pub(super) fn any_over_type_mut<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    should_visit_lazy_type_attributes: bool,
+    query: &mut dyn FnMut(Type<'db>) -> bool,
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
-        query: &'a dyn Fn(Type<'db>) -> bool,
+        query: RefCell<&'a mut dyn FnMut(Type<'db>) -> bool>,
         recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<bool>,
         should_visit_lazy_type_attributes: bool,
@@ -318,7 +329,7 @@ pub(super) fn any_over_type<'db>(
             if already_found {
                 return;
             }
-            let found = already_found | (self.query)(ty);
+            let found = already_found | (self.query.borrow_mut())(ty);
             self.found_matching_type.set(found);
             if found {
                 return;
@@ -328,7 +339,7 @@ pub(super) fn any_over_type<'db>(
     }
 
     let visitor = AnyOverTypeVisitor {
-        query,
+        query: RefCell::new(query),
         recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::new(false),
         should_visit_lazy_type_attributes,

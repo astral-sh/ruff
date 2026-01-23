@@ -15193,20 +15193,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     return Err(GenericContextError::InvalidArgument);
                 }
-            } else if any_over_type(
-                db,
-                *typevar,
-                &|ty| match ty {
-                    Type::Dynamic(DynamicType::TodoUnpack | DynamicType::TodoStarredExpression) => {
-                        true
-                    }
-                    Type::NominalInstance(nominal) => {
-                        nominal.has_known_class(db, KnownClass::TypeVarTuple)
-                    }
-                    _ => false,
-                },
-                true,
-            ) {
+            } else if any_over_type(db, *typevar, true, &|ty| match ty {
+                Type::Dynamic(DynamicType::TodoUnpack | DynamicType::TodoStarredExpression) => true,
+                Type::NominalInstance(nominal) => {
+                    nominal.has_known_class(db, KnownClass::TypeVarTuple)
+                }
+                _ => false,
+            }) {
                 return Err(GenericContextError::NotYetSupported);
             } else {
                 if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, subscript) {
