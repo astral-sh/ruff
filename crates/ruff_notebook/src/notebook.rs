@@ -227,7 +227,6 @@ impl Notebook {
     }
 
     /// Update the cell offsets as per the given [`SourceMap`].
-
     fn update_cell_offsets(&mut self, source_map: &SourceMap) {
         // The first offset is always going to be at 0, so skip it.
         for offset in self.cell_offsets.iter_mut().skip(1) {
@@ -636,7 +635,7 @@ print("after empty cells")
         let initial_offsets: Vec<u32> = notebook
             .cell_offsets()
             .iter()
-            .map(|offset| offset.to_u32())
+            .map(ruff_text_size::TextSize::to_u32)
             .collect();
         // [0, 4, 5, 6, 7, 8] - each cell separated by \n, first cell has content "\n\n\n"
         assert_eq!(initial_offsets, vec![0, 4, 5, 6, 7, 8]);
@@ -672,18 +671,18 @@ print("after empty cells")
         let updated_offsets: Vec<u32> = notebook
             .cell_offsets()
             .iter()
-            .map(|offset| offset.to_u32())
+            .map(ruff_text_size::TextSize::to_u32)
             .collect();
         // All offsets should be valid (non-decreasing and <= content length)
         for i in 0..updated_offsets.len() - 1 {
             assert!(
                 updated_offsets[i] <= updated_offsets[i + 1],
-                "Offsets should be non-decreasing: {:?}",
-                updated_offsets
+                "Offsets should be non-decreasing: {updated_offsets:?}",
             );
         }
+        let content_len = u32::try_from(transformed.len()).unwrap();
         assert!(
-            *updated_offsets.last().unwrap() <= transformed.len() as u32,
+            *updated_offsets.last().unwrap() <= content_len,
             "Last offset should not exceed content length"
         );
     }
