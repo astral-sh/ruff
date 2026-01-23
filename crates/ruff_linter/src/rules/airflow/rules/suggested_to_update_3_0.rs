@@ -48,28 +48,10 @@ impl Violation for Airflow3SuggestedUpdate {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Airflow3SuggestedUpdate {
-            deprecated,
-            replacement,
-        } = self;
-        match replacement {
-            Replacement::None
-            | Replacement::AttrName(_)
-            | Replacement::Message(_)
-            | Replacement::Rename { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ }
-            | Replacement::SourceModuleMovedToSDK {
-                module: _, name: _, ..
-            }
-            | Replacement::SourceModuleMovedWithMessage {
-                module: _, name: _, ..
-            } => {
-                format!(
-                    "`{deprecated}` is removed in Airflow 3.0; \
-                    It still works in Airflow 3.0 but is expected to be removed in a future version."
-                )
-            }
-        }
+        let Airflow3SuggestedUpdate { deprecated, .. } = self;
+        format!(
+            "`{deprecated}` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version."
+        )
     }
 
     fn fix_title(&self) -> Option<String> {

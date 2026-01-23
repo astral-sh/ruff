@@ -52,25 +52,8 @@ impl Violation for Airflow3Removal {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Airflow3Removal {
-            deprecated,
-            replacement,
-        } = self;
-        match replacement {
-            Replacement::None
-            | Replacement::AttrName(_)
-            | Replacement::Message(_)
-            | Replacement::Rename { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ }
-            | Replacement::SourceModuleMovedToSDK {
-                module: _, name: _, ..
-            }
-            | Replacement::SourceModuleMovedWithMessage {
-                module: _, name: _, ..
-            } => {
-                format!("`{deprecated}` is removed in Airflow 3.0")
-            }
-        }
+        let Airflow3Removal { deprecated, .. } = self;
+        format!("`{deprecated}` is removed in Airflow 3.0")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -695,8 +678,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::SourceModuleMovedWithMessage {
                 module: "airflow.hooks.base",
                 name: "BaseHook".to_string(),
-                message: "Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1. \
-                Follow the instructions of AIR321 if you're using 3.1+.",
+                message: "Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1+.",
                 suggest_fix: true,
             }
         }

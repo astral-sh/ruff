@@ -13,6 +13,9 @@ use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
+/// Warning message for internal modules that are not part of the public API.
+pub(crate) const INTERNAL_MODULE_WARNING: &str = "This is an internal module which is not suggested to be used and is subject to change without notice.";
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Replacement {
     // There's no replacement or suggestion other than removal

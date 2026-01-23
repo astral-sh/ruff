@@ -617,7 +617,7 @@ AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
 92 |
 93 | from airflow.sensors.base_sensor_operator import BaseSensorOperator
    |
-help: `BaseHook` has been moved to `airflow.hooks.base` since Airflow 3.0. Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1. Follow the instructions of AIR321 if you're using 3.1+.
+help: `BaseHook` has been moved to `airflow.hooks.base` since Airflow 3.0. Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1+.
 85 | 
 86 | # airflow.configuration
 87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -657,7 +657,7 @@ AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
 98 |
 99 | from airflow.utils.helpers import chain as helper_chain
    |
-help: `BaseHook` has been moved to `airflow.hooks.base` since Airflow 3.0. Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1. Follow the instructions of AIR321 if you're using 3.1+.
+help: `BaseHook` has been moved to `airflow.hooks.base` since Airflow 3.0. Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1+.
 85 | 
 86 | # airflow.configuration
 87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set

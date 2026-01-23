@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::rules::airflow::helpers::{
-    Replacement, generate_import_edit, generate_remove_and_runtime_import_edit,
-    is_guarded_by_try_except,
+    INTERNAL_MODULE_WARNING, Replacement, generate_import_edit,
+    generate_remove_and_runtime_import_edit, is_guarded_by_try_except,
 };
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -33,7 +33,7 @@ use ruff_text_size::TextRange;
 /// convert_to_utc(datetime.now())
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.12")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct Airflow31Removal {
     deprecated: String,
     replacement: Replacement,
@@ -44,25 +44,8 @@ impl Violation for Airflow31Removal {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Airflow31Removal {
-            deprecated,
-            replacement,
-        } = self;
-        match replacement {
-            Replacement::None
-            | Replacement::AttrName(_)
-            | Replacement::Message(_)
-            | Replacement::Rename { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ }
-            | Replacement::SourceModuleMovedToSDK {
-                module: _, name: _, ..
-            }
-            | Replacement::SourceModuleMovedWithMessage {
-                module: _, name: _, ..
-            } => {
-                format!("`{deprecated}` is removed in Airflow 3.1")
-            }
-        }
+        let Airflow31Removal { deprecated, .. } = self;
+        format!("`{deprecated}` is removed in Airflow 3.1")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -103,10 +86,7 @@ pub(crate) fn airflow_3_1_removal_expr(checker: &Checker, expr: &Expr) {
     }
 
     match expr {
-        Expr::Attribute(ExprAttribute { range, .. }) => {
-            check_name(checker, expr, *range);
-        }
-        Expr::Name(ExprName { range, .. }) => {
+        Expr::Attribute(ExprAttribute { range, .. }) | Expr::Name(ExprName { range, .. }) => {
             check_name(checker, expr, *range);
         }
         _ => {}
@@ -145,7 +125,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedWithMessage {
             module: "airflow.sdk.definitions._internal.setup_teardown",
             name: rest.to_string(),
-            message: "This is an internal module which is not suggested to be used and is subject to change without notice.",
+            message: INTERNAL_MODULE_WARNING,
             suggest_fix: false,
         },
 
@@ -161,7 +141,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::SourceModuleMovedWithMessage {
                 module: "airflow.models.xcom",
                 name: "XCOM_RETURN_KEY".to_string(),
-                message: "This is an internal module which is not suggested to be used and is subject to change without notice.",
+                message: INTERNAL_MODULE_WARNING,
                 suggest_fix: false,
             }
         }
@@ -195,7 +175,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedWithMessage {
             module: "airflow.sdk.definitions._internal.decorators",
             name: rest.to_string(),
-            message: "This is an internal module which is not suggested to be used and is subject to change without notice.",
+            message: INTERNAL_MODULE_WARNING,
             suggest_fix: false,
         },
 
@@ -208,7 +188,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedWithMessage {
             module: "airflow.sdk.definitions._internal.abstractoperator",
             name: rest.to_string(),
-            message: "This is an internal module which is not suggested to be used and is subject to change without notice.",
+            message: INTERNAL_MODULE_WARNING,
             suggest_fix: false,
         },
 
