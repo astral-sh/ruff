@@ -291,8 +291,7 @@ pub(crate) fn format_path(
     let cache = cache.filter(|_| range.is_none());
 
     // Format the source.
-    let format_result = match format_source(&unformatted, source_type, Some(path), settings, range)?
-    {
+    let format_result = match format_source(&unformatted, Some(path), settings, range)? {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
@@ -356,15 +355,13 @@ impl From<FormattedSource> for FormatResult {
 /// unchanged.
 pub(crate) fn format_source(
     source_kind: &SourceKind,
-    source_type: SourceType,
     path: Option<&Path>,
     settings: &FormatterSettings,
     range: Option<FormatRange>,
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
-        SourceKind::Python(unformatted) => {
-            let py_source_type = source_type.expect_python();
-            let options = settings.to_format_options(py_source_type, unformatted, path);
+        SourceKind::Python(unformatted, py_source_type) => {
+            let options = settings.to_format_options(*py_source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -400,7 +397,10 @@ pub(crate) fn format_source(
             if formatted.len() == unformatted.len() && formatted == *unformatted {
                 Ok(FormattedSource::Unchanged)
             } else {
-                Ok(FormattedSource::Formatted(SourceKind::Python(formatted)))
+                Ok(FormattedSource::Formatted(SourceKind::Python(
+                    formatted,
+                    *py_source_type,
+                )))
             }
         }
         SourceKind::IpyNotebook(notebook) => {
@@ -1283,6 +1283,7 @@ mod tests {
     use ruff_db::panic::catch_unwind;
     use ruff_linter::logging::DisplayParseError;
     use ruff_linter::source_kind::{SourceError, SourceKind};
+    use ruff_python_ast::PySourceType;
     use ruff_python_formatter::FormatModuleError;
     use ruff_python_parser::{ParseError, ParseErrorType};
     use ruff_text_size::{TextRange, TextSize};
@@ -1293,7 +1294,7 @@ mod tests {
     #[test]
     fn error_diagnostics() -> anyhow::Result<()> {
         let path = PathBuf::from("test.py");
-        let source_kind = SourceKind::Python("1".to_string());
+        let source_kind = SourceKind::Python("1".to_string(), PySourceType::Python);
 
         let panic_error = catch_unwind(|| {
             panic!("Test panic for FormatCommandError");
@@ -1392,8 +1393,8 @@ mod tests {
         expect_formatted: Range<u32>,
     ) {
         let mr = ModifiedRange::new(
-            &SourceKind::Python(unformatted.to_string()),
-            &SourceKind::Python(formatted.to_string()),
+            &SourceKind::Python(unformatted.to_string(), PySourceType::Python),
+            &SourceKind::Python(formatted.to_string(), PySourceType::Python),
         );
         assert_eq!(
             mr.unformatted,

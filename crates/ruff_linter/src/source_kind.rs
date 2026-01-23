@@ -19,7 +19,7 @@ use crate::text_helpers::ShowNonprinting;
 #[derive(Clone, Debug, PartialEq)]
 pub enum SourceKind {
     /// The source contains Python source code.
-    Python(String),
+    Python(String, PySourceType),
     /// The source contains a Jupyter notebook.
     IpyNotebook(Box<Notebook>),
     /// The source contains Markdown text.
@@ -40,7 +40,7 @@ impl SourceKind {
 
     pub fn as_python(&self) -> Option<&str> {
         match self {
-            SourceKind::Python(code) => Some(code),
+            SourceKind::Python(code, _) => Some(code),
             _ => None,
         }
     }
@@ -54,7 +54,7 @@ impl SourceKind {
 
     pub fn expect_python(self) -> String {
         match self {
-            SourceKind::Python(code) => code,
+            SourceKind::Python(code, _) => code,
             _ => panic!("expected python code"),
         }
     }
@@ -81,7 +81,9 @@ impl SourceKind {
                 cloned.update(source_map, new_source);
                 SourceKind::IpyNotebook(cloned)
             }
-            SourceKind::Python(_) => SourceKind::Python(new_source),
+            SourceKind::Python(_, py_source_type) => {
+                SourceKind::Python(new_source, *py_source_type)
+            }
             SourceKind::Markdown(_) => SourceKind::Markdown(new_source),
         }
     }
@@ -89,7 +91,7 @@ impl SourceKind {
     /// Returns the Python source code for this source kind.
     pub fn source_code(&self) -> &str {
         match self {
-            SourceKind::Python(source) | SourceKind::Markdown(source) => source,
+            SourceKind::Python(source, _) | SourceKind::Markdown(source) => source,
             SourceKind::IpyNotebook(notebook) => notebook.source_code(),
         }
     }
@@ -104,9 +106,9 @@ impl SourceKind {
                     .is_python_notebook()
                     .then_some(Self::IpyNotebook(Box::new(notebook))))
             }
-            SourceType::Python(_) => {
+            SourceType::Python(py_source_type) => {
                 let contents = std::fs::read_to_string(path)?;
-                Ok(Some(Self::Python(contents)))
+                Ok(Some(Self::Python(contents, py_source_type)))
             }
             SourceType::Markdown => {
                 let contents = std::fs::read_to_string(path)?;
@@ -130,7 +132,7 @@ impl SourceKind {
                         .is_python_notebook()
                         .then_some(Self::IpyNotebook(Box::new(notebook))))
                 } else {
-                    Ok(Some(Self::Python(source_code)))
+                    Ok(Some(Self::Python(source_code, py_source_type)))
                 }
             }
             SourceType::Toml(_) => Ok(None),
@@ -143,7 +145,7 @@ impl SourceKind {
     /// For Jupyter notebooks, this will write out the notebook as JSON.
     pub fn write(&self, writer: &mut dyn Write) -> Result<(), SourceError> {
         match self {
-            SourceKind::Python(source) | SourceKind::Markdown(source) => {
+            SourceKind::Python(source, _) | SourceKind::Markdown(source) => {
                 writer.write_all(source.as_bytes())?;
                 Ok(())
             }
@@ -163,7 +165,7 @@ impl SourceKind {
         path: Option<&'a Path>,
     ) -> Option<SourceKindDiff<'a>> {
         match (self, other) {
-            (SourceKind::Python(src), SourceKind::Python(dst)) => Some(SourceKindDiff {
+            (SourceKind::Python(src, _), SourceKind::Python(dst, _)) => Some(SourceKindDiff {
                 kind: DiffKind::Text(src, dst),
                 path,
             }),

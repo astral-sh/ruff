@@ -212,7 +212,7 @@ impl Workspace {
         let source_type = PySourceType::default();
 
         // TODO(dhruvmanila): Support Jupyter Notebooks
-        let source_kind = SourceKind::Python(contents.to_string());
+        let source_kind = SourceKind::Python(contents.to_string(), source_type);
 
         // Use the unresolved version because we don't have a file path.
         let target_version = self.settings.linter.unresolved_target_version;

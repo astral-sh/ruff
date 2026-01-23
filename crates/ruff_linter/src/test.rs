@@ -197,7 +197,12 @@ pub(crate) fn assert_notebook_path(
 pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
-    test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
+    test_contents(
+        &SourceKind::Python(contents.into_owned(), PySourceType::Python),
+        path,
+        settings,
+    )
+    .0
 }
 
 thread_local! {

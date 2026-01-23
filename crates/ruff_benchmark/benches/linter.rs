@@ -83,13 +83,14 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                         assert!(parsed.has_valid_syntax());
 
                         let path = case.path();
+                        let py_source_type = PySourceType::from(path.as_path());
                         lint_only(
                             &path,
                             None,
                             settings,
                             flags::Noqa::Enabled,
-                            &SourceKind::Python(case.code().to_string()),
-                            PySourceType::from(path.as_path()),
+                            &SourceKind::Python(case.code().to_string(), py_source_type),
+                            py_source_type,
                             ParseSource::Precomputed(parsed),
                         )
                     },

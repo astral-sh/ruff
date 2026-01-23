@@ -102,7 +102,7 @@ fn format_source_code(
     };
 
     // Format the source.
-    let formatted = format_source(&source_kind, source_type, path, settings, range)?;
+    let formatted = format_source(&source_kind, path, settings, range)?;
 
     match &formatted {
         FormattedSource::Formatted(formatted) => match mode {
