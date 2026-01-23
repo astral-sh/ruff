@@ -345,6 +345,9 @@ impl Session {
         match path {
             AnySystemPath::System(system_path) => {
                 self.project_state_for_path(system_path).unwrap_or_else(|| {
+                    // TODO: While ty supports multiple workspace folders, we still
+                    // need to figure out which project should this virtual path
+                    // belong to: https://github.com/astral-sh/ty/issues/794
                     self.projects
                         .values()
                         .next()
@@ -352,9 +355,9 @@ impl Session {
                 })
             }
             AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: Currently, ty only supports single workspace but we need to figure out
-                // which project should this virtual path belong to when there are multiple
-                // projects: https://github.com/astral-sh/ty/issues/794
+                // TODO: While ty supports multiple workspace folders, we still
+                // need to figure out which project should this virtual path
+                // belong to: https://github.com/astral-sh/ty/issues/794
                 self.projects
                     .iter()
                     .next()
@@ -383,15 +386,17 @@ impl Session {
                     return self.projects.range_mut(range).next_back().unwrap().1;
                 }
 
-                // TODO: Currently, ty only supports single workspaces but we need to figure out
-                // which project to use when we support multiple projects (e.g. look for the first project
-                // with an overlapping search path?)
+                // TODO: While ty supports multiple workspace folders, we still
+                // need to figure out which project should this virtual path
+                // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
+                // look for the first project with an overlapping search path?)
                 self.projects.values_mut().next().unwrap()
             }
             AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: Currently, ty only supports single workspace but we need to figure out
-                // which project should this virtual path belong to when there are multiple
-                // projects: https://github.com/astral-sh/ty/issues/794
+                // TODO: While ty supports multiple workspace folders, we still
+                // need to figure out which project should this virtual path
+                // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
+                // look for the first project with an overlapping search path?)
                 self.projects
                     .iter_mut()
                     .next()
