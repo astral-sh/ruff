@@ -578,7 +578,8 @@ Run Ruff on the given files or directories
 Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to check [default: .]
+  [FILES]...  List of files or directories to check, or `-` to read from stdin
+              [default: .]
 
 Options:
       --fix
@@ -716,7 +717,8 @@ Run the Ruff formatter on the given files or directories
 Usage: ruff format [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to format [default: .]
+  [FILES]...  List of files or directories to format, or `-` to read from stdin
+              [default: .]
 
 Options:
       --check
