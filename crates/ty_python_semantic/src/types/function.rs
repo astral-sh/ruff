@@ -599,12 +599,11 @@ impl<'db> OverloadLiteral<'db> {
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function()?.node(&module);
+    ) -> (Span, Span) {
+        let file = self.file(db);
+        let span = Span::from(file);
+        let module = parsed_module(db, file).load(db);
+        let func_def = self.node(db, file, &module);
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
@@ -616,26 +615,25 @@ impl<'db> OverloadLiteral<'db> {
             .unwrap_or(func_def.parameters.range);
         let name_span = span.clone().with_range(func_def.name.range);
         let parameter_span = span.with_range(range);
-        Some((name_span, parameter_span))
+        (name_span, parameter_span)
     }
 
-    pub(crate) fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
+    pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
+        let file = self.file(db);
+        let span = Span::from(file);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function()?.node(&module);
+        let func_def = self.node(db, file, &module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
         if let Some(return_type_range) = return_type_range {
             signature = signature.cover(return_type_range);
         }
-        Some(FunctionSpans {
+        FunctionSpans {
             signature: span.clone().with_range(signature),
             name: span.clone().with_range(func_def.name.range),
             parameters: span.clone().with_range(func_def.parameters.range),
             return_type: return_type_range.map(|range| span.clone().with_range(range)),
-        })
+        }
     }
 }
 
@@ -686,15 +684,11 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).definition(db)
     }
 
-    fn parameter_span(
-        self,
-        db: &'db dyn Db,
-        parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
+    fn parameter_span(self, db: &'db dyn Db, parameter_index: Option<usize>) -> (Span, Span) {
         self.last_definition(db).parameter_span(db, parameter_index)
     }
 
-    fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+    fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.last_definition(db).spans(db)
     }
 
@@ -992,7 +986,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
+    ) -> (Span, Span) {
         self.literal(db).parameter_span(db, parameter_index)
     }
 
@@ -1009,7 +1003,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// An example of a good use case is to improve
     /// a diagnostic.
-    pub(crate) fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+    pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.literal(db).spans(db)
     }
 

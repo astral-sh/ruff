@@ -2502,15 +2502,12 @@ impl<'db> CallableBinding<'db> {
                     let (overloads, implementation) =
                         function.overloads_and_implementation(context.db());
 
-                    if let Some(spans) = overloads
-                        .first()
-                        .and_then(|overload| overload.spans(context.db()))
-                    {
+                    if let Some(overload) = overloads.first() {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "First overload defined here",
                         );
-                        sub.annotate(Annotation::primary(spans.signature));
+                        sub.annotate(Annotation::primary(overload.spans(context.db()).signature));
                         diag.sub(sub);
                     }
 
@@ -2532,14 +2529,14 @@ impl<'db> CallableBinding<'db> {
                         ));
                     }
 
-                    if let Some(spans) =
-                        implementation.and_then(|function| function.spans(context.db()))
-                    {
+                    if let Some(implementation) = implementation {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "Overload implementation defined here",
                         );
-                        sub.annotate(Annotation::primary(spans.signature));
+                        sub.annotate(Annotation::primary(
+                            implementation.spans(context.db()).signature,
+                        ));
                         diag.sub(sub);
                     }
                 }
@@ -4421,15 +4418,13 @@ impl<'db> BindingError<'db> {
                 }
 
                 if let Some(matching_overload) = matching_overload {
-                    if let Some((name_span, parameter_span)) =
-                        matching_overload.get(context.db()).and_then(|overload| {
-                            overload.parameter_span(context.db(), Some(parameter.index))
-                        })
-                    {
+                    if let Some(overload_literal) = matching_overload.get(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "Matching overload defined here",
                         );
+                        let (name_span, parameter_span) =
+                            overload_literal.parameter_span(context.db(), Some(parameter.index));
                         sub.annotate(Annotation::primary(name_span));
                         sub.annotate(
                             Annotation::secondary(parameter_span)

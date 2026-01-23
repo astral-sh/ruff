@@ -6655,11 +6655,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         parameter_index: Option<usize>,
     ) -> Option<(Span, Span)> {
-        match *self {
-            Type::FunctionLiteral(function) => function.parameter_span(db, parameter_index),
-            Type::BoundMethod(bound_method) => bound_method
-                .function(db)
-                .parameter_span(db, parameter_index),
+        match self {
+            Type::FunctionLiteral(function) => Some(function.parameter_span(db, parameter_index)),
+            Type::BoundMethod(bound_method) => Some(
+                bound_method
+                    .function(db)
+                    .parameter_span(db, parameter_index),
+            ),
             _ => None,
         }
     }
@@ -6682,9 +6684,9 @@ impl<'db> Type<'db> {
     /// An example of a good use case is to improve
     /// a diagnostic.
     fn function_spans(&self, db: &'db dyn Db) -> Option<FunctionSpans> {
-        match *self {
-            Type::FunctionLiteral(function) => function.spans(db),
-            Type::BoundMethod(bound_method) => bound_method.function(db).spans(db),
+        match self {
+            Type::FunctionLiteral(function) => Some(function.spans(db)),
+            Type::BoundMethod(bound_method) => Some(bound_method.function(db).spans(db)),
             _ => None,
         }
     }
