@@ -2263,7 +2263,7 @@ fn range_formatting_notebook() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to format main.ipynb: Range formatting isn't supported.
+    error: Failed to format main.ipynb: Range formatting is only supported for Python files.
     ");
     Ok(())
 }

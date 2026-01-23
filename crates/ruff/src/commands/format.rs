@@ -1367,7 +1367,7 @@ mod tests {
         io: Cannot write to file
         --> test.py:1:1
 
-        invalid-cli-option: Range formatting isn't supported.
+        invalid-cli-option: Range formatting is only supported for Python files.
         --> test.py:1:1
 
         panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
