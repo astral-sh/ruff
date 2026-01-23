@@ -4283,6 +4283,16 @@ pub(super) fn report_invalid_method_override<'db>(
             .as_ref()
             .and_then(Span::range)
             .unwrap_or_else(|| {
+                // TODO: This assertion demonstrates the root cause of
+                // https://github.com/astral-sh/ty/issues/2602
+                // The `subclass_function` might be from a different file than `context.file()`
+                // when a function from another module is assigned as a method.
+                assert_eq!(
+                    subclass_function.literal(db).last_definition(db).body_scope(db).file(db),
+                    context.file(),
+                    "FunctionType is from a different file than the inference context. \
+                    This would cause a panic when accessing the AST node."
+                );
                 subclass_function
                     .node(db, context.file(), context.module())
                     .range
@@ -4542,6 +4552,15 @@ pub(super) fn report_overridden_final_method<'db>(
         let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {
             return;
         };
+        // TODO: This assertion demonstrates the root cause of
+        // https://github.com/astral-sh/ty/issues/2602
+        // The `subclass_literal` class might be from a different file than `context.file()`.
+        assert_eq!(
+            subclass_literal.body_scope(db).file(db),
+            context.file(),
+            "Class is from a different file than the inference context. \
+            This would cause a panic when accessing the AST node."
+        );
         let class_node = subclass_literal
             .body_scope(db)
             .node(db)
@@ -4553,6 +4572,14 @@ pub(super) fn report_overridden_final_method<'db>(
         let is_only = overload_count >= class_node.body.len();
 
         let overload_deletion = |overload: &OverloadLiteral<'db>| {
+            // TODO: This assertion demonstrates the root cause of
+            // https://github.com/astral-sh/ty/issues/2602
+            assert_eq!(
+                overload.body_scope(db).file(db),
+                context.file(),
+                "Overload is from a different file than the inference context. \
+                This would cause a panic when accessing the AST node."
+            );
             let range = overload.node(db, context.file(), context.module()).range();
             if is_only {
                 Edit::range_replacement("pass".to_string(), range)

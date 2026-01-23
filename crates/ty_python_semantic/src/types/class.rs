@@ -2427,6 +2427,15 @@ impl<'db> StaticClassLiteral<'db> {
     /// query depends on the AST of another file (bad!).
     fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
         let scope = self.body_scope(db);
+        // TODO: This assertion demonstrates the root cause of
+        // https://github.com/astral-sh/ty/issues/2602
+        // The class might be from a different file than the passed module.
+        assert_eq!(
+            scope.file(db),
+            module.module().file(),
+            "StaticClassLiteral is from a different file than the passed module. \
+            This would cause a panic when accessing the AST node."
+        );
         scope.node(db).expect_class().node(module)
     }
 
@@ -4012,6 +4021,18 @@ impl<'db> StaticClassLiteral<'db> {
                 if let CodeGeneratorKind::DataclassLike(_) = field_policy
                     && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
                 {
+                    // TODO: This assertion demonstrates the root cause of
+                    // https://github.com/astral-sh/ty/issues/2602
+                    // The `literal` FunctionType might be from a different file than `context.file()`
+                    // (e.g., when `__setattr__ = imported_function`). The call to `literal.node()`
+                    // below incorrectly uses `context.file()` and `context.module()` instead of
+                    // the file where `literal` is actually defined.
+                    assert_eq!(
+                        literal.literal(db).last_definition(db).body_scope(db).file(db),
+                        context.file(),
+                        "FunctionType is from a different file than the inference context. \
+                        This would cause a panic when accessing the AST node."
+                    );
                     if let Some(builder) = context.report_lint(
                         &INVALID_DATACLASS_OVERRIDE,
                         literal.node(db, context.file(), context.module()),
