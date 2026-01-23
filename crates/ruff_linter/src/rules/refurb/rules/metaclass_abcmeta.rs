@@ -43,7 +43,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// The rule's fix is unsafe if the class has base classes. This is because the base classes might
 /// be validating the class's other base classes (e.g., `typing.Protocol` does this) or otherwise
 /// alter runtime behavior if more base classes are added.
-/// The rule's fix is unsafe too if the class has comments in its definition.
+/// The rule's fix will also be marked as unsafe if the class has
+/// comments in its argument list that could be deleted.
 ///
 ///
 /// ## References
