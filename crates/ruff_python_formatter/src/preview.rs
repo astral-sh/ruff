@@ -29,13 +29,6 @@ pub(crate) const fn is_blank_line_before_decorated_class_in_stub_enabled(
 }
 
 /// Returns `true` if the
-/// [`allow_newline_after_block_open`](https://github.com/astral-sh/ruff/pull/21110) preview style
-/// is enabled.
-pub(crate) const fn is_allow_newline_after_block_open_enabled(context: &PyFormatContext) -> bool {
-    context.is_preview()
-}
-
-/// Returns `true` if the
 /// [`parenthesize_lambda_bodies`](https://github.com/astral-sh/ruff/pull/21385) preview style is
 /// enabled.
 pub(crate) const fn is_parenthesize_lambda_bodies_enabled(context: &PyFormatContext) -> bool {
