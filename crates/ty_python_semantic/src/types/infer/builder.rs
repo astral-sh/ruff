@@ -8708,6 +8708,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_binding(import_from.into(), definition)
             .insert(self, Type::unknown());
 
+        let settings = self.db().analysis_settings(self.file());
+
+        if settings
+            .allowed_unresolved_imports
+            .matches(&full_submodule_name)
+            .is_include()
+        {
+            return;
+        }
+
         if !self.is_reachable(import_from) {
             return;
         }
