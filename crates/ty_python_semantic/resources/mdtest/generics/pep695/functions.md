@@ -258,9 +258,10 @@ methods that are compatible with the return type, so the `return` expression is 
 
 ```py
 def same_constrained_types[T: (int, str)](t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
+
+def chained_constrained_types[T: (int, float)](t1: T, t2: T, t3: T) -> T:
+    return (t1 + t2) * t3
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two

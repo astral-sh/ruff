@@ -289,9 +289,12 @@ from typing import TypeVar
 T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
+
+S = TypeVar("S", int, float)
+
+def chained_constrained_types(t1: S, t2: S, t3: S) -> S:
+    return (t1 + t2) * t3
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two
