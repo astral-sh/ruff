@@ -3013,6 +3013,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             });
         }
 
+        // For ParamSpec parameters, both *args and **kwargs are required since we don't know
+        // what arguments the underlying callable expects. For all other callables, variadic
+        // and keyword_variadic parameters are optional.
+        let paramspec_parameters = self.parameters.as_paramspec().is_some();
+
         let mut missing = vec![];
         for (
             index,
@@ -3027,11 +3032,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     continue;
                 }
                 let param = &self.parameters[index];
-                if param.is_variadic()
-                    || param.is_keyword_variadic()
+                if !paramspec_parameters && (param.is_variadic() || param.is_keyword_variadic())
                     || param.default_type().is_some()
                 {
                     // variadic/keywords and defaulted arguments are not required
+                    // (unless the parameters represent a ParamSpec)
                     continue;
                 }
                 missing.push(ParameterContext::new(param, index, false));
@@ -3040,6 +3045,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         if !missing.is_empty() {
             self.errors.push(BindingError::MissingArguments {
                 parameters: ParameterContexts(missing),
+                paramspec: self.parameters.as_paramspec(),
             });
         }
 
@@ -4210,6 +4216,10 @@ pub(crate) enum BindingError<'db> {
     /// One or more required parameters (that is, with no default) is not supplied by any argument.
     MissingArguments {
         parameters: ParameterContexts,
+        /// If the missing arguments are for a `ParamSpec`, this contains the `ParamSpec` typevar.
+        /// This is used to provide more informative error messages explaining why `*args` and
+        /// `**kwargs` are required.
+        paramspec: Option<BoundTypeVarInstance<'db>>,
     },
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
@@ -4549,7 +4559,10 @@ impl<'db> BindingError<'db> {
                 }
             }
 
-            Self::MissingArguments { parameters } => {
+            Self::MissingArguments {
+                parameters,
+                paramspec,
+            } => {
                 if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, node) {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
@@ -4575,6 +4588,16 @@ impl<'db> BindingError<'db> {
                             sub.annotate(Annotation::primary(parameter_span));
                             diag.sub(sub);
                         }
+                    }
+                    if let Some(paramspec) = paramspec {
+                        let paramspec_name = paramspec.name(context.db());
+                        diag.sub(SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!(
+                                "These arguments are required because `ParamSpec` `{paramspec_name}` \
+                                 could represent any set of parameters at runtime"
+                            ),
+                        ));
                     }
                 }
             }

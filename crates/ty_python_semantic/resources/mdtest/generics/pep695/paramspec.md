@@ -179,12 +179,15 @@ def f[**P](func: Callable[P, int]) -> Callable[P, None]:
         reveal_type(func(*kwargs, **args))  # revealed: int
 
         # error: [invalid-argument-type] "Argument is incorrect: Expected `P@f.args`, found `P@f.kwargs`"
+        # error: [missing-argument]
         reveal_type(func(args, kwargs))  # revealed: int
 
         # Both parameters are required
-        # TODO: error
+        # error: [missing-argument]
         reveal_type(func())  # revealed: int
+        # error: [missing-argument]
         reveal_type(func(*args))  # revealed: int
+        # error: [missing-argument]
         reveal_type(func(**kwargs))  # revealed: int
     return wrapper
 ```
