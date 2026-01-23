@@ -10,6 +10,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+insta.workspace = true
 regex.workspace = true
 ruff_python_ast.workspace = true
 ruff_python_formatter.workspace = true

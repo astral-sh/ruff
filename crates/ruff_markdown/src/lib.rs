@@ -78,3 +78,55 @@ pub fn format_code_blocks(
         MarkdownResult::Unchanged
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_snapshot;
+    use ruff_workspace::FormatterSettings;
+
+    use crate::{MarkdownResult, format_code_blocks};
+
+    impl std::fmt::Display for MarkdownResult {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Formatted(source) => write!(f, "{source}"),
+                Self::Unchanged => write!(f, "Unchanged"),
+            }
+        }
+    }
+
+    #[test]
+    fn format_code_blocks_basic() {
+        let code = r#"
+This is poorly formatted code:
+
+```py
+print( "hello" )
+```
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @r#"
+        This is poorly formatted code:
+
+        ```py
+        print("hello")
+        ```
+        "#
+        );
+    }
+
+    #[test]
+    fn format_code_blocks_unchanged() {
+        let code = r#"
+This is well formatted code:
+
+```py
+print("hello")
+```
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @"Unchanged");
+    }
+}
