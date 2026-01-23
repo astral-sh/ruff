@@ -14,13 +14,6 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
     context.is_preview()
 }
 
-/// Returns `true` if the [`blank_line_before_decorated_class_in_stub`](https://github.com/astral-sh/ruff/issues/18865) preview style is enabled.
-pub(crate) const fn is_blank_line_before_decorated_class_in_stub_enabled(
-    context: &PyFormatContext,
-) -> bool {
-    context.is_preview()
-}
-
 /// Returns `true` if the
 /// [`parenthesize_lambda_bodies`](https://github.com/astral-sh/ruff/pull/21385) preview style is
 /// enabled.
