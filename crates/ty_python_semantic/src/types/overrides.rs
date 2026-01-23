@@ -259,6 +259,9 @@ fn check_class_declaration<'db>(
             if is_enum_member {
                 let member_value_type = member.ty;
 
+                // TODO ideally this would be a syntactic check that only matches on literal `...`
+                // in the source, rather than matching on the type. But this would require storing
+                // additional information in `EnumMetadata`.
                 let is_ellipsis = matches!(
                     member_value_type,
                     Type::NominalInstance(nominal_instance)
@@ -275,14 +278,16 @@ fn check_class_declaration<'db>(
                             first_reachable_definition.focus_range(db, context.module()),
                         ) {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Enum member `{}` value is not compatible with expected type",
+                                "Enum member `{}` value is not assignable to expected type",
                                 &member.name
                             ));
                             diagnostic.info(format_args!(
-                                "Expected type assignable to `{}`, got `{}`",
+                                "Expected `{}`, got `{}`",
                                 expected_type.display(db),
                                 member_value_type.display(db)
                             ));
+                            // TODO we could also point to the source of our `_value_` type
+                            // expectations (`_value_` annotation or `__init__` method)
                         }
                     }
                 }
