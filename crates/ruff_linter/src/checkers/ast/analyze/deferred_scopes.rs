@@ -144,7 +144,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 ruff::rules::mutable_dataclass_default(checker, class_def);
             }
             if checker.is_rule_enabled(Rule::UnusedPrivateMember) {
-                pylint::rules::unused_private_member(checker, class_def, scope_id, scope);
+                pylint::rules::unused_private_member(checker, class_def);
             }
         }
 
