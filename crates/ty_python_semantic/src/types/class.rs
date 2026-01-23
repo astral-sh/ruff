@@ -20,8 +20,8 @@ use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE, INVALID_DATACLASS_OVERRIDE,
-    INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
+    CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE,
+    INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
     report_conflicting_metaclass_from_bases,
 };
 use crate::types::enums::{
@@ -37,7 +37,6 @@ use crate::types::generics::{
 use crate::types::infer::{
     infer_complete_scope_types, infer_expression_type, infer_unpack_types, nearest_enclosing_class,
 };
-use crate::types::list_members::all_end_of_scope_members;
 use crate::types::member::{Member, class_member};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::relation::{
@@ -92,14 +91,6 @@ fn static_class_explicit_bases_cycle_initial<'db>(
     Box::default()
 }
 
-fn inheritance_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Option<InheritanceCycle> {
-    None
-}
-
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -149,24 +140,6 @@ fn try_metaclass_cycle_initial<'db>(
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
-}
-
-fn decorators_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
-fn fields_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-    _specialization: Option<Specialization<'db>>,
-    _field_policy: CodeGeneratorKind<'db>,
-) -> FxIndexMap<Name, Field<'db>> {
-    FxIndexMap::default()
 }
 
 fn dynamic_class_explicit_bases_cycle_initial<'db>(
@@ -5169,6 +5142,8 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns an empty slice if the bases cannot be computed (e.g., due to a cycle)
     /// or if the bases argument is not a tuple.
+    ///
+    /// Returns `[Unknown]` if the bases tuple is variable-length (like `tuple[type, ...]`).
     #[salsa::tracked(returns(deref), cycle_initial=dynamic_class_explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let scope = self.scope(db);
@@ -5217,7 +5192,7 @@ impl<'db> DynamicClassLiteral<'db> {
         };
 
         // For variable-length tuples (like `tuple[type, ...]`), we can't statically
-        // determine the bases, so return a single Unknown base.
+        // determine the bases, so return Unknown.
         let Some(tuple_spec) = bases_type.tuple_instance_spec(db) else {
             return Box::from([Type::unknown()]);
         };
@@ -5290,12 +5265,12 @@ impl<'db> DynamicClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
-        let base_types = self.explicit_bases(db);
+        let original_bases = self.explicit_bases(db);
 
         // If no bases, metaclass is `type`.
         // To dynamically create a class with no bases that has a custom metaclass,
         // you have to invoke that metaclass rather than `type()`.
-        if base_types.is_empty() {
+        if original_bases.is_empty() {
             return Ok(KnownClass::Type.to_class_literal(db));
         }
 
@@ -5304,16 +5279,19 @@ impl<'db> DynamicClassLiteral<'db> {
             return Ok(SubclassOfType::subclass_of_unknown());
         }
 
-        // Convert types to ClassBases. Use a placeholder class for conversion.
+        // Convert Types to ClassBases for metaclass computation.
         let placeholder_class: ClassLiteral<'db> =
             KnownClass::Object.try_to_class_literal(db).unwrap().into();
-        let bases: Vec<ClassBase<'db>> = base_types
+
+        let bases: Vec<ClassBase<'db>> = original_bases
             .iter()
-            .map(|ty| {
-                ClassBase::try_from_type(db, *ty, placeholder_class)
-                    .unwrap_or_else(ClassBase::unknown)
-            })
+            .filter_map(|base_type| ClassBase::try_from_type(db, *base_type, placeholder_class))
             .collect();
+
+        // If all bases failed to convert, return type as the metaclass.
+        if bases.is_empty() {
+            return Ok(KnownClass::Type.to_class_literal(db));
+        }
 
         // Start with the first base's metaclass as the candidate.
         let mut candidate = bases[0].metaclass(db);
@@ -8248,16 +8226,25 @@ impl KnownClass {
                     if let Err(error) = dynamic_class.try_mro(db) {
                         match error.reason() {
                             DynamicMroErrorKind::InvalidBases(invalid_bases) => {
-                                for (_, invalid_type) in invalid_bases {
+                                for (_, base_type) in invalid_bases {
                                     if let Some(builder) =
                                         context.report_lint(&INVALID_BASE, call_expression)
                                     {
                                         builder.into_diagnostic(format_args!(
-                                            "Invalid class base with type `{}` (all bases must be a class, \
-                                                `Any`, `Unknown` or `Todo`)",
-                                            invalid_type.display(db),
+                                            "Invalid class base with type `{}`",
+                                            base_type.display(db)
                                         ));
                                     }
+                                }
+                            }
+                            DynamicMroErrorKind::InheritanceCycle => {
+                                if let Some(builder) =
+                                    context.report_lint(&CYCLIC_CLASS_DEFINITION, call_expression)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cyclic definition of `{}`",
+                                        dynamic_class.name(db)
+                                    ));
                                 }
                             }
                             DynamicMroErrorKind::DuplicateBases(duplicates) => {
