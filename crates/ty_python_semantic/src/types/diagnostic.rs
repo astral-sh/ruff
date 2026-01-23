@@ -3597,6 +3597,41 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
 }
 
+pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ranged>(
+    context: &InferContext,
+    pattern_cls: T,
+    protocol: ProtocolClass,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, pattern_cls) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = protocol.name(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Class `{class_name}` cannot be used in a class pattern",
+    ));
+    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format_args!(
+            "`{class_name}` is declared as a protocol class, \
+                but it is not declared as runtime-checkable"
+        ),
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol.definition_span(db))
+            .message(format_args!("`{class_name}` declared here")),
+    );
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(
+        "A protocol class can only be used in a match class pattern if it is decorated \
+            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`",
+    );
+    diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
+}
+
 pub(crate) fn report_attempted_protocol_instantiation(
     context: &InferContext,
     call: &ast::ExprCall,

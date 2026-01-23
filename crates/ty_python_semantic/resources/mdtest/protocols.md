@@ -2479,6 +2479,50 @@ def f(arg1: type, arg2: type):
         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
 ```
 
+## Match class patterns and protocols
+
+<!-- snapshot-diagnostics -->
+
+Similar to `isinstance()`, using a non-runtime-checkable protocol class in a match class pattern
+will raise `TypeError` at runtime. We emit an error for these cases:
+
+```py
+from typing_extensions import Protocol, runtime_checkable
+
+class HasX(Protocol):
+    x: int
+
+@runtime_checkable
+class RuntimeCheckableHasX(Protocol):
+    x: int
+
+def match_non_runtime_checkable(arg: object):
+    match arg:
+        case HasX():  # error: [invalid-argument-type]
+            reveal_type(arg)  # revealed: HasX
+        case _:
+            reveal_type(arg)  # revealed: ~HasX
+
+def match_runtime_checkable(arg: object):
+    match arg:
+        case RuntimeCheckableHasX():  # no error!
+            reveal_type(arg)  # revealed: RuntimeCheckableHasX
+        case _:
+            reveal_type(arg)  # revealed: ~RuntimeCheckableHasX
+```
+
+The same applies to nested class patterns:
+
+```py
+class Wrapper:
+    inner: object
+
+def match_nested_non_runtime_checkable(arg: Wrapper):
+    match arg:
+        case Wrapper(inner=HasX()):  # error: [invalid-argument-type]
+            pass
+```
+
 ## Truthiness of protocol instances
 
 An instance of a protocol type generally has ambiguous truthiness:
