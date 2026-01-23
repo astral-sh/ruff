@@ -19,13 +19,13 @@ static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
     // adapted from blacken-docs
     // https://github.com/adamchainz/blacken-docs/blob/fb107c1dce25f9206e29297aaa1ed7afc2980a5a/src/blacken_docs/__init__.py#L17
     Regex::new(
-        r"(?imsx)
+        r"(?imx)
                     (?<before>
                         ^(?<indent>\ *)```[^\S\r\n]*
                         (?<lang>python|py|python3|py3|pyi)
-                        (?:\ .*?)?\n
+                        (?<info>(?:\ .*)?)\n
                     )
-                    (?<code>.*?)
+                    (?s:(?<code>.*?))
                     (?<after>
                         ^\ *```[^\S\r\n]*$
                     )
@@ -41,8 +41,21 @@ pub fn format_code_blocks(
 ) -> MarkdownResult {
     let mut changed = false;
     let formatted_document = MARKDOWN_CODE_BLOCK.replace_all(source, |capture: &Captures| {
-        let (original, [before, code_indent, code_lang, unformatted_code, after]) =
-            capture.extract();
+        let (
+            original,
+            [
+                before,
+                code_indent,
+                code_lang,
+                info_string,
+                unformatted_code,
+                after,
+            ],
+        ) = capture.extract();
+
+        if info_string.to_ascii_lowercase().contains("ruff:skip") {
+            return original.to_string();
+        }
 
         let code_block_source_type = if code_lang == "pyi" {
             PySourceType::Stub
@@ -123,6 +136,21 @@ This is well formatted code:
 
 ```py
 print("hello")
+```
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_skipped() {
+        let code = r#"
+This is intentionally poorly formatted code:
+
+```py ruff:skip
+print(
+      "hello"   )
 ```
         "#;
         assert_snapshot!(
