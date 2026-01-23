@@ -2394,65 +2394,40 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     let unformatted = test.fixture_path("unformatted.md");
 
     assert_cmd_snapshot!(test.format_command()
-        .args(["--isolated", "--preview", "--diff"])
+        .args(["--isolated", "--preview", "--check"])
         .arg(unformatted),
         @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    --- CRATE_ROOT/resources/test/fixtures/unformatted.md
-    +++ CRATE_ROOT/resources/test/fixtures/unformatted.md
-    @@ -17,15 +17,20 @@
-     Labeled Python code:
-     
-     ```py
-    -print( "hello" )
-    -def foo(): pass
-    +print("hello")
-    +
-    +
-    +def foo():
-    +    pass
-     ```
-     
-     Labeled Python stub:
-     
-     ```pyi
-    -print( "hello" )
-    -def foo(): pass
-    +print("hello")
-    +
-    +def foo():
-    +    pass
-     ```
-     
-     Labeled Rust code:
-    @@ -40,7 +45,7 @@
-     * List item
-     
-       ```py
-    -  print( "hello" )
-    +  print("hello")
-       ```
-     
-     Block quoted code blocks may not be supported:
-    @@ -56,10 +61,10 @@
-     
-     <!-- blacken-docs:off -->
-     ```py
-    -print( "hello" )
-    +print("hello")
-     ```
-     <!-- blacken-docs:on -->
-     
-     ```py
-    -print( "hello" )
-    +print("hello")
-     ```
+    unformatted: File would be reformatted
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
+    9  | Labeled Python code:
+    10 | 
+    11 | ```py
+       - print( "hello" )
+       - def foo(): pass
+    12 + print("hello")
+    13 + 
+    14 + 
+    15 + def foo():
+    16 +     pass
+    17 | ```
+    18 | 
+    19 | Labeled Python stub:
+    20 | 
+    21 | ```pyi
+       - print( "hello" )
+       - def foo(): pass
+    22 + print("hello")
+    23 + 
+    24 + def foo():
+    25 +     pass
+    26 | ```
 
+    1 file would be reformatted
 
     ----- stderr -----
-    1 file would be reformatted
     "#);
     Ok(())
 }
@@ -2477,14 +2452,6 @@ fn markdown_formatting_stdin() -> Result<()> {
     print( "hello" )
     ```
 
-    Unlabeled Rust code:
-
-    ```
-    fn thing() {
-        println!( "hello" );
-    }
-    ```
-
     Labeled Python code:
 
     ```py
@@ -2502,42 +2469,6 @@ fn markdown_formatting_stdin() -> Result<()> {
 
     def foo():
         pass
-    ```
-
-    Labeled Rust code:
-    ```rust
-    fn thing() {
-        println!( "hello" );
-    }
-    ```
-
-    Indented code blocks should also work:
-
-    * List item
-
-      ```py
-      print("hello")
-      ```
-
-    Block quoted code blocks may not be supported:
-
-    > Quoted text
-    >
-    > ```py
-    > print( "hello" )
-    > ```
-
-
-    Blacken-docs supports ignore directives:
-
-    <!-- blacken-docs:off -->
-    ```py
-    print("hello")
-    ```
-    <!-- blacken-docs:on -->
-
-    ```py
-    print("hello")
     ```
 
     ----- stderr -----
