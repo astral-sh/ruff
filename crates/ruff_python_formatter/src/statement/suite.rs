@@ -17,9 +17,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::preview::{
-    is_allow_newline_after_block_open_enabled, is_blank_line_before_decorated_class_in_stub_enabled,
-};
+use crate::preview::is_blank_line_before_decorated_class_in_stub_enabled;
 use crate::statement::trailing_semicolon;
 use crate::verbatim::{
     write_skipped_statements, write_suppressed_statements_starting_with_leading_comment,
@@ -189,12 +187,11 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 false,
             )
         } else {
-            // Allow an empty line after a function header in preview, if the function has no
+            // Allow an empty line after a function header
+            // if the function has no
             // docstring and no initial comment.
-            let allow_newline_after_block_open =
-                is_allow_newline_after_block_open_enabled(f.context())
-                    && matches!(self.kind, SuiteKind::Function)
-                    && matches!(first, SuiteChildStatement::Other(_));
+            let allow_newline_after_block_open = matches!(self.kind, SuiteKind::Function)
+                && matches!(first, SuiteChildStatement::Other(_));
 
             let start = comments
                 .leading(first)
