@@ -3013,6 +3013,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             });
         }
 
+        // For ParamSpec parameters, both *args and **kwargs are required since we don't know
+        // what arguments the underlying callable expects. For all other callables, variadic
+        // and keyword_variadic parameters are optional.
+        let paramspec_parameters = self.parameters.as_paramspec().is_some();
+
         let mut missing = vec![];
         for (
             index,
@@ -3027,11 +3032,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     continue;
                 }
                 let param = &self.parameters[index];
-                if param.is_variadic()
-                    || param.is_keyword_variadic()
+                if !paramspec_parameters && (param.is_variadic() || param.is_keyword_variadic())
                     || param.default_type().is_some()
                 {
                     // variadic/keywords and defaulted arguments are not required
+                    // (unless the parameters represent a ParamSpec)
                     continue;
                 }
                 missing.push(ParameterContext::new(param, index, false));
