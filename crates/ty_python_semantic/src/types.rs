@@ -1481,6 +1481,54 @@ impl<'db> Type<'db> {
         if yes { self.negate(db) } else { *self }
     }
 
+    /// Return `true` if it is possible to spell an equivalent type to this one
+    /// in user annotations without nonstandard extensions to the type system
+    pub(crate) fn is_spellable(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::Never
+            | Type::NewTypeInstance(_)
+            | Type::EnumLiteral(_)
+            | Type::NominalInstance(_)
+            // `TypedDict` and `Protocol` can be synthesized,
+            // but it's always possible to create an equivalent type using a class definition.
+            | Type::TypedDict(_)
+            | Type::ProtocolInstance(_)
+            // Not all `Callable` types are spellable using the `Callable` type form,
+            // but they are all spellable using callback protocols.
+            | Type::Callable(_)
+            // `Unknown` and `@Todo` are nonstandard extensions,
+            // but they are both exactly equivalent to `Any`
+            | Type::Dynamic(_)
+            | Type::TypeVar(_)
+            | Type::TypeAlias(_)
+            | Type::SubclassOf(_)=> true,
+            Type::Intersection(_)
+            | Type::SpecialForm(_)
+            | Type::BoundSuper(_)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::PropertyInstance(_)
+            | Type::FunctionLiteral(_)
+            | Type::ModuleLiteral(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::KnownInstance(_) => false,
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_spellable(db)),
+        }
+    }
+
     /// If the type is a union, filters union elements based on the provided predicate.
     ///
     /// Otherwise, returns the type unchanged.

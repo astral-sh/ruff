@@ -461,6 +461,7 @@ def collect_ty_diagnostics(
             "check",
             f"--python-version={python_version}",
             "--output-format=gitlab",
+            "--ignore=assert-type-unspellable-subtype",
             "--exit-zero",
             *map(str, test_files),
         ],
