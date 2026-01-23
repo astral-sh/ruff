@@ -979,7 +979,7 @@ impl<'db> Type<'db> {
                     //
                     // Without this, we may encounter oscillation as the cycle heads oscillate,
                     // despite the same divergent types being inferred in each iteration.
-                    any_over_type_mut(db, previous, false, &mut |ty| {
+                    any_over_type_mut(db, self, false, &mut |ty| {
                         if let Some(DivergentType { id }) = ty.as_divergent() {
                             cycle_heads.insert(id);
                         }
