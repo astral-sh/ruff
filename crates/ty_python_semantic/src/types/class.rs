@@ -81,22 +81,6 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 
-fn explicit_bases_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
-fn inheritance_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Option<InheritanceCycle> {
-    None
-}
-
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -137,14 +121,6 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
-fn is_typed_dict_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> bool {
-    false
-}
-
 #[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
@@ -154,24 +130,6 @@ fn try_metaclass_cycle_initial<'db>(
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
-}
-
-fn decorators_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
-fn fields_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-    _specialization: Option<Specialization<'db>>,
-    _field_policy: CodeGeneratorKind<'db>,
-) -> FxIndexMap<Name, Field<'db>> {
-    FxIndexMap::default()
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -394,18 +352,12 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     }
 }
 
-fn variance_of_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: GenericAlias<'db>,
-    _typevar: BoundTypeVarInstance<'db>,
-) -> TypeVarVariance {
-    TypeVarVariance::Bivariant
-}
-
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=variance_of_cycle_initial)]
+    #[salsa::tracked(
+        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
@@ -2560,7 +2512,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_initial=explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!(
             "StaticClassLiteral::explicit_bases_query: {}",
@@ -2670,7 +2622,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(returns(deref), cycle_initial=decorators_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("StaticClassLiteral::decorators: {}", self.name(db));
 
@@ -2782,9 +2734,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
     /// `typing.TypedDict`, either directly or indirectly).
-    #[salsa::tracked(cycle_initial=is_typed_dict_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size
-    )]
+    #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
     pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         if let Some(known) = self.known(db) {
             return known.is_typed_dict_subclass();
@@ -4006,7 +3956,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// See [`StaticClassLiteral::own_fields`] for more details.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=fields_cycle_initial,
+        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
         heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn fields(
         self,
@@ -4784,7 +4734,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_initial=inheritance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///
@@ -4867,7 +4817,7 @@ impl<'db> StaticClassLiteral<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
-    #[salsa::tracked(cycle_initial=crate::types::variance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)

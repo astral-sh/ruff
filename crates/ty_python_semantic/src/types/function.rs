@@ -656,14 +656,6 @@ pub struct FunctionLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionLiteral<'_> {}
 
-fn overloads_and_implementation_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: FunctionLiteral<'db>,
-) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-    (Box::new([]), None)
-}
-
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
@@ -712,8 +704,8 @@ impl<'db> FunctionLiteral<'db> {
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         #[salsa::tracked(
             returns(ref),
+            cycle_initial=|_, _, _| (Box::default(), None),
             heap_size=ruff_memory_usage::heap_size,
-            cycle_initial=overloads_and_implementation_cycle_initial
         )]
         fn overloads_and_implementation_inner<'db>(
             db: &'db dyn Db,
@@ -1057,7 +1049,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::single(Signature::bottom()), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
@@ -1317,14 +1309,6 @@ fn is_instance_truthiness<'db>(
             Truthiness::Ambiguous
         }
     }
-}
-
-fn signature_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionType<'db>,
-) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom())
 }
 
 fn last_definition_signature_cycle_initial<'db>(
