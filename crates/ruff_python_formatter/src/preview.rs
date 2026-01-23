@@ -45,15 +45,6 @@ pub(crate) const fn is_allow_newline_after_block_open_enabled(context: &PyFormat
 }
 
 /// Returns `true` if the
-/// [`avoid_parens_for_long_as_captures`](https://github.com/astral-sh/ruff/pull/21176) preview
-/// style is enabled.
-pub(crate) const fn is_avoid_parens_for_long_as_captures_enabled(
-    context: &PyFormatContext,
-) -> bool {
-    context.is_preview()
-}
-
-/// Returns `true` if the
 /// [`parenthesize_lambda_bodies`](https://github.com/astral-sh/ruff/pull/21385) preview style is
 /// enabled.
 pub(crate) const fn is_parenthesize_lambda_bodies_enabled(context: &PyFormatContext) -> bool {
