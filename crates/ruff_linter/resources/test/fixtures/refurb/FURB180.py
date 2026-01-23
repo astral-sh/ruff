@@ -56,3 +56,11 @@ class A6(abc.ABC):
 class A7(B0, abc.ABC, B1):
     @abstractmethod
     def foo(self): pass
+
+# Issue 22631 reproduction
+class C(
+    other_kwarg=1,
+    # comment
+    metaclass=abc.ABCMeta,
+):
+    pass

@@ -39,9 +39,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// The rule's fix is unsafe if the class has base classes. This is because the base classes might
-/// be validating the class's other base classes (e.g., `typing.Protocol` does this) or otherwise
-/// alter runtime behavior if more base classes are added.
+/// The rule's fix is unsafe if the class has base classes, or if the fix would result in the
+/// deletion of comments.
+///
+/// If the class has base classes, inheriting from `abc.ABC` might alter the runtime behavior if
+/// those base classes validate the class's other base classes (e.g., `typing.Protocol`).
 ///
 /// ## References
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
@@ -82,11 +84,25 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let applicability = if class_def.bases().is_empty() {
+    let mut applicability = if class_def.bases().is_empty() {
         Applicability::Safe
     } else {
         Applicability::Unsafe
     };
+
+    // If the fix involves a range deletion or replacement that contains a comment, the fix is
+    // unsafe.
+    if applicability == Applicability::Safe {
+        let range = if position > 0 {
+            TextRange::new(class_def.keywords()[position - 1].end(), keyword.end())
+        } else {
+            keyword.range()
+        };
+        if checker.comment_ranges().intersects(range) {
+            applicability = Applicability::Unsafe;
+        }
+    }
+
     let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range);
 
     diagnostic.try_set_fix(|| {
