@@ -912,7 +912,7 @@ impl From<&FormatCommandError> for Diagnostic {
             FormatCommandError::MarkdownExperimental(_) => Diagnostic::new(
                 DiagnosticId::ExperimentalFeature,
                 Severity::Warning,
-                "Markdown formatting is experimental, use --preview mode flag.",
+                "Markdown formatting is experimental, enable preview mode.",
             ),
         };
 
