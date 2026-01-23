@@ -906,7 +906,7 @@ impl From<&FormatCommandError> for Diagnostic {
             FormatCommandError::RangeFormatNotSupported(_) => Diagnostic::new(
                 DiagnosticId::InvalidCliOption,
                 Severity::Error,
-                "Range formatting isn't supported.",
+                "Range formatting is only supported for Python files.",
             ),
             FormatCommandError::MarkdownExperimental(_) => Diagnostic::new(
                 DiagnosticId::ExperimentalFeature,
@@ -994,7 +994,7 @@ impl Display for FormatCommandError {
                 if let Some(path) = path {
                     write!(
                         f,
-                        "{header}{path}{colon} Range formatting isn't supported.",
+                        "{header}{path}{colon} Range formatting is only supported for Python files.",
                         header = "Failed to format ".bold(),
                         path = fs::relativize_path(path).bold(),
                         colon = ":".bold()
@@ -1002,7 +1002,7 @@ impl Display for FormatCommandError {
                 } else {
                     write!(
                         f,
-                        "{header} Range formatting isn't supported",
+                        "{header} Range formatting is only supported for Python files",
                         header = "Failed to format:".bold()
                     )
                 }
@@ -1011,7 +1011,7 @@ impl Display for FormatCommandError {
                 if let Some(path) = path {
                     write!(
                         f,
-                        "{header}{path}{colon} Markdown formatting is experimental, use --preview mode.",
+                        "{header}{path}{colon} Markdown formatting is experimental, enable preview mode.",
                         header = "Failed to format ".bold(),
                         path = fs::relativize_path(path).bold(),
                         colon = ":".bold()
@@ -1019,7 +1019,7 @@ impl Display for FormatCommandError {
                 } else {
                     write!(
                         f,
-                        "{header} Markdown formatting is experimental, use --preview mode",
+                        "{header} Markdown formatting is experimental, enable preview mode",
                         header = "Failed to format:".bold()
                     )
                 }
