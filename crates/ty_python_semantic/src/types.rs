@@ -30,8 +30,8 @@ pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
-    TypeContext, infer_deferred_types, infer_definition_types, infer_expression_type,
-    infer_expression_types, infer_scope_types, static_expression_truthiness,
+    TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
+    infer_expression_type, infer_expression_types, infer_scope_types, static_expression_truthiness,
 };
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::{CallableSignature, Signature};
@@ -49,6 +49,7 @@ use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::builder::RecursivelyDefined;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
+use crate::types::class::NamedTupleSpec;
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
@@ -70,6 +71,7 @@ use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
+use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -120,6 +122,7 @@ mod visitor;
 mod definition;
 #[cfg(test)]
 mod property_tests;
+mod subscript;
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
@@ -131,7 +134,13 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
-        let result = infer_scope_types(db, scope_id);
+        // Scopes that may require type context are inferred during the inference of
+        // their outer scope.
+        if scope_id.accepts_type_context(db) {
+            continue;
+        }
+
+        let result = infer_scope_types(db, scope_id, TypeContext::default());
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
@@ -198,7 +207,7 @@ fn definition_expression_type<'db>(
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(expression)
     }
 }
 
@@ -354,59 +363,6 @@ impl Default for MemberLookupPolicy {
     fn default() -> Self {
         Self::empty()
     }
-}
-
-fn member_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(id)).into()
-}
-
-fn member_lookup_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_member: &PlaceAndQualifiers<'db>,
-    member: PlaceAndQualifiers<'db>,
-    _self_type: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    member.cycle_normalized(db, *previous_member, cycle)
-}
-
-fn class_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(id)).into()
-}
-
-fn class_lookup_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_member: &PlaceAndQualifiers<'db>,
-    member: PlaceAndQualifiers<'db>,
-    _self_type: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    member.cycle_normalized(db, *previous_member, cycle)
-}
-
-fn variance_cycle_initial<'db, T>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: T,
-    _typevar: BoundTypeVarInstance<'db>,
-) -> TypeVarVariance {
-    TypeVarVariance::Bivariant
 }
 
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
@@ -1525,6 +1481,54 @@ impl<'db> Type<'db> {
         if yes { self.negate(db) } else { *self }
     }
 
+    /// Return `true` if it is possible to spell an equivalent type to this one
+    /// in user annotations without nonstandard extensions to the type system
+    pub(crate) fn is_spellable(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::Never
+            | Type::NewTypeInstance(_)
+            | Type::EnumLiteral(_)
+            | Type::NominalInstance(_)
+            // `TypedDict` and `Protocol` can be synthesized,
+            // but it's always possible to create an equivalent type using a class definition.
+            | Type::TypedDict(_)
+            | Type::ProtocolInstance(_)
+            // Not all `Callable` types are spellable using the `Callable` type form,
+            // but they are all spellable using callback protocols.
+            | Type::Callable(_)
+            // `Unknown` and `@Todo` are nonstandard extensions,
+            // but they are both exactly equivalent to `Any`
+            | Type::Dynamic(_)
+            | Type::TypeVar(_)
+            | Type::TypeAlias(_)
+            | Type::SubclassOf(_)=> true,
+            Type::Intersection(_)
+            | Type::SpecialForm(_)
+            | Type::BoundSuper(_)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::PropertyInstance(_)
+            | Type::FunctionLiteral(_)
+            | Type::ModuleLiteral(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::KnownInstance(_) => false,
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_spellable(db)),
+        }
+    }
+
     /// If the type is a union, filters union elements based on the provided predicate.
     ///
     /// Otherwise, returns the type unchanged.
@@ -2462,7 +2466,13 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
@@ -3012,7 +3022,13 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,
@@ -3223,6 +3239,19 @@ impl<'db> Type<'db> {
                 && !protocol.interface().includes_member(db, name_str) =>
             {
                 Place::Undefined.into()
+            }
+
+            // This case needs to come before the `no_instance_fallback` catch-all, so that we
+            // treat `NewType`s of `float` and `complex` as their special-case union base types.
+            // Otherwise we'll look up e.g. `__add__` with a `self` type bound to the `NewType`,
+            // which will fail to match e.g. `float.__add__` (because its `self` parameter is just
+            // `float` and not `int | float`). However, all other `NewType` cases need to fall
+            // through, because we generally do want e.g. methods that return `Self` to return the
+            // `NewType`.
+            Type::NewTypeInstance(new_type_instance) if new_type_instance.base_is_union(db) => {
+                new_type_instance
+                    .concrete_base_type(db)
+                    .member_lookup_with_policy(db, name, policy)
             }
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
@@ -3638,10 +3667,14 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_) => Truthiness::Ambiguous,
 
-            Type::TypedDict(_) => {
-                // TODO: We could do better here, but it's unclear if this is important.
-                // See existing `TypedDict`-related tests in `truthiness.md`
-                Truthiness::Ambiguous
+            Type::TypedDict(td) => {
+                if td.items(db).values().any(TypedDictField::is_required) {
+                    Truthiness::AlwaysTrue
+                } else {
+                    // We can potentially infer empty typeddicts as always falsy if they're `closed=True`,
+                    // but as of 22-01-26 we don't yet support PEP 728.
+                    Truthiness::Ambiguous
+                }
             }
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
@@ -3779,6 +3812,60 @@ impl<'db> Type<'db> {
         };
 
         non_negative_int_literal(db, return_ty)
+    }
+
+    /// Returns the key and value types of this object if it was unpacked using `**`,
+    /// or `None` if the object does not support unpacking.
+    fn unpack_keys_and_items(self, db: &'db dyn Db) -> Option<(Type<'db>, Type<'db>)> {
+        let key_ty = match self
+            .member_lookup_with_policy(
+                db,
+                Name::new_static("keys"),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        {
+            Place::Defined(DefinedPlace {
+                ty: keys_method,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => keys_method
+                .try_call(db, &CallArguments::none())
+                .ok()
+                .and_then(|bindings| {
+                    Some(
+                        bindings
+                            .return_type(db)
+                            .try_iterate(db)
+                            .ok()?
+                            .homogeneous_element_type(db),
+                    )
+                })?,
+
+            _ => return None,
+        };
+
+        let value_ty = match self
+            .member_lookup_with_policy(
+                db,
+                Name::new_static("__getitem__"),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        {
+            Place::Defined(DefinedPlace {
+                ty: getitem_method,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => getitem_method
+                .try_call(db, &CallArguments::positional([Type::unknown()]))
+                .ok()
+                .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
+
+            _ => Type::unknown(),
+        };
+
+        Some((key_ty, value_ty))
     }
 
     /// Returns a [`Bindings`] that can be used to analyze a call to this type. You must call
@@ -5573,6 +5660,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::NamedTupleSpec(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::NamedTupleSpec],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::UnionType(instance) => {
                     // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
                     // expensive if there are errors.
@@ -5886,7 +5977,13 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=apply_specialization_cycle_recover, cycle_initial=apply_specialization_cycle_initial)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -5995,6 +6092,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Specialization(_) |
                 KnownInstanceType::Literal(_) |
                 KnownInstanceType::LiteralStringAlias(_) |
+                KnownInstanceType::NamedTupleSpec(_) |
                 KnownInstanceType::NewType(_) => {
                     // TODO: For some of these, we may need to apply the type mapping to inner types.
                     self
@@ -6402,6 +6500,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Specialization(_)
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
+                | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::NewType(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
@@ -6482,7 +6581,13 @@ impl<'db> Type<'db> {
     }
 
     #[allow(clippy::used_underscore_binding)]
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=expand_eagerly_cycle_recover, cycle_initial=expand_eagerly_cycle_initial)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, ()| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn expand_eagerly_(self, db: &'db dyn Db, _unit: ()) -> Type<'db> {
         self.apply_type_mapping(db, &TypeMapping::EagerExpansion, TypeContext::default())
     }
@@ -6649,11 +6754,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         parameter_index: Option<usize>,
     ) -> Option<(Span, Span)> {
-        match *self {
-            Type::FunctionLiteral(function) => function.parameter_span(db, parameter_index),
-            Type::BoundMethod(bound_method) => bound_method
-                .function(db)
-                .parameter_span(db, parameter_index),
+        match self {
+            Type::FunctionLiteral(function) => Some(function.parameter_span(db, parameter_index)),
+            Type::BoundMethod(bound_method) => Some(
+                bound_method
+                    .function(db)
+                    .parameter_span(db, parameter_index),
+            ),
             _ => None,
         }
     }
@@ -6676,9 +6783,9 @@ impl<'db> Type<'db> {
     /// An example of a good use case is to improve
     /// a diagnostic.
     fn function_spans(&self, db: &'db dyn Db) -> Option<FunctionSpans> {
-        match *self {
-            Type::FunctionLiteral(function) => function.spans(db),
-            Type::BoundMethod(bound_method) => bound_method.function(db).spans(db),
+        match self {
+            Type::FunctionLiteral(function) => Some(function.spans(db)),
+            Type::BoundMethod(bound_method) => Some(bound_method.function(db).spans(db)),
             _ => None,
         }
     }
@@ -6813,46 +6920,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         );
         v
     }
-}
-
-fn apply_specialization_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: Type<'db>,
-    _specialization: Specialization<'db>,
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
-}
-
-fn apply_specialization_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _specialization: Specialization<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn expand_eagerly_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _unit: (),
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn expand_eagerly_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: Type<'db>,
-    _unit: (),
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
@@ -7069,6 +7136,9 @@ pub enum KnownInstanceType<'db> {
     /// An identity callable created with `typing.NewType(name, base)`, which behaves like a
     /// subtype of `base` in type expressions. See the `struct NewType` payload for an example.
     NewType(NewType<'db>),
+
+    /// The inferred spec for a functional `NamedTuple` class.
+    NamedTupleSpec(NamedTupleSpec<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7115,6 +7185,11 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::NewType(newtype) => {
             visitor.visit_type(db, newtype.concrete_base_type(db));
         }
+        KnownInstanceType::NamedTupleSpec(spec) => {
+            for field in spec.fields(db) {
+                visitor.visit_type(db, field.ty);
+            }
+        }
     }
 }
 
@@ -7155,6 +7230,7 @@ impl<'db> KnownInstanceType<'db> {
                 newtype
                     .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
             ),
+            Self::NamedTupleSpec(spec) => Self::NamedTupleSpec(spec.normalized_impl(db, visitor)),
             Self::Deprecated(_)
             | Self::ConstraintSet(_)
             | Self::GenericContext(_)
@@ -7211,6 +7287,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::Specialization(specialization) => specialization
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::Specialization),
+            Self::NamedTupleSpec(spec) => spec
+                .recursive_type_normalized_impl(db, div, true)
+                .map(Self::NamedTupleSpec),
         }
     }
 
@@ -7237,6 +7316,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Callable(_) => KnownClass::GenericAlias,
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
+            Self::NamedTupleSpec(_) => KnownClass::Sequence,
         }
     }
 
@@ -7508,6 +7588,8 @@ enum InvalidTypeExpression<'db> {
     GenericContext,
     /// Same for `ty_extensions.Specialization`
     Specialization,
+    /// Same for `NamedTupleSpec`
+    NamedTupleSpec,
     /// Same for `typing.TypedDict`
     TypedDict,
     /// Same for `typing.TypeAlias`, anywhere except for as the sole annotation on an annotated
@@ -7566,6 +7648,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::Specialization => f.write_str(
                         "`ty_extensions.GenericContext` is not allowed in type expressions",
                     ),
+                    InvalidTypeExpression::NamedTupleSpec => {
+                        f.write_str("`NamedTupleSpec` is not allowed in type expressions")
+                    }
                     InvalidTypeExpression::TypedDict => f.write_str(
                         "The special form `typing.TypedDict` \
                             is not allowed in type expressions",
@@ -8137,7 +8222,7 @@ impl<'db> TypeVarInstance<'db> {
         Some(TypeVarBoundOrConstraints::Constraints(constraints))
     }
 
-    #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
@@ -8273,15 +8358,6 @@ fn lazy_default_cycle_recover<'db>(
         (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
         (_, None) => None,
     }
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn lazy_default_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: TypeVarInstance<'db>,
-) -> Option<Type<'db>> {
-    Some(Type::divergent(id))
 }
 
 /// Where a type variable is bound and usable.
@@ -11488,7 +11564,13 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
-    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -11538,7 +11620,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         self.specialization(db).is_some()
     }
 
-    #[salsa::tracked(cycle_initial=generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
         let file = scope.file(db);
@@ -11559,32 +11641,6 @@ impl<'db> PEP695TypeAliasType<'db> {
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
         self
     }
-}
-
-fn generic_context_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: PEP695TypeAliasType<'db>,
-) -> Option<GenericContext<'db>> {
-    None
-}
-
-fn value_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: PEP695TypeAliasType<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn value_type_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: PEP695TypeAliasType<'db>,
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.

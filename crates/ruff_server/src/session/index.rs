@@ -127,9 +127,10 @@ impl Index {
     pub(super) fn key_from_url(&self, url: Url) -> DocumentKey {
         if self.notebook_cells.contains_key(&url) {
             DocumentKey::NotebookCell(url)
-        } else if Path::new(url.path())
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
+        } else if self
+            .documents
+            .get(&url)
+            .is_some_and(|controller| controller.as_notebook().is_some())
         {
             DocumentKey::Notebook(url)
         } else {

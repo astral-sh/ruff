@@ -363,3 +363,44 @@ def f():
     else:
         reveal_type(x)  # revealed: (str & ~AlwaysTruthy) | None
 ```
+
+## Narrowing a union of a `TypedDict` and `None`
+
+```py
+from typing_extensions import TypedDict, NotRequired, Required
+
+class Empty(TypedDict): ...
+
+class NonEmpty(TypedDict):
+    x: int
+
+class HasNotRequired1(TypedDict):
+    x: NotRequired[int]
+
+class HasNotRequired2(TypedDict, total=False):
+    x: int
+
+class AlsoNonEmpty(TypedDict, total=False):
+    x: Required[int]
+
+def f(arg1: Empty | None, arg2: NonEmpty | None, arg3: HasNotRequired1 | None, arg4: HasNotRequired2 | None, arg5: AlsoNonEmpty):
+    if arg1:
+        # the truthiness of `Empty` is ambiguous,
+        # because the `Empty` type includes possible `TypedDict` subtypes
+        # that might have required keys
+        reveal_type(arg1)  # revealed: Empty & ~AlwaysFalsy
+
+    if arg2:
+        # but `NonEmpty` is known to be a subtype of `AlwaysTruthy`
+        # because of the required key, so we can narrow to a simpler type here
+        reveal_type(arg2)  # revealed: NonEmpty
+
+    if arg3:
+        reveal_type(arg3)  # revealed: HasNotRequired1 & ~AlwaysFalsy
+
+    if arg4:
+        reveal_type(arg4)  # revealed: HasNotRequired2 & ~AlwaysFalsy
+
+    if arg5:
+        reveal_type(arg5)  # revealed: AlsoNonEmpty
+```

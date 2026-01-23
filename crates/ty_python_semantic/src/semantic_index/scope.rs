@@ -35,6 +35,16 @@ impl<'db> ScopeId<'db> {
         self.scope(db).node()
     }
 
+    /// Returns `true` if this scope may require type context from its parent scope.
+    pub(crate) fn accepts_type_context(self, db: &dyn Db) -> bool {
+        matches!(
+            self.node(db),
+            NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_)
+                | NodeWithScopeKind::DictComprehension(_)
+        )
+    }
+
     pub(crate) fn scope(self, db: &dyn Db) -> &Scope {
         semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
     }

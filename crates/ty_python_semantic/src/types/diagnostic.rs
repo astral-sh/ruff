@@ -107,7 +107,9 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&INEFFECTIVE_FINAL);
+    registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
+    registry.register_lint(&ASSERT_TYPE_UNSPELLABLE_SUBTYPE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
@@ -126,6 +128,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
+    registry.register_lint(&INVALID_TYPED_DICT_HEADER);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -1879,6 +1882,41 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for `@final` classes that have unimplemented abstract methods.
+    ///
+    /// ## Why is this bad?
+    /// A class decorated with `@final` cannot be subclassed. If such a class has abstract
+    /// methods that are not implemented, the class can never be properly instantiated, as
+    /// the abstract methods can never be implemented (since subclassing is prohibited).
+    ///
+    /// At runtime, instantiation of classes with unimplemented abstract methods is only
+    /// prevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.
+    /// However, type checkers also enforce this for classes that do not use `ABCMeta`, since
+    /// the intent for the class to be abstract is clear from the use of `@abstractmethod`.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from abc import ABC, abstractmethod
+    /// from typing import final
+    ///
+    /// class Base(ABC):
+    ///     @abstractmethod
+    ///     def method(self) -> int: ...
+    ///
+    /// @final
+    /// class Derived(Base):  # Error: `Derived` does not implement `method`
+    ///     pass
+    /// ```
+    pub(crate) static ABSTRACT_METHOD_IN_FINAL_CLASS = {
+        summary: "detects `@final` classes with unimplemented abstract methods",
+        status: LintStatus::stable("0.0.13"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for methods that are decorated with `@override` but do not override any method in a superclass.
     ///
     /// ## Why is this bad?
@@ -1931,6 +1969,36 @@ declare_lint! {
     pub(crate) static TYPE_ASSERTION_FAILURE = {
         summary: "detects failed type assertions",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `assert_type()` calls where the actual type
+    /// is an unspellable subtype of the asserted type.
+    ///
+    /// ## Why is this bad?
+    /// `assert_type()` is intended to ensure that the inferred type of a value
+    /// is exactly the same as the asserted type. But in some situations, ty
+    /// has nonstandard extensions to the type system that allow it to infer
+    /// more precise types than can be expressed in user annotations. ty emits a
+    /// different error code to `type-assertion-failure` in these situations so
+    /// that users can easily differentiate between the two cases.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def _(x: int):
+    ///     assert_type(x, int)  # fine
+    ///     if x:
+    ///         assert_type(x, int)  # error: [assert-type-unspellable-subtype]
+    ///                              # the actual type is `int & ~AlwaysFalsy`,
+    ///                              # which excludes types like `Literal[0]`
+    /// ```
+    pub(crate) static ASSERT_TYPE_UNSPELLABLE_SUBTYPE = {
+        summary: "detects failed type assertions",
+        status: LintStatus::stable("0.0.14"),
         default_level: Level::Error,
     }
 }
@@ -2356,6 +2424,35 @@ declare_lint! {
     pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
         summary: "detects invalid statements in `TypedDict` class bodies",
         status: LintStatus::stable("0.0.9"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects errors in `TypedDict` class headers, such as unexpected arguments
+    /// or invalid base classes.
+    ///
+    /// ## Why is this bad?
+    /// The typing spec states that `TypedDict`s are not permitted to have
+    /// custom metaclasses. Using `**` unpacking in a `TypedDict` header
+    /// is also prohibited by ty, as it means that ty cannot statically determine
+    /// whether keys in the `TypedDict` are intended to be required or optional.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]
+    ///     ...
+    ///
+    /// def f(x: dict):
+    ///     class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]
+    ///         ...
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_HEADER = {
+        summary: "detects invalid statements in `TypedDict` class headers",
+        status: LintStatus::stable("0.0.14"),
         default_level: Level::Error,
     }
 }
@@ -4173,15 +4270,13 @@ pub(crate) fn report_rebound_typevar<'db>(
         return;
     };
     let span = match binding_type(db, other_definition) {
-        Type::ClassLiteral(class) => Some(class.header_span(db)),
-        Type::FunctionLiteral(function) => function.spans(db).map(|spans| spans.signature),
+        Type::ClassLiteral(class) => class.header_span(db),
+        Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
     };
-    if let Some(span) = span {
-        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-            "Type variable `{typevar_name}` is bound in this enclosing scope",
-        )));
-    }
+    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+        "Type variable `{typevar_name}` is bound in this enclosing scope",
+    )));
 }
 
 // I tried refactoring this function to placate Clippy,
@@ -4199,13 +4294,8 @@ pub(super) fn report_invalid_method_override<'db>(
 ) {
     let db = context.db();
 
-    let signature_span = |function: FunctionType<'db>| {
-        function
-            .literal(db)
-            .last_definition(db)
-            .spans(db)
-            .map(|spans| spans.signature)
-    };
+    let signature_span =
+        |function: FunctionType<'db>| function.literal(db).last_definition(db).spans(db).signature;
 
     let subclass_definition_kind = subclass_definition.kind(db);
     let subclass_definition_signature_span = signature_span(subclass_function);
@@ -4214,8 +4304,7 @@ pub(super) fn report_invalid_method_override<'db>(
     // in the body of the class here, we cannot use the range associated with the `FunctionType`
     let diagnostic_range = if subclass_definition_kind.is_function_def() {
         subclass_definition_signature_span
-            .as_ref()
-            .and_then(Span::range)
+            .range()
             .unwrap_or_else(|| {
                 subclass_function
                     .node(db, context.file(), context.module())
@@ -4274,11 +4363,9 @@ pub(super) fn report_invalid_method_override<'db>(
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    if !subclass_definition_kind.is_function_def()
-        && let Some(span) = subclass_definition_signature_span
-    {
+    if !subclass_definition_kind.is_function_def() {
         diagnostic.annotate(
-            Annotation::secondary(span)
+            Annotation::secondary(subclass_definition_signature_span)
                 .message(format_args!("Signature of `{class_name}.{member}`")),
         );
     }
@@ -4302,8 +4389,8 @@ pub(super) fn report_invalid_method_override<'db>(
                 );
 
                 let superclass_function_span = match superclass_type {
-                    Type::FunctionLiteral(function) => signature_span(function),
-                    Type::BoundMethod(method) => signature_span(method.function(db)),
+                    Type::FunctionLiteral(function) => Some(signature_span(function)),
+                    Type::BoundMethod(method) => Some(signature_span(method.function(db))),
                     _ => None,
                 };
 

@@ -20,14 +20,15 @@ use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, sema
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
-use crate::types::infer::{infer_deferred_types, infer_scope_types};
+use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, todo_type,
+    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, infer_complete_scope_types,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -54,7 +55,7 @@ fn function_signature_expression_type<'db>(
         infer_deferred_types(db, definition).expression_type(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
-        infer_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(expression)
     }
 }
 
@@ -188,9 +189,13 @@ impl<'db> CallableSignature<'db> {
                 {
                     Some(CallableSignature::from_overloads(
                         callable.signatures(db).iter().map(|signature| Signature {
-                            generic_context: self_signature.generic_context.map(|context| {
-                                type_mapping.update_signature_generic_context(db, context)
-                            }),
+                            generic_context: GenericContext::merge_optional(
+                                db,
+                                signature.generic_context,
+                                self_signature.generic_context.map(|context| {
+                                    type_mapping.update_signature_generic_context(db, context)
+                                }),
+                            ),
                             definition: signature.definition,
                             parameters: if signature.parameters().is_top() {
                                 signature.parameters().clone()
@@ -414,7 +419,11 @@ impl<'db> CallableSignature<'db> {
                         db,
                         CallableSignature::from_overloads(other_signatures.iter().map(
                             |signature| {
-                                Signature::new(signature.parameters().clone(), Type::unknown())
+                                Signature::new_generic(
+                                    signature.generic_context,
+                                    signature.parameters().clone(),
+                                    Type::unknown(),
+                                )
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -446,7 +455,11 @@ impl<'db> CallableSignature<'db> {
                         db,
                         CallableSignature::from_overloads(self_signatures.iter().map(
                             |signature| {
-                                Signature::new(signature.parameters().clone(), Type::unknown())
+                                Signature::new_generic(
+                                    signature.generic_context,
+                                    signature.parameters().clone(),
+                                    Type::unknown(),
+                                )
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -1096,7 +1109,11 @@ impl<'db> Signature<'db> {
             let upper = Type::Callable(CallableType::new(
                 db,
                 CallableSignature::from_overloads(other.overloads.iter().map(|signature| {
-                    Signature::new(signature.parameters().clone(), Type::unknown())
+                    Signature::new_generic(
+                        signature.generic_context,
+                        signature.parameters().clone(),
+                        Type::unknown(),
+                    )
                 })),
                 CallableTypeKind::ParamSpecValue,
             ));
@@ -1352,7 +1369,8 @@ impl<'db> Signature<'db> {
                 (Some(self_bound_typevar), None) => {
                     let upper = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new(
+                        CallableSignature::single(Signature::new_generic(
+                            other.generic_context,
                             other.parameters.clone(),
                             Type::unknown(),
                         )),
@@ -1371,7 +1389,8 @@ impl<'db> Signature<'db> {
                 (None, Some(other_bound_typevar)) => {
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new(
+                        CallableSignature::single(Signature::new_generic(
+                            self.generic_context,
                             self.parameters.clone(),
                             Type::unknown(),
                         )),

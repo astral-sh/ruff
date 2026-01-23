@@ -672,6 +672,38 @@ fn many_search_paths() -> anyhow::Result<()> {
             .arg("--extra-search-path").arg("extra1")
             .arg("--extra-search-path").arg("extra2")
             .arg("--extra-search-path").arg("extra3")
+            .arg("--extra-search-path").arg("extra4"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> test.py:1:14
+      |
+    1 | import foo1, baz
+      |              ^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
+    info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
+    info:   3. <temp_dir>/extra3 (extra search path specified on the CLI or in your config file)
+    info:   4. <temp_dir>/extra4 (extra search path specified on the CLI or in your config file)
+    info:   5. <temp_dir>/ (first-party code)
+    info:   6. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-platform").arg("linux")
+            .arg("--extra-search-path").arg("extra1")
+            .arg("--extra-search-path").arg("extra2")
+            .arg("--extra-search-path").arg("extra3")
             .arg("--extra-search-path").arg("extra4")
             .arg("--extra-search-path").arg("extra5")
             .arg("--extra-search-path").arg("extra6"),
