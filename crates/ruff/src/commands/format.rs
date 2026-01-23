@@ -510,7 +510,6 @@ pub(crate) fn format_source(
                 MarkdownResult::Unchanged => Ok(FormattedSource::Unchanged),
             }
         }
-        SourceKind::Toml(_) => Ok(FormattedSource::Unchanged),
     }
 }
 
