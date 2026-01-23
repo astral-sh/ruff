@@ -1,19 +1,9 @@
-This is a markdown document with some fenced code blocks with unformatted code.
-
-Unlabeled Python code:
-
-```
-print( "hello" )
-```
-
-Labeled Python code:
+This is a markdown document with two fenced code blocks:
 
 ```py
 print( "hello" )
 def foo(): pass
 ```
-
-Labeled Python stub:
 
 ```pyi
 print( "hello" )

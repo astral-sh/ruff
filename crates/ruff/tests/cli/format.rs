@@ -2383,7 +2383,7 @@ fn markdown_formatting_preview_disabled() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to format CRATE_ROOT/resources/test/fixtures/unformatted.md: Markdown formatting is experimental, use --preview mode.
+    error: Failed to format CRATE_ROOT/resources/test/fixtures/unformatted.md: Markdown formatting is experimental, enable preview mode.
     ");
     Ok(())
 }
@@ -2402,28 +2402,26 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     ----- stdout -----
     unformatted: File would be reformatted
       --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
-    9  | Labeled Python code:
+    1  | This is a markdown document with two fenced code blocks:
+    2  | 
+    3  | ```py
+       - print( "hello" )
+       - def foo(): pass
+    4  + print("hello")
+    5  + 
+    6  + 
+    7  + def foo():
+    8  +     pass
+    9  | ```
     10 | 
-    11 | ```py
+    11 | ```pyi
        - print( "hello" )
        - def foo(): pass
     12 + print("hello")
     13 + 
-    14 + 
-    15 + def foo():
-    16 +     pass
-    17 | ```
-    18 | 
-    19 | Labeled Python stub:
-    20 | 
-    21 | ```pyi
-       - print( "hello" )
-       - def foo(): pass
-    22 + print("hello")
-    23 + 
-    24 + def foo():
-    25 +     pass
-    26 | ```
+    14 + def foo():
+    15 +     pass
+    16 | ```
 
     1 file would be reformatted
 
@@ -2444,15 +2442,7 @@ fn markdown_formatting_stdin() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    This is a markdown document with some fenced code blocks with unformatted code.
-
-    Unlabeled Python code:
-
-    ```
-    print( "hello" )
-    ```
-
-    Labeled Python code:
+    This is a markdown document with two fenced code blocks:
 
     ```py
     print("hello")
@@ -2461,8 +2451,6 @@ fn markdown_formatting_stdin() -> Result<()> {
     def foo():
         pass
     ```
-
-    Labeled Python stub:
 
     ```pyi
     print("hello")
