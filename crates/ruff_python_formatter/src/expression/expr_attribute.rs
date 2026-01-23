@@ -113,7 +113,6 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // (it's a fluent chain but not the first element).
             //
             // We also break _at_ the first call in the chain.
-            // For example:
             else if call_chain_layout.is_fluent() {
                 if parenthesize_value
                     || value.is_call_expr()
