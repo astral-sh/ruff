@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/await.py
 ---
 ## Input
 ```python
@@ -134,27 +133,11 @@ await (
 
 # https://github.com/astral-sh/ruff/issues/8644
 test_data = await (
-    Stream.from_async(async_data)
+    Stream
+    .from_async(async_data)
     .flat_map_async()
     .map()
     .filter_async(is_valid_data)
     .to_list()
 )
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -65,7 +65,8 @@
- 
- # https://github.com/astral-sh/ruff/issues/8644
- test_data = await (
--    Stream.from_async(async_data)
-+    Stream
-+    .from_async(async_data)
-     .flat_map_async()
-     .map()
-     .filter_async(is_valid_data)
 ```
