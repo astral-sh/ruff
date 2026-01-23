@@ -4239,15 +4239,13 @@ pub(crate) fn report_rebound_typevar<'db>(
         return;
     };
     let span = match binding_type(db, other_definition) {
-        Type::ClassLiteral(class) => Some(class.header_span(db)),
-        Type::FunctionLiteral(function) => function.spans(db).map(|spans| spans.signature),
+        Type::ClassLiteral(class) => class.header_span(db),
+        Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
     };
-    if let Some(span) = span {
-        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-            "Type variable `{typevar_name}` is bound in this enclosing scope",
-        )));
-    }
+    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+        "Type variable `{typevar_name}` is bound in this enclosing scope",
+    )));
 }
 
 // I tried refactoring this function to placate Clippy,
@@ -4265,13 +4263,8 @@ pub(super) fn report_invalid_method_override<'db>(
 ) {
     let db = context.db();
 
-    let signature_span = |function: FunctionType<'db>| {
-        function
-            .literal(db)
-            .last_definition(db)
-            .spans(db)
-            .map(|spans| spans.signature)
-    };
+    let signature_span =
+        |function: FunctionType<'db>| function.literal(db).last_definition(db).spans(db).signature;
 
     let subclass_definition_kind = subclass_definition.kind(db);
     let subclass_definition_signature_span = signature_span(subclass_function);
@@ -4280,8 +4273,7 @@ pub(super) fn report_invalid_method_override<'db>(
     // in the body of the class here, we cannot use the range associated with the `FunctionType`
     let diagnostic_range = if subclass_definition_kind.is_function_def() {
         subclass_definition_signature_span
-            .as_ref()
-            .and_then(Span::range)
+            .range()
             .unwrap_or_else(|| {
                 subclass_function
                     .node(db, context.file(), context.module())
@@ -4340,11 +4332,9 @@ pub(super) fn report_invalid_method_override<'db>(
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    if !subclass_definition_kind.is_function_def()
-        && let Some(span) = subclass_definition_signature_span
-    {
+    if !subclass_definition_kind.is_function_def() {
         diagnostic.annotate(
-            Annotation::secondary(span)
+            Annotation::secondary(subclass_definition_signature_span)
                 .message(format_args!("Signature of `{class_name}.{member}`")),
         );
     }
@@ -4368,8 +4358,8 @@ pub(super) fn report_invalid_method_override<'db>(
                 );
 
                 let superclass_function_span = match superclass_type {
-                    Type::FunctionLiteral(function) => signature_span(function),
-                    Type::BoundMethod(method) => signature_span(method.function(db)),
+                    Type::FunctionLiteral(function) => Some(signature_span(function)),
+                    Type::BoundMethod(method) => Some(signature_span(method.function(db))),
                     _ => None,
                 };
 
