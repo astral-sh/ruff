@@ -894,6 +894,7 @@ impl Rules {
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(*lint, severity, lint_source);
                     } else {
+                        // ignore
                         selection.disable(*lint);
                     }
                 }
