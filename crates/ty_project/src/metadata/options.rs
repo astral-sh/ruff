@@ -882,13 +882,26 @@ impl Rules {
 
         for (rule_name, level) in &self.inner {
             let source = rule_name.source();
+            let lint_source = match source {
+                ValueSource::File(_) => LintSource::File,
+                ValueSource::Cli => LintSource::Cli,
+                ValueSource::Editor => LintSource::Editor,
+            };
+
+            // Handle "all" as a special case - apply the level to all rules
+            if rule_name.eq_ignore_ascii_case("all") {
+                for lint in registry.lints() {
+                    if let Ok(severity) = Severity::try_from(**level) {
+                        selection.enable(*lint, severity, lint_source);
+                    } else {
+                        selection.disable(*lint);
+                    }
+                }
+                continue;
+            }
+
             match registry.get(rule_name) {
                 Ok(lint) => {
-                    let lint_source = match source {
-                        ValueSource::File(_) => LintSource::File,
-                        ValueSource::Cli => LintSource::Cli,
-                        ValueSource::Editor => LintSource::Editor,
-                    };
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(lint, severity, lint_source);
                     } else {

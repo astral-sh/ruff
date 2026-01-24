@@ -315,7 +315,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'error'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -323,7 +323,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -331,7 +331,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("Disables the rule. Can be specified multiple times.")
+                .help("Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
