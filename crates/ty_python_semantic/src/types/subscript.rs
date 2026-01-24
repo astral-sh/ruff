@@ -23,7 +23,8 @@ use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
-    DynamicType, KnownInstanceType, Type, TypeAliasType, UnionBuilder, UnionType, todo_type,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
+    UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -166,6 +167,11 @@ impl<'db> SubscriptError<'db> {
 
     fn into_errors(self) -> Vec<SubscriptErrorKind<'db>> {
         self.errors
+    }
+
+    /// Returns `true` if any error indicates the subscript method was available.
+    fn any_method_available(&self) -> bool {
+        self.errors.iter().any(SubscriptErrorKind::method_available)
     }
 
     pub(crate) fn report_diagnostics(
@@ -330,6 +336,12 @@ impl<'db> SubscriptErrorKind<'db> {
             }
         }
     }
+
+    /// Returns `true` if this error indicates the subscript method was available
+    /// (even if the call failed). Returns `false` for `NotSubscriptable` errors.
+    fn method_available(&self) -> bool {
+        !matches!(self, Self::NotSubscriptable { .. })
+    }
 }
 
 fn map_union_subscript<'db, F>(
@@ -364,6 +376,62 @@ where
     }
 }
 
+fn map_intersection_subscript<'db, F>(
+    db: &'db dyn Db,
+    intersection: IntersectionType<'db>,
+    mut map_fn: F,
+) -> Result<Type<'db>, SubscriptError<'db>>
+where
+    F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
+{
+    let mut results = Vec::new();
+    let mut errors = Vec::new();
+
+    // Use `positive_elements_or_object` to ensure we always have at least one element.
+    // An intersection with only negative elements (e.g., `~int & ~str`) is implicitly
+    // `object & ~int & ~str`, so we fall back to `object`.
+    for element in intersection.positive_elements_or_object(db) {
+        match map_fn(element) {
+            Ok(result) => results.push(result),
+            Err(error) => errors.push(error),
+        }
+    }
+
+    // If any element succeeded, return the intersection of successful results.
+    if !results.is_empty() {
+        let mut builder = IntersectionBuilder::new(db);
+        for result in results {
+            builder = builder.add_positive(result);
+        }
+        return Ok(builder.build());
+    }
+
+    // All elements failed. Check if any element has the method available
+    // (even if the call failed). If so, filter out `NotSubscriptable` errors
+    // for elements that lack the method.
+    let any_has_method = errors.iter().any(SubscriptError::any_method_available);
+
+    let mut builder = IntersectionBuilder::new(db);
+    let mut collected_errors = Vec::new();
+
+    for error in errors {
+        if !any_has_method || error.any_method_available() {
+            builder = builder.add_positive(error.result_type());
+            let error_iter = error.into_errors().into_iter();
+            if any_has_method {
+                collected_errors.extend(error_iter.filter(SubscriptErrorKind::method_available));
+            } else {
+                collected_errors.extend(error_iter);
+            }
+        }
+    }
+
+    Err(SubscriptError::with_errors(
+        builder.build(),
+        collected_errors,
+    ))
+}
+
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
@@ -392,8 +460,16 @@ impl<'db> Type<'db> {
                 value_ty.subscript(db, element, expr_context)
             })),
 
-            (Type::Intersection(_), _) | (_, Type::Intersection(_)) => {
-                Some(Ok(todo_type!("Subscript expressions with intersections")))
+            (Type::Intersection(intersection), _) => {
+                Some(map_intersection_subscript(db, intersection, |element| {
+                    element.subscript(db, slice_ty, expr_context)
+                }))
+            }
+
+            (_, Type::Intersection(intersection)) => {
+                Some(map_intersection_subscript(db, intersection, |element| {
+                    value_ty.subscript(db, element, expr_context)
+                }))
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
