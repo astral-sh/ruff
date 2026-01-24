@@ -42,6 +42,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         contents.push(HoverContent::Signature(signature));
     } else if let Some(typed_dict_key) = typed_dict_key {
         contents.push(HoverContent::TypedDictKey {
+            owner: typed_dict_key.owner,
             key: typed_dict_key.key,
             ty: typed_dict_key.declared_ty,
         });
@@ -142,7 +143,11 @@ impl fmt::Display for DisplayHover<'_, '_> {
 pub enum HoverContent<'db> {
     Signature(String),
     Type(Type<'db>, Option<TypeVarVariance>, TypeQualifiers),
-    TypedDictKey { key: String, ty: Type<'db> },
+    TypedDictKey {
+        owner: String,
+        key: String,
+        ty: Type<'db>,
+    },
     Docstring(Docstring),
 }
 
@@ -209,10 +214,10 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
                     .fmt(f)
             }
-            HoverContent::TypedDictKey { key, ty } => {
+            HoverContent::TypedDictKey { owner, key, ty } => {
                 let (ty_string, syntax) = self.ty_string_and_syntax(ty);
                 self.kind
-                    .fenced_code_block(format!("(key) {key}: {ty_string}"), syntax)
+                    .fenced_code_block(format!("(key of {owner}) {key}: {ty_string}"), syntax)
                     .fmt(f)
             }
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
@@ -3368,6 +3373,50 @@ def function():
     }
 
     #[test]
+    fn hover_subscript_literal_index_variants() {
+        let cases = [
+            r#"
+        values: list[int] = [1, 2]
+        print(values[<CURSOR>0])
+        "#,
+            r#"
+        values: list[int] = [1, 2]
+        print(values[0<CURSOR>])
+        "#,
+            r#"
+        values: list[int] = [1, 2]
+        print(values<CURSOR>[0])
+        "#,
+            r#"
+        values: list[int] = [1, 2]
+        print(values<CURSOR>[-1])
+        "#,
+            r#"
+        values: list[int] = [1, 2]
+        print(values[<CURSOR>-1])
+        "#,
+            r#"
+        values: list[int] = [1, 2]
+        print(values[-<CURSOR>1])
+        "#,
+            r#"
+        values: list[int] = [1, 2]
+        print(values[-1<CURSOR>])
+        "#,
+        ];
+
+        for (index, case) in cases.iter().enumerate() {
+            let test = cursor_test(case);
+            let hover = test.hover();
+            assert_eq!(
+                hover.lines().next(),
+                Some("int"),
+                "case {index} expected `int` hover, got:\n{hover}"
+            );
+        }
+    }
+
+    #[test]
     fn hover_typed_dict_key_literal() {
         let test = cursor_test(
             r#"
@@ -3385,13 +3434,13 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @r#"
-        (key) name: str
+        (key of Person) name: str
         ---------------------------------------------
         The person's full legal name
 
         ---------------------------------------------
         ```python
-        (key) name: str
+        (key of Person) name: str
         ```
         ---
         The person's full legal name
