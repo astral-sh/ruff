@@ -1346,3 +1346,27 @@ def _(x: int | list[int]):
     # error: [not-iterable] "Object of type `int | list[int]` may not be iterable"
     f(*x)
 ```
+
+## Non-iterable variadic argument with overloaded functions
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def foo(a: int) -> tuple[int]: ...
+@overload
+def foo(a: int, b: int) -> tuple[int, int]: ...
+```
+
+```py
+from overloaded import foo
+
+# error: [not-iterable] "Object of type `None` is not iterable"
+foo(*None)
+
+def _(arg: int):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    foo(*arg)
+```
