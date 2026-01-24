@@ -440,6 +440,7 @@ impl MainLoop {
     ) -> anyhow::Result<()> {
         let terminal_settings = db.project().settings(db).terminal();
         let is_human_readable = terminal_settings.output_format.is_human_readable();
+        let mut stdout = self.printer.stream_for_details().lock();
 
         match diagnostics {
             [] => {
@@ -449,12 +450,18 @@ impl MainLoop {
                         "{}",
                         "All checks passed!".green().bold()
                     )?;
+                } else if terminal_settings.output_format
+                    == ty_project::metadata::options::OutputFormat::Gitlab
+                {
+                    // For Gitlab format, write an empty JSON list
+
+                    if stdout.is_enabled() {
+                        writeln!(stdout, "[]")?;
+                    }
                 }
             }
             diagnostics => {
                 let diagnostics_count = diagnostics.len();
-
-                let mut stdout = self.printer.stream_for_details().lock();
 
                 // Only render diagnostics if they're going to be displayed, since doing
                 // so is expensive.
