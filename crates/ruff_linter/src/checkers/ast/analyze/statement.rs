@@ -1613,6 +1613,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::InvalidMockAccess) {
                 pygrep_hooks::rules::uncalled_mock_method(checker, value);
+                pygrep_hooks::rules::non_existent_mock_method(checker, value);
             }
             if checker.is_rule_enabled(Rule::NamedExprWithoutContext) {
                 pylint::rules::named_expr_without_context(checker, value);
