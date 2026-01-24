@@ -1395,7 +1395,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let abstract_methods = class_type.abstract_methods(db);
 
         // If there are no abstract methods, we're done.
-        let Some((first_method_name, first_defining_class)) = abstract_methods.iter().next() else {
+        let Some((first_method_name, (defining_class, definition))) =
+            abstract_methods.iter().next()
+        else {
             return;
         };
 
@@ -1416,29 +1418,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         ));
 
-        // Add secondary annotation pointing to the first abstract method definition.
-        let abstract_method =
-            first_defining_class.class_member(db, first_method_name, MemberLookupPolicy::default());
-        let function = abstract_method
-            .place
-            .ignore_possibly_undefined()
-            .and_then(|ty| match ty {
-                Type::FunctionLiteral(f) => Some(f),
-                Type::PropertyInstance(p) => p.getter(db).and_then(Type::as_function_literal),
-                _ => None,
-            });
-        if let Some(function) = function {
-            let overload = function.literal(db).last_definition(db);
-            let module = parsed_module(db, function.file(db)).load(db);
-            diagnostic.annotate(
-                Annotation::secondary(Span::from(overload.focus_range(db, &module))).message(
-                    format_args!(
-                        "`{first_method_name}` defined as abstract on superclass `{defining_class}`",
-                        defining_class = first_defining_class.name(db)
-                    ),
-                ),
-            );
-        }
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let span = Span::from(definition.focus_range(db, &module));
+        let secondary_annotation = Annotation::secondary(span).message(format_args!(
+            "`{first_method_name}` defined as abstract on superclass `{defining_class}`",
+            defining_class = defining_class.name(db)
+        ));
+        diagnostic.annotate(secondary_annotation);
     }
 
     /// Check the overloaded functions in this scope.
