@@ -11890,15 +11890,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // ===
         // Subdiagnostic (2): check to see if it's a capitalized older type hint that is available as lowercase in this version of Python.
         // ===
+        // We don't need to check for typing_extensions.Type,
+        // because it's already caught by typing.Type.
         if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY39 {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
-                diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
-                add_inferred_python_version_hint_to_diagnostic(
-                    self.db(),
-                    &mut diagnostic,
-                    "resolving types",
-                );
-            } else if let Some(("", builtin_name)) = as_pep_585_generic("typing_extensions", id) {
                 diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
                 add_inferred_python_version_hint_to_diagnostic(
                     self.db(),

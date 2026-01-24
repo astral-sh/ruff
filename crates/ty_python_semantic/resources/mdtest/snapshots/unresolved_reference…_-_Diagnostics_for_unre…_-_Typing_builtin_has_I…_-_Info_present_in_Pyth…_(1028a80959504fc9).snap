@@ -14,7 +14,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_r
 
 ```
 1 | foo: List[int]  # error: [unresolved-reference]
-2 | bar: Type # error: [unresolved-reference]
+2 | bar: Type  # error: [unresolved-reference]
 ```
 
 # Diagnostics
@@ -25,7 +25,7 @@ error[unresolved-reference]: Name `List` used when not defined
   |
 1 | foo: List[int]  # error: [unresolved-reference]
   |      ^^^^ Did you mean `list`?
-2 | bar: Type # error: [unresolved-reference]
+2 | bar: Type  # error: [unresolved-reference]
   |
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unresolved-reference` is enabled by default
@@ -37,7 +37,7 @@ error[unresolved-reference]: Name `Type` used when not defined
  --> src/mdtest_snippet.py:2:6
   |
 1 | foo: List[int]  # error: [unresolved-reference]
-2 | bar: Type # error: [unresolved-reference]
+2 | bar: Type  # error: [unresolved-reference]
   |      ^^^^ Did you mean `type`?
   |
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
