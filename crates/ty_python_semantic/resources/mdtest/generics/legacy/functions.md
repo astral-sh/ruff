@@ -289,9 +289,36 @@ from typing import TypeVar
 T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
+
+S = TypeVar("S", int, float)
+
+def chained_constrained_types(t1: S, t2: S, t3: S) -> S:
+    return (t1 + t2) * t3
+
+def typevar_times_literal(t: S) -> S:
+    return t * 2
+
+def literal_times_typevar(t: S) -> S:
+    return 2 * t
+
+def negate_typevar(t: S) -> S:
+    return -t
+
+def positive_typevar(t: S) -> S:
+    return +t
+```
+
+Unary operations that are not supported by all constraints should error:
+
+```py
+from typing import TypeVar
+
+U = TypeVar("U", int, float)
+
+def invert_typevar(t: U) -> int:
+    # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `U@invert_typevar`"
+    return ~t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two
@@ -751,4 +778,33 @@ reveal_type(x)  # revealed: list[Sub]
 
 y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
+```
+
+## Bounded TypeVar with callable parameter
+
+When a bounded TypeVar appears in a `Callable` parameter's return type, the inferred type should be
+the actual type from the call, not the TypeVar's upper bound.
+
+See: <https://github.com/astral-sh/ty/issues/2292>
+
+```py
+from typing import Callable, TypeVar
+
+class Base:
+    pass
+
+class Derived(Base):
+    attr: int
+
+T = TypeVar("T", bound=Base)
+
+def takes_factory(factory: Callable[[], T]) -> T:
+    return factory()
+
+# Passing a class as a factory: should infer Derived, not Base
+result = takes_factory(Derived)
+reveal_type(result)  # revealed: Derived
+
+# Accessing an attribute that only exists on Derived should work
+print(result.attr)  # No error
 ```

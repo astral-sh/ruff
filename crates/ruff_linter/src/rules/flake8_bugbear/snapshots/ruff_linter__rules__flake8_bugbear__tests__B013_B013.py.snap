@@ -39,3 +39,28 @@ help: Replace with `except ValueError`
 14 |     pass
 15 | 
 16 | list_exceptions = [FileExistsError, FileNotFoundError]
+
+B013 [*] A length-one tuple literal is redundant in exception handlers
+  --> B013.py:25:8
+   |
+23 |   try:
+24 |       ...
+25 |   except (
+   |  ________^
+26 | |         ValueError,
+27 | |         # text
+28 | |         ):
+   | |_________^
+29 |       ...
+   |
+help: Replace with `except ValueError`
+22 | 
+23 | try:
+24 |     ...
+   - except (
+   -         ValueError,
+   -         # text
+   -         ):
+25 + except ValueError:
+26 |     ...
+note: This is an unsafe fix and may change runtime behavior

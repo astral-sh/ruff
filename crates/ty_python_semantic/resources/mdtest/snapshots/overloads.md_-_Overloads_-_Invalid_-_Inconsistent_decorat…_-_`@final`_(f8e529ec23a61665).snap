@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: overloads.md - Overloads - Invalid - Inconsistent decorators - `@final`
 mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
@@ -60,6 +61,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 13 |     @overload
 14 |     # error: [invalid-overload]
 15 |     def method2(self, x: str) -> str: ...
+16 | 
+17 |     @overload
+18 |     def method3(self, x: int) -> int: ...
+19 |     @final
+20 |     @overload
+21 |     def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+22 |     @overload
+23 |     @final
+24 |     def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+25 |     @overload
+26 |     def method3(self, x: bytearray) -> bytearray: ...
 ```
 
 # Diagnostics
@@ -108,6 +120,49 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 14 |     # error: [invalid-overload]
 15 |     def method2(self, x: str) -> str: ...
    |         ^^^^^^^
+16 |
+17 |     @overload
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: `@final` decorator should be applied only to the first overload
+  --> src/mdtest_snippet.pyi:18:9
+   |
+17 |     @overload
+18 |     def method3(self, x: int) -> int: ...
+   |         ------- First overload defined here
+19 |     @final
+20 |     @overload
+21 |     def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+   |         ^^^^^^^
+22 |     @overload
+23 |     @final
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: `@final` decorator should be applied only to the first overload
+  --> src/mdtest_snippet.pyi:24:9
+   |
+22 |     @overload
+23 |     @final
+24 |     def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+   |         ^^^^^^^
+25 |     @overload
+26 |     def method3(self, x: bytearray) -> bytearray: ...
+   |
+  ::: src/mdtest_snippet.pyi:18:9
+   |
+17 |     @overload
+18 |     def method3(self, x: int) -> int: ...
+   |         ------- First overload defined here
+19 |     @final
+20 |     @overload
    |
 info: rule `invalid-overload` is enabled by default
 

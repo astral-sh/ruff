@@ -94,7 +94,7 @@ def calculate_sum():
 ",
         );
 
-        assert_snapshot!(test.document_highlights(), @r"
+        assert_snapshot!(test.document_highlights(), @"
         info[document_highlights]: Highlight 1 (Write)
          --> main.py:3:5
           |
@@ -149,7 +149,7 @@ def process_data(<CURSOR>data):
 ",
         );
 
-        assert_snapshot!(test.document_highlights(), @r"
+        assert_snapshot!(test.document_highlights(), @"
         info[document_highlights]: Highlight 1 (Other)
          --> main.py:2:18
           |
@@ -203,7 +203,7 @@ calc = Calculator()
 ",
         );
 
-        assert_snapshot!(test.document_highlights(), @r"
+        assert_snapshot!(test.document_highlights(), @"
         info[document_highlights]: Highlight 1 (Other)
          --> main.py:2:7
           |

@@ -444,6 +444,44 @@ severity levels or disable them entirely.
 
 ---
 
+## `overrides.analysis`
+
+#### `respect-type-ignore-comments`
+
+Whether ty should respect `type: ignore` comments.
+
+When set to `false`, `type: ignore` comments are treated like any other normal
+comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+
+Setting this option can be useful when using ty alongside other type checkers or when
+you prefer using `ty: ignore` over `type: ignore`.
+
+Defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+---
+
 ## `src`
 
 ### `exclude`

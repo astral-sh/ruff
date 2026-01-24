@@ -1,6 +1,6 @@
-# Tuple pair is assignable to their union
+# Disjointness of two types implies that neither is a subtype of the other
 
-Regression test for <https://github.com/astral-sh/ty/issues/2236>.
+This is a regression test for <https://github.com/astral-sh/ty/issues/2236>.
 
 ```toml
 [environment]

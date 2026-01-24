@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 use std::env::VarError;
 use std::num::{NonZeroU8, NonZeroU16};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use anyhow::{Context, Result, anyhow};
 use glob::{GlobError, Paths, PatternError, glob};
@@ -36,8 +35,7 @@ use ruff_linter::settings::{
     DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
 };
 use ruff_linter::{
-    RUFF_PKG_VERSION, RuleSelector, fs, warn_user_once, warn_user_once_by_id,
-    warn_user_once_by_message,
+    RuleSelector, fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message,
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
@@ -53,6 +51,7 @@ use crate::options::{
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    validate_required_version,
 };
 use crate::settings::{
     EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, INCLUDE_PREVIEW, LineEnding,
@@ -155,13 +154,7 @@ pub struct Configuration {
 impl Configuration {
     pub fn into_settings(self, project_root: &Path) -> Result<Settings> {
         if let Some(required_version) = &self.required_version {
-            let ruff_pkg_version = pep440_rs::Version::from_str(RUFF_PKG_VERSION)
-                .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
-            if !required_version.contains(&ruff_pkg_version) {
-                return Err(anyhow!(
-                    "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
-                ));
-            }
+            validate_required_version(required_version)?;
         }
 
         let linter_target_version = TargetVersion(self.target_version);

@@ -92,7 +92,7 @@ result = calculate_sum(value=42)
 ",
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 5 references
          --> main.py:2:19
           |
@@ -139,7 +139,7 @@ def outer_function():
 ",
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 9 references
           --> main.py:3:5
            |
@@ -200,7 +200,7 @@ final_value = global_counter
 ",
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 9 references
           --> main.py:2:1
            |
@@ -251,7 +251,7 @@ except ValueError as err:
 ",
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 4 references
           --> main.py:4:29
            |
@@ -286,7 +286,7 @@ match x:
 ",
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:3:20
           |
@@ -315,7 +315,7 @@ match data:
 ",
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 4 references
          --> main.py:3:29
           |
@@ -352,7 +352,7 @@ value = my_function
 ",
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 6 references
           --> main.py:2:5
            |
@@ -402,7 +402,7 @@ cls = MyClass
 ",
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 6 references
           --> main.py:2:7
            |
@@ -785,7 +785,7 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 2 references
           --> main.py:10:30
            |
@@ -816,7 +816,7 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 2 references
           --> main.py:10:30
            |
@@ -898,7 +898,7 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:2:13
           |
@@ -916,7 +916,7 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:2:13
           |
@@ -935,7 +935,7 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:3:15
           |
@@ -955,7 +955,7 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:3:15
           |
@@ -974,7 +974,7 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:2:14
           |
@@ -992,7 +992,7 @@ cls = MyClass
             "#,
         );
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:2:14
           |
@@ -1036,7 +1036,7 @@ class DataProcessor:
             )
             .build();
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 6 references
          --> app.py:2:19
           |
@@ -1097,7 +1097,7 @@ def process_model():
             )
             .build();
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 5 references
          --> main.py:6:19
           |
@@ -1147,7 +1147,7 @@ func<CURSOR>_alias()
 
         // When finding references to the alias, we should NOT find references
         // to the original function in the original module
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 2 references
          --> importer.py:2:30
           |
@@ -1222,7 +1222,7 @@ func<CURSOR>_alias()
             )
             .build();
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 2 references
          --> main.py:3:20
           |
@@ -1252,7 +1252,7 @@ func<CURSOR>_alias()
             )
             .build();
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 2 references
          --> main.py:3:20
           |
@@ -1282,7 +1282,7 @@ func<CURSOR>_alias()
             )
             .build();
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 2 references
          --> main.py:2:36
           |
@@ -1312,7 +1312,7 @@ func<CURSOR>_alias()
             )
             .build();
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 2 references
          --> main.py:2:36
           |
@@ -1348,7 +1348,7 @@ func<CURSOR>_alias()
             .build();
 
         // TODO(submodule-imports): this should light up both instances of `subpkg`
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 1 references
          --> mypackage/__init__.py:4:5
           |
@@ -1474,7 +1474,7 @@ func<CURSOR>_alias()
             )
             .build();
 
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> mypackage/__init__.py:2:21
           |
@@ -1512,7 +1512,7 @@ func<CURSOR>_alias()
             .build();
 
         // TODO: this should also highlight the RHS subpkg in the import
-        assert_snapshot!(test.references(), @r"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 1 references
          --> mypackage/__init__.py:4:5
           |

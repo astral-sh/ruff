@@ -117,3 +117,14 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 134 |     final_variable_without_subscript: 'Final' = []
     |                                                 ^^
     |
+
+RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+   --> RUF012.py:146:12
+    |
+144 | # Lint should trigger RUF012 only  for the `test` field and not the `_fields_`
+145 | class S(ctypes.Structure):
+146 |     test = [""]
+    |            ^^^^
+147 |     _fields_ = [
+148 |         ("attr_set", ctypes.c_uint64),
+    |

@@ -97,6 +97,7 @@ FBT001 Boolean-typed positional argument in function definition
    |                   ^^^^^
 91 |         pass
    |
+help: Consider adding `@typing.override` if changing the function signature would violate the Liskov Substitution Principle
 
 FBT001 Boolean-typed positional argument in function definition
    --> FBT.py:100:10

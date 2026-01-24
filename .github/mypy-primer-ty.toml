@@ -5,5 +5,5 @@
 [rules]
 possibly-unresolved-reference = "warn"
 possibly-missing-import = "warn"
-unused-ignore-comment = "warn"
 division-by-zero = "warn"
+unsupported-dynamic-base = "warn"

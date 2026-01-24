@@ -1016,6 +1016,108 @@ class Color(Enum):
 reveal_type(Color.RED != Color.RED)  # revealed: bool
 ```
 
+## Generic enums are invalid
+
+Enum classes cannot be generic. Python does not support generic enums, and attempting to create one
+will result in a `TypeError` at runtime.
+
+### PEP 695 syntax
+
+Using PEP 695 type parameters on an enum is invalid:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+# error: [invalid-generic-enum] "Enum class `E` cannot be generic"
+class E[T](Enum):
+    A = 1
+    B = 2
+```
+
+### Legacy `Generic` base class
+
+Inheriting from both `Enum` and `Generic[T]` is also invalid:
+
+```py
+from enum import Enum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-generic-enum] "Enum class `F` cannot be generic"
+class F(Enum, Generic[T]):
+    A = 1
+    B = 2
+```
+
+### Swapped order (`Generic` first)
+
+The order of bases doesn't matter; it's still invalid:
+
+```py
+from enum import Enum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-generic-enum] "Enum class `G` cannot be generic"
+class G(Generic[T], Enum):
+    A = 1
+    B = 2
+```
+
+### Enum subclasses
+
+Subclasses of enum base classes also cannot be generic:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum, IntEnum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-generic-enum] "Enum class `MyIntEnum` cannot be generic"
+class MyIntEnum[T](IntEnum):
+    A = 1
+
+# error: [invalid-generic-enum] "Enum class `MyFlagEnum` cannot be generic"
+class MyFlagEnum(IntEnum, Generic[T]):
+    A = 1
+```
+
+### Custom enum base class
+
+Even with custom enum subclasses that don't have members, they cannot be made generic:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class MyEnumBase(Enum):
+    def some_method(self) -> None: ...
+
+# error: [invalid-generic-enum] "Enum class `MyEnum` cannot be generic"
+class MyEnum[T](MyEnumBase):
+    A = 1
+```
+
 ## References
 
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>

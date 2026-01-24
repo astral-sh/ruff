@@ -191,7 +191,7 @@ func(value=42)
 ",
         );
 
-        assert_snapshot!(test.rename("number"), @r"
+        assert_snapshot!(test.rename("number"), @"
         info[rename]: Rename symbol (found 4 locations)
          --> main.py:2:10
           |
@@ -220,7 +220,7 @@ x = func
 ",
         );
 
-        assert_snapshot!(test.rename("calculate"), @r"
+        assert_snapshot!(test.rename("calculate"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:5
           |
@@ -249,7 +249,7 @@ cls = MyClass
 ",
         );
 
-        assert_snapshot!(test.rename("MyNewClass"), @r"
+        assert_snapshot!(test.rename("MyNewClass"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:7
           |
@@ -276,7 +276,7 @@ def fu<CURSOR>nc():
         );
 
         assert_snapshot!(test.rename(""), @"Cannot rename");
-        assert_snapshot!(test.rename("valid_name"), @r"
+        assert_snapshot!(test.rename("valid_name"), @"
         info[rename]: Rename symbol (found 1 locations)
          --> main.py:2:5
           |
@@ -321,7 +321,7 @@ class DataProcessor:
             )
             .build();
 
-        assert_snapshot!(test.rename("utility_function"), @r"
+        assert_snapshot!(test.rename("utility_function"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> utils.py:2:5
           |
@@ -664,7 +664,7 @@ class DataProcessor:
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 2 locations)
           --> main.py:10:30
            |
@@ -695,7 +695,7 @@ class DataProcessor:
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 2 locations)
           --> main.py:10:30
            |
@@ -777,7 +777,7 @@ class DataProcessor:
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:13
           |
@@ -795,7 +795,7 @@ class DataProcessor:
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:13
           |
@@ -814,7 +814,7 @@ class DataProcessor:
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:3:15
           |
@@ -834,7 +834,7 @@ class DataProcessor:
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:3:15
           |
@@ -853,7 +853,7 @@ class DataProcessor:
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:14
           |
@@ -871,7 +871,7 @@ class DataProcessor:
             "#,
         );
 
-        assert_snapshot!(test.rename("XY"), @r"
+        assert_snapshot!(test.rename("XY"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:14
           |
@@ -939,7 +939,7 @@ result = alias()
             )
             .build();
 
-        assert_snapshot!(test.rename("new_alias"), @r"
+        assert_snapshot!(test.rename("new_alias"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
@@ -970,7 +970,7 @@ result = <CURSOR>alias()
             )
             .build();
 
-        assert_snapshot!(test.rename("new_alias"), @r"
+        assert_snapshot!(test.rename("new_alias"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
@@ -1020,7 +1020,7 @@ value1 = func_alias()
             )
             .build();
 
-        assert_snapshot!(test.rename("renamed_function"), @r"
+        assert_snapshot!(test.rename("renamed_function"), @"
         info[rename]: Rename symbol (found 5 locations)
          --> source.py:2:5
           |
@@ -1079,7 +1079,7 @@ class App:
             )
             .build();
 
-        assert_snapshot!(test.rename("new_util_name"), @r"
+        assert_snapshot!(test.rename("new_util_name"), @"
         info[rename]: Rename symbol (found 4 locations)
          --> file3.py:2:19
           |
@@ -1142,7 +1142,7 @@ result = func(10, <CURSOR>y=20)
 ",
         );
 
-        assert_snapshot!(test.rename("z"), @r"
+        assert_snapshot!(test.rename("z"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:13
           |
@@ -1169,7 +1169,7 @@ result = func(10, y=20)
 ",
         );
 
-        assert_snapshot!(test.rename("z"), @r"
+        assert_snapshot!(test.rename("z"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:13
           |
@@ -1199,7 +1199,7 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @r"
+        assert_snapshot!(test.rename("z"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:3:20
           |
@@ -1228,16 +1228,16 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @r"
-            info[rename]: Rename symbol (found 2 locations)
-             --> main.py:2:15
-              |
-            2 | import lib as lib2
-              |               ^^^^
-            3 |
-            4 | x = lib2
-              |     ----
-              |
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:15
+          |
+        2 | import lib as lib2
+          |               ^^^^
+        3 |
+        4 | x = lib2
+          |     ----
+          |
         ");
     }
 
@@ -1255,7 +1255,7 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @r"
+        assert_snapshot!(test.rename("z"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:17
           |
@@ -1288,7 +1288,7 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @r"
+        assert_snapshot!(test.rename("z"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:3:20
           |
@@ -1324,7 +1324,7 @@ result = func(10, y=20)
             .build();
 
         // TODO(submodule-imports): we should refuse to rename this (it's the name of a module)
-        assert_snapshot!(test.rename("mypkg"), @r"
+        assert_snapshot!(test.rename("mypkg"), @"
         info[rename]: Rename symbol (found 1 locations)
          --> mypackage/__init__.py:4:5
           |
@@ -1451,7 +1451,7 @@ result = func(10, y=20)
             .build();
 
         // Renaming the integer is correct
-        assert_snapshot!(test.rename("mypkg"), @r"
+        assert_snapshot!(test.rename("mypkg"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> mypackage/__init__.py:2:21
           |
@@ -1494,7 +1494,7 @@ result = func(10, y=20)
         // However us being cautious here *would* be good as the rename will actually
         // result in a `subpkg` variable still existing in this code, as the import's LHS
         // `DefinitionKind::ImportFromSubmodule` would stop being overwritten by the RHS!
-        assert_snapshot!(test.rename("mypkg"), @r"
+        assert_snapshot!(test.rename("mypkg"), @"
         info[rename]: Rename symbol (found 1 locations)
          --> mypackage/__init__.py:4:5
           |
@@ -1680,7 +1680,7 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r"
+        assert_snapshot!(test.rename("better_name"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> lib.py:4:9
           |
@@ -1729,7 +1729,7 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r"
+        assert_snapshot!(test.rename("better_name"), @"
         info[rename]: Rename symbol (found 4 locations)
          --> lib.py:4:9
           |
@@ -1785,7 +1785,7 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r"
+        assert_snapshot!(test.rename("better_name"), @"
         info[rename]: Rename symbol (found 4 locations)
          --> lib.py:4:9
           |
@@ -1847,7 +1847,7 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r"
+        assert_snapshot!(test.rename("better_name"), @"
         info[rename]: Rename symbol (found 6 locations)
           --> lib.py:4:9
            |
@@ -2209,7 +2209,7 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r"
+        assert_snapshot!(test.rename("better_name"), @"
         info[rename]: Rename symbol (found 1 locations)
          --> main.py:4:14
           |

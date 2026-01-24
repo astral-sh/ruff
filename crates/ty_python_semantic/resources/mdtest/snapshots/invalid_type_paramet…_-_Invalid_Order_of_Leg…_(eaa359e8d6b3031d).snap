@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: invalid_type_parameter_order.md - Invalid Order of Legacy Type Parameters
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_type_parameter_order.md

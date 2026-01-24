@@ -1,5 +1,6 @@
 #![allow(clippy::print_stdout)]
 
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, BufWriter, Write, stdout};
 use std::path::{Path, PathBuf};
@@ -21,7 +22,7 @@ use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
 use crate::args::{
-    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand,
+    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand, TerminalColor,
 };
 use crate::printer::{Flags as PrinterFlags, Printer};
 
@@ -131,6 +132,13 @@ pub fn run(
         global_options,
     }: Args,
 ) -> Result<ExitStatus> {
+    // Set color before so all outputs are properly colored
+    if let Some(color_override) =
+        colored_override(global_options.color, std::env::var_os("FORCE_COLOR"))
+    {
+        colored::control::set_override(color_override);
+    }
+
     {
         ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
         let default_panic_hook = std::panic::take_hook();
@@ -514,6 +522,22 @@ https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
     Ok(ExitStatus::Success)
 }
 
+fn colored_override(
+    color: Option<TerminalColor>,
+    env_force_color: Option<OsString>,
+) -> Option<bool> {
+    match color {
+        // Cli arguments should take precedence over env vars.
+        Some(TerminalColor::Always) => Some(true),
+        Some(TerminalColor::Never) => Some(false),
+        // Default to no override, but respect FORCE_COLOR.
+        Some(TerminalColor::Auto) | None => {
+            // support FORCE_COLOR env var
+            env_force_color.map(|force_color: OsString| !force_color.is_empty())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test_file_change_detector {
     use std::path::PathBuf;
@@ -631,6 +655,29 @@ mod test_file_change_detector {
                 ],
                 attrs: notify::event::EventAttributes::default(),
             }),
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_set_colored_override {
+    use crate::{args::TerminalColor, colored_override};
+
+    #[test]
+    fn force_color_env_is_respected() {
+        assert_eq!(colored_override(None, Some("1".into())), Some(true));
+    }
+
+    #[test]
+    fn cli_args_takes_precedences_over_force_color_env() {
+        assert_eq!(
+            colored_override(Some(TerminalColor::Never), Some("1".into())),
+            Some(false)
+        );
+
+        assert_eq!(
+            colored_override(Some(TerminalColor::Always), None),
+            Some(true)
         );
     }
 }

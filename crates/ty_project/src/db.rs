@@ -470,8 +470,9 @@ impl SemanticDb for ProjectDatabase {
         ty_python_semantic::default_lint_registry()
     }
 
-    fn analysis_settings(&self) -> &AnalysisSettings {
-        self.project().settings(self).analysis()
+    fn analysis_settings(&self, file: File) -> &AnalysisSettings {
+        let settings = file_settings(self, file);
+        settings.analysis(self)
     }
 
     fn verbose(&self) -> bool {
@@ -661,7 +662,7 @@ pub(crate) mod tests {
             ty_python_semantic::default_lint_registry()
         }
 
-        fn analysis_settings(&self) -> &AnalysisSettings {
+        fn analysis_settings(&self, _file: ruff_db::files::File) -> &AnalysisSettings {
             self.project().settings(self).analysis()
         }
 

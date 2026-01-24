@@ -408,7 +408,7 @@ def f(x: type[B]) -> B: ...
 from overloaded import A, B, f
 
 def _(x: type[A | B]):
-    reveal_type(x)  # revealed: type[A] | type[B]
+    reveal_type(x)  # revealed: type[A | B]
     reveal_type(f(x))  # revealed: A | B
     reveal_type(f(*(x,)))  # revealed: A | B
 ```
@@ -558,6 +558,41 @@ def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
 
     reveal_type(f(my_enum_instance))  # revealed: MyEnumSubclass
     reveal_type(f(*(my_enum_instance,)))  # revealed: MyEnumSubclass
+```
+
+### Expanding PEP 695 type alias
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+PEP 695 type aliases should be properly expanded during argument type expansion. This test ensures
+that `type X = A | B` is treated the same as a plain union `A | B` during overload resolution.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload, Literal
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: A) -> A: ...
+@overload
+def f(x: B) -> B: ...
+```
+
+```py
+from overloaded import A, B, f
+
+type Alias = A | B
+
+def _(x: Alias) -> None:
+    # The type alias `Alias` should be expanded to `A | B` during overload resolution
+    reveal_type(f(x))  # revealed: A | B
+    reveal_type(f(*(x,)))  # revealed: A | B
 ```
 
 ### No matching overloads

@@ -231,7 +231,8 @@ impl<'db> Definitions<'db> {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
                 ResolvedDefinition::Module(module.file(db)?)
             }
-            ty_python_semantic::types::TypeDefinition::Class(definition)
+            ty_python_semantic::types::TypeDefinition::StaticClass(definition)
+            | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)
             | ty_python_semantic::types::TypeDefinition::Function(definition)
             | ty_python_semantic::types::TypeDefinition::TypeVar(definition)
             | ty_python_semantic::types::TypeDefinition::TypeAlias(definition)

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: final.md - `typing.Final` - Full diagnostics
 mdtest path: crates/ty_python_semantic/resources/mdtest/type_qualifiers/final.md
