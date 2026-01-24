@@ -4277,25 +4277,17 @@ pub(super) fn report_invalid_method_override<'db>(
     let subclass_definition_signature_span = signature_span(subclass_function);
 
     // If the function was originally defined elsewhere and simply assigned
-    // in the body of the class here, we cannot use the range associated with the `FunctionType`
+    // in the body of the class here, we cannot use the range associated with the `FunctionType`.
+    // In that case, fall back to the definition's range which is always in the current file.
+    // See: https://github.com/astral-sh/ty/issues/2602
     let diagnostic_range = if subclass_definition_kind.is_function_def() {
         subclass_definition_signature_span
             .as_ref()
             .and_then(Span::range)
             .unwrap_or_else(|| {
-                // TODO: This assertion demonstrates the root cause of
-                // https://github.com/astral-sh/ty/issues/2602
-                // The `subclass_function` might be from a different file than `context.file()`
-                // when a function from another module is assigned as a method.
-                assert_eq!(
-                    subclass_function.literal(db).last_definition(db).body_scope(db).file(db),
-                    context.file(),
-                    "FunctionType is from a different file than the inference context. \
-                    This would cause a panic when accessing the AST node."
-                );
-                subclass_function
-                    .node(db, context.file(), context.module())
-                    .range
+                // The function might be from a different file (e.g., `method = imported_function`).
+                // Fall back to using the definition's range which is always in the current file.
+                subclass_definition.full_range(db, context.module()).range()
             })
     } else {
         subclass_definition.full_range(db, context.module()).range()
@@ -4552,15 +4544,17 @@ pub(super) fn report_overridden_final_method<'db>(
         let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {
             return;
         };
-        // TODO: This assertion demonstrates the root cause of
-        // https://github.com/astral-sh/ty/issues/2602
-        // The `subclass_literal` class might be from a different file than `context.file()`.
-        assert_eq!(
-            subclass_literal.body_scope(db).file(db),
-            context.file(),
-            "Class is from a different file than the inference context. \
-            This would cause a panic when accessing the AST node."
-        );
+
+        // If the function is defined in a different file (e.g., `method = imported_function`),
+        // we can't provide an autofix since we'd need to modify a different file.
+        // We still report the diagnostic, but skip the autofix logic.
+        // See: https://github.com/astral-sh/ty/issues/2602
+        let function_file = function.literal(db).last_definition(db).body_scope(db).file(db);
+        if function_file != context.file() {
+            diagnostic.help(format_args!("Remove the override of `{member}`"));
+            return;
+        }
+
         let class_node = subclass_literal
             .body_scope(db)
             .node(db)
@@ -4572,14 +4566,6 @@ pub(super) fn report_overridden_final_method<'db>(
         let is_only = overload_count >= class_node.body.len();
 
         let overload_deletion = |overload: &OverloadLiteral<'db>| {
-            // TODO: This assertion demonstrates the root cause of
-            // https://github.com/astral-sh/ty/issues/2602
-            assert_eq!(
-                overload.body_scope(db).file(db),
-                context.file(),
-                "Overload is from a different file than the inference context. \
-                This would cause a panic when accessing the AST node."
-            );
             let range = overload.node(db, context.file(), context.module()).range();
             if is_only {
                 Edit::range_replacement("pass".to_string(), range)

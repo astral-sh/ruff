@@ -4015,27 +4015,25 @@ impl<'db> StaticClassLiteral<'db> {
             let attr = result.ignore_conflicting_declarations();
             let symbol = table.symbol(symbol_id);
             let name = symbol.name();
-            if let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
+            if let Some(Type::FunctionLiteral(_)) = attr.place.ignore_possibly_undefined()
                 && matches!(name.as_str(), "__setattr__" | "__delattr__")
             {
                 if let CodeGeneratorKind::DataclassLike(_) = field_policy
                     && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
                 {
-                    // TODO: This assertion demonstrates the root cause of
-                    // https://github.com/astral-sh/ty/issues/2602
-                    // The `literal` FunctionType might be from a different file than `context.file()`
-                    // (e.g., when `__setattr__ = imported_function`). The call to `literal.node()`
-                    // below incorrectly uses `context.file()` and `context.module()` instead of
-                    // the file where `literal` is actually defined.
-                    assert_eq!(
-                        literal.literal(db).last_definition(db).body_scope(db).file(db),
-                        context.file(),
-                        "FunctionType is from a different file than the inference context. \
-                        This would cause a panic when accessing the AST node."
-                    );
+                    // Get the definition from the declarations to use its range.
+                    // This handles the case where the function is from a different file
+                    // (e.g., `__setattr__ = imported_function`).
+                    // See: https://github.com/astral-sh/ty/issues/2602
+                    let Some(first_declaration) = declarations.clone().next() else {
+                        continue;
+                    };
+                    let Some(definition) = first_declaration.declaration.definition() else {
+                        continue;
+                    };
                     if let Some(builder) = context.report_lint(
                         &INVALID_DATACLASS_OVERRIDE,
-                        literal.node(db, context.file(), context.module()),
+                        definition.focus_range(db, context.module()),
                     ) {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Cannot overwrite attribute `{}` in class `{}`",
