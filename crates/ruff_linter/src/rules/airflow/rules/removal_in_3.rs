@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::rules::airflow::helpers::{
     Replacement, generate_import_edit, generate_remove_and_runtime_import_edit,
-    is_airflow_builtin_or_provider, is_guarded_by_try_except,
+    is_airflow_builtin_or_provider, is_guarded_by_try_except, is_method_in_subclass,
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -1199,19 +1199,7 @@ fn is_execute_method_inherits_from_airflow_operator(
     function_def: &StmtFunctionDef,
     semantic: &SemanticModel,
 ) -> bool {
-    if function_def.name.as_str() != "execute" {
-        return false;
-    }
-
-    let ScopeKind::Class(class_def) = semantic.current_scope().kind else {
-        return false;
-    };
-
-    class_def.bases().iter().any(|class_base| {
-        semantic
-            .resolve_qualified_name(class_base)
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["airflow", .., "BaseOperator"])
-            })
+    is_method_in_subclass(function_def, semantic, "execute", |segments| {
+        matches!(segments, ["airflow", .., "BaseOperator"])
     })
 }

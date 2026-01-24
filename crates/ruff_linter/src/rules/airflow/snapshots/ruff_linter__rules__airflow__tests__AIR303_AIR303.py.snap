@@ -286,3 +286,25 @@ AIR303 `Asset` signature is changed in Airflow 3.0
 72 | Asset("asset1")
    |
 help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+  --> AIR303.py:81:9
+   |
+79 | # 3 positional args, 3rd NOT named 'ti_key'
+80 | class DeprecatedOperatorLink1(BaseOperatorLink):
+81 |     def get_link(self, operator, dttm):
+   |         ^^^^^^^^
+82 |         pass
+   |
+help: The third positional argument needs to be named as `ti_key`. Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)`.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:116:9
+    |
+114 | # 3 positional args, 3rd NOT named 'ti_key'
+115 | class DeprecatedOperatorLink2(BaseOperatorLink):
+116 |     def get_link(self, operator, dttm):
+    |         ^^^^^^^^
+117 |         pass
+    |
+help: The third positional argument needs to be named as `ti_key`. Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)`.
