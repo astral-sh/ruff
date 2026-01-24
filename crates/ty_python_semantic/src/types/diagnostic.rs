@@ -4559,7 +4559,13 @@ pub(super) fn report_overridden_final_method<'db>(
     // It's tempting to autofix properties as well,
     // but you'd want to delete the `@my_property.deleter` as well as the getter and the deleter,
     // and we don't model property deleters at all right now.
-    if let Type::FunctionLiteral(function) = subclass_type {
+    //
+    // We also only provide autofixes if the subclass member is a function definition (not an
+    // assignment like `method = some_function`). If it's an assignment, the function type
+    // might be from a different file, and the autofix should delete the assignment instead, which we don't handle today.
+    if let Type::FunctionLiteral(function) = subclass_type
+        && subclass_definition.kind(db).is_function_def()
+    {
         let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {
             return;
         };
