@@ -37,3 +37,6 @@ assert (x / 2) == (y / 3)
 
 # ok
 assert Path(__file__).parent / ".txt" == 1
+
+def foo(a, b):
+    return a == b - float("2")

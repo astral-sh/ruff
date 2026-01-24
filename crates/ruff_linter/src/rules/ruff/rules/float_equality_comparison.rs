@@ -112,7 +112,7 @@ impl Violation for FloatEqualityComparison<'_> {
     }
 }
 
-/// RUF070
+/// RUF069
 pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     let locator = checker.locator();
     let semantic = checker.semantic();
@@ -145,17 +145,20 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
                 Expr::Call(ast::ExprCall { func, .. }) => {
                     semantic.match_builtin_expr(func, "float")
                 }
-                // Division always returns float in Python
-                // https://docs.python.org/3/tutorial/introduction.html#numbers
                 Expr::BinOp(ast::ExprBinOp {
-                    left,
-                    right,
-                    op: ast::Operator::Div,
-                    ..
+                    left, right, op, ..
                 }) => {
-                    // Only trigger for numeric divisions, not path operations
-                    is_numeric_expr(left) || is_numeric_expr(right)
+                    // Division always returns float in Python
+                    // https://docs.python.org/3/tutorial/introduction.html#numbers
+                    match op {
+                        ast::Operator::Div => {
+                            // Only trigger for numeric divisions, not path operations
+                            is_numeric_expr(left) || is_numeric_expr(right)
+                        },
+                        _ => has_float(left, semantic) || has_float(right, semantic)
+                    }
                 }
+                Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand, semantic),
                 _ => false,
             }
         }
