@@ -29,6 +29,7 @@ python-version = "3.9"
 
 ```py
 foo: List[int]  # error: [unresolved-reference]
+bar: Type  # error: [unresolved-reference]
 ```
 
 ### Info not present before Python 3.9
@@ -42,4 +43,5 @@ python-version = "3.8"
 
 ```py
 foo: List[int]  # error: [unresolved-reference]
+bar: Type  # error: [unresolved-reference]
 ```
