@@ -72,3 +72,65 @@ Asset("asset1", {k: v for k, v in zip(["extra"], ["metadata"])})
 Asset("asset1")
 Asset("asset1", extra={"key": "value"})
 Asset(uri="asset1", extra={"key": "value"})
+
+
+from airflow.models.baseoperatorlink import BaseOperatorLink
+
+# 3 positional args, 3rd NOT named 'ti_key'
+class DeprecatedOperatorLink1(BaseOperatorLink):
+    def get_link(self, operator, dttm):
+        pass
+
+# keyword-only ti_key
+class ValidOperatorLink1(BaseOperatorLink):
+    def get_link(self, operator, *, ti_key):
+        pass
+
+# positional ti_key with correct name
+class ValidOperatorLink2(BaseOperatorLink):
+    def get_link(self, operator, ti_key):
+        pass
+
+# not exactly 3 positional args
+class ValidOperatorLink3(BaseOperatorLink):
+    def get_link(self, operator):
+        pass
+
+class ValidOperatorLink4(BaseOperatorLink):
+    def get_link(self, operator, ti_key, extra):
+        pass
+
+# Not a subclass of BaseOperatorLink
+class NotOperatorLinkSubclass:
+    def get_link(self, operator, dttm):
+        pass
+
+# Not a class method
+def get_link(operator, dttm):
+    pass
+
+from airflow.sdk import BaseOperatorLink
+
+# 3 positional args, 3rd NOT named 'ti_key'
+class DeprecatedOperatorLink2(BaseOperatorLink):
+    def get_link(self, operator, dttm):
+        pass
+
+# keyword-only ti_key
+class ValidOperatorLink5(BaseOperatorLink):
+    def get_link(self, operator, *, ti_key):
+        pass
+
+# positional ti_key with correct name
+class ValidOperatorLink6(BaseOperatorLink):
+    def get_link(self, operator, ti_key):
+        pass
+
+# not exactly 3 positional args
+class ValidOperatorLink7(BaseOperatorLink):
+    def get_link(self, operator):
+        pass
+
+class ValidOperatorLink8(BaseOperatorLink):
+    def get_link(self, operator, ti_key, extra):
+        pass
