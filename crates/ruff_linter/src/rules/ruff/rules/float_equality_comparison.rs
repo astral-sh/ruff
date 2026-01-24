@@ -154,8 +154,8 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
                         ast::Operator::Div => {
                             // Only trigger for numeric divisions, not path operations
                             is_numeric_expr(left) || is_numeric_expr(right)
-                        },
-                        _ => has_float(left, semantic) || has_float(right, semantic)
+                        }
+                        _ => has_float(left, semantic) || has_float(right, semantic),
                     }
                 }
                 Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand, semantic),
