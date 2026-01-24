@@ -1,6 +1,6 @@
 use std::{path::Path, sync::LazyLock};
 
-use regex::{Captures, Regex};
+use regex::Regex;
 use ruff_python_ast::PySourceType;
 use ruff_python_formatter::format_module_source;
 use ruff_python_trivia::textwrap::{dedent, indent};
@@ -39,43 +39,41 @@ pub fn format_code_blocks(
     path: Option<&Path>,
     settings: &FormatterSettings,
 ) -> MarkdownResult {
-    let mut changed = false;
-    let formatted_document = MARKDOWN_CODE_BLOCK.replace_all(source, |capture: &Captures| {
-        let (original, [before, code_indent, code_lang, unformatted_code, after]) =
-            capture.extract();
+    let mut replacements = Vec::new();
 
-        let code_block_source_type = if code_lang == "pyi" {
-            PySourceType::Stub
-        } else {
-            PySourceType::Python
-        };
-        let unformatted_code = dedent(unformatted_code);
-        let options = settings.to_format_options(code_block_source_type, &unformatted_code, path);
+    for capture in MARKDOWN_CODE_BLOCK.captures_iter(source) {
+        let (_, [before, code_indent, language, code, after]) = capture.extract();
+        let capture_range = capture.get_match().range();
+        let code_range = (capture_range.start + before.len())..(capture_range.end - after.len());
+
+        let py_source_type = PySourceType::from_extension(language);
+        let unformatted_code = dedent(code);
+        let options = settings.to_format_options(py_source_type, &unformatted_code, path);
 
         // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
         #[expect(clippy::redundant_closure_for_method_calls)]
         let formatted_code =
             format_module_source(&unformatted_code, options).map(|formatted| formatted.into_code());
 
-        // TODO: figure out how to properly raise errors from inside closure
         if let Ok(formatted_code) = formatted_code {
-            if formatted_code.len() == unformatted_code.len() && formatted_code == *unformatted_code
+            if formatted_code.len() != unformatted_code.len() || formatted_code != *unformatted_code
             {
-                original.to_string()
-            } else {
-                changed = true;
-                let formatted_code = indent(formatted_code.as_str(), code_indent);
-                format!("{before}{formatted_code}{after}")
+                replacements.push((
+                    code_range,
+                    indent(formatted_code.as_str(), code_indent).to_string(),
+                ));
             }
-        } else {
-            original.to_string()
         }
-    });
+    }
 
-    if changed {
-        MarkdownResult::Formatted(formatted_document.to_string())
-    } else {
+    if replacements.is_empty() {
         MarkdownResult::Unchanged
+    } else {
+        let mut content = source.to_string();
+        for (range, replacement) in replacements.iter().rev() {
+            content.replace_range(range.clone(), replacement);
+        }
+        MarkdownResult::Formatted(content)
     }
 }
 
@@ -103,6 +101,8 @@ This is poorly formatted code:
 ```py
 print( "hello" )
 ```
+
+More text.
         "#;
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
@@ -112,6 +112,8 @@ print( "hello" )
         ```py
         print("hello")
         ```
+
+        More text.
         "#
         );
     }
@@ -124,6 +126,8 @@ This is well formatted code:
 ```py
 print("hello")
 ```
+
+More text.
         "#;
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
