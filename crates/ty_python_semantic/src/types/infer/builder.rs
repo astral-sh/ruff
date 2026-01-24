@@ -12,6 +12,7 @@ use ruff_python_ast::{
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::is_keyword;
+use ruff_python_stdlib::typing::as_pep_585_generic;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -11887,7 +11888,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // ===
-        // Subdiagnostic (2):
+        // Subdiagnostic (2): check to see if it's a capitalized older type hint that is available as lowercase in this version of Python.
+        // ===
+        if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY39 {
+            if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
+                diagnostic.info(format_args!("Rename `{id}` to `{builtin_name}`."));
+                add_inferred_python_version_hint_to_diagnostic(
+                    self.db(),
+                    &mut diagnostic,
+                    "resolving types",
+                );
+            }
+            if let Some(("", builtin_name)) = as_pep_585_generic("typing_extensions", id) {
+                diagnostic.info(format_args!("Rename `{id}` to `{builtin_name}`."));
+                add_inferred_python_version_hint_to_diagnostic(
+                    self.db(),
+                    &mut diagnostic,
+                    "resolving types",
+                );
+            }
+        }
+
+        // ===
+        // Subdiagnostic (3):
         // - If it's an instance method, check to see if it's available as an attribute on `self`;
         // - If it's a classmethod, check to see if it's available as an attribute on `cls`
         // ===
