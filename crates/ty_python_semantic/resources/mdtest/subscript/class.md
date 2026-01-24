@@ -157,3 +157,47 @@ def i(x: object):
         # error: [not-subscriptable]
         reveal_type(x[0])  # revealed: Unknown
 ```
+
+When both the value and the slice are intersections, we distribute over both. For `(A & B)[X & Y]`,
+we get `(A[X] & A[Y]) & (B[X] & B[Y])`.
+
+```py
+from ty_extensions import Intersection
+
+class ResultA: ...
+class ResultB: ...
+
+class ContainerA:
+    def __getitem__(self, key: int) -> ResultA:
+        return ResultA()
+
+class ContainerB:
+    def __getitem__(self, key: int) -> ResultB:
+        return ResultB()
+
+class IndexA(int): ...
+class IndexB(int): ...
+
+def j(
+    container_a: ContainerA,
+    container_b: ContainerB,
+    container_ab: Intersection[ContainerA, ContainerB],
+    index_a: IndexA,
+    index_ab: Intersection[IndexA, IndexB],
+):
+    # Single container, single index
+    reveal_type(container_a[index_a])  # revealed: ResultA
+
+    # Single container, intersection index distributes over the index:
+    # ContainerA[IndexA] & ContainerA[IndexB] = ResultA & ResultA = ResultA
+    reveal_type(container_a[index_ab])  # revealed: ResultA
+
+    # Intersection container, single index distributes over the container:
+    # ContainerA[IndexA] & ContainerB[IndexA] = ResultA & ResultB
+    reveal_type(container_ab[index_a])  # revealed: ResultA & ResultB
+
+    # Both are intersections: distributes over both
+    # (ContainerA[IndexA] & ContainerA[IndexB]) & (ContainerB[IndexA] & ContainerB[IndexB])
+    # = (ResultA & ResultA) & (ResultB & ResultB) = ResultA & ResultB
+    reveal_type(container_ab[index_ab])  # revealed: ResultA & ResultB
+```
