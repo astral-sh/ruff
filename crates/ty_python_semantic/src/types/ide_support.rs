@@ -405,6 +405,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
 }
 
 pub struct TypedDictKeyHover<'db> {
+    pub owner: String,
     pub key: String,
     pub declared_ty: Type<'db>,
     pub docstring: Option<String>,
@@ -419,6 +420,7 @@ pub fn typed_dict_key_hover<'db>(
         .as_string_literal_expr()
         .map(|literal| literal.value.to_str())?;
     let value_ty = subscript.value.inferred_type(model)?;
+    let owner = value_ty.display(model.db()).to_string();
     let typed_dict = value_ty.as_typed_dict()?;
     let field = typed_dict.items(model.db()).get(key)?;
     let docstring = field
@@ -426,6 +428,7 @@ pub fn typed_dict_key_hover<'db>(
         .and_then(|declaration| declaration.docstring(model.db()));
 
     Some(TypedDictKeyHover {
+        owner,
         key: key.to_string(),
         declared_ty: field.declared_ty,
         docstring,
