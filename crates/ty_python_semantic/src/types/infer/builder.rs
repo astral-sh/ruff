@@ -11892,7 +11892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // ===
         if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY39 {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
-                diagnostic.info(format_args!("Rename `{id}` to `{builtin_name}`."));
+                diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
                 add_inferred_python_version_hint_to_diagnostic(
                     self.db(),
                     &mut diagnostic,
@@ -11900,7 +11900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             if let Some(("", builtin_name)) = as_pep_585_generic("typing_extensions", id) {
-                diagnostic.info(format_args!("Rename `{id}` to `{builtin_name}`."));
+                diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
                 add_inferred_python_version_hint_to_diagnostic(
                     self.db(),
                     &mut diagnostic,

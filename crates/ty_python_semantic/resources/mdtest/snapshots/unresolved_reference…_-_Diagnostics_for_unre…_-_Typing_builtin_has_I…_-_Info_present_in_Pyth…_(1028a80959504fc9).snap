@@ -23,9 +23,8 @@ error[unresolved-reference]: Name `List` used when not defined
  --> src/mdtest_snippet.py:1:6
   |
 1 | foo: List[int]  # error: [unresolved-reference]
-  |      ^^^^
+  |      ^^^^ Did you mean `list`?
   |
-info: Rename `List` to `list`.
 info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unresolved-reference` is enabled by default
 
