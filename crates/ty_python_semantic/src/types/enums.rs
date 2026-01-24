@@ -7,10 +7,10 @@ use crate::{
     place::{
         DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
     },
-    semantic_index::{place_table, use_def_map},
+    semantic_index::{place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
-        StaticClassLiteral, Type, TypeQualifiers,
+        Parameter, StaticClassLiteral, Type, TypeQualifiers,
     },
 };
 
@@ -18,15 +18,17 @@ use crate::{
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
+    pub(crate) value_sunder_type: Type<'db>,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
 
-impl EnumMetadata<'_> {
+impl<'db> EnumMetadata<'db> {
     fn empty() -> Self {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
+            value_sunder_type: Type::Dynamic(DynamicType::Unknown),
         }
     }
 
@@ -285,7 +287,59 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    Some(EnumMetadata { members, aliases })
+    // _value_
+    let scope = class.body_scope(db);
+    let value_sunder_symbol = place_table(db, scope).symbol_id("_value_")?;
+    let value_sunder_declarations =
+        use_def_map.end_of_scope_symbol_declarations(value_sunder_symbol);
+
+    let inferred_value_sunder_type = place_from_declarations(db, value_sunder_declarations)
+        .ignore_conflicting_declarations()
+        .ignore_possibly_undefined()?;
+
+    let value_sunder_type =
+        extract_init_member_type(db, class, scope).unwrap_or(inferred_value_sunder_type);
+
+    Some(EnumMetadata {
+        members,
+        aliases,
+        value_sunder_type,
+    })
+}
+
+// Extracts the expected enum member type from `__init__` method parameters.
+fn extract_init_member_type<'db>(
+    db: &'db dyn Db,
+    _class: StaticClassLiteral<'db>,
+    scope: ScopeId<'db>,
+) -> Option<Type<'db>> {
+    let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
+    let init_declarations = use_def_map(db, scope).end_of_scope_symbol_declarations(init_symbol_id);
+
+    let place_and_qualifiers = place_from_declarations(db, init_declarations)
+        .ignore_conflicting_declarations()
+        .ignore_possibly_undefined()?;
+
+    let Type::FunctionLiteral(func_type) = place_and_qualifiers else {
+        return None;
+    };
+
+    let signature = func_type.signature(db);
+
+    let param_types: Vec<Type<'db>> = signature
+        .overloads
+        .first()?
+        .parameters()
+        .iter()
+        .skip(1) // skip `self`
+        .map(Parameter::annotated_type)
+        .collect();
+
+    match param_types.len() {
+        0 => None,
+        // At this moment, we just infer any as type similar to other type checkers
+        _ => Some(Type::Dynamic(DynamicType::Any)),
+    }
 }
 
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(
