@@ -1315,6 +1315,69 @@ fn last_definition_signature_cycle_initial<'db>(
     Signature::bottom()
 }
 
+/// Classify the body of this function:
+/// - [`FunctionBodyKind::Stub`] if it is a stub function (i.e., only contains `pass` or `...`
+/// - [`FunctionBodyKind::AlwaysRaisesNotImplementedError`] if it consists of a single
+///   `raise NotImplementedError` statement
+/// - [`FunctionBodyKind::Regular`] otherwise
+pub(super) fn function_body_kind<'db>(
+    db: &'db dyn Db,
+    node: &ast::StmtFunctionDef,
+    infer_type: impl Fn(&ast::Expr) -> Type<'db>,
+) -> FunctionBodyKind {
+    // Allow docstrings, but only as the first statement.
+    let suite = if let Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) = node.body.first()
+        && value.is_string_literal_expr()
+    {
+        &node.body[1..]
+    } else {
+        &node.body[..]
+    };
+
+    if suite.iter().all(|stmt| match stmt {
+        ast::Stmt::Pass(_) => true,
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+        _ => false,
+    }) {
+        return FunctionBodyKind::Stub;
+    }
+
+    if let [ast::Stmt::Raise(raise)] = suite
+        && let ast::StmtRaise {
+            exc: Some(exc),
+            cause: None,
+            node_index: _,
+            range: _,
+        } = raise
+    {
+        return match infer_type(exc) {
+            Type::ClassLiteral(class) if class.is_known(db, KnownClass::NotImplementedError) => {
+                FunctionBodyKind::AlwaysRaisesNotImplementedError
+            }
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::NotImplementedError) =>
+            {
+                FunctionBodyKind::AlwaysRaisesNotImplementedError
+            }
+            _ => FunctionBodyKind::Regular,
+        };
+    }
+
+    FunctionBodyKind::Regular
+}
+
+/// Classification of function body kinds.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum FunctionBodyKind {
+    /// The function body only consists of `...`, `pass`, and/or a docstring.
+    Stub,
+    /// The function body consists of a single `raise NotImplementedError` statement.
+    AlwaysRaisesNotImplementedError,
+    /// Any function body that is not a stub and does not consist of a single
+    /// `raise NotImplementedError` statement.
+    Regular,
+}
+
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(

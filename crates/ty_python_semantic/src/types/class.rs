@@ -6319,6 +6319,7 @@ pub enum KnownClass {
     Staticmethod,
     Classmethod,
     Super,
+    NotImplementedError,
     // enum
     Enum,
     EnumType,
@@ -6447,6 +6448,7 @@ impl KnownClass {
 
             Self::BaseException
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Object
             | Self::OrderedDict
@@ -6530,6 +6532,7 @@ impl KnownClass {
             | KnownClass::Slice
             | KnownClass::Property
             | KnownClass::BaseException
+            | KnownClass::NotImplementedError
             | KnownClass::Exception
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -6619,6 +6622,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -6707,6 +6711,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -6813,6 +6818,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -6898,6 +6904,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -6985,6 +6992,7 @@ impl KnownClass {
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::Exception => "Exception",
+            Self::NotImplementedError => "NotImplementedError",
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
@@ -7346,6 +7354,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7475,6 +7484,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7584,6 +7594,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7654,6 +7665,7 @@ impl KnownClass {
             "BaseException" => &[Self::BaseException],
             "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
             "Exception" => &[Self::Exception],
+            "NotImplementedError" => &[Self::NotImplementedError],
             "ExceptionGroup" => &[Self::ExceptionGroup],
             "staticmethod" => &[Self::Staticmethod],
             "classmethod" => &[Self::Classmethod],
@@ -7771,6 +7783,7 @@ impl KnownClass {
             | Self::VersionInfo
             | Self::BaseException
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::EllipsisType
             | Self::BaseExceptionGroup

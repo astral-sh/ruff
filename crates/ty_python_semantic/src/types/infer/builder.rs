@@ -99,8 +99,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
-    FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
-    is_implicit_classmethod,
+    FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
+    OverloadLiteral, function_body_kind, is_implicit_classmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
@@ -2483,28 +2483,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_body(&function.body);
 
         if let Some(returns) = function.returns.as_deref() {
-            fn is_stub_suite(suite: &[ast::Stmt]) -> bool {
-                match suite {
-                    [
-                        ast::Stmt::Expr(ast::StmtExpr { value: first, .. }),
-                        ast::Stmt::Expr(ast::StmtExpr { value: second, .. }),
-                        ..,
-                    ] => first.is_string_literal_expr() && second.is_ellipsis_literal_expr(),
-                    [
-                        ast::Stmt::Expr(ast::StmtExpr { value, .. }),
-                        ast::Stmt::Pass(_),
-                        ..,
-                    ] => value.is_string_literal_expr(),
-                    [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ..] => {
-                        value.is_ellipsis_literal_expr() || value.is_string_literal_expr()
-                    }
-                    [ast::Stmt::Pass(_)] => true,
-                    _ => false,
-                }
-            }
-
-            let has_empty_body =
-                self.return_types_and_ranges.is_empty() && is_stub_suite(&function.body);
+            let has_empty_body = self.return_types_and_ranges.is_empty()
+                && function_body_kind(self.db(), function, |expr| self.expression_type(expr))
+                    != FunctionBodyKind::Regular;
 
             let mut enclosing_class_context = None;
 
