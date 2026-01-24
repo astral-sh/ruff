@@ -749,7 +749,18 @@ impl GotoTarget<'_> {
     ) -> Option<GotoTarget<'a>> {
         tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
-        match covering_node.node() {
+        let node = covering_node.node();
+        // If the cursor is on the literal subscript index/key (e.g. `values[0]`, `person["name"]`),
+        // retarget to the subscript so hover isn't suppressed as a literal.
+        if let Some(expr) = node.as_expr_ref()
+            && expr.is_literal_expr()
+            && let Some(AnyNodeRef::ExprSubscript(subscript)) = covering_node.parent()
+            && subscript.slice.range() == expr.range()
+        {
+            return Some(GotoTarget::Expression(subscript.into()));
+        }
+
+        match node {
             AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
                 Some(AnyNodeRef::StmtFunctionDef(function)) => {
                     Some(GotoTarget::FunctionDef(function))

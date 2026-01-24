@@ -3,9 +3,11 @@ use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
+use ty_python_semantic::types::ide_support::typed_dict_key_hover;
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
@@ -20,6 +22,13 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
+    let typed_dict_key = match &goto_target {
+        GotoTarget::Expression(ast::ExprRef::Subscript(subscript)) => {
+            typed_dict_key_hover(&model, subscript)
+        }
+        _ => None,
+    };
+
     let docs = goto_target
         .get_definition_targets(
             &model,
@@ -31,6 +40,14 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     let mut contents = Vec::new();
     if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
         contents.push(HoverContent::Signature(signature));
+    } else if let Some(typed_dict_key) = typed_dict_key {
+        contents.push(HoverContent::TypedDictKey {
+            key: typed_dict_key.key,
+            ty: typed_dict_key.declared_ty,
+        });
+        if let Some(docstring) = typed_dict_key.docstring {
+            contents.push(HoverContent::Docstring(Docstring::new(docstring)));
+        }
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
@@ -125,6 +142,7 @@ impl fmt::Display for DisplayHover<'_, '_> {
 pub enum HoverContent<'db> {
     Signature(String),
     Type(Type<'db>, Option<TypeVarVariance>, TypeQualifiers),
+    TypedDictKey { key: String, ty: Type<'db> },
     Docstring(Docstring),
 }
 
@@ -142,6 +160,22 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
     db: &'db dyn Db,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
+}
+
+impl<'db> DisplayHoverContent<'_, 'db> {
+    fn ty_string_and_syntax(&self, ty: &Type<'db>) -> (String, &'static str) {
+        // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
+        // render poorly with python syntax-highlighting but well as xml
+        let ty_string = ty
+            .display_with(self.db, DisplaySettings::default().multiline())
+            .to_string();
+        let syntax = if ty_string.starts_with('<') {
+            "xml"
+        } else {
+            "python"
+        };
+        (ty_string, syntax)
+    }
 }
 
 impl fmt::Display for DisplayHoverContent<'_, '_> {
@@ -170,18 +204,15 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     format!(" ({})", names.join(", "))
                 };
 
-                // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
-                // render poorly with python syntax-highlighting but well as xml
-                let ty_string = ty
-                    .display_with(self.db, DisplaySettings::default().multiline())
-                    .to_string();
-                let syntax = if ty_string.starts_with('<') {
-                    "xml"
-                } else {
-                    "python"
-                };
+                let (ty_string, syntax) = self.ty_string_and_syntax(ty);
                 self.kind
                     .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
+                    .fmt(f)
+            }
+            HoverContent::TypedDictKey { key, ty } => {
+                let (ty_string, syntax) = self.ty_string_and_syntax(ty);
+                self.kind
+                    .fenced_code_block(format!("(key) {key}: {ty_string}"), syntax)
                     .fmt(f)
             }
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
@@ -3305,6 +3336,77 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_subscript_literal_index() {
+        let test = cursor_test(
+            r#"
+        values: list[int] = [1, 2]
+        print(values[0<CURSOR>])
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        int
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:7
+          |
+        2 | values: list[int] = [1, 2]
+        3 | print(values[0])
+          |       ^^^^^^^^-
+          |       |       |
+          |       |       Cursor offset
+          |       source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_typed_dict_key_literal() {
+        let test = cursor_test(
+            r#"
+        from typing import TypedDict
+
+        class Person(TypedDict):
+            """A person in the database"""
+
+            name: str
+            """The person's full legal name"""
+
+        person: Person = {"name": "Sarah"}
+        person["na<CURSOR>me"]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        (key) name: str
+        ---------------------------------------------
+        The person's full legal name
+
+        ---------------------------------------------
+        ```python
+        (key) name: str
+        ```
+        ---
+        The person's full legal name
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:1
+           |
+        10 | person: Person = {"name": "Sarah"}
+        11 | person["name"]
+           | ^^^^^^^^^^-^^^
+           | |         |
+           | |         Cursor offset
+           | source
+           |
+        "#);
     }
 
     #[test]
