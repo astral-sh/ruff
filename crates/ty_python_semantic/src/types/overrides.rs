@@ -12,7 +12,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     lint::LintId,
-    place::{DefinedPlace, Place, place_from_declarations},
+    place::{DefinedPlace, Place},
     semantic_index::{
         definition::{Definition, DefinitionKind},
         place::ScopedPlaceId,
@@ -54,73 +54,6 @@ const PROHIBITED_NAMEDTUPLE_ATTRS: &[&str] = &[
     "_source",
 ];
 
-struct EnumClassInfo<'db> {
-    metadata: &'db EnumMetadata<'db>,
-    value_sunder_type: Type<'db>,
-}
-
-impl<'db> EnumClassInfo<'db> {
-    fn from_class(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<EnumClassInfo<'db>> {
-        let metadata = enum_metadata(db, class.into())?;
-
-        let scope = class.body_scope(db);
-        let value_sunder_symbol = place_table(db, scope).symbol_id("_value_")?;
-        let value_sunder_declarations =
-            use_def_map(db, scope).end_of_scope_symbol_declarations(value_sunder_symbol);
-        let value_sunder_type = place_from_declarations(db, value_sunder_declarations)
-            .ignore_conflicting_declarations()
-            .ignore_possibly_undefined()?;
-
-        let expected_member_type = Self::extract_init_member_type(db, class, scope);
-        let value_sunder_type = if let Some(ty) = expected_member_type {
-            ty
-        } else {
-            value_sunder_type
-        };
-
-        Some(EnumClassInfo {
-            metadata,
-            value_sunder_type,
-        })
-    }
-
-    /// Extracts the expected enum member type from `__init__` method parameters.
-    fn extract_init_member_type(
-        db: &'db dyn Db,
-        _class: StaticClassLiteral<'db>,
-        scope: ScopeId<'db>,
-    ) -> Option<Type<'db>> {
-        let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
-        let init_declarations =
-            use_def_map(db, scope).end_of_scope_symbol_declarations(init_symbol_id);
-
-        let place_and_qualifiers =
-            place_from_declarations(db, init_declarations).ignore_conflicting_declarations();
-        let init_place_type = place_and_qualifiers.ignore_possibly_undefined()?;
-
-        let Type::FunctionLiteral(func_type) = init_place_type else {
-            return None;
-        };
-
-        let signature = func_type.signature(db);
-
-        let param_types: Vec<Type<'db>> = signature
-            .overloads
-            .first()?
-            .parameters()
-            .iter()
-            .skip(1) // skip `self`
-            .map(Parameter::annotated_type)
-            .collect();
-
-        match param_types.len() {
-            0 => None,
-            1 => param_types.into_iter().next(),
-            _ => Some(Type::heterogeneous_tuple(db, param_types)),
-        }
-    }
-}
-
 // TODO: Support dynamic class literals. If we allow dynamic classes to define attributes in their
 // namespace dictionary, we should also check whether those attributes are valid overrides of
 // attributes in their superclasses.
@@ -134,13 +67,13 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     let class_specialized = class.identity_specialization(db);
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
-    let enum_info = EnumClassInfo::from_class(db, class);
+    let enum_info = enum_metadata(db, class.into());
 
     for member in own_class_members {
         check_class_declaration(
             context,
             configuration,
-            enum_info.as_ref(),
+            enum_info,
             class_specialized,
             scope,
             &member,
@@ -151,7 +84,7 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
 fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
     configuration: OverrideRulesConfig,
-    enum_info: Option<&EnumClassInfo<'db>>,
+    enum_info: Option<&EnumMetadata<'db>>,
     class: ClassType<'db>,
     class_scope: ScopeId<'db>,
     member: &MemberWithDefinition<'db>,
@@ -255,7 +188,7 @@ fn check_class_declaration<'db>(
         if member.name != "_value_"
             && let DefinitionKind::Assignment(_) = first_reachable_definition.kind(db)
         {
-            let is_enum_member = enum_info.metadata.resolve_member(&member.name).is_some();
+            let is_enum_member = enum_info.resolve_member(&member.name).is_some();
             if is_enum_member {
                 let member_value_type = member.ty;
 
