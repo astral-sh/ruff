@@ -14,7 +14,6 @@ pub enum MarkdownResult {
 
 // TODO: account for ~~~ and arbitrary length code fences
 // TODO: support code blocks nested inside block quotes, etc
-// TODO: support unlabeled code blocks
 static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
     // adapted from blacken-docs
     // https://github.com/adamchainz/blacken-docs/blob/fb107c1dce25f9206e29297aaa1ed7afc2980a5a/src/blacken_docs/__init__.py#L17
@@ -22,7 +21,7 @@ static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
         r"(?imsx)
                     (?<before>
                         ^(?<indent>\ *)```[^\S\r\n]*
-                        (?<lang>python|py|python3|py3|pyi)
+                        (?<lang>(?:python|py|python3|py3|pyi)?)
                         (?:\ .*?)?\n
                     )
                     (?<code>.*?)
@@ -128,6 +127,58 @@ print("hello")
 ```
 
 More text.
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_syntax_error() {
+        let code = r#"
+This is well formatted code:
+
+```py
+print "hello"
+```
+
+More text.
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_unlabeled_python() {
+        let code = r#"
+This is poorly formatted code:
+
+```
+print( "hello" )
+```
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @r#"
+        This is poorly formatted code:
+
+        ```
+        print("hello")
+        ```
+        "#);
+    }
+
+    #[test]
+    fn format_code_blocks_unlabeled_rust() {
+        let code = r#"
+This is poorly formatted code:
+
+```
+fn (foo: &str) -> &str {
+    foo
+}
+```
         "#;
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
