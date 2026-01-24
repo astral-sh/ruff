@@ -411,40 +411,25 @@ where
     // for elements that lack the method.
     let any_has_method = errors.iter().any(SubscriptError::any_method_available);
 
-    if any_has_method {
-        let mut builder = IntersectionBuilder::new(db);
-        let mut filtered_errors = Vec::new();
+    let mut builder = IntersectionBuilder::new(db);
+    let mut collected_errors = Vec::new();
 
-        for error in errors {
-            if error.any_method_available() {
-                builder = builder.add_positive(error.result_type());
-                filtered_errors.extend(
-                    error
-                        .into_errors()
-                        .into_iter()
-                        .filter(SubscriptErrorKind::method_available),
-                );
+    for error in errors {
+        if !any_has_method || error.any_method_available() {
+            builder = builder.add_positive(error.result_type());
+            let error_iter = error.into_errors().into_iter();
+            if any_has_method {
+                collected_errors.extend(error_iter.filter(SubscriptErrorKind::method_available));
+            } else {
+                collected_errors.extend(error_iter);
             }
         }
-
-        return Err(SubscriptError::with_errors(
-            builder.build(),
-            filtered_errors,
-        ));
     }
 
-    // No element has the method. Combine all errors.
-    let first = errors
-        .first()
-        .expect("`positive_elements_or_object` guarantees at least one element");
-
-    let result_ty = first.result_type();
-    let all_errors = errors
-        .into_iter()
-        .flat_map(SubscriptError::into_errors)
-        .collect();
-
-    Err(SubscriptError::with_errors(result_ty, all_errors))
+    Err(SubscriptError::with_errors(
+        builder.build(),
+        collected_errors,
+    ))
 }
 
 impl<'db> Type<'db> {
