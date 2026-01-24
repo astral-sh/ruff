@@ -8,7 +8,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
-    ceil_char_boundary,
     github::{DisplayGithubDiagnostics, GithubRenderer},
 };
 use crate::cancellation::CancellationToken;
