@@ -352,9 +352,10 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                         .any(|element| is_expandable_type(db, element)),
                     Tuple::Variable(_) => false,
                 })
-                || enum_metadata(db, class.class_literal(db).0).is_some()
+                || enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
+        Type::TypeAlias(alias) => is_expandable_type(db, alias.value_type(db)),
         _ => false,
     }
 }
@@ -403,13 +404,15 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db).0, None) {
+            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None) {
                 return Some(enum_members.collect());
             }
 
             None
         }
         Type::Union(union) => Some(union.elements(db).to_vec()),
+        // For type aliases, expand the underlying value type.
+        Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
         _ => None,
@@ -420,7 +423,8 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 mod tests {
     use crate::db::tests::setup_db;
     use crate::types::tuple::TupleType;
-    use crate::types::{KnownClass, Type, UnionType};
+    use crate::types::{KnownClass, ManualPEP695TypeAliasType, Type, TypeAliasType, UnionType};
+    use ruff_python_ast as ast;
 
     use super::expand_type;
 
@@ -434,6 +438,27 @@ mod tests {
         ];
         let union_type = UnionType::from_elements(&db, types);
         let expanded = expand_type(&db, union_type).unwrap();
+        assert_eq!(expanded.len(), types.len());
+        assert_eq!(expanded, types);
+    }
+
+    #[test]
+    fn expand_pep695_type_alias() {
+        let db = setup_db();
+        let types = [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::Str.to_instance(&db),
+            KnownClass::Bytes.to_instance(&db),
+        ];
+        let union_type = UnionType::from_elements(&db, types);
+        let alias_type =
+            Type::TypeAlias(TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                &db,
+                ast::name::Name::new_static("MyAlias"),
+                None,
+                union_type,
+            )));
+        let expanded = expand_type(&db, alias_type).unwrap();
         assert_eq!(expanded.len(), types.len());
         assert_eq!(expanded, types);
     }

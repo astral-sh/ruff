@@ -1,6 +1,8 @@
+use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::function_type::is_subject_to_liskov_substitution_principle;
 
 use crate::checkers::ast::Checker;
 use crate::settings::LinterSettings;
@@ -190,4 +192,28 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
     }
 
     false
+}
+
+pub(super) fn add_liskov_substitution_principle_help(
+    diagnostic: &mut Diagnostic,
+    function_name: &str,
+    decorator_list: &[ast::Decorator],
+    checker: &Checker,
+) {
+    let semantic = checker.semantic();
+    let parent_scope = semantic.current_scope();
+    let pep8_settings = &checker.settings().pep8_naming;
+    if is_subject_to_liskov_substitution_principle(
+        function_name,
+        decorator_list,
+        parent_scope,
+        semantic,
+        &pep8_settings.classmethod_decorators,
+        &pep8_settings.staticmethod_decorators,
+    ) {
+        diagnostic.help(
+            "Consider adding `@typing.override` if changing the function signature \
+                would violate the Liskov Substitution Principle",
+        );
+    }
 }

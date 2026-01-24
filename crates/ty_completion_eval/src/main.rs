@@ -540,16 +540,17 @@ fn copy_project(src_dir: &SystemPath, dst_dir: &SystemPath) -> anyhow::Result<Ve
     std::fs::create_dir_all(dst_dir).with_context(|| dst_dir.to_string())?;
 
     let mut cursors = vec![];
-    for result in walkdir::WalkDir::new(src_dir.as_std_path()) {
+    let it = walkdir::WalkDir::new(src_dir.as_std_path())
+        .into_iter()
+        .filter_entry(|dent| {
+            !dent
+                .file_name()
+                .to_str()
+                .is_some_and(|name| name.starts_with('.'))
+        });
+    for result in it {
         let dent =
             result.with_context(|| format!("failed to get directory entry from {src_dir}"))?;
-        if dent
-            .file_name()
-            .to_str()
-            .is_some_and(|name| name.starts_with('.'))
-        {
-            continue;
-        }
 
         let src = SystemPath::from_std_path(dent.path()).ok_or_else(|| {
             anyhow::anyhow!("path `{}` is not valid UTF-8", dent.path().display())

@@ -48,11 +48,11 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
 zip = { workspace = true }
 
-[target.'cfg(target_arch="wasm32")'.dependencies]
-web-time = { version = "1.1.0" }
-
 [target.'cfg(not(target_arch="wasm32"))'.dependencies]
 etcetera = { workspace = true, optional = true }
+
+[target.'cfg(target_arch="wasm32")'.dependencies]
+web-time = { version = "1.1.0" }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["filters"] }

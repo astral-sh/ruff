@@ -197,3 +197,22 @@ RUF020 `Never | T` is equivalent to `T`
    |            ^^^^^
    |
 help: Remove `Never`
+
+RUF020 [*] `Never | T` is equivalent to `T`
+  --> RUF020.py:21:9
+   |
+20 | def func() -> (
+21 |         Never  # text
+   |         ^^^^^
+22 |         | # text
+23 |         int
+   |
+help: Remove `Never`
+18 | 
+19 | 
+20 | def func() -> (
+   -         Never  # text
+   -         | # text
+21 |         int
+22 | ): ...
+note: This is an unsafe fix and may change runtime behavior

@@ -136,7 +136,6 @@ yield
 # error: [invalid-syntax] "`yield from` statement outside of a function"
 yield from []
 
-# error: [invalid-syntax] "`await` statement outside of a function"
 # error: [invalid-syntax] "`await` outside of an asynchronous function"
 await C()
 

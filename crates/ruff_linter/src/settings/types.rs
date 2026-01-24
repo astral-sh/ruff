@@ -36,6 +36,7 @@ pub enum PythonVersion {
     Py312,
     Py313,
     Py314,
+    Py315,
 }
 
 impl Default for PythonVersion {
@@ -58,6 +59,7 @@ impl TryFrom<ast::PythonVersion> for PythonVersion {
             ast::PythonVersion::PY312 => Ok(Self::Py312),
             ast::PythonVersion::PY313 => Ok(Self::Py313),
             ast::PythonVersion::PY314 => Ok(Self::Py314),
+            ast::PythonVersion::PY315 => Ok(Self::Py315),
             _ => Err(format!("unrecognized python version {value}")),
         }
     }
@@ -88,6 +90,7 @@ impl PythonVersion {
             Self::Py312 => (3, 12),
             Self::Py313 => (3, 13),
             Self::Py314 => (3, 14),
+            Self::Py315 => (3, 15),
         }
     }
 }
@@ -604,13 +607,21 @@ impl TryFrom<String> for RequiredVersion {
     type Error = pep440_rs::VersionSpecifiersParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl FromStr for RequiredVersion {
+    type Err = pep440_rs::VersionSpecifiersParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
-        if let Ok(version) = pep440_rs::Version::from_str(&value) {
+        if let Ok(version) = pep440_rs::Version::from_str(value) {
             Ok(Self(VersionSpecifiers::from(
                 VersionSpecifier::equals_version(version),
             )))
         } else {
-            Ok(Self(VersionSpecifiers::from_str(&value)?))
+            Ok(Self(VersionSpecifiers::from_str(value)?))
         }
     }
 }

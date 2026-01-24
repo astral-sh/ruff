@@ -190,75 +190,6 @@ class SSLCertVerificationError(SSLError, ValueError):
 
 CertificateError = SSLCertVerificationError
 
-if sys.version_info < (3, 12):
-    @deprecated("Deprecated since Python 3.7; removed in Python 3.12. Use `SSLContext.wrap_socket()` instead.")
-    def wrap_socket(
-        sock: socket.socket,
-        keyfile: StrOrBytesPath | None = None,
-        certfile: StrOrBytesPath | None = None,
-        server_side: bool = False,
-        cert_reqs: int = ...,
-        ssl_version: int = ...,
-        ca_certs: str | None = None,
-        do_handshake_on_connect: bool = True,
-        suppress_ragged_eofs: bool = True,
-        ciphers: str | None = None,
-    ) -> SSLSocket: ...
-    @deprecated("Deprecated since Python 3.7; removed in Python 3.12.")
-    def match_hostname(cert: _PeerCertRetDictType, hostname: str) -> None:
-        """Verify that *cert* (in decoded format as returned by
-        SSLSocket.getpeercert()) matches the *hostname*.  RFC 2818 and RFC 6125
-        rules are followed.
-
-        The function matches IP addresses rather than dNSNames if hostname is a
-        valid ipaddress string. IPv4 addresses are supported on all platforms.
-        IPv6 addresses are supported on platforms with IPv6 support (AF_INET6
-        and inet_pton).
-
-        CertificateError is raised on failure. On success, the function
-        returns nothing.
-        """
-
-def cert_time_to_seconds(cert_time: str) -> int:
-    """Return the time in seconds since the Epoch, given the timestring
-    representing the "notBefore" or "notAfter" date from a certificate
-    in ``"%b %d %H:%M:%S %Y %Z"`` strptime format (C locale).
-
-    "notBefore" or "notAfter" dates must use UTC (RFC 5280).
-
-    Month is one of: Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
-    UTC should be specified as GMT (see ASN1_TIME_print())
-    """
-
-if sys.version_info >= (3, 10):
-    def get_server_certificate(
-        addr: tuple[str, int], ssl_version: int = ..., ca_certs: str | None = None, timeout: float = ...
-    ) -> str:
-        """Retrieve the certificate from the server at the specified address,
-        and return it as a PEM-encoded string.
-        If 'ca_certs' is specified, validate the server cert against it.
-        If 'ssl_version' is specified, use it in the connection attempt.
-        If 'timeout' is specified, use it in the connection attempt.
-        """
-
-else:
-    def get_server_certificate(addr: tuple[str, int], ssl_version: int = ..., ca_certs: str | None = None) -> str:
-        """Retrieve the certificate from the server at the specified address,
-        and return it as a PEM-encoded string.
-        If 'ca_certs' is specified, validate the server cert against it.
-        If 'ssl_version' is specified, use it in the connection attempt.
-        """
-
-def DER_cert_to_PEM_cert(der_cert_bytes: ReadableBuffer) -> str:
-    """Takes a certificate in binary DER format and returns the
-    PEM version of it as a string.
-    """
-
-def PEM_cert_to_DER_cert(pem_cert_string: str) -> bytes:
-    """Takes a certificate in ASCII PEM format and returns the
-    DER-encoded version of it as a byte sequence
-    """
-
 class DefaultVerifyPaths(NamedTuple):
     """DefaultVerifyPaths(cafile, capath, openssl_cafile_env, openssl_cafile, openssl_capath_env, openssl_capath)"""
 
@@ -608,6 +539,80 @@ class SSLSocket(socket.socket):
             end of the SSL channel as a list of DER-encoded bytes.
             """
 
+if sys.version_info < (3, 12):
+    @deprecated("Deprecated since Python 3.7; removed in Python 3.12. Use `SSLContext.wrap_socket()` instead.")
+    def wrap_socket(
+        sock: socket.socket,
+        keyfile: StrOrBytesPath | None = None,
+        certfile: StrOrBytesPath | None = None,
+        server_side: bool = False,
+        cert_reqs: int = VerifyMode.CERT_NONE,
+        ssl_version: int = _SSLMethod.PROTOCOL_TLS,
+        ca_certs: str | None = None,
+        do_handshake_on_connect: bool = True,
+        suppress_ragged_eofs: bool = True,
+        ciphers: str | None = None,
+    ) -> SSLSocket: ...
+    @deprecated("Deprecated since Python 3.7; removed in Python 3.12.")
+    def match_hostname(cert: _PeerCertRetDictType, hostname: str) -> None:
+        """Verify that *cert* (in decoded format as returned by
+        SSLSocket.getpeercert()) matches the *hostname*.  RFC 2818 and RFC 6125
+        rules are followed.
+
+        The function matches IP addresses rather than dNSNames if hostname is a
+        valid ipaddress string. IPv4 addresses are supported on all platforms.
+        IPv6 addresses are supported on platforms with IPv6 support (AF_INET6
+        and inet_pton).
+
+        CertificateError is raised on failure. On success, the function
+        returns nothing.
+        """
+
+def cert_time_to_seconds(cert_time: str) -> int:
+    """Return the time in seconds since the Epoch, given the timestring
+    representing the "notBefore" or "notAfter" date from a certificate
+    in ``"%b %d %H:%M:%S %Y %Z"`` strptime format (C locale).
+
+    "notBefore" or "notAfter" dates must use UTC (RFC 5280).
+
+    Month is one of: Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+    UTC should be specified as GMT (see ASN1_TIME_print())
+    """
+
+def DER_cert_to_PEM_cert(der_cert_bytes: ReadableBuffer) -> str:
+    """Takes a certificate in binary DER format and returns the
+    PEM version of it as a string.
+    """
+
+def PEM_cert_to_DER_cert(pem_cert_string: str) -> bytes:
+    """Takes a certificate in ASCII PEM format and returns the
+    DER-encoded version of it as a byte sequence
+    """
+
+if sys.version_info >= (3, 10):
+    def get_server_certificate(
+        addr: tuple[str, int],
+        ssl_version: int = _SSLMethod.PROTOCOL_TLS_CLIENT,
+        ca_certs: str | None = None,
+        timeout: float = ...,
+    ) -> str:
+        """Retrieve the certificate from the server at the specified address,
+        and return it as a PEM-encoded string.
+        If 'ca_certs' is specified, validate the server cert against it.
+        If 'ssl_version' is specified, use it in the connection attempt.
+        If 'timeout' is specified, use it in the connection attempt.
+        """
+
+else:
+    def get_server_certificate(
+        addr: tuple[str, int], ssl_version: int = _SSLMethod.PROTOCOL_TLS_CLIENT, ca_certs: str | None = None
+    ) -> str:
+        """Retrieve the certificate from the server at the specified address,
+        and return it as a PEM-encoded string.
+        If 'ca_certs' is specified, validate the server cert against it.
+        If 'ssl_version' is specified, use it in the connection attempt.
+        """
+
 class TLSVersion(enum.IntEnum):
     """An enumeration."""
 
@@ -723,7 +728,7 @@ if sys.version_info >= (3, 10):
     def _create_unverified_context(
         protocol: int | None = None,
         *,
-        cert_reqs: int = ...,
+        cert_reqs: int = VerifyMode.CERT_NONE,
         check_hostname: bool = False,
         purpose: Purpose = Purpose.SERVER_AUTH,
         certfile: StrOrBytesPath | None = None,
@@ -744,7 +749,7 @@ else:
     def _create_unverified_context(
         protocol: int = ...,
         *,
-        cert_reqs: int = ...,
+        cert_reqs: int = VerifyMode.CERT_NONE,
         check_hostname: bool = False,
         purpose: Purpose = Purpose.SERVER_AUTH,
         certfile: StrOrBytesPath | None = None,

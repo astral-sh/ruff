@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: super.md - Super - Basic Usage - Implicit Super Object
 mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
@@ -21,13 +22,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
   7 | 
   8 | class B(A):
   9 |     def __init__(self, a: int):
- 10 |         reveal_type(super())  # revealed: <super: <class 'B'>, B>
+ 10 |         reveal_type(super())  # revealed: <super: <class 'B'>, Self@__init__>
  11 |         reveal_type(super(object, super()))  # revealed: <super: <class 'object'>, super>
  12 |         super().__init__(a)
  13 | 
  14 |     @classmethod
  15 |     def f(cls):
- 16 |         reveal_type(super())  # revealed: <super: <class 'B'>, <class 'B'>>
+ 16 |         reveal_type(super())  # revealed: <super: <class 'B'>, type[Self@f]>
  17 |         super().f()
  18 | 
  19 | super(B, B(42)).__init__(42)
@@ -77,16 +78,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  63 |         reveal_type(super())
  64 | 
  65 |     def method4(self: Self):
- 66 |         # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
+ 66 |         # revealed: <super: <class 'Foo'>, Self@method4>
  67 |         reveal_type(super())
  68 | 
  69 |     def method5[S: Foo[int]](self: S, other: S) -> S:
- 70 |         # revealed: <super: <class 'Foo'>, Foo[int]>
+ 70 |         # revealed: <super: <class 'Foo'>, S@method5>
  71 |         reveal_type(super())
  72 |         return self
  73 | 
  74 |     def method6[S: (Foo[int], Foo[str])](self: S, other: S) -> S:
- 75 |         # revealed: <super: <class 'Foo'>, Foo[int]> | <super: <class 'Foo'>, Foo[str]>
+ 75 |         # revealed: <super: <class 'Foo'>, S@method6> | <super: <class 'Foo'>, S@method6>
  76 |         reveal_type(super())
  77 |         return self
  78 | 
@@ -113,35 +114,48 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  99 |         # revealed: Unknown
 100 |         reveal_type(super())
 101 |         return self
-102 | 
-103 | type Alias = Bar
-104 | 
-105 | class Bar:
-106 |     def method(self: Alias):
-107 |         # revealed: <super: <class 'Bar'>, Bar>
-108 |         reveal_type(super())
-109 | 
-110 |     def pls_dont_call_me(self: Never):
-111 |         # revealed: <super: <class 'Bar'>, Unknown>
-112 |         reveal_type(super())
-113 | 
-114 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
-115 |         # revealed: <super: <class 'Bar'>, Bar>
-116 |         reveal_type(super())
+102 |     # TypeVar bounded by `type[Foo]` rather than `Foo`
+103 |     # TODO: Should error on signature - `self` is annotated as a class type, not an instance type
+104 |     def method11[S: type[Foo[int]]](self: S, other: S) -> S:
+105 |         # Delegates to the bound to resolve the super type
+106 |         reveal_type(super())  # revealed: <super: <class 'Foo'>, <class 'Foo[int]'>>
+107 |         return self
+108 |     # TypeVar bounded by `type[Foo]`, used in `type[T]` position
+109 |     # TODO: Should error on signature - `cls` would be `type[type[Foo[int]]]`, a metaclass
+110 |     # Delegates to `type[Unknown]` since `type[type[Foo[int]]]` can't be constructed
+111 |     @classmethod
+112 |     def method12[S: type[Foo[int]]](cls: type[S]) -> S:
+113 |         reveal_type(super())  # revealed: <super: <class 'Foo'>, Unknown>
+114 |         raise NotImplementedError
+115 | 
+116 | type Alias = Bar
 117 | 
-118 | class P(Protocol):
-119 |     def method(self: P):
-120 |         # revealed: <super: <class 'P'>, P>
+118 | class Bar:
+119 |     def method(self: Alias):
+120 |         # revealed: <super: <class 'Bar'>, Bar>
 121 |         reveal_type(super())
 122 | 
-123 | class E(enum.Enum):
-124 |     X = 1
-125 | 
-126 |     def method(self: E):
-127 |         match self:
-128 |             case E.X:
-129 |                 # revealed: <super: <class 'E'>, E>
-130 |                 reveal_type(super())
+123 |     def pls_dont_call_me(self: Never):
+124 |         # revealed: <super: <class 'Bar'>, Unknown>
+125 |         reveal_type(super())
+126 | 
+127 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
+128 |         # revealed: <super: <class 'Bar'>, Bar>
+129 |         reveal_type(super())
+130 | 
+131 | class P(Protocol):
+132 |     def method(self: P):
+133 |         # revealed: <super: <class 'P'>, P>
+134 |         reveal_type(super())
+135 | 
+136 | class E(enum.Enum):
+137 |     X = 1
+138 | 
+139 |     def method(self: E):
+140 |         match self:
+141 |             case E.X:
+142 |                 # revealed: <super: <class 'E'>, E>
+143 |                 reveal_type(super())
 ```
 
 # Diagnostics
@@ -204,6 +218,7 @@ error[invalid-super-argument]: `S@method10` is a type variable with an abstract/
 100 |         reveal_type(super())
     |                     ^^^^^^^
 101 |         return self
+102 |     # TypeVar bounded by `type[Foo]` rather than `Foo`
     |
 info: Type variable `S` has upper bound `(...) -> str`
 info: rule `invalid-super-argument` is enabled by default

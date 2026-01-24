@@ -1032,4 +1032,125 @@ reveal_type(asdict(p))  # revealed: dict[str, Any]
 reveal_type(replace(p, name="Bob"))  # revealed: Person
 ```
 
+## Calling decorator function directly with a class argument
+
+When a function decorated with `@dataclass_transform()` is called directly with a class argument
+(not used as a decorator), it should return the class with the dataclass transformation applied.
+
+### Basic case
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+def my_dataclass[T](cls: type[T]) -> type[T]:
+    return cls
+
+class A:
+    x: int
+
+B = my_dataclass(A)
+
+reveal_type(B)  # revealed: <class 'A'>
+
+B(1)
+```
+
+### Function with additional parameters
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+def my_dataclass[T](cls: type[T], *, order: bool = False) -> type[T]:
+    return cls
+
+class A:
+    x: int
+
+B = my_dataclass(A, order=True)
+
+reveal_type(B)  # revealed: <class 'A'>
+
+reveal_type(B(1) < B(2))  # revealed: bool
+```
+
+### Overloaded decorator function
+
+When the decorator function has overloads (one for direct class application, one for returning a
+decorator), calling it with a class should return the class type.
+
+```py
+from typing_extensions import dataclass_transform, Callable, overload
+
+@overload
+@dataclass_transform()
+def my_dataclass[T](cls: type[T]) -> type[T]: ...
+@overload
+def my_dataclass[T]() -> Callable[[type[T]], type[T]]: ...
+def my_dataclass[T](cls: type[T] | None = None) -> type[T] | Callable[[type[T]], type[T]]:
+    raise NotImplementedError
+
+class A:
+    x: int
+
+B = my_dataclass(A)
+
+reveal_type(B)  # revealed: <class 'A'>
+
+B(1)
+```
+
+### Passing a specialized generic class
+
+When calling a `@dataclass_transform()` decorated function with a specialized generic class, the
+specialization should be preserved.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+def my_dataclass[T](cls: type[T]) -> type[T]:
+    return cls
+
+class A[T]:
+    x: T
+
+B = my_dataclass(A[int])
+
+reveal_type(B)  # revealed: <class 'A[int]'>
+
+B(1)
+```
+
+### Decorator factory with class parameter
+
+When a `@dataclass_transform()` decorated function takes a class as a parameter but is used as a
+decorator factory (returns a decorator), the dataclass behavior should be applied to the decorated
+class, not to the parameter class.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+def hydrated_dataclass[T](target: type[T], *, frozen: bool = False):
+    def decorator[U](cls: type[U]) -> type[U]:
+        return cls
+    return decorator
+
+class Target:
+    pass
+
+decorator = hydrated_dataclass(Target)
+reveal_type(decorator)  # revealed: <decorator produced by dataclass-like function>
+
+@hydrated_dataclass(Target)
+class Model:
+    x: int
+
+# Model should be a dataclass-like class with x as a field
+Model(x=1)
+reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
+```
+
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

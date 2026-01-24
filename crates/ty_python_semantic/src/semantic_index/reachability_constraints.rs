@@ -375,7 +375,10 @@ fn type_excluded_by_previous_patterns<'db>(
 /// statement with N cases where each case references the subject (e.g., `self`), we would
 /// re-analyze each pattern O(N) times (once per reference), leading to O(N²) total work.
 /// With memoization, each pattern is analyzed exactly once.
-#[salsa::tracked(cycle_initial = analyze_pattern_predicate_cycle_initial, heap_size = get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
     let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
 
@@ -414,14 +417,6 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     } else {
         truthiness
     }
-}
-
-fn analyze_pattern_predicate_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _predicate: PatternPredicate<'db>,
-) -> Truthiness {
-    Truthiness::Ambiguous
 }
 
 /// A collection of reachability constraints for a given scope.
@@ -899,9 +894,7 @@ impl ReachabilityConstraints {
                 let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
                     .fold((true, true), |(none, all), overload| {
                         let overload_returns_never =
-                            overload.return_ty.is_some_and(|return_type| {
-                                return_type.is_equivalent_to(db, Type::Never)
-                            });
+                            overload.return_ty.is_equivalent_to(db, Type::Never);
 
                         (
                             none && !overload_returns_never,
@@ -947,24 +940,20 @@ impl ReachabilityConstraints {
 
                 match imported_symbol(
                     db,
-                    referenced_file,
+                    Some(referenced_file),
                     symbol.name(),
                     requires_explicit_reexport,
                 )
                 .place
                 {
-                    crate::place::Place::Defined(
-                        _,
-                        _,
-                        crate::place::Definedness::AlwaysDefined,
-                        _,
-                    ) => Truthiness::AlwaysTrue,
-                    crate::place::Place::Defined(
-                        _,
-                        _,
-                        crate::place::Definedness::PossiblyUndefined,
-                        _,
-                    ) => Truthiness::Ambiguous,
+                    crate::place::Place::Defined(crate::place::DefinedPlace {
+                        definedness: crate::place::Definedness::AlwaysDefined,
+                        ..
+                    }) => Truthiness::AlwaysTrue,
+                    crate::place::Place::Defined(crate::place::DefinedPlace {
+                        definedness: crate::place::Definedness::PossiblyUndefined,
+                        ..
+                    }) => Truthiness::Ambiguous,
                     crate::place::Place::Undefined => Truthiness::AlwaysFalse,
                 }
             }

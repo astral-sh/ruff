@@ -146,11 +146,15 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
         .map(|binding_id| semantic.binding(binding_id))
         .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             NoSelfUse {
                 method_name: name.to_string(),
             },
             func.identifier(),
+        );
+        diagnostic.help(
+            "Consider adding `@typing.override` if this method overrides \
+            a method from a superclass",
         );
     }
 }

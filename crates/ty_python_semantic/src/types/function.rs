@@ -57,8 +57,9 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
+use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
-use crate::place::{Definedness, Place, place_from_bindings};
+use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
@@ -67,8 +68,9 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
-    report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
+    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
+    report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::display::DisplaySettings;
@@ -76,18 +78,19 @@ use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
-    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
-    definition_expression_type, infer_definition_types, walk_signature,
+    KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionBuilder, binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
-use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -374,8 +377,11 @@ impl<'db> OverloadLiteral<'db> {
             .name
             .scoped_use_id(db, scope);
 
-        let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined, _) =
-            place_from_bindings(db, use_def.bindings_at_use(use_id)).place
+        let Place::Defined(DefinedPlace {
+            ty: Type::FunctionLiteral(previous_type),
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = place_from_bindings(db, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };
@@ -558,10 +564,11 @@ impl<'db> OverloadLiteral<'db> {
                 let index = semantic_index(db, scope_id.file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class).expect(
-                    "We should always find the surrounding class \
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
+                    .expect(
+                        "We should always find the surrounding class \
                      for an implicit self: Self annotation",
-                );
+                    );
 
                 if self.is_classmethod(db) {
                     Some(SubclassOfType::from(
@@ -592,12 +599,11 @@ impl<'db> OverloadLiteral<'db> {
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function()?.node(&module);
+    ) -> (Span, Span) {
+        let file = self.file(db);
+        let span = Span::from(file);
+        let module = parsed_module(db, file).load(db);
+        let func_def = self.node(db, file, &module);
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
@@ -609,26 +615,25 @@ impl<'db> OverloadLiteral<'db> {
             .unwrap_or(func_def.parameters.range);
         let name_span = span.clone().with_range(func_def.name.range);
         let parameter_span = span.with_range(range);
-        Some((name_span, parameter_span))
+        (name_span, parameter_span)
     }
 
-    pub(crate) fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
+    pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
+        let file = self.file(db);
+        let span = Span::from(file);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function()?.node(&module);
+        let func_def = self.node(db, file, &module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
         if let Some(return_type_range) = return_type_range {
             signature = signature.cover(return_type_range);
         }
-        Some(FunctionSpans {
+        FunctionSpans {
             signature: span.clone().with_range(signature),
             name: span.clone().with_range(func_def.name.range),
             parameters: span.clone().with_range(func_def.parameters.range),
             return_type: return_type_range.map(|range| span.clone().with_range(range)),
-        })
+        }
     }
 }
 
@@ -648,14 +653,6 @@ pub struct FunctionLiteral<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionLiteral<'_> {}
-
-fn overloads_and_implementation_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: FunctionLiteral<'db>,
-) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-    (Box::new([]), None)
-}
 
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
@@ -687,15 +684,11 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).definition(db)
     }
 
-    fn parameter_span(
-        self,
-        db: &'db dyn Db,
-        parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
+    fn parameter_span(self, db: &'db dyn Db, parameter_index: Option<usize>) -> (Span, Span) {
         self.last_definition(db).parameter_span(db, parameter_index)
     }
 
-    fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+    fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.last_definition(db).spans(db)
     }
 
@@ -705,8 +698,8 @@ impl<'db> FunctionLiteral<'db> {
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         #[salsa::tracked(
             returns(ref),
+            cycle_initial=|_, _, _| (Box::default(), None),
             heap_size=ruff_memory_usage::heap_size,
-            cycle_initial=overloads_and_implementation_cycle_initial
         )]
         fn overloads_and_implementation_inner<'db>(
             db: &'db dyn Db,
@@ -742,9 +735,9 @@ impl<'db> FunctionLiteral<'db> {
     fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
-        let (implementation, overloads) = self.overloads_and_implementation(db);
-        overloads.into_iter().chain(implementation.iter().copied())
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
+        let (overloads, implementation) = self.overloads_and_implementation(db);
+        overloads.iter().copied().chain(implementation)
     }
 
     /// Typed externally-visible signature for this function.
@@ -993,7 +986,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
+    ) -> (Span, Span) {
         self.literal(db).parameter_span(db, parameter_index)
     }
 
@@ -1010,7 +1003,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// An example of a good use case is to improve
     /// a diagnostic.
-    pub(crate) fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+    pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.literal(db).spans(db)
     }
 
@@ -1028,7 +1021,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
         self.literal(db).iter_overloads_and_implementation(db)
     }
 
@@ -1050,7 +1043,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::single(Signature::bottom()), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
@@ -1221,10 +1214,7 @@ fn is_instance_truthiness<'db>(
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
-                .any(|c| match c {
-                    ClassType::Generic(c) => c.origin(db) == class,
-                    ClassType::NonGeneric(c) => c == class,
-                })
+                .any(|c| c.class_literal(db) == class)
         {
             return true;
         }
@@ -1315,14 +1305,6 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-fn signature_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionType<'db>,
-) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom())
-}
-
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
@@ -1410,6 +1392,9 @@ pub enum KnownFunction {
     Dataclass,
     /// `dataclasses.field`
     Field,
+
+    /// `functools.total_ordering`
+    TotalOrdering,
 
     /// `inspect.getattr_static`
     GetattrStatic,
@@ -1499,6 +1484,7 @@ impl KnownFunction {
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
+            Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
             | Self::IsDisjointFrom
@@ -1571,8 +1557,13 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
                     return;
                 }
-                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                {
+                let diagnostic =
+                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(db, *asserted_ty) {
+                        &TYPE_ASSERTION_FAILURE
+                    } else {
+                        &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
+                    };
+                if let Some(builder) = context.report_lint(diagnostic, call_expression) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
                         asserted_ty.display(db),
@@ -1810,10 +1801,19 @@ impl KnownFunction {
                     let mut diag = builder.into_diagnostic("Revealed MRO");
                     let span = context.span(&call_expression.arguments.args[0]);
                     let mut message = String::new();
+                    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+                        db,
+                        classes
+                            .iter()
+                            .flat_map(|class| class.iter_mro(db))
+                            .filter_map(ClassBase::into_class),
+                    );
                     for (i, class) in classes.iter().enumerate() {
                         message.push('(');
                         for class in class.iter_mro(db) {
-                            message.push_str(&class.display(db).to_string());
+                            message.push_str(
+                                &class.display_with(db, display_settings.clone()).to_string(),
+                            );
                             // Omit the comma for the last element (which is always `object`)
                             if class
                                 .into_class()
@@ -1996,6 +1996,29 @@ impl KnownFunction {
 
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
+
+            KnownFunction::TotalOrdering => {
+                // When `total_ordering(cls)` is called as a function (not as a decorator),
+                // check that the class defines at least one ordering method.
+                let [Some(class_type)] = parameter_types else {
+                    return;
+                };
+
+                let class = match class_type {
+                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
+                    Type::GenericAlias(generic) => ClassType::Generic(*generic),
+                    _ => return,
+                };
+
+                if !class.has_ordering_method_in_mro(db) {
+                    report_invalid_total_ordering_call(
+                        context,
+                        class.class_literal(db),
+                        call_expression,
+                    );
+                }
+            }
+
             _ => {}
         }
     }
@@ -2066,6 +2089,7 @@ pub(crate) mod tests {
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,
+                KnownFunction::TotalOrdering => KnownModule::Functools,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

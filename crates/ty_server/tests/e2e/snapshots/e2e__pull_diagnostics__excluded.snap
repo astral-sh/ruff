@@ -1,0 +1,5 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: excluded_diagnostics
+---
+{"kind": "full", "items": []}

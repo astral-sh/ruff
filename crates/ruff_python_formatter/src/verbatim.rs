@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
+use itertools::PeekingNext;
 use ruff_formatter::{FormatError, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
@@ -451,6 +452,40 @@ fn write_suppressed_statements<'a>(
     }
 }
 
+#[cold]
+pub(crate) fn write_skipped_statements<'a>(
+    first_skipped: &'a Stmt,
+    statements: &mut std::slice::Iter<'a, Stmt>,
+    verbatim_range: TextRange,
+    f: &mut PyFormatter,
+) -> FormatResult<&'a Stmt> {
+    let comments = f.context().comments().clone();
+    comments.mark_verbatim_node_comments_formatted(first_skipped.into());
+
+    let mut preceding = first_skipped;
+
+    while let Some(prec) = statements.peeking_next(|next| next.end() <= verbatim_range.end()) {
+        comments.mark_verbatim_node_comments_formatted(prec.into());
+        preceding = prec;
+    }
+
+    let first_leading = comments.leading(first_skipped);
+    let preceding_trailing = comments.trailing(preceding);
+
+    // Write the outer comments and format the node as verbatim
+    write!(
+        f,
+        [
+            leading_comments(first_leading),
+            source_position(verbatim_range.start()),
+            verbatim_text(verbatim_range),
+            source_position(verbatim_range.end()),
+            trailing_comments(preceding_trailing)
+        ]
+    )?;
+    Ok(preceding)
+}
+
 #[derive(Copy, Clone, Debug)]
 enum InSuppression {
     No,
@@ -890,65 +925,6 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
 
         f.write_element(FormatElement::Tag(Tag::EndVerbatim));
         Ok(())
-    }
-}
-
-/// Disables formatting for `node` and instead uses the same formatting as the node has in source.
-///
-/// The `node` gets indented as any formatted node to avoid syntax errors when the indentation string changes (e.g. from 2 spaces to 4).
-/// The `node`s leading and trailing comments are formatted as usual, except if they fall into the suppressed node's range.
-#[cold]
-pub(crate) fn suppressed_node<'a, N>(node: N) -> FormatSuppressedNode<'a>
-where
-    N: Into<AnyNodeRef<'a>>,
-{
-    FormatSuppressedNode { node: node.into() }
-}
-
-pub(crate) struct FormatSuppressedNode<'a> {
-    node: AnyNodeRef<'a>,
-}
-
-impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
-        let node_comments = comments.leading_dangling_trailing(self.node);
-
-        // Mark all comments as formatted that fall into the node range
-        for comment in node_comments.leading {
-            if comment.start() > self.node.start() {
-                comment.mark_formatted();
-            }
-        }
-
-        for comment in node_comments.trailing {
-            if comment.start() < self.node.end() {
-                comment.mark_formatted();
-            }
-        }
-
-        // Some statements may end with a semicolon. Preserve the semicolon
-        let semicolon_range = self
-            .node
-            .is_statement()
-            .then(|| trailing_semicolon(self.node, f.context().source()))
-            .flatten();
-        let verbatim_range = semicolon_range.map_or(self.node.range(), |semicolon| {
-            TextRange::new(self.node.start(), semicolon.end())
-        });
-        comments.mark_verbatim_node_comments_formatted(self.node);
-
-        // Write the outer comments and format the node as verbatim
-        write!(
-            f,
-            [
-                leading_comments(node_comments.leading),
-                source_position(verbatim_range.start()),
-                verbatim_text(verbatim_range),
-                source_position(verbatim_range.end()),
-                trailing_comments(node_comments.trailing)
-            ]
-        )
     }
 }
 

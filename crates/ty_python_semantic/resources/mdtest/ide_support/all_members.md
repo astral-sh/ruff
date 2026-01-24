@@ -361,6 +361,52 @@ def f(union: A | B):
     static_assert(not has_member(union, "only_on_b"))
 ```
 
+Unless one of the elements of the union is `Any`, thus making it dynamic. In which case, we consider
+items on the intersection of the non-`Any` elements:
+
+```py
+from typing import Any
+from ty_extensions import has_member, static_assert
+
+class A:
+    on_both: int = 1
+    only_on_a: str = "a"
+
+class B:
+    on_both: int = 2
+    only_on_b: str = "b"
+
+def f(union: Any | A):
+    static_assert(has_member(union, "on_both"))
+    static_assert(has_member(union, "only_on_a"))
+
+def g(union: Any | A | B):
+    static_assert(has_member(union, "on_both"))
+    static_assert(not has_member(union, "only_on_a"))
+    static_assert(not has_member(union, "only_on_b"))
+```
+
+Similarly, unioning with an intersection involving `Any` is treated the same as if it was just
+unioned with `Any`:
+
+```py
+from typing import Any
+from ty_extensions import Intersection, has_member, static_assert
+
+class A:
+    on_both: int = 1
+    only_on_a: str = "a"
+
+class B:
+    on_both: int = 2
+    only_on_b: str = "b"
+
+def f(x: Intersection[Any, A] | B):
+    static_assert(has_member(x, "on_both"))
+    static_assert(not has_member(x, "only_on_a"))
+    static_assert(has_member(x, "only_on_b"))
+```
+
 ### Intersections
 
 #### Only positive types
@@ -824,6 +870,102 @@ static_assert(not has_member(F, "__match_args__"))
 static_assert(not has_member(F(), "__weakref__"))
 ```
 
+### Dynamic classes (created via `type()`)
+
+Dynamic classes created using the three-argument form of `type()` support autocomplete for members
+inherited from their base classes on the class object:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class Base:
+    base_attr: int = 1
+
+    def base_method(self) -> str:
+        return "hello"
+
+class Mixin:
+    mixin_attr: str = "mixin"
+
+# Dynamic class with a single base
+DynamicSingle = type("DynamicSingle", (Base,), {})
+
+# The class object has access to base class attributes
+static_assert(has_member(DynamicSingle, "base_attr"))
+static_assert(has_member(DynamicSingle, "base_method"))
+
+# Dynamic class with multiple bases
+DynamicMulti = type("DynamicMulti", (Base, Mixin), {})
+
+static_assert(has_member(DynamicMulti, "base_attr"))
+static_assert(has_member(DynamicMulti, "mixin_attr"))
+```
+
+Members from `object` and the `type` metaclass are available on the class object:
+
+```py
+from ty_extensions import has_member, static_assert
+
+Dynamic = type("Dynamic", (), {})
+
+# object members are available on the class
+static_assert(has_member(Dynamic, "__doc__"))
+static_assert(has_member(Dynamic, "__init__"))
+
+# type metaclass members are available on the class
+static_assert(has_member(Dynamic, "__name__"))
+static_assert(has_member(Dynamic, "__bases__"))
+static_assert(has_member(Dynamic, "__mro__"))
+static_assert(has_member(Dynamic, "__subclasses__"))
+```
+
+Attributes from the namespace dict (third argument) are not tracked:
+
+```py
+from ty_extensions import has_member, static_assert
+
+DynamicWithDict = type("DynamicWithDict", (), {"custom_attr": 42})
+
+# TODO: these should pass -- namespace dict attributes are not yet available for autocomplete
+static_assert(has_member(DynamicWithDict, "custom_attr"))  # error: [static-assert-error]
+static_assert(has_member(DynamicWithDict(), "custom_attr"))  # error: [static-assert-error]
+```
+
+Dynamic classes inheriting from classes with custom metaclasses get metaclass members:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class MyMeta(type):
+    meta_attr: str = "meta"
+
+class Base(metaclass=MyMeta):
+    base_attr: int = 1
+
+Dynamic = type("Dynamic", (Base,), {})
+
+# Metaclass attributes are available on the class
+static_assert(has_member(Dynamic, "meta_attr"))
+static_assert(has_member(Dynamic, "base_attr"))
+```
+
+However, instances of dynamic classes currently do not expose members for autocomplete:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class Base:
+    base_attr: int = 1
+
+DynamicSingle = type("DynamicSingle", (Base,), {})
+instance = DynamicSingle()
+
+# TODO: these should pass; instance members should be available
+static_assert(has_member(instance, "base_attr"))  # error: [static-assert-error]
+static_assert(has_member(instance, "__repr__"))  # error: [static-assert-error]
+static_assert(has_member(instance, "__hash__"))  # error: [static-assert-error]
+```
+
 ### Attributes not available at runtime
 
 Typeshed includes some attributes in `object` that are not available for some (builtin) types. For
@@ -835,4 +977,40 @@ from ty_extensions import has_member, static_assert
 
 # TODO: this should ideally not be available:
 static_assert(not has_member(3, "__annotations__"))  # error: [static-assert-error]
+```
+
+### `ModuleType` attributes are available on modules
+
+`namespace_package/foo.py`:
+
+```py
+```
+
+`regular_module.py`:
+
+```py
+```
+
+`regular_package/__init__.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import namespace_package
+import regular_module
+import regular_package
+from ty_extensions import static_assert, has_member
+
+static_assert(has_member(namespace_package, "__file__"))
+static_assert(has_member(namespace_package, "__name__"))
+static_assert(has_member(namespace_package, "__eq__"))
+static_assert(has_member(regular_module, "__file__"))
+static_assert(has_member(regular_module, "__name__"))
+static_assert(has_member(regular_module, "__eq__"))
+static_assert(has_member(regular_package, "__file__"))
+static_assert(has_member(regular_package, "__name__"))
+static_assert(has_member(regular_package, "__eq__"))
 ```
