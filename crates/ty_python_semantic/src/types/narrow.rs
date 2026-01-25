@@ -1053,31 +1053,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && rhs_ty.is_singleton(self.db)
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
-            let union_elements = union.elements(self.db);
-            let filtered: Vec<_> = union_elements
-                .iter()
-                .filter(|elem| {
-                    elem.as_nominal_instance()
-                        .and_then(|inst| inst.tuple_spec(self.db))
-                        .and_then(|spec| spec.py_index(self.db, index).ok())
-                        .is_none_or(|el_ty| {
-                            if is_positive_check {
-                                // `is X` context: keep tuples where element could be X
-                                !el_ty.is_disjoint_from(self.db, rhs_ty)
-                            } else {
-                                // `is not X` context: keep tuples where element is not always X
-                                !el_ty.is_subtype_of(self.db, rhs_ty)
-                            }
-                        })
-                })
-                .copied()
-                .collect();
-            if filtered.len() < union_elements.len() {
+            let filtered = union.filter(self.db, |elem| {
+                elem.as_nominal_instance()
+                    .and_then(|inst| inst.tuple_spec(self.db))
+                    .and_then(|spec| spec.py_index(self.db, index).ok())
+                    .is_none_or(|el_ty| {
+                        if is_positive_check {
+                            // `is X` context: keep tuples where element could be X
+                            !el_ty.is_disjoint_from(self.db, rhs_ty)
+                        } else {
+                            // `is not X` context: keep tuples where element is not always X
+                            !el_ty.is_subtype_of(self.db, rhs_ty)
+                        }
+                    })
+            });
+            if filtered != Type::Union(union) {
                 let place = self.expect_place(&subscript_place_expr);
-                constraints.insert(
-                    place,
-                    NarrowingConstraint::replacement(UnionType::from_elements(self.db, filtered)),
-                );
+                constraints.insert(place, NarrowingConstraint::replacement(filtered));
             }
         }
 
@@ -1766,33 +1758,25 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
 
         // Filter the union based on whether each tuple element at the index could match the rhs.
-        let union_elements = union.elements(self.db);
-        let filtered: Vec<_> = union_elements
-            .iter()
-            .filter(|elem| {
-                elem.as_nominal_instance()
-                    .and_then(|inst| inst.tuple_spec(self.db))
-                    .and_then(|spec| spec.py_index(self.db, index).ok())
-                    .is_none_or(|el_ty| {
-                        if constrain_with_equality {
-                            // Keep tuples where element could be equal to rhs.
-                            !el_ty.is_disjoint_from(self.db, rhs_type)
-                        } else {
-                            // Keep tuples where element is not always equal to rhs.
-                            !el_ty.is_subtype_of(self.db, rhs_type)
-                        }
-                    })
-            })
-            .copied()
-            .collect();
+        let filtered = union.filter(self.db, |elem| {
+            elem.as_nominal_instance()
+                .and_then(|inst| inst.tuple_spec(self.db))
+                .and_then(|spec| spec.py_index(self.db, index).ok())
+                .is_none_or(|el_ty| {
+                    if constrain_with_equality {
+                        // Keep tuples where element could be equal to rhs.
+                        !el_ty.is_disjoint_from(self.db, rhs_type)
+                    } else {
+                        // Keep tuples where element is not always equal to rhs.
+                        !el_ty.is_subtype_of(self.db, rhs_type)
+                    }
+                })
+        });
 
         // Only create a constraint if we actually narrowed something.
-        if filtered.len() < union_elements.len() {
+        if filtered != rhs_type {
             let place = self.expect_place(&subscript_place_expr);
-            Some((
-                place,
-                NarrowingConstraint::replacement(UnionType::from_elements(self.db, filtered)),
-            ))
+            Some((place, NarrowingConstraint::replacement(filtered)))
         } else {
             None
         }
