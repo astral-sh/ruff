@@ -4680,6 +4680,7 @@ dependencies = [
  "strum_macros",
  "tracing",
  "ty_static",
+ "which",
 ]
 
 [[package]]
