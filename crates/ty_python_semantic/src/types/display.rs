@@ -37,6 +37,18 @@ use crate::types::{
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 
+/// A type that can be displayed with a qualified name for disambiguation.
+///
+/// This trait provides the interface needed by [`AmbiguityState`] to track
+/// whether items with the same name need to be qualified for disambiguation.
+pub(crate) trait QualifiableName<'db>: Copy + PartialEq {
+    /// Returns the unqualified name of this item.
+    fn name(self, db: &'db dyn Db) -> &'db str;
+
+    /// Returns the path components leading to this item (excluding the item's own name).
+    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String>;
+}
+
 /// Settings for displaying types and signatures
 #[derive(Debug, Clone, Default)]
 pub struct DisplaySettings<'db> {
@@ -120,32 +132,12 @@ impl<'db> DisplaySettings<'db> {
             collector: &AmbiguousNameCollector<'db>,
         ) -> DisplaySettings<'db> {
             DisplaySettings {
-                qualified: Rc::new(
-                    collector
-                        .class_names
-                        .borrow()
-                        .iter()
-                        .filter_map(|(name, ambiguity)| {
-                            Some((
-                                *name,
-                                QualificationLevel::from_class_literal_ambiguity_state(ambiguity)?,
-                            ))
-                        })
-                        .collect(),
-                ),
-                qualified_type_aliases: Rc::new(
-                    collector
-                        .type_alias_names
-                        .borrow()
-                        .iter()
-                        .filter_map(|(name, ambiguity)| {
-                            Some((
-                                *name,
-                                QualificationLevel::from_type_alias_ambiguity_state(ambiguity)?,
-                            ))
-                        })
-                        .collect(),
-                ),
+                qualified: Rc::new(AmbiguousNameCollector::to_qualification_map(
+                    &collector.class_names,
+                )),
+                qualified_type_aliases: Rc::new(AmbiguousNameCollector::to_qualification_map(
+                    &collector.type_alias_names,
+                )),
                 ..DisplaySettings::default()
             }
         }
@@ -388,21 +380,11 @@ pub enum QualificationLevel {
 }
 
 impl QualificationLevel {
-    const fn from_class_literal_ambiguity_state(
-        state: &ClassLiteralAmbiguityState,
-    ) -> Option<Self> {
+    const fn from_ambiguity_state<T>(state: &AmbiguityState<T>) -> Option<Self> {
         match state {
-            ClassLiteralAmbiguityState::Unambiguous(_) => None,
-            ClassLiteralAmbiguityState::RequiresFullyQualifiedName { .. } => Some(Self::ModuleName),
-            ClassLiteralAmbiguityState::RequiresFileAndLineNumber => Some(Self::FileAndLineNumber),
-        }
-    }
-
-    const fn from_type_alias_ambiguity_state(state: &TypeAliasAmbiguityState) -> Option<Self> {
-        match state {
-            TypeAliasAmbiguityState::Unambiguous(_) => None,
-            TypeAliasAmbiguityState::RequiresFullyQualifiedName { .. } => Some(Self::ModuleName),
-            TypeAliasAmbiguityState::RequiresFileAndLineNumber => Some(Self::FileAndLineNumber),
+            AmbiguityState::Unambiguous(_) => None,
+            AmbiguityState::RequiresFullyQualifiedName { .. } => Some(Self::ModuleName),
+            AmbiguityState::RequiresFileAndLineNumber => Some(Self::FileAndLineNumber),
         }
     }
 }
@@ -410,128 +392,94 @@ impl QualificationLevel {
 #[derive(Debug, Default)]
 struct AmbiguousNameCollector<'db> {
     visited_types: RefCell<FxHashSet<Type<'db>>>,
-    class_names: RefCell<FxHashMap<&'db str, ClassLiteralAmbiguityState<'db>>>,
-    type_alias_names: RefCell<FxHashMap<&'db str, TypeAliasAmbiguityState<'db>>>,
+    class_names: RefCell<FxHashMap<&'db str, AmbiguityState<ClassLiteral<'db>>>>,
+    type_alias_names: RefCell<FxHashMap<&'db str, AmbiguityState<TypeAliasType<'db>>>>,
 }
 
 impl<'db> AmbiguousNameCollector<'db> {
-    fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
-        match self.class_names.borrow_mut().entry(class.name(db)) {
+    /// Records an item for ambiguity tracking.
+    ///
+    /// This updates the ambiguity state for items with the same name:
+    /// - First occurrence: `Unambiguous`
+    /// - Different qualified paths: `RequiresFullyQualifiedName`
+    /// - Same qualified paths: `RequiresFileAndLineNumber`
+    fn record<T: QualifiableName<'db>>(
+        map: &RefCell<FxHashMap<&'db str, AmbiguityState<T>>>,
+        db: &'db dyn Db,
+        item: T,
+    ) {
+        match map.borrow_mut().entry(item.name(db)) {
             Entry::Vacant(entry) => {
-                entry.insert(ClassLiteralAmbiguityState::Unambiguous(class));
+                entry.insert(AmbiguityState::Unambiguous(item));
             }
             Entry::Occupied(mut entry) => {
                 let value = entry.get_mut();
                 match value {
-                    ClassLiteralAmbiguityState::Unambiguous(existing) => {
-                        if *existing != class {
-                            let qualified_name_components =
-                                class.qualified_name(db).components_excluding_self();
-                            if existing.qualified_name(db).components_excluding_self()
-                                == qualified_name_components
-                            {
-                                *value = ClassLiteralAmbiguityState::RequiresFileAndLineNumber;
+                    AmbiguityState::Unambiguous(existing) => {
+                        if *existing != item {
+                            let qualified_name_components = item.qualified_name_components(db);
+                            if existing.qualified_name_components(db) == qualified_name_components {
+                                *value = AmbiguityState::RequiresFileAndLineNumber;
                             } else {
-                                *value = ClassLiteralAmbiguityState::RequiresFullyQualifiedName {
-                                    class,
+                                *value = AmbiguityState::RequiresFullyQualifiedName {
+                                    item,
                                     qualified_name_components,
                                 };
                             }
                         }
                     }
-                    ClassLiteralAmbiguityState::RequiresFullyQualifiedName {
-                        class: existing,
+                    AmbiguityState::RequiresFullyQualifiedName {
+                        item: existing,
                         qualified_name_components,
                     } => {
-                        if *existing != class {
-                            let new_components =
-                                class.qualified_name(db).components_excluding_self();
+                        if *existing != item {
+                            let new_components = item.qualified_name_components(db);
                             if *qualified_name_components == new_components {
-                                *value = ClassLiteralAmbiguityState::RequiresFileAndLineNumber;
+                                *value = AmbiguityState::RequiresFileAndLineNumber;
                             }
                         }
                     }
-                    ClassLiteralAmbiguityState::RequiresFileAndLineNumber => {}
+                    AmbiguityState::RequiresFileAndLineNumber => {}
                 }
             }
         }
+    }
+
+    fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
+        Self::record(&self.class_names, db, class);
     }
 
     fn record_type_alias(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-        match self
-            .type_alias_names
-            .borrow_mut()
-            .entry(type_alias.name(db))
-        {
-            Entry::Vacant(entry) => {
-                entry.insert(TypeAliasAmbiguityState::Unambiguous(type_alias));
-            }
-            Entry::Occupied(mut entry) => {
-                let value = entry.get_mut();
-                match value {
-                    TypeAliasAmbiguityState::Unambiguous(existing) => {
-                        if *existing != type_alias {
-                            let qualified_name_components =
-                                type_alias.qualified_name(db).components_excluding_self();
-                            if existing.qualified_name(db).components_excluding_self()
-                                == qualified_name_components
-                            {
-                                *value = TypeAliasAmbiguityState::RequiresFileAndLineNumber;
-                            } else {
-                                *value = TypeAliasAmbiguityState::RequiresFullyQualifiedName {
-                                    type_alias,
-                                    qualified_name_components,
-                                };
-                            }
-                        }
-                    }
-                    TypeAliasAmbiguityState::RequiresFullyQualifiedName {
-                        type_alias: existing,
-                        qualified_name_components,
-                    } => {
-                        if *existing != type_alias {
-                            let new_components =
-                                type_alias.qualified_name(db).components_excluding_self();
-                            if *qualified_name_components == new_components {
-                                *value = TypeAliasAmbiguityState::RequiresFileAndLineNumber;
-                            }
-                        }
-                    }
-                    TypeAliasAmbiguityState::RequiresFileAndLineNumber => {}
-                }
-            }
-        }
+        Self::record(&self.type_alias_names, db, type_alias);
+    }
+
+    /// Converts an ambiguity state map into a qualification level map.
+    fn to_qualification_map<T>(
+        map: &RefCell<FxHashMap<&'db str, AmbiguityState<T>>>,
+    ) -> FxHashMap<&'db str, QualificationLevel> {
+        map.borrow()
+            .iter()
+            .filter_map(|(name, ambiguity)| {
+                Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
+            })
+            .collect()
     }
 }
 
-/// Whether or not a class can be unambiguously identified by its *unqualified* name
+/// Whether or not an item can be unambiguously identified by its *unqualified* name
 /// given the other types that are present in the same context.
+///
+/// This is generic over the item type (e.g., [`ClassLiteral`] or [`TypeAliasType`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum ClassLiteralAmbiguityState<'db> {
-    /// The class can be displayed unambiguously using its unqualified name
-    Unambiguous(ClassLiteral<'db>),
-    /// The class must be displayed using its fully qualified name to avoid ambiguity.
+enum AmbiguityState<T> {
+    /// The item can be displayed unambiguously using its unqualified name.
+    Unambiguous(T),
+    /// The item must be displayed using its fully qualified name to avoid ambiguity.
     RequiresFullyQualifiedName {
-        class: ClassLiteral<'db>,
+        item: T,
         qualified_name_components: Vec<String>,
     },
-    /// Even the class's fully qualified name is not sufficient;
-    /// we must also include the file and line number.
-    RequiresFileAndLineNumber,
-}
-
-/// Whether or not a type alias can be unambiguously identified by its *unqualified* name
-/// given the other types that are present in the same context.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum TypeAliasAmbiguityState<'db> {
-    /// The type alias can be displayed unambiguously using its unqualified name
-    Unambiguous(TypeAliasType<'db>),
-    /// The type alias must be displayed using its fully qualified name to avoid ambiguity.
-    RequiresFullyQualifiedName {
-        type_alias: TypeAliasType<'db>,
-        qualified_name_components: Vec<String>,
-    },
-    /// Even the type alias's fully qualified name is not sufficient;
+    /// Even the item's fully qualified name is not sufficient;
     /// we must also include the file and line number.
     RequiresFileAndLineNumber,
 }

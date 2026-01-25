@@ -789,6 +789,16 @@ impl<'db> From<DynamicNamedTupleLiteral<'db>> for ClassLiteral<'db> {
     }
 }
 
+impl<'db> super::display::QualifiableName<'db> for ClassLiteral<'db> {
+    fn name(self, db: &'db dyn Db) -> &'db str {
+        ClassLiteral::name(self, db)
+    }
+
+    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
+        self.qualified_name(db).components_excluding_self()
+    }
+}
+
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
 #[derive(

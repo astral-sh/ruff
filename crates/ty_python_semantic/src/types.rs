@@ -11766,6 +11766,16 @@ impl<'db> TypeAliasType<'db> {
     }
 }
 
+impl<'db> display::QualifiableName<'db> for TypeAliasType<'db> {
+    fn name(self, db: &'db dyn Db) -> &'db str {
+        TypeAliasType::name(self, db)
+    }
+
+    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
+        self.qualified_name(db).components_excluding_self()
+    }
+}
+
 // N.B. It would be incorrect to derive `Eq`, `PartialEq`, or `Hash` for this struct,
 // because two `QualifiedTypeAliasName` instances might refer to different type aliases but
 // have the same components. You'd expect them to compare equal, but they'd compare
