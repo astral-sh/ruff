@@ -790,6 +790,9 @@ declare_lint! {
     ///         case HasX():  # error: [isinstance-against-protocol]
     ///             pass
     /// ```
+    ///
+    /// ## References
+    /// - [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)
     pub(crate) static ISINSTANCE_AGAINST_PROTOCOL = {
         summary: "reports runtime checks against non-runtime-checkable protocol classes",
         status: LintStatus::stable("0.0.14"),
