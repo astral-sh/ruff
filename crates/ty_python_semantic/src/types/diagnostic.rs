@@ -766,9 +766,9 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Reports runtime checks against non-runtime-checkable protocol classes.
+    /// Reports runtime checks against non-runtime-checkable `Protocol` classes.
     /// This includes explicit calls to `isinstance()`/`issubclass()` and implicit
-    /// checks performed by match class patterns.
+    /// checks performed by `match` class patterns.
     ///
     /// ## Why is this bad?
     /// Using a non-runtime-checkable protocol in these contexts raises `TypeError`
