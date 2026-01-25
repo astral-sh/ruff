@@ -792,7 +792,7 @@ declare_lint! {
     /// ```
     pub(crate) static ISINSTANCE_AGAINST_PROTOCOL = {
         summary: "reports runtime checks against non-runtime-checkable protocol classes",
-        status: LintStatus::stable("0.0.10"),
+        status: LintStatus::stable("0.0.14"),
         default_level: Level::Error,
     }
 }
