@@ -18,14 +18,14 @@ use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
-use crate::types::signatures::Parameters;
+use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
+    CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     UnionType, declaration_type, walk_type_var_bounds,
 };
@@ -1677,6 +1677,35 @@ impl<'db> SpecializationBuilder<'db> {
         }
     }
 
+    /// Infer type mappings by comparing formal callable signatures against actual callables.
+    fn infer_from_callable_signature(
+        &mut self,
+        formal: Type<'db>,
+        formal_signature: &CallableSignature<'db>,
+        actual_callables: &CallableTypes<'db>,
+        f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+    ) {
+        let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
+
+        for actual_callable in actual_callables.as_slice() {
+            if formal_is_single_paramspec {
+                let when = actual_callable
+                    .signatures(self.db)
+                    .when_constraint_set_assignable_to(self.db, formal_signature, self.inferable);
+                self.add_type_mappings_from_constraint_set(formal, when, &mut *f);
+            } else {
+                for actual_signature in &actual_callable.signatures(self.db).overloads {
+                    let when = actual_signature.when_constraint_set_assignable_to_signatures(
+                        self.db,
+                        formal_signature,
+                        self.inferable,
+                    );
+                    self.add_type_mappings_from_constraint_set(formal, when, &mut *f);
+                }
+            }
+        }
+    }
+
     /// Infer type mappings for the specialization based on a given type and its declared type.
     pub(crate) fn infer(
         &mut self,
@@ -2045,36 +2074,29 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
+            // When the formal type is a protocol with a `__call__` method, infer the specialization
+            // from matching the actual type's callable signature against the protocol's `__call__`
+            // method signature.
+            (Type::ProtocolInstance(formal_protocol), _) => {
+                let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
+                else {
+                    return Ok(());
+                };
+                let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
+                    return Ok(());
+                };
+                // The `__call__` method is bound to `self`, so we need to bind it to get the
+                // callable signature that the actual type needs to match.
+                let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
+                self.infer_from_callable_signature(formal, formal_signature, &actual_callables, f);
+            }
+
             (Type::Callable(formal_callable), _) => {
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     return Ok(());
                 };
-
-                let formal_callable = formal_callable.signatures(self.db);
-                let formal_is_single_paramspec = formal_callable.is_single_paramspec().is_some();
-
-                for actual_callable in actual_callables.as_slice() {
-                    if formal_is_single_paramspec {
-                        let when = actual_callable
-                            .signatures(self.db)
-                            .when_constraint_set_assignable_to(
-                                self.db,
-                                formal_callable,
-                                self.inferable,
-                            );
-                        self.add_type_mappings_from_constraint_set(formal, when, &mut f);
-                    } else {
-                        for actual_signature in &actual_callable.signatures(self.db).overloads {
-                            let when = actual_signature
-                                .when_constraint_set_assignable_to_signatures(
-                                    self.db,
-                                    formal_callable,
-                                    self.inferable,
-                                );
-                            self.add_type_mappings_from_constraint_set(formal, when, &mut f);
-                        }
-                    }
-                }
+                let formal_signature = formal_callable.signatures(self.db);
+                self.infer_from_callable_signature(formal, formal_signature, &actual_callables, f);
             }
 
             // Expand type aliases in the actual type.
