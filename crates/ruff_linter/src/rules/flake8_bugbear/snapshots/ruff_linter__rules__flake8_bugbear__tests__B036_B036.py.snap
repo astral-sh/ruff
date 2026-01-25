@@ -51,21 +51,21 @@ B036 `yield` in context manager without `try`/`finally` is not protected against
    |
 
 B036 `yield` in context manager without `try`/`finally` is not protected against exceptions
-   --> B036.py:189:9
+   --> B036.py:187:9
     |
-187 | def bad_try_with_else():
-188 |     try:
-189 |         yield  # B036
+185 | def bad_try_with_else():
+186 |     try:
+187 |         yield  # B036
     |         ^^^^^
-190 |     except Exception:
-191 |         pass
+188 |     except Exception:
+189 |         pass
     |
 
 B036 `yield` in context manager without `try`/`finally` is not protected against exceptions
-   --> B036.py:201:9
+   --> B036.py:199:9
     |
-199 |         do_something()
-200 |     except Exception:
-201 |         yield  # B036
+197 |         do_something()
+198 |     except Exception:
+199 |         yield  # B036
     |         ^^^^^
     |
