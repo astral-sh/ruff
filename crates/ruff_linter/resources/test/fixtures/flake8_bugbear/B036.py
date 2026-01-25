@@ -39,7 +39,7 @@ def bad_nested_in_loop():
         yield  # B036
 
 
-# OK - yield is last statement (no cleanup code to protect)
+# OK
 
 @contextmanager
 def good_yield_last():
@@ -56,8 +56,6 @@ async def good_async_yield_last():
 def good_yield_from_last():
     yield from other_generator()
 
-
-# OK
 
 @contextmanager
 def good_try_finally():
@@ -200,8 +198,6 @@ def bad_yield_in_except_no_finally():
     except Exception:
         yield  # B036
 
-
-# OK - yield is last statement (aliased/attribute imports)
 
 @cm
 def good_aliased_import():
