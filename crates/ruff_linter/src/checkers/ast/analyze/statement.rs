@@ -185,6 +185,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::ReturnInGenerator) {
                 flake8_bugbear::rules::return_in_generator(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::ContextManagerWithoutFinally) {
+                flake8_bugbear::rules::contextmanager_without_finally(checker, function_def);
+            }
             if checker.any_rule_enabled(&[
                 Rule::UnnecessaryReturnNone,
                 Rule::ImplicitReturnValue,
