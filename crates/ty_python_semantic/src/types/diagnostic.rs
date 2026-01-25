@@ -63,6 +63,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
+    registry.register_lint(&EMPTY_BODY);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
@@ -797,6 +798,45 @@ declare_lint! {
     pub(crate) static INVALID_RETURN_TYPE = {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects functions with empty bodies that have a non-`None` return type annotation.
+    ///
+    /// ## Why is this bad?
+    /// A function with an empty body (containing only `...`, `pass`, or a docstring) will
+    /// implicitly return `None` at runtime, which contradicts a non-`None` return type annotation.
+    /// While Pyright allows this pattern and mypy used to allow it, it is technically unsound
+    /// since the function does not actually return the annotated type at runtime.
+    ///
+    /// Functions with empty bodies are permitted in certain contexts where they serve as
+    /// declarations rather than implementations:
+    /// - Functions in stub files (`.pyi`)
+    /// - Methods in Protocol classes
+    /// - Abstract methods decorated with `@abstractmethod`
+    /// - Overload declarations decorated with `@overload`
+    /// - Functions in `if TYPE_CHECKING` blocks
+    ///
+    /// ## Examples
+    /// ```python
+    /// def foo() -> int: ...  # error: [empty-body]
+    ///
+    /// def bar() -> str:
+    ///     """A function that does nothing."""
+    ///     pass  # error: [empty-body]
+    /// ```
+    ///
+    /// To fix this issue, either:
+    /// - Add a function body that returns the annotated type
+    /// - Change the return annotation to `-> None`
+    /// - Use one of the allowed contexts (Protocol, abstractmethod, etc.)
+    /// - Disable this rule if you're gradually migrating a codebase
+    pub(crate) static EMPTY_BODY = {
+        summary: "detects functions with empty bodies that have a non-`None` return type annotation",
+        status: LintStatus::stable("0.0.13"),
         default_level: Level::Error,
     }
 }
@@ -2960,10 +3000,18 @@ pub(super) fn report_implicit_return_type(
     enclosing_class_of_method: Option<ClassType>,
     no_return: bool,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
+    let db = context.db();
+    
+    // Use EMPTY_BODY lint for functions with empty bodies, INVALID_RETURN_TYPE for others
+    let lint_to_use = if has_empty_body {
+        &EMPTY_BODY
+    } else {
+        &INVALID_RETURN_TYPE
+    };
+    
+    let Some(builder) = context.report_lint(lint_to_use, range) else {
         return;
     };
-    let db = context.db();
 
     // If no return statement is defined in the function, then the function always returns `None`
     let mut diagnostic = if no_return {
