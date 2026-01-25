@@ -210,6 +210,7 @@ uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
+which = { version = "8.0.0" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 

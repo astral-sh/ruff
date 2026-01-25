@@ -214,6 +214,15 @@ impl PythonEnvironment {
                 .map(Some);
         }
 
+        #[cfg(not(target_family = "wasm"))]
+        if let Ok(python_path) = which::which("python3")
+            && let Some(python_path) = python_path.to_str()
+            && let Ok(env) =
+                PythonEnvironment::new(python_path, SysPrefixPathOrigin::PythonBinary, system)
+        {
+            return Ok(Some(env));
+        }
+
         Ok(None)
     }
 
@@ -1661,6 +1670,8 @@ pub enum SysPrefixPathOrigin {
     LocalVenv,
     /// The `sys.prefix` path came from the environment ty is installed in.
     SelfEnvironment,
+    /// The Python binary discovered in $PATH
+    PythonBinary,
 }
 
 impl SysPrefixPathOrigin {
@@ -1673,7 +1684,8 @@ impl SysPrefixPathOrigin {
             | Self::PythonCliFlag
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
-            | Self::CondaPrefixVar => false,
+            | Self::CondaPrefixVar
+            | Self::PythonBinary => false,
             // It's not strictly true that the self environment must be virtual, e.g., ty could be
             // installed in a system Python environment and users may expect us to respect
             // dependencies installed alongside it. However, we're intentionally excluding support
@@ -1693,7 +1705,8 @@ impl SysPrefixPathOrigin {
             Self::PythonCliFlag
             | Self::ConfigFileSetting(..)
             | Self::Editor
-            | Self::SelfEnvironment => false,
+            | Self::SelfEnvironment
+            | Self::PythonBinary => false,
             Self::VirtualEnvVar
             | Self::CondaPrefixVar
             | Self::DerivedFromPyvenvCfg
@@ -1711,7 +1724,8 @@ impl SysPrefixPathOrigin {
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
             | Self::ConfigFileSetting(..)
-            | Self::PythonCliFlag => false,
+            | Self::PythonCliFlag
+            | Self::PythonBinary => false,
             Self::LocalVenv => true,
         }
     }
@@ -1728,6 +1742,7 @@ impl std::fmt::Display for SysPrefixPathOrigin {
             Self::LocalVenv => f.write_str("local virtual environment"),
             Self::Editor => f.write_str("selected interpreter in your editor"),
             Self::SelfEnvironment => f.write_str("ty environment"),
+            Self::PythonBinary => f.write_str("Python binary discovered in $PATH"),
         }
     }
 }
