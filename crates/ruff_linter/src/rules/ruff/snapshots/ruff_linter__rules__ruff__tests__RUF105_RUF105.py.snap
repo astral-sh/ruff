@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF105 Importing type/function `Path` from module `pathlib`.
  --> RUF105.py:6:21
   |
-5 | # import type, not ok
+5 | # import type => not ok
 6 | from pathlib import Path
   |                     ^^^^
 7 | path = Path('/')
@@ -13,9 +13,29 @@ RUF105 Importing type/function `Path` from module `pathlib`.
 RUF105 Importing type/function `dup` from module `os`.
   --> RUF105.py:10:22
    |
- 9 | # import module, function
+ 9 | # import module, function => ok, not ok
 10 | from os import path, dup
    |                      ^^^
 11 | cwd = path.cwd()
 12 | fd = dup(0)
+   |
+
+RUF105 Importing type/function `CompletedProcess` from module `subprocess`.
+  --> RUF105.py:18:24
+   |
+17 | # import type => not ok
+18 | from subprocess import CompletedProcess
+   |                        ^^^^^^^^^^^^^^^^
+19 | def assert_success(cp: CompletedProcess):
+20 |     assert cp.returncode == 0
+   |
+
+RUF105 Importing type/function `ArgumentError` from module `argparse`.
+  --> RUF105.py:23:22
+   |
+22 | # import type => not ok
+23 | from argparse import ArgumentError
+   |                      ^^^^^^^^^^^^^
+24 | class MyError(ArgumentError):
+25 |     pass
    |

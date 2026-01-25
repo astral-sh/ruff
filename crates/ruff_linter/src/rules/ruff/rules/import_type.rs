@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    self as ast, Expr, ExprCall, ExprName, Stmt, StmtImportFrom,
+    self as ast, Expr, ExprCall, ExprName, Stmt, StmtImportFrom, StmtClassDef,
     visitor::{self, Visitor},
 };
 use rustc_hash::FxHashMap;
@@ -39,6 +39,32 @@ impl<'a, 'b> ImportTypeVisitor<'a, 'b> {
             seen_imports_from: FxHashMap::default(),
         }
     }
+
+    fn check_symbol(&mut self, name: &str) {
+        if let Some((stmt_import_from, symbol)) = self.seen_imports_from.get(name) {
+            self.checker.report_diagnostic(
+                ImportType {
+                    module_name: stmt_import_from
+                        .module
+                        .as_ref()
+                        .map_or(".", |m| m.as_ref())
+                        .to_string(),
+                    type_name: name.to_string(),
+                },
+                symbol.range,
+            );
+        }
+    }
+
+    fn check_nonmodule_expr(&mut self, expr: &'a Expr) {
+            if let Expr::Name(ExprName { id: func_name, .. }) = expr {
+                // from foo import bar
+                // bar(...)
+                // => bar is a type/function
+
+                self.check_symbol(func_name);
+        }
+    }
 }
 
 impl<'a, 'b> Visitor<'a> for ImportTypeVisitor<'a, 'b> {
@@ -61,34 +87,30 @@ impl<'a, 'b> Visitor<'a> for ImportTypeVisitor<'a, 'b> {
                     .insert(imported_symbol.to_string(), (stmt_import_from, &name.name));
             }
         }
+
+        if let Stmt::ClassDef(StmtClassDef {
+            arguments: Some(arguments), ..
+        }) = stmt {
+            for arg in &*arguments.args {
+                self.check_nonmodule_expr(arg);
+            }
+        }
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         visitor::walk_expr(self, expr);
 
         if let Expr::Call(ExprCall { func, .. }) = expr {
-            if let Expr::Name(ExprName { id: func_name, .. }) = &**func {
-                // from foo import bar
-                // bar(...)
-                // => bar is a type/function
+            // func(...) => not a module
 
-                if let Some((stmt_import_from, symbol)) =
-                    self.seen_imports_from.get(func_name.as_str())
-                {
-                    self.checker.report_diagnostic(
-                        ImportType {
-                            module_name: stmt_import_from
-                                .module
-                                .as_ref()
-                                .map_or(".", |m| m.as_ref())
-                                .to_string(),
-                            type_name: func_name.to_string(),
-                        },
-                        symbol.range,
-                    );
-                }
-            }
+            self.check_nonmodule_expr(&*func);
         }
+    }
+
+    fn visit_annotation(&mut self, expr: &'a Expr) {
+        visitor::walk_annotation(self, expr);
+
+        self.check_nonmodule_expr(expr);
     }
 }
 
