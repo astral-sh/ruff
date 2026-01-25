@@ -30,9 +30,10 @@ use crate::checkers::ast::Checker;
 /// standard library:
 ///
 /// - Use `math.isclose()` for scalar comparisons
+/// - Use `cmath.isclose()` for complex numbers comparisons
 /// - Use `unittest.assertAlmostEqual()` in tests with `unittest`
 ///
-/// Note that `math.isclose()` has a default absolute tolerance of zero, so
+/// Note that `math.isclose()` / `cmath.isclose()` has a default absolute tolerance of zero, so
 /// when comparing values near zero, you must explicitly specify an `abs_tol`
 /// parameter.
 ///
@@ -51,15 +52,20 @@ use crate::checkers::ast::Checker;
 ///
 /// ```python
 /// assert 0.1 + 0.2 == 0.3  # AssertionError
+///
+/// assert complex(0.3, 0.1) == complex(0.1 + 0.2, 0.1)  # AssertionError
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
+/// import cmath
 /// import math
 ///
 /// # Scalar comparison
 /// assert math.isclose(0.1 + 0.2, 0.3, abs_tol=1e-9)
+/// # Complex numbers comparison
+/// assert cmath.isclose(complex(0.3, 0.1), complex(0.1 + 0.2, 0.1), abs_tol=1e-9)
 /// ```
 ///
 /// ## Ecosystem-specific alternatives
@@ -88,6 +94,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Floating Point Arithmetic: Issues and Limitations](https://docs.python.org/3/tutorial/floatingpoint.html#floating-point-arithmetic-issues-and-limitations)
 /// - [Decimal fixed point and floating point arithmetic](https://docs.python.org/3/library/decimal.html#module-decimal)
 /// - [Python documentation: `math.isclose`](https://docs.python.org/3/library/math.html#math.isclose)
+/// - [Python documentation: `cmath.isclose`](https://docs.python.org/3/library/cmath.html#cmath.isclose)
 /// - [Python documentation: `unittest.assertAlmostEqual`](https://docs.python.org/3/library/unittest.html#unittest.TestCase.assertAlmostEqual)
 /// - [NumPy documentation: `numpy.isclose`](https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose)
 /// - [NumPy documentation: `numpy.allclose`](https://numpy.org/doc/stable/reference/generated/numpy.allclose.html#numpy-allclose)
@@ -142,9 +149,9 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex)) => true,
         _ => {
             match expr {
-                Expr::Call(ast::ExprCall { func, .. }) => {
-                    semantic.match_builtin_expr(func, "float")
-                }
+                Expr::Call(ast::ExprCall { func, .. }) => ["float", "complex"]
+                    .iter()
+                    .any(|s| semantic.match_builtin_expr(func, s)),
                 Expr::BinOp(ast::ExprBinOp {
                     left, right, op, ..
                 }) => {

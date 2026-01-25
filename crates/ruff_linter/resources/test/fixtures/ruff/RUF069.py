@@ -39,4 +39,6 @@ assert (x / 2) == (y / 3)
 assert Path(__file__).parent / ".txt" == 1
 
 def foo(a, b):
-    return a == b - float("2")
+    return a == b * float("2")
+
+assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)

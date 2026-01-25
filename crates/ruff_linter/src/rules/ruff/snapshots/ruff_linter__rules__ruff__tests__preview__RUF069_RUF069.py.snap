@@ -196,10 +196,21 @@ RUF069 Unreliable floating point equality comparison `x / 2 == y / 3`
 38 | # ok
    |
 
-RUF069 Unreliable floating point equality comparison `a == b - float("2")`
+RUF069 Unreliable floating point equality comparison `a == b * float("2")`
   --> RUF069.py:42:12
    |
 41 | def foo(a, b):
-42 |     return a == b - float("2")
+42 |     return a == b * float("2")
    |            ^^^^^^^^^^^^^^^^^^^
+43 |
+44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+   |
+
+RUF069 Unreliable floating point equality comparison `complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)`
+  --> RUF069.py:44:8
+   |
+42 |     return a == b * float("2")
+43 |
+44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
