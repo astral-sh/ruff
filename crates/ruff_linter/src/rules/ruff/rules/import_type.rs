@@ -23,13 +23,13 @@ impl Violation for ImportType {
             module_name,
             type_name,
         } = self;
-        format!("Importing type `{type_name}` from module `{module_name}`.")
+        format!("Importing type/function `{type_name}` from module `{module_name}`.")
     }
 }
 
 struct ImportTypeVisitor<'a, 'b> {
     checker: &'a Checker<'b>,
-    seen_imports_from: FxHashMap<String, &'a StmtImportFrom>,
+    seen_imports_from: FxHashMap<String, (&'a StmtImportFrom, &'a Identifier)>,
 }
 
 impl<'a, 'b> ImportTypeVisitor<'a, 'b> {
@@ -58,7 +58,7 @@ impl<'a, 'b> Visitor<'a> for ImportTypeVisitor<'a, 'b> {
                     symbol_name
                 };
                 self.seen_imports_from
-                    .insert(imported_symbol.to_string(), stmt_import_from);
+                    .insert(imported_symbol.to_string(), (stmt_import_from, &name.name));
             }
         }
     }
@@ -72,13 +72,19 @@ impl<'a, 'b> Visitor<'a> for ImportTypeVisitor<'a, 'b> {
                 // bar(...)
                 // => bar is a type/function
 
-                if let Some(stmt_import_from) = self.seen_imports_from.get(func_name.as_str()) {
+                if let Some((stmt_import_from, symbol)) =
+                    self.seen_imports_from.get(func_name.as_str())
+                {
                     self.checker.report_diagnostic(
                         ImportType {
-                            module_name: stmt_import_from.module.as_ref().map_or(".", |m| m.as_ref()).to_string(),
+                            module_name: stmt_import_from
+                                .module
+                                .as_ref()
+                                .map_or(".", |m| m.as_ref())
+                                .to_string(),
                             type_name: func_name.to_string(),
                         },
-                        stmt_import_from.range,
+                        symbol.range,
                     );
                 }
             }
