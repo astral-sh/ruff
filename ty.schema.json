@@ -960,6 +960,16 @@
             }
           ]
         },
+        "isinstance-against-protocol": {
+          "title": "reports runtime checks against non-runtime-checkable protocol classes",
+          "description": "## What it does\nReports runtime checks against non-runtime-checkable `Protocol` classes.\nThis includes explicit calls to `isinstance()`/`issubclass()` and implicit\nchecks performed by `match` class patterns.\n\n## Why is this bad?\nUsing a non-runtime-checkable protocol in these contexts raises `TypeError`\nat runtime.\n\n## Examples\n```python\nfrom typing_extensions import Protocol\n\nclass HasX(Protocol):\n    x: int\n\ndef f(arg: object, arg2: type):\n    isinstance(arg, HasX)  # error: [isinstance-against-protocol]\n    issubclass(arg2, HasX)  # error: [isinstance-against-protocol]\n\ndef g(arg: object):\n    match arg:\n        case HasX():  # error: [isinstance-against-protocol]\n            pass\n```\n\n## References\n- [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",

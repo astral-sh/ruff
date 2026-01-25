@@ -89,6 +89,7 @@ use crate::types::diagnostic::{
     report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
     report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
+    report_match_pattern_against_non_runtime_checkable_protocol,
     report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -4232,7 +4233,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for keyword in &arguments.keywords {
                     self.infer_nested_match_pattern(&keyword.pattern);
                 }
-                self.infer_standalone_expression(cls, TypeContext::default());
+                let cls_ty = self.infer_standalone_expression(cls, TypeContext::default());
+                if let Type::ClassLiteral(class) = cls_ty
+                    && let Some(protocol_class) = class.into_protocol_class(self.db())
+                    && !protocol_class.is_runtime_checkable(self.db())
+                {
+                    report_match_pattern_against_non_runtime_checkable_protocol(
+                        &self.context,
+                        cls.as_ref(),
+                        protocol_class,
+                    );
+                }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
@@ -4283,7 +4294,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for keyword in &arguments.keywords {
                     self.infer_nested_match_pattern(&keyword.pattern);
                 }
-                self.infer_maybe_standalone_expression(cls, TypeContext::default());
+                let cls_ty = self.infer_maybe_standalone_expression(cls, TypeContext::default());
+                if let Type::ClassLiteral(class) = cls_ty
+                    && let Some(protocol_class) = class.into_protocol_class(self.db())
+                    && !protocol_class.is_runtime_checkable(self.db())
+                {
+                    report_match_pattern_against_non_runtime_checkable_protocol(
+                        &self.context,
+                        cls.as_ref(),
+                        protocol_class,
+                    );
+                }
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {
