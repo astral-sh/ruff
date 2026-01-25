@@ -2438,40 +2438,17 @@ impl<'db> Parameter<'db> {
         let kind = match kind {
             ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
                 name: name.clone(),
-                default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
-                    Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div),
-                    ),
-                    None => None,
-                },
+                default_type: default_type.map(|_| Type::Never),
             },
             ParameterKind::PositionalOrKeyword { name, default_type } => {
                 ParameterKind::PositionalOrKeyword {
                     name: name.clone(),
-                    default_type: match default_type {
-                        Some(ty) if nested => {
-                            Some(ty.recursive_type_normalized_impl(db, div, true)?)
-                        }
-                        Some(ty) => Some(
-                            ty.recursive_type_normalized_impl(db, div, true)
-                                .unwrap_or(div),
-                        ),
-                        None => None,
-                    },
+                    default_type: default_type.map(|_| Type::Never),
                 }
             }
             ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
                 name: name.clone(),
-                default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
-                    Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div),
-                    ),
-                    None => None,
-                },
+                default_type: default_type.map(|_| Type::Never),
             },
             ParameterKind::Variadic { name } => ParameterKind::Variadic { name: name.clone() },
             ParameterKind::KeywordVariadic { name } => {
