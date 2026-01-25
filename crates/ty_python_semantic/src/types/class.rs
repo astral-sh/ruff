@@ -3,12 +3,12 @@ use std::cell::RefCell;
 use std::fmt::Write;
 use std::sync::{LazyLock, Mutex};
 
-use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, Mro, MroIterator, SpecialFormType, StaticMroError,
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
+use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::{NodeWithScopeKind, Scope};
@@ -786,16 +786,6 @@ impl<'db> From<DynamicClassLiteral<'db>> for ClassLiteral<'db> {
 impl<'db> From<DynamicNamedTupleLiteral<'db>> for ClassLiteral<'db> {
     fn from(literal: DynamicNamedTupleLiteral<'db>) -> Self {
         ClassLiteral::DynamicNamedTuple(literal)
-    }
-}
-
-impl<'db> super::display::QualifiableName<'db> for ClassLiteral<'db> {
-    fn name(self, db: &'db dyn Db) -> &'db str {
-        ClassLiteral::name(self, db)
-    }
-
-    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
-        self.qualified_name(db).components_excluding_self()
     }
 }
 
@@ -6198,12 +6188,7 @@ impl<'db> QualifiedClassName<'db> {
             }
         };
 
-        super::display::qualified_name_components_from_scope(
-            self.db,
-            file,
-            file_scope_id,
-            skip_count,
-        )
+        display::qualified_name_components_from_scope(self.db, file, file_scope_id, skip_count)
     }
 }
 

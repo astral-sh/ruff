@@ -37,16 +37,33 @@ use crate::types::{
     Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 
-/// A type that can be displayed with a qualified name for disambiguation.
+/// A named item that can be either a class or a type alias.
 ///
-/// This trait provides the interface needed by [`AmbiguityState`] to track
-/// whether items with the same name need to be qualified for disambiguation.
-pub(crate) trait QualifiableName<'db>: Copy + PartialEq {
-    /// Returns the unqualified name of this item.
-    fn name(self, db: &'db dyn Db) -> &'db str;
+/// This wrapper allows tracking both classes and type aliases together for
+/// disambiguation, since a class and type alias with the same name in different
+/// modules need to be distinguished in error messages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NamedItem<'db> {
+    Class(ClassLiteral<'db>),
+    TypeAlias(TypeAliasType<'db>),
+}
 
-    /// Returns the path components leading to this item (excluding the item's own name).
-    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String>;
+impl<'db> NamedItem<'db> {
+    fn name(self, db: &'db dyn Db) -> &'db str {
+        match self {
+            NamedItem::Class(class) => class.name(db),
+            NamedItem::TypeAlias(type_alias) => type_alias.name(db),
+        }
+    }
+
+    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
+        match self {
+            NamedItem::Class(class) => class.qualified_name(db).components_excluding_self(),
+            NamedItem::TypeAlias(type_alias) => {
+                type_alias.qualified_name(db).components_excluding_self()
+            }
+        }
+    }
 }
 
 /// Settings for displaying types and signatures
@@ -131,13 +148,12 @@ impl<'db> DisplaySettings<'db> {
         fn build_display_settings<'db>(
             collector: &AmbiguousNameCollector<'db>,
         ) -> DisplaySettings<'db> {
+            // Both classes and type aliases use the same qualification map since
+            // a class and type alias with the same name need to be disambiguated.
+            let qualification_map = Rc::new(collector.qualification_map());
             DisplaySettings {
-                qualified: Rc::new(AmbiguousNameCollector::to_qualification_map(
-                    &collector.class_names,
-                )),
-                qualified_type_aliases: Rc::new(AmbiguousNameCollector::to_qualification_map(
-                    &collector.type_alias_names,
-                )),
+                qualified: Rc::clone(&qualification_map),
+                qualified_type_aliases: qualification_map,
                 ..DisplaySettings::default()
             }
         }
@@ -380,7 +396,7 @@ pub enum QualificationLevel {
 }
 
 impl QualificationLevel {
-    const fn from_ambiguity_state<T>(state: &AmbiguityState<T>) -> Option<Self> {
+    const fn from_ambiguity_state(state: &AmbiguityState) -> Option<Self> {
         match state {
             AmbiguityState::Unambiguous(_) => None,
             AmbiguityState::RequiresFullyQualifiedName { .. } => Some(Self::ModuleName),
@@ -392,8 +408,7 @@ impl QualificationLevel {
 #[derive(Debug, Default)]
 struct AmbiguousNameCollector<'db> {
     visited_types: RefCell<FxHashSet<Type<'db>>>,
-    class_names: RefCell<FxHashMap<&'db str, AmbiguityState<ClassLiteral<'db>>>>,
-    type_alias_names: RefCell<FxHashMap<&'db str, AmbiguityState<TypeAliasType<'db>>>>,
+    names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
 }
 
 impl<'db> AmbiguousNameCollector<'db> {
@@ -403,12 +418,8 @@ impl<'db> AmbiguousNameCollector<'db> {
     /// - First occurrence: `Unambiguous`
     /// - Different qualified paths: `RequiresFullyQualifiedName`
     /// - Same qualified paths: `RequiresFileAndLineNumber`
-    fn record<T: QualifiableName<'db>>(
-        map: &RefCell<FxHashMap<&'db str, AmbiguityState<T>>>,
-        db: &'db dyn Db,
-        item: T,
-    ) {
-        match map.borrow_mut().entry(item.name(db)) {
+    fn record(&self, db: &'db dyn Db, item: NamedItem<'db>) {
+        match self.names.borrow_mut().entry(item.name(db)) {
             Entry::Vacant(entry) => {
                 entry.insert(AmbiguityState::Unambiguous(item));
             }
@@ -446,18 +457,20 @@ impl<'db> AmbiguousNameCollector<'db> {
     }
 
     fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
-        Self::record(&self.class_names, db, class);
+        self.record(db, NamedItem::Class(class));
     }
 
     fn record_type_alias(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-        Self::record(&self.type_alias_names, db, type_alias);
+        self.record(db, NamedItem::TypeAlias(type_alias));
     }
 
-    /// Converts an ambiguity state map into a qualification level map.
-    fn to_qualification_map<T>(
-        map: &RefCell<FxHashMap<&'db str, AmbiguityState<T>>>,
-    ) -> FxHashMap<&'db str, QualificationLevel> {
-        map.borrow()
+    /// Returns the qualification level map for all names.
+    ///
+    /// When there's any ambiguity for a name (including conflicts between a class
+    /// and a type alias), the name is included so that items with that name get qualified.
+    fn qualification_map(&self) -> FxHashMap<&'db str, QualificationLevel> {
+        self.names
+            .borrow()
             .iter()
             .filter_map(|(name, ambiguity)| {
                 Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
@@ -468,15 +481,13 @@ impl<'db> AmbiguousNameCollector<'db> {
 
 /// Whether or not an item can be unambiguously identified by its *unqualified* name
 /// given the other types that are present in the same context.
-///
-/// This is generic over the item type (e.g., [`ClassLiteral`] or [`TypeAliasType`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum AmbiguityState<T> {
+enum AmbiguityState<'db> {
     /// The item can be displayed unambiguously using its unqualified name.
-    Unambiguous(T),
+    Unambiguous(NamedItem<'db>),
     /// The item must be displayed using its fully qualified name to avoid ambiguity.
     RequiresFullyQualifiedName {
-        item: T,
+        item: NamedItem<'db>,
         qualified_name_components: Vec<String>,
     },
     /// Even the item's fully qualified name is not sufficient;

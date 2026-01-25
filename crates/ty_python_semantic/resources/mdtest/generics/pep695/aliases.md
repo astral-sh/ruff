@@ -435,3 +435,21 @@ def i(x: P.UniqueAlias1, y: Q.UniqueAlias2) -> None:
     # error: [invalid-assignment] "Object of type `UniqueAlias2` is not assignable to `UniqueAlias1`"
     a: P.UniqueAlias1 = y
 ```
+
+## Class and type alias with same name
+
+When a class and a type alias have the same name in different scopes, both should be fully qualified
+to distinguish them in error messages:
+
+```py
+class Container1:
+    class Item:
+        pass
+
+class Container2:
+    type Item = str
+
+def j(x: Container1.Item, y: Container2.Item) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Container2.Item` is not assignable to `mdtest_snippet.Container1.Item`"
+    a: Container1.Item = y
+```
