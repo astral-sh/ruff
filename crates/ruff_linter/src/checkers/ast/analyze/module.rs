@@ -12,4 +12,7 @@ pub(crate) fn module(suite: &Suite, checker: &Checker) {
     if checker.is_rule_enabled(Rule::InvalidFormatterSuppressionComment) {
         ruff::rules::ignored_formatter_suppression_comment(checker, suite);
     }
+    if checker.is_rule_enabled(Rule::ImportType) {
+        ruff::rules::import_type(checker, suite);
+    }
 }
