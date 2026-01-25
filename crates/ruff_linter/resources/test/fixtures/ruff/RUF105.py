@@ -23,3 +23,8 @@ def assert_success(cp: CompletedProcess):
 from argparse import ArgumentError
 class MyError(ArgumentError):
     pass
+
+# import type from typing => ok
+from typing import Any
+def func(arg: Any):
+    pass

@@ -9,6 +9,31 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use ruff_python_ast::Identifier;
 
+static MODULES_WHITELIST: &'static [&'static str] = &[
+    "typing",
+    "__future__",
+];
+
+/// ## What it does
+/// Checks for types or function imports.
+///
+/// ## Why is this bad?
+/// TODO
+///
+/// ## Example
+/// ```python
+/// from pathlib import Path
+/// path = Path('/')
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pathlib
+/// path = pathlib.Path('/')
+/// ```
+///
+/// ## References
+/// - [Google Python Style Guide - Imports](https://google.github.io/styleguide/pyguide.html#22-imports)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.4.0")]
 pub(crate) struct ImportType {
@@ -42,6 +67,14 @@ impl<'a, 'b> ImportTypeVisitor<'a, 'b> {
 
     fn check_symbol(&mut self, name: &str) {
         if let Some((stmt_import_from, symbol)) = self.seen_imports_from.get(name) {
+            let module_name = stmt_import_from
+                        .module
+                        .as_ref()
+                        .map_or(".", |m| m.as_ref());
+            if MODULES_WHITELIST.contains(&module_name) {
+                return;
+            }
+
             self.checker.report_diagnostic(
                 ImportType {
                     module_name: stmt_import_from
