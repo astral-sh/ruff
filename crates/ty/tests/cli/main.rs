@@ -739,6 +739,28 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
     Ok(())
 }
 
+
+
+#[test]
+fn gitlab_empty_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "potato = 42")?;
+
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(r#"("fingerprint": ")[a-z0-9]+(",)"#, "$1[FINGERPRINT]$2");
+    let _s = settings.bind_to_scope();
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=gitlab").env("CI_PROJECT_DIR", case.project_dir), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    []
+    
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn github_diagnostics() -> anyhow::Result<()> {
     let case = CliTest::with_file(
