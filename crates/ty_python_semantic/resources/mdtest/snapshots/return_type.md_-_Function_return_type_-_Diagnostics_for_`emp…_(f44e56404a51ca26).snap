@@ -33,7 +33,11 @@ error[empty-body]: Function always implicitly returns `None`, which is not assig
   |                         ^^^
   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: Only functions in stub files, methods on protocol classes, or methods with `@abstractmethod` are permitted to have empty bodies
+info: Functions with empty bodies and non-`None` return types are only permitted:
+info:  - in stub files
+info:  - in `if TYPE_CHECKING` blocks
+info:  - as methods on protocol classes
+info:  - or as `@abstractmethod`-decorated methods on abstract classes
 info: Class `Concrete` has `typing.Protocol` in its MRO, but it is not a protocol class
 info: Only classes that directly inherit from `typing.Protocol` or `typing_extensions.Protocol` are considered protocol classes
  --> src/mdtest_snippet.py:6:7
