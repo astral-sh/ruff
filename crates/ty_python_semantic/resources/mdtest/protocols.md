@@ -2428,12 +2428,12 @@ class HasX(Protocol):
     x: int
 
 def f(arg: object, arg2: type):
-    if isinstance(arg, HasX):  # error: [invalid-argument-type]
+    if isinstance(arg, HasX):  # error: [isinstance-against-protocol]
         reveal_type(arg)  # revealed: HasX
     else:
         reveal_type(arg)  # revealed: ~HasX
 
-    if issubclass(arg2, HasX):  # error: [invalid-argument-type]
+    if issubclass(arg2, HasX):  # error: [isinstance-against-protocol]
         reveal_type(arg2)  # revealed: type[HasX]
     else:
         reveal_type(arg2)  # revealed: type & ~type[HasX]
@@ -2498,7 +2498,7 @@ class RuntimeCheckableHasX(Protocol):
 
 def match_non_runtime_checkable(arg: object):
     match arg:
-        case HasX():  # error: [invalid-argument-type]
+        case HasX():  # error: [isinstance-against-protocol]
             reveal_type(arg)  # revealed: HasX
         case _:
             reveal_type(arg)  # revealed: ~HasX
@@ -2519,7 +2519,7 @@ class Wrapper:
 
 def match_nested_non_runtime_checkable(arg: Wrapper):
     match arg:
-        case Wrapper(inner=HasX()):  # error: [invalid-argument-type]
+        case Wrapper(inner=HasX()):  # error: [isinstance-against-protocol]
             pass
 ```
 

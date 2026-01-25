@@ -67,6 +67,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_KEY);
+    registry.register_lint(&ISINSTANCE_AGAINST_PROTOCOL);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
@@ -759,6 +760,39 @@ declare_lint! {
     pub(crate) static INVALID_KEY = {
         summary: "detects invalid subscript accesses or TypedDict literal keys",
         status: LintStatus::stable("0.0.1-alpha.17"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Reports runtime checks against non-runtime-checkable protocol classes.
+    /// This includes explicit calls to `isinstance()`/`issubclass()` and implicit
+    /// checks performed by match class patterns.
+    ///
+    /// ## Why is this bad?
+    /// Using a non-runtime-checkable protocol in these contexts raises `TypeError`
+    /// at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing_extensions import Protocol
+    ///
+    /// class HasX(Protocol):
+    ///     x: int
+    ///
+    /// def f(arg: object, arg2: type):
+    ///     isinstance(arg, HasX)  # error: [isinstance-against-protocol]
+    ///     issubclass(arg2, HasX)  # error: [isinstance-against-protocol]
+    ///
+    /// def g(arg: object):
+    ///     match arg:
+    ///         case HasX():  # error: [isinstance-against-protocol]
+    ///             pass
+    /// ```
+    pub(crate) static ISINSTANCE_AGAINST_PROTOCOL = {
+        summary: "reports runtime checks against non-runtime-checkable protocol classes",
+        status: LintStatus::stable("0.0.10"),
         default_level: Level::Error,
     }
 }
@@ -3566,7 +3600,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     protocol: ProtocolClass,
     function: KnownFunction,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+    let Some(builder) = context.report_lint(&ISINSTANCE_AGAINST_PROTOCOL, call) else {
         return;
     };
     let db = context.db();
@@ -3576,20 +3610,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
         "Class `{class_name}` cannot be used as the second argument to `{function_name}`",
     ));
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
-
-    let mut class_def_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        format_args!(
-            "`{class_name}` is declared as a protocol class, \
-                but it is not declared as runtime-checkable"
-        ),
-    );
-    class_def_diagnostic.annotate(
-        Annotation::primary(protocol.definition_span(db))
-            .message(format_args!("`{class_name}` declared here")),
-    );
-    diagnostic.sub(class_def_diagnostic);
-
+    add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(format_args!(
         "A protocol class can only be used in `{function_name}` checks if it is decorated \
             with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
@@ -3602,7 +3623,7 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
     pattern_cls: T,
     protocol: ProtocolClass,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, pattern_cls) else {
+    let Some(builder) = context.report_lint(&ISINSTANCE_AGAINST_PROTOCOL, pattern_cls) else {
         return;
     };
     let db = context.db();
@@ -3611,7 +3632,20 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
         "Class `{class_name}` cannot be used in a class pattern",
     ));
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+    add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
+    diagnostic.info(
+        "A protocol class can only be used in a match class pattern if it is decorated \
+            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`",
+    );
+    diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
+}
 
+fn add_non_runtime_checkable_protocol_context<'db, 'ctx>(
+    db: &'db dyn Db,
+    diagnostic: &mut LintDiagnosticGuard<'db, 'ctx>,
+    protocol: ProtocolClass,
+) {
+    let class_name = protocol.name(db);
     let mut class_def_diagnostic = SubDiagnostic::new(
         SubDiagnosticSeverity::Info,
         format_args!(
@@ -3624,12 +3658,6 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
             .message(format_args!("`{class_name}` declared here")),
     );
     diagnostic.sub(class_def_diagnostic);
-
-    diagnostic.info(
-        "A protocol class can only be used in a match class pattern if it is decorated \
-            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`",
-    );
-    diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
 }
 
 pub(crate) fn report_attempted_protocol_instantiation(
