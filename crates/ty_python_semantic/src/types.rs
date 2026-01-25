@@ -5,6 +5,7 @@ use ruff_diagnostics::{Edit, Fix};
 
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::fmt::Write;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -11757,6 +11758,54 @@ impl<'db> TypeAliasType<'db> {
             }
             TypeAliasType::ManualPEP695(_) => self,
         }
+    }
+
+    /// Returns a struct that can display the fully qualified name of this type alias.
+    pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
+        QualifiedTypeAliasName::from_type_alias(db, self)
+    }
+}
+
+// N.B. It would be incorrect to derive `Eq`, `PartialEq`, or `Hash` for this struct,
+// because two `QualifiedTypeAliasName` instances might refer to different type aliases but
+// have the same components. You'd expect them to compare equal, but they'd compare
+// unequal if `PartialEq`/`Eq` were naively derived.
+#[derive(Clone, Copy)]
+pub(crate) struct QualifiedTypeAliasName<'db> {
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+}
+
+impl<'db> QualifiedTypeAliasName<'db> {
+    pub(crate) fn from_type_alias(db: &'db dyn Db, type_alias: TypeAliasType<'db>) -> Self {
+        Self { db, type_alias }
+    }
+
+    /// Returns the components of the qualified name of this type alias, excluding the alias itself.
+    ///
+    /// For example, calling this method on a type alias `D` inside a class `C` in module `a.b`
+    /// would return `["a", "b", "C"]`.
+    pub(crate) fn components_excluding_self(&self) -> Vec<String> {
+        let Some(definition) = self.type_alias.definition(self.db) else {
+            return vec![];
+        };
+
+        let file = definition.file(self.db);
+        let file_scope_id = definition.file_scope(self.db);
+
+        // Type aliases are defined directly in their enclosing scope (no body scope like classes),
+        // so we don't skip any ancestor scopes.
+        display::qualified_name_components_from_scope(self.db, file, file_scope_id, 0)
+    }
+}
+
+impl std::fmt::Display for QualifiedTypeAliasName<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for parent in self.components_excluding_self() {
+            f.write_str(&parent)?;
+            f.write_char('.')?;
+        }
+        f.write_str(self.type_alias.name(self.db))
     }
 }
 

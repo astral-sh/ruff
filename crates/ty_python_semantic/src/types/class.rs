@@ -3,15 +3,15 @@ use std::cell::RefCell;
 use std::fmt::Write;
 use std::sync::{LazyLock, Mutex};
 
-use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, Mro, MroIterator, SpecialFormType, StaticMroError,
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
+use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
 use crate::semantic_index::definition::{Definition, DefinitionState};
-use crate::semantic_index::scope::{NodeWithScopeKind, Scope, ScopeKind};
+use crate::semantic_index::scope::{NodeWithScopeKind, Scope};
 use crate::semantic_index::symbol::Symbol;
 use crate::semantic_index::{
     DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
@@ -6188,39 +6188,7 @@ impl<'db> QualifiedClassName<'db> {
             }
         };
 
-        let module_ast = parsed_module(self.db, file).load(self.db);
-        let index = semantic_index(self.db, file);
-
-        let mut name_parts = vec![];
-
-        for (_, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(skip_count) {
-            let node = ancestor_scope.node();
-
-            match ancestor_scope.kind() {
-                ScopeKind::Class => {
-                    if let Some(class_def) = node.as_class() {
-                        name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
-                    }
-                }
-                ScopeKind::Function => {
-                    if let Some(function_def) = node.as_function() {
-                        name_parts.push(format!(
-                            "<locals of function '{}'>",
-                            function_def.node(&module_ast).name.as_str()
-                        ));
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        if let Some(module) = file_to_module(self.db, file) {
-            let module_name = module.name(self.db);
-            name_parts.push(module_name.as_str().to_string());
-        }
-
-        name_parts.reverse();
-        name_parts
+        display::qualified_name_components_from_scope(self.db, file, file_scope_id, skip_count)
     }
 }
 
