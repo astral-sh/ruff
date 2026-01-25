@@ -108,6 +108,7 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
         Expr::Attribute(attribute_expr @ ExprAttribute { range, .. }) => {
             check_name(checker, expr, *range);
             check_class_attribute(checker, attribute_expr);
+            check_removed_attribute_access_on_context_key(checker, attribute_expr);
         }
         Expr::Name(ExprName {
             id,
@@ -369,40 +370,44 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
         return;
     }
 
-    let is_kwarg_parameter = value
-        .as_name_expr()
-        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
-
-    let is_assigned_from_get_current_context =
-        typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["airflow", "utils", "context", "get_current_context"]
-            )
-        });
-
-    if !(is_kwarg_parameter || is_assigned_from_get_current_context) {
+    if !is_context_variable(checker, value) {
         return;
     }
 
-    for removed_key in REMOVED_CONTEXT_KEYS {
-        let Some(Expr::StringLiteral(ExprStringLiteral {
-            value,
-            range,
-            node_index: _,
-        })) = call_expr.arguments.find_positional(0)
-        else {
-            continue;
-        };
-        if value == removed_key {
-            checker.report_diagnostic(
-                Airflow3Removal {
-                    deprecated: removed_key.to_string(),
-                    replacement: Replacement::None,
-                },
-                *range,
-            );
-        }
+    let Some(Expr::StringLiteral(ExprStringLiteral {
+        value: key,
+        range,
+        node_index: _,
+    })) = call_expr.arguments.find_positional(0)
+    else {
+        return;
+    };
+
+    // Check removed context keys
+    if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
+        checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: key.to_string(),
+                replacement: Replacement::None,
+            },
+            *range,
+        );
+        return;
+    }
+
+    // triggering_dataset_events -> triggering_asset_events
+    if key.to_str() == "triggering_dataset_events" {
+        let mut diagnostic = checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: "triggering_dataset_events".to_string(),
+                replacement: Replacement::AttrName("triggering_asset_events"),
+            },
+            *range,
+        );
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "\"triggering_asset_events\"".to_string(),
+            *range,
+        )));
     }
 }
 
@@ -419,19 +424,7 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
         return;
     };
 
-    let is_kwarg_parameter = value
-        .as_name_expr()
-        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
-
-    let is_assigned_from_get_current_context =
-        typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["airflow", "utils", "context", "get_current_context"]
-            )
-        });
-
-    if !(is_kwarg_parameter || is_assigned_from_get_current_context) {
+    if !is_context_variable(checker, value) {
         return;
     }
 
@@ -443,6 +436,66 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
             },
             slice.range(),
         );
+        return;
+    }
+
+    // triggering_dataset_events -> triggering_asset_events
+    if key.to_str() == "triggering_dataset_events" {
+        let mut diagnostic = checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: "triggering_dataset_events".to_string(),
+                replacement: Replacement::AttrName("triggering_asset_events"),
+            },
+            slice.range(),
+        );
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "\"triggering_asset_events\"".to_string(),
+            slice.range(),
+        )));
+    }
+}
+
+/// Check for removed attribute access on context key value.
+fn check_removed_attribute_access_on_context_key(checker: &Checker, attr_expr: &ExprAttribute) {
+    if !in_airflow_task_function(checker.semantic()) {
+        return;
+    }
+
+    let attr = attr_expr.attr.as_str();
+
+    let replacement = match attr {
+        "external_trigger"
+            if is_removed_context_key_attribute(checker, attr_expr, "dag_run", attr) =>
+        {
+            Replacement::Message(
+                "`external_trigger` is removed; it cannot be accessed from `context[\"dag_run\"]`",
+            )
+        }
+        "uri" if is_removed_context_key_attribute(checker, attr_expr, "inlet_events", attr) => {
+            Replacement::AttrName("asset.uri")
+        }
+        _ => return,
+    };
+
+    let fix = if let Replacement::AttrName(name) = replacement {
+        Some(Fix::safe_edit(Edit::range_replacement(
+            name.to_string(),
+            attr_expr.attr.range(),
+        )))
+    } else {
+        None
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
+        Airflow3Removal {
+            deprecated: attr.to_string(),
+            replacement,
+        },
+        attr_expr.attr.range(),
+    );
+
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
     }
 }
 
@@ -1214,4 +1267,96 @@ fn is_execute_method_inherits_from_airflow_operator(
                 matches!(qualified_name.segments(), ["airflow", .., "BaseOperator"])
             })
     })
+}
+
+/// Check if an expression is a valid Airflow context variable.
+fn is_context_variable(checker: &Checker, expr: &Expr) -> bool {
+    let is_kwarg = expr
+        .as_name_expr()
+        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
+
+    let is_from_get_current_context = typing::resolve_assignment(expr, checker.semantic())
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
+        });
+
+    is_kwarg || is_from_get_current_context
+}
+
+/// Check if an expression accesses a specific context key. It returns `true` if `expr`
+/// accesses the given `key` from an Airflow context variable via either subscript or
+/// `.get()` method.
+fn is_context_key_access(checker: &Checker, expr: &Expr, key: &str) -> bool {
+    // context["key"]
+    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
+        if let Some(ExprStringLiteral {
+            value: slice_key, ..
+        }) = slice.as_string_literal_expr()
+        {
+            if slice_key.to_str() == key && is_context_variable(checker, value) {
+                return true;
+            }
+        }
+    }
+    // context.get("key")
+    if let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = expr
+    {
+        if let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() {
+            if attr.as_str() == "get" {
+                if let Some(Expr::StringLiteral(ExprStringLiteral { value: arg_key, .. })) =
+                    arguments.find_positional(0)
+                {
+                    if arg_key.to_str() == key && is_context_variable(checker, value) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Check for removed attributes on context key values.
+///
+/// Returns `true` if `attr_expr` accesses a removed attribute on a context key value,
+/// which can be used to determine whether to report a diagnostic.
+///
+/// Examples for `context_key="dag_run"`, `removed_attr="external_trigger"`:
+/// ```python
+/// context["dag_run"].external_trigger
+/// context.get("dag_run").external_trigger
+/// dag_run = context["dag_run"]; dag_run.external_trigger
+/// ```
+fn is_removed_context_key_attribute(
+    checker: &Checker,
+    attr_expr: &ExprAttribute,
+    context_key: &str,
+    removed_attr: &str,
+) -> bool {
+    let ExprAttribute { value, attr, .. } = attr_expr;
+
+    if attr.as_str() != removed_attr {
+        return false;
+    }
+
+    let semantic = checker.semantic();
+
+    // Direct access: context["key"].attr or context.get("key").attr
+    if is_context_key_access(checker, value, context_key) {
+        return true;
+    }
+
+    // Variable bound to context key: x = context["key"]; x.attr
+    value
+        .as_name_expr()
+        .and_then(|name| semantic.only_binding(name))
+        .map(|id| semantic.binding(id))
+        .and_then(|binding| typing::find_binding_value(binding, semantic))
+        .is_some_and(|bound_value| is_context_key_access(checker, bound_value, context_key))
 }
