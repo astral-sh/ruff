@@ -481,7 +481,7 @@ fn render_markdown(docstring: &str) -> String {
                 // This is the end of a doctest
                 block_indent = 0;
                 in_any_code = false;
-                in_literal = false;
+                in_doctest = false;
                 output.push_str(FENCE);
             }
         } else {
@@ -2261,5 +2261,53 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
+    }
+
+    // Regression test: a doctest followed by a literal block with blank lines inside.
+    // Previously, in_doctest wasn't reset when ending a doctest, so a blank line inside
+    // a subsequent literal block would incorrectly end the literal block early.
+    // See: https://github.com/astral-sh/ty/issues/2497
+    #[test]
+    fn doctest_then_literal_block_with_blank_lines() {
+        let docstring = Docstring::new(
+            "\
+Example:
+
+>>> print(\"hello\")
+hello
+
+Code example::
+
+    def foo():
+        pass
+
+    def bar():
+        pass
+
+Done.
+"
+            .to_owned(),
+        );
+
+        // The blank line between foo() and bar() should be preserved inside the code block,
+        // NOT cause the code block to end early with bar() rendered as regular text.
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Example:  
+          
+        ```````````python
+        >>> print("hello")
+        hello
+        ```````````  
+        Code example:    
+        ```````````python
+            def foo():
+                pass
+
+            def bar():
+                pass
+
+        ```````````
+        Done.
+        "#);
     }
 }

@@ -289,9 +289,36 @@ from typing import TypeVar
 T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
+
+S = TypeVar("S", int, float)
+
+def chained_constrained_types(t1: S, t2: S, t3: S) -> S:
+    return (t1 + t2) * t3
+
+def typevar_times_literal(t: S) -> S:
+    return t * 2
+
+def literal_times_typevar(t: S) -> S:
+    return 2 * t
+
+def negate_typevar(t: S) -> S:
+    return -t
+
+def positive_typevar(t: S) -> S:
+    return +t
+```
+
+Unary operations that are not supported by all constraints should error:
+
+```py
+from typing import TypeVar
+
+U = TypeVar("U", int, float)
+
+def invert_typevar(t: U) -> int:
+    # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `U@invert_typevar`"
+    return ~t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two

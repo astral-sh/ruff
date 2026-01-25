@@ -66,7 +66,14 @@ mod tests;
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
-#[salsa::tracked(returns(ref), cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=definition_cycle_initial,
+    cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
+        inference.cycle_normalized(db, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -86,16 +93,6 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition()
 }
 
-fn definition_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_inference: &DefinitionInference<'db>,
-    inference: DefinitionInference<'db>,
-    _definition: Definition<'db>,
-) -> DefinitionInference<'db> {
-    inference.cycle_normalized(db, previous_inference, cycle)
-}
-
 fn definition_cycle_initial<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
@@ -108,7 +105,14 @@ fn definition_cycle_initial<'db>(
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
-#[salsa::tracked(returns(ref), cycle_fn=deferred_cycle_recovery, cycle_initial=deferred_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=deferred_cycle_initial,
+    cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
+        inference.cycle_normalized(db, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -127,16 +131,6 @@ pub(crate) fn infer_deferred_types<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
         .finish_definition()
-}
-
-fn deferred_cycle_recovery<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_inference: &DefinitionInference<'db>,
-    inference: DefinitionInference<'db>,
-    _definition: Definition<'db>,
-) -> DefinitionInference<'db> {
-    inference.cycle_normalized(db, previous_inference, cycle)
 }
 
 fn deferred_cycle_initial<'db>(
@@ -189,7 +183,14 @@ pub(crate) fn infer_scope_types<'db>(
     infer_scope_types_impl(db, InferScope::new(db, scope, tcx))
 }
 
-#[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, _| {
+        inference.cycle_normalized(db, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(crate) fn infer_scope_types_impl<'db>(
     db: &'db dyn Db,
     input: InferScope<'db>,
@@ -207,24 +208,6 @@ pub(crate) fn infer_scope_types_impl<'db>(
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope, tcx), index, &module).finish_scope()
 }
 
-fn scope_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_inference: &ScopeInference<'db>,
-    inference: ScopeInference<'db>,
-    _input: InferScope<'db>,
-) -> ScopeInference<'db> {
-    inference.cycle_normalized(db, previous_inference, cycle)
-}
-
-fn scope_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _input: InferScope<'db>,
-) -> ScopeInference<'db> {
-    ScopeInference::cycle_initial(Type::divergent(id))
-}
-
 /// Infer all types for an [`Expression`] (including sub-expressions).
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
@@ -237,7 +220,14 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-#[salsa::tracked(returns(ref), cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=expression_cycle_initial,
+    cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, _| {
+        inference.cycle_normalized(db, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(super) fn infer_expression_types_impl<'db>(
     db: &'db dyn Db,
     input: InferExpression<'db>,
@@ -263,16 +253,6 @@ pub(super) fn infer_expression_types_impl<'db>(
         &module,
     )
     .finish_expression()
-}
-
-fn expression_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_inference: &ExpressionInference<'db>,
-    inference: ExpressionInference<'db>,
-    _input: InferExpression<'db>,
-) -> ExpressionInference<'db> {
-    inference.cycle_normalized(db, previous_inference, cycle)
 }
 
 fn expression_cycle_initial<'db>(
@@ -315,7 +295,13 @@ pub(crate) fn infer_expression_type<'db>(
     infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-#[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
 fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>) -> Type<'db> {
     let (expression, _) = input.into_inner(db);
 
@@ -326,24 +312,6 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
     let inference = infer_expression_types_impl(db, input);
 
     inference.expression_type(expression.node_ref(db, &module))
-}
-
-fn single_expression_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_cycle_value: &Type<'db>,
-    result: Type<'db>,
-    _input: InferExpression<'db>,
-) -> Type<'db> {
-    result.cycle_normalized(db, *previous_cycle_value, cycle)
-}
-
-fn single_expression_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _input: InferExpression<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
 }
 
 /// An `Expression` with an optional `TypeContext`.
@@ -464,7 +432,10 @@ impl<'db> TypeContext<'db> {
 ///
 /// Returns [`Truthiness::Ambiguous`] in case any non-definitely bound places
 /// were encountered while inferring the type of the expression.
-#[salsa::tracked(cycle_initial=static_expression_truthiness_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(
+    cycle_initial=|_, _, _| Truthiness::Ambiguous,
+    heap_size=get_size2::GetSize::get_heap_size
+)]
 pub(crate) fn static_expression_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -481,21 +452,20 @@ pub(crate) fn static_expression_truthiness<'db>(
     inference.expression_type(node).bool(db)
 }
 
-fn static_expression_truthiness_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _expression: Expression<'db>,
-) -> Truthiness {
-    Truthiness::Ambiguous
-}
-
 /// Infer the types for an [`Unpack`] operation.
 ///
 /// This infers the expression type and performs structural match against the target expression
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
-#[salsa::tracked(returns(ref), cycle_fn=unpack_cycle_recover, cycle_initial=unpack_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, _| {
+        result.cycle_normalized(db, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let module = parsed_module(db, file).load(db);
@@ -505,24 +475,6 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     let mut unpacker = Unpacker::new(db, unpack.target_scope(db), &module);
     unpacker.unpack(unpack.target(db, &module), unpack.value(db));
     unpacker.finish()
-}
-
-fn unpack_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _unpack: Unpack<'db>,
-) -> UnpackResult<'db> {
-    UnpackResult::cycle_initial(Type::divergent(id))
-}
-
-fn unpack_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_cycle_result: &UnpackResult<'db>,
-    result: UnpackResult<'db>,
-    _unpack: Unpack<'db>,
-) -> UnpackResult<'db> {
-    result.cycle_normalized(db, previous_cycle_result, cycle)
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.
@@ -712,6 +664,9 @@ pub(crate) struct DefinitionInference<'db> {
 struct DefinitionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
+
+    /// Functions called while inferring this definition.
+    called_functions: Box<[FunctionType<'db>]>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,

@@ -346,7 +346,7 @@ impl<'db> GenericContext<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=inferable_typevars_cycle_initial,
+            cycle_initial=|_, _, _| FxHashSet::default(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inferable_typevars_inner<'db>(
@@ -702,35 +702,6 @@ impl<'db> GenericContext<'db> {
             .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor));
 
         Self::from_typevar_instances(db, variables)
-    }
-}
-
-fn inferable_typevars_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: GenericContext<'db>,
-) -> FxHashSet<BoundTypeVarIdentity<'db>> {
-    FxHashSet::default()
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum LegacyGenericBase {
-    Generic,
-    Protocol,
-}
-
-impl LegacyGenericBase {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Generic => "Generic",
-            Self::Protocol => "Protocol",
-        }
-    }
-}
-
-impl Display for LegacyGenericBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
     }
 }
 
@@ -1769,6 +1740,12 @@ impl<'db> SpecializationBuilder<'db> {
         let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
         match (formal, actual) {
+            // Expand PEP 695 type aliases in the formal type.
+            // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
+            (Type::TypeAlias(alias), _) => {
+                return self.infer_map_impl(alias.value_type(self.db), actual, polarity, f, seen);
+            }
+
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
             // multiple union elements, we ideally want to express that _only one_ of them needs to
             // match, and that we should infer the smallest type mapping that allows that.
@@ -2098,6 +2075,15 @@ impl<'db> SpecializationBuilder<'db> {
                         }
                     }
                 }
+            }
+
+            // Expand type aliases in the actual type.
+            //
+            // This is placed at the end of the match block to avoid expanding the type alias
+            // when it can be matched directly against a type variable in the formal type,
+            // e.g., `reveal_type(alias)` should reveal the type alias, not its value type.
+            (formal, Type::TypeAlias(alias)) => {
+                return self.infer_map_impl(formal, alias.value_type(self.db), polarity, f, seen);
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables

@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.14.14
+
+Released on 2026-01-22.
+
+### Preview features
+
+- Preserve required parentheses in lambda bodies ([#22747](https://github.com/astral-sh/ruff/pull/22747))
+- Combine range suppression code diagnostics ([#22613](https://github.com/astral-sh/ruff/pull/22613))
+- \[`airflow`\] Second positional argument to `Asset`/`Dataset` should not be a dictionary (`AIR303`) ([#22453](https://github.com/astral-sh/ruff/pull/22453))
+- \[`ruff`\] Detect duplicate entries in `__all__` (`RUF068`) ([#22114](https://github.com/astral-sh/ruff/pull/22114))
+
+### Bug fixes
+
+- \[`pyupgrade`\] Allow shadowing non-builtin bindings (`UP029`) ([#22749](https://github.com/astral-sh/ruff/pull/22749))
+- \[`pyupgrade`\] Apply `UP045` to string arguments of `typing.cast` ([#22320](https://github.com/astral-sh/ruff/pull/22320))
+- \[`flake8-pie`\] Detect duplicated declared class fields in `PIE794` ([#22717](https://github.com/astral-sh/ruff/pull/22717))
+
+### Rule changes
+
+- \[`flake8-pyi`\] Fix inconsistent handling of forward references for `__new__`, `__enter__`, `__aenter__` in `PYI034` ([#22798](https://github.com/astral-sh/ruff/pull/22798))
+- \[`flake8-pytest-style`\] Support `check` parameter in `PT011` ([#22725](https://github.com/astral-sh/ruff/pull/22725))
+- \[`ruff`\] Add exception for `ctypes.Structure._fields_` (`RUF012`) ([#22559](https://github.com/astral-sh/ruff/pull/22559))
+- Many fixes are now marked unsafe if they would remove comments:
+    - \[`flake8-bugbear`\] [`B009`](https://github.com/astral-sh/ruff/pull/22656), [`B010`](https://github.com/astral-sh/ruff/pull/22657), [`B013`](https://github.com/astral-sh/ruff/pull/22658), [`B014`](https://github.com/astral-sh/ruff/pull/22659), [`B033`](https://github.com/astral-sh/ruff/pull/22632)
+    - \[`flake8-simplify`\] [`SIM910`](https://github.com/astral-sh/ruff/pull/22662), [`SIM911`](https://github.com/astral-sh/ruff/pull/22661)
+    - \[`pyupgrade`\] [`UP007`](https://github.com/astral-sh/ruff/pull/22772), [`UP039`](https://github.com/astral-sh/ruff/pull/22774), [`UP041`](https://github.com/astral-sh/ruff/pull/22773), [`UP045`](https://github.com/astral-sh/ruff/pull/22772)
+    - \[`refurb`\] [`FURB105`](https://github.com/astral-sh/ruff/pull/22767), [`FURB116`](https://github.com/astral-sh/ruff/pull/22681), [`FURB136`](https://github.com/astral-sh/ruff/pull/22680), [`FURB140`](https://github.com/astral-sh/ruff/pull/22679), [`FURB145`](https://github.com/astral-sh/ruff/pull/22670), [`FURB154`](https://github.com/astral-sh/ruff/pull/22669), [`FURB157`](https://github.com/astral-sh/ruff/pull/22668), [`FURB164`](https://github.com/astral-sh/ruff/pull/22667),[`FURB181`](https://github.com/astral-sh/ruff/pull/22666), [`FURB188`](https://github.com/astral-sh/ruff/pull/22665)
+    - \[`ruff`\] [`RUF019`](https://github.com/astral-sh/ruff/pull/22663), [`RUF020`](https://github.com/astral-sh/ruff/pull/22664)
+
+### Documentation
+
+- Add `--exit-non-zero-on-format` to formatter exit codes section ([#22761](https://github.com/astral-sh/ruff/pull/22761))
+- Update contributing guide for adding a new rule ([#22779](https://github.com/astral-sh/ruff/pull/22779))
+- \[`FastAPI`\] Document fix safety for `FAST001` ([#22655](https://github.com/astral-sh/ruff/pull/22655))
+- \[`flake8-async`\] Tweak explanation to focus on latency/efficiency tradeoff (`ASYNC110`) ([#22715](https://github.com/astral-sh/ruff/pull/22715))
+- \[`pandas-vet`\] Make example error out-of-the-box (`PD002`) ([#22561](https://github.com/astral-sh/ruff/pull/22561))
+- \[`refurb`\] Make the example work out of box (`FURB101`) ([#22770](https://github.com/astral-sh/ruff/pull/22770))
+- \[`refurb`\] Make the example work out of box (`FURB103`) ([#22769](https://github.com/astral-sh/ruff/pull/22769))
+
+### Contributors
+
+- [@alejsdev](https://github.com/alejsdev)
+- [@ntBre](https://github.com/ntBre)
+- [@caiquejjx](https://github.com/caiquejjx)
+- [@chirizxc](https://github.com/chirizxc)
+- [@denyszhak](https://github.com/denyszhak)
+- [@sjyangkevin](https://github.com/sjyangkevin)
+- [@MeGaGiGaGon](https://github.com/MeGaGiGaGon)
+- [@leandrobbraga](https://github.com/leandrobbraga)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@carljm](https://github.com/carljm)
+- [@amyreese](https://github.com/amyreese)
+- [@zsol](https://github.com/zsol)
+- [@harupy](https://github.com/harupy)
+
 ## 0.14.13
 
 Released on 2026-01-15.

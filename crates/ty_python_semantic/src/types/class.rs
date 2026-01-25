@@ -34,7 +34,6 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
-use crate::types::list_members::all_end_of_scope_members;
 use crate::types::member::{Member, class_member};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::relation::{
@@ -81,22 +80,6 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 
-fn explicit_bases_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
-fn inheritance_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Option<InheritanceCycle> {
-    None
-}
-
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -137,14 +120,6 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
-fn is_typed_dict_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> bool {
-    false
-}
-
 #[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
@@ -154,24 +129,6 @@ fn try_metaclass_cycle_initial<'db>(
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
-}
-
-fn decorators_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
-fn fields_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-    _specialization: Option<Specialization<'db>>,
-    _field_policy: CodeGeneratorKind<'db>,
-) -> FxIndexMap<Name, Field<'db>> {
-    FxIndexMap::default()
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -394,18 +351,12 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     }
 }
 
-fn variance_of_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: GenericAlias<'db>,
-    _typevar: BoundTypeVarInstance<'db>,
-) -> TypeVarVariance {
-    TypeVarVariance::Bivariant
-}
-
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=variance_of_cycle_initial)]
+    #[salsa::tracked(
+        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
@@ -1068,12 +1019,16 @@ impl<'db> ClassType<'db> {
         self.class_literal(db).is_final(db)
     }
 
-    /// Returns a map of abstract method names to the class that originally defines them.
+    /// Returns a map of methods on this class that were defined as abstract on a superclass
+    /// and have not been overridden with a concrete implementation anywhere in the MRO
     ///
-    /// Only returns methods that are still abstract on `self` (i.e., have not been overridden
-    /// with a concrete implementation anywhere in the MRO).
+    /// The value of the map is a tuple of the class that defined the abstract method
+    /// and the [`Definition`] of the abstract method.
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, ClassType<'db>> {
+    pub(crate) fn abstract_methods(
+        self,
+        db: &'db dyn Db,
+    ) -> FxIndexMap<Name, (ClassType<'db>, Definition<'db>)> {
         fn is_abstract(db: &dyn Db, ty: Type) -> bool {
             match ty {
                 Type::FunctionLiteral(function) => {
@@ -1095,78 +1050,42 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        fn is_method_like(ty: Type) -> bool {
-            matches!(
-                ty,
-                Type::FunctionLiteral(_)
-                    | Type::BoundMethod(_)
-                    | Type::PropertyInstance(_)
-                    | Type::KnownBoundMethod(_)
-                    | Type::WrapperDescriptor(_)
-                    | Type::Callable(_)
-                    | Type::DataclassDecorator(_)
-                    | Type::DataclassTransformer(_)
-            )
-        }
+        let mut abstract_methods: FxIndexMap<Name, _> = FxIndexMap::default();
 
-        let mut abstract_methods = FxIndexMap::<Name, ClassType<'db>>::default();
-
-        // Collect all abstract methods defined anywhere in the MRO.
-        for class_base in self.iter_mro(db) {
-            let class = match class_base {
-                ClassBase::Class(class) => class,
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => continue,
-                ClassBase::Dynamic(_) => continue,
-            };
-
-            // Skip dynamic classes; they can't define abstract methods.
-            let Some((class_literal, _)) = class.static_class_literal(db) else {
+        // Iterate through the MRO in reverse order,
+        // skipping `object` (we know it doesn't define any abstract methods)
+        for supercls in self.iter_mro(db).rev().skip(1) {
+            let ClassBase::Class(class) = supercls else {
                 continue;
             };
-
-            let class_scope = class_literal.body_scope(db);
-
-            for member in all_end_of_scope_members(db, class_scope) {
-                if is_abstract(db, member.member.ty) {
-                    abstract_methods.entry(member.member.name).or_insert(class);
+            // Currently we do not recognize dynamic classes as being able to define abstract methods,
+            // but we do recognise them as being able to override abstract methods defined in static classes.
+            let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
+                abstract_methods
+                    .retain(|name, _| class.own_class_member(db, None, name).is_undefined());
+                continue;
+            };
+            let scope = class_literal.body_scope(db);
+            let place_table = place_table(db, scope);
+            for (symbol_id, bindings_iterator) in
+                use_def_map(db, class_literal.body_scope(db)).all_end_of_scope_symbol_bindings()
+            {
+                let name = place_table.symbol(symbol_id).name();
+                let place_and_definition = place_from_bindings(db, bindings_iterator);
+                let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
+                    continue;
+                };
+                let Some(definition) = place_and_definition.first_definition else {
+                    continue;
+                };
+                if is_abstract(db, ty) {
+                    abstract_methods.insert(name.clone(), (class, definition));
+                } else {
+                    // If this method is concrete, remove it from the map of abstract methods.
+                    abstract_methods.shift_remove(name);
                 }
             }
         }
-
-        // Get `self`'s body scope for checking non-callable bindings.
-        let self_body_scope = self
-            .static_class_literal(db)
-            .map(|(class_literal, _)| class_literal.body_scope(db));
-
-        // Filter out methods that have been overridden with concrete implementations.
-        abstract_methods.retain(|method_name, _| {
-            let member = self.class_member(db, method_name, MemberLookupPolicy::default());
-            match member.place {
-                Place::Defined(defined) => {
-                    if is_method_like(defined.ty) {
-                        // For method-like types, check if it's still abstract.
-                        is_abstract(db, defined.ty)
-                    } else {
-                        // For non-callable types, check if there's a binding in `self`'s
-                        // scope. A binding (like `f = 42` or `f: int = 42`) overrides
-                        // the abstract method, but a declaration-only (like `f: int`) does not.
-                        let Some(body_scope) = self_body_scope else {
-                            return true;
-                        };
-                        let table = place_table(db, body_scope);
-                        let has_binding = table.symbol_id(method_name).is_some_and(|symbol_id| {
-                            let use_def = use_def_map(db, body_scope);
-                            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                            !place_from_bindings(db, bindings).place.is_undefined()
-                        });
-                        // If there's a binding, the method is implemented (not abstract).
-                        // If there's no binding, the method is still abstract.
-                        !has_binding
-                    }
-                }
-                Place::Undefined => true,
-            }
-        });
 
         abstract_methods
     }
@@ -2560,7 +2479,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_initial=explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!(
             "StaticClassLiteral::explicit_bases_query: {}",
@@ -2670,7 +2589,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(returns(deref), cycle_initial=decorators_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("StaticClassLiteral::decorators: {}", self.name(db));
 
@@ -2782,9 +2701,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
     /// `typing.TypedDict`, either directly or indirectly).
-    #[salsa::tracked(cycle_initial=is_typed_dict_cycle_initial,
-        heap_size=ruff_memory_usage::heap_size
-    )]
+    #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
     pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         if let Some(known) = self.known(db) {
             return known.is_typed_dict_subclass();
@@ -4006,7 +3923,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// See [`StaticClassLiteral::own_fields`] for more details.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=fields_cycle_initial,
+        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
         heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn fields(
         self,
@@ -4784,7 +4701,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_initial=inheritance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///
@@ -4867,7 +4784,7 @@ impl<'db> StaticClassLiteral<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
-    #[salsa::tracked(cycle_initial=crate::types::variance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)

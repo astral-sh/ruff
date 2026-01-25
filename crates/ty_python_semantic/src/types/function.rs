@@ -68,9 +68,9 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
-    report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
-    report_invalid_total_ordering_call,
+    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
+    report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::display::DisplaySettings;
@@ -599,12 +599,11 @@ impl<'db> OverloadLiteral<'db> {
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function()?.node(&module);
+    ) -> (Span, Span) {
+        let file = self.file(db);
+        let span = Span::from(file);
+        let module = parsed_module(db, file).load(db);
+        let func_def = self.node(db, file, &module);
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
@@ -616,26 +615,25 @@ impl<'db> OverloadLiteral<'db> {
             .unwrap_or(func_def.parameters.range);
         let name_span = span.clone().with_range(func_def.name.range);
         let parameter_span = span.with_range(range);
-        Some((name_span, parameter_span))
+        (name_span, parameter_span)
     }
 
-    pub(crate) fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
+    pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
+        let file = self.file(db);
+        let span = Span::from(file);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function()?.node(&module);
+        let func_def = self.node(db, file, &module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
         if let Some(return_type_range) = return_type_range {
             signature = signature.cover(return_type_range);
         }
-        Some(FunctionSpans {
+        FunctionSpans {
             signature: span.clone().with_range(signature),
             name: span.clone().with_range(func_def.name.range),
             parameters: span.clone().with_range(func_def.parameters.range),
             return_type: return_type_range.map(|range| span.clone().with_range(range)),
-        })
+        }
     }
 }
 
@@ -655,14 +653,6 @@ pub struct FunctionLiteral<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionLiteral<'_> {}
-
-fn overloads_and_implementation_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: FunctionLiteral<'db>,
-) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-    (Box::new([]), None)
-}
 
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
@@ -694,15 +684,11 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).definition(db)
     }
 
-    fn parameter_span(
-        self,
-        db: &'db dyn Db,
-        parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
+    fn parameter_span(self, db: &'db dyn Db, parameter_index: Option<usize>) -> (Span, Span) {
         self.last_definition(db).parameter_span(db, parameter_index)
     }
 
-    fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+    fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.last_definition(db).spans(db)
     }
 
@@ -712,8 +698,8 @@ impl<'db> FunctionLiteral<'db> {
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         #[salsa::tracked(
             returns(ref),
+            cycle_initial=|_, _, _| (Box::default(), None),
             heap_size=ruff_memory_usage::heap_size,
-            cycle_initial=overloads_and_implementation_cycle_initial
         )]
         fn overloads_and_implementation_inner<'db>(
             db: &'db dyn Db,
@@ -1000,7 +986,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
+    ) -> (Span, Span) {
         self.literal(db).parameter_span(db, parameter_index)
     }
 
@@ -1017,7 +1003,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// An example of a good use case is to improve
     /// a diagnostic.
-    pub(crate) fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+    pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.literal(db).spans(db)
     }
 
@@ -1057,7 +1043,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::single(Signature::bottom()), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
@@ -1319,14 +1305,6 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-fn signature_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionType<'db>,
-) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom())
-}
-
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
@@ -1579,8 +1557,13 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
                     return;
                 }
-                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                {
+                let diagnostic =
+                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(db, *asserted_ty) {
+                        &TYPE_ASSERTION_FAILURE
+                    } else {
+                        &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
+                    };
+                if let Some(builder) = context.report_lint(diagnostic, call_expression) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
                         asserted_ty.display(db),

@@ -86,7 +86,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
 
 #[salsa::tracked(
     returns(as_ref),
-    cycle_initial=constraints_for_expression_cycle_initial,
+    cycle_initial=|_, _, _| None,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
@@ -100,7 +100,7 @@ fn all_narrowing_constraints_for_expression<'db>(
 
 #[salsa::tracked(
     returns(as_ref),
-    cycle_initial=negative_constraints_for_expression_cycle_initial,
+    cycle_initial=|_, _, _| None,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_negative_narrowing_constraints_for_expression<'db>(
@@ -119,22 +119,6 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
 ) -> Option<NarrowingConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
-}
-
-fn constraints_for_expression_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
-    None
-}
-
-fn negative_constraints_for_expression_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
-    None
 }
 
 /// Functions that can be used to narrow the type of a first argument using a "classinfo" second argument.
