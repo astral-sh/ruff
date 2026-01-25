@@ -362,3 +362,76 @@ def head[T](l: list[T]) -> T:
 def _(x: MyList[int]):
     reveal_type(head(x))  # revealed: int
 ```
+
+## Fully qualified type alias names in error messages
+
+When two type aliases have the same name but are in different scopes, they should be fully qualified
+in error messages to distinguish them:
+
+```py
+class A:
+    class B[T]:
+        pass
+
+    type D = list[int]
+
+class C:
+    class B[T]:
+        pass
+
+    type D = list[str]
+
+def f(b: C.B[C.D]) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.C.B[mdtest_snippet.C.D]` is not assignable to `mdtest_snippet.A.B[mdtest_snippet.A.D]`"
+    a: A.B[A.D] = b
+```
+
+## Fully qualified type alias names in nested classes
+
+Type aliases in nested classes should include the full class path:
+
+```py
+class Outer1:
+    class Inner:
+        type Alias = int
+
+class Outer2:
+    class Inner:
+        type Alias = str
+
+def g(x: Outer1.Inner.Alias, y: Outer2.Inner.Alias) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Outer2.Inner.Alias` is not assignable to `mdtest_snippet.Outer1.Inner.Alias`"
+    a: Outer1.Inner.Alias = y
+```
+
+## Fully qualified generic type aliases
+
+Ambiguous generic type aliases should also be fully qualified:
+
+```py
+class X:
+    type GenAlias[T] = list[T]
+
+class Y:
+    type GenAlias[T] = dict[str, T]
+
+def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Y.GenAlias[int]` is not assignable to `mdtest_snippet.X.GenAlias[int]`"
+    a: X.GenAlias[int] = y
+```
+
+## Non-ambiguous type aliases should not be qualified
+
+Type aliases with unique names should NOT be qualified:
+
+```py
+class P:
+    type UniqueAlias1 = int
+
+class Q:
+    type UniqueAlias2 = str
+
+def i(x: P.UniqueAlias1, y: Q.UniqueAlias2) -> None:
+    # error: [invalid-assignment] "Object of type `UniqueAlias2` is not assignable to `UniqueAlias1`"
+    a: P.UniqueAlias1 = y
+```
