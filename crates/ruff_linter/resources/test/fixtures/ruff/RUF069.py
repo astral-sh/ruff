@@ -42,3 +42,7 @@ def foo(a, b):
     return a == b * float("2")
 
 assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+
+assert (y := x / 2) == 1
+
+assert (0.3 if x > 0 else 1) == 0.1 + 0.2

@@ -145,8 +145,9 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
 
 fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
     match ResolvedPythonType::from(expr) {
-        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float)) => true,
-        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex)) => true,
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float | NumberLike::Complex)) => {
+            true
+        }
         _ => {
             match expr {
                 Expr::Call(ast::ExprCall { func, .. }) => ["float", "complex"]
@@ -166,6 +167,10 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
                     }
                 }
                 Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand, semantic),
+                Expr::Named(ast::ExprNamed { value, .. }) => has_float(value, semantic),
+                Expr::If(ast::ExprIf { body, orelse, .. }) => {
+                    has_float(body, semantic) || has_float(orelse, semantic)
+                }
                 _ => false,
             }
         }
@@ -179,6 +184,7 @@ fn is_numeric_expr(expr: &Expr) -> bool {
             is_numeric_expr(left) || is_numeric_expr(right)
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_expr(operand),
+        Expr::Named(ast::ExprNamed { value, .. }) => is_numeric_expr(value),
         _ => false,
     }
 }

@@ -213,4 +213,26 @@ RUF069 Unreliable floating point equality comparison `complex(0.3, 0.2) == compl
 43 |
 44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | assert (y := x / 2) == 1
+   |
+
+RUF069 Unreliable floating point equality comparison `y := x / 2 == 1`
+  --> RUF069.py:46:9
+   |
+44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+45 |
+46 | assert (y := x / 2) == 1
+   |         ^^^^^^^^^^^^^^^^
+47 |
+48 | assert (0.3 if x > 0 else 1) == 0.1 + 0.2
+   |
+
+RUF069 Unreliable floating point equality comparison `0.3 if x > 0 else 1 == 0.1 + 0.2`
+  --> RUF069.py:48:9
+   |
+46 | assert (y := x / 2) == 1
+47 |
+48 | assert (0.3 if x > 0 else 1) == 0.1 + 0.2
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
