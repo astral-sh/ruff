@@ -223,6 +223,31 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// If there is an `src/__init__.py(i)` file, don't add `./src` as a root.
+/// This is an antipattern (you're meant to have a top-level package directory
+/// *inside* `src/`), but it's a mistake that a surprising number of people make,
+/// and the diagnostic issued by ty is confusing if imports don't work.
+#[test]
+fn src_subdirectory_not_added_as_root_if_src_package_exists() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/__init__.py", ""),
+        ("src/box.py", "class Box: ..."),
+        ("src/test_box.py", "from .box import Box"),
+    ])?;
+
+    // The import is only resolvable because `src` was *not* added as a root.
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// This tests that, even if no Python *version* has been specified on the CLI or in a config file,
 /// ty is still able to infer the Python version from a `--python` argument on the CLI,
 /// *even if* the `--python` argument points to a system installation.
