@@ -3403,6 +3403,14 @@ def function():
         values: list[int] = [1, 2]
         print(values[-1<CURSOR>])
         "#,
+            r#"
+        values: list[int] = [1, 2]
+        print(values[+<CURSOR>1])
+        "#,
+            r#"
+        values: list[int] = [1, 2]
+        print(values[+1<CURSOR>])
+        "#,
         ];
 
         for (index, case) in cases.iter().enumerate() {
@@ -3412,6 +3420,98 @@ def function():
                 hover.lines().next(),
                 Some("int"),
                 "case {index} expected `int` hover, got:\n{hover}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_subscript_slice_literal_bounds_variants() {
+        let list_cases = [
+            (
+                "list[int]",
+                r#"
+        values: list[int] = [1, 2]
+        values[1<CURSOR>:]
+        "#,
+            ),
+            (
+                "list[int]",
+                r#"
+        values: list[int] = [1, 2]
+        values[:<CURSOR>-1]
+        "#,
+            ),
+            (
+                "list[int]",
+                r#"
+        values: list[int] = [1, 2]
+        values[:-<CURSOR>1]
+        "#,
+            ),
+            (
+                "list[int]",
+                r#"
+        values: list[int] = [1, 2]
+        values[: -1<CURSOR>]
+        "#,
+            ),
+            (
+                "list[int]",
+                r#"
+        values: list[int] = [1, 2]
+        values[<CURSOR>:2]
+        "#,
+            ),
+            (
+                "list[int]",
+                r#"
+        values: list[int] = [1, 2]
+        values[:<CURSOR>2]
+        "#,
+            ),
+        ];
+
+        for (index, (expected, case)) in list_cases.iter().enumerate() {
+            let test = cursor_test(case);
+            let hover = test.hover();
+            assert_eq!(
+                hover.lines().next(),
+                Some(*expected),
+                "list case {index} expected `{expected}` hover, got:\n{hover}"
+            );
+        }
+
+        let string_cases = [
+            (
+                "str",
+                r#"
+        def f(s: str):
+            s[<CURSOR>1:-1]
+        "#,
+            ),
+            (
+                "str",
+                r#"
+        def f(s: str):
+            s[1:<CURSOR>-1]
+        "#,
+            ),
+            (
+                "str",
+                r#"
+        def f(s: str):
+            s[1:-<CURSOR>1]
+        "#,
+            ),
+        ];
+
+        for (index, (expected, case)) in string_cases.iter().enumerate() {
+            let test = cursor_test(case);
+            let hover = test.hover();
+            assert_eq!(
+                hover.lines().next(),
+                Some(*expected),
+                "string case {index} expected `{expected}` hover, got:\n{hover}"
             );
         }
     }
