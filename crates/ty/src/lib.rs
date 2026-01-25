@@ -433,6 +433,33 @@ impl MainLoop {
         Ok(ExitStatus::Success)
     }
 
+    fn print_diagnostics(
+        &self,
+        db: &ProjectDatabase,
+        stdout: &mut crate::printer::Stdout,
+        terminal_settings: &TerminalSettings,
+        diagnostics: &[Diagnostic],
+    ) -> anyhow::Result<()> {
+        // Only render diagnostics if they're going to be displayed, since doing
+        // so is expensive.
+
+        if stdout.is_enabled() {
+            let display_config = DisplayDiagnosticConfig::default()
+                .format(terminal_settings.output_format.into())
+                .color(colored::control::SHOULD_COLORIZE.should_colorize())
+                .with_cancellation_token(Some(self.cancellation_token.clone()))
+                .show_fix_diff(true);
+
+            write!(
+                stdout,
+                "{}",
+                DisplayDiagnostics::new(db, &display_config, diagnostics)
+            )?;
+        }
+
+        Ok(())
+    }
+
     fn write_diagnostics(
         &self,
         db: &ProjectDatabase,
@@ -450,34 +477,14 @@ impl MainLoop {
                         "{}",
                         "All checks passed!".green().bold()
                     )?;
-                } else if terminal_settings.output_format
-                    == ty_project::metadata::options::OutputFormat::Gitlab
-                {
-                    // For Gitlab format, write an empty JSON list
-
-                    if stdout.is_enabled() {
-                        writeln!(stdout, "[]")?;
-                    }
+                } else {
+                    self.print_diagnostics(db, &mut stdout, terminal_settings, diagnostics)?;
                 }
             }
             diagnostics => {
                 let diagnostics_count = diagnostics.len();
 
-                // Only render diagnostics if they're going to be displayed, since doing
-                // so is expensive.
-                if stdout.is_enabled() {
-                    let display_config = DisplayDiagnosticConfig::default()
-                        .format(terminal_settings.output_format.into())
-                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
-                        .with_cancellation_token(Some(self.cancellation_token.clone()))
-                        .show_fix_diff(true);
-
-                    write!(
-                        stdout,
-                        "{}",
-                        DisplayDiagnostics::new(db, &display_config, diagnostics)
-                    )?;
-                }
+                self.print_diagnostics(db, &mut stdout, terminal_settings, diagnostics)?;
 
                 if !self.cancellation_token.is_cancelled() && is_human_readable {
                     writeln!(
