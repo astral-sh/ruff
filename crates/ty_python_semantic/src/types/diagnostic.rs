@@ -46,6 +46,9 @@ use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{Module, ModuleName};
 
+const RUNTIME_CHECKABLE_DOCS_URL: &str =
+    "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
+
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
@@ -3618,7 +3621,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
         "A protocol class can only be used in `{function_name}` checks if it is decorated \
             with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
     ));
-    diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
+    diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
 }
 
 pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ranged>(
@@ -3640,12 +3643,12 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
         "A protocol class can only be used in a match class pattern if it is decorated \
             with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`",
     );
-    diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
+    diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
 }
 
-fn add_non_runtime_checkable_protocol_context<'db, 'ctx>(
+fn add_non_runtime_checkable_protocol_context<'db>(
     db: &'db dyn Db,
-    diagnostic: &mut LintDiagnosticGuard<'db, 'ctx>,
+    diagnostic: &mut LintDiagnosticGuard<'db, '_>,
     protocol: ProtocolClass,
 ) {
     let class_name = protocol.name(db);
