@@ -215,7 +215,7 @@ impl PythonEnvironment {
         }
 
         #[cfg(not(target_family = "wasm"))]
-        if let Ok(python_path) = which::which("python3")
+        if let Ok(python_path) = which::which("python3").or_else(|_| which::which("python"))
             && let Some(python_path) = python_path.to_str()
             && let Ok(env) =
                 PythonEnvironment::new(python_path, SysPrefixPathOrigin::PythonBinary, system)
