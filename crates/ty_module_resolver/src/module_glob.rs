@@ -44,7 +44,6 @@
 use std::fmt;
 
 use regex::RegexSet;
-use thiserror::Error;
 
 use crate::ModuleName;
 
@@ -226,7 +225,7 @@ impl ModuleNameMatch {
 }
 
 /// Error type for module glob pattern parsing.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum ModuleGlobError {
     /// The pattern is empty (e.g., `""` or `"!"`).
     #[error("module glob pattern cannot be empty")]
@@ -248,7 +247,7 @@ pub enum ModuleGlobError {
     #[error(
         "`**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `{0}`"
     )]
-    InvalidDoubleStarUsage(String),
+    InvalidDoubleStarUsage(Box<str>),
 
     /// The underlying regex failed to compile (e.g., DFA size limit exceeded).
     #[error("failed to compile module glob pattern")]
@@ -293,9 +292,9 @@ fn glob_to_regex(pattern: &str) -> Result<Box<str>, ModuleGlobError> {
 
         // Check for `**` mixed with other characters.
         if component.contains("**") && component != "**" {
-            return Err(ModuleGlobError::InvalidDoubleStarUsage(
-                component.to_string(),
-            ));
+            return Err(ModuleGlobError::InvalidDoubleStarUsage(Box::from(
+                component,
+            )));
         }
 
         let is_last = components.peek().is_none();

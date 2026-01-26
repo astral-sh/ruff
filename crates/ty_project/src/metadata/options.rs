@@ -449,7 +449,7 @@ impl Options {
 
         if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
             return Err(ToSettingsError {
-                diagnostic: diagnostic.into(),
+                diagnostic: Box::new(diagnostic),
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             });
@@ -1310,17 +1310,11 @@ impl AnalysisOptions {
 
         let allowed_unresolved_imports =
             if let Some(allowed_unresolved_imports) = allowed_unresolved_imports {
-                match build_module_glob_set(
-                    db,
-                    allowed_unresolved_imports,
-                    "allowed_unresolved_imports",
-                ) {
-                    Ok(set) => set,
-                    Err(error) => {
+                build_module_glob_set(db, allowed_unresolved_imports, "allowed_unresolved_imports")
+                    .unwrap_or_else(|error| {
                         diagnostics.push(*error);
                         ModuleGlobSet::empty()
-                    }
-                }
+                    })
             } else {
                 allowed_unresolved_imports_default
             };
@@ -1870,7 +1864,10 @@ impl OptionDiagnostic {
                 } else {
                     self.sub(SubDiagnostic::new(
                         SubDiagnosticSeverity::Info,
-                        format!("The {value_label} is defined in the `{option_name}` option in your configuration file"),
+                        format!(
+                            "The {value_label} is defined in the `{option_name}` option \
+                            in your configuration file"
+                        ),
                     ))
                 }
             }
