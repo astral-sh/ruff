@@ -102,9 +102,9 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct FloatEqualityComparison<'a> {
-    pub left: &'a str,
-    pub right: &'a str,
-    pub operand: &'a str,
+    left: &'a str,
+    right: &'a str,
+    operator: &'a str,
 }
 
 impl Violation for FloatEqualityComparison<'_> {
