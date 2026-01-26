@@ -34,9 +34,7 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
-use crate::types::infer::{
-    infer_expression_type, infer_unpack_types, nearest_enclosing_class,
-};
+use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::relation::{
