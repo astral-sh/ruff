@@ -566,7 +566,7 @@ impl DocumentQuery {
         match self {
             Self::Text { document, .. } => ruff_linter::source_kind::SourceKind::Python(
                 document.contents().to_string(),
-                ruff_python_ast::PySourceType::from(self.virtual_file_path()),
+                ruff_python_ast::PySourceType::from(self.virtual_file_path()).is_stub(),
             ),
             Self::Notebook { notebook, .. } => {
                 ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())

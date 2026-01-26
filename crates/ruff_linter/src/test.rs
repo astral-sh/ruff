@@ -198,7 +198,7 @@ pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic
     let path = Path::new("<filename>");
     let contents = dedent(contents);
     test_contents(
-        &SourceKind::Python(contents.into_owned(), PySourceType::Python),
+        &SourceKind::Python(contents.into_owned(), false),
         path,
         settings,
     )

@@ -18,8 +18,8 @@ use crate::text_helpers::ShowNonprinting;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SourceKind {
-    /// The source contains Python source code.
-    Python(String, PySourceType),
+    /// The source contains Python source codea, and whether it's a stub.
+    Python(String, bool),
     /// The source contains a Jupyter notebook.
     IpyNotebook(Box<Notebook>),
     /// The source contains Markdown text.
@@ -73,6 +73,14 @@ impl SourceKind {
         }
     }
 
+    pub fn py_source_type(&self) -> PySourceType {
+        match self {
+            Self::IpyNotebook(_) => PySourceType::Ipynb,
+            Self::Python(_, true) => PySourceType::Stub,
+            _ => PySourceType::Python,
+        }
+    }
+
     #[must_use]
     pub(crate) fn updated(&self, new_source: String, source_map: &SourceMap) -> Self {
         match self {
@@ -81,9 +89,7 @@ impl SourceKind {
                 cloned.update(source_map, new_source);
                 SourceKind::IpyNotebook(cloned)
             }
-            SourceKind::Python(_, py_source_type) => {
-                SourceKind::Python(new_source, *py_source_type)
-            }
+            SourceKind::Python(_, is_stub) => SourceKind::Python(new_source, *is_stub),
             SourceKind::Markdown(_) => SourceKind::Markdown(new_source),
         }
     }
@@ -108,7 +114,7 @@ impl SourceKind {
             }
             SourceType::Python(py_source_type) => {
                 let contents = std::fs::read_to_string(path)?;
-                Ok(Some(Self::Python(contents, py_source_type)))
+                Ok(Some(Self::Python(contents, py_source_type.is_stub())))
             }
             SourceType::Markdown => {
                 let contents = std::fs::read_to_string(path)?;
@@ -132,7 +138,7 @@ impl SourceKind {
                         .is_python_notebook()
                         .then_some(Self::IpyNotebook(Box::new(notebook))))
                 } else {
-                    Ok(Some(Self::Python(source_code, py_source_type)))
+                    Ok(Some(Self::Python(source_code, py_source_type.is_stub())))
                 }
             }
             SourceType::Toml(_) => Ok(None),

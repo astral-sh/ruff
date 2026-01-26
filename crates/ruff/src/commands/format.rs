@@ -360,8 +360,9 @@ pub(crate) fn format_source(
     range: Option<FormatRange>,
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
-        SourceKind::Python(unformatted, py_source_type) => {
-            let options = settings.to_format_options(*py_source_type, unformatted, path);
+        SourceKind::Python(unformatted, _) => {
+            let py_source_type = source_kind.py_source_type();
+            let options = settings.to_format_options(py_source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -399,7 +400,7 @@ pub(crate) fn format_source(
             } else {
                 Ok(FormattedSource::Formatted(SourceKind::Python(
                     formatted,
-                    *py_source_type,
+                    py_source_type.is_stub(),
                 )))
             }
         }
@@ -1294,7 +1295,7 @@ mod tests {
     #[test]
     fn error_diagnostics() -> anyhow::Result<()> {
         let path = PathBuf::from("test.py");
-        let source_kind = SourceKind::Python("1".to_string(), PySourceType::Python);
+        let source_kind = SourceKind::Python("1".to_string(), false);
 
         let panic_error = catch_unwind(|| {
             panic!("Test panic for FormatCommandError");
@@ -1393,8 +1394,8 @@ mod tests {
         expect_formatted: Range<u32>,
     ) {
         let mr = ModifiedRange::new(
-            &SourceKind::Python(unformatted.to_string(), PySourceType::Python),
-            &SourceKind::Python(formatted.to_string(), PySourceType::Python),
+            &SourceKind::Python(unformatted.to_string(), false),
+            &SourceKind::Python(formatted.to_string(), false),
         );
         assert_eq!(
             mr.unformatted,

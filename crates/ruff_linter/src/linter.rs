@@ -1031,7 +1031,7 @@ mod tests {
         );
         let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
         let contents = std::fs::read_to_string(&path)?;
-        let source_kind = SourceKind::Python(contents, PySourceType::Python);
+        let source_kind = SourceKind::Python(contents, false);
 
         let diagnostics = test_contents_syntax_errors(
             &source_kind,
@@ -1089,7 +1089,7 @@ mod tests {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
         let diagnostics = test_contents_syntax_errors(
-            &SourceKind::Python(std::fs::read_to_string(&path)?, PySourceType::Python),
+            &SourceKind::Python(std::fs::read_to_string(&path)?, false),
             &path,
             &LinterSettings::for_rule(rule),
         );
@@ -1212,7 +1212,7 @@ mod tests {
         let path = Path::new("<filename>.pyi");
         let contents = dedent(contents);
         let diagnostics = test_contents(
-            &SourceKind::Python(contents.into_owned(), PySourceType::Stub),
+            &SourceKind::Python(contents.into_owned(), true),
             path,
             settings,
         )
