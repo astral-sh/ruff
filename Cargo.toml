@@ -116,7 +116,6 @@ indoc = { version = "2.0.4" }
 insta = { version = "1.35.1" }
 insta-cmd = { version = "0.6.0" }
 is-macro = { version = "0.3.5" }
-is-wsl = { version = "0.4.0" }
 itertools = { version = "0.14.0" }
 jiff = { version = "0.2.0" }
 jod-thread = { version = "1.0.0" }
