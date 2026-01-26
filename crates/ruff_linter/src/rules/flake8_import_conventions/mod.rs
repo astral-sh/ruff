@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn custom() -> Result<()> {
-        let mut aliases = default_aliases();
+        let mut aliases = default_aliases(PreviewMode::Disabled);
         aliases.extend(FxHashMap::from_iter([
             ("dask.array".to_string(), "da".to_string()),
             ("dask.dataframe".to_string(), "dd".to_string()),
@@ -75,7 +75,7 @@ mod tests {
             Path::new("flake8_import_conventions/custom_banned.py"),
             &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
-                    aliases: default_aliases(),
+                    aliases: default_aliases(PreviewMode::Disabled),
                     banned_aliases: FxHashMap::from_iter([
                         (
                             "typing".to_string(),
@@ -109,7 +109,7 @@ mod tests {
             Path::new("flake8_import_conventions/custom_banned_from.py"),
             &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
-                    aliases: default_aliases(),
+                    aliases: default_aliases(PreviewMode::Disabled),
                     banned_aliases: FxHashMap::default(),
                     banned_from: FxHashSet::from_iter([
                         "logging.config".to_string(),
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn override_defaults() -> Result<()> {
-        let mut aliases = default_aliases();
+        let mut aliases = default_aliases(PreviewMode::Disabled);
         aliases.extend(FxHashMap::from_iter([(
             "numpy".to_string(),
             "nmp".to_string(),
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn from_imports() -> Result<()> {
-        let mut aliases = default_aliases();
+        let mut aliases = default_aliases(PreviewMode::Disabled);
         aliases.extend(FxHashMap::from_iter([
             ("xml.dom.minidom".to_string(), "md".to_string()),
             (
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn same_name() -> Result<()> {
-        let mut aliases = default_aliases();
+        let mut aliases = default_aliases(PreviewMode::Disabled);
         aliases.extend(FxHashMap::from_iter([(
             "django.conf.settings".to_string(),
             "settings".to_string(),

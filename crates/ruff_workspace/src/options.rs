@@ -1663,7 +1663,7 @@ impl Flake8ImportConventionsOptions {
                 .into_iter()
                 .map(|(module, alias)| (module.into_string(), alias.into_string()))
                 .collect(),
-            None => flake8_import_conventions::settings::default_aliases(),
+            None => flake8_import_conventions::settings::default_aliases(preview),
         };
         if let Some(extend_aliases) = self.extend_aliases {
             aliases.extend(
@@ -1671,11 +1671,6 @@ impl Flake8ImportConventionsOptions {
                     .into_iter()
                     .map(|(module, alias)| (module.into_string(), alias.into_string())),
             );
-        }
-
-        // Merge preview aliases if preview mode is enabled
-        if preview.is_enabled() {
-            aliases.extend(flake8_import_conventions::settings::preview_aliases());
         }
 
         let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
@@ -1689,12 +1684,9 @@ impl Flake8ImportConventionsOptions {
             normalized_aliases.insert(module, normalized_alias);
         }
 
-        let mut banned_aliases = self.banned_aliases.unwrap_or_default();
-
-        // Merge preview banned aliases if preview mode is enabled
-        if preview.is_enabled() {
-            banned_aliases.extend(flake8_import_conventions::settings::preview_banned_aliases());
-        }
+        let banned_aliases = self.banned_aliases.unwrap_or_else(|| {
+            flake8_import_conventions::settings::default_banned_aliases(preview)
+        });
 
         Ok(flake8_import_conventions::settings::Settings {
             aliases: normalized_aliases,

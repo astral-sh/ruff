@@ -70,11 +70,24 @@ pub struct Settings {
     pub banned_from: FxHashSet<String>,
 }
 
-pub fn default_aliases() -> FxHashMap<String, String> {
-    CONVENTIONAL_ALIASES
+pub fn default_aliases(preview: PreviewMode) -> FxHashMap<String, String> {
+    let mut aliases = CONVENTIONAL_ALIASES
         .iter()
         .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-        .collect::<FxHashMap<_, _>>()
+        .collect::<FxHashMap<_, _>>();
+
+    if preview.is_enabled() {
+        aliases.extend(preview_aliases());
+    }
+    aliases
+}
+
+pub fn default_banned_aliases(preview: PreviewMode) -> FxHashMap<String, BannedAliases> {
+    let mut banned_aliases = FxHashMap::default();
+    if preview.is_enabled() {
+        banned_aliases.extend(preview_banned_aliases());
+    }
+    banned_aliases
 }
 
 pub fn preview_aliases() -> FxHashMap<String, String> {
@@ -93,17 +106,9 @@ pub fn preview_banned_aliases() -> FxHashMap<String, BannedAliases> {
 
 impl Settings {
     pub fn new(preview: PreviewMode) -> Self {
-        let mut aliases = default_aliases();
-        let mut banned_aliases = FxHashMap::default();
-
-        if preview.is_enabled() {
-            aliases.extend(preview_aliases());
-            banned_aliases.extend(preview_banned_aliases());
-        }
-
         Self {
-            aliases,
-            banned_aliases,
+            aliases: default_aliases(preview),
+            banned_aliases: default_banned_aliases(preview),
             banned_from: FxHashSet::default(),
         }
     }
@@ -112,8 +117,8 @@ impl Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            aliases: default_aliases(),
-            banned_aliases: FxHashMap::default(),
+            aliases: default_aliases(PreviewMode::Disabled),
+            banned_aliases: default_banned_aliases(PreviewMode::Disabled),
             banned_from: FxHashSet::default(),
         }
     }
