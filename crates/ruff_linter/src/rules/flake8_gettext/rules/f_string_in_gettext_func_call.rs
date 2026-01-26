@@ -53,7 +53,8 @@ impl Violation for FStringInGetTextFuncCall {
         if self.is_plural {
             "f-string in plural argument is resolved before function call".to_string()
         } else {
-            "f-string is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
+            "f-string is resolved before function call; consider `_(\"string %s\") % arg`"
+                .to_string()
         }
     }
 }
@@ -71,7 +72,10 @@ pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, args
     if is_ngettext_call(checker, func) {
         if let Some(second) = args.get(1) {
             if second.is_f_string_expr() {
-                checker.report_diagnostic(FStringInGetTextFuncCall { is_plural: true }, second.range());
+                checker.report_diagnostic(
+                    FStringInGetTextFuncCall { is_plural: true },
+                    second.range(),
+                );
             }
         }
     }

@@ -65,7 +65,10 @@ pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
         if let Expr::Call(ast::ExprCall { func, .. }) = &first {
             if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
                 if attr == "format" {
-                    checker.report_diagnostic(FormatInGetTextFuncCall { is_plural: false }, first.range());
+                    checker.report_diagnostic(
+                        FormatInGetTextFuncCall { is_plural: false },
+                        first.range(),
+                    );
                 }
             }
         }
@@ -77,7 +80,10 @@ pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
             if let Expr::Call(ast::ExprCall { func, .. }) = &second {
                 if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
                     if attr == "format" {
-                        checker.report_diagnostic(FormatInGetTextFuncCall { is_plural: true }, second.range());
+                        checker.report_diagnostic(
+                            FormatInGetTextFuncCall { is_plural: true },
+                            second.range(),
+                        );
                     }
                 }
             }

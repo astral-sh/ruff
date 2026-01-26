@@ -69,7 +69,8 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
         }) = &first
         {
             if left.is_string_literal_expr() {
-                checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: false }, first.range());
+                checker
+                    .report_diagnostic(PrintfInGetTextFuncCall { is_plural: false }, first.range());
             }
         }
     }
@@ -84,7 +85,10 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
             }) = &second
             {
                 if left.is_string_literal_expr() {
-                    checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: true }, second.range());
+                    checker.report_diagnostic(
+                        PrintfInGetTextFuncCall { is_plural: true },
+                        second.range(),
+                    );
                 }
             }
         }

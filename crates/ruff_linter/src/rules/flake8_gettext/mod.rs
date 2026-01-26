@@ -16,7 +16,7 @@ pub(crate) fn is_ngettext_call(checker: &Checker, func: &Expr) -> bool {
             return true;
         }
     }
-    
+
     // Check qualified name (e.g., `gettext_mod.ngettext(...)`)
     checker
         .semantic()
