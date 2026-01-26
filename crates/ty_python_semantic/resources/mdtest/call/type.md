@@ -822,6 +822,15 @@ class Y(type("X", (NamedTuple("NT", [("field", "Y | int")]),), {})): ...
 reveal_type(Y)  # revealed: <class 'Y'>
 ```
 
+Forward references via subscript annotations on generic bases are supported:
+
+```py
+# Forward reference to X via subscript annotation in tuple base
+# (This fails at runtime, but we should handle it without panicking)
+X = type("X", (tuple["X | None"],), {})
+reveal_type(X)  # revealed: <class 'X'>
+```
+
 ## Dynamic class names (non-literal strings)
 
 When the class name is not a string literal, we still create a class literal type but with a
