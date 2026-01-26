@@ -102,9 +102,9 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct FloatEqualityComparison<'a> {
-    pub left: &'a str,
-    pub right: &'a str,
-    pub operand: &'a str,
+    left: &'a str,
+    right: &'a str,
+    operator: &'a str,
 }
 
 impl Violation for FloatEqualityComparison<'_> {
@@ -113,9 +113,9 @@ impl Violation for FloatEqualityComparison<'_> {
         let FloatEqualityComparison {
             left,
             right,
-            operand,
+            operator,
         } = self;
-        format!("Unreliable floating point equality comparison `{left} {operand} {right}`")
+        format!("Unreliable floating point equality comparison `{left} {operator} {right}`")
     }
 }
 
@@ -124,7 +124,7 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
     let locator = checker.locator();
     let semantic = checker.semantic();
 
-    for (left, right, operand) in std::iter::once(&*compare.left)
+    for (left, right, operator) in std::iter::once(&*compare.left)
         .chain(&compare.comparators)
         .tuple_windows()
         .zip(&compare.ops)
@@ -136,7 +136,7 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
             FloatEqualityComparison {
                 left: locator.slice(left.range()),
                 right: locator.slice(right.range()),
-                operand: operand.as_str(),
+                operator: operator.as_str(),
             },
             TextRange::new(left.start(), right.end()),
         );
@@ -166,11 +166,7 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
                         _ => has_float(left, semantic) || has_float(right, semantic),
                     }
                 }
-                Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand, semantic),
                 Expr::Named(ast::ExprNamed { value, .. }) => has_float(value, semantic),
-                Expr::If(ast::ExprIf { body, orelse, .. }) => {
-                    has_float(body, semantic) || has_float(orelse, semantic)
-                }
                 _ => false,
             }
         }
