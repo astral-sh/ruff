@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast};
-use ruff_python_semantic::Modules;
+use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::{BindingKind, Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -54,11 +54,11 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    if call
-        .func
-        .as_attribute_expr()
-        .is_none_or(|attr| attr.attr.as_str() != "extractall")
-    {
+    let Some(attr) = call.func.as_attribute_expr() else {
+        return;
+    };
+
+    if attr.attr.as_str() != "extractall" {
         return;
     }
 
@@ -71,5 +71,49 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
+    if let Some(name) = attr.value.as_name_expr() {
+        if let Some(binding_id) = checker.semantic().resolve_name(name) {
+            let binding = checker.semantic().binding(binding_id);
+            if matches!(binding.kind, BindingKind::WithItemVar) {
+                if let Some(Stmt::With(ast::StmtWith { items, .. })) =
+                    binding.statement(checker.semantic())
+                {
+                    if let Some(item) = items.iter().find(|item| {
+                        item.optional_vars.as_ref().is_some_and(|vars| {
+                            vars.as_name_expr().is_some_and(|n| n.id == name.id)
+                        })
+                    }) {
+                        if is_zipfile(&item.context_expr, checker.semantic()) {
+                            return;
+                        }
+                    }
+                }
+            } else if matches!(binding.kind, BindingKind::Assignment) {
+                if let Some(
+                    Stmt::Assign(ast::StmtAssign { value, .. })
+                    | Stmt::AnnAssign(ast::StmtAnnAssign {
+                        value: Some(value), ..
+                    }),
+                ) = binding.statement(checker.semantic())
+                {
+                    if is_zipfile(value, checker.semantic()) {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     checker.report_diagnostic(TarfileUnsafeMembers, call.func.range());
+}
+
+fn is_zipfile(expr: &Expr, semantic: &SemanticModel) -> bool {
+    let expr = if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+        func.as_ref()
+    } else {
+        expr
+    };
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["zipfile", "ZipFile"]))
 }
