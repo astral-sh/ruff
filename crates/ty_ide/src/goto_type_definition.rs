@@ -764,7 +764,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -818,7 +836,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -904,7 +940,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "MyClass | No" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -918,7 +972,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:15
+          |
+        2 | a: "MyClass | No" = 1
+          |               ^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | -------
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
+        "#);
     }
 
     #[test]

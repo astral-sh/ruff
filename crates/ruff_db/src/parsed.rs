@@ -198,12 +198,15 @@ mod indexed {
         // Because these are 32-bit, you would need *gigabytes* of code in
         // a single python file to cause any conflicts, so we don't try to
         // handle those conflicts at all.
-        let index = if let Some(parent) = parent_node_index.as_u32() {
-            let space = parent.leading_zeros();
-            parent << space.saturating_sub(1) | (1 << 31)
-        } else {
-            0
-        };
+        //
+        // We panic here if no proper parent because this really should never
+        // happen and if it does any fallback we do will break invariants
+        // that code needs to depend on.
+        let parent = parent_node_index
+            .as_u32()
+            .expect("Indexed string annotations must have a valid parent node index");
+        let space = parent.leading_zeros();
+        let index = parent << space.saturating_sub(1) | (1 << 31);
 
         let mut visitor = Visitor {
             nodes: Some(Vec::new()),

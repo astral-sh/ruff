@@ -975,9 +975,15 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
         some docs
 
         ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
         some docs
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -1020,9 +1026,15 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
         some docs
 
         ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
         some docs
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -1078,9 +1090,15 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
         some docs
 
         ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
         some docs
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -1108,7 +1126,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:15
+          |
+        2 | a: "MyClass | No" = 1
+          |               ^-
+          |               ||
+          |               |Cursor offset
+          |               source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
     }
 
     #[test]

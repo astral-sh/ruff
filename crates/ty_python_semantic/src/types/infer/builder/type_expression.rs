@@ -609,13 +609,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     element_ty.exact_tuple_instance_spec(builder.db()).is_none()
                 }
                 ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-                    let value_ty = if builder.deferred_state.in_string_annotation() {
-                        // Using `.expression_type` does not work in string annotations, because
-                        // we do not store types for sub-expressions. Re-infer the type here.
-                        builder.infer_expression(value, TypeContext::default())
-                    } else {
-                        builder.expression_type(value)
-                    };
+                    let value_ty = builder.expression_type(value);
 
                     value_ty == Type::SpecialForm(SpecialFormType::Unpack)
                 }
