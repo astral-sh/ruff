@@ -779,6 +779,65 @@ def _(
     reveal_type(f(*args6))  # revealed: int
 ```
 
+### Variable-length unpacking with explicit keyword arguments
+
+When a variable-length iterable (like a list) is unpacked and followed by explicit keyword
+arguments, the variadic unpacking should not greedily consume parameters that have explicit keyword
+bindings. This prevents false positive "parameter already assigned" errors.
+
+Regression test for <https://github.com/astral-sh/ty/issues/1584>.
+
+```py
+from typing import TypedDict
+
+def f(a: str, b: str, c: float) -> None: ...
+
+# Explicit keyword argument takes precedence over variable-length variadic expansion.
+# The list unpacking should only fill `a` and `b`, leaving `c` for the keyword argument.
+def _(args: list[str]) -> None:
+    f(*args, c=1.0)
+
+# Fixed-length tuple unpacking with keyword argument also works correctly.
+def _(args: tuple[str, str]) -> None:
+    f(*args, c=1.0)
+
+# But, with a fixed-length tuple that is too long, we get the expected error.
+def _(args: tuple[str, str, str]) -> None:
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int | float`, found `str`"
+    # error: [parameter-already-assigned] "Multiple values provided for parameter `c` of function `f`"
+    f(*args, c=1.0)
+```
+
+However, when there's no explicit keyword argument, the behavior remains conservative:
+
+```py
+# Positional argument after variable-length variadic is ambiguous
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    f(*args, 1.0)
+
+# Multiple variable-length variadics are also ambiguous
+def _(args1: list[str], args2: list[float]) -> None:
+    # error: [invalid-argument-type]
+    f(*args1, *args2)
+
+# Keyword variadic (**dict) with unknown keys is also ambiguous
+def _(args: list[str], kwargs: dict[str, float]) -> None:
+    # error: [invalid-argument-type]
+    f(*args, **kwargs)
+
+# Keyword variadic with TypedDict has known keys but is still handled conservatively
+# but we could possibly improve this in the future.
+class CKwargs(TypedDict):
+    c: float
+
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [parameter-already-assigned]
+    f(*args, **CKwargs(c=1.0))
+```
+
 ### Keyword argument, positional-or-keyword parameter
 
 ```py
@@ -1322,4 +1381,51 @@ def f(**kwargs: _T) -> _T:
     return kwargs["a"]
 
 reveal_type(f(**Foo(a=1, b="b")))  # revealed: int | str
+```
+
+## Non-iterable variadic argument
+
+A starred argument must be iterable. If it is not, an error should be reported.
+
+```py
+def some_fn(a: int):
+    pass
+
+# error: [not-iterable] "Object of type `None` is not iterable"
+some_fn(*None)
+```
+
+This also applies when the type might not be iterable:
+
+```py
+def f(*args: int) -> int:
+    return 1
+
+def _(x: int | list[int]):
+    # error: [not-iterable] "Object of type `int | list[int]` may not be iterable"
+    f(*x)
+```
+
+## Non-iterable variadic argument with overloaded functions
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def foo(a: int) -> tuple[int]: ...
+@overload
+def foo(a: int, b: int) -> tuple[int, int]: ...
+```
+
+```py
+from overloaded import foo
+
+# error: [not-iterable] "Object of type `None` is not iterable"
+foo(*None)
+
+def _(arg: int):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    foo(*arg)
 ```

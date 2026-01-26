@@ -874,32 +874,13 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
-fn place_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _scope: ScopeId<'db>,
-    _place_id: ScopedPlaceId,
-    _requires_explicit_reexport: RequiresExplicitReExport,
-    _considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(id)).into()
-}
-
-#[allow(clippy::too_many_arguments)]
-fn place_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_place: &PlaceAndQualifiers<'db>,
-    place: PlaceAndQualifiers<'db>,
-    _scope: ScopeId<'db>,
-    _place_id: ScopedPlaceId,
-    _requires_explicit_reexport: RequiresExplicitReExport,
-    _considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    place.cycle_normalized(db, *previous_place, cycle)
-}
-
-#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+    cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
+        place.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -1756,7 +1737,7 @@ pub(crate) mod implicit_globals {
     /// so the cost of hashing the names is likely to be more expensive than it's worth.
     #[salsa::tracked(
         returns(deref),
-        cycle_initial=module_type_symbols_initial,
+        cycle_initial=|_, _| smallvec::SmallVec::default(),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
@@ -1786,13 +1767,6 @@ pub(crate) mod implicit_globals {
             })
             .cloned()
             .collect()
-    }
-
-    fn module_type_symbols_initial(
-        _db: &dyn Db,
-        _id: salsa::Id,
-    ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        smallvec::SmallVec::default()
     }
 
     /// Returns an iterator over all implicit module global symbols and their types.

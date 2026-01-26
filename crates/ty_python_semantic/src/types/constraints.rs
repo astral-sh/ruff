@@ -84,7 +84,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
     UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxIndexMap, FxOrderSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -147,13 +147,8 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::never();
-        for child in self {
-            if result.union(db, f(child)).is_always_satisfied(db) {
-                return result;
-            }
-        }
-        result
+        let node = Node::distributed_or(db, self.map(|element| f(element).node));
+        ConstraintSet { node }
     }
 
     fn when_all<'db>(
@@ -161,13 +156,8 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always();
-        for child in self {
-            if result.intersect(db, f(child)).is_never_satisfied(db) {
-                return result;
-            }
-        }
-        result
+        let node = Node::distributed_and(db, self.map(|element| f(element).node));
+        ConstraintSet { node }
     }
 }
 
@@ -1174,6 +1164,104 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Combine an iterator of nodes into a single node using an associative operator.
+    ///
+    /// Because the operator is associative, we don't have to combine the nodes left to right; we
+    /// can instead combine them in a "tree-like" way:
+    ///
+    /// ```text
+    /// linear:  (((((a ∨ b) ∨ c) ∨ d) ∨ e) ∨ f) ∨ g
+    /// tree:    ((a ∨ b) ∨ (c ∨ d)) ∨ ((e ∨ f) ∨ g)
+    /// ```
+    ///
+    /// We have to invoke the operator the same number of times. But BDD operators are often much
+    /// cheaper when the operands are small, and with the tree shape, many more of the invocations
+    /// are performed on small BDDs.
+    ///
+    /// You must also provide the "zero" and "one" units of the operator. The "zero" is the value
+    /// that has no effect (`0 ∨ a = a`). It is returned if the iterator is empty. The "one" is the
+    /// value that saturates (`1 ∨ a = 1`). We use this to short-circuit; if any element BDD or any
+    /// intermediate result evaluates to "one", we can return early.
+    fn tree_fold(
+        db: &'db dyn Db,
+        nodes: impl Iterator<Item = Self>,
+        zero: Self,
+        one: Self,
+        mut combine: impl FnMut(Self, &'db dyn Db, Self) -> Self,
+    ) -> Self {
+        // To implement the "linear" shape described above, we could collect the iterator elements
+        // into a vector, and then use the fold at the bottom of this method to combine the
+        // elements using the operator.
+        //
+        // To implement the "tree" shape, we also maintain a "depth" for each element of the
+        // vector, which indicates how many times the operator has been applied to the element.
+        // As we collect elements into the vector, we keep it capped at a length `O(log n)` of the
+        // number of elements seen so far. To do that, whenever the last two elements of the vector
+        // have the same depth, we apply the operator once to combine those two elements, adding
+        // the result back to the vector with an incremented depth. (That might let us combine the
+        // result with the _next_ intermediate result in the vector, and so on.)
+        //
+        // Walking through the example above, our vector ends up looking like:
+        //
+        //                                a/0
+        //                     a/0 b/0 => ab/1
+        //                                ab/1 c/0
+        //   ab/1 c/0 d/0 => ab/1 cd/1 => abcd/2
+        //                                abcd/2 e/0
+        //              abcd/2 e/0 f/0 => abcd/2 ef/1
+        //                                abcd/2 ef/1 g/0
+        //
+        // We use a SmallVec for the accumulator so that we don't have to spill over to the heap
+        // until the iterator passes 256 elements.
+        let mut accumulator: SmallVec<[(Node<'db>, u8); 8]> = SmallVec::default();
+        for node in nodes {
+            if node == one {
+                return one;
+            }
+
+            let (mut node, mut depth) = (node, 0);
+            while accumulator
+                .last()
+                .is_some_and(|(_, existing)| *existing == depth)
+            {
+                let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
+                node = combine(existing, db, node);
+                if node == one {
+                    return one;
+                }
+                depth += 1;
+            }
+            accumulator.push((node, depth));
+        }
+
+        // At this point, we've consumed all of the iterator. The length of the accumulator will be
+        // the same as the number of 1 bits in the length of the iterator. We do a final fold to
+        // produce the overall result.
+        accumulator
+            .into_iter()
+            .fold(zero, |result, (node, _)| combine(result, db, node))
+    }
+
+    fn distributed_or(db: &'db dyn Db, nodes: impl Iterator<Item = Node<'db>>) -> Self {
+        Self::tree_fold(
+            db,
+            nodes,
+            Node::AlwaysFalse,
+            Node::AlwaysTrue,
+            Self::or_with_offset,
+        )
+    }
+
+    fn distributed_and(db: &'db dyn Db, nodes: impl Iterator<Item = Node<'db>>) -> Self {
+        Self::tree_fold(
+            db,
+            nodes,
+            Node::AlwaysTrue,
+            Node::AlwaysFalse,
+            Self::and_with_offset,
+        )
+    }
+
     /// Returns the `and` or intersection of two BDDs.
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
@@ -1785,56 +1873,66 @@ impl<'db> Node<'db> {
             db: &'db dyn Db,
             node: Node<'db>,
             prefix: &'a dyn Display,
+            seen: RefCell<FxIndexSet<InteriorNode<'db>>>,
         }
 
-        impl<'a, 'db> DisplayNode<'a, 'db> {
-            fn new(db: &'db dyn Db, node: Node<'db>, prefix: &'a dyn Display) -> Self {
-                Self { db, node, prefix }
+        fn format_node<'db>(
+            db: &'db dyn Db,
+            node: Node<'db>,
+            prefix: &dyn Display,
+            seen: &RefCell<FxIndexSet<InteriorNode<'db>>>,
+            f: &mut std::fmt::Formatter<'_>,
+        ) -> std::fmt::Result {
+            match node {
+                Node::AlwaysTrue => write!(f, "always"),
+                Node::AlwaysFalse => write!(f, "never"),
+                Node::Interior(interior) => {
+                    let (index, is_new) = seen.borrow_mut().insert_full(interior);
+                    if !is_new {
+                        return write!(f, "<{index}> SHARED");
+                    }
+                    write!(
+                        f,
+                        "<{index}> {} {}/{}",
+                        interior.constraint(db).display(db),
+                        interior.source_order(db),
+                        interior.max_source_order(db),
+                    )?;
+                    // Calling display_graph recursively here causes rustc to claim that the
+                    // expect(unused) up above is unfulfilled!
+                    write!(f, "\n{prefix}┡━₁ ",)?;
+                    format_node(
+                        db,
+                        interior.if_true(db),
+                        &format_args!("{prefix}│   ",),
+                        seen,
+                        f,
+                    )?;
+                    write!(f, "\n{prefix}└─₀ ",)?;
+                    format_node(
+                        db,
+                        interior.if_false(db),
+                        &format_args!("{prefix}    ",),
+                        seen,
+                        f,
+                    )?;
+                    Ok(())
+                }
             }
         }
 
         impl Display for DisplayNode<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.node {
-                    Node::AlwaysTrue => write!(f, "always"),
-                    Node::AlwaysFalse => write!(f, "never"),
-                    Node::Interior(interior) => {
-                        write!(
-                            f,
-                            "{} {}/{}",
-                            interior.constraint(self.db).display(self.db),
-                            interior.source_order(self.db),
-                            interior.max_source_order(self.db),
-                        )?;
-                        // Calling display_graph recursively here causes rustc to claim that the
-                        // expect(unused) up above is unfulfilled!
-                        write!(
-                            f,
-                            "\n{}┡━₁ {}",
-                            self.prefix,
-                            DisplayNode::new(
-                                self.db,
-                                interior.if_true(self.db),
-                                &format_args!("{}│   ", self.prefix)
-                            ),
-                        )?;
-                        write!(
-                            f,
-                            "\n{}└─₀ {}",
-                            self.prefix,
-                            DisplayNode::new(
-                                self.db,
-                                interior.if_false(self.db),
-                                &format_args!("{}    ", self.prefix)
-                            ),
-                        )?;
-                        Ok(())
-                    }
-                }
+                format_node(self.db, self.node, self.prefix, &self.seen, f)
             }
         }
 
-        DisplayNode::new(db, self, prefix)
+        DisplayNode {
+            db,
+            node: self,
+            prefix,
+            seen: RefCell::default(),
+        }
     }
 }
 
@@ -4002,30 +4100,18 @@ mod tests {
     #[test]
     fn test_display_graph_output() {
         let expected = indoc! {r#"
-            (U = bool) 2/4
-            ┡━₁ (U = str) 1/4
-            │   ┡━₁ (T = bool) 4/4
-            │   │   ┡━₁ (T = str) 3/3
+            <0> (U = bool) 2/4
+            ┡━₁ <1> (U = str) 1/4
+            │   ┡━₁ <2> (T = bool) 4/4
+            │   │   ┡━₁ <3> (T = str) 3/3
             │   │   │   ┡━₁ always
             │   │   │   └─₀ always
-            │   │   └─₀ (T = str) 3/3
+            │   │   └─₀ <4> (T = str) 3/3
             │   │       ┡━₁ always
             │   │       └─₀ never
-            │   └─₀ (T = bool) 4/4
-            │       ┡━₁ (T = str) 3/3
-            │       │   ┡━₁ always
-            │       │   └─₀ always
-            │       └─₀ (T = str) 3/3
-            │           ┡━₁ always
-            │           └─₀ never
-            └─₀ (U = str) 1/4
-                ┡━₁ (T = bool) 4/4
-                │   ┡━₁ (T = str) 3/3
-                │   │   ┡━₁ always
-                │   │   └─₀ always
-                │   └─₀ (T = str) 3/3
-                │       ┡━₁ always
-                │       └─₀ never
+            │   └─₀ <2> SHARED
+            └─₀ <5> (U = str) 1/4
+                ┡━₁ <2> SHARED
                 └─₀ never
         "#}
         .trim_end();

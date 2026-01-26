@@ -285,6 +285,10 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
+        if is_ignored_variable_assignment_target(expr) {
+            return;
+        }
+
         if let Some(inlay_hint) = InlayHint::variable_type(expr, rhs, ty, self.db, allow_edits) {
             self.hints.push(inlay_hint);
         }
@@ -496,6 +500,17 @@ fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bo
     true
 }
 
+fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
+    let Expr::Name(name) = expr else {
+        return false;
+    };
+
+    let name = name.id.as_str();
+    let is_dunder = name.starts_with("__") && name.ends_with("__") && name.len() > 4;
+
+    name.starts_with('_') && !is_dunder
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -580,10 +595,7 @@ mod tests {
         ///
         /// [`inlay_hints_with_settings`]: Self::inlay_hints_with_settings
         fn inlay_hints(&mut self) -> String {
-            self.inlay_hints_with_settings(&InlayHintSettings {
-                variable_types: true,
-                call_argument_names: true,
-            })
+            self.inlay_hints_with_settings(&InlayHintSettings::default())
         }
 
         fn with_extra_file(&mut self, file_name: &str, content: &str) {
@@ -1031,6 +1043,141 @@ mod tests {
         10 | x4[: int], y4[: str] = (x3, y3)
            |                 ^^^
            |
+        "#);
+    }
+
+    #[test]
+    fn test_leading_underscore_variable_assignment_has_no_type_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+
+            _ = i(1)
+            _ignored = i(1)
+            __ignored = i(1)
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def i(x: int, /) -> int:
+            return x
+
+        _ = i(1)
+        _ignored = i(1)
+        __ignored = i(1)
+        "#);
+    }
+
+    #[test]
+    fn test_leading_underscore_variable_in_tuple_assignment_has_no_type_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+            def s(x: str, /) -> str:
+                return x
+
+            x, _ignored = (i(1), s('abc'))
+            __ignored, y = (i(1), s('abc'))
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x[: int], _ignored = (i(1), s('abc'))
+        __ignored, y[: str] = (i(1), s('abc'))
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:7:5
+          |
+        5 |     return x
+        6 |
+        7 | x[: int], _ignored = (i(1), s('abc'))
+          |     ^^^
+        8 | __ignored, y[: str] = (i(1), s('abc'))
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:8:16
+          |
+        7 | x[: int], _ignored = (i(1), s('abc'))
+        8 | __ignored, y[: str] = (i(1), s('abc'))
+          |                ^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_dunder_variable_assignment_has_type_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+
+            __special__ = i(1)
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def i(x: int, /) -> int:
+            return x
+
+        __special__[: int] = i(1)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:5:15
+          |
+        3 |     return x
+        4 |
+        5 | __special__[: int] = i(1)
+          |               ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+
+        __special__: int = i(1)
         "#);
     }
 

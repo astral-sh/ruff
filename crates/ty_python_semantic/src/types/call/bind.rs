@@ -2502,15 +2502,12 @@ impl<'db> CallableBinding<'db> {
                     let (overloads, implementation) =
                         function.overloads_and_implementation(context.db());
 
-                    if let Some(spans) = overloads
-                        .first()
-                        .and_then(|overload| overload.spans(context.db()))
-                    {
+                    if let Some(overload) = overloads.first() {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "First overload defined here",
                         );
-                        sub.annotate(Annotation::primary(spans.signature));
+                        sub.annotate(Annotation::primary(overload.spans(context.db()).signature));
                         diag.sub(sub);
                     }
 
@@ -2532,14 +2529,14 @@ impl<'db> CallableBinding<'db> {
                         ));
                     }
 
-                    if let Some(spans) =
-                        implementation.and_then(|function| function.spans(context.db()))
-                    {
+                    if let Some(implementation) = implementation {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "Overload implementation defined here",
                         );
-                        sub.annotate(Annotation::primary(spans.signature));
+                        sub.annotate(Annotation::primary(
+                            implementation.spans(context.db()).signature,
+                        ));
                         diag.sub(sub);
                     }
                 }
@@ -2656,15 +2653,32 @@ struct ArgumentMatcher<'a, 'db> {
     first_excess_positional: Option<usize>,
     num_synthetic_args: usize,
     variadic_argument_matched_to_variadic_parameter: bool,
+
+    /// Parameter indices that have explicit keyword arguments (e.g., `foo=value`).
+    ///
+    /// This is used to prevent variadic arguments from greedily matching parameters that will be
+    /// explicitly provided via keyword arguments.
+    explicit_keyword_parameters: FxHashSet<usize>,
 }
 
 impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     fn new(
-        arguments: &CallArguments,
+        arguments: &CallArguments<'a, 'db>,
         parameters: &'a Parameters<'db>,
         argument_forms: &'a mut ArgumentForms,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
+        let explicit_keyword_parameters: FxHashSet<usize> = arguments
+            .iter()
+            .filter_map(|(argument, _)| {
+                if let Argument::Keyword(name) = argument {
+                    parameters.keyword_by_name(name).map(|(idx, _)| idx)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         Self {
             parameters,
             argument_forms,
@@ -2675,6 +2689,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             first_excess_positional: None,
             num_synthetic_args: 0,
             variadic_argument_matched_to_variadic_parameter: false,
+            explicit_keyword_parameters,
         }
     }
 
@@ -2889,13 +2904,20 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
 
         // If the tuple is variable-length, we assume that it will soak up all remaining positional
-        // parameters.
+        // parameters, stopping only when we reach a parameter that has an explicit keyword argument
+        // or a parameter that can only be provided via keyword argument.
         if is_variable {
             while self
                 .parameters
                 .get_positional(self.next_positional)
                 .is_some()
             {
+                if self
+                    .explicit_keyword_parameters
+                    .contains(&self.next_positional)
+                {
+                    break;
+                }
                 self.match_positional(
                     argument_index,
                     argument,
@@ -3013,6 +3035,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             });
         }
 
+        // For ParamSpec parameters, both *args and **kwargs are required since we don't know
+        // what arguments the underlying callable expects. For all other callables, variadic
+        // and keyword_variadic parameters are optional.
+        let paramspec_parameters = self.parameters.as_paramspec().is_some();
+
         let mut missing = vec![];
         for (
             index,
@@ -3027,11 +3054,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     continue;
                 }
                 let param = &self.parameters[index];
-                if param.is_variadic()
-                    || param.is_keyword_variadic()
+                if !paramspec_parameters && (param.is_variadic() || param.is_keyword_variadic())
                     || param.default_type().is_some()
                 {
                     // variadic/keywords and defaulted arguments are not required
+                    // (unless the parameters represent a ParamSpec)
                     continue;
                 }
                 missing.push(ParameterContext::new(param, index, false));
@@ -3040,6 +3067,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         if !missing.is_empty() {
             self.errors.push(BindingError::MissingArguments {
                 parameters: ParameterContexts(missing),
+                paramspec: self.parameters.as_paramspec(),
             });
         }
 
@@ -4210,6 +4238,10 @@ pub(crate) enum BindingError<'db> {
     /// One or more required parameters (that is, with no default) is not supplied by any argument.
     MissingArguments {
         parameters: ParameterContexts,
+        /// If the missing arguments are for a `ParamSpec`, this contains the `ParamSpec` typevar.
+        /// This is used to provide more informative error messages explaining why `*args` and
+        /// `**kwargs` are required.
+        paramspec: Option<BoundTypeVarInstance<'db>>,
     },
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
@@ -4421,15 +4453,13 @@ impl<'db> BindingError<'db> {
                 }
 
                 if let Some(matching_overload) = matching_overload {
-                    if let Some((name_span, parameter_span)) =
-                        matching_overload.get(context.db()).and_then(|overload| {
-                            overload.parameter_span(context.db(), Some(parameter.index))
-                        })
-                    {
+                    if let Some(overload_literal) = matching_overload.get(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "Matching overload defined here",
                         );
+                        let (name_span, parameter_span) =
+                            overload_literal.parameter_span(context.db(), Some(parameter.index));
                         sub.annotate(Annotation::primary(name_span));
                         sub.annotate(
                             Annotation::secondary(parameter_span)
@@ -4549,7 +4579,10 @@ impl<'db> BindingError<'db> {
                 }
             }
 
-            Self::MissingArguments { parameters } => {
+            Self::MissingArguments {
+                parameters,
+                paramspec,
+            } => {
                 if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, node) {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
@@ -4575,6 +4608,16 @@ impl<'db> BindingError<'db> {
                             sub.annotate(Annotation::primary(parameter_span));
                             diag.sub(sub);
                         }
+                    }
+                    if let Some(paramspec) = paramspec {
+                        let paramspec_name = paramspec.name(context.db());
+                        diag.sub(SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!(
+                                "These arguments are required because `ParamSpec` `{paramspec_name}` \
+                                 could represent any set of parameters at runtime"
+                            ),
+                        ));
                     }
                 }
             }

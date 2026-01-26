@@ -346,7 +346,7 @@ impl<'db> GenericContext<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=inferable_typevars_cycle_initial,
+            cycle_initial=|_, _, _| FxHashSet::default(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inferable_typevars_inner<'db>(
@@ -702,35 +702,6 @@ impl<'db> GenericContext<'db> {
             .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor));
 
         Self::from_typevar_instances(db, variables)
-    }
-}
-
-fn inferable_typevars_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: GenericContext<'db>,
-) -> FxHashSet<BoundTypeVarIdentity<'db>> {
-    FxHashSet::default()
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum LegacyGenericBase {
-    Generic,
-    Protocol,
-}
-
-impl LegacyGenericBase {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Generic => "Generic",
-            Self::Protocol => "Protocol",
-        }
-    }
-}
-
-impl Display for LegacyGenericBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
     }
 }
 

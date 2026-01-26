@@ -5,6 +5,7 @@ use ruff_diagnostics::{Edit, Fix};
 
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::fmt::Write;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -71,6 +72,7 @@ use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
+use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -121,6 +123,7 @@ mod visitor;
 mod definition;
 #[cfg(test)]
 mod property_tests;
+mod subscript;
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
@@ -361,59 +364,6 @@ impl Default for MemberLookupPolicy {
     fn default() -> Self {
         Self::empty()
     }
-}
-
-fn member_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(id)).into()
-}
-
-fn member_lookup_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_member: &PlaceAndQualifiers<'db>,
-    member: PlaceAndQualifiers<'db>,
-    _self_type: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    member.cycle_normalized(db, *previous_member, cycle)
-}
-
-fn class_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(id)).into()
-}
-
-fn class_lookup_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_member: &PlaceAndQualifiers<'db>,
-    member: PlaceAndQualifiers<'db>,
-    _self_type: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
-) -> PlaceAndQualifiers<'db> {
-    member.cycle_normalized(db, *previous_member, cycle)
-}
-
-fn variance_cycle_initial<'db, T>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: T,
-    _typevar: BoundTypeVarInstance<'db>,
-) -> TypeVarVariance {
-    TypeVarVariance::Bivariant
 }
 
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
@@ -1532,6 +1482,54 @@ impl<'db> Type<'db> {
         if yes { self.negate(db) } else { *self }
     }
 
+    /// Return `true` if it is possible to spell an equivalent type to this one
+    /// in user annotations without nonstandard extensions to the type system
+    pub(crate) fn is_spellable(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::Never
+            | Type::NewTypeInstance(_)
+            | Type::EnumLiteral(_)
+            | Type::NominalInstance(_)
+            // `TypedDict` and `Protocol` can be synthesized,
+            // but it's always possible to create an equivalent type using a class definition.
+            | Type::TypedDict(_)
+            | Type::ProtocolInstance(_)
+            // Not all `Callable` types are spellable using the `Callable` type form,
+            // but they are all spellable using callback protocols.
+            | Type::Callable(_)
+            // `Unknown` and `@Todo` are nonstandard extensions,
+            // but they are both exactly equivalent to `Any`
+            | Type::Dynamic(_)
+            | Type::TypeVar(_)
+            | Type::TypeAlias(_)
+            | Type::SubclassOf(_)=> true,
+            Type::Intersection(_)
+            | Type::SpecialForm(_)
+            | Type::BoundSuper(_)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::PropertyInstance(_)
+            | Type::FunctionLiteral(_)
+            | Type::ModuleLiteral(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::KnownInstance(_) => false,
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_spellable(db)),
+        }
+    }
+
     /// If the type is a union, filters union elements based on the provided predicate.
     ///
     /// Otherwise, returns the type unchanged.
@@ -2469,7 +2467,13 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
@@ -3019,7 +3023,13 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,
@@ -3658,10 +3668,14 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_) => Truthiness::Ambiguous,
 
-            Type::TypedDict(_) => {
-                // TODO: We could do better here, but it's unclear if this is important.
-                // See existing `TypedDict`-related tests in `truthiness.md`
-                Truthiness::Ambiguous
+            Type::TypedDict(td) => {
+                if td.items(db).values().any(TypedDictField::is_required) {
+                    Truthiness::AlwaysTrue
+                } else {
+                    // We can potentially infer empty typeddicts as always falsy if they're `closed=True`,
+                    // but as of 22-01-26 we don't yet support PEP 728.
+                    Truthiness::Ambiguous
+                }
             }
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
@@ -5914,7 +5928,13 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=apply_specialization_cycle_recover, cycle_initial=apply_specialization_cycle_initial)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -6512,7 +6532,13 @@ impl<'db> Type<'db> {
     }
 
     #[allow(clippy::used_underscore_binding)]
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=expand_eagerly_cycle_recover, cycle_initial=expand_eagerly_cycle_initial)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, ()| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn expand_eagerly_(self, db: &'db dyn Db, _unit: ()) -> Type<'db> {
         self.apply_type_mapping(db, &TypeMapping::EagerExpansion, TypeContext::default())
     }
@@ -6679,11 +6705,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         parameter_index: Option<usize>,
     ) -> Option<(Span, Span)> {
-        match *self {
-            Type::FunctionLiteral(function) => function.parameter_span(db, parameter_index),
-            Type::BoundMethod(bound_method) => bound_method
-                .function(db)
-                .parameter_span(db, parameter_index),
+        match self {
+            Type::FunctionLiteral(function) => Some(function.parameter_span(db, parameter_index)),
+            Type::BoundMethod(bound_method) => Some(
+                bound_method
+                    .function(db)
+                    .parameter_span(db, parameter_index),
+            ),
             _ => None,
         }
     }
@@ -6706,9 +6734,9 @@ impl<'db> Type<'db> {
     /// An example of a good use case is to improve
     /// a diagnostic.
     fn function_spans(&self, db: &'db dyn Db) -> Option<FunctionSpans> {
-        match *self {
-            Type::FunctionLiteral(function) => function.spans(db),
-            Type::BoundMethod(bound_method) => bound_method.function(db).spans(db),
+        match self {
+            Type::FunctionLiteral(function) => Some(function.spans(db)),
+            Type::BoundMethod(bound_method) => Some(bound_method.function(db).spans(db)),
             _ => None,
         }
     }
@@ -6843,46 +6871,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         );
         v
     }
-}
-
-fn apply_specialization_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: Type<'db>,
-    _specialization: Specialization<'db>,
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
-}
-
-fn apply_specialization_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _specialization: Specialization<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn expand_eagerly_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: Type<'db>,
-    _unit: (),
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn expand_eagerly_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: Type<'db>,
-    _unit: (),
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
@@ -8185,7 +8173,7 @@ impl<'db> TypeVarInstance<'db> {
         Some(TypeVarBoundOrConstraints::Constraints(constraints))
     }
 
-    #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
@@ -8321,15 +8309,6 @@ fn lazy_default_cycle_recover<'db>(
         (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
         (_, None) => None,
     }
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn lazy_default_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: TypeVarInstance<'db>,
-) -> Option<Type<'db>> {
-    Some(Type::divergent(id))
 }
 
 /// Where a type variable is bound and usable.
@@ -11536,7 +11515,13 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
-    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -11586,7 +11571,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         self.specialization(db).is_some()
     }
 
-    #[salsa::tracked(cycle_initial=generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
         let file = scope.file(db);
@@ -11607,32 +11592,6 @@ impl<'db> PEP695TypeAliasType<'db> {
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
         self
     }
-}
-
-fn generic_context_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: PEP695TypeAliasType<'db>,
-) -> Option<GenericContext<'db>> {
-    None
-}
-
-fn value_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _self: PEP695TypeAliasType<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
-}
-
-fn value_type_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_value: &Type<'db>,
-    value: Type<'db>,
-    _self: PEP695TypeAliasType<'db>,
-) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
@@ -11799,6 +11758,54 @@ impl<'db> TypeAliasType<'db> {
             }
             TypeAliasType::ManualPEP695(_) => self,
         }
+    }
+
+    /// Returns a struct that can display the fully qualified name of this type alias.
+    pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
+        QualifiedTypeAliasName::from_type_alias(db, self)
+    }
+}
+
+// N.B. It would be incorrect to derive `Eq`, `PartialEq`, or `Hash` for this struct,
+// because two `QualifiedTypeAliasName` instances might refer to different type aliases but
+// have the same components. You'd expect them to compare equal, but they'd compare
+// unequal if `PartialEq`/`Eq` were naively derived.
+#[derive(Clone, Copy)]
+pub(crate) struct QualifiedTypeAliasName<'db> {
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+}
+
+impl<'db> QualifiedTypeAliasName<'db> {
+    pub(crate) fn from_type_alias(db: &'db dyn Db, type_alias: TypeAliasType<'db>) -> Self {
+        Self { db, type_alias }
+    }
+
+    /// Returns the components of the qualified name of this type alias, excluding the alias itself.
+    ///
+    /// For example, calling this method on a type alias `D` inside a class `C` in module `a.b`
+    /// would return `["a", "b", "C"]`.
+    pub(crate) fn components_excluding_self(&self) -> Vec<String> {
+        let Some(definition) = self.type_alias.definition(self.db) else {
+            return vec![];
+        };
+
+        let file = definition.file(self.db);
+        let file_scope_id = definition.file_scope(self.db);
+
+        // Type aliases are defined directly in their enclosing scope (no body scope like classes),
+        // so we don't skip any ancestor scopes.
+        display::qualified_name_components_from_scope(self.db, file, file_scope_id, 0)
+    }
+}
+
+impl std::fmt::Display for QualifiedTypeAliasName<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for parent in self.components_excluding_self() {
+            f.write_str(&parent)?;
+            f.write_char('.')?;
+        }
+        f.write_str(self.type_alias.name(self.db))
     }
 }
 
@@ -12583,7 +12590,10 @@ impl<'db> IntersectionType<'db> {
 
     /// Returns an iterator over the positive elements of the intersection. If
     /// there are no positive elements, returns a single `object` type.
-    fn positive_elements_or_object(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+    pub(crate) fn positive_elements_or_object(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = Type<'db>> {
         if self.positive(db).is_empty() {
             Either::Left(std::iter::once(Type::object()))
         } else {

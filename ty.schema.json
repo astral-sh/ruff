@@ -370,6 +370,16 @@
             }
           ]
         },
+        "assert-type-unspellable-subtype": {
+          "title": "detects failed type assertions",
+          "description": "## What it does\nChecks for `assert_type()` calls where the actual type\nis an unspellable subtype of the asserted type.\n\n## Why is this bad?\n`assert_type()` is intended to ensure that the inferred type of a value\nis exactly the same as the asserted type. But in some situations, ty\nhas nonstandard extensions to the type system that allow it to infer\nmore precise types than can be expressed in user annotations. ty emits a\ndifferent error code to `type-assertion-failure` in these situations so\nthat users can easily differentiate between the two cases.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    if x:\n        assert_type(x, int)  # error: [assert-type-unspellable-subtype]\n                             # the actual type is `int & ~AlwaysFalsy`,\n                             # which excludes types like `Literal[0]`\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "byte-string-type-annotation": {
           "title": "detects byte strings in type annotation positions",
           "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
@@ -483,6 +493,16 @@
         "duplicate-kw-only": {
           "title": "detects dataclass definitions with more than one usage of `KW_ONLY`",
           "description": "## What it does\nChecks for dataclass definitions with more than one field\nannotated with `KW_ONLY`.\n\n## Why is this bad?\n`dataclasses.KW_ONLY` is a special marker used to\nemulate the `*` syntax in normal signatures.\nIt can only be used once per dataclass.\n\nAttempting to annotate two different fields with\nit will lead to a runtime error.\n\n## Examples\n```python\nfrom dataclasses import dataclass, KW_ONLY\n\n@dataclass\nclass A:  # Crash at runtime\n    b: int\n    _1: KW_ONLY\n    c: str\n    _2: KW_ONLY\n    d: bytes\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "empty-body": {
+          "title": "detects functions with empty bodies that have a non-`None` return type annotation",
+          "description": "## What it does\nDetects functions with empty bodies that have a non-`None` return type annotation.\n\nThe errors reported by this rule have the same motivation as the `invalid-return-type`\nrule. The diagnostic exists as a separate error code to allow users to disable this\nrule while prototyping code. While we strongly recommend enabling this rule if\npossible, users migrating from other type checkers may also find it useful to\ntemporarily disable this rule on some or all of their codebase if they find it\nresults in a large number of diagnostics.\n\n## Why is this bad?\nA function with an empty body (containing only `...`, `pass`, or a docstring) will\nimplicitly return `None` at runtime. Returning `None` when the return type is non-`None`\nis unsound, and will lead to ty inferring incorrect types elsewhere.\n\nFunctions with empty bodies are permitted in certain contexts where they serve as\ndeclarations rather than implementations:\n- Functions in stub files (`.pyi`)\n- Methods in Protocol classes\n- Abstract methods decorated with `@abstractmethod`\n- Overload declarations decorated with `@overload`\n- Functions in `if TYPE_CHECKING` blocks\n\n## Examples\n```python\ndef foo() -> int: ...  # error: [empty-body]\n\ndef bar() -> str:\n    \"\"\"A function that does nothing.\"\"\"\n    pass  # error: [empty-body]\n```",
           "default": "error",
           "oneOf": [
             {
@@ -832,7 +852,7 @@
         },
         "invalid-return-type": {
           "title": "detects returned values that can't be assigned to the function's annotated return type",
-          "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+          "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\nNote that the special case of a function with a non-`None` return type and an empty body\nis handled by the separate `empty-body` error code.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type\nis unsound, and will lead to ty inferring incorrect types elsewhere.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
           "default": "error",
           "oneOf": [
             {
@@ -940,9 +960,29 @@
             }
           ]
         },
+        "invalid-typed-dict-header": {
+          "title": "detects invalid statements in `TypedDict` class headers",
+          "description": "## What it does\nDetects errors in `TypedDict` class headers, such as unexpected arguments\nor invalid base classes.\n\n## Why is this bad?\nThe typing spec states that `TypedDict`s are not permitted to have\ncustom metaclasses. Using `**` unpacking in a `TypedDict` header\nis also prohibited by ty, as it means that ty cannot statically determine\nwhether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]\n    ...\n\ndef f(x: dict):\n    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]\n        ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-statement": {
           "title": "detects invalid statements in `TypedDict` class bodies",
           "description": "## What it does\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For\nexample, method definitions and field values aren't allowed. None of these will be\navailable on \"instances of the `TypedDict`\" at runtime (as `dict` is the runtime class of\nall \"`TypedDict` instances\").\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "isinstance-against-protocol": {
+          "title": "reports runtime checks against non-runtime-checkable protocol classes",
+          "description": "## What it does\nReports runtime checks against non-runtime-checkable `Protocol` classes.\nThis includes explicit calls to `isinstance()`/`issubclass()` and implicit\nchecks performed by `match` class patterns.\n\n## Why is this bad?\nUsing a non-runtime-checkable protocol in these contexts raises `TypeError`\nat runtime.\n\n## Examples\n```python\nfrom typing_extensions import Protocol\n\nclass HasX(Protocol):\n    x: int\n\ndef f(arg: object, arg2: type):\n    isinstance(arg, HasX)  # error: [isinstance-against-protocol]\n    issubclass(arg2, HasX)  # error: [isinstance-against-protocol]\n\ndef g(arg: object):\n    match arg:\n        case HasX():  # error: [isinstance-against-protocol]\n            pass\n```\n\n## References\n- [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)",
           "default": "error",
           "oneOf": [
             {

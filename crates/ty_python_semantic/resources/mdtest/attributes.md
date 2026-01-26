@@ -2130,7 +2130,7 @@ mod.global_symbol = "b"
 mod.global_symbol = 1
 
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
-(_, mod.global_symbol) = (..., 1)
+_, mod.global_symbol = (..., 1)
 
 # TODO: this should be an error, but we do not understand list unpackings yet.
 [_, mod.global_symbol] = [1, 2]
