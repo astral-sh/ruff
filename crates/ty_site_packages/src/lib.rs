@@ -727,6 +727,7 @@ pub(crate) fn conda_environment_from_env(
     Some(path)
 }
 
+#[cfg(not(target_family = "wasm"))]
 pub(crate) fn binary_from_path(binary: &str, paths: &str) -> Option<SystemPathBuf> {
     let mut binaries = which::which_in_global(binary, Some(&paths)).ok()?;
     SystemPathBuf::from_path_buf(binaries.next()?).ok()
