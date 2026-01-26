@@ -41,9 +41,7 @@ pub fn format_code_blocks(
     let mut replacements = Vec::new();
 
     for capture in MARKDOWN_CODE_BLOCK.captures_iter(source) {
-        let (_, [before, code_indent, language, code, after]) = capture.extract();
-        let capture_range = capture.get_match().range();
-        let code_range = (capture_range.start + before.len())..(capture_range.end - after.len());
+        let (_, [_before, code_indent, language, code, _after]) = capture.extract();
 
         let py_source_type = PySourceType::from_extension(language);
         let unformatted_code = dedent(code);
@@ -57,6 +55,10 @@ pub fn format_code_blocks(
         if let Ok(formatted_code) = formatted_code {
             if formatted_code.len() != unformatted_code.len() || formatted_code != *unformatted_code
             {
+                let code_range = capture
+                    .name("code")
+                    .map(|m| m.range())
+                    .expect("markdown regex didn't capture code range");
                 replacements.push((
                     code_range,
                     indent(formatted_code.as_str(), code_indent).to_string(),
