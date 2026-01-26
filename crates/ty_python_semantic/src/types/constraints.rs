@@ -1121,11 +1121,36 @@ impl<'db> Node<'db> {
             .filter(|constraint| !present.contains(constraint))
             .collect::<Vec<_>>();
         let mut path = support.path_assignments(db, self);
-        self.for_each_path_with_missing(db, &missing, &mut f, &mut path);
+        self.for_each_path_inner(db, &missing, &mut f, &mut path);
+    }
+
+    fn for_each_path_inner(
+        self,
+        db: &'db dyn Db,
+        missing: &[ConstrainedTypeVar<'db>],
+        f: &mut dyn FnMut(&PathAssignments<'db>),
+        path: &mut PathAssignments<'db>,
+    ) {
+        match self {
+            Node::AlwaysTrue => Self::for_each_path_with_missing(db, missing, f, path),
+            Node::AlwaysFalse => {}
+            Node::Interior(interior) => {
+                let constraint = interior.constraint(db);
+                path.walk_edge(db, constraint.when_true(), |path, _| {
+                    interior
+                        .if_true(db)
+                        .for_each_path_inner(db, missing, f, path);
+                });
+                path.walk_edge(db, constraint.when_false(), |path, _| {
+                    interior
+                        .if_false(db)
+                        .for_each_path_inner(db, missing, f, path);
+                });
+            }
+        }
     }
 
     fn for_each_path_with_missing(
-        self,
         db: &'db dyn Db,
         missing: &[ConstrainedTypeVar<'db>],
         f: &mut dyn FnMut(&PathAssignments<'db>),
@@ -1133,34 +1158,13 @@ impl<'db> Node<'db> {
     ) {
         if let Some((constraint, rest)) = missing.split_first() {
             path.walk_edge(db, constraint.when_true(), |path, _| {
-                self.for_each_path_with_missing(db, rest, f, path);
+                Self::for_each_path_with_missing(db, rest, f, path);
             });
             path.walk_edge(db, constraint.when_false(), |path, _| {
-                self.for_each_path_with_missing(db, rest, f, path);
+                Self::for_each_path_with_missing(db, rest, f, path);
             });
         } else {
-            self.for_each_path_inner(db, f, path);
-        }
-    }
-
-    fn for_each_path_inner(
-        self,
-        db: &'db dyn Db,
-        f: &mut dyn FnMut(&PathAssignments<'db>),
-        path: &mut PathAssignments<'db>,
-    ) {
-        match self {
-            Node::AlwaysTrue => f(path),
-            Node::AlwaysFalse => {}
-            Node::Interior(interior) => {
-                let constraint = interior.constraint(db);
-                path.walk_edge(db, constraint.when_true(), |path, _| {
-                    interior.if_true(db).for_each_path_inner(db, f, path);
-                });
-                path.walk_edge(db, constraint.when_false(), |path, _| {
-                    interior.if_false(db).for_each_path_inner(db, f, path);
-                });
-            }
+            f(path);
         }
     }
 
