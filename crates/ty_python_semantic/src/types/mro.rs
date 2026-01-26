@@ -337,7 +337,7 @@ impl<'db> Mro<'db> {
         let original_bases = dynamic.explicit_bases(db);
 
         // Use a placeholder class literal for try_from_type (the subclass parameter is only
-        // used for Protocol/TypedDict detection which doesn't apply here).
+        // used for NamedTuple subclasses, which doesn't apply here).
         let placeholder_class: ClassLiteral<'db> =
             KnownClass::Object.try_to_class_literal(db).unwrap().into();
 

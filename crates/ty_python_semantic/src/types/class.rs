@@ -83,14 +83,6 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 
-fn static_class_explicit_bases_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: StaticClassLiteral<'db>,
-) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -140,14 +132,6 @@ fn try_metaclass_cycle_initial<'db>(
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
-}
-
-fn dynamic_class_explicit_bases_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: DynamicClassLiteral<'db>,
-) -> Box<[Type<'db>]> {
-    Box::default()
 }
 
 #[expect(clippy::unnecessary_wraps)]
@@ -2494,7 +2478,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_initial=static_class_explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!(
             "StaticClassLiteral::explicit_bases_query: {}",
@@ -5144,7 +5128,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// or if the bases argument is not a tuple.
     ///
     /// Returns `[Unknown]` if the bases tuple is variable-length (like `tuple[type, ...]`).
-    #[salsa::tracked(returns(deref), cycle_initial=dynamic_class_explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let scope = self.scope(db);
         let file = scope.file(db);
