@@ -8279,18 +8279,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         range: TextRange,
         level: u32,
         module: Option<&str>,
+        module_name: Option<&ModuleName>,
     ) {
         let is_import_reachable = self.is_reachable(import_node);
 
         if !is_import_reachable {
             return;
         }
-
-        let module_name = if level == 0 {
-            module.and_then(ModuleName::new)
-        } else {
-            ModuleName::from_identifier_parts(self.db(), self.file(), module, level).ok()
-        };
 
         let settings = self.db().analysis_settings(self.file());
 
@@ -8422,7 +8417,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            self.report_unresolved_import(node.into(), alias.range(), 0, Some(name));
+            self.report_unresolved_import(
+                node.into(),
+                alias.range(),
+                0,
+                Some(name),
+                Some(&full_module_name),
+            );
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -8568,6 +8569,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     module_ref.range(),
                     *level,
                     module,
+                    None,
                 );
                 return;
             }
@@ -8583,13 +8585,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     module_ref.range(),
                     *level,
                     module,
+                    None,
                 );
                 return;
             }
         };
 
         if resolve_module(self.db(), self.file(), &module_name).is_none() {
-            self.report_unresolved_import(import_from.into(), module_ref.range(), *level, module);
+            self.report_unresolved_import(
+                import_from.into(),
+                module_ref.range(),
+                *level,
+                module,
+                Some(&module_name),
+            );
         }
     }
 
