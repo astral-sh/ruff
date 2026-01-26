@@ -67,7 +67,7 @@ pub(crate) fn invalid_hash_return(checker: &Checker, function_def: &ast::StmtFun
     let terminal = Terminal::from_function(function_def, checker.semantic());
 
     // If every control flow path raises an exception, ignore the function.
-    if terminal == Terminal::Raise {
+    if terminal.is_always_raise() {
         return;
     }
 
