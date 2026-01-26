@@ -60,8 +60,10 @@ Ruff is extremely actively developed and used in major open-source projects like
 Ruff is backed by [Astral](https://astral.sh), the creators of
 [uv](https://github.com/astral-sh/uv) and [ty](https://github.com/astral-sh/ty).
 
-Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff), or the
-original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
+Read the [launch
+post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff), or the
+original [project
+announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Testimonials
 
