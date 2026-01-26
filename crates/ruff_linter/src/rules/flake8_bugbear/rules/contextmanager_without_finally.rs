@@ -67,12 +67,13 @@ pub(crate) fn contextmanager_without_finally(checker: &Checker, function_def: &S
     }
 
     let last_yield_range = function_def.body.last().and_then(|stmt| {
-        if let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt {
-            if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_)) {
-                return Some(value.range());
-            }
+        if let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt
+            && matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
+        {
+            Some(value.range())
+        } else {
+            None
         }
-        None
     });
 
     let mut visitor = YieldFinallyVisitor::default();
