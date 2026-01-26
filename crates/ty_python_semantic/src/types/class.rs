@@ -5057,6 +5057,7 @@ pub struct DynamicClassLiteral<'db> {
     ///   uniquely identifies this class and can be used to find the `type()` call.
     /// - `ScopeOffset`: The `type()` call is "dangling" (not assigned). The offset
     ///   is relative to the enclosing scope's anchor node index.
+    #[returns(ref)]
     pub anchor: DynamicClassAnchor<'db>,
 
     /// The class members from the namespace dict (third argument to `type()`).
@@ -5108,7 +5109,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns the definition where this class is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => Some(definition),
+            DynamicClassAnchor::Definition(definition) => Some(*definition),
             DynamicClassAnchor::ScopeOffset { .. } => None,
         }
     }
@@ -5117,7 +5118,7 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => definition.scope(db),
-            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
+            DynamicClassAnchor::ScopeOffset { scope, .. } => *scope,
         }
     }
 
@@ -5134,48 +5135,50 @@ impl<'db> DynamicClassLiteral<'db> {
     /// or if the bases argument is not a tuple.
     ///
     /// Returns `[Unknown]` if the bases tuple is variable-length (like `tuple[type, ...]`).
-    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
-        // For dangling calls, bases are stored directly on the anchor.
-        if let DynamicClassAnchor::ScopeOffset { explicit_bases, .. } = self.anchor(db) {
-            return explicit_bases;
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
+        /// Inner cached function for deferred inference of bases.
+        /// Only called for assigned `type()` calls where inference was deferred.
+        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+        fn deferred_explicit_bases<'db>(
+            db: &'db dyn Db,
+            definition: Definition<'db>,
+        ) -> Box<[Type<'db>]> {
+            let module = parsed_module(db, definition.file(db)).load(db);
+
+            let value = definition
+                .kind(db)
+                .value(&module)
+                .expect("DynamicClassAnchor::Definition should only be used for assignments");
+            let call_expr = value
+                .as_call_expr()
+                .expect("Definition value should be a call expression");
+
+            // The `bases` argument is the second positional argument.
+            let Some(bases_arg) = call_expr.arguments.args.get(1) else {
+                return Box::default();
+            };
+
+            // Use `definition_expression_type` for deferred inference support.
+            let bases_type = definition_expression_type(db, definition, bases_arg);
+
+            // For variable-length tuples (like `tuple[type, ...]`), we can't statically
+            // determine the bases, so return Unknown.
+            let Some(tuple_spec) = bases_type.tuple_instance_spec(db) else {
+                return Box::from([Type::unknown()]);
+            };
+            let Some(elements) = tuple_spec.as_fixed_length() else {
+                return Box::from([Type::unknown()]);
+            };
+
+            elements.elements_slice().iter().copied().collect()
         }
 
-        // For assigned calls, we need to use deferred inference.
-        let DynamicClassAnchor::Definition(definition) = self.anchor(db) else {
-            unreachable!("handled above")
-        };
-
-        let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
-
-        let value = definition
-            .kind(db)
-            .value(&module)
-            .expect("DynamicClassAnchor::Definition should only be used for assignments");
-        let call_expr = value
-            .as_call_expr()
-            .expect("Definition value should be a call expression");
-
-        // The `bases` argument is the second positional argument.
-        let Some(bases_arg) = call_expr.arguments.args.get(1) else {
-            return Box::default();
-        };
-
-        // Use `definition_expression_type` for deferred inference support.
-        let bases_type = definition_expression_type(db, definition, bases_arg);
-
-        // For variable-length tuples (like `tuple[type, ...]`), we can't statically
-        // determine the bases, so return Unknown.
-        let Some(tuple_spec) = bases_type.tuple_instance_spec(db) else {
-            return Box::from([Type::unknown()]);
-        };
-        let Some(elements) = tuple_spec.as_fixed_length() else {
-            return Box::from([Type::unknown()]);
-        };
-
-        elements.elements_slice().iter().copied().collect()
+        match self.anchor(db) {
+            // For dangling calls, bases are stored directly on the anchor.
+            DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => explicit_bases.as_ref(),
+            // For assigned calls, use deferred inference.
+            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(db, *definition),
+        }
     }
 
     /// Returns a [`Span`] with the range of the `type()` call expression.
@@ -5207,7 +5210,7 @@ impl<'db> DynamicClassLiteral<'db> {
                 let anchor_u32 = scope_anchor
                     .as_u32()
                     .expect("anchor should not be NodeIndex::NONE");
-                let absolute_index = NodeIndex::from(anchor_u32 + offset);
+                let absolute_index = NodeIndex::from(anchor_u32 + *offset);
 
                 // Get the node and return its range.
                 let node: &ast::ExprCall = module
@@ -5470,7 +5473,7 @@ impl<'db> DynamicClassLiteral<'db> {
         Self::new(
             db,
             self.name(db).clone(),
-            self.anchor(db),
+            self.anchor(db).clone(),
             self.members(db),
             self.has_dynamic_namespace(db),
             dataclass_params,
