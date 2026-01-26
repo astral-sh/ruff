@@ -8289,14 +8289,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let settings = self.db().analysis_settings(self.file());
 
-        if let Some(module_name) = &module_name {
-            if settings
+        if let Some(module_name) = &module_name
+            && settings
                 .allowed_unresolved_imports
                 .matches(module_name)
                 .is_include()
-            {
-                return;
-            }
+        {
+            return;
         }
 
         let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
