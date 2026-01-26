@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// - Use `cmath.isclose()` for complex numbers comparisons
 /// - Use `unittest.assertAlmostEqual()` in tests with `unittest`
 ///
-/// Note that `math.isclose()` / `cmath.isclose()` has a default absolute tolerance of zero, so
+/// Note that `math.isclose()` and `cmath.isclose()` have a default absolute tolerance of zero, so
 /// when comparing values near zero, you must explicitly specify an `abs_tol`
 /// parameter.
 ///
