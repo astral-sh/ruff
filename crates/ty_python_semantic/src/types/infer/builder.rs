@@ -7602,9 +7602,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let scope = self.scope();
 
+        // For assigned `type()` calls, the bases are inferred via deferred inference after the
+        // class is created. For dangling calls, we infer bases eagerly since they cannot
+        // recursively reference the class being defined.
+        let bases_type =
+            bases_type.unwrap_or_else(|| self.infer_expression(bases_arg, TypeContext::default()));
+
         // Create the anchor for identifying this dynamic class.
         // - For assigned `type()` calls, the Definition uniquely identifies the class.
-        // - For dangling calls, compute a relative offset from the scope's node index.
+        // - For dangling calls, compute a relative offset from the scope's node index,
+        //   and store the explicit bases directly (computed eagerly above).
         let anchor = if let Some(def) = definition {
             DynamicClassAnchor::Definition(def)
         } else {
@@ -7616,9 +7623,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let call_u32 = call_node_index
                 .as_u32()
                 .expect("call node should not be NodeIndex::NONE");
+
+            // Extract explicit bases from the bases tuple type.
+            let explicit_bases = Self::extract_explicit_bases(db, bases_type);
+
             DynamicClassAnchor::ScopeOffset {
                 scope,
                 offset: call_u32 - anchor_u32,
+                explicit_bases,
             }
         };
 
@@ -7630,12 +7642,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             has_dynamic_namespace,
             None,
         );
-
-        // For assigned `type()` calls, the bases are inferred via deferred inference after the
-        // class is created. For dangling calls, `bases_type` is already available from immediate
-        // inference.
-        let bases_type =
-            bases_type.unwrap_or_else(|| self.infer_expression(bases_arg, TypeContext::default()));
 
         // Validate bases and collect disjoint bases for diagnostics.
         let mut disjoint_bases = self.validate_dynamic_type_bases(bases_arg, bases_type, &name);
@@ -8481,6 +8487,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diagnostic.set_primary_message("Will raise `ValueError` at runtime");
             }
         }
+    }
+
+    /// Extract explicit base types from a bases tuple type.
+    ///
+    /// This is used for dangling `type()` calls where bases are computed eagerly
+    /// and stored directly on the `DynamicClassAnchor::ScopeOffset` variant.
+    fn extract_explicit_bases(db: &'db dyn Db, bases_type: Type<'db>) -> Box<[Type<'db>]> {
+        let Some(tuple_spec) = bases_type.tuple_instance_spec(db) else {
+            return Box::from([Type::unknown()]);
+        };
+        let Some(elements) = tuple_spec.as_fixed_length() else {
+            return Box::from([Type::unknown()]);
+        };
+        elements.elements_slice().iter().copied().collect()
     }
 
     /// Validate base classes from the second argument of a `type()` call.

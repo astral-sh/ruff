@@ -35,7 +35,7 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
 use crate::types::infer::{
-    infer_complete_scope_types, infer_expression_type, infer_unpack_types, nearest_enclosing_class,
+    infer_expression_type, infer_unpack_types, nearest_enclosing_class,
 };
 use crate::types::member::{Member, class_member};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
@@ -5081,9 +5081,7 @@ pub struct DynamicClassLiteral<'db> {
 /// This enum provides stable identity for `DynamicClassLiteral`:
 /// - For assigned calls, the `Definition` uniquely identifies the class.
 /// - For dangling calls, a relative offset provides stable identity.
-#[derive(
-    Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum DynamicClassAnchor<'db> {
     /// The `type()` call is assigned to a variable.
     ///
@@ -5095,7 +5093,14 @@ pub enum DynamicClassAnchor<'db> {
     ///
     /// The offset is relative to the enclosing scope's anchor node index.
     /// For module scope, this is equivalent to an absolute index (anchor is 0).
-    ScopeOffset { scope: ScopeId<'db>, offset: u32 },
+    ///
+    /// The `explicit_bases` are computed eagerly at creation time since dangling
+    /// calls cannot recursively reference the class being defined.
+    ScopeOffset {
+        scope: ScopeId<'db>,
+        offset: u32,
+        explicit_bases: Box<[Type<'db>]>,
+    },
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
@@ -5120,9 +5125,12 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Returns the explicit base classes of this dynamic class.
     ///
-    /// The bases are computed lazily from the `type()` call expression. For assigned
-    /// `type()` calls, this uses deferred inference to handle forward references
-    /// (e.g., `X = type("X", (tuple["X | None"],), {})`).
+    /// For assigned `type()` calls, bases are computed lazily using deferred inference
+    /// to handle forward references (e.g., `X = type("X", (tuple["X | None"],), {})`).
+    ///
+    /// For dangling `type()` calls, bases are computed eagerly at creation time and
+    /// stored directly on the anchor, since dangling calls cannot recursively reference
+    /// the class being defined.
     ///
     /// Returns an empty slice if the bases cannot be computed (e.g., due to a cycle)
     /// or if the bases argument is not a tuple.
@@ -5130,50 +5138,35 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns `[Unknown]` if the bases tuple is variable-length (like `tuple[type, ...]`).
     #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        // For dangling calls, bases are stored directly on the anchor.
+        if let DynamicClassAnchor::ScopeOffset { explicit_bases, .. } = self.anchor(db) {
+            return explicit_bases;
+        }
+
+        // For assigned calls, we need to use deferred inference.
+        let DynamicClassAnchor::Definition(definition) = self.anchor(db) else {
+            unreachable!("handled above")
+        };
+
         let scope = self.scope(db);
         let file = scope.file(db);
         let module = parsed_module(db, file).load(db);
 
-        // Get the `type()` call expression and extract the `bases` argument.
-        let call_expr = match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => {
-                let value = definition
-                    .kind(db)
-                    .value(&module)
-                    .expect("DynamicClassAnchor::Definition should only be used for assignments");
-                value
-                    .as_call_expr()
-                    .expect("Definition value should be a call expression")
-            }
-            DynamicClassAnchor::ScopeOffset { offset, .. } => {
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("anchor should not be NodeIndex::NONE");
-                let absolute_index = NodeIndex::from(anchor_u32 + offset);
-                module
-                    .get_by_index(absolute_index)
-                    .try_into()
-                    .expect("scope offset should point to ExprCall")
-            }
-        };
+        let value = definition
+            .kind(db)
+            .value(&module)
+            .expect("DynamicClassAnchor::Definition should only be used for assignments");
+        let call_expr = value
+            .as_call_expr()
+            .expect("Definition value should be a call expression");
 
         // The `bases` argument is the second positional argument.
         let Some(bases_arg) = call_expr.arguments.args.get(1) else {
             return Box::default();
         };
 
-        // Infer the `bases` type.
-        let bases_type = match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => {
-                // Use `definition_expression_type` for deferred inference support.
-                definition_expression_type(db, definition, bases_arg)
-            }
-            DynamicClassAnchor::ScopeOffset { .. } => {
-                // For dangling calls, the bases were already inferred as part of the scope.
-                infer_complete_scope_types(db, scope).expression_type(bases_arg)
-            }
-        };
+        // Use `definition_expression_type` for deferred inference support.
+        let bases_type = definition_expression_type(db, definition, bases_arg);
 
         // For variable-length tuples (like `tuple[type, ...]`), we can't statically
         // determine the bases, so return Unknown.
