@@ -32,7 +32,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         None,
         linter_settings,
         Noqa::Enabled,
-        &SourceKind::Python(code.to_string()),
+        &SourceKind::Python(code.to_string(), false),
         PySourceType::Python,
         ParseSource::None,
     );
@@ -57,7 +57,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
             None,
             linter_settings,
             Noqa::Enabled,
-            &SourceKind::Python(formatted.clone()),
+            &SourceKind::Python(formatted.clone(), false),
             PySourceType::Python,
             ParseSource::None,
         );
