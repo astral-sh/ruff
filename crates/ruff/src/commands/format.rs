@@ -1284,7 +1284,6 @@ mod tests {
     use ruff_db::panic::catch_unwind;
     use ruff_linter::logging::DisplayParseError;
     use ruff_linter::source_kind::{SourceError, SourceKind};
-    use ruff_python_ast::PySourceType;
     use ruff_python_formatter::FormatModuleError;
     use ruff_python_parser::{ParseError, ParseErrorType};
     use ruff_text_size::{TextRange, TextSize};
