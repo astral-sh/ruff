@@ -30,6 +30,13 @@ pub static LARGE_DATASET: TestFile = TestFile::new(
     include_str!("../resources/large/dataset.py"),
 );
 
+// "https://raw.githubusercontent.com/DHI/mikeio/b7d26418f4db2909b0aa965253dbe83194d7bb5b/tests/test_dataset.py"
+// with added formatting and suppressions
+pub static LARGE_SUPPRESSIONS: TestFile = TestFile::new(
+    "large/suppressions.py",
+    include_str!("../resources/large/suppressions.py"),
+);
+
 /// Relative size of a test case. Benchmarks can use it to configure the time for how long a benchmark should run to get stable results.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum TestCaseSpeed {

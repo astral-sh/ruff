@@ -1,4 +1,4 @@
-use ruff_benchmark::criterion;
+use ruff_benchmark::{LARGE_SUPPRESSIONS, criterion};
 
 use criterion::{
     BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
@@ -59,6 +59,7 @@ fn create_test_cases() -> Vec<TestCase> {
         TestCase::normal(PYDANTIC_TYPES.clone()),
         TestCase::normal(NUMPY_CTYPESLIB.clone()),
         TestCase::slow(LARGE_DATASET.clone()),
+        TestCase::slow(LARGE_SUPPRESSIONS.clone()),
     ]
 }
 
