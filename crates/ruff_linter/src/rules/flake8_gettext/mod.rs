@@ -5,9 +5,24 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 
-pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
+
+/// Returns true if the function call is ngettext
+pub(crate) fn is_ngettext_call(checker: &Checker, func: &Expr) -> bool {
+    // Check direct name reference first (e.g., `ngettext(...)`)
+    if let Some(name) = func.as_name_expr() {
+        if name.id == "ngettext" {
+            return true;
+        }
+    }
+    
+    // Check qualified name (e.g., `gettext_mod.ngettext(...)`)
+    checker
+        .semantic()
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), [.., "ngettext"]))
+}
 
 /// Returns true if the [`Expr`] is an internationalization function call.
 pub(crate) fn is_gettext_func_call(

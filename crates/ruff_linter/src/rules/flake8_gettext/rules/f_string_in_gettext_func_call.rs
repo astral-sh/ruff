@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_gettext::helpers;
+use crate::rules::flake8_gettext::is_ngettext_call;
 
 /// ## What it does
 /// Checks for f-strings in `gettext` function calls.
@@ -43,12 +43,18 @@ use crate::rules::flake8_gettext::helpers;
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.260")]
-pub(crate) struct FStringInGetTextFuncCall;
+pub(crate) struct FStringInGetTextFuncCall {
+    is_plural: bool,
+}
 
 impl Violation for FStringInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "f-string is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
+        if self.is_plural {
+            "f-string in plural argument is resolved before function call".to_string()
+        } else {
+            "f-string is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
+        }
     }
 }
 
@@ -57,15 +63,15 @@ pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, args
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if first.is_f_string_expr() {
-            checker.report_diagnostic(FStringInGetTextFuncCall {}, first.range());
+            checker.report_diagnostic(FStringInGetTextFuncCall { is_plural: false }, first.range());
         }
     }
 
     // Check second argument (plural) for ngettext calls
-    if helpers::is_ngettext_call(checker, func) {
+    if is_ngettext_call(checker, func) {
         if let Some(second) = args.get(1) {
             if second.is_f_string_expr() {
-                checker.report_diagnostic(FStringInGetTextFuncCall {}, second.range());
+                checker.report_diagnostic(FStringInGetTextFuncCall { is_plural: true }, second.range());
             }
         }
     }

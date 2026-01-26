@@ -30,7 +30,7 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 9 | _gettext(f"{'value'}")  # no lint
   |
 
-INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+INT001 f-string in plural argument is resolved before function call
  --> INT001.py:7:24
   |
 6 | gettext(f"{'value'}")

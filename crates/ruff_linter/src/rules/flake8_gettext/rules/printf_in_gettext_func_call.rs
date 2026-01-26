@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_gettext::helpers;
+use crate::rules::flake8_gettext::is_ngettext_call;
 
 /// ## What it does
 /// Checks for printf-style formatted strings in `gettext` function calls.
@@ -42,13 +42,19 @@ use crate::rules::flake8_gettext::helpers;
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.260")]
-pub(crate) struct PrintfInGetTextFuncCall;
+pub(crate) struct PrintfInGetTextFuncCall {
+    is_plural: bool,
+}
 
 impl Violation for PrintfInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "printf-style format is resolved before function call; consider `_(\"string %s\") % arg`"
-            .to_string()
+        if self.is_plural {
+            "printf-style format in plural argument is resolved before function call".to_string()
+        } else {
+            "printf-style format is resolved before function call; consider `_(\"string %s\") % arg`"
+                .to_string()
+        }
     }
 }
 
@@ -63,13 +69,13 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
         }) = &first
         {
             if left.is_string_literal_expr() {
-                checker.report_diagnostic(PrintfInGetTextFuncCall {}, first.range());
+                checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: false }, first.range());
             }
         }
     }
 
     // Check second argument (plural) for ngettext calls
-    if helpers::is_ngettext_call(checker, func) {
+    if is_ngettext_call(checker, func) {
         if let Some(second) = args.get(1) {
             if let Expr::BinOp(ast::ExprBinOp {
                 op: Operator::Mod,
@@ -78,7 +84,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
             }) = &second
             {
                 if left.is_string_literal_expr() {
-                    checker.report_diagnostic(PrintfInGetTextFuncCall {}, second.range());
+                    checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: true }, second.range());
                 }
             }
         }
