@@ -5308,9 +5308,9 @@ impl<'db> Type<'db> {
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
         //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
+        // We use the return type of `__new__` to refine the constructed instance type when it
+        // returns an instance of the class (or subclass). If it returns an unrelated type, we
+        // skip `__init__` and return that type instead.
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
@@ -5323,7 +5323,6 @@ impl<'db> Type<'db> {
 
         // Construct an instance type that we can use to look up the `__init__` instance method.
         // This performs the same logic as `Type::to_instance`, except for generic class literals.
-        // TODO: we should use the actual return type of `__new__` to determine the instance type
         let init_ty = self_type
             .to_instance(db)
             .expect("type should be convertible to instance type");
@@ -5400,7 +5399,40 @@ impl<'db> Type<'db> {
             }
         });
 
-        let init_call_outcome = if new_call_outcome.is_none() || !init_method.is_undefined() {
+        let new_return_ty = new_call_outcome
+            .as_ref()
+            .and_then(|result| result.as_ref().ok())
+            .map(|bindings| bindings.return_type(db));
+        let default_instance_ty = self
+            .to_instance(db)
+            .expect("type should be convertible to instance type");
+        // Only treat `__new__` return types as authoritative when they are fully informative;
+        // `Any`/`Unknown` are too permissive to determine whether `__init__` should run.
+        let new_return_is_informative = new_return_ty.is_some_and(|ty| {
+            let contains_noninformative = |ty| {
+                matches!(
+                    ty,
+                    Type::Dynamic(
+                        DynamicType::Any | DynamicType::Unknown | DynamicType::UnknownGeneric(_)
+                    )
+                )
+            };
+            !any_over_type(db, ty, &contains_noninformative, true)
+        });
+        let new_return_is_subtype = new_return_is_informative
+            && new_return_ty.is_some_and(|ty| ty.is_subtype_of(db, default_instance_ty));
+        let new_return_is_related = new_return_is_subtype;
+        let new_return_is_same_class = generic_origin
+            .and_then(|origin| origin.as_static())
+            .is_some_and(|origin| {
+                new_return_ty.is_some_and(|ty| ty.specialization_of(db, origin).is_some())
+            });
+        let new_return_allows_init =
+            !new_return_is_informative || new_return_is_related || new_return_is_same_class;
+
+        let init_call_outcome = if new_call_outcome.is_none()
+            || (new_return_allows_init && !init_method.is_undefined())
+        {
             let call_result = match init_ty
                 .member_lookup_with_policy(
                     db,
@@ -5438,11 +5470,24 @@ impl<'db> Type<'db> {
             None
         };
 
+        if matches!(new_call_outcome, Some(Ok(_))) {
+            if let Some(new_return_ty) = new_return_ty {
+                if new_return_is_informative
+                    && !new_return_is_related
+                    && !new_return_is_same_class
+                {
+                    return Ok(new_return_ty);
+                }
+            }
+        }
+
         // Note that we use `self` here, not `self_type`, so that if constructor argument inference
-        // fails, we fail back to the default specialization.
-        let instance_ty = self
-            .to_instance(db)
-            .expect("type should be convertible to instance type");
+        // fails, we fall back to the default specialization.
+        let instance_ty = if new_return_is_subtype {
+            new_return_ty.unwrap_or(default_instance_ty)
+        } else {
+            default_instance_ty
+        };
 
         match (generic_origin, new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
@@ -5469,7 +5514,24 @@ impl<'db> Type<'db> {
                         .single_element()?
                         .matching_overloads()
                         .next()?;
-                    binding.specialization()?.restrict(db, generic_context?)
+                    // Prefer specializations implied by the `__new__` return type when it is
+                    // an instance of the same class, then combine with argument-inferred mappings.
+                    let return_specialization = generic_origin.as_static().and_then(|origin| {
+                        binding
+                            .return_type()
+                            .specialization_of(db, origin)
+                            .and_then(|spec| spec.restrict(db, generic_context?))
+                    });
+                    let binding_specialization =
+                        binding.specialization()?.restrict(db, generic_context?);
+                    match (return_specialization, binding_specialization) {
+                        (Some(return_spec), Some(binding_spec)) => {
+                            Some(return_spec.combine(db, binding_spec))
+                        }
+                        (Some(return_spec), None) => Some(return_spec),
+                        (None, Some(binding_spec)) => Some(binding_spec),
+                        (None, None) => None,
+                    }
                 };
 
                 let new_specialization =
