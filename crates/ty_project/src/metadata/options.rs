@@ -1272,14 +1272,19 @@ pub struct AnalysisOptions {
     )]
     pub respect_type_ignore_comments: Option<bool>,
 
-    /// A list of module glob patterns for which unresolved import diagnostics should be suppressed.
+    /// A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
     ///
-    /// Supports glob patterns:
-    /// - `*` matches zero or more characters except `.` (e.g., `foo.*` matches `foo.bar` but not `foo.bar.baz`)
+    /// Details on supported glob patterns:
+    /// - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
+    ///   not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`
+    ///   matches `foo` and `barfoo` but not `foo.bar` or `foobar`.
     /// - `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
     /// - Prefix a pattern with `!` to exclude matching modules
     ///
     /// When multiple patterns match, later entries take precedence.
+    ///
+    /// Glob patterns can be used in combinations with each other. For example, to suppress errors for
+    /// any module where the first component contains the substring `test`, use `*test*.**`.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[]"#,
