@@ -3,8 +3,12 @@ use std::sync::Arc;
 
 use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
-use ruff_python_ast::{AnyRootNodeRef, ModModule, NodeIndex};
-use ruff_python_parser::{ParseOptions, Parsed, parse_unchecked};
+use ruff_python_ast::{
+    AnyRootNodeRef, HasNodeIndex, ModExpression, ModModule, NodeIndex, StringLiteral,
+};
+use ruff_python_parser::{
+    ParseError, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
+};
 
 use crate::Db;
 use crate::files::File;
@@ -43,6 +47,18 @@ pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     parse_unchecked(&source, options)
         .try_into_module()
         .expect("PySourceType always parses into a module")
+}
+
+pub fn parsed_string_annotation(
+    source: &str,
+    string: &StringLiteral,
+) -> Result<Parsed<ModExpression>, ParseError> {
+    let expr = parse_string_annotation(source, string)?;
+
+    // We need the sub-ast of the string annotation to be indexed
+    indexed::ensure_indexed(&expr, string.node_index().load());
+
+    Ok(expr)
 }
 
 /// A wrapper around a parsed module.
@@ -169,12 +185,40 @@ mod indexed {
         pub parsed: Parsed<ModModule>,
     }
 
+    /// Ensure the following sub-AST is indexed, using the parent node's index
+    /// as a basis for unambiguous AST node indices.
+    pub fn ensure_indexed(parsed: &Parsed<ModExpression>, parent_node_index: NodeIndex) {
+        // High level idea:
+        //
+        // With 0x0000_00AB we want to shift away all the leading 0's so we
+        // have 0xAB00_0000, and then start counting up from there. To avoid
+        // ambiguity around 0, we actually only shift up to the second-most
+        // significant digit and then set the most significant digit to 1.
+        //
+        // Because these are 32-bit, you would need *gigabytes* of code in
+        // a single python file to cause any conflicts, so we don't try to
+        // handle those conflicts at all.
+        let index = if let Some(parent) = parent_node_index.as_u32() {
+            let space = parent.leading_zeros();
+            parent << space.saturating_sub(1) | (1 << 31)
+        } else {
+            0
+        };
+
+        let mut visitor = Visitor {
+            nodes: Some(Vec::new()),
+            index,
+        };
+
+        AnyNodeRef::from(parsed.syntax()).visit_source_order(&mut visitor);
+    }
+
     impl IndexedModule {
         /// Create a new [`IndexedModule`] from the given AST.
         #[allow(clippy::unnecessary_cast)]
         pub fn new(parsed: Parsed<ModModule>) -> Arc<Self> {
             let mut visitor = Visitor {
-                nodes: Vec::new(),
+                nodes: Some(Vec::new()),
                 index: 0,
             };
 
@@ -185,7 +229,7 @@ mod indexed {
 
             AnyNodeRef::from(inner.parsed.syntax()).visit_source_order(&mut visitor);
 
-            let index: Box<[AnyRootNodeRef<'_>]> = visitor.nodes.into_boxed_slice();
+            let index: Box<[AnyRootNodeRef<'_>]> = visitor.nodes.unwrap().into_boxed_slice();
 
             // SAFETY: We cast from `Box<[AnyRootNodeRef<'_>]>` to `Box<[AnyRootNodeRef<'static>]>`,
             // faking the 'static lifetime to create the self-referential struct. The node references
@@ -214,7 +258,7 @@ mod indexed {
     /// A visitor that collects nodes in source order.
     pub struct Visitor<'a> {
         pub index: u32,
-        pub nodes: Vec<AnyRootNodeRef<'a>>,
+        pub nodes: Option<Vec<AnyRootNodeRef<'a>>>,
     }
 
     impl<'a> Visitor<'a> {
@@ -224,7 +268,9 @@ mod indexed {
             AnyRootNodeRef<'a>: From<&'a T>,
         {
             node.node_index().set(NodeIndex::from(self.index));
-            self.nodes.push(AnyRootNodeRef::from(node));
+            if let Some(nodes) = &mut self.nodes {
+                nodes.push(AnyRootNodeRef::from(node));
+            }
             self.index += 1;
         }
     }
