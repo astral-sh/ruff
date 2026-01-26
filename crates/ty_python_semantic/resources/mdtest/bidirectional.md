@@ -299,6 +299,11 @@ def _(flag: bool):
 
 ## Dunder Calls
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 The key and value parameters types are used as type context for `__setitem__` dunder calls:
 
 ```py
@@ -329,23 +334,26 @@ Similarly, the value type for augmented assignment dunder calls is inferred with
 ```py
 from typing import TypedDict
 
-class Bar(TypedDict):
-    bar: int
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+class Bar(TypedDict, closed=False):
+    bar: list[int]
 
 def _(bar: Bar):
-    bar |= reveal_type({"bar": 1})  # revealed: Bar
+    bar |= reveal_type({"bar": lst(1)})  # revealed: Bar
 
 class Bar2(TypedDict):
-    bar: int
+    bar: list[int | None]
 
 class X:
     def __ior__(self, other: Bar2): ...
 
 def _(x: X):
-    x |= reveal_type({"bar": 1})  # revealed: Bar2
+    x |= reveal_type({"bar": lst(1)})  # revealed: Bar2
 
 def _(x: X | Bar):
-    x |= {"bar": 1}
+    x |= {"bar": lst(1)}
 ```
 
 ## Multi-inference diagnostics
