@@ -215,8 +215,9 @@ impl PythonEnvironment {
         }
 
         #[cfg(not(target_family = "wasm"))]
-        if let Ok(python_path) = which::which("python3").or_else(|_| which::which("python"))
-            && let Some(python_path) = python_path.to_str()
+        if let Ok(paths) = system.env_var("PATH")
+            && let Some(python_path) =
+                binary_from_path("python3", &paths).or_else(|| binary_from_path("python", &paths))
             && let Ok(env) =
                 PythonEnvironment::new(python_path, SysPrefixPathOrigin::PythonBinary, system)
         {
@@ -724,6 +725,11 @@ pub(crate) fn conda_environment_from_env(
     }
 
     Some(path)
+}
+
+pub(crate) fn binary_from_path(binary: &str, paths: &str) -> Option<SystemPathBuf> {
+    let mut binaries = which::which_in_global(binary, Some(&paths)).ok()?;
+    SystemPathBuf::from_path_buf(binaries.next()?).ok()
 }
 
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.
