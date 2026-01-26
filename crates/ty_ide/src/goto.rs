@@ -751,25 +751,13 @@ impl GotoTarget<'_> {
 
         let node = covering_node.node();
 
-        // Special-case subscripts: if the cursor lands on the index/key, slice bound, or slice
-        // inside `value[...]`, retarget the covering node to the parent `ExprSubscript`.
+        // Special-case subscripts: if the cursor lands on a literal index/key, slice bound, or
+        // slice inside `value[...]`, retarget the covering node to the parent `ExprSubscript`.
+        // Non-literal subscripts (e.g. `value[a<CURSOR>b]`) still hover the identifier itself.
         // This avoids "no hover" on literals and lets hover/goto show the subscript result type.
+        // TODO: Consider a dedicated GotoTarget for literal subscripts to enable goto-declaration
+        // for TypedDict keys (https://github.com/astral-sh/ty/issues/2630).
         if let Some(expr) = node.as_expr_ref() {
-            let signed_literal_expr_range = |expr: ast::ExprRef<'_>| -> Option<TextRange> {
-                if expr.is_literal_expr() {
-                    return Some(expr.range());
-                }
-
-                let unary_op = expr.unary_op_expr()?;
-                if matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
-                    && unary_op.operand.is_literal_expr()
-                {
-                    Some(unary_op.range())
-                } else {
-                    None
-                }
-            };
-
             let enclosing_subscript_with_slice_range =
                 |range: TextRange| -> Option<&'a ast::ExprSubscript> {
                     covering_node.ancestors().find_map(|node| {
@@ -791,7 +779,17 @@ impl GotoTarget<'_> {
             // 2. Cursor on a literal or signed-literal `ExprSubscript.slice` (e.g. `values[0]`,
             // `person["name"]`, `values[-1]` where the covering node is the bracketed
             // expression).
-            let slice_expr_range = signed_literal_expr_range(expr);
+            let slice_expr_range = if expr.is_literal_expr() {
+                Some(expr.range())
+            } else if let Some(unary_op) = expr.unary_op_expr()
+                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand.is_literal_expr()
+            {
+                Some(unary_op.range())
+            } else {
+                None
+            };
+
             if let Some(slice_range) = slice_expr_range
                 && let Some(subscript) = enclosing_subscript_with_slice_range(slice_range)
             {

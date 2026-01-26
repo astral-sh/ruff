@@ -229,6 +229,8 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
 mod tests {
     use crate::tests::{CursorTest, cursor_test};
     use crate::{MarkupKind, hover};
+    use std::fmt::Write as _;
+
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
@@ -3347,173 +3349,157 @@ def function():
     fn hover_subscript_literal_index() {
         let test = cursor_test(
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values[0<CURSOR>])
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"
-        int
+        assert_snapshot!(test.hover(), @r#"
+        str
         ---------------------------------------------
         ```python
-        int
+        str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:7
           |
-        2 | values: list[int] = [1, 2]
+        2 | values: list[str] = ["a", "b"]
         3 | print(values[0])
           |       ^^^^^^^^-
           |       |       |
           |       |       Cursor offset
           |       source
           |
-        ");
+        "#);
     }
 
     #[test]
     fn hover_subscript_literal_index_variants() {
         let cases = [
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values[<CURSOR>0])
         "#,
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values[0<CURSOR>])
         "#,
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values<CURSOR>[0])
         "#,
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values<CURSOR>[-1])
         "#,
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values[<CURSOR>-1])
         "#,
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values[-<CURSOR>1])
         "#,
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values[-1<CURSOR>])
         "#,
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values[+<CURSOR>1])
         "#,
             r#"
-        values: list[int] = [1, 2]
+        values: list[str] = ["a", "b"]
         print(values[+1<CURSOR>])
         "#,
         ];
 
+        let mut output = String::new();
         for (index, case) in cases.iter().enumerate() {
             let test = cursor_test(case);
             let hover = test.hover();
-            assert_eq!(
-                hover.lines().next(),
-                Some("int"),
-                "case {index} expected `int` hover, got:\n{hover}"
-            );
+            write!(output, "case {index}:\n{hover}\n\n").unwrap();
         }
+        assert_snapshot!(output);
     }
 
     #[test]
-    fn hover_subscript_slice_literal_bounds_variants() {
+    fn hover_subscript_non_literal_index() {
+        let test = cursor_test(
+            r#"
+        values: list[str] = ["a", "b"]
+        def get_index() -> int: ...
+        idx = get_index()
+        print(values[-<CURSOR>idx])
+        "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_subscript_slice_literal_bounds_list_variants() {
         let list_cases = [
-            (
-                "list[int]",
-                r#"
-        values: list[int] = [1, 2]
+            r#"
+        values: list[str] = ["a", "b"]
         values[1<CURSOR>:]
         "#,
-            ),
-            (
-                "list[int]",
-                r#"
-        values: list[int] = [1, 2]
+            r#"
+        values: list[str] = ["a", "b"]
         values[:<CURSOR>-1]
         "#,
-            ),
-            (
-                "list[int]",
-                r#"
-        values: list[int] = [1, 2]
+            r#"
+        values: list[str] = ["a", "b"]
         values[:-<CURSOR>1]
         "#,
-            ),
-            (
-                "list[int]",
-                r#"
-        values: list[int] = [1, 2]
+            r#"
+        values: list[str] = ["a", "b"]
         values[: -1<CURSOR>]
         "#,
-            ),
-            (
-                "list[int]",
-                r#"
-        values: list[int] = [1, 2]
+            r#"
+        values: list[str] = ["a", "b"]
         values[<CURSOR>:2]
         "#,
-            ),
-            (
-                "list[int]",
-                r#"
-        values: list[int] = [1, 2]
+            r#"
+        values: list[str] = ["a", "b"]
         values[:<CURSOR>2]
         "#,
-            ),
         ];
 
-        for (index, (expected, case)) in list_cases.iter().enumerate() {
+        let mut output = String::new();
+        for (index, case) in list_cases.iter().enumerate() {
             let test = cursor_test(case);
             let hover = test.hover();
-            assert_eq!(
-                hover.lines().next(),
-                Some(*expected),
-                "list case {index} expected `{expected}` hover, got:\n{hover}"
-            );
+            write!(output, "list case {index}:\n{hover}\n\n").unwrap();
         }
+        assert_snapshot!(output);
+    }
 
+    #[test]
+    fn hover_subscript_slice_literal_bounds_string_variants() {
         let string_cases = [
-            (
-                "str",
-                r#"
+            r#"
         def f(s: str):
             s[<CURSOR>1:-1]
         "#,
-            ),
-            (
-                "str",
-                r#"
+            r#"
         def f(s: str):
             s[1:<CURSOR>-1]
         "#,
-            ),
-            (
-                "str",
-                r#"
+            r#"
         def f(s: str):
             s[1:-<CURSOR>1]
         "#,
-            ),
         ];
 
-        for (index, (expected, case)) in string_cases.iter().enumerate() {
+        let mut output = String::new();
+        for (index, case) in string_cases.iter().enumerate() {
             let test = cursor_test(case);
             let hover = test.hover();
-            assert_eq!(
-                hover.lines().next(),
-                Some(*expected),
-                "string case {index} expected `{expected}` hover, got:\n{hover}"
-            );
+            write!(output, "string case {index}:\n{hover}\n\n").unwrap();
         }
+        assert_snapshot!(output);
     }
 
     #[test]
