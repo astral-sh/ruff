@@ -259,12 +259,15 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
-        // First, transform the type to its meta type, unless it's already a class-like type.
-        let meta_type = match ty {
+        let meta_type = ty.to_meta_type(db);
+
+        // Look up the attribute first on the meta-type, unless it's already a class-like type.
+        let lookup_type = match ty {
             Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => ty,
-            _ => ty.to_meta_type(db),
+            _ => meta_type,
         };
-        let class_literal = match meta_type {
+
+        let class_literal = match lookup_type {
             Type::ClassLiteral(class_literal) => class_literal,
             Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
                 Some(cls) => match cls.static_class_literal(db) {
@@ -287,14 +290,7 @@ pub fn definitions_for_attribute<'db>(
         // class_literal.
         // Only look up definitions on the metaclass if the type is a class object to begin with in
         // order to prevent looking up instance members on the class metaclass
-        if resolved.is_empty()
-            && matches!(
-                ty,
-                Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_)
-            )
-        {
-            let meta_type = class_literal.metaclass(db);
-
+        if resolved.is_empty() && meta_type != lookup_type {
             let class_literal = match meta_type {
                 Type::ClassLiteral(class_literal) => class_literal,
                 Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {

@@ -1883,6 +1883,47 @@ p = Poi<CURSOR>nt(1, 2)
         assert_snapshot!(test.goto_definition(), @r#"No goto target found"#);
     }
 
+    /// Check that we don't fall into infinite recursion when e.g.
+    /// looking up attributes on the metaclass of `type`
+    /// (`type` is its own metaclass)
+    #[test]
+    fn goto_definition_on_builtins_dot_type_itself_unresolved() {
+        let test = CursorTest::builder()
+            .source("main.py", "type.<CURSOR>a")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"No goto target found"#);
+    }
+
+    /// Check that we don't fall into infinite recursion when e.g.
+    /// looking up attributes on the metaclass of `type`
+    /// (`type` is its own metaclass)
+    #[test]
+    fn goto_definition_on_builtins_dot_type_itself_resolved() {
+        let test = CursorTest::builder()
+            .source("main.py", "type.__dict<CURSOR>offset__")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:1:6
+          |
+        1 | type.__dictoffset__
+          |      ^^^^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+           --> stdlib/builtins.pyi:262:9
+            |
+        260 |     __dict__: Final[types.MappingProxyType[str, Any]]  # type: ignore[assignment]
+        261 |     @property
+        262 |     def __dictoffset__(self) -> int: ...
+            |         --------------
+        263 |     @property
+        264 |     def __flags__(self) -> int: ...
+            |
+        ");
+    }
+
     impl CursorTest {
         fn goto_definition(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {
