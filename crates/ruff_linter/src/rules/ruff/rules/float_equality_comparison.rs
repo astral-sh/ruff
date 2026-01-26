@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::linter::float::is_infinity_string_literal;
 
 /// ## What it does
 /// Checks for comparisons between floating-point values using `==` or `!=`.
@@ -129,7 +130,13 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
         .tuple_windows()
         .zip(&compare.ops)
         .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
-        .filter(|((left, right), _)| has_float(left, semantic) || has_float(right, semantic))
+        .filter(|((left, right), _)| {
+            if should_skip_comparison(left, semantic) || should_skip_comparison(right, semantic) {
+                return false;
+            }
+
+            has_float(left, semantic) || has_float(right, semantic)
+        })
         .map(|((left, right), op)| (left, right, op))
     {
         checker.report_diagnostic(
@@ -181,6 +188,35 @@ fn is_numeric_expr(expr: &Expr) -> bool {
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_expr(operand),
         Expr::Named(ast::ExprNamed { value, .. }) => is_numeric_expr(value),
+        _ => false,
+    }
+}
+
+fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) => {
+            // Skip `pytest.approx` or `math.inf`
+            if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
+                if matches!(
+                    qualified_name.segments(),
+                    ["pytest", "approx"] | ["math", "inf"]
+                ) {
+                    return true;
+                }
+            }
+
+            // Skip `float("inf")`, `float("-inf")`, `float("infinity")`
+            if semantic.match_builtin_expr(func, "float") {
+                return arguments.args.len() == 1
+                    && arguments.keywords.is_empty()
+                    && is_infinity_string_literal(&arguments.args[0]).is_some();
+            }
+
+            false
+        }
+
         _ => false,
     }
 }

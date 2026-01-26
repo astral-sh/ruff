@@ -46,3 +46,23 @@ assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
 assert (y := x / 2) == 1
 
 assert (0.3 if x > 0 else 1) == 0.1 + 0.2
+
+
+def _():
+    import math
+
+    inf = float("inf")
+
+    assert inf == float("inf")  # ok
+
+    assert float("-inf") == float("-infinity")  # ok
+
+    assert float("infinity") == float("inf")  # ok
+
+    assert math.inf == float("inf")  # ok
+
+
+def _pytest():
+    import pytest
+
+    assert pytest.approx(1 / 3, rel=1e-6) == 0.333333  # ok
