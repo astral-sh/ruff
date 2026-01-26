@@ -12,6 +12,7 @@ use crate::types::{
     TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasType, SemanticModel};
+use itertools::Either;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -229,18 +230,18 @@ pub fn definitions_for_attribute<'db>(
     };
 
     let tys = match lhs_ty {
-        Type::Union(union) => union.elements(model.db()).to_vec(),
-        _ => vec![lhs_ty],
+        Type::Union(union) => union.elements(model.db()),
+        _ => std::slice::from_ref(&lhs_ty),
     };
 
     // Expand intersections for each subtype into their components
     let expanded_tys = tys
-        .into_iter()
+        .iter()
         .flat_map(|ty| match ty {
-            Type::Intersection(intersection) => intersection.positive(db).iter().copied().collect(),
-            _ => vec![ty],
+            Type::Intersection(intersection) => Either::Left(intersection.positive(db).iter()),
+            _ => Either::Right(std::iter::once(ty)),
         })
-        .collect::<Vec<_>>();
+        .copied();
 
     for ty in expanded_tys {
         // Handle modules
