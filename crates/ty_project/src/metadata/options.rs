@@ -28,7 +28,9 @@ use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_module_resolver::{SearchPathSettings, SearchPathSettingsError, SearchPaths};
+use ty_module_resolver::{
+    ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
+};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
@@ -439,7 +441,19 @@ impl Options {
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             })?;
 
-        let analysis = self.analysis.or_default().to_settings();
+        let mut analysis_diagnostics = Vec::new();
+        let analysis = self
+            .analysis
+            .or_default()
+            .to_settings(db, &mut analysis_diagnostics);
+
+        if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
+            return Err(ToSettingsError {
+                diagnostic: Box::new(diagnostic),
+                output_format: terminal.output_format,
+                color: colored::control::SHOULD_COLORIZE.should_colorize(),
+            });
+        }
 
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)
@@ -991,7 +1005,8 @@ fn build_include_filter(
         }
 
         for pattern in include_patterns {
-            pattern.absolute(project_root, system, PortableGlobKind::Include)
+            pattern
+                .absolute(project_root, system, PortableGlobKind::Include)
                 .and_then(|include| Ok(includes.add(&include)?))
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
@@ -1000,36 +1015,13 @@ fn build_include_filter(
                         Severity::Error,
                     );
 
-                    match pattern.source() {
-                        ValueSource::File(file_path) => {
-                            if let Ok(file) = system_path_to_file(db, &**file_path) {
-                                diagnostic
-                                    .with_message("Invalid include pattern")
-                                    .with_annotation(Some(
-                                        Annotation::primary(
-                                            Span::from(file)
-                                                .with_optional_range(pattern.range()),
-                                        )
-                                            .message(err.to_string()),
-                                    ))
-                            } else {
-                                diagnostic.sub(SubDiagnostic::new(
-                                    SubDiagnosticSeverity::Info,
-                                    format!("The pattern is defined in the `{}` option in your configuration file", context.include_name()),
-                                ))
-                            }
-                        }
-                        ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "The pattern was specified on the CLI",
-                        )),
-                        ValueSource::Editor => {
-                            diagnostic.sub(SubDiagnostic::new(
-                                SubDiagnosticSeverity::Info,
-                                "The pattern was specified in the editor settings.",
-                            ))
-                        }
-                    }
+                    diagnostic.with_source_sub(
+                        db,
+                        pattern.value(),
+                        "pattern",
+                        context.include_name(),
+                        err,
+                    )
                 })?;
         }
     } else {
@@ -1079,7 +1071,8 @@ fn build_exclude_filter(
     // Add user-specified excludes
     if let Some(exclude_patterns) = exclude_patterns {
         for exclude in exclude_patterns {
-            exclude.absolute(project_root, system, PortableGlobKind::Exclude)
+            exclude
+                .absolute(project_root, system, PortableGlobKind::Exclude)
                 .and_then(|pattern| Ok(excludes.add(&pattern)?))
                 .map_err(|err| {
                     let diagnostic = OptionDiagnostic::new(
@@ -1088,34 +1081,13 @@ fn build_exclude_filter(
                         Severity::Error,
                     );
 
-                    match exclude.source() {
-                        ValueSource::File(file_path) => {
-                            if let Ok(file) = system_path_to_file(db, &**file_path) {
-                                diagnostic
-                                    .with_message("Invalid exclude pattern")
-                                    .with_annotation(Some(
-                                        Annotation::primary(
-                                            Span::from(file)
-                                                .with_optional_range(exclude.range()),
-                                        )
-                                            .message(err.to_string()),
-                                    ))
-                            } else {
-                                diagnostic.sub(SubDiagnostic::new(
-                                    SubDiagnosticSeverity::Info,
-                                    format!("The pattern is defined in the `{}` option in your configuration file", context.exclude_name()),
-                                ))
-                            }
-                        }
-                        ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "The pattern was specified on the CLI",
-                        )),
-                        ValueSource::Editor => diagnostic.sub(SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "The pattern was specified in the editor settings",
-                        ))
-                    }
+                    diagnostic.with_source_sub(
+                        db,
+                        exclude.value(),
+                        "pattern",
+                        context.exclude_name(),
+                        err,
+                    )
                 })?;
         }
     }
@@ -1299,20 +1271,100 @@ pub struct AnalysisOptions {
         "#
     )]
     pub respect_type_ignore_comments: Option<bool>,
+
+    /// A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+    ///
+    /// Details on supported glob patterns:
+    /// - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
+    ///   not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`
+    ///   matches `foo` and `barfoo` but not `foo.bar` or `foobar`.
+    /// - `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+    /// - Prefix a pattern with `!` to exclude matching modules
+    ///
+    /// When multiple patterns match, later entries take precedence.
+    ///
+    /// Glob patterns can be used in combinations with each other. For example, to suppress errors for
+    /// any module where the first component contains the substring `test`, use `*test*.**`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Suppress errors for all `test` modules except `test.foo`
+            allowed-unresolved-imports = ["test.**", "!test.foo"]
+        "#
+    )]
+    pub allowed_unresolved_imports: Option<Vec<RangedValue<String>>>,
 }
 
 impl AnalysisOptions {
-    pub(super) fn to_settings(&self) -> AnalysisSettings {
+    pub(super) fn to_settings(
+        &self,
+        db: &dyn Db,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> AnalysisSettings {
+        let Self {
+            respect_type_ignore_comments,
+            allowed_unresolved_imports,
+        } = self;
+
         let AnalysisSettings {
             respect_type_ignore_comments: respect_type_ignore_default,
+            allowed_unresolved_imports: allowed_unresolved_imports_default,
         } = AnalysisSettings::default();
 
+        let allowed_unresolved_imports =
+            if let Some(allowed_unresolved_imports) = allowed_unresolved_imports {
+                build_module_glob_set(db, allowed_unresolved_imports, "allowed_unresolved_imports")
+                    .unwrap_or_else(|error| {
+                        diagnostics.push(*error);
+                        ModuleGlobSet::empty()
+                    })
+            } else {
+                allowed_unresolved_imports_default
+            };
+
         AnalysisSettings {
-            respect_type_ignore_comments: self
-                .respect_type_ignore_comments
+            respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
+            allowed_unresolved_imports,
         }
     }
+}
+
+fn build_module_glob_set(
+    db: &dyn Db,
+    patterns: &[RangedValue<String>],
+    option_name: &str,
+) -> Result<ModuleGlobSet, Box<OptionDiagnostic>> {
+    let mut builder = ModuleGlobSetBuilder::new();
+
+    for glob in patterns {
+        if let Err(error) = builder.add(glob) {
+            let diagnostic = OptionDiagnostic::new(
+                DiagnosticId::InvalidGlob,
+                format!("Invalid glob pattern `{error}`"),
+                Severity::Error,
+            );
+
+            return Err(diagnostic
+                .with_source_sub(db, glob, "glob", option_name, error)
+                .into());
+        }
+    }
+
+    builder.build().map_err(|_| {
+        let diagnostic = OptionDiagnostic::new(
+            DiagnosticId::InvalidGlob,
+            "The `{option_name}` patterns resulted in a regex that is too large".to_string(),
+            Severity::Error,
+        );
+
+        Box::new(diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "Please open an issue on the ty repository and share the patterns that caused the error.",
+        )))
+    })
 }
 
 /// Configuration override that applies to specific files based on glob patterns.
@@ -1614,7 +1666,7 @@ impl RangedValue<OverrideOptions> {
             merged_analysis = merged_analysis.combine(global_analysis.clone());
         }
 
-        let analysis = merged_analysis.to_settings();
+        let analysis = merged_analysis.to_settings(db, diagnostics);
 
         let override_instance = Override {
             files,
@@ -1755,6 +1807,7 @@ pub enum TyTomlError {
 pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
+    concise_message: Option<String>,
     severity: Severity,
     annotation: Option<Annotation>,
     sub: Vec<SubDiagnostic>,
@@ -1765,6 +1818,7 @@ impl OptionDiagnostic {
         Self {
             id,
             message,
+            concise_message: None,
             severity,
             annotation: None,
             sub: Vec::new(),
@@ -1780,8 +1834,57 @@ impl OptionDiagnostic {
     }
 
     #[must_use]
+    fn with_concise_message(self, message: impl Display) -> Self {
+        OptionDiagnostic {
+            concise_message: Some(message.to_string()),
+            ..self
+        }
+    }
+
+    #[must_use]
     fn with_annotation(self, annotation: Option<Annotation>) -> Self {
         OptionDiagnostic { annotation, ..self }
+    }
+
+    fn with_source_sub<T>(
+        mut self,
+        db: &dyn Db,
+        value: &RangedValue<T>,
+        value_label: &str,
+        option_name: &str,
+        err: impl Display,
+    ) -> Self {
+        match value.source() {
+            ValueSource::File(file_path) => {
+                if let Ok(file) = system_path_to_file(db, &**file_path) {
+                    let concise_message = std::mem::take(&mut self.message);
+                    self.with_concise_message(concise_message)
+                        .with_message(format_args!("Invalid {value_label}"))
+                        .with_annotation(Some(
+                            Annotation::primary(
+                                Span::from(file).with_optional_range(value.range()),
+                            )
+                            .message(err.to_string()),
+                        ))
+                } else {
+                    self.sub(SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        format!(
+                            "The {value_label} is defined in the `{option_name}` option \
+                            in your configuration file"
+                        ),
+                    ))
+                }
+            }
+            ValueSource::Cli => self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The {value_label} was specified on the CLI",
+            )),
+            ValueSource::Editor => self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The {value_label} was specified in the editor settings.",
+            )),
+        }
     }
 
     #[must_use]
@@ -1792,6 +1895,11 @@ impl OptionDiagnostic {
 
     pub(crate) fn to_diagnostic(&self) -> Diagnostic {
         let mut diag = Diagnostic::new(self.id, self.severity, &self.message);
+
+        if let Some(concise_message) = &self.concise_message {
+            diag.set_concise_message(concise_message);
+        }
+
         if let Some(annotation) = self.annotation.clone() {
             diag.annotate(annotation);
         }

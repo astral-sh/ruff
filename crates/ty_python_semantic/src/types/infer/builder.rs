@@ -8279,6 +8279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         range: TextRange,
         level: u32,
         module: Option<&str>,
+        module_name: Option<&ModuleName>,
     ) {
         let is_import_reachable = self.is_reachable(import_node);
 
@@ -8286,16 +8287,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
+        let settings = self.db().analysis_settings(self.file());
+
+        if let Some(module_name) = &module_name
+            && settings
+                .allowed_unresolved_imports
+                .matches(module_name)
+                .is_include()
+        {
+            return;
+        }
+
         let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
             return;
         };
+
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot resolve imported module `{}`",
             format_import_from_module(level, module)
         ));
 
         if level == 0 {
-            if let Some(module_name) = module.and_then(ModuleName::new) {
+            if let Some(module_name) = module_name {
                 let program = Program::get(self.db());
                 let typeshed_versions = program.search_paths(self.db()).typeshed_versions();
 
@@ -8403,7 +8416,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            self.report_unresolved_import(node.into(), alias.range(), 0, Some(name));
+            self.report_unresolved_import(
+                node.into(),
+                alias.range(),
+                0,
+                Some(name),
+                Some(&full_module_name),
+            );
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -8549,6 +8568,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     module_ref.range(),
                     *level,
                     module,
+                    None,
                 );
                 return;
             }
@@ -8564,13 +8584,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     module_ref.range(),
                     *level,
                     module,
+                    None,
                 );
                 return;
             }
         };
 
         if resolve_module(self.db(), self.file(), &module_name).is_none() {
-            self.report_unresolved_import(import_from.into(), module_ref.range(), *level, module);
+            self.report_unresolved_import(
+                import_from.into(),
+                module_ref.range(),
+                *level,
+                module,
+                Some(&module_name),
+            );
         }
     }
 
@@ -8721,6 +8748,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
+        let settings = self.db().analysis_settings(self.file());
+
+        if settings
+            .allowed_unresolved_imports
+            .matches(full_submodule_name.as_ref().unwrap_or(&module_name))
+            .is_include()
+        {
+            return;
+        }
+
         let Some(builder) = self
             .context
             .report_lint(&UNRESOLVED_IMPORT, AnyNodeRef::Alias(alias))
@@ -8828,6 +8865,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // That didn't work, try to produce diagnostics
         self.add_binding(import_from.into(), definition)
             .insert(self, Type::unknown());
+
+        let settings = self.db().analysis_settings(self.file());
+
+        if settings
+            .allowed_unresolved_imports
+            .matches(&full_submodule_name)
+            .is_include()
+        {
+            return;
+        }
 
         if !self.is_reachable(import_from) {
             return;

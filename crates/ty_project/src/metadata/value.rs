@@ -435,14 +435,6 @@ impl RelativeGlobPattern {
         Self::new(pattern, ValueSource::Cli)
     }
 
-    pub(crate) fn source(&self) -> &ValueSource {
-        self.0.source()
-    }
-
-    pub(crate) fn range(&self) -> Option<TextRange> {
-        self.0.range()
-    }
-
     /// Resolves the absolute pattern for `self` based on its origin.
     pub(crate) fn absolute(
         &self,
@@ -457,6 +449,10 @@ impl RelativeGlobPattern {
 
         let pattern = PortableGlobPattern::parse(&self.0, kind)?;
         Ok(pattern.into_absolute(relative_to))
+    }
+
+    pub(crate) fn value(&self) -> &RangedValue<String> {
+        &self.0
     }
 }
 

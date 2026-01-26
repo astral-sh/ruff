@@ -188,7 +188,7 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
     // It's okay to ignore the errors here because the rules are eagerly validated
     // during `overrides.to_settings()`.
     let rules = rules.to_rule_selection(db, &mut Vec::new());
-    let analysis = analysis.to_settings();
+    let analysis = analysis.to_settings(db, &mut Vec::new());
 
     FileSettings::File(Arc::new(OverrideSettings { rules, analysis }))
 }
