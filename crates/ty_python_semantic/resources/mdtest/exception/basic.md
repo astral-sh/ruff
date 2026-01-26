@@ -109,7 +109,10 @@ def silence2[
         type[ValueError],
         type[TypeError],
     )
-](func: Callable[[], None], exception_type: T,):
+](
+    func: Callable[[], None],
+    exception_type: T,
+):
     try:
         func()
     except exception_type as e:
