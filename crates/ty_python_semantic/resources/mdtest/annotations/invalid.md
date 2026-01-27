@@ -155,6 +155,38 @@ def invalid_binary_operators(
     reveal_type(l)  # revealed: Unknown
 ```
 
+## Multiple starred expressions in a `tuple` specialization
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def f(
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    x: tuple[*tuple[int, ...], *tuple[str, ...]],
+    y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
+    # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
+    z: tuple[*tuple[int, ...], *tuple[str]],
+):
+    reveal_type(x)  # revealed: tuple[int | str, ...]
+    reveal_type(y)  # revealed: tuple[str | int, ...]
+    reveal_type(z)  # revealed: tuple[*tuple[int, ...], str]
+
+T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
+
+def func3(t: tuple[*Ts]):
+    t5: tuple[*tuple[str], *Ts]  # OK
+    t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
+```
+
 ## Invalid AST nodes in string annotations
 
 Invalid AST nodes should also be rejected when they appear in string annotations:

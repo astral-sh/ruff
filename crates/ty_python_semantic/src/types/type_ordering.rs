@@ -294,6 +294,9 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (DynamicType::TodoStarredExpression, _) => Ordering::Less,
         (_, DynamicType::TodoStarredExpression) => Ordering::Greater,
 
+        (DynamicType::TodoTypeVarTuple, _) => Ordering::Less,
+        (_, DynamicType::TodoTypeVarTuple) => Ordering::Greater,
+
         (DynamicType::Divergent(left), DynamicType::Divergent(right)) => left.cmp(&right),
         (DynamicType::Divergent(_), _) => Ordering::Less,
         (_, DynamicType::Divergent(_)) => Ordering::Greater,
