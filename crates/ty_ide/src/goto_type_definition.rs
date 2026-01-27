@@ -1060,29 +1060,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
+         --> main.py:2:11
           |
         2 | x: "list['MyClass | int'] | None"
-          |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clicking here
+          |           ^^^^^^^ Clicking here
         3 |
         4 | class MyClass:
           |
-        info: Found 2 type definitions
-            --> stdlib/builtins.pyi:2829:7
-             |
-        2828 | @disjoint_base
-        2829 | class list(MutableSequence[_T]):
-             |       ----
-        2830 |     """Built-in mutable sequence.
-             |
-            ::: stdlib/types.pyi:969:11
-             |
-         967 | if sys.version_info >= (3, 10):
-         968 |     @final
-         969 |     class NoneType:
-             |           --------
-         970 |         """The type of the None singleton."""
-             |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass | int'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
         "#);
     }
 
@@ -1099,29 +1092,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
+         --> main.py:2:17
           |
         2 | x: "list['int | MyClass'] | None"
-          |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clicking here
+          |                 ^^^^^^^ Clicking here
         3 |
         4 | class MyClass:
           |
-        info: Found 2 type definitions
-            --> stdlib/builtins.pyi:2829:7
-             |
-        2828 | @disjoint_base
-        2829 | class list(MutableSequence[_T]):
-             |       ----
-        2830 |     """Built-in mutable sequence.
-             |
-            ::: stdlib/types.pyi:969:11
-             |
-         967 | if sys.version_info >= (3, 10):
-         968 |     @final
-         969 |     class NoneType:
-             |           --------
-         970 |         """The type of the None singleton."""
-             |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['int | MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
         "#);
     }
 
@@ -1170,29 +1156,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
+         --> main.py:2:19
           |
         2 | x: "list['int' | 'MyClass'] | None"
-          |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clicking here
+          |                   ^^^^^^^ Clicking here
         3 |
         4 | class MyClass:
           |
-        info: Found 2 type definitions
-            --> stdlib/builtins.pyi:2829:7
-             |
-        2828 | @disjoint_base
-        2829 | class list(MutableSequence[_T]):
-             |       ----
-        2830 |     """Built-in mutable sequence.
-             |
-            ::: stdlib/types.pyi:969:11
-             |
-         967 | if sys.version_info >= (3, 10):
-         968 |     @final
-         969 |     class NoneType:
-             |           --------
-         970 |         """The type of the None singleton."""
-             |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
         "#);
     }
 
@@ -1209,29 +1188,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
+         --> main.py:2:11
           |
         2 | x: "list['MyClass' | 'str'] | None"
-          |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clicking here
+          |           ^^^^^^^ Clicking here
         3 |
         4 | class MyClass:
           |
-        info: Found 2 type definitions
-            --> stdlib/builtins.pyi:2829:7
-             |
-        2828 | @disjoint_base
-        2829 | class list(MutableSequence[_T]):
-             |       ----
-        2830 |     """Built-in mutable sequence.
-             |
-            ::: stdlib/types.pyi:969:11
-             |
-         967 | if sys.version_info >= (3, 10):
-         968 |     @final
-         969 |     class NoneType:
-             |           --------
-         970 |         """The type of the None singleton."""
-             |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
         "#);
     }
 
@@ -1248,29 +1220,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
+         --> main.py:2:13
           |
         2 | x: """'list["MyClass" | "str"]' | None"""
-          |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Clicking here
+          |             ^^^^^^^^^ Clicking here
         3 |
         4 | class MyClass:
           |
-        info: Found 2 type definitions
-            --> stdlib/builtins.pyi:2829:7
-             |
-        2828 | @disjoint_base
-        2829 | class list(MutableSequence[_T]):
-             |       ----
-        2830 |     """Built-in mutable sequence.
-             |
-            ::: stdlib/types.pyi:969:11
-             |
-         967 | if sys.version_info >= (3, 10):
-         968 |     @final
-         969 |     class NoneType:
-             |           --------
-         970 |         """The type of the None singleton."""
-             |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | -------
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
         "#);
     }
 
