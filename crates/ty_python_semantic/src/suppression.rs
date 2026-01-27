@@ -56,7 +56,7 @@ declare_lint! {
     /// Checks for `type: ignore` directives that are no longer applicable.
     ///
     /// ## Why is this bad?
-    /// A `ty: ignore` directive that no longer matches any diagnostic violations is likely
+    /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
     /// included by mistake, and should be removed to avoid confusion.
     ///
     /// ## Examples
