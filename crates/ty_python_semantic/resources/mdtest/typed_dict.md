@@ -2403,6 +2403,50 @@ def test_match(x: Thing):
             reveal_type(x)  # revealed: Bar
 ```
 
+PEP 695 type aliases also work with `in`/`not in` narrowing:
+
+```py
+class Baz(TypedDict):
+    baz: int
+
+type ThingWithBaz = Foo | Baz
+
+def test_in(x: ThingWithBaz):
+    if "baz" not in x:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo | Baz
+```
+
+Nested PEP 695 type aliases (an alias referring to another alias) also work:
+
+```py
+type Inner = Foo | Bar
+type Outer = Inner
+
+def test_nested_if(x: Outer):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Bar
+
+def test_nested_match(x: Outer):
+    match x["tag"]:
+        case "foo":
+            reveal_type(x)  # revealed: Foo
+        case "bar":
+            reveal_type(x)  # revealed: Bar
+
+type InnerWithBaz = Foo | Baz
+type OuterWithBaz = InnerWithBaz
+
+def test_nested_in(x: OuterWithBaz):
+    if "baz" not in x:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo | Baz
+```
+
 ## Only annotated declarations are allowed in the class body
 
 <!-- snapshot-diagnostics -->

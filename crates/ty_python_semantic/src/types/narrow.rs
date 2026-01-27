@@ -1045,7 +1045,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //             reveal_type(t)  # tuple[int, int]
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
             && let ast::Expr::Subscript(subscript) = &**left
-            && let Type::Union(union) = inference.expression_type(&*subscript.value)
+            && let Type::Union(union) = inference
+                .expression_type(&*subscript.value)
+                .resolve_type_alias(self.db)
             && let Some(subscript_place_expr) = PlaceExpr::try_from_expr(&subscript.value)
             && let Type::IntLiteral(index) = inference.expression_type(&*subscript.slice)
             && let Ok(index) = i32::try_from(index)
@@ -1150,12 +1152,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         .is_some_and(TypedDictField::is_required)
                 };
 
-                let narrowed = match rhs_type {
+                let resolved_rhs_type = rhs_type.resolve_type_alias(self.db);
+
+                let narrowed = match resolved_rhs_type {
                     Type::TypedDict(td) => {
                         if requires_key(td) {
                             Type::Never
                         } else {
-                            rhs_type
+                            resolved_rhs_type
                         }
                     }
                     Type::Intersection(intersection) => {
@@ -1168,7 +1172,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         {
                             Type::Never
                         } else {
-                            rhs_type
+                            resolved_rhs_type
                         }
                     }
                     Type::Union(union) => {
@@ -1184,10 +1188,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             _ => true,
                         })
                     }
-                    _ => rhs_type,
+                    _ => resolved_rhs_type,
                 };
 
-                if narrowed != rhs_type {
+                if narrowed != resolved_rhs_type {
                     let place = self.expect_place(&rhs_place_expr);
                     constraints.insert(place, NarrowingConstraint::replacement(narrowed));
                 }
@@ -1734,7 +1738,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         constrain_with_equality: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         // We need a union type for narrowing to be useful.
-        let Type::Union(union) = subscript_value_type else {
+        let Type::Union(union) = subscript_value_type.resolve_type_alias(self.db) else {
             return None;
         };
 
