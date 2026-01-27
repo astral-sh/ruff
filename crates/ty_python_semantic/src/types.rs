@@ -5492,34 +5492,29 @@ impl<'db> Type<'db> {
                     }
                 }
 
+                // Returns the specialization that we infer from matching the constructor call
+                // arguments with the parameters of __new__ or __init__.
                 let specialize_constructor = |outcome: Option<Bindings<'db>>| {
                     let (_, binding) = outcome
                         .as_ref()?
                         .single_element()?
                         .matching_overloads()
                         .next()?;
-                    // Prefer specializations implied by the `__new__` return type when it is
-                    // an instance of the same class, then combine with argument-inferred mappings.
-                    let return_specialization = generic_origin.as_static().and_then(|origin| {
-                        binding
-                            .return_type()
-                            .specialization_of(db, origin)
-                            .and_then(|spec| spec.restrict(db, generic_context?))
-                    });
-                    let binding_specialization =
-                        binding.specialization()?.restrict(db, generic_context?);
-                    match (return_specialization, binding_specialization) {
-                        (Some(return_spec), Some(binding_spec)) => {
-                            Some(return_spec.combine(db, binding_spec))
-                        }
-                        (Some(return_spec), None) => Some(return_spec),
-                        (None, Some(binding_spec)) => Some(binding_spec),
-                        (None, None) => None,
-                    }
+                    binding.specialization()?.restrict(db, generic_context?)
                 };
 
-                let new_specialization =
-                    specialize_constructor(new_call_outcome.and_then(Result::ok));
+                // Returns the specialization that we infer from the return type of __new__.
+                let specialize_new_return_type = |new_return_ty: Option<Type<'db>>| {
+                    new_return_ty?
+                        .specialization_of(db, generic_origin.as_static()?)?
+                        .restrict(db, generic_context?)
+                };
+
+                let new_specialization = combine_specializations(
+                    db,
+                    specialize_constructor(new_call_outcome.and_then(Result::ok)),
+                    specialize_new_return_type(new_return_ty),
+                );
                 let init_specialization =
                     specialize_constructor(init_call_outcome.and_then(Result::ok));
                 let specialization =
