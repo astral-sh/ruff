@@ -416,8 +416,7 @@ If either method comes from a generic base class, we don't currently use its inf
 to specialize the class.
 
 ```py
-from typing_extensions import Self
-from typing_extensions import Generic, TypeVar
+from typing_extensions import Generic, Self, TypeVar
 from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
