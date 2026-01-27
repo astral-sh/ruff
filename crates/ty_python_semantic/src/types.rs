@@ -6938,18 +6938,20 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
-/// A Salsa-tracked constraint set. This is only needed to have something appropriately small to
+/// A Salsa-interned constraint set. This is only needed to have something appropriately small to
 /// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
 /// constraint sets to check things like assignability; they're only used as a debugging aid in
-/// mdtests. That means there's no need for this to be interned; being tracked is sufficient.
+/// mdtests. In theory, that means there's no need for this to be interned; being tracked would be
+/// sufficient. However, we currently think that tracked structs are unsound w.r.t. salsa cycles,
+/// so out of an abundance of caution, we are interning the struct.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct TrackedConstraintSet<'db> {
+pub struct InternedConstraintSet<'db> {
     constraints: ConstraintSet<'db>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for TrackedConstraintSet<'_> {}
+impl get_size2::GetSize for InternedConstraintSet<'_> {}
 
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`NominalInstanceType`].
@@ -6996,7 +6998,7 @@ pub enum KnownInstanceType<'db> {
 
     /// A constraint set, which is exposed in mdtests as an instance of
     /// `ty_extensions.ConstraintSet`.
-    ConstraintSet(TrackedConstraintSet<'db>),
+    ConstraintSet(InternedConstraintSet<'db>),
 
     /// A generic context, which is exposed in mdtests as an instance of
     /// `ty_extensions.GenericContext`.
@@ -10638,9 +10640,9 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetRange,
     ConstraintSetAlways,
     ConstraintSetNever,
-    ConstraintSetImpliesSubtypeOf(TrackedConstraintSet<'db>),
-    ConstraintSetSatisfies(TrackedConstraintSet<'db>),
-    ConstraintSetSatisfiedByAllTypeVars(TrackedConstraintSet<'db>),
+    ConstraintSetImpliesSubtypeOf(InternedConstraintSet<'db>),
+    ConstraintSetSatisfies(InternedConstraintSet<'db>),
+    ConstraintSetSatisfiedByAllTypeVars(InternedConstraintSet<'db>),
 
     // GenericContext methods
     GenericContextSpecializeConstrained(GenericContext<'db>),
