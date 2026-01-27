@@ -106,8 +106,7 @@ impl SourceKind {
         }
     }
 
-    /// Read the [`SourceKind`] from the given path. Returns `None` if the source is not a Python
-    /// source file.
+    /// Read the [`SourceKind`] from the given path. Returns `None` if the source is a TOML file.
     pub fn from_path(path: &Path, source_type: SourceType) -> Result<Option<Self>, SourceError> {
         match source_type {
             SourceType::Python(PySourceType::Ipynb) => {
@@ -128,8 +127,8 @@ impl SourceKind {
         }
     }
 
-    /// Read the [`SourceKind`] from the given source code. Returns `None` if the source is not
-    /// Python source code.
+    /// Read the [`SourceKind`] from the given source code. Returns `None` if the source is
+    /// a TOML file.
     pub fn from_source_code(
         source_code: String,
         source_type: SourceType,
