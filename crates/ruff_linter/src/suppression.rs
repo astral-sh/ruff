@@ -921,6 +921,74 @@ print('hello')
     }
 
     #[test]
+    fn single_range_suppression_after_dedent() {
+        let source = "
+def outer():
+    def inner():
+        pass
+
+    # ruff: disable[foo]
+    print('hello')
+    # ruff: enable[foo]
+
+# ruff: disable[bar]
+print('hello')
+# ruff: enable[bar]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo]\n    print('hello')\n    # ruff: enable[foo]",
+                    code: "foo",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: disable[foo]",
+                        action: Disable,
+                        codes: [
+                            "foo",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: SuppressionComment {
+                        text: "# ruff: enable[foo]",
+                        action: Enable,
+                        codes: [
+                            "foo",
+                        ],
+                        reason: "",
+                    },
+                },
+                Suppression {
+                    covered_source: "# ruff: disable[bar]\nprint('hello')\n# ruff: enable[bar]",
+                    code: "bar",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: disable[bar]",
+                        action: Disable,
+                        codes: [
+                            "bar",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: SuppressionComment {
+                        text: "# ruff: enable[bar]",
+                        action: Enable,
+                        codes: [
+                            "bar",
+                        ],
+                        reason: "",
+                    },
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
     fn single_range_suppression_implicit_match() {
         let source = "
 # ruff: disable[foo]
