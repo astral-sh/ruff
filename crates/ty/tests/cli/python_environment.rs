@@ -2415,6 +2415,38 @@ fn default_root_project_name_folder() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// This is the "flat layout", but it looks *nearly* like the "src variant" layout.
+/// If `psycopg/__init__.py` didn't exist, we'd add `psycopg/` as a search path --
+/// but because it *does*, we can see that this is clearly meant to be the flat layout.
+#[test]
+fn default_root_flat_layout_variant() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "psycopg"
+            "#,
+        ),
+        ("psycopg/__init__.py", ""),
+        ("psycopg/box.py", "class Box: ..."),
+        // This import only resolves because of the fact that
+        // `./psycopg` was *not* added as a search path.
+        ("psycopg/psycopg/__init__.py", "from psycopg.box import Box"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn default_root_flat_layout() -> anyhow::Result<()> {
     let case = CliTest::with_files([
