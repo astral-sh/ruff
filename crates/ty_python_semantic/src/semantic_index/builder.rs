@@ -758,8 +758,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (definition, num_definitions)
     }
 
-    // Creates a definition for each key in the dictionary, based on the outer target in the
-    // dictionary assignment.
+    // Creates a definition for each key-value assignment in the dictionary.
+    //
+    // If there are multiple targets, a given key-value definition will be created multiple
+    // times for each target.
     fn add_dict_key_assignment_definitions(
         &mut self,
         targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,

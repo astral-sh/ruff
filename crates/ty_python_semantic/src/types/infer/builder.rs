@@ -8190,7 +8190,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
-
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }

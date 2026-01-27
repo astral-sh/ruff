@@ -78,6 +78,9 @@ reveal_type({x: y for x, y in enumerate(range(42))})
 
 ## Key narrowing
 
+The original assignment to each key, as well as future assignments, are used to narrow access to
+individual keys:
+
 ```py
 from typing import TypedDict
 
@@ -95,16 +98,22 @@ reveal_type(x2["a"])  # revealed: Literal[1]
 reveal_type(x2["b"])  # revealed: Literal["2"]
 
 class TD(TypedDict):
-    x: int
+    td: int
 
-x3: dict[int, int | TD] = {1: 1, 2: {"x": 1}}
+x3: dict[int, int | TD] = {1: 1, 2: {"td": 1}}
 reveal_type(x3)  # revealed: dict[int, int | TD]
 reveal_type(x3[1])  # revealed: Literal[1]
 reveal_type(x3[2])  # revealed: TD
 
-x4 = {1: 1, 2: {"x": 2, "y": "3"}}
-reveal_type(x4[1])  # revealed: Literal[1]
-reveal_type(x4[2])  # revealed: dict[Unknown | str, Unknown | int | str]
-reveal_type(x4[2]["x"])  # revealed: Literal[2]
-reveal_type(x4[2]["y"])  # revealed: Literal["3"]
+x4 = {"a": 1, "b": {"c": 2, "d": "3"}}
+reveal_type(x4["a"])  # revealed: Literal[1]
+reveal_type(x4["b"])  # revealed: dict[Unknown | str, Unknown | int | str]
+reveal_type(x4["b"]["c"])  # revealed: Literal[2]
+reveal_type(x4["b"]["d"])  # revealed: Literal["3"]
+
+x5: dict[str, int | dict[str, int | TD]] = {"a": 1, "b": {"c": 2, "d": {"td": 1}}}
+reveal_type(x5["a"])  # revealed: Literal[1]
+reveal_type(x5["b"])  # revealed: dict[str, int | TD]
+reveal_type(x5["b"]["c"])  # revealed: Literal[2]
+reveal_type(x5["b"]["d"])  # revealed: TD
 ```
