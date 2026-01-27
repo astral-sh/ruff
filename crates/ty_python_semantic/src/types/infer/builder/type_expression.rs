@@ -674,7 +674,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     diagnostic.annotate(
                                         self.context
                                             .secondary(element)
-                                            .message("Second unpacked variadict tuple"),
+                                            .message("Later unpacked variadic tuple"),
                                     );
                                 }
                             } else {

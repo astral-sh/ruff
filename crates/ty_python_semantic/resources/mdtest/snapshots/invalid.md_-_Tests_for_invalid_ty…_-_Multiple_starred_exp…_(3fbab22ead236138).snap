@@ -46,7 +46,7 @@ error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a
 7 |     x: tuple[*tuple[int, ...], *tuple[str, ...]],
   |        ^^^^^^----------------^^----------------^
   |              |                 |
-  |              |                 Second unpacked variadict tuple
+  |              |                 Later unpacked variadic tuple
   |              First unpacked variadic tuple
 8 |     y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
 9 |     # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
@@ -64,7 +64,7 @@ error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a
  8 |     y: tuple[*tuple[int, ...], str, int, *tuple[str, ...]],  # error: [invalid-type-form]
    |        ^^^^^^----------------^^^^^^^^^^^^----------------^
    |              |                           |
-   |              |                           Second unpacked variadict tuple
+   |              |                           Later unpacked variadic tuple
    |              First unpacked variadic tuple
  9 |     # Multiple unpacked elements are fine, as long as the unpacked elements are not variadic:
 10 |     z: tuple[*tuple[int, ...], *tuple[str]],
@@ -82,7 +82,7 @@ error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a
 16 | T1 = tuple[int, *Ts, str, *Ts]  # error: [invalid-type-form]
    |      ^^^^^^^^^^^---^^^^^^^---^
    |                 |         |
-   |                 |         Second unpacked variadict tuple
+   |                 |         Later unpacked variadic tuple
    |                 First unpacked variadic tuple
 17 |
 18 | def func3(t: tuple[*Ts]):
@@ -100,7 +100,7 @@ error[invalid-type-form]: Multiple unpacked variadic tuples are not allowed in a
 20 |     t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
    |         ^^^^^^----------------^^---^
    |               |                 |
-   |               |                 Second unpacked variadict tuple
+   |               |                 Later unpacked variadic tuple
    |               First unpacked variadic tuple
    |
 info: rule `invalid-type-form` is enabled by default
