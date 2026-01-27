@@ -493,6 +493,75 @@ reveal_type(C(1, True))  # revealed: C[int]
 wrong_innards: C[int] = C("five", 1)
 ```
 
+### Some `__new__` overloads only apply to certain specializations
+
+```py
+from typing import Any
+from typing_extensions import overload, Generic, Self, TypeVar
+from ty_extensions import generic_context, into_callable
+
+class C[T]:
+    # we need to use the type variable or else the class is bivariant in T, and
+    # specializations become meaningless
+    x: T
+
+    @overload
+    def __new__(cls, x: str) -> "C[str]": ...
+    @overload
+    def __new__(cls, x: bytes) -> "C[bytes]": ...
+    @overload
+    def __new__(cls, x: bytes) -> "C[int]": ...
+    @overload
+    def __new__(cls, x: int) -> Self: ...
+    def __new__(cls, x: str | bytes | int) -> Any: ...
+
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(C))
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(into_callable(C)))
+
+reveal_type(C("string"))  # revealed: C[str]
+reveal_type(C(b"bytes"))  # revealed: C[bytes]
+reveal_type(C(12))  # revealed: C[Unknown]
+
+reveal_type(C[str]("string"))  # revealed: C[str]
+reveal_type(C[str](b"bytes"))  # revealed: C[bytes]
+reveal_type(C[str](12))  # revealed: C[str]
+
+reveal_type(C[bytes]("string"))  # revealed: C[str]
+reveal_type(C[bytes](b"bytes"))  # revealed: C[bytes]
+reveal_type(C[bytes](12))  # revealed: C[bytes]
+
+reveal_type(C[int]("string"))  # revealed: C[str]
+reveal_type(C[int](b"bytes"))  # revealed: C[bytes]
+reveal_type(C[int](12))  # revealed: C[int]
+
+reveal_type(C[None]("string"))  # revealed: C[str]
+reveal_type(C[None](b"bytes"))  # revealed: C[bytes]
+reveal_type(C[None](12))  # revealed: C[None]
+
+class D[T, U]:
+    # we need to use the type variables or else the class is bivariant, and
+    # specializations become meaningless
+    x: T
+    y: U
+
+    @overload
+    def __new__(cls, u: U) -> "D[str, U]": ...
+    @overload
+    def __new__(cls, t: T, u: U) -> Self: ...
+    def __new__(cls, *args) -> Any: ...
+
+# revealed: ty_extensions.GenericContext[T@D, U@D]
+reveal_type(generic_context(D))
+# revealed: ty_extensions.GenericContext[T@D, U@D]
+reveal_type(generic_context(into_callable(D)))
+
+reveal_type(D("string"))  # revealed: D[str, str]
+reveal_type(D(1))  # revealed: D[str, int]
+reveal_type(D(1, "string"))  # revealed: D[int, str]
+```
+
 ### Some `__init__` overloads only apply to certain specializations
 
 ```py
@@ -541,6 +610,11 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 
 class D[T, U]:
+    # we need to use the type variables or else the class is bivariant, and
+    # specializations become meaningless
+    x: T
+    y: U
+
     @overload
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
@@ -552,9 +626,9 @@ reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_callable(D)))
 
-reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
-reveal_type(D(1))  # revealed: D[str, Literal[1]]
-reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
+reveal_type(D("string"))  # revealed: D[str, str]
+reveal_type(D(1))  # revealed: D[str, int]
+reveal_type(D(1, "string"))  # revealed: D[int, str]
 ```
 
 ### Synthesized methods with dataclasses
