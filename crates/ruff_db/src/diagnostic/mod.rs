@@ -1041,7 +1041,7 @@ pub enum DiagnosticId {
     InvalidCliOption,
 
     /// Experimental feature requires preview mode.
-    ExperimentalFeature,
+    PreviewFeature,
 
     /// An internal assumption was violated.
     ///
@@ -1095,7 +1095,7 @@ impl DiagnosticId {
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
             DiagnosticId::Unformatted => "unformatted",
             DiagnosticId::InvalidCliOption => "invalid-cli-option",
-            DiagnosticId::ExperimentalFeature => "experimental-feature",
+            DiagnosticId::PreviewFeature => "preview-feature",
             DiagnosticId::InternalError => "internal-error",
         }
     }

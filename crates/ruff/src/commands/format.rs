@@ -910,7 +910,7 @@ impl From<&FormatCommandError> for Diagnostic {
                 "Range formatting is only supported for Python files.",
             ),
             FormatCommandError::MarkdownExperimental(_) => Diagnostic::new(
-                DiagnosticId::ExperimentalFeature,
+                DiagnosticId::PreviewFeature,
                 Severity::Warning,
                 "Markdown formatting is experimental, enable preview mode.",
             ),
