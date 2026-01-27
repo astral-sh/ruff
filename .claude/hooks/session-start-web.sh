@@ -10,5 +10,6 @@ fi
 # Install clippy and rustfmt for the active toolchain.
 rustup component add clippy rustfmt
 
-# Install cargo-nextest
-cargo install --locked cargo-nextest
+# Our CLAUDE.md says to use nextest, but it's slow to install, so just tell
+# CCfW not to try to use it.
+echo "nextest is not installed, so just use 'cargo test' instead."
