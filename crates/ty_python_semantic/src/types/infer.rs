@@ -498,7 +498,7 @@ pub(crate) fn nearest_enclosing_class<'db>(
             let definition = semantic.expect_single_definition(class);
             declaration_type(db, definition)
                 .inner_type()
-                .as_class_literal()
+                .as_class_literal(db)
                 .and_then(ClassLiteral::as_static)
         })
 }
@@ -523,7 +523,7 @@ pub(crate) fn nearest_enclosing_function<'db>(
             inference
                 .undecorated_type()
                 .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
-                .as_function_literal()
+                .as_function_literal(db)
         })
 }
 

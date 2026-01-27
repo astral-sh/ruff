@@ -981,8 +981,8 @@ impl<'db> Type<'db> {
         self.is_instance_of(db, KnownClass::NotImplementedType)
     }
 
-    pub(crate) fn is_todo(&self) -> bool {
-        self.as_dynamic().is_some_and(|dynamic| match dynamic {
+    pub(crate) fn is_todo(&self, db: &'db dyn Db) -> bool {
+        self.as_dynamic(db).is_some_and(|dynamic| match dynamic {
             DynamicType::Any
             | DynamicType::Unknown
             | DynamicType::UnknownGeneric(_)
@@ -1178,8 +1178,8 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypeVar(_))
     }
 
-    pub(crate) const fn as_typevar(self) -> Option<BoundTypeVarInstance<'db>> {
-        match self {
+    pub(crate) fn as_typevar(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
+        match self.resolve_type_alias(db) {
             Type::TypeVar(bound_typevar) => Some(bound_typevar),
             _ => None,
         }
@@ -1189,15 +1189,15 @@ impl<'db> Type<'db> {
         any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
     }
 
-    pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
-        match self {
+    pub(crate) fn as_special_form(self, db: &'db dyn Db) -> Option<SpecialFormType> {
+        match self.resolve_type_alias(db) {
             Type::SpecialForm(special_form) => Some(special_form),
             _ => None,
         }
     }
 
-    pub const fn as_class_literal(self) -> Option<ClassLiteral<'db>> {
-        match self {
+    pub fn as_class_literal(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+        match self.resolve_type_alias(db) {
             Type::ClassLiteral(class_type) => Some(class_type),
             _ => None,
         }
@@ -1220,34 +1220,35 @@ impl<'db> Type<'db> {
         ty
     }
 
-    pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
-        match self {
+    pub(crate) fn as_dynamic(self, db: &'db dyn Db) -> Option<DynamicType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
             _ => None,
         }
     }
 
-    pub(crate) const fn as_callable(self) -> Option<CallableType<'db>> {
-        match self {
+    pub(crate) fn as_callable(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::Callable(callable_type) => Some(callable_type),
             _ => None,
         }
     }
 
-    pub(crate) const fn expect_dynamic(self) -> DynamicType<'db> {
-        self.as_dynamic().expect("Expected a Type::Dynamic variant")
+    pub(crate) fn expect_dynamic(self, db: &'db dyn Db) -> DynamicType<'db> {
+        self.as_dynamic(db)
+            .expect("Expected a Type::Dynamic variant")
     }
 
-    pub(crate) const fn as_protocol_instance(self) -> Option<ProtocolInstanceType<'db>> {
-        match self {
+    pub(crate) fn as_protocol_instance(self, db: &'db dyn Db) -> Option<ProtocolInstanceType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::ProtocolInstance(instance) => Some(instance),
             _ => None,
         }
     }
 
     #[track_caller]
-    pub(crate) const fn expect_class_literal(self) -> ClassLiteral<'db> {
-        self.as_class_literal()
+    pub(crate) fn expect_class_literal(self, db: &'db dyn Db) -> ClassLiteral<'db> {
+        self.as_class_literal(db)
             .expect("Expected a Type::ClassLiteral variant")
     }
 
@@ -1259,8 +1260,8 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub(crate) const fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
-        match self {
+    pub(crate) fn as_enum_literal(self, db: &'db dyn Db) -> Option<EnumLiteralType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::EnumLiteral(enum_literal) => Some(enum_literal),
             _ => None,
         }
@@ -1268,8 +1269,8 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) const fn expect_enum_literal(self) -> EnumLiteralType<'db> {
-        self.as_enum_literal()
+    pub(crate) fn expect_enum_literal(self, db: &'db dyn Db) -> EnumLiteralType<'db> {
+        self.as_enum_literal(db)
             .expect("Expected a Type::EnumLiteral variant")
     }
 
@@ -1277,8 +1278,8 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypedDict(..))
     }
 
-    pub(crate) const fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
-        match self {
+    pub(crate) fn as_typed_dict(self, db: &'db dyn Db) -> Option<TypedDictType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::TypedDict(typed_dict) => Some(typed_dict),
             _ => None,
         }
@@ -1311,8 +1312,8 @@ impl<'db> Type<'db> {
         ))
     }
 
-    pub(crate) const fn as_module_literal(self) -> Option<ModuleLiteralType<'db>> {
-        match self {
+    pub(crate) fn as_module_literal(self, db: &'db dyn Db) -> Option<ModuleLiteralType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::ModuleLiteral(module) => Some(module),
             _ => None,
         }
@@ -1322,16 +1323,16 @@ impl<'db> Type<'db> {
         matches!(self, Type::Union(_))
     }
 
-    pub(crate) const fn as_union(self) -> Option<UnionType<'db>> {
-        match self {
+    pub(crate) fn as_union(self, db: &'db dyn Db) -> Option<UnionType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::Union(union_type) => Some(union_type),
             _ => None,
         }
     }
 
     #[track_caller]
-    pub(crate) const fn expect_union(self) -> UnionType<'db> {
-        self.as_union().expect("Expected a Type::Union variant")
+    pub(crate) fn expect_union(self, db: &'db dyn Db) -> UnionType<'db> {
+        self.as_union(db).expect("Expected a Type::Union variant")
     }
 
     /// Returns whether this is a "real" intersection type. (Negated types are represented by an
@@ -1344,8 +1345,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_function_literal(self) -> Option<FunctionType<'db>> {
-        match self {
+    pub(crate) fn as_function_literal(self, db: &'db dyn Db) -> Option<FunctionType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::FunctionLiteral(function_type) => Some(function_type),
             _ => None,
         }
@@ -1353,8 +1354,8 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_function_literal(self) -> FunctionType<'db> {
-        self.as_function_literal()
+    pub(crate) fn expect_function_literal(self, db: &'db dyn Db) -> FunctionType<'db> {
+        self.as_function_literal(db)
             .expect("Expected a Type::FunctionLiteral variant")
     }
 
@@ -1380,7 +1381,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.as_union().is_some_and(|union| {
+        self.as_union(db).is_some_and(|union| {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
@@ -1393,7 +1394,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.as_union().is_some_and(|union| {
+        self.as_union(db).is_some_and(|union| {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
@@ -1405,8 +1406,8 @@ impl<'db> Type<'db> {
             || (self.is_enum(db) && !self.overrides_equality(db))
     }
 
-    pub(crate) fn as_string_literal(self) -> Option<StringLiteralType<'db>> {
-        match self {
+    pub(crate) fn as_string_literal(self, db: &'db dyn Db) -> Option<StringLiteralType<'db>> {
+        match self.resolve_type_alias(db) {
             Type::StringLiteral(string_literal) => Some(string_literal),
             _ => None,
         }
@@ -5953,7 +5954,7 @@ impl<'db> Type<'db> {
                 TypedDictType::Class(class) => SubclassOfType::from(db, class),
                 TypedDictType::Synthesized(_) => SubclassOfType::from(
                     db,
-                    todo_type!("TypedDict synthesized meta-type").expect_dynamic(),
+                    todo_type!("TypedDict synthesized meta-type").expect_dynamic(db),
                 ),
             },
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
@@ -8305,7 +8306,7 @@ impl<'db> TypeVarInstance<'db> {
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
                 let func_ty = definition_expression_type(db, definition, &call_expr.func);
-                let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
+                let known_class = func_ty.as_class_literal(db).and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 let default_type = definition_expression_type(db, definition, expr);
                 if known_class == Some(KnownClass::ParamSpec) {
@@ -13184,16 +13185,16 @@ pub(crate) mod tests {
         // salsa, but that would mean we would have to pass in `db` everywhere.
 
         // A union of several `Todo` types collapses to a single `Todo` type:
-        assert!(UnionType::from_elements(&db, [todo1, todo2]).is_todo());
+        assert!(UnionType::from_elements(&db, [todo1, todo2]).is_todo(&db));
 
         // And similar for intersection types:
-        assert!(IntersectionType::from_elements(&db, [todo1, todo2]).is_todo());
+        assert!(IntersectionType::from_elements(&db, [todo1, todo2]).is_todo(&db));
         assert!(
             IntersectionBuilder::new(&db)
                 .add_positive(todo1)
                 .add_negative(todo2)
                 .build()
-                .is_todo()
+                .is_todo(&db)
         );
     }
 

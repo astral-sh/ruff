@@ -1381,7 +1381,7 @@ fn add_class_arg_completions<'db>(
 
     let is_typed_dict = class_def
         .inferred_type(model)
-        .and_then(Type::as_class_literal)
+        .and_then(|ty| ty.as_class_literal(model.db()))
         .is_some_and(|t| t.is_typed_dict(model.db()));
 
     // TODO: Handle PEP 728 that adds two extra keywords,

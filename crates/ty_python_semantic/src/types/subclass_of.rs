@@ -425,14 +425,14 @@ impl<'db> SubclassOfInner<'db> {
             Type::TypedDict(typed_dict) => match typed_dict {
                 TypedDictType::Class(class) => SubclassOfInner::Class(class),
                 TypedDictType::Synthesized(_) => SubclassOfInner::Dynamic(
-                    todo_type!("type[T] for synthesized TypedDicts").expect_dynamic(),
+                    todo_type!("type[T] for synthesized TypedDicts").expect_dynamic(db),
                 ),
             },
             Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
             Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
             Type::ProtocolInstance(_) => {
-                SubclassOfInner::Dynamic(todo_type!("type[T] for protocols").expect_dynamic())
+                SubclassOfInner::Dynamic(todo_type!("type[T] for protocols").expect_dynamic(db))
             }
             _ => return None,
         })

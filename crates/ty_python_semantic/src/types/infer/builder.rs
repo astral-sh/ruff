@@ -636,7 +636,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Filter out class literals that result from imports
             if let DefinitionKind::Class(class) = definition.kind(self.db()) {
                 ty.inner_type()
-                    .as_class_literal()
+                    .as_class_literal(self.db())
                     .and_then(ClassLiteral::as_static)
                     .map(|class_literal| (class_literal, class.node(self.module())))
             } else {
@@ -1003,7 +1003,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Find the @total_ordering decorator to report the diagnostic at its location
                 if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
                     self.expression_type(&decorator.expression)
-                        .as_function_literal()
+                        .as_function_literal(self.db())
                         .is_some_and(|function| {
                             function.is_known(self.db(), KnownFunction::TotalOrdering)
                         })
@@ -1449,7 +1449,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !matches!(definition.kind(self.db()), DefinitionKind::Function(_)) {
                     return None;
                 }
-                let function = ty.inner_type().as_function_literal()?;
+                let function = ty.inner_type().as_function_literal(self.db())?;
                 if function.has_known_decorator(self.db(), FunctionDecorators::OVERLOAD) {
                     Some(definition.place(self.db()))
                 } else {
@@ -1534,7 +1534,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.index
                             .expect_single_definition(class_node_ref.node(self.module())),
                     )
-                    .expect_class_literal();
+                    .expect_class_literal(self.db());
 
                     if class.is_protocol(self.db())
                         || (Type::ClassLiteral(class)
@@ -1704,7 +1704,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             };
 
-            let Some(function) = ty.inner_type().as_function_literal() else {
+            let Some(function) = ty.inner_type().as_function_literal(self.db()) else {
                 continue;
             };
 
@@ -3101,7 +3101,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for decorator in &function_node.decorator_list {
             let decorator_ty = inference.expression_type(&decorator.expression);
             if let Some(known_class) = decorator_ty
-                .as_class_literal()
+                .as_class_literal(db)
                 .and_then(|class| class.known(db))
             {
                 if known_class == KnownClass::Staticmethod {
@@ -3116,7 +3116,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_literal = infer_definition_types(db, class_definition)
             .declaration_type(class_definition)
             .inner_type()
-            .as_class_literal()?;
+            .as_class_literal(db)?;
 
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
         if is_classmethod || function_name == "__new__" {
@@ -3227,7 +3227,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
             if decorator_ty
-                .as_function_literal()
+                .as_function_literal(self.db())
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
             {
                 dataclass_params = Some(DataclassParams::default_params(self.db()));
@@ -3235,7 +3235,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if decorator_ty
-                .as_function_literal()
+                .as_function_literal(self.db())
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::TotalOrdering))
             {
                 total_ordering = true;
@@ -3255,7 +3255,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if decorator_ty
-                .as_function_literal()
+                .as_function_literal(self.db())
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::TypeCheckOnly))
             {
                 type_check_only = true;
@@ -3263,16 +3263,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Skip identity decorators to avoid salsa cycles on typeshed.
-            if decorator_ty.as_function_literal().is_some_and(|function| {
-                matches!(
-                    function.known(self.db()),
-                    Some(
-                        KnownFunction::Final
-                            | KnownFunction::DisjointBase
-                            | KnownFunction::RuntimeCheckable
+            if decorator_ty
+                .as_function_literal(self.db())
+                .is_some_and(|function| {
+                    matches!(
+                        function.known(self.db()),
+                        Some(
+                            KnownFunction::Final
+                                | KnownFunction::DisjointBase
+                                | KnownFunction::RuntimeCheckable
+                        )
                     )
-                )
-            }) {
+                })
+            {
                 continue;
             }
 
@@ -4007,7 +4010,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
                     // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                    return_todo |= param_type.is_todo()
+                    return_todo |= param_type.is_todo(self.db())
                         && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
                     parameter_types.push(param_type);
                 }
@@ -4093,7 +4096,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // OnlyParamSpec[int]  # P: (int, /)
                         // ```
                         let parameters =
-                            if param_type.is_todo() {
+                            if param_type.is_todo(self.db()) {
                                 Parameters::todo()
                             } else {
                                 Parameters::new(
@@ -4420,15 +4423,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db: &'db dyn Db,
             slice_ty: Type<'db>,
         ) -> Option<impl Iterator<Item = &'db str> + 'db> {
-            if let Some(literal) = slice_ty.as_string_literal() {
+            if let Some(literal) = slice_ty.as_string_literal(db) {
                 Some(Either::Left(std::iter::once(literal.value(db))))
             } else {
-                slice_ty.as_union().map(|union| {
+                slice_ty.as_union(db).map(|union| {
                     Either::Right(
                         union
                             .elements(db)
                             .iter()
-                            .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                            .filter_map(|ty| ty.as_string_literal(db).map(|lit| lit.value(db))),
                     )
                 })
             }
@@ -4642,8 +4645,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                             }
                             CallErrorKind::BindingError => {
-                                if let Some(typed_dict) = object_ty.as_typed_dict() {
-                                    if let Some(key) = slice_ty.as_string_literal() {
+                                if let Some(typed_dict) = object_ty.as_typed_dict(db) {
+                                    if let Some(key) = slice_ty.as_string_literal(db) {
                                         let key = key.value(db);
                                         validate_typed_dict_key_assignment(
                                             &self.context,
@@ -4866,7 +4869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 CallErrorKind::BindingError => {
                                     // For deletions of string literal keys on `TypedDict`, provide
                                     // a more detailed diagnostic.
-                                    if let Some(typed_dict) = object_ty.as_typed_dict() {
+                                    if let Some(typed_dict) = object_ty.as_typed_dict(db) {
                                         if let Type::StringLiteral(string_literal) = slice_ty {
                                             let key = string_literal.value(db);
                                             let items = typed_dict.items(db);
@@ -5838,7 +5841,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                     } else {
                         match callable_type
-                            .as_class_literal()
+                            .as_class_literal(self.db())
                             .and_then(|cls| cls.known(self.db()))
                         {
                             Some(
@@ -6025,7 +6028,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let Some(name_param) = name_param_ty
+            .as_string_literal(db)
+            .map(|name| name.value(db))
+        else {
             return error(
                 &self.context,
                 "The first argument to `ParamSpec` must be a string literal",
@@ -6242,7 +6248,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let Some(name_param) = name_param_ty
+            .as_string_literal(db)
+            .map(|name| name.value(db))
+        else {
             return error(
                 &self.context,
                 "The first argument to `TypeVar` must be a string literal.",
@@ -6360,7 +6369,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
 
-        let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let Some(name) = name_param_ty
+            .as_string_literal(db)
+            .map(|name| name.value(db))
+        else {
             return error(
                 &self.context,
                 "The first argument to `NewType` must be a string literal",
@@ -6419,7 +6431,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
         let known_class = func_ty
-            .as_class_literal()
+            .as_class_literal(self.db())
             .and_then(|cls| cls.known(self.db()));
         if known_class == Some(KnownClass::NewType) {
             self.infer_newtype_assignment_deferred(arguments);
@@ -7212,7 +7224,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 fixed_tuple
                     .all_elements()
                     .iter()
-                    .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
+                    .map(|elt| elt.as_string_literal(db).map(|s| Name::new(s.value(db))))
                     .collect()
             } else {
                 // Get the elements from the list or tuple literal.
@@ -7227,7 +7239,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|elt| {
                             // Each element should be a string literal.
                             let field_ty = self.expression_type(elt);
-                            let field_lit = field_ty.as_string_literal()?;
+                            let field_lit = field_ty.as_string_literal(db)?;
                             Some(Name::new(field_lit.value(db)))
                         })
                         .collect::<Option<_>>()
@@ -7968,7 +7980,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let class_literal = infer_definition_types(db, class_definition)
                     .declaration_type(class_definition)
                     .inner_type()
-                    .as_class_literal()?
+                    .as_class_literal(db)?
                     .as_static()?;
 
                 class_literal
@@ -8693,7 +8705,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid looking up attributes on a module if a module imports from itself
         // (e.g. `from parent import submodule` inside the `parent` module).
         let import_is_self_referential = module_ty
-            .as_module_literal()
+            .as_module_literal(self.db())
             .is_some_and(|module| Some(self.file()) == module.module(self.db()).file(self.db()));
 
         // Although it isn't the runtime semantics, we go to some trouble to prioritize a submodule
@@ -10155,7 +10167,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(tcx) = tcx.annotation {
             let tcx = tcx.filter_union(self.db(), Type::is_typed_dict);
 
-            if let Some(typed_dict) = tcx.as_typed_dict() {
+            if let Some(typed_dict) = tcx.as_typed_dict(self.db()) {
                 // If there is a single typed dict annotation, infer against it directly.
                 if let Some(ty) =
                     self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
@@ -10171,7 +10183,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut narrowed_typed_dicts = Vec::new();
                 for element in tcx.elements(self.db()) {
                     let typed_dict = element
-                        .as_typed_dict()
+                        .as_typed_dict(self.db())
                         .expect("filtered out non-typed-dict types above");
 
                     if self
@@ -11006,9 +11018,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(tcx) = call_expression_tcx.annotation
             && let Some(typed_dict) = tcx
                 .filter_union(self.db(), Type::is_typed_dict)
-                .as_typed_dict()
+                .as_typed_dict(self.db())
             && callable_type
-                .as_class_literal()
+                .as_class_literal(self.db())
                 .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
             && arguments.args.is_empty()
             && arguments
@@ -11282,7 +11294,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && class_literal.is_typed_dict(self.db())
         {
             let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
-            if let Some(typed_dict) = typed_dict_type.as_typed_dict() {
+            if let Some(typed_dict) = typed_dict_type.as_typed_dict(self.db()) {
                 validate_typed_dict_constructor(
                     &self.context,
                     typed_dict,
@@ -14588,7 +14600,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let callable = self
                     .infer_callable_type(subscript)
-                    .as_callable()
+                    .as_callable(self.db())
                     .expect("always returns Type::Callable");
 
                 return Type::KnownInstance(KnownInstanceType::Callable(callable));

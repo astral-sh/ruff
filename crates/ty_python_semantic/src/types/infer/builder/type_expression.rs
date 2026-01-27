@@ -603,7 +603,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             element_ty: Type,
             builder: &mut TypeInferenceBuilder,
         ) -> bool {
-            if !element_ty.is_todo() {
+            if !element_ty.is_todo(builder.db()) {
                 return false;
             }
 
@@ -807,7 +807,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if class_literal.is_protocol(self.db()) {
                             SubclassOfType::from(
                                 self.db(),
-                                todo_type!("type[T] for protocols").expect_dynamic(),
+                                todo_type!("type[T] for protocols").expect_dynamic(self.db()),
                             )
                         } else if class_literal.is_tuple(self.db()) {
                             let class_type = self
@@ -1896,7 +1896,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
                     // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                    return_todo |= param_type.is_todo()
+                    return_todo |= param_type.is_todo(self.db())
                         && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
                     parameter_types.push(param_type);
                 }

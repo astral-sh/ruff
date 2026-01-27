@@ -2702,7 +2702,7 @@ mod tests {
         global_symbol(db, module, "f")
             .place
             .expect_type()
-            .expect_function_literal()
+            .expect_function_literal(db)
     }
 
     #[track_caller]

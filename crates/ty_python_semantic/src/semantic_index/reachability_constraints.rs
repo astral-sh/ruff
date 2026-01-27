@@ -823,7 +823,7 @@ impl ReachabilityConstraints {
             }
             PatternPredicateKind::Class(class_expr, kind) => {
                 let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
-                    .as_class_literal()
+                    .as_class_literal(db)
                     .map(|class| Type::instance(db, class.top_materialization(db)));
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {

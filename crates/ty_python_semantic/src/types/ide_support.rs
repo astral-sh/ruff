@@ -159,7 +159,7 @@ pub fn definitions_for_name<'db>(
         if matches!(name_str, "float" | "complex")
             && let Some(expr) = node.expr_name()
             && let Some(ty) = expr.inferred_type(model)
-            && let Some(union) = ty.as_union()
+            && let Some(union) = ty.as_union(db)
             && is_float_or_complex_annotation(db, union, name_str)
         {
             return union
@@ -200,7 +200,7 @@ fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> boo
         "complex" => KnownUnion::Complex.to_type(db),
         _ => return false,
     }
-    .expect_union();
+    .expect_union(db);
 
     ty == float_or_complex_ty
 }

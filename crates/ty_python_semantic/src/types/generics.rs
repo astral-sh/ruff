@@ -1820,7 +1820,7 @@ impl<'db> SpecializationBuilder<'db> {
                 let mut bound_typevars = union_formal
                     .elements(self.db)
                     .iter()
-                    .filter_map(|ty| ty.as_typevar());
+                    .filter_map(|ty| ty.as_typevar(self.db));
 
                 // TODO:
                 // Handling more than one bare typevar is something that we can't handle yet.

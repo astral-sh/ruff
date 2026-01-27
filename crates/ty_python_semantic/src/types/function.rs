@@ -331,7 +331,7 @@ impl<'db> OverloadLiteral<'db> {
         needle: KnownFunction,
     ) -> Option<Span> {
         self.find_decorator_span(db, |ty| {
-            ty.as_function_literal()
+            ty.as_function_literal(db)
                 .is_some_and(|f| f.is_known(db, needle))
         })
     }
@@ -1659,7 +1659,7 @@ impl KnownFunction {
                         return;
                     }
                     let mut diagnostic = if let Some(message) = message
-                        .and_then(Type::as_string_literal)
+                        .and_then(|m| m.as_string_literal(db))
                         .map(|s| s.value(db))
                     {
                         builder.into_diagnostic(format_args!("Static assertion error: {message}"))
@@ -2119,7 +2119,7 @@ pub(crate) mod tests {
             let function_definition = known_module_symbol(&db, module, function_name)
                 .place
                 .expect_type()
-                .expect_function_literal()
+                .expect_function_literal(&db)
                 .definition(&db);
 
             assert_eq!(

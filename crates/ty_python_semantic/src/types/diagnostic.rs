@@ -2904,7 +2904,7 @@ pub(crate) fn is_invalid_typed_dict_literal(
 ) -> bool {
     target_ty
         .filter_union(db, Type::is_typed_dict)
-        .as_typed_dict()
+        .as_typed_dict(db)
         .is_some()
         && matches!(source, AnyNodeRef::ExprDict(_))
 }

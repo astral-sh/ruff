@@ -454,7 +454,7 @@ impl<'db> Bindings<'db> {
                                 ..,
                             ] if property.getter(db).is_some_and(|getter| {
                                 getter
-                                    .as_function_literal()
+                                    .as_function_literal(db)
                                     .is_some_and(|f| f.name(db) == "__name__")
                             }) =>
                             {
@@ -468,7 +468,7 @@ impl<'db> Bindings<'db> {
                             ] => {
                                 match property
                                     .getter(db)
-                                    .and_then(Type::as_function_literal)
+                                    .and_then(|g| g.as_function_literal(db))
                                     .map(|f| f.name(db).as_str())
                                 {
                                     Some("__name__") => {
@@ -758,7 +758,7 @@ impl<'db> Bindings<'db> {
                         };
 
                         let alias = alias
-                            .and_then(Type::as_string_literal)
+                            .and_then(|a| a.as_string_literal(db))
                             .map(|literal| Box::from(literal.value(db)));
 
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
@@ -1002,7 +1002,7 @@ impl<'db> Bindings<'db> {
                                 // be a "(specialised) protocol class", but `typing.is_protocol(SupportsAbs[int])` returns
                                 // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
                                 overload.set_return_type(Type::BooleanLiteral(
-                                    ty.as_class_literal()
+                                    ty.as_class_literal(db)
                                         .is_some_and(|class| class.is_protocol(db)),
                                 ));
                             }
@@ -1034,7 +1034,7 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
 
-                            let Some(attr_name) = attr_name.as_string_literal() else {
+                            let Some(attr_name) = attr_name.as_string_literal(db) else {
                                 continue;
                             };
 
@@ -1392,7 +1392,7 @@ impl<'db> Bindings<'db> {
                                 .tuple_spec(db)?
                                 .fixed_elements()
                                 .map(|ty| {
-                                    ty.as_typevar()
+                                    ty.as_typevar(db)
                                         .map(|bound_typevar| bound_typevar.identity(db))
                                 })
                                 .collect()
@@ -4387,12 +4387,12 @@ impl<'db> BindingError<'db> {
                     && *argument_index == Some(1)
                     && matches!(
                         callable_ty
-                            .as_function_literal()
+                            .as_function_literal(context.db())
                             .and_then(|function| function.known(context.db())),
                         Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
                     )
                     && provided_ty
-                        .as_special_form()
+                        .as_special_form(context.db())
                         .is_some_and(SpecialFormType::is_valid_isinstance_target)
                 {
                     return;
@@ -4975,7 +4975,7 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         known_module_symbol(db, KnownModule::Contextlib, "_AsyncGeneratorContextManager")
             .place
             .ignore_possibly_undefined()?
-            .as_class_literal()?;
+            .as_class_literal(db)?;
 
     let context_manager = context_manager.apply_specialization(db, |generic_context| {
         generic_context.specialize_partial(db, [Some(yield_ty), None])

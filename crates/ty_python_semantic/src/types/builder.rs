@@ -826,7 +826,7 @@ impl<'db> IntersectionBuilder<'db> {
                 for intersection in &self.intersections {
                     if intersection.negative.iter().any(|negative| {
                         negative
-                            .as_enum_literal()
+                            .as_enum_literal(self.db)
                             .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
                     }) {
                         contains_enum_literal_as_negative_element = true;
@@ -1443,7 +1443,7 @@ mod tests {
 
         let t0 = Type::IntLiteral(0);
         let t1 = Type::IntLiteral(1);
-        let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
+        let union = UnionType::from_elements(&db, [t0, t1]).expect_union(&db);
 
         assert_eq!(union.elements(&db), &[t0, t1]);
     }
@@ -1508,23 +1508,23 @@ mod tests {
             .ignore_possibly_undefined()
             .unwrap();
 
-        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)
+        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(&db), None)
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(literals.len(), 3);
 
         // SafeUUID.safe
         let l_safe = literals[0];
-        assert_eq!(l_safe.expect_enum_literal().name(&db), "safe");
+        assert_eq!(l_safe.expect_enum_literal(&db).name(&db), "safe");
         // SafeUUID.unsafe
         let l_unsafe = literals[1];
-        assert_eq!(l_unsafe.expect_enum_literal().name(&db), "unsafe");
+        assert_eq!(l_unsafe.expect_enum_literal(&db).name(&db), "unsafe");
         // SafeUUID.unknown
         let l_unknown = literals[2];
-        assert_eq!(l_unknown.expect_enum_literal().name(&db), "unknown");
+        assert_eq!(l_unknown.expect_enum_literal(&db).name(&db), "unknown");
 
         // The enum itself: SafeUUID
-        let safe_uuid = l_safe.expect_enum_literal().enum_class_instance(&db);
+        let safe_uuid = l_safe.expect_enum_literal(&db).enum_class_instance(&db);
 
         {
             let actual = IntersectionBuilder::new(&db)

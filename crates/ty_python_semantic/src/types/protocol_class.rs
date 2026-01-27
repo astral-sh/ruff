@@ -264,7 +264,7 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db, 'db>> {
         self.members(db)
-            .filter(|member| !member.is_method() && !member.ty().is_todo())
+            .filter(|member| !member.is_method() && !member.ty().is_todo(db))
             .collect()
     }
 

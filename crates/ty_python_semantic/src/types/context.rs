@@ -9,7 +9,7 @@ use ruff_db::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{Type, TypeCheckDiagnostics, binding_type};
+use super::{TypeCheckDiagnostics, binding_type};
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
@@ -195,7 +195,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
                     .ancestor_scopes(scope_id)
                     .filter_map(|(_, scope)| scope.node().as_function())
                     .map(|node| binding_type(self.db, index.expect_single_definition(node)))
-                    .filter_map(Type::as_function_literal);
+                    .filter_map(|ty| ty.as_function_literal(self.db));
 
                 // Iterate over all functions and test if any is decorated with `@no_type_check`.
                 function_scope_tys.any(|function_ty| {

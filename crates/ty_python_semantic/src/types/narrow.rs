@@ -861,7 +861,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // Add the narrowed values from the RHS first, to keep literals before broader types.
             builder = builder.add(rhs_values);
 
-            if let Some(lhs_union) = lhs_ty.as_union() {
+            if let Some(lhs_union) = lhs_ty.as_union(self.db) {
                 for element in lhs_union.elements(self.db) {
                     // Skip single-valued types (handled via RHS matching).
                     if element.is_single_valued(self.db) {
@@ -906,7 +906,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             let mut single_builder = UnionBuilder::new(self.db);
             let mut rest_builder = UnionBuilder::new(self.db);
 
-            if let Some(lhs_union) = lhs_ty.as_union() {
+            if let Some(lhs_union) = lhs_ty.as_union(self.db) {
                 for element in lhs_union.elements(self.db) {
                     if element.is_single_valued(self.db)
                         || element.is_literal_string()
@@ -1045,9 +1045,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //             reveal_type(t)  # tuple[int, int]
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
             && let ast::Expr::Subscript(subscript) = &**left
-            && let Type::Union(union) = inference
+            && let Some(union) = inference
                 .expression_type(&*subscript.value)
-                .resolve_type_alias(self.db)
+                .as_union(self.db)
             && let Some(subscript_place_expr) = PlaceExpr::try_from_expr(&subscript.value)
             && let Type::IntLiteral(index) = inference.expression_type(&*subscript.slice)
             && let Ok(index) = i32::try_from(index)
@@ -1167,7 +1167,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             .positive(self.db)
                             .iter()
                             .copied()
-                            .filter_map(Type::as_typed_dict)
+                            .filter_map(|ty| ty.as_typed_dict(self.db))
                             .any(requires_key)
                         {
                             Type::Never
@@ -1183,7 +1183,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                                 .positive(self.db)
                                 .iter()
                                 .copied()
-                                .filter_map(Type::as_typed_dict)
+                                .filter_map(|ty| ty.as_typed_dict(self.db))
                                 .any(requires_key),
                             _ => true,
                         })
@@ -1363,7 +1363,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if function == KnownFunction::HasAttr {
                     let attr = inference
                         .expression_type(second_arg)
-                        .as_string_literal()?
+                        .as_string_literal(self.db)?
                         .value(self.db);
 
                     if !is_identifier(attr) {

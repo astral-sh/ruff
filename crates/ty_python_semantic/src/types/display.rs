@@ -1034,7 +1034,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         Type::PropertyInstance(property),
                         property
                             .getter(self.db)
-                            .and_then(Type::as_function_literal)
+                            .and_then(|g| g.as_function_literal(self.db))
                             .map(|getter| &**getter.name(self.db)),
                     ),
                     KnownBoundMethodType::PropertyDunderSet(property) => (
@@ -1044,7 +1044,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         Type::PropertyInstance(property),
                         property
                             .getter(self.db)
-                            .and_then(Type::as_function_literal)
+                            .and_then(|g| g.as_function_literal(self.db))
                             .map(|getter| &**getter.name(self.db)),
                     ),
                     KnownBoundMethodType::StrStartswith(literal) => (

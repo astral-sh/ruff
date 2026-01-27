@@ -451,7 +451,7 @@ impl NodeWithScopeKind {
             NodeWithScopeKind::Class(class) => {
                 let definition = index.expect_single_definition(class);
                 binding_type(db, definition)
-                    .as_class_literal()?
+                    .as_class_literal(db)?
                     .generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {
@@ -459,7 +459,7 @@ impl NodeWithScopeKind {
                 infer_definition_types(db, definition)
                     .undecorated_type()
                     .expect("function should have undecorated type")
-                    .as_function_literal()?
+                    .as_function_literal(db)?
                     .last_definition_signature(db)
                     .generic_context
             }

@@ -821,7 +821,7 @@ impl<'db> ClassType<'db> {
         ClassType::NonGeneric(
             KnownClass::Object
                 .to_class_literal(db)
-                .as_class_literal()
+                .as_class_literal(db)
                 .expect("`object` should always be a non-generic class in typeshed"),
         )
     }
@@ -1822,7 +1822,7 @@ impl<'db> ClassType<'db> {
                         .filter(|parameter| !parameter.inferred_annotation)
                         .map(Parameter::annotated_type)
                         .filter(|ty| {
-                            ty.as_typevar()
+                            ty.as_typevar(db)
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
                         });
                     let return_type = self_annotation.unwrap_or(correct_return_type);
@@ -2618,7 +2618,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> impl Iterator<Item = KnownFunction> + 'db {
         self.decorators(db)
             .iter()
-            .filter_map(|deco| deco.as_function_literal())
+            .filter_map(|deco| deco.as_function_literal(db))
             .filter_map(|decorator| decorator.known(db))
     }
 
@@ -3336,7 +3336,7 @@ impl<'db> StaticClassLiteral<'db> {
                 // which has generic signatures that accept any arguments.
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
-                    .as_class_literal()?
+                    .as_class_literal(db)?
                     .as_static()?
                     .own_class_member(db, inherited_generic_context, None, name)
                     .ignore_possibly_undefined()
@@ -3459,7 +3459,7 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
-                    .as_class_literal()?
+                    .as_class_literal(db)?
                     .as_static()?
                     .own_class_member(db, self.inherited_generic_context(db), None, name)
                     .ignore_possibly_undefined()
@@ -5417,7 +5417,7 @@ fn synthesize_namedtuple_class_member<'db>(
             // Fall back to NamedTupleFallback for other synthesized methods.
             KnownClass::NamedTupleFallback
                 .to_class_literal(db)
-                .as_class_literal()?
+                .as_class_literal(db)?
                 .as_static()?
                 .own_class_member(db, inherited_generic_context, None, name)
                 .ignore_possibly_undefined()
@@ -5581,7 +5581,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             .unwrap_or_else(|| {
                 KnownClass::Tuple
                     .to_class_literal(db)
-                    .as_class_literal()
+                    .as_class_literal(db)
                     .expect("tuple should be a class literal")
                     .default_specialization(db)
             })
@@ -5681,7 +5681,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 "_fields" | "_replace" | "__replace__" => {
                     return KnownClass::NamedTupleFallback
                         .to_class_literal(db)
-                        .as_class_literal()?
+                        .as_class_literal(db)?
                         .as_static()?
                         .own_class_member(db, None, None, name)
                         .ignore_possibly_undefined()
@@ -7174,7 +7174,10 @@ impl KnownClass {
                 .apply_specialization(db, |_| generic_context.specialize(db, specialization))
         }
 
-        let class_literal = self.to_class_literal(db).as_class_literal()?.as_static()?;
+        let class_literal = self
+            .to_class_literal(db)
+            .as_class_literal(db)?
+            .as_static()?;
         let generic_context = class_literal.generic_context(db)?;
         let specialization = specialization.into();
 
@@ -7965,7 +7968,7 @@ impl KnownClass {
                 };
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
-                    DeprecatedInstance::new(db, message.as_string_literal()),
+                    DeprecatedInstance::new(db, message.as_string_literal(db)),
                 )));
             }
 
@@ -7985,7 +7988,7 @@ impl KnownClass {
                     return;
                 };
 
-                let Some(name) = name.as_string_literal() else {
+                let Some(name) = name.as_string_literal(db) else {
                     if let Some(builder) =
                         context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
                     {

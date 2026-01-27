@@ -568,7 +568,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
             Type::Intersection(intersection)
                 if intersection.positive(db).iter().any(|element| {
-                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                    element.as_typevar(db).is_some_and(|element_bound_typevar| {
                         typevar.is_same_typevar_as(db, element_bound_typevar)
                     })
                 }) =>
@@ -577,7 +577,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
             Type::Intersection(intersection)
                 if intersection.negative(db).iter().any(|element| {
-                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                    element.as_typevar(db).is_some_and(|element_bound_typevar| {
                         typevar.is_same_typevar_as(db, element_bound_typevar)
                     })
                 }) =>
@@ -599,7 +599,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
             Type::Union(union)
                 if union.elements(db).iter().any(|element| {
-                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                    element.as_typevar(db).is_some_and(|element_bound_typevar| {
                         typevar.is_same_typevar_as(db, element_bound_typevar)
                     })
                 }) =>

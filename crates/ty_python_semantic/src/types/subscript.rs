@@ -255,7 +255,7 @@ impl<'db> SubscriptErrorKind<'db> {
                     }
                 }
                 CallErrorKind::BindingError => {
-                    if let Some(typed_dict) = value_ty.as_typed_dict() {
+                    if let Some(typed_dict) = value_ty.as_typed_dict(db) {
                         report_invalid_key_on_typed_dict(
                             context,
                             value_node.into(),
@@ -789,7 +789,7 @@ impl<'db> Type<'db> {
 
             // TODO: properly handle old-style generics; get rid of this temporary hack
             if !value_ty
-                .as_class_literal()
+                .as_class_literal(db)
                 .is_some_and(|class| class.iter_mro(db).contains(&ClassBase::Generic))
             {
                 return Err(SubscriptError::new(
