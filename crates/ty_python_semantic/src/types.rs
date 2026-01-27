@@ -7477,8 +7477,11 @@ impl TypeQualifiers {
             Self::INIT_VAR => "InitVar",
             Self::REQUIRED => "Required",
             Self::NOT_REQUIRED => "NotRequired",
+            Self::READ_ONLY => "ReadOnly",
             _ => {
-                unreachable!("Only a single bit should be set when calling `TypeQualifiers::name`")
+                unreachable!(
+                    "Only a single bit should be set when calling `TypeQualifiers::name` (got {self:?})"
+                )
             }
         }
     }

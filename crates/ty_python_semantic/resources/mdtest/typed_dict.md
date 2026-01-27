@@ -1651,6 +1651,21 @@ from typing import TypedDict
 x: TypedDict = {"name": "Alice"}
 ```
 
+### `ReadOnly`, `Required` and `NotRequired` not allowed in parameter annotations
+
+```py
+from typing_extensions import Required, NotRequired, ReadOnly
+
+def bad(
+    # error: [invalid-type-form] "`Required` is not allowed in function parameter annotations"
+    a: Required[int],
+    # error: [invalid-type-form] "`NotRequired` is not allowed in function parameter annotations"
+    b: NotRequired[int],
+    # error: [invalid-type-form] "`ReadOnly` is not allowed in function parameter annotations"
+    c: ReadOnly[int],
+): ...
+```
+
 ### `dict`-subclass inhabitants
 
 Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a subclass:

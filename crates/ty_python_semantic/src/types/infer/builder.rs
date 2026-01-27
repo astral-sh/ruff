@@ -2860,6 +2860,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeQualifiers::FINAL,
             TypeQualifiers::CLASS_VAR,
             TypeQualifiers::INIT_VAR,
+            TypeQualifiers::REQUIRED,
+            TypeQualifiers::NOT_REQUIRED,
+            TypeQualifiers::READ_ONLY,
         ] {
             if qualifiers.contains(qualifier)
                 && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter)
