@@ -179,12 +179,15 @@ def f[**P](func: Callable[P, int]) -> Callable[P, None]:
         reveal_type(func(*kwargs, **args))  # revealed: int
 
         # error: [invalid-argument-type] "Argument is incorrect: Expected `P@f.args`, found `P@f.kwargs`"
+        # error: [missing-argument]
         reveal_type(func(args, kwargs))  # revealed: int
 
         # Both parameters are required
-        # TODO: error
+        # error: [missing-argument]
         reveal_type(func())  # revealed: int
+        # error: [missing-argument]
         reveal_type(func(*args))  # revealed: int
+        # error: [missing-argument]
         reveal_type(func(**kwargs))  # revealed: int
     return wrapper
 ```
@@ -681,11 +684,64 @@ reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, 
 # error: [invalid-argument-type]
 reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
-# TODO: Both of these shouldn't raise an error
-# error: [invalid-argument-type]
+# TODO: This should reveal the matching overload instead
 reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-# error: [invalid-argument-type]
 reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# error: [invalid-argument-type] "Argument to function `with_parameters` is incorrect: Expected `int`, found `None`"
+reveal_type(with_parameters(int_int, None))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+def foo(int_or_str: int | str):
+    # Argument type expansion leads to matching both overloads.
+    # TODO: Should this be an error instead?
+    reveal_type(with_parameters(int_int, int_or_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# Keyword argument matching should also work
+# TODO: This should reveal the matching overload instead
+reveal_type(with_parameters(int_int, x=1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(with_parameters(int_int, x="a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# No matching overload should error
+# error: [invalid-argument-type]
+reveal_type(with_parameters(int_int, 1.5))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+```
+
+### Overloads with multiple parameters
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def multi(x: int, y: int) -> int: ...
+@overload
+def multi(x: str, y: str) -> str: ...
+```
+
+```py
+from typing import Callable
+from overloaded import multi
+
+def run[**P, R](f: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return f(*args, **kwargs)
+
+# Both arguments match first overload
+# TODO: should reveal `int`
+reveal_type(run(multi, 1, 2))  # revealed: int | str
+
+# Both arguments match second overload
+# TODO: should reveal `str`
+reveal_type(run(multi, "a", "b"))  # revealed: int | str
+
+# Mixed positional and keyword
+# TODO: both should reveal `int`
+reveal_type(run(multi, 1, y=2))  # revealed: int | str
+reveal_type(run(multi, x=1, y=2))  # revealed: int | str
+
+# No matching overload (int, str doesn't match either overload of `multi`)
+# error: [invalid-argument-type]
+reveal_type(run(multi, 1, "b"))  # revealed: int | str
 ```
 
 ### Overloads with subtitution of `P.args` and `P.kwargs`
@@ -799,4 +855,85 @@ def f(x: int, y: str):
     pass
 
 reveal_type(infer_paramspec(f))  # revealed: (x: int, y: str) -> None
+```
+
+## Generic context preservation through `ParamSpec` decorators
+
+When a generic function is decorated with a `ParamSpec`-based decorator, the generic context of the
+decorated function should be preserved. This allows type inference to work correctly when calling
+the decorated function.
+
+Regression test for <https://github.com/astral-sh/ty/issues/2336>
+
+### Basic
+
+```py
+from typing import Callable
+from ty_extensions import generic_context
+
+def decorator[**P, T](func: Callable[P, T]) -> Callable[P, T]:
+    return func
+
+@decorator
+def identity[T](value: T) -> T:
+    return value
+
+@decorator
+def pair[T, U](first: T, second: U) -> tuple[T, U]:
+    return (first, second)
+
+# revealed: ty_extensions.GenericContext[T@identity]
+reveal_type(generic_context(identity))
+# revealed: ty_extensions.GenericContext[T@pair, U@pair]
+reveal_type(generic_context(pair))
+
+reveal_type(identity(1))  # revealed: Literal[1]
+reveal_type(identity("hello"))  # revealed: Literal["hello"]
+
+reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
+reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float]
+```
+
+### Chained decorators with generic functions
+
+```py
+from typing import Callable
+
+def decorator1[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+def decorator2[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@decorator1
+@decorator2
+def chained_generic[T](value: T) -> T:
+    return value
+
+reveal_type(chained_generic(42))  # revealed: Literal[42]
+reveal_type(chained_generic("test"))  # revealed: Literal["test"]
+```
+
+### Generic method decoration
+
+```py
+from typing import Callable
+from ty_extensions import generic_context
+
+def method_decorator[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class Container:
+    @method_decorator
+    def generic_method[T](self, value: T) -> T:
+        return value
+
+c = Container()
+
+# revealed: ty_extensions.GenericContext[T@generic_method]
+reveal_type(generic_context(c.generic_method))
+
+reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
+reveal_type(c.generic_method(100))  # revealed: Literal[100]
+reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[Unknown | int]
 ```

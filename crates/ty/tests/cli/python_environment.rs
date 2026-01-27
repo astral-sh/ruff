@@ -223,6 +223,31 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// If there is an `src/__init__.py(i)` file, don't add `./src` as a root.
+/// This is an antipattern (you're meant to have a top-level package directory
+/// *inside* `src/`), but it's a mistake that a surprising number of people make,
+/// and the diagnostic issued by ty is confusing if imports don't work.
+#[test]
+fn src_subdirectory_not_added_as_root_if_src_package_exists() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/__init__.py", ""),
+        ("src/box.py", "class Box: ..."),
+        ("src/test_box.py", "from .box import Box"),
+    ])?;
+
+    // The import is only resolvable because `src` was *not* added as a root.
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// This tests that, even if no Python *version* has been specified on the CLI or in a config file,
 /// ty is still able to infer the Python version from a `--python` argument on the CLI,
 /// *even if* the `--python` argument points to a system installation.
@@ -665,6 +690,38 @@ fn many_search_paths() -> anyhow::Result<()> {
         ("extra6/foo6.py", ""),
         ("test.py", "import foo1, baz"),
     ])?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-platform").arg("linux")
+            .arg("--extra-search-path").arg("extra1")
+            .arg("--extra-search-path").arg("extra2")
+            .arg("--extra-search-path").arg("extra3")
+            .arg("--extra-search-path").arg("extra4"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> test.py:1:14
+      |
+    1 | import foo1, baz
+      |              ^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
+    info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
+    info:   3. <temp_dir>/extra3 (extra search path specified on the CLI or in your config file)
+    info:   4. <temp_dir>/extra4 (extra search path specified on the CLI or in your config file)
+    info:   5. <temp_dir>/ (first-party code)
+    info:   6. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     assert_cmd_snapshot!(
         case.command()
@@ -2344,6 +2401,38 @@ fn default_root_project_name_folder() -> anyhow::Result<()> {
             print(f"{foo} {bar}")
             "#,
         ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// This is the "flat layout", but it looks *nearly* like the "src variant" layout.
+/// If `psycopg/__init__.py` didn't exist, we'd add `psycopg/` as a search path --
+/// but because it *does*, we can see that this is clearly meant to be the flat layout.
+#[test]
+fn default_root_flat_layout_variant() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "psycopg"
+            "#,
+        ),
+        ("psycopg/__init__.py", ""),
+        ("psycopg/box.py", "class Box: ..."),
+        // This import only resolves because of the fact that
+        // `./psycopg` was *not* added as a search path.
+        ("psycopg/psycopg/__init__.py", "from psycopg.box import Box"),
     ])?;
 
     assert_cmd_snapshot!(case.command(), @"

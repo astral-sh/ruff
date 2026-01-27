@@ -1208,7 +1208,7 @@ def _(flag: bool):
     reveal_type(C1.y)  # revealed: int | str
 
     C1.y = 100
-    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:8'>`"
+    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3:15'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:8:15'>`"
     C1.y = "problematic"
 
     class C2:
@@ -2094,8 +2094,8 @@ def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(b.__class__)  # revealed: <class 'str'>
     reveal_type(type(b))  # revealed: <class 'str'>
 
-    reveal_type(c.__class__)  # revealed: type[int] | type[str]
-    reveal_type(type(c))  # revealed: type[int] | type[str]
+    reveal_type(c.__class__)  # revealed: type[int | str]
+    reveal_type(type(c))  # revealed: type[int | str]
 
     # `type[type]`, a.k.a., either the class `type` or some subclass of `type`.
     # It would be incorrect to infer `Literal[type]` here,
@@ -2130,7 +2130,7 @@ mod.global_symbol = "b"
 mod.global_symbol = 1
 
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
-(_, mod.global_symbol) = (..., 1)
+_, mod.global_symbol = (..., 1)
 
 # TODO: this should be an error, but we do not understand list unpackings yet.
 [_, mod.global_symbol] = [1, 2]
@@ -2686,9 +2686,11 @@ reveal_type(C().x)  # revealed: int
 
 ### Attributes defined in methods with unknown decorators
 
-When an attribute is defined in a method that is decorated with an unknown decorator, we consider it
-to be accessible on both the class itself and instances of that class. This is consistent with the
-gradual guarantee, because the unknown decorator *could* be an alias for `builtins.classmethod`.
+When an attribute is defined in a method that is decorated with an unknown decorator, the method is
+treated as a regular instance method. The attribute is accessible on instances but not on the class
+itself. We don't assume that an unknown decorator might be an alias for `@classmethod`, because that
+would cause the attribute to pollute class-level lookups and potentially override instance-level
+declarations.
 
 ```py
 # error: [unresolved-import]
@@ -2699,8 +2701,57 @@ class C:
     def f(self):
         self.x: int = 1
 
-reveal_type(C.x)  # revealed: int
+# error: [unresolved-attribute]
+reveal_type(C.x)  # revealed: Unknown
 reveal_type(C().x)  # revealed: int
+
+class D:
+    def __init__(self):
+        self.x: int = 1
+
+    @unknown_decorator
+    def f(self):
+        self.x = 2
+
+reveal_type(D().x)  # revealed: int
+```
+
+### Attributes declared in `__init__` but also assigned in a decorated method
+
+When an attribute is declared with a type annotation in `__init__`, and then assigned (without
+annotation) in a method decorated with a known decorator like `@cache`, we should respect the
+declared type from `__init__`. The decorated method's assignment should not cause the type to
+include `Unknown`.
+
+```py
+from functools import cache
+
+class C:
+    def __init__(self) -> None:
+        self.x: int = 0
+
+    @cache
+    def method(self) -> None:
+        self.x = 1
+
+def f(c: C) -> None:
+    reveal_type(c.x)  # revealed: int
+```
+
+### Attributes defined in a property
+
+Instance attributes can be defined in a `@property` getter. Properties are still instance methods
+that take `self`, so attribute assignments in them should be recognized.
+
+```py
+class C:
+    @property
+    def prop(self) -> int:
+        self.x: int = 1
+        return self.x
+
+def f(c: C) -> None:
+    reveal_type(c.x)  # revealed: int
 ```
 
 ## Enum classes

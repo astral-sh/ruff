@@ -72,6 +72,16 @@
     "AnalysisOptions": {
       "type": "object",
       "properties": {
+        "allowed-unresolved-imports": {
+          "description": "A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/string"
+          }
+        },
         "respect-type-ignore-comments": {
           "description": "Whether ty should respect `type: ignore` comments.\n\nWhen set to `false`, `type: ignore` comments are treated like any other normal\ncomment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).\n\nSetting this option can be useful when using ty alongside other type checkers or when\nyou prefer using `ty: ignore` over `type: ignore`.\n\nDefaults to `true`.",
           "type": [
@@ -208,6 +218,16 @@
     "OverrideOptions": {
       "type": "object",
       "properties": {
+        "analysis": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnalysisOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "exclude": {
           "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`.\nExclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
           "anyOf": [
@@ -330,10 +350,30 @@
     "Rules": {
       "type": "object",
       "properties": {
+        "abstract-method-in-final-class": {
+          "title": "detects `@final` classes with unimplemented abstract methods",
+          "description": "## What it does\nChecks for `@final` classes that have unimplemented abstract methods.\n\n## Why is this bad?\nA class decorated with `@final` cannot be subclassed. If such a class has abstract\nmethods that are not implemented, the class can never be properly instantiated, as\nthe abstract methods can never be implemented (since subclassing is prohibited).\n\nAt runtime, instantiation of classes with unimplemented abstract methods is only\nprevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.\nHowever, type checkers also enforce this for classes that do not use `ABCMeta`, since\nthe intent for the class to be abstract is clear from the use of `@abstractmethod`.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\nclass Base(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n@final\nclass Derived(Base):  # Error: `Derived` does not implement `method`\n    pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "ambiguous-protocol-member": {
           "title": "detects protocol classes with ambiguous interfaces",
           "description": "## What it does\nChecks for protocol classes with members that will lead to ambiguous interfaces.\n\n## Why is this bad?\nAssigning to an undeclared variable in a protocol class leads to an ambiguous\ninterface which may lead to the type checker inferring unexpected things. It's\nrecommended to ensure that all members of a protocol class are explicitly declared.\n\n## Examples\n\n```py\nfrom typing import Protocol\n\nclass BaseProto(Protocol):\n    a: int                               # fine (explicitly declared as `int`)\n    def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration\n    c = \"some variable\"                  # error: no explicit declaration, leading to ambiguity\n    b = method_member                    # error: no explicit declaration, leading to ambiguity\n\n    # error: this creates implicit assignments of `d` and `e` in the protocol class body.\n    # Were they really meant to be considered protocol members?\n    for d, e in enumerate(range(42)):\n        pass\n\nclass SubProto(BaseProto, Protocol):\n    a = 42  # fine (declared in superclass)\n```",
           "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "assert-type-unspellable-subtype": {
+          "title": "detects failed type assertions",
+          "description": "## What it does\nChecks for `assert_type()` calls where the actual type\nis an unspellable subtype of the asserted type.\n\n## Why is this bad?\n`assert_type()` is intended to ensure that the inferred type of a value\nis exactly the same as the asserted type. But in some situations, ty\nhas nonstandard extensions to the type system that allow it to infer\nmore precise types than can be expressed in user annotations. ty emits a\ndifferent error code to `type-assertion-failure` in these situations so\nthat users can easily differentiate between the two cases.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    if x:\n        assert_type(x, int)  # error: [assert-type-unspellable-subtype]\n                             # the actual type is `int & ~AlwaysFalsy`,\n                             # which excludes types like `Literal[0]`\n```",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -460,6 +500,16 @@
             }
           ]
         },
+        "empty-body": {
+          "title": "detects functions with empty bodies that have a non-`None` return type annotation",
+          "description": "## What it does\nDetects functions with empty bodies that have a non-`None` return type annotation.\n\nThe errors reported by this rule have the same motivation as the `invalid-return-type`\nrule. The diagnostic exists as a separate error code to allow users to disable this\nrule while prototyping code. While we strongly recommend enabling this rule if\npossible, users migrating from other type checkers may also find it useful to\ntemporarily disable this rule on some or all of their codebase if they find it\nresults in a large number of diagnostics.\n\n## Why is this bad?\nA function with an empty body (containing only `...`, `pass`, or a docstring) will\nimplicitly return `None` at runtime. Returning `None` when the return type is non-`None`\nis unsound, and will lead to ty inferring incorrect types elsewhere.\n\nFunctions with empty bodies are permitted in certain contexts where they serve as\ndeclarations rather than implementations:\n- Functions in stub files (`.pyi`)\n- Methods in Protocol classes\n- Abstract methods decorated with `@abstractmethod`\n- Overload declarations decorated with `@overload`\n- Functions in `if TYPE_CHECKING` blocks\n\n## Examples\n```python\ndef foo() -> int: ...  # error: [empty-body]\n\ndef bar() -> str:\n    \"\"\"A function that does nothing.\"\"\"\n    pass  # error: [empty-body]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
           "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
@@ -514,6 +564,16 @@
           "title": "detects index out of bounds errors",
           "description": "## What it does\nChecks for attempts to use an out of bounds index to get an item from\na container.\n\n## Why is this bad?\nUsing an out of bounds index will raise an `IndexError` at runtime.\n\n## Examples\n```python\nt = (0, 1, 2)\nt[3]  # IndexError: tuple index out of range\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "ineffective-final": {
+          "title": "detects calls to `final()` that type checkers cannot interpret",
+          "description": "## What it does\nChecks for calls to `final()` that type checkers cannot interpret.\n\n## Why is this bad?\nThe `final()` function is designed to be used as a decorator. When called directly\nas a function (e.g., `final(type(...))`), type checkers will not understand the\napplication of `final` and will not prevent subclassing.\n\n## Example\n\n```python\nfrom typing import final\n\n# Incorrect: type checkers will not prevent subclassing\nMyClass = final(type(\"MyClass\", (), {}))\n\n# Correct: use `final` as a decorator\n@final\nclass MyClass: ...\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -590,6 +650,26 @@
             }
           ]
         },
+        "invalid-dataclass": {
+          "title": "detects invalid `@dataclass` applications",
+          "description": "## What it does\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\nApplying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,\n`Enum`, or `Protocol` is invalid:\n\n- `NamedTuple` and `TypedDict` classes will raise an exception at runtime when\n  instantiating the class.\n- `Enum` classes with `@dataclass` are [explicitly not supported].\n- `Protocol` classes define interfaces and cannot be instantiated.\n\n## Examples\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n@dataclass  # error: [invalid-dataclass]\nclass Foo(NamedTuple):\n    x: int\n```\n\n[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-dataclass-override": {
+          "title": "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
+          "description": "## What it does\nChecks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or\n`__delattr__` method defined.\n\n## Why is this bad?\nFrozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a\n`FrozenInstanceError` to emulate immutability.\n\nOverriding either of these methods raises a runtime error.\n\n## Examples\n```python\nfrom dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass A:\n    def __setattr__(self, name: str, value: object) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-declaration": {
           "title": "detects invalid declarations",
           "description": "## What it does\nChecks for declarations where the inferred type of an existing symbol\nis not [assignable to] its post-hoc declared type.\n\n## Why is this bad?\nSuch declarations break the rules of the type system and\nweaken a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\na = 1\na: str\n```\n\n[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable",
@@ -633,6 +713,16 @@
         "invalid-generic-class": {
           "title": "detects invalid generic classes",
           "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\nMany of these result in `TypeError` being raised at runtime if they are violated.\n\n## Examples\n```python\nfrom typing_extensions import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\", default=int)\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n\n# error: type parameter with default comes before type parameter without default\nclass D(Generic[U, T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-generic-enum": {
+          "title": "detects generic enum classes",
+          "description": "## What it does\nChecks for enum classes that are also generic.\n\n## Why is this bad?\nEnum classes cannot be generic. Python does not support generic enums:\nattempting to create one will either result in an immediate `TypeError`\nat runtime, or will create a class that cannot be specialized in the way\nthat a normal generic class can.\n\n## Examples\n```python\nfrom enum import Enum\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\n\n# error: enum class cannot be generic (class creation fails with `TypeError`)\nclass E[T](Enum):\n    A = 1\n\n# error: enum class cannot be generic (class creation fails with `TypeError`)\nclass F(Enum, Generic[T]):\n    A = 1\n\n# error: enum class cannot be generic -- the class creation does not immediately fail...\nclass G(Generic[T], Enum):\n    A = 1\n\n# ...but this raises `KeyError`:\nx: G[int]\n```\n\n## References\n- [Python documentation: Enum](https://docs.python.org/3/library/enum.html)",
           "default": "error",
           "oneOf": [
             {
@@ -762,7 +852,7 @@
         },
         "invalid-return-type": {
           "title": "detects returned values that can't be assigned to the function's annotated return type",
-          "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+          "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\nNote that the special case of a function with a non-`None` return type and an empty body\nis handled by the separate `empty-body` error code.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type\nis unsound, and will lead to ty inferring incorrect types elsewhere.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
           "default": "error",
           "oneOf": [
             {
@@ -870,9 +960,29 @@
             }
           ]
         },
+        "invalid-typed-dict-header": {
+          "title": "detects invalid statements in `TypedDict` class headers",
+          "description": "## What it does\nDetects errors in `TypedDict` class headers, such as unexpected arguments\nor invalid base classes.\n\n## Why is this bad?\nThe typing spec states that `TypedDict`s are not permitted to have\ncustom metaclasses. Using `**` unpacking in a `TypedDict` header\nis also prohibited by ty, as it means that ty cannot statically determine\nwhether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]\n    ...\n\ndef f(x: dict):\n    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]\n        ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-statement": {
           "title": "detects invalid statements in `TypedDict` class bodies",
           "description": "## What it does\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For\nexample, method definitions and field values aren't allowed. None of these will be\navailable on \"instances of the `TypedDict`\" at runtime (as `dict` is the runtime class of\nall \"`TypedDict` instances\").\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "isinstance-against-protocol": {
+          "title": "reports runtime checks against non-runtime-checkable protocol classes",
+          "description": "## What it does\nReports runtime checks against non-runtime-checkable `Protocol` classes.\nThis includes explicit calls to `isinstance()`/`issubclass()` and implicit\nchecks performed by `match` class patterns.\n\n## Why is this bad?\nUsing a non-runtime-checkable protocol in these contexts raises `TypeError`\nat runtime.\n\n## Examples\n```python\nfrom typing_extensions import Protocol\n\nclass HasX(Protocol):\n    x: int\n\ndef f(arg: object, arg2: type):\n    isinstance(arg, HasX)  # error: [isinstance-against-protocol]\n    issubclass(arg2, HasX)  # error: [isinstance-against-protocol]\n\ndef g(arg: object):\n    match arg:\n        case HasX():  # error: [isinstance-against-protocol]\n            pass\n```\n\n## References\n- [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)",
           "default": "error",
           "oneOf": [
             {

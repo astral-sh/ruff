@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.91"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -43,12 +43,14 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
 ty_combine = { path = "crates/ty_combine" }
+ty_completion_bench = { path = "crates/ty_completion_bench" }
 ty_completion_eval = { path = "crates/ty_completion_eval" }
 ty_ide = { path = "crates/ty_ide" }
 ty_module_resolver = { path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
 ty_server = { path = "crates/ty_server" }
+ty_site_packages = { path = "crates/ty_site_packages" }
 ty_static = { path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
@@ -147,10 +149,11 @@ rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 regex-automata = { version = "0.4.9" }
+regex-syntax = { version = "0.8.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "9860ff6ca0f1f8f3a8d6b832020002790b501254", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -215,6 +218,7 @@ ignored = [
     "ruff_options_metadata",
     "uuid",
     "get-size2",
+    "ty_completion_bench",
     "ty_completion_eval",
 ]
 

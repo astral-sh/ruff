@@ -40,6 +40,46 @@ Valid severities are:
 
 ## `analysis`
 
+### `allowed-unresolved-imports`
+
+A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+
+Details on supported glob patterns:
+- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
+  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`
+  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.
+- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
+
 ### `respect-type-ignore-comments`
 
 Whether ty should respect `type: ignore` comments.
@@ -440,6 +480,84 @@ severity levels or disable them entirely.
 
     [overrides.rules]
     possibly-unresolved-reference = "ignore"
+    ```
+
+---
+
+## `overrides.analysis`
+
+#### `allowed-unresolved-imports`
+
+A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+
+Details on supported glob patterns:
+- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
+  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`
+  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.
+- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
+
+#### `respect-type-ignore-comments`
+
+Whether ty should respect `type: ignore` comments.
+
+When set to `false`, `type: ignore` comments are treated like any other normal
+comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+
+Setting this option can be useful when using ty alongside other type checkers or when
+you prefer using `ty: ignore` over `type: ignore`.
+
+Defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
     ```
 
 ---

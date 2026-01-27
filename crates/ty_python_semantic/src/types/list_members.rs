@@ -363,6 +363,19 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::ModuleLiteral(literal) => {
+                // Looking up `__file__` on `types.ModuleType` will not give as precise a type
+                // as we infer in type inference, but it's confuisng if autocomplete etc.
+                // shows a different type in the tooltip to the one inferred by the type checker.
+                let dunder_file_type = if literal.module(db).file(db).is_some() {
+                    KnownClass::Str.to_instance(db)
+                } else {
+                    Type::none(db)
+                };
+                self.members.insert(Member {
+                    name: Name::new_static("__file__"),
+                    ty: dunder_file_type,
+                });
+
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
                 let module = literal.module(db);
 
@@ -377,7 +390,7 @@ impl<'db> AllMembers<'db> {
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(DefinedPlace { ty, .. }) =
-                        imported_symbol(db, file, symbol_name, None).place
+                        imported_symbol(db, Some(file), symbol_name, None).place
                     else {
                         continue;
                     };

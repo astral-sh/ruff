@@ -328,3 +328,128 @@ def _(x: DivergentList[int]):
     d1: DivergentList[int] = [x]
     d2: DivergentList[int] = x[0]
 ```
+
+## Solving generics with type alias parameters
+
+A generic function parameter annotated with a PEP 695 type alias that contains a type variable
+should properly infer the specialization from the argument:
+
+```py
+type MyList[T] = list[T]
+type MyDict[K, V] = dict[K, V]
+
+def head[T](my_list: MyList[T]) -> T:
+    return my_list[0]
+
+def get_value[K, V](my_dict: MyDict[K, V], key: K) -> V:
+    return my_dict[key]
+
+reveal_type(head([1, 2]))  # revealed: int
+reveal_type(head(["a", "b"]))  # revealed: str
+
+d: dict[str, int] = {"a": 1}
+reveal_type(get_value(d, "a"))  # revealed: int
+```
+
+It also works in the reverse direction, where the type alias is used as the argument type:
+
+```py
+type MyList[T] = list[T]
+
+def head[T](l: list[T]) -> T:
+    return l[0]
+
+def _(x: MyList[int]):
+    reveal_type(head(x))  # revealed: int
+```
+
+## Fully qualified type alias names in error messages
+
+When two type aliases have the same name but are in different scopes, they should be fully qualified
+in error messages to distinguish them:
+
+```py
+class A:
+    class B[T]:
+        pass
+
+    type D = list[int]
+
+class C:
+    class B[T]:
+        pass
+
+    type D = list[str]
+
+def f(b: C.B[C.D]) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.C.B[mdtest_snippet.C.D]` is not assignable to `mdtest_snippet.A.B[mdtest_snippet.A.D]`"
+    a: A.B[A.D] = b
+```
+
+## Fully qualified type alias names in nested classes
+
+Type aliases in nested classes should include the full class path:
+
+```py
+class Outer1:
+    class Inner:
+        type Alias = int
+
+class Outer2:
+    class Inner:
+        type Alias = str
+
+def g(x: Outer1.Inner.Alias, y: Outer2.Inner.Alias) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Outer2.Inner.Alias` is not assignable to `mdtest_snippet.Outer1.Inner.Alias`"
+    a: Outer1.Inner.Alias = y
+```
+
+## Fully qualified generic type aliases
+
+Ambiguous generic type aliases should also be fully qualified:
+
+```py
+class X:
+    type GenAlias[T] = list[T]
+
+class Y:
+    type GenAlias[T] = dict[str, T]
+
+def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Y.GenAlias[int]` is not assignable to `mdtest_snippet.X.GenAlias[int]`"
+    a: X.GenAlias[int] = y
+```
+
+## Non-ambiguous type aliases should not be qualified
+
+Type aliases with unique names should NOT be qualified:
+
+```py
+class P:
+    type UniqueAlias1 = int
+
+class Q:
+    type UniqueAlias2 = str
+
+def i(x: P.UniqueAlias1, y: Q.UniqueAlias2) -> None:
+    # error: [invalid-assignment] "Object of type `UniqueAlias2` is not assignable to `UniqueAlias1`"
+    a: P.UniqueAlias1 = y
+```
+
+## Class and type alias with same name
+
+When a class and a type alias have the same name in different scopes, both should be fully qualified
+to distinguish them in error messages:
+
+```py
+class Container1:
+    class Item:
+        pass
+
+class Container2:
+    type Item = str
+
+def j(x: Container1.Item, y: Container2.Item) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Container2.Item` is not assignable to `mdtest_snippet.Container1.Item`"
+    a: Container1.Item = y
+```

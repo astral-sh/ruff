@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, binary_heap};
 
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -13,7 +14,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
-use ty_python_semantic::types::UnionType;
+use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
     types::{CycleDetector, KnownClass, Type},
@@ -87,7 +88,7 @@ pub fn completion<'db>(
 struct Completions<'db> {
     db: &'db dyn Db,
     context: CollectionContext<'db>,
-    items: Vec<Completion<'db>>,
+    items: BinaryHeap<CompletionRanker<'db>>,
     /// The query used to match against candidate completions.
     ///
     /// If a completion's name doesn't match this query, then
@@ -96,6 +97,13 @@ struct Completions<'db> {
 }
 
 impl<'db> Completions<'db> {
+    /// A limit on the total number of completions we'll return.
+    ///
+    /// A user should refine its completion request if the searched symbol
+    /// doesn't appear in the first 1k results. Serializing/deserializing 1k
+    /// completions can be expensive and result in noticeable lag.
+    const LIMIT: usize = 1_000;
+
     /// Create a new empty collection of completions.
     ///
     /// The given typed text should correspond to what we believe
@@ -106,30 +114,27 @@ impl<'db> Completions<'db> {
         Completions {
             db,
             context,
-            items: vec![],
+            items: BinaryHeap::new(),
             query,
         }
     }
 
     /// Convert this collection into a simple
     /// sequence of completions.
-    fn into_completions(mut self) -> Vec<Completion<'db>> {
-        self.items.sort_by(rank);
+    fn into_completions(self) -> Vec<Completion<'db>> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        // A user should refine its completion request if the searched symbol doesn't appear in the first 1k results.
-        // Serializing/deserializing 1k completions can be expensive and result in noticeable lag.
-        self.items.truncate(1000);
-        self.items
+            .into_sorted_vec()
+            .into_iter()
+            .map(|CompletionRanker(c)| c)
+            .collect()
     }
 
     // Convert this collection into a list of "import..." fixes
-    fn into_imports(mut self) -> Vec<ImportEdit> {
-        self.items.sort_by(rank);
+    fn into_imports(self) -> Vec<ImportEdit> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        self.items
+            .into_sorted_vec()
             .into_iter()
+            .map(|CompletionRanker(c)| c)
             .filter_map(|item| {
                 Some(ImportEdit {
                     label: format!("import {}", item.qualified?),
@@ -140,12 +145,11 @@ impl<'db> Completions<'db> {
     }
 
     // Convert this collection into a list of "qualify..." fixes
-    fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
-        self.items.sort_by(rank);
+    fn into_qualifications(self, range: TextRange) -> Vec<ImportEdit> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        self.items
+            .into_sorted_vec()
             .into_iter()
+            .map(|CompletionRanker(c)| c)
             .filter_map(|item| {
                 // If we would have to actually import something, don't suggest the qualification
                 // (we could, maybe we should, but for now, we don't)
@@ -198,8 +202,16 @@ impl<'db> Completions<'db> {
         if self.context.exclude(self.db, &builder) {
             return false;
         }
-        self.items
-            .push(builder.build(self.db, &self.context, &self.query));
+        let completion = CompletionRanker(builder.build(self.db, &self.context, &self.query));
+        if self.items.len() >= Completions::LIMIT {
+            // OK because `self.items` is guaranteed to be non-empty here.
+            let worst = self.items.peek_mut().unwrap();
+            if *worst <= completion {
+                return false;
+            }
+            binary_heap::PeekMut::pop(worst);
+        }
+        self.items.push(completion);
         true
     }
 }
@@ -378,20 +390,30 @@ impl<'db> CompletionBuilder<'db> {
         ctx: &CollectionContext<'db>,
         query: &UserQuery,
     ) -> Completion<'db> {
-        // Tags completions with context-specific if they are
-        // known to be usable in a `raise` context and we have
-        // determined a raisable type `raisable_ty`.
-        //
-        // It's possible that some completions are usable in a `raise`
-        // but aren't marked here. That is, false negatives are
-        // possible but false positives are not.
-        if let Some(raisable_ty) = ctx.raisable_ty {
-            if let Some(ty) = self.ty {
-                self.is_context_specific |= ty.is_assignable_to(db, raisable_ty);
-            }
-        }
         if let Some(ty) = self.ty {
             self.is_type_check_only = ty.is_type_check_only(db);
+            // Tags completions with context-specific if they are
+            // known to be usable in an exception context and we have
+            // determined an `exception_ty`.
+            //
+            // It's possible that some completions are usable in an exception
+            // but aren't marked here. That is, false negatives are
+            // possible but false positives are not.
+            if let Some(exception_ty) = ctx.exception_ty {
+                self.is_context_specific |= ty.is_assignable_to(db, exception_ty);
+            }
+            if ctx.is_in_class_def {
+                self.is_context_specific |= ty.is_class_literal()
+                    || matches!(
+                        ty,
+                        Type::SpecialForm(
+                            SpecialFormType::Protocol
+                                | SpecialFormType::Generic
+                                | SpecialFormType::TypedDict
+                                | SpecialFormType::NamedTuple
+                        )
+                    );
+            }
         }
         let kind = self
             .kind
@@ -584,18 +606,11 @@ impl<'m> Context<'m> {
         match self.kind {
             ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
-                let is_raising_exception = self.cursor.is_raising_exception();
+                let exception_ty = self.cursor.exception_ty(db);
                 CollectionContext {
-                    raisable_ty: is_raising_exception.then(|| {
-                        UnionType::from_elements(
-                            db,
-                            [
-                                KnownClass::BaseException.to_subclass_of(db),
-                                KnownClass::BaseException.to_instance(db),
-                            ],
-                        )
-                    }),
-                    is_raising_exception,
+                    exception_ty,
+                    is_raising_exception: exception_ty.is_some(),
+                    is_in_class_def: self.cursor.is_in_class_def(),
                     valid_keywords: self.cursor.valid_keywords(),
                 }
             }
@@ -628,6 +643,8 @@ struct ContextCursor<'m> {
     range: TextRange,
     /// The tokens that appear before the cursor.
     tokens_before: &'m [Token],
+    /// The covering node based on `parsed` and `range`.
+    covering_node: CoveringNode<'m>,
 }
 
 impl<'m> ContextCursor<'m> {
@@ -639,13 +656,16 @@ impl<'m> ContextCursor<'m> {
     ) -> ContextCursor<'m> {
         let tokens_before = tokens_start_before(parsed.tokens(), offset);
         let Some(range) = ContextCursor::find_typed_text_range(tokens_before, offset) else {
+            let range = TextRange::empty(offset);
+            let covering_node = covering_node(parsed.syntax().into(), range);
             return ContextCursor {
                 parsed,
                 source,
                 typed: None,
                 offset,
-                range: TextRange::empty(offset),
+                range,
                 tokens_before,
+                covering_node,
             };
         };
 
@@ -654,6 +674,8 @@ impl<'m> ContextCursor<'m> {
             !text.is_empty(),
             "expected typed text, when found, to be non-empty"
         );
+
+        let covering_node = covering_node(parsed.syntax().into(), range);
         ContextCursor {
             parsed,
             source,
@@ -661,6 +683,7 @@ impl<'m> ContextCursor<'m> {
             offset,
             range,
             tokens_before,
+            covering_node,
         }
     }
 
@@ -761,8 +784,7 @@ impl<'m> ContextCursor<'m> {
     /// Returns true when the cursor sits on a binding statement.
     /// E.g. naming a parameter, type parameter, or `for` <name>).
     fn is_in_variable_binding(&self) -> bool {
-        let covering = self.covering_node(self.range);
-        covering.ancestors().any(|node| match node {
+        self.covering_node.ancestors().any(|node| match node {
             ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(self.range),
             ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
                 type_param.name.range.contains_range(self.range)
@@ -792,25 +814,63 @@ impl<'m> ContextCursor<'m> {
         })
     }
 
-    /// Returns true when the cursor is after a `raise` keyword.
-    fn is_raising_exception(&self) -> bool {
-        /// The maximum number of tokens we're willing to
-        /// look-behind to find a `raise` keyword.
-        const LIMIT: usize = 10;
+    /// Returns the expected type when the cursor sits inside
+    /// a `raise` or `except` expression.
+    ///
+    /// The return value is always `None` if the cursor is not
+    /// inside a `raise` or `except` context.
+    fn exception_ty<'db>(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db);
+        let base_exception_instance = KnownClass::BaseException.to_instance(db);
+        let raise_ty = UnionType::from_elements(db, [base_exception_ty, base_exception_instance]);
+        let cause_ty = UnionType::from_elements(db, [raise_ty, Type::none(db)]);
+        let except_ty = UnionType::from_elements(
+            db,
+            [
+                base_exception_ty,
+                Type::homogeneous_tuple(db, base_exception_ty),
+            ],
+        );
 
-        // This only looks for things like `raise foo.bar.baz.qu<CURSOR>`.
-        // Technically, any kind of expression is allowed after `raise`.
-        // But we may not always want to treat it specially. So we're
-        // rather conservative about what we consider "raising an
-        // exception" to be for the purposes of completions. The failure
-        // mode here is that we may wind up suggesting things that
-        // shouldn't be raised. The benefit is that when this heuristic
-        // does work, we won't suggest things that shouldn't be raised.
-        for token in self.tokens_before.iter().rev().take(LIMIT) {
-            match token.kind() {
-                TokenKind::Name | TokenKind::Dot => continue,
-                TokenKind::Raise => return true,
-                _ => return false,
+        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
+
+        for node in self.covering_node.ancestors() {
+            match node {
+                ast::AnyNodeRef::StmtRaise(stmt) => {
+                    if stmt.exc.as_deref().is_some_and(contains) {
+                        return Some(raise_ty);
+                    } else if stmt.cause.as_deref().is_some_and(contains) {
+                        return Some(cause_ty);
+                    }
+                }
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
+                    if handler.type_.as_deref().is_some_and(contains) {
+                        return Some(except_ty);
+                    }
+                }
+                _ => {}
+            }
+            if node.is_statement() {
+                return None;
+            }
+        }
+        None
+    }
+
+    /// Returns true when the curser is within the
+    /// arguments node of a class definition.
+    ///
+    /// E.g. `class Foo(Bar<CURSOR>)`
+    fn is_in_class_def(&self) -> bool {
+        for node in self.covering_node.ancestors() {
+            if let ast::AnyNodeRef::StmtClassDef(class_def) = node {
+                return class_def
+                    .arguments
+                    .as_ref()
+                    .is_some_and(|args| args.range.contains_range(self.range));
+            }
+            if node.is_statement() {
+                return false;
             }
         }
         false
@@ -822,11 +882,10 @@ impl<'m> ContextCursor<'m> {
     /// Returns None if no context-based exclusions can
     /// be identified. Meaning that all keywords are valid.
     fn valid_keywords(&self) -> Option<FxHashSet<&'static str>> {
-        let covering_node = self.covering_node(self.range);
-
         // Check if the cursor is within the naming
         // part of a decorator node.
-        if covering_node
+        if self
+            .covering_node
             .ancestors()
             // We bail if we're specifying arguments as we don't
             // want to suppress suggestions there.
@@ -837,7 +896,7 @@ impl<'m> ContextCursor<'m> {
         {
             return Some(FxHashSet::from_iter(["lambda"]));
         }
-        covering_node.ancestors().find_map(|node| {
+        self.covering_node.ancestors().find_map(|node| {
             self.is_in_for_statement_iterable(node)
                 .then(|| FxHashSet::from_iter(["yield", "lambda", "await"]))
                 .or_else(|| {
@@ -1001,13 +1060,14 @@ impl UserQuery {
 #[derive(Clone, Debug, Default)]
 struct CollectionContext<'db> {
     /// A pre-computed type corresponding to what is
-    /// expected for the type of valuables that are
-    /// raisable.
+    /// expected in an exception expression.
     ///
     /// This is only `Some` when `is_raising_exception` is `true`.
-    raisable_ty: Option<Type<'db>>,
-    /// Whether we're in a `raise <EXPR>` context or not.
+    exception_ty: Option<Type<'db>>,
+    /// Whether we're in an exception context (`raise` or `except`) or not.
     is_raising_exception: bool,
+    /// Whether we're in a class definition context or not.
+    is_in_class_def: bool,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -1271,7 +1331,7 @@ fn add_argument_completions<'db>(
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
-    for node in cursor.covering_node(cursor.range).ancestors() {
+    for node in cursor.covering_node.ancestors() {
         match node {
             ast::AnyNodeRef::ExprCall(call) => {
                 if call.arguments.range().contains_range(cursor.range) {
@@ -1347,7 +1407,7 @@ fn add_function_arg_completions<'db>(
 ) {
     debug_assert!(
         cursor
-            .covering_node(cursor.range)
+            .covering_node
             .ancestors()
             .take_while(|node| !node.is_statement())
             .any(|node| node.is_arguments()),
@@ -1358,11 +1418,11 @@ fn add_function_arg_completions<'db>(
     let Some(sig_help) = signature_help(db, file, cursor.offset) else {
         return;
     };
-    let set_function_args = detect_set_function_args(cursor);
+    let mut set_function_args = detect_set_function_args(cursor);
 
     for sig in &sig_help.signatures {
         for p in &sig.parameters {
-            if p.is_positional_only || set_function_args.contains(&p.name.as_str()) {
+            if p.is_positional_only || !set_function_args.insert(p.name.as_str()) {
                 continue;
             }
             let mut builder = CompletionBuilder::argument(&p.name).ty(p.ty);
@@ -1394,9 +1454,8 @@ fn add_function_arg_completions<'db>(
 /// If the parent node is not an arguments node, the return value
 /// is an empty Vec.
 fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str> {
-    let range = TextRange::empty(cursor.offset);
     cursor
-        .covering_node(range)
+        .covering_node
         .parent()
         .and_then(|node| match node {
             ast::AnyNodeRef::Arguments(args) => Some(args),
@@ -1526,23 +1585,19 @@ fn add_unimported_completions<'db>(
         }
 
         let module_name = symbol.module().name(db);
-        let (name, qualified, request) = symbol
+        let (name, request) = symbol
             .name_in_file()
-            .map(|name| {
-                let qualified = format!("{module_name}.{name}");
-                (name, qualified, create_import_request(module_name, name))
-            })
+            .map(|name| (name, create_import_request(module_name, name)))
             .unwrap_or_else(|| {
                 let name = module_name.as_str();
-                let qualified = name.to_string();
-                (name, qualified, ImportRequest::module(name))
+                (name, ImportRequest::module(name))
             });
         let import_action = importer.import(request, &members);
         // N.B. We use `add_skip_query` here because `all_symbols`
         // already takes our query into account.
         completions.add_skip_query(
             Completion::builder(name)
-                .qualified(qualified)
+                .qualified(symbol.qualified())
                 .insert(import_action.symbol_text())
                 .kind(symbol.kind().to_completion_kind())
                 .module_name(module_name)
@@ -1679,13 +1734,9 @@ impl<'t> CompletionTargetTokens<'t> {
                 let node = cursor.covering_node(token.range()).node();
                 Some(CompletionTargetAst::Scoped(ScopedTarget { node }))
             }
-            CompletionTargetTokens::Unknown => {
-                let range = TextRange::empty(cursor.offset);
-                let covering_node = cursor.covering_node(range);
-                Some(CompletionTargetAst::Scoped(ScopedTarget {
-                    node: covering_node.node(),
-                }))
-            }
+            CompletionTargetTokens::Unknown => Some(CompletionTargetAst::Scoped(ScopedTarget {
+                node: cursor.covering_node.node(),
+            })),
         }
     }
 }
@@ -2386,19 +2437,44 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
     imp(db, ty, &CompletionKindVisitor::default())
 }
 
-/// Return an ordering relating the two completions.
+/// Defines an ordering relating the two completions for ranking purposes.
 ///
-/// A `Ordering::Less` is returned when `c1` should be ranked above
-/// `c2`. A `Ordering::Greater` is returned when `c1` should be ranked
-/// below `c2`. In other words, a standard ascending sort used with
-/// this comparison routine will yields the "best ranked" completions
-/// first.
+/// A `Ordering::Less` is returned when `c1` should be ranked above `c2`. A
+/// `Ordering::Greater` is returned when `c1` should be ranked below `c2`.
+/// In other words, an ascending sort used with this comparison routine will
+/// yields the "best ranked" completions first. This scheme was chosen so that
+/// this type works with a max-heap (such as `std::collections::BinaryHeap`).
 ///
-/// Note that this could have been implemented via `Eq` and `Ord`
-/// impls on `Completion`, but is instead a separate function to avoid
-/// conflating relevance ranking with identity.
-fn rank(c1: &Completion<'_>, c2: &Completion<'_>) -> Ordering {
-    (&c1.relevance, &c1.name).cmp(&(&c2.relevance, &c2.name))
+/// Note that this could have been implemented via `Eq` and `Ord` impls on
+/// `Completion` directly, but is instead a separate type to avoid conflating
+/// relevance ranking with identity.
+#[derive(Debug)]
+struct CompletionRanker<'db>(Completion<'db>);
+
+impl Eq for CompletionRanker<'_> {}
+
+impl PartialEq for CompletionRanker<'_> {
+    fn eq(&self, rhs: &CompletionRanker<'_>) -> bool {
+        self.0.relevance == rhs.0.relevance
+            && self.0.name == rhs.0.name
+            && self.0.module_name == rhs.0.module_name
+    }
+}
+
+impl Ord for CompletionRanker<'_> {
+    fn cmp(&self, rhs: &CompletionRanker<'_>) -> Ordering {
+        (&self.0.relevance, &self.0.name, &self.0.module_name).cmp(&(
+            &rhs.0.relevance,
+            &rhs.0.name,
+            &rhs.0.module_name,
+        ))
+    }
+}
+
+impl PartialOrd for CompletionRanker<'_> {
+    fn partial_cmp(&self, rhs: &CompletionRanker<'_>) -> Option<Ordering> {
+        Some(self.cmp(rhs))
+    }
 }
 
 #[cfg(test)]
@@ -2585,7 +2661,7 @@ type<CURSOR>
 
         assert_snapshot!(
             test.type_signatures().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         type :: <class 'type'>
         TypeError :: <class 'TypeError'>
         ",
@@ -3344,9 +3420,9 @@ class Foo(<CURSOR>):
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3362,9 +3438,9 @@ class Bar: ...
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3380,9 +3456,9 @@ class Bar: ...
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3396,9 +3472,9 @@ class Foo(<CURSOR>",
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3586,7 +3662,7 @@ quux.<CURSOR>
         __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self@__new__
+        __new__ :: def __new__[Self](cls) -> Self
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method Quux.__repr__() -> str
@@ -3667,19 +3743,19 @@ C.<CURSOR>
         __mro__ :: tuple[type, ...]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self@__new__
-        __or__ :: bound method <class 'C'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
+        __new__ :: def __new__[Self](cls) -> Self
+        __or__ :: bound method <class 'C'>.__or__[Self](value: Any, /) -> UnionType | Self
         __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
         __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
         __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: def __repr__(self) -> str
-        __ror__ :: bound method <class 'C'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
+        __ror__ :: bound method <class 'C'>.__ror__[Self](value: Any, /) -> UnionType | Self
         __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'C'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self@__subclasses__]
+        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self]
         __subclasshook__ :: bound method <class 'C'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -3737,18 +3813,18 @@ Meta.<CURSOR>
                 __mro__ :: tuple[type, ...]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
-                __or__ :: def __or__[Self](self: Self@__or__, value: Any, /) -> UnionType | Self@__or__
+                __or__ :: def __or__[Self](self: Self, value: Any, /) -> UnionType | Self
                 __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __ror__ :: def __ror__[Self](self: Self@__ror__, value: Any, /) -> UnionType | Self@__ror__
+                __ror__ :: def __ror__[Self](self: Self, value: Any, /) -> UnionType | Self
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: def __subclasscheck__(self, subclass: type, /) -> bool
-                __subclasses__ :: def __subclasses__[Self](self: Self@__subclasses__) -> list[Self@__subclasses__]
+                __subclasses__ :: def __subclasses__[Self](self: Self) -> list[Self]
                 __subclasshook__ :: bound method <class 'Meta'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -3866,19 +3942,19 @@ Quux.<CURSOR>
         __mro__ :: tuple[type, ...]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self@__new__
-        __or__ :: bound method <class 'Quux'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
+        __new__ :: def __new__[Self](cls) -> Self
+        __or__ :: bound method <class 'Quux'>.__or__[Self](value: Any, /) -> UnionType | Self
         __prepare__ :: bound method <class 'type'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
         __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
         __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: def __repr__(self) -> str
-        __ror__ :: bound method <class 'Quux'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
+        __ror__ :: bound method <class 'Quux'>.__ror__[Self](value: Any, /) -> UnionType | Self
         __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'Quux'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self@__subclasses__]
+        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self]
         __subclasshook__ :: bound method <class 'Quux'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -3919,8 +3995,8 @@ Answer.<CURSOR>
                 __bool__ :: bound method <class 'Answer'>.__bool__() -> Literal[True]
                 __class__ :: <class 'EnumMeta'>
                 __contains__ :: bound method <class 'Answer'>.__contains__(value: object) -> bool
-                __copy__ :: def __copy__(self) -> Self@__copy__
-                __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self@__deepcopy__
+                __copy__ :: def __copy__[Self](self) -> Self
+                __deepcopy__ :: def __deepcopy__[Self](self, memo: Any) -> Self
                 __delattr__ :: def __delattr__(self, name: str, /) -> None
                 __dict__ :: dict[str, Any]
                 __dictoffset__ :: int
@@ -3930,34 +4006,34 @@ Answer.<CURSOR>
                 __flags__ :: int
                 __format__ :: def __format__(self, format_spec: str) -> str
                 __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
-                __getitem__ :: bound method <class 'Answer'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT@__getitem__
+                __getitem__ :: bound method <class 'Answer'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
                 __init_subclass__ :: bound method <class 'Answer'>.__init_subclass__() -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
-                __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT@__iter__]
+                __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
                 __members__ :: MappingProxyType[str, Answer]
                 __module__ :: str
                 __mro__ :: tuple[type, ...]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
-                __new__ :: def __new__(cls, value: object) -> Self@__new__
-                __or__ :: bound method <class 'Answer'>.__or__[Self](value: Any, /) -> UnionType | Self@__or__
+                __new__ :: def __new__[Self](cls, value: object) -> Self
+                __or__ :: bound method <class 'Answer'>.__or__[Self](value: Any, /) -> UnionType | Self
                 __order__ :: str
                 __prepare__ :: bound method <class 'EnumMeta'>.__prepare__(cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT@__reversed__]
-                __ror__ :: bound method <class 'Answer'>.__ror__[Self](value: Any, /) -> UnionType | Self@__ror__
+                __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT]
+                __ror__ :: bound method <class 'Answer'>.__ror__[Self](value: Any, /) -> UnionType | Self
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
-                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self@__subclasses__]
+                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self]
                 __subclasshook__ :: bound method <class 'Answer'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -3999,7 +4075,7 @@ quux.<CURSOR>
         index :: bound method Quux.index(value: Any, start: SupportsIndex = 0, stop: SupportsIndex = ..., /) -> int
         x :: int
         y :: str
-        __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], (value: tuple[_T@__add__, ...], /) -> tuple[int | str | _T@__add__, ...]]
+        __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], [_T](value: tuple[_T, ...], /) -> tuple[int | str | _T, ...]]
         __annotations__ :: dict[str, Any]
         __class__ :: type[Quux]
         __class_getitem__ :: bound method type[Quux].__class_getitem__(item: Any, /) -> GenericAlias
@@ -4025,7 +4101,7 @@ quux.<CURSOR>
         __module__ :: str
         __mul__ :: bound method Quux.__mul__(value: SupportsIndex, /) -> tuple[int | str, ...]
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: (x: int, y: str) -> None
+        __new__ :: (x: int, y: str) -> Quux
         __orig_bases__ :: tuple[Any, ...]
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
@@ -8009,7 +8085,7 @@ my_list[0].remove<CURSOR>
         );
         assert_snapshot!(
             builder.build().snapshot(),
-            @r"
+            @"
         removeprefix
         removesuffix
         ",
@@ -8030,7 +8106,7 @@ def f(x: Any | str):
         );
         assert_snapshot!(
             builder.build().snapshot(),
-            @r"
+            @"
         removeprefix
         removesuffix
         ",
@@ -8052,7 +8128,7 @@ def f(x: Intersection[int, Any] | str):
         );
         assert_snapshot!(
             builder.build().snapshot(),
-            @r"
+            @"
         removeprefix
         removesuffix
         ",
@@ -8067,6 +8143,109 @@ def f(x: Intersection[int, Any] | str):
         assert_snapshot!(
             builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
             @"__file__ :: str",
+        );
+    }
+
+    #[test]
+    fn dunder_file_attribute_completion_non_namespace_package() {
+        let builder = CursorTest::builder()
+            .source("module.py", "")
+            .source("main.py", "import module; module.__file<CURSOR>")
+            .completion_test_builder();
+
+        // __file__ should be `str` when accessed as an attribute on a non-namespace-package module,
+        // not `str | None`
+        assert_snapshot!(
+            builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
+            @"__file__ :: str",
+        );
+    }
+
+    #[test]
+    fn dunder_file_attribute_completion_namespace_package() {
+        let builder = CursorTest::builder()
+            .source("namespace_package/foo.py", "")
+            .source(
+                "main.py",
+                "import namespace_package; namespace_package.__file<CURSOR>",
+            )
+            .completion_test_builder();
+
+        // __file__ should be `None` when accessed as an attribute on a namespace-package module,
+        // not `str | None`
+        assert_snapshot!(
+            builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
+            @"__file__ :: None",
+        );
+    }
+
+    #[test]
+    fn no_duplicate_keyword_arg() {
+        let builder = completion_test_builder(
+            r#"
+import re
+re.match('', '', fla<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().skip_builtins().build().snapshot(),
+            @"flags=",
+        );
+    }
+
+    // Ideally, we should favour completions that are definitely raisable
+    // here. However, doing so would require `exception_ty` to fall back to
+    // token matching when AST-matching fails, making the function signficantly
+    // more complex. At the time of writing, this trade-off was not
+    // considered worthwhile.
+    //
+    // Note that this only applies to bare raise/raise-from statements with no
+    // characters typed after it. It does not apply to `raise A<CURSOR>`.
+    #[test]
+    fn empty_raise_statement() {
+        let builder = completion_test_builder(
+            r#"
+raise <CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().skip_builtins().build().snapshot(),
+            @r"
+            and
+            as
+            assert
+            async
+            await
+            break
+            case
+            class
+            continue
+            def
+            del
+            elif
+            else
+            except
+            finally
+            for
+            from
+            global
+            if
+            import
+            in
+            is
+            lambda
+            match
+            nonlocal
+            not
+            or
+            pass
+            raise
+            return
+            try
+            while
+            with
+            yield
+            ",
         );
     }
 

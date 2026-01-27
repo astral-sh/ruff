@@ -797,7 +797,7 @@ class B(A):
     pass
 
 class C[T]:
-    def check(x: object) -> TypeIs[T]:
+    def check(self, x: object) -> TypeIs[T]:
         # this is a bad check, but we only care about it type-checking
         return False
 
@@ -835,7 +835,7 @@ class B(A):
     pass
 
 class C[T]:
-    def check(x: object) -> TypeGuard[T]:
+    def check(self, x: object) -> TypeGuard[T]:
         # this is a bad check, but we only care about it type-checking
         return False
 

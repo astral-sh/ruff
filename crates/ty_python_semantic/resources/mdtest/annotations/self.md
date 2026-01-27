@@ -585,8 +585,8 @@ class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):
     # TODO: reject the Self usage. because self cannot be used within a metaclass.
-    def __new__(cls) -> Self:
-        return super().__new__(cls)
+    def __new__(cls, name, bases, dct) -> Self:
+        return cls(name, bases, dct)
 ```
 
 ## Explicit annotations override implicit `Self`

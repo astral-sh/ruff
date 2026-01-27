@@ -258,9 +258,30 @@ methods that are compatible with the return type, so the `return` expression is 
 
 ```py
 def same_constrained_types[T: (int, str)](t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
+
+def chained_constrained_types[T: (int, float)](t1: T, t2: T, t3: T) -> T:
+    return (t1 + t2) * t3
+
+def typevar_times_literal[T: (int, float)](t: T) -> T:
+    return t * 2
+
+def literal_times_typevar[T: (int, float)](t: T) -> T:
+    return 2 * t
+
+def negate_typevar[T: (int, float)](t: T) -> T:
+    return -t
+
+def positive_typevar[T: (int, float)](t: T) -> T:
+    return +t
+```
+
+Unary operations that are not supported by all constraints should error:
+
+```py
+def invert_typevar[T: (int, float)](t: T) -> int:
+    # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `T@invert_typevar`"
+    return ~t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two
@@ -867,10 +888,10 @@ class ClassWithOverloadedInit[T]:
 # overload. We would then also have to determine that R must be equal to the return type of **P's
 # solution.
 
-# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
+# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(into_callable(ClassWithOverloadedInit))
 # TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
-# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], (x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
+# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], [T](x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
 reveal_type(accepts_callable(ClassWithOverloadedInit))
 # TODO: revealed: ClassWithOverloadedInit[int]
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
@@ -886,25 +907,35 @@ class GenericClass[T]:
         raise NotImplementedError
 
 def _(x: list[str]):
-    # TODO: This fails because we are not propagating GenericClass's generic context into the
-    # Callable that we create for it.
-    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(into_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_callable(GenericClass)))
 
-    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(accepts_callable(GenericClass))
-    # TODO: revealed: ty_extensions.GenericContext[T@GenericClass]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(accepts_callable(GenericClass)))
 
-    # TODO: revealed: GenericClass[str]
-    # TODO: no errors
-    # revealed: GenericClass[T@GenericClass]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
+    # revealed: GenericClass[str]
     reveal_type(accepts_callable(GenericClass)(x, x))
+```
+
+### `Callable`s that return union types
+
+```py
+from typing import Callable
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def my_iter[T](f: Callable[[], T | None]) -> Box[T]:
+    return Box()
+
+def get_int() -> int | None: ...
+
+reveal_type(my_iter(get_int))  # revealed: Box[int]
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times

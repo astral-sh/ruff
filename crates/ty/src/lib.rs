@@ -442,14 +442,12 @@ impl MainLoop {
         let is_human_readable = terminal_settings.output_format.is_human_readable();
 
         match diagnostics {
-            [] => {
-                if is_human_readable {
-                    writeln!(
-                        self.printer.stream_for_success_summary(),
-                        "{}",
-                        "All checks passed!".green().bold()
-                    )?;
-                }
+            [] if is_human_readable => {
+                writeln!(
+                    self.printer.stream_for_success_summary(),
+                    "{}",
+                    "All checks passed!".green().bold()
+                )?;
             }
             diagnostics => {
                 let diagnostics_count = diagnostics.len();

@@ -140,7 +140,7 @@ pub(crate) fn add_required_imports(
     source_type: PySourceType,
     context: &LintContext,
 ) {
-    for required_import in &settings.isort.required_imports {
+    for required_import in settings.isort.required_imports.iter().rev() {
         add_required_import(
             required_import,
             parsed,

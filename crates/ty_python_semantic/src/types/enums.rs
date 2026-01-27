@@ -39,18 +39,9 @@ impl EnumMetadata<'_> {
     }
 }
 
-#[allow(clippy::unnecessary_wraps)]
-fn enum_metadata_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _class: ClassLiteral<'db>,
-) -> Option<EnumMetadata<'db>> {
-    Some(EnumMetadata::empty())
-}
-
 /// List all members of an enum.
 #[allow(clippy::ref_option, clippy::unnecessary_wraps)]
-#[salsa::tracked(returns(as_ref), cycle_initial=enum_metadata_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -67,9 +58,9 @@ pub(crate) fn enum_metadata<'db>(
             //
             // MyEnum = type("MyEnum", (BaseEnum,), {"A": 1, "B": 2})
             // ```
-            // TODO: Add a diagnostic for including an enum in a `type(...)` call.
             return None;
         }
+        ClassLiteral::DynamicNamedTuple(..) => return None,
     };
 
     // This is a fast path to avoid traversing the MRO of known classes

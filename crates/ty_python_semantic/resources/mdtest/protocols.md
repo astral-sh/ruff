@@ -2428,12 +2428,12 @@ class HasX(Protocol):
     x: int
 
 def f(arg: object, arg2: type):
-    if isinstance(arg, HasX):  # error: [invalid-argument-type]
+    if isinstance(arg, HasX):  # error: [isinstance-against-protocol]
         reveal_type(arg)  # revealed: HasX
     else:
         reveal_type(arg)  # revealed: ~HasX
 
-    if issubclass(arg2, HasX):  # error: [invalid-argument-type]
+    if issubclass(arg2, HasX):  # error: [isinstance-against-protocol]
         reveal_type(arg2)  # revealed: type[HasX]
     else:
         reveal_type(arg2)  # revealed: type & ~type[HasX]
@@ -2477,6 +2477,50 @@ def f(arg1: type, arg2: type):
         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]
     else:
         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
+```
+
+## Match class patterns and protocols
+
+<!-- snapshot-diagnostics -->
+
+Similar to `isinstance()`, using a non-runtime-checkable protocol class in a match class pattern
+will raise `TypeError` at runtime. We emit an error for these cases:
+
+```py
+from typing_extensions import Protocol, runtime_checkable
+
+class HasX(Protocol):
+    x: int
+
+@runtime_checkable
+class RuntimeCheckableHasX(Protocol):
+    x: int
+
+def match_non_runtime_checkable(arg: object):
+    match arg:
+        case HasX():  # error: [isinstance-against-protocol]
+            reveal_type(arg)  # revealed: HasX
+        case _:
+            reveal_type(arg)  # revealed: ~HasX
+
+def match_runtime_checkable(arg: object):
+    match arg:
+        case RuntimeCheckableHasX():  # no error!
+            reveal_type(arg)  # revealed: RuntimeCheckableHasX
+        case _:
+            reveal_type(arg)  # revealed: ~RuntimeCheckableHasX
+```
+
+The same applies to nested class patterns:
+
+```py
+class Wrapper:
+    inner: object
+
+def match_nested_non_runtime_checkable(arg: Wrapper):
+    match arg:
+        case Wrapper(inner=HasX()):  # error: [isinstance-against-protocol]
+            pass
 ```
 
 ## Truthiness of protocol instances
