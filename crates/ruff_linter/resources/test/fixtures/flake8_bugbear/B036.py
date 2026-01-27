@@ -13,14 +13,6 @@ def bad1():
 
 
 @contextmanager
-def bad_try_without_finally():
-    try:
-        yield  # B036
-    except Exception:
-        pass
-
-
-@contextmanager
 def bad_with_code_after_yield():
     with other_cm():
         yield  # B036
@@ -28,15 +20,17 @@ def bad_with_code_after_yield():
 
 
 @contextmanager
-def bad_nested_conditional():
+def bad_nested_conditional_not_last():
     if condition:
         yield  # B036
+    print("after if")
 
 
 @contextmanager
-def bad_nested_in_loop():
+def bad_nested_in_loop_not_last():
     for i in range(10):
         yield  # B036
+    print("after loop")
 
 
 # OK
@@ -182,9 +176,17 @@ def good_with_class():
 
 
 @contextmanager
-def bad_try_with_else():
+def good_try_except_without_finally():
     try:
-        yield  # B036
+        yield
+    except Exception:
+        pass
+
+
+@contextmanager
+def good_try_except_with_else():
+    try:
+        yield
     except Exception:
         pass
     else:
@@ -192,11 +194,11 @@ def bad_try_with_else():
 
 
 @contextmanager
-def bad_yield_in_except_no_finally():
+def good_yield_in_except_no_finally():
     try:
         do_something()
     except Exception:
-        yield  # B036
+        yield
 
 
 @cm
@@ -236,3 +238,30 @@ def good_yield_in_else_with_finally():
         yield
     finally:
         cleanup()
+
+
+@contextmanager
+def good_yield_terminal_in_conditional():
+    if condition:
+        yield
+
+
+@contextmanager
+def good_yield_terminal_in_loop():
+    for i in range(10):
+        yield
+
+
+@contextmanager
+def good_yield_before_return():
+    print("setup")
+    yield
+    return
+
+
+@contextmanager
+def good_yield_terminal_in_branches():
+    if condition:
+        yield
+    else:
+        yield
