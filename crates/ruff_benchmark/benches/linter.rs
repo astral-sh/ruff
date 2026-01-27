@@ -89,7 +89,10 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                             None,
                             settings,
                             flags::Noqa::Enabled,
-                            &SourceKind::Python(case.code().to_string(), py_source_type.is_stub()),
+                            &SourceKind::Python {
+                                code: case.code().to_string(),
+                                is_stub: py_source_type.is_stub(),
+                            },
                             py_source_type,
                             ParseSource::Precomputed(parsed),
                         )
