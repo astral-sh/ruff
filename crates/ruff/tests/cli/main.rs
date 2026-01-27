@@ -172,7 +172,7 @@ impl CliTest {
     }
 
     /// Returns the path to the crate root.
-    pub(crate) fn crate_root<'a>() -> &'a Path {
+    pub(crate) fn crate_root() -> &'static Path {
         Path::new(env!("CARGO_MANIFEST_DIR"))
     }
 
