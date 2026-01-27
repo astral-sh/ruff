@@ -2198,6 +2198,51 @@ class WackyInt(int):
 _: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
 ```
 
+Intersections containing a TypedDict with literal fields can be narrowed with equality checks. Since
+`Foo` requires `tag == "foo"`, the else branch is `Never`:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+def _(x: Intersection[Foo, Any]):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo & Any
+    else:
+        reveal_type(x)  # revealed: Never
+```
+
+But intersections with non-literal fields cannot be narrowed:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+def _(x: Intersection[NonLiteralTD, Any]):
+    if x["tag"] == 42:
+        reveal_type(x)  # revealed: NonLiteralTD & Any
+    else:
+        reveal_type(x)  # revealed: NonLiteralTD & Any
+```
+
+This is especially important when the field type is disjoint from the comparison literal. Even
+though `str` and `int` are disjoint, we can't narrow here because a `str` subclass could override
+`__eq__` to return `True`. Without proper handling, this would wrongly narrow to `Never`:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+class StrTagTD(TypedDict):
+    tag: str
+
+def _(x: Intersection[StrTagTD, Any]):
+    if x["tag"] == 42:
+        reveal_type(x)  # revealed: StrTagTD & Any
+    else:
+        reveal_type(x)  # revealed: StrTagTD & Any
+```
+
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
 
 ```py
@@ -2363,6 +2408,88 @@ def match_with_dict(u: Foo | Bar | dict):
             # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
             # false negative in `is_disjoint_impl`.
             reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+```
+
+## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases
+
+PEP 695 type aliases are transparently resolved when narrowing tagged unions:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict, Literal
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+
+class Bar(TypedDict):
+    tag: Literal["bar"]
+
+type Thing = Foo | Bar
+
+def test_if(x: Thing):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Bar
+```
+
+PEP 695 type aliases also work in `match` statements:
+
+```py
+def test_match(x: Thing):
+    match x["tag"]:
+        case "foo":
+            reveal_type(x)  # revealed: Foo
+        case "bar":
+            reveal_type(x)  # revealed: Bar
+```
+
+PEP 695 type aliases also work with `in`/`not in` narrowing:
+
+```py
+class Baz(TypedDict):
+    baz: int
+
+type ThingWithBaz = Foo | Baz
+
+def test_in(x: ThingWithBaz):
+    if "baz" not in x:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo | Baz
+```
+
+Nested PEP 695 type aliases (an alias referring to another alias) also work:
+
+```py
+type Inner = Foo | Bar
+type Outer = Inner
+
+def test_nested_if(x: Outer):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Bar
+
+def test_nested_match(x: Outer):
+    match x["tag"]:
+        case "foo":
+            reveal_type(x)  # revealed: Foo
+        case "bar":
+            reveal_type(x)  # revealed: Bar
+
+type InnerWithBaz = Foo | Baz
+type OuterWithBaz = InnerWithBaz
+
+def test_nested_in(x: OuterWithBaz):
+    if "baz" not in x:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo | Baz
 ```
 
 ## Only annotated declarations are allowed in the class body
