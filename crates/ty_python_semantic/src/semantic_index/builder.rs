@@ -31,7 +31,7 @@ use crate::semantic_index::definition::{
     StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::member::MemberExprBuilder;
+use crate::semantic_index::member::{Member, MemberExpr, MemberExprBuilder};
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
@@ -2810,6 +2810,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let scope = self.current_scope();
                 if self.scopes[scope].kind() == ScopeKind::Function {
                     self.generator_functions.insert(scope);
+                }
+                walk_expr(self, expr);
+            }
+            ast::Expr::Call(call_expr) => {
+                // For `getattr(obj, "attr")` calls, create a member place for `obj.attr`
+                // so that narrowing constraints can be applied to it.
+                if let Some(member_expr) = MemberExpr::try_from_getattr_call(call_expr) {
+                    let _ = self.add_place(PlaceExpr::Member(Member::new(member_expr)));
                 }
                 walk_expr(self, expr);
             }

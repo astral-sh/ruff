@@ -59,6 +59,24 @@ impl PlaceExpr {
         let member_expression = MemberExpr::try_from_builder(builder)?;
         Some(Self::Member(Member::new(member_expression)))
     }
+
+    /// Creates a new `PlaceExpr` by extending this expression with an attribute access.
+    ///
+    /// For example, if this expression is `x` and `attr_name` is `"flag"`,
+    /// the result is the expression `x.flag`. If this expression is `x.y` and
+    /// `attr_name` is `"z"`, the result is `x.y.z`.
+    pub(crate) fn extend_with_attr(&self, attr_name: &str) -> Self {
+        match self {
+            PlaceExpr::Symbol(symbol) => {
+                let member_expr = MemberExpr::from_symbol_and_attr(symbol.name(), attr_name);
+                PlaceExpr::Member(Member::new(member_expr))
+            }
+            PlaceExpr::Member(member) => {
+                let extended = member.expression().extend_with_attr(attr_name);
+                PlaceExpr::Member(Member::new(extended))
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for PlaceExpr {

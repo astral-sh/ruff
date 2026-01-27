@@ -1,5 +1,6 @@
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
@@ -165,7 +166,6 @@ pub(crate) struct MemberExpr {
 }
 
 impl MemberExpr {
-    #[cfg(test)]
     pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
         MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)
     }
@@ -178,6 +178,72 @@ impl MemberExpr {
                 path: builder.path,
                 segments: Segments::from_vec(builder.segments),
             })
+        }
+    }
+
+    /// Creates a [`MemberExpr`] for `symbol.attr` from a symbol name and attribute name.
+    pub(super) fn from_symbol_and_attr(symbol_name: &str, attr_name: &str) -> Self {
+        let path = Name::new(format!("{symbol_name}{attr_name}"));
+        let segment = SegmentInfo::new(
+            SegmentKind::Attribute,
+            TextSize::try_from(symbol_name.len()).expect("symbol name too long"),
+        );
+        Self {
+            path,
+            segments: Segments::from_vec(smallvec::smallvec![segment]),
+        }
+    }
+
+    /// For `getattr(obj, "attr")` calls, extracts a [`MemberExpr`] for `obj.attr`.
+    ///
+    /// This allows narrowing constraints from truthiness checks (like `if getattr(x, "flag"):`)
+    /// to be applied to the corresponding attribute access.
+    pub(crate) fn try_from_getattr_call(call_expr: &ast::ExprCall) -> Option<Self> {
+        // Check if the callee is a bare name "getattr".
+        let func_name = call_expr.func.as_name_expr()?;
+        if func_name.id.as_str() != "getattr" {
+            return None;
+        }
+
+        let [obj, attr_arg, ..] = &*call_expr.arguments.args else {
+            return None;
+        };
+
+        // The attribute argument must be a string literal.
+        let attr_str = attr_arg.as_string_literal_expr()?;
+        let attr_name = attr_str.value.to_str();
+
+        // Must be a valid identifier.
+        if !is_identifier(attr_name) {
+            return None;
+        }
+
+        // The object must be convertible to a place expression (e.g., a name or attribute)
+        // and we construct the member expression accordingly.
+        match obj {
+            ast::Expr::Name(name) => Some(Self::from_symbol_and_attr(name.id.as_str(), attr_name)),
+            _ => {
+                let member = Self::try_from_expr(obj.into())?;
+                Some(member.extend_with_attr(attr_name))
+            }
+        }
+    }
+
+    /// Creates a new `MemberExpr` by extending this expression with an attribute access.
+    ///
+    /// For example, if this expression is `x.y` and `attr_name` is `"z"`,
+    /// the result is the expression `x.y.z`.
+    pub(crate) fn extend_with_attr(&self, attr_name: &str) -> Self {
+        let mut path = self.path.clone();
+        let start_offset = path.text_len();
+        let _ = write!(path, "{attr_name}");
+
+        let mut segments: SmallVec<[SegmentInfo; 8]> = self.segment_infos().collect();
+        segments.push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
+
+        Self {
+            path,
+            segments: Segments::from_vec(segments),
         }
     }
 

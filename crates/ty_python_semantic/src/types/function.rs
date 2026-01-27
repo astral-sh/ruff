@@ -1340,6 +1340,9 @@ pub enum KnownFunction {
     /// `builtins.hasattr`
     #[strum(serialize = "hasattr")]
     HasAttr,
+    /// `builtins.getattr`
+    #[strum(serialize = "getattr")]
+    GetAttr,
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
     /// `builtins.len`
@@ -1459,6 +1462,7 @@ impl KnownFunction {
             Self::IsInstance
             | Self::IsSubclass
             | Self::HasAttr
+            | Self::GetAttr
             | Self::Len
             | Self::Repr
             | Self::DunderImport => module.is_builtins(),
@@ -2068,6 +2072,7 @@ pub(crate) mod tests {
                 | KnownFunction::Repr
                 | KnownFunction::IsInstance
                 | KnownFunction::HasAttr
+                | KnownFunction::GetAttr
                 | KnownFunction::IsSubclass
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 

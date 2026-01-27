@@ -72,7 +72,9 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
 
-    constraints.and_then(|constraints| constraints.get(&place).cloned())
+    constraints
+        .as_ref()
+        .and_then(|constraints| constraints.get(&place).cloned())
 }
 
 #[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
@@ -1353,14 +1355,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg, second_arg] = &*expr_call.arguments.args else {
-                    return None;
-                };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(self.db)?;
-                let place = self.expect_place(&first_arg);
+                let args = &*expr_call.arguments.args;
 
                 if function == KnownFunction::HasAttr {
+                    let [first_arg, second_arg] = args else {
+                        return None;
+                    };
+                    let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                    let place = self.expect_place(&first_arg);
+
                     let attr = inference
                         .expression_type(second_arg)
                         .as_string_literal()?
@@ -1382,6 +1386,48 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         ),
                     )]));
                 }
+
+                if function == KnownFunction::GetAttr {
+                    let [first_arg, second_arg, ..] = args else {
+                        return None;
+                    };
+                    let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+
+                    let attr = inference
+                        .expression_type(second_arg)
+                        .as_string_literal()?
+                        .value(self.db);
+
+                    if !is_identifier(attr) {
+                        return None;
+                    }
+
+                    // Narrow the member `x.attr` based on truthiness of `getattr(x, "attr")`.
+                    // This is equivalent to how `if x.attr:` narrows `x.attr`.
+                    //
+                    // The member place might not exist if `getattr` was aliased (e.g., `ga = getattr`),
+                    // in which case the builder wouldn't have created the place.
+                    let member_expr = first_arg.extend_with_attr(attr);
+                    let member_place = self.places().place_id(&member_expr)?;
+
+                    let constraint = if is_positive {
+                        Type::AlwaysFalsy.negate(self.db)
+                    } else {
+                        Type::AlwaysTruthy.negate(self.db)
+                    };
+
+                    return Some(NarrowingConstraints::from_iter([(
+                        member_place,
+                        NarrowingConstraint::intersection(constraint),
+                    )]));
+                }
+
+                // Other functions like `isinstance`, `issubclass`, etc. take exactly two arguments.
+                let [first_arg, second_arg] = args else {
+                    return None;
+                };
+                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let place = self.expect_place(&first_arg);
 
                 let function = function.into_classinfo_constraint_function()?;
 
