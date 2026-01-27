@@ -24,7 +24,7 @@ use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
-use ruff_linter::rules::pylint::settings::ConstantType;
+use ruff_linter::rules::pylint::settings::{AllowedValue, ConstantType};
 use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
@@ -3293,6 +3293,16 @@ pub struct PylintOptions {
     )]
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
 
+    /// Specific literal values to ignore when used as "magic values" (see `PLR2004`).
+    #[option(
+        default = r#"[0, 1, 0.0, 1.0, "", "__main__"]"#,
+        value_type = r#"list[str | int | float | complex | bytes]"#,
+        example = r#"
+            allow-magic-values = [42, 3.14, "special"]
+        "#
+    )]
+    pub allow_magic_values: Option<Vec<AllowedValue>>,
+
     /// Dunder methods name to allow, in addition to the default set from the
     /// Python standard library (see `PLW3201`).
     #[option(
@@ -3367,6 +3377,9 @@ impl PylintOptions {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            allow_magic_values: self
+                .allow_magic_values
+                .unwrap_or(defaults.allow_magic_values),
             allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_positional_args: self

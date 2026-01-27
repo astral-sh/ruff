@@ -758,6 +758,46 @@
     "Alias": {
       "type": "string"
     },
+    "AllowedValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "type": "number",
+          "format": "double"
+        },
+        {
+          "type": "object",
+          "required": [
+            "imag",
+            "real"
+          ],
+          "properties": {
+            "imag": {
+              "type": "number",
+              "format": "double"
+            },
+            "real": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        }
+      ]
+    },
     "AnalyzeOptions": {
       "description": "Configures Ruff's `analyze` command.",
       "type": "object",
@@ -2788,6 +2828,16 @@
           ],
           "items": {
             "$ref": "#/definitions/ConstantType"
+          }
+        },
+        "allow-magic-values": {
+          "description": "Specific literal values to ignore when used as \"magic values\" (see `PLR2004`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/AllowedValue"
           }
         },
         "max-args": {
