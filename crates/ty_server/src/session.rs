@@ -461,6 +461,9 @@ impl Session {
     ///
     /// The client provided is used to show error messages, publish
     /// diagnostics related to configuration and register capabilities.
+    ///
+    /// This is typically called when a response to a
+    /// `workspace/configuration` request is received.
     pub(crate) fn initialize_workspace_folders(
         &mut self,
         client: &Client,
@@ -790,6 +793,78 @@ impl Session {
                 client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
             },
         );
+    }
+
+    /// Removes a workspace folder at the given URL.
+    ///
+    /// This removes the workspace folder and its associated project database,
+    /// and clears diagnostics for any documents that were in the workspace.
+    ///
+    /// # Errors
+    ///
+    /// This returns an error if the workspace folder has already been removed
+    /// or otherwise could not be found.
+    pub(crate) fn remove_workspace_folder(
+        &mut self,
+        client: &Client,
+        url: &Url,
+    ) -> anyhow::Result<()> {
+        tracing::info!("Removing workspace folder: {url}");
+
+        let path = url
+            .to_file_path()
+            .map_err(|()| anyhow!("Workspace URL is not a file path: {url}"))?;
+        let workspace_path = SystemPathBuf::from_path_buf(path)
+            .map_err(|path| anyhow!("Workspace path is not valid UTF-8: {}", path.display()))?;
+
+        anyhow::ensure!(
+            self.workspaces.unregister(&workspace_path),
+            "Workspace not found: {url}",
+        );
+
+        // Note that it is somewhat unclear whether we actually need to
+        // clear diagnostics here. It seems that, at least in the case
+        // of VS Code, it will auto-clear any diagnostics not found in
+        // the workspace diagnostic response. Moreover, VS Code will
+        // re-request workspace diagnostics after removing a workspace
+        // folder.
+        //
+        // For now, we keep unconditionally clearing diagnostics on
+        // opened text documents for reasons of good sense, but it's
+        // possible that we don't even need to do that (when workspace
+        // diagnostics are enabled).
+        //
+        // See: https://github.com/astral-sh/ruff/pull/22953#discussion_r2745255350
+
+        // Remove the associated project database.
+        if let Some(project_state) = self.projects.remove(&workspace_path) {
+            // Clear diagnostics for any files that had pushed diagnostics in this project.
+            for file_url in project_state.untracked_files_with_pushed_diagnostics {
+                self.clear_diagnostics(client, &file_url);
+            }
+        }
+
+        // Collect all of the documents to clear upfront to
+        // work around borrowck.
+        let documents_to_clear: Vec<DocumentHandle> = self
+            .text_document_handles()
+            .filter_map(|doc| {
+                if let AnySystemPath::System(ref path) = *doc.notebook_or_file_path()
+                    && path.starts_with(&workspace_path)
+                {
+                    Some(doc)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for doc in documents_to_clear {
+            self.clear_diagnostics(client, doc.url());
+        }
+
+        self.bump_revision();
+
+        Ok(())
     }
 
     /// Clears the diagnostics for the document identified by `uri`.
@@ -1430,6 +1505,13 @@ impl Workspaces {
         Ok(())
     }
 
+    /// Unregisters a workspace folder at the given path.
+    ///
+    /// Returns `true` if the workspace was removed, `false` if it wasn't found.
+    fn unregister(&mut self, path: &SystemPath) -> bool {
+        self.workspaces.remove(path).is_some()
+    }
+
     /// Returns a reference to the workspace for the given path, [`None`] if there's no workspace
     /// registered for the path.
     fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
@@ -1754,6 +1836,11 @@ impl DocumentHandle {
     /// Calling this multiple times for the same document is a logic error.
     ///
     /// Returns `true` if the client needs to clear the diagnostics for this document.
+    ///
+    /// # Errors
+    ///
+    /// This can return an error when the document does not exist in the
+    /// session index.
     pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
         let is_cell = self.is_cell();
         let path = self.notebook_or_file_path();
