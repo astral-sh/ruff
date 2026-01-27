@@ -18,6 +18,7 @@ use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, Met
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
+use crate::types::protocol_class::ProtocolMember;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -771,35 +772,47 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Reports runtime checks against non-runtime-checkable `Protocol` classes.
-    /// This includes explicit calls to `isinstance()`/`issubclass()` and implicit
-    /// checks performed by `match` class patterns.
+    /// Reports invalid runtime checks against `Protocol` classes.
+    /// This includes explicit calls `isinstance()`/`issubclass()` against
+    /// non-runtime-checkable protocols, `issubclass()` calls against protocols
+    /// that have non-method members, and implicit `isinstance()` checks against
+    /// non-runtime-checkable protocols via pattern matching.
     ///
     /// ## Why is this bad?
-    /// Using a non-runtime-checkable protocol in these contexts raises `TypeError`
-    /// at runtime.
+    /// These calls (implicit or explicit) raise `TypeError` at runtime.
     ///
     /// ## Examples
     /// ```python
-    /// from typing_extensions import Protocol
+    /// from typing_extensions import Protocol, runtime_checkable
     ///
     /// class HasX(Protocol):
     ///     x: int
     ///
+    /// @runtime_checkable
+    /// class HasY(Protocol):
+    ///     y: int
+    ///
     /// def f(arg: object, arg2: type):
-    ///     isinstance(arg, HasX)  # error: [isinstance-against-protocol]
-    ///     issubclass(arg2, HasX)  # error: [isinstance-against-protocol]
+    ///     isinstance(arg, HasX)  # error: [isinstance-against-protocol] (not runtime-checkable)
+    ///     issubclass(arg2, HasX)  # error: [isinstance-against-protocol] (not runtime-checkable)
     ///
     /// def g(arg: object):
     ///     match arg:
-    ///         case HasX():  # error: [isinstance-against-protocol]
+    ///         case HasX():  # error: [isinstance-against-protocol] (not runtime-checkable)
     ///             pass
+    ///
+    /// def h(arg2: type):
+    ///     isinstance(arg2, HasY)  # fine (runtime-checkable)
+    ///
+    ///     # `HasY` is runtime-checkable, but has non-method members,
+    ///     # so it still can't be used in `issubclass` checks)
+    ///     issubclass(arg2, HasY)  # error: [isinstance-against-protocol]
     /// ```
     ///
     /// ## References
     /// - [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)
     pub(crate) static ISINSTANCE_AGAINST_PROTOCOL = {
-        summary: "reports runtime checks against non-runtime-checkable protocol classes",
+        summary: "reports invalid runtime checks against protocol classes",
         status: LintStatus::stable("0.0.14"),
         default_level: Level::Error,
     }
@@ -3712,6 +3725,69 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
             with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
     ));
     diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
+}
+
+pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'db>(
+    context: &'db InferContext<'db, '_>,
+    call: &ast::ExprCall,
+    protocol: ProtocolClass<'db>,
+    non_method_members: &[ProtocolMember<'db, 'db>],
+) {
+    let Some(builder) = context.report_lint(&ISINSTANCE_AGAINST_PROTOCOL, call) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = protocol.name(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Class `{class_name}` cannot be used as the second argument to `issubclass`",
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "`{class_name}` cannot be used as the second argument to `issubclass` \
+        as it is a protocol with non-method members"
+    ));
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    if let [single_member] = non_method_members {
+        let mut sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "A protocol class cannot be used in `issubclass` checks \
+            if it has non-method members",
+        );
+        if let Some(definition) = single_member.definition() {
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
+            let span = Span::from(definition.focus_range(db, &module));
+            sub.annotate(Annotation::primary(span).message(format_args!(
+                "Non-method member `{}` declared here",
+                single_member.name()
+            )));
+        }
+        diagnostic.sub(sub);
+    } else {
+        diagnostic.info(
+            "A protocol class cannot be used in `issubclass` checks \
+            if it has non-method members",
+        );
+        let mut sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "`{class_name}` has non-method members {}",
+                format_enumeration(non_method_members.iter().map(ProtocolMember::name))
+            ),
+        );
+        if let Some((name, definition)) = non_method_members
+            .iter()
+            .find_map(|member| Some((member.name(), member.definition()?)))
+        {
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
+            let span = Span::from(definition.focus_range(db, &module));
+            sub.annotate(
+                Annotation::primary(span)
+                    .message(format_args!("Non-method member `{name}` declared here")),
+            );
+        }
+        diagnostic.sub(sub);
+    }
 }
 
 pub(crate) fn report_runtime_check_against_typed_dict(
