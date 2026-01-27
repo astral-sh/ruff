@@ -38,10 +38,12 @@ pub fn format_code_blocks(
     path: Option<&Path>,
     settings: &FormatterSettings,
 ) -> MarkdownResult {
-    let mut replacements = Vec::new();
+    let mut changed = false;
+    let mut formatted = String::with_capacity(source.len());
+    let mut last_match = 0;
 
     for capture in MARKDOWN_CODE_BLOCK.captures_iter(source) {
-        let (_, [_before, code_indent, language, code, _after]) = capture.extract();
+        let (_, [before, code_indent, language, code, after]) = capture.extract();
 
         let py_source_type = PySourceType::from_extension(language);
         let unformatted_code = dedent(code);
@@ -55,26 +57,25 @@ pub fn format_code_blocks(
         if let Ok(formatted_code) = formatted_code {
             if formatted_code.len() != unformatted_code.len() || formatted_code != *unformatted_code
             {
-                let code_range = capture
-                    .name("code")
-                    .map(|m| m.range())
-                    .expect("markdown regex didn't capture code range");
-                replacements.push((
-                    code_range,
-                    indent(formatted_code.as_str(), code_indent).to_string(),
-                ));
+                let m = capture.get_match();
+                formatted.push_str(&source[last_match..m.start()]);
+
+                let indented_code = indent(&formatted_code, code_indent);
+                // otherwise I need to deal with a result from write!
+                #[expect(clippy::format_push_string)]
+                formatted.push_str(&format!("{before}{indented_code}{after}"));
+
+                last_match = m.end();
+                changed = true;
             }
         }
     }
 
-    if replacements.is_empty() {
-        MarkdownResult::Unchanged
+    if changed {
+        formatted.push_str(&source[last_match..]);
+        MarkdownResult::Formatted(formatted)
     } else {
-        let mut content = source.to_string();
-        for (range, replacement) in replacements.iter().rev() {
-            content.replace_range(range.clone(), replacement);
-        }
-        MarkdownResult::Formatted(content)
+        MarkdownResult::Unchanged
     }
 }
 
