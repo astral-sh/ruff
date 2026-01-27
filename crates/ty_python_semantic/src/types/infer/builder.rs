@@ -2532,6 +2532,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut declared_ty = self.file_expression_type(returns);
             let definition = self.index.expect_single_definition(function);
+            if let Type::TypeAlias(type_alias) = declared_ty
+                && type_alias.specialization(self.db()).is_none()
+            {
+                // Avoid default-specializing type aliases whose type parameters only appear
+                // inside nested callables in return position.
+                let raw_value = type_alias.raw_value_type(self.db());
+                let callable_scoped =
+                    GenericContext::callable_scoped_typevar_identities(self.db(), [raw_value]);
+                let outer = GenericContext::collect_bound_typevars_from_types(
+                    self.db(),
+                    [raw_value],
+                    false,
+                );
+                if !callable_scoped.is_empty() && outer.is_empty() {
+                    declared_ty = raw_value;
+                }
+            }
             let mut parameter_types = Vec::new();
             for param in function.parameters.iter_non_variadic_params() {
                 if let Some(annotation) = param.annotation() {
@@ -2569,7 +2586,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut scoped = FxHashSet::default();
             for typevar in return_typevars_all {
-                if typevar.binding_context(self.db()) == BindingContext::Definition(definition)
+                let binding_is_implicit_alias = matches!(
+                    typevar.binding_context(self.db()),
+                    BindingContext::Definition(binding_def)
+                        if matches!(
+                            binding_def.kind(self.db()),
+                            DefinitionKind::Assignment(_)
+                                | DefinitionKind::AnnotatedAssignment(_)
+                                | DefinitionKind::TypeAlias(_)
+                        )
+                );
+
+                if (typevar.binding_context(self.db()) == BindingContext::Definition(definition)
+                    || binding_is_implicit_alias)
                     && !typevar.typevar(self.db()).is_self(self.db())
                     && !parameter_identities.contains(&typevar.identity(self.db()))
                     && !return_outer_identities.contains(&typevar.identity(self.db()))
@@ -5943,12 +5972,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_expression(value, tcx)
                 };
 
-                let value_ty = GenericContext::scope_callable_typevars_in_type(
-                    self.db(),
-                    definition,
-                    value_ty,
-                );
-
                 self.typevar_binding_context = previous_typevar_binding_context;
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
@@ -8089,9 +8112,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
-
-            let inferred_ty =
-                GenericContext::scope_callable_typevars_in_type(self.db(), definition, inferred_ty);
 
             if is_pep_613_type_alias {
                 let inferred_ty =

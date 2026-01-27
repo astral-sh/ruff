@@ -50,7 +50,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
     ///
     /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
-    fn infer_type_expression_with_state(
+    pub(super) fn infer_type_expression_with_state(
         &mut self,
         expression: &ast::Expr,
         deferred_state: DeferredExpressionState,

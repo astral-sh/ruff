@@ -513,56 +513,21 @@ impl<'db> GenericContext<'db> {
         collector.typevars.into_inner()
     }
 
-    /// Returns the typevars bound to `binding_context` that appear only inside `Callable` types.
-    pub(crate) fn callable_scoped_typevars_for_types(
+    /// Returns the identities of bound typevars that appear only inside `Callable` types.
+    pub(crate) fn callable_scoped_typevar_identities(
         db: &'db dyn Db,
-        binding_context: Definition<'db>,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
         let types: Vec<Type<'db>> = types.into_iter().collect();
-
-        let all = Self::collect_bound_typevars_from_types(
-            db,
-            types.iter().copied(),
-            true,
-        );
-        let outer = Self::collect_bound_typevars_from_types(
-            db,
-            types.iter().copied(),
-            false,
-        );
+        let all = Self::collect_bound_typevars_from_types(db, types.iter().copied(), true);
+        let outer = Self::collect_bound_typevars_from_types(db, types.iter().copied(), false);
         let outer_identities: FxHashSet<_> =
             outer.iter().map(|typevar| typevar.identity(db)).collect();
 
-        let mut scoped = FxHashSet::default();
-        for typevar in all {
-            if typevar.binding_context(db) == BindingContext::Definition(binding_context)
-                && !typevar.typevar(db).is_self(db)
-                && !outer_identities.contains(&typevar.identity(db))
-            {
-                scoped.insert(typevar.identity(db));
-            }
-        }
-
-        scoped
-    }
-
-    /// Re-scope any typevars bound to `binding_context` that appear only within `Callable` types.
-    pub(crate) fn scope_callable_typevars_in_type(
-        db: &'db dyn Db,
-        binding_context: Definition<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
-        let scoped = Self::callable_scoped_typevars_for_types(db, binding_context, [ty]);
-        if scoped.is_empty() {
-            ty
-        } else {
-            ty.apply_type_mapping(
-                db,
-                &TypeMapping::ScopeCallableTypevars { scoped: &scoped },
-                TypeContext::default(),
-            )
-        }
+        all.into_iter()
+            .map(|typevar| typevar.identity(db))
+            .filter(|identity| !outer_identities.contains(identity))
+            .collect()
     }
 
     pub(crate) fn merge_pep695_and_legacy(

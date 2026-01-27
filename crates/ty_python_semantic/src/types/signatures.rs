@@ -16,8 +16,11 @@ use itertools::{EitherOrBoth, Itertools};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, semantic_index};
-use crate::semantic_index::definition::Definition;
+use super::{
+    DynamicType, Type, TypeVarVariance, binding_type, definition_expression_type, semantic_index,
+};
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
+use crate::semantic_index::place::PlaceExpr;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::infer_deferred_types;
@@ -45,17 +48,79 @@ fn function_signature_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     expression: &ast::Expr,
+    is_return: bool,
 ) -> Type<'db> {
     let file = definition.file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
-    if scope == definition.scope(db) {
+    let inferred = if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
         infer_deferred_types(db, definition).expression_type(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).expression_type(expression)
+    };
+
+    if !is_return {
+        return inferred;
+    }
+
+    // In return position, prefer the binding type for implicit aliases that are only generic
+    // inside nested callables. This avoids default-specializing them to `Unknown`.
+    if PlaceExpr::try_from_expr(expression).is_none() {
+        return inferred;
+    }
+    let file_scope_id = scope.file_scope_id(db);
+    let use_def = index.use_def_map(file_scope_id);
+    let expression_ref = ast::ExprRef::from(expression);
+    let ast_ids = index.ast_ids(file_scope_id);
+    let Some(use_id) = ast_ids.try_use_id(expression_ref) else {
+        return inferred;
+    };
+    let mut definitions = use_def
+        .bindings_at_use(use_id)
+        .filter_map(|binding| match binding.binding {
+            DefinitionState::Defined(definition) => Some(definition),
+            DefinitionState::Deleted | DefinitionState::Undefined => None,
+        })
+        .collect::<FxOrderSet<_>>();
+    let Some(binding_def) = definitions.pop() else {
+        return inferred;
+    };
+    if !definitions.is_empty() {
+        return inferred;
+    }
+    if !matches!(
+        binding_def.kind(db),
+        DefinitionKind::Assignment(_)
+            | DefinitionKind::AnnotatedAssignment(_)
+            | DefinitionKind::TypeAlias(_)
+    ) {
+        return inferred;
+    }
+
+    let binding_ty = binding_type(db, binding_def);
+    let type_expr_ty = match binding_ty.in_type_expression(db, scope, Some(definition)) {
+        Ok(ty) => ty,
+        Err(_) => return inferred,
+    };
+    let candidate = if let Type::TypeAlias(type_alias) = type_expr_ty {
+        if type_alias.specialization(db).is_none() {
+            type_alias.raw_value_type(db)
+        } else {
+            type_expr_ty
+        }
+    } else {
+        type_expr_ty
+    };
+
+    let callable_scoped = GenericContext::callable_scoped_typevar_identities(db, [candidate]);
+    let outer = GenericContext::collect_bound_typevars_from_types(db, [candidate], false);
+    if !callable_scoped.is_empty() && outer.is_empty() {
+        candidate
+    } else {
+        inferred
     }
 }
 
@@ -695,11 +760,26 @@ impl<'db> Signature<'db> {
             function_node.parameters.as_ref(),
             has_implicitly_positional_first_parameter,
         );
-        let return_ty = function_node
+        let mut return_ty = function_node
             .returns
             .as_ref()
-            .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()))
+            .map(|returns| {
+                function_signature_expression_type(db, definition, returns.as_ref(), true)
+            })
             .unwrap_or_else(Type::unknown);
+        if let Type::TypeAlias(type_alias) = return_ty
+            && type_alias.specialization(db).is_none()
+        {
+            // Avoid default-specializing type aliases whose type parameters only appear inside
+            // nested callables; those should remain generic callables in return position.
+            let raw_value = type_alias.raw_value_type(db);
+            let callable_scoped =
+                GenericContext::callable_scoped_typevar_identities(db, [raw_value]);
+            let outer = GenericContext::collect_bound_typevars_from_types(db, [raw_value], false);
+            if !callable_scoped.is_empty() && outer.is_empty() {
+                return_ty = raw_value;
+            }
+        }
         let legacy_generic_context =
             GenericContext::from_function_params(db, definition, &parameters, return_ty);
         let full_generic_context = GenericContext::merge_pep695_and_legacy(
@@ -734,7 +814,19 @@ impl<'db> Signature<'db> {
 
         let mut scoped = rustc_hash::FxHashSet::default();
         for typevar in return_typevars_all {
-            if typevar.binding_context(db) == BindingContext::Definition(definition)
+            let binding_is_implicit_alias = matches!(
+                typevar.binding_context(db),
+                BindingContext::Definition(binding_def)
+                    if matches!(
+                        binding_def.kind(db),
+                        DefinitionKind::Assignment(_)
+                            | DefinitionKind::AnnotatedAssignment(_)
+                            | DefinitionKind::TypeAlias(_)
+                    )
+            );
+
+            if (typevar.binding_context(db) == BindingContext::Definition(definition)
+                || binding_is_implicit_alias)
                 && !typevar.typevar(db).is_self(db)
                 && !parameter_identities.contains(&typevar.identity(db))
                 && !return_outer_identities.contains(&typevar.identity(db))
@@ -2663,7 +2755,7 @@ impl<'db> Parameter<'db> {
         let (annotated_type, inferred_annotation, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
                 (
-                    function_signature_expression_type(db, definition, annotation),
+                    function_signature_expression_type(db, definition, annotation, false),
                     false,
                     annotation.is_starred_expr(),
                 )

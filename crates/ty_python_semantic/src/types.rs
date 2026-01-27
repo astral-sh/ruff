@@ -11620,8 +11620,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        let ty = definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value);
-        GenericContext::scope_callable_typevars_in_type(db, definition, ty)
+        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
