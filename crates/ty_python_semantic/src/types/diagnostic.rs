@@ -72,6 +72,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_KEY);
     registry.register_lint(&ISINSTANCE_AGAINST_PROTOCOL);
+    registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
@@ -800,6 +801,42 @@ declare_lint! {
     pub(crate) static ISINSTANCE_AGAINST_PROTOCOL = {
         summary: "reports runtime checks against non-runtime-checkable protocol classes",
         status: LintStatus::stable("0.0.14"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Reports runtime checks against `TypedDict` classes.
+    /// This includes explicit calls to `isinstance()`/`issubclass()` and implicit
+    /// checks performed by `match` class patterns.
+    ///
+    /// ## Why is this bad?
+    /// Using a `TypedDict` class in these contexts raises `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing_extensions import TypedDict
+    ///
+    /// class Movie(TypedDict):
+    ///     name: str
+    ///     director: str
+    ///
+    /// def f(arg: object, arg2: type):
+    ///     isinstance(arg, Movie)  # error: [isinstance-against-typed-dict]
+    ///     issubclass(arg2, Movie)  # error: [isinstance-against-typed-dict]
+    ///
+    /// def g(arg: object):
+    ///     match arg:
+    ///         case Movie():  # error: [isinstance-against-typed-dict]
+    ///             pass
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing specification: `TypedDict`](https://typing.python.org/en/latest/spec/typeddict.html)
+    pub(crate) static ISINSTANCE_AGAINST_TYPED_DICT = {
+        summary: "reports runtime checks against `TypedDict` classes",
+        status: LintStatus::stable("0.0.15"),
         default_level: Level::Error,
     }
 }
@@ -3664,7 +3701,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     };
     let db = context.db();
     let class_name = protocol.name(db);
-    let function_name: &'static str = function.into();
+    let function_name = function.name();
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Class `{class_name}` cannot be used as the second argument to `{function_name}`",
     ));
@@ -3675,6 +3712,23 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
             with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
     ));
     diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
+}
+
+pub(crate) fn report_runtime_check_against_typed_dict(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    class: ClassLiteral,
+    function: KnownFunction,
+) {
+    let Some(builder) = context.report_lint(&ISINSTANCE_AGAINST_TYPED_DICT, call) else {
+        return;
+    };
+    let class_name = class.name(context.db());
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "`TypedDict` class `{class_name}` cannot be used as the second argument to `{function_name}`",
+        function_name = function.name()
+    ));
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 }
 
 pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ranged>(
@@ -3697,6 +3751,22 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
             with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`",
     );
     diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
+}
+
+pub(crate) fn report_match_pattern_against_typed_dict<T: Ranged>(
+    context: &InferContext,
+    pattern_cls: T,
+    class: ClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&ISINSTANCE_AGAINST_TYPED_DICT, pattern_cls) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = class.name(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "`TypedDict` class `{class_name}` cannot be used in a class pattern",
+    ));
+    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
 fn add_non_runtime_checkable_protocol_context<'db>(

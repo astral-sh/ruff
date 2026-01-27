@@ -1684,7 +1684,7 @@ class Person(TypedDict):
 x: Person = MyDict({"name": "Alice", "age": 30})
 ```
 
-### Cannot be used in `isinstance` tests
+### Cannot be used in `isinstance` tests or `issubclass` tests
 
 ```py
 from typing import TypedDict
@@ -1693,9 +1693,24 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-def _(obj: object) -> bool:
-    # TODO: this should be an error
-    return isinstance(obj, Person)
+def _(obj: object, obj2: type):
+    # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used as the second argument to `isinstance`"
+    isinstance(obj, Person)
+    # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used as the second argument to `issubclass`"
+    issubclass(obj2, Person)
+```
+
+They also cannot be used in class patterns for `match` statements:
+
+```py
+def f(x: object):
+    match x:
+        # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used in a class pattern"
+        case Person():
+            pass
+        # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used in a class pattern"
+        case object(parent=Person()):
+            pass
 ```
 
 ## Diagnostics
