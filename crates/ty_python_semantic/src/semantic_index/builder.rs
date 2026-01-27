@@ -768,14 +768,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) {
         for target in targets {
             if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
-                self.add_dict_key_assignment_definitions_impl(target, dict, assignment);
+                self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
             }
         }
     }
 
     fn add_dict_key_assignment_definitions_impl(
         &mut self,
-        target: MemberExprBuilder,
+        target: &MemberExprBuilder,
         dict: &'ast ast::ExprDict,
         assignment: Definition<'db>,
     ) {
@@ -791,11 +791,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // Recurse into nested dictionaries.
             if let ast::Expr::Dict(dict_value) = &item.value {
-                self.add_dict_key_assignment_definitions_impl(
-                    member_expr.clone(),
-                    dict_value,
-                    assignment,
-                );
+                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
             }
 
             if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
