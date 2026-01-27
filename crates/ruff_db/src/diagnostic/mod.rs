@@ -1523,9 +1523,6 @@ pub enum DiagnosticFormat {
     ///
     /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
     Github,
-
-    #[cfg(feature = "serde")]
-    Sarif,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

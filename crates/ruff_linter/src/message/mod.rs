@@ -195,55 +195,25 @@ impl<'a> EmitterContext<'a> {
     }
 }
 
-struct RuffRuleMetadata {
-    rule: Rule,
-    code: String,
-    linter_name: &'static str,
-    url: Option<String>,
-}
-
-impl RuleMetadata for RuffRuleMetadata {
-    fn code(&self) -> &str {
-        &self.code
-    }
-
-    fn name(&self) -> Option<&str> {
-        Some(self.rule.into())
-    }
-
-    fn linter(&self) -> Option<&str> {
-        Some(self.linter_name)
-    }
-
-    fn summary(&self) -> &str {
-        self.rule.message_formats()[0]
-    }
-
-    fn explanation(&self) -> Option<&str> {
-        self.rule.explanation()
-    }
-
-    fn url(&self) -> Option<&str> {
-        self.url.as_deref()
-    }
-}
-
 struct RuffMetadataProvider;
 
 impl RuleMetadataProvider for RuffMetadataProvider {
-    fn get_metadata<'a>(&'a self, code: &'a SecondaryCode) -> Option<Box<dyn RuleMetadata + 'a>> {
+    fn metadata(&self, diagnostic: &Diagnostic) -> Option<RuleMetadata> {
+        let code = diagnostic.secondary_code()?;
         let code_str = code.as_str();
         let (linter, suffix) = Linter::parse_code(code_str)?;
-        let rule: Rule = linter
+        let rule = linter
             .all_rules()
             .find(|rule| rule.noqa_code().suffix() == suffix)?;
 
-        Some(Box::new(RuffRuleMetadata {
-            rule,
+        Some(RuleMetadata {
             code: code_str.to_string(),
-            linter_name: linter.name(),
+            name: Some(rule.into()),
+            linter: Some(linter.name()),
+            summary: rule.message_formats()[0],
+            explanation: rule.explanation(),
             url: rule.url(),
-        }))
+        })
     }
 }
 

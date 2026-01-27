@@ -71,7 +71,7 @@ exit_code: 1
           "informationUri": "https://github.com/astral-sh/ruff",
           "name": "Ruff",
           "rules": [],
-          "version": "0.0.0"
+          "version": "[VERSION] (2a9222b8a 2026-01-21)"
         }
       }
     }

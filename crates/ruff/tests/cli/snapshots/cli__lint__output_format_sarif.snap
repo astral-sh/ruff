@@ -156,7 +156,7 @@ exit_code: 1
               }
             }
           ],
-          "version": "0.0.0"
+          "version": "[VERSION] (2a9222b8a 2026-01-21)"
         }
       }
     }

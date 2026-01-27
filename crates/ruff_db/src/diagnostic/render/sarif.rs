@@ -1,29 +1,21 @@
 use super::FileResolver;
-use crate::diagnostic::{Diagnostic, SecondaryCode, Severity};
+use crate::diagnostic::{Diagnostic, Severity};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 use std::collections::HashMap;
 
-pub trait RuleMetadata {
-    fn code(&self) -> &str;
-    fn name(&self) -> Option<&str> {
-        None
-    }
-    fn linter(&self) -> Option<&str> {
-        None
-    }
-    fn summary(&self) -> &str;
-    fn explanation(&self) -> Option<&str> {
-        None
-    }
-    fn url(&self) -> Option<&str> {
-        None
-    }
+pub struct RuleMetadata {
+    pub code: String,
+    pub name: Option<&'static str>,
+    pub linter: Option<&'static str>,
+    pub summary: &'static str,
+    pub explanation: Option<&'static str>,
+    pub url: Option<String>,
 }
 pub trait RuleMetadataProvider {
-    fn get_metadata<'a>(&'a self, code: &'a SecondaryCode) -> Option<Box<dyn RuleMetadata + 'a>>;
+    fn metadata(&self, diagnostic: &Diagnostic) -> Option<RuleMetadata>;
 }
 pub struct SarifToolInfo {
     pub name: &'static str,
@@ -63,19 +55,16 @@ impl SarifRenderer<'_> {
         let unique_rules: HashMap<String, SarifRule> = diagnostics
             .iter()
             .filter_map(|d| {
-                d.secondary_code().map(|code| {
-                    let rule = if let Some(provider) = self.metadata_provider {
-                        if let Some(metadata) = provider.get_metadata(code) {
-                            SarifRule::from_metadata(metadata.as_ref())
-                        } else {
-                            SarifRule::from_diagnostic(d, code)
-                        }
-                    } else {
-                        SarifRule::from_diagnostic(d, code)
-                    };
+                let code = d.secondary_code()?;
+                let metadata = self
+                    .metadata_provider
+                    .and_then(|provider| provider.metadata(d));
 
-                    (code.as_str().to_string(), rule)
-                })
+                let rule = metadata
+                    .map(SarifRule::from_metadata)
+                    .unwrap_or_else(|| SarifRule::from_diagnostic(d));
+
+                Some((code.as_str().to_string(), rule))
             })
             .collect();
 
@@ -91,7 +80,7 @@ impl SarifRenderer<'_> {
                         "name": self.tool.name,
                         "informationUri": self.tool.information_uri,
                         "rules": rules,
-                        "version": env!("CARGO_PKG_VERSION"),
+                        "version": crate::program_version().unwrap_or_else(|| "unknown"),
                     }
                 },
                 "results": results,
@@ -342,28 +331,28 @@ struct SarifRegion {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SarifRule {
     id: String,
-    name: Option<String>,
-    linter: Option<String>,
+    name: Option<&'static str>,
+    linter: Option<&'static str>,
     summary: String,
     explanation: Option<String>,
     url: Option<String>,
 }
 
 impl SarifRule {
-    fn from_metadata(metadata: &dyn RuleMetadata) -> Self {
+    fn from_metadata(metadata: RuleMetadata) -> Self {
         Self {
-            id: metadata.code().to_string(),
-            name: metadata.name().map(ToString::to_string),
-            linter: metadata.linter().map(ToString::to_string),
-            summary: metadata.summary().to_string(),
-            explanation: metadata.explanation().map(ToString::to_string),
-            url: metadata.url().map(ToString::to_string),
+            id: metadata.code,
+            name: metadata.name,
+            linter: metadata.linter,
+            summary: metadata.summary.to_string(),
+            explanation: metadata.explanation.map(ToString::to_string),
+            url: metadata.url,
         }
     }
 
-    fn from_diagnostic(diagnostic: &Diagnostic, code: &SecondaryCode) -> Self {
+    fn from_diagnostic(diagnostic: &Diagnostic) -> Self {
         Self {
-            id: code.as_str().to_string(),
+            id: diagnostic.secondary_code_or_id().to_string(),
             name: None,
             linter: None,
             summary: diagnostic.primary_message().to_string(),
@@ -434,29 +423,5 @@ impl<'a> DisplaySarifDiagnostics<'a> {
 impl std::fmt::Display for DisplaySarifDiagnostics<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.renderer.render(f, self.diagnostics)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
-    };
-
-    #[test]
-    fn output() {
-        let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Sarif);
-        let output = env.render_diagnostics(&diagnostics);
-        serde_json::from_str::<serde_json::Value>(&output).unwrap();
-        insta::assert_snapshot!(output);
-    }
-
-    #[test]
-    fn syntax_errors() {
-        let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Sarif);
-        let output = env.render_diagnostics(&diagnostics);
-        serde_json::from_str::<serde_json::Value>(&output).unwrap();
-        insta::assert_snapshot!(output);
     }
 }
