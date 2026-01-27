@@ -1021,12 +1021,13 @@ mod tests {
             cache: &Cache,
         ) -> Result<FormatResult, FormatCommandError> {
             let file_path = self.package_root.join(path);
+            let ranges = Vec::new();
             format_path(
                 &file_path,
                 &self.settings.formatter,
                 PySourceType::Python,
                 FormatMode::Write,
-                None,
+                &ranges,
                 Some(cache),
             )
         }

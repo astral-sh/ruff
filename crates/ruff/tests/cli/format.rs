@@ -2159,6 +2159,178 @@ def foo(arg1, arg2,):
 }
 
 #[test]
+fn multiple_ranges() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--stdin-filename", "test.py", "--range=7-9", "--range=2-3", "--range=4-6"])
+        .arg("-")
+        .pass_stdin(r#"
+a = [2     ]
+b = [3     ]
+c = [4     ]
+d = [5     ]
+e = [6     ]
+f = [7     ]
+g = [8     ]
+h = [9     ]
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    a = [2]
+    b = [3     ]
+    c = [4]
+    d = [5]
+    e = [6     ]
+    f = [7]
+    g = [8]
+    h = [9     ]
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
+fn multiple_overlapping_ranges() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--stdin-filename", "test.py", "--range=5-9", "--range=5-8", "--range=4-6"])
+        .arg("-")
+        .pass_stdin(r#"
+a = [2     ]
+b = [3     ]
+c = [4     ]
+d = [5     ]
+e = [6     ]
+f = [7     ]
+g = [8     ]
+h = [9     ]
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    a = [2     ]
+    b = [3     ]
+    c = [4]
+    d = [5]
+    e = [6]
+    f = [7]
+    g = [8]
+    h = [9     ]
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
+fn multiple_ranges_in_same_statement() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--stdin-filename", "test.py", "--range=3-4", "--range=6-7"])
+        .arg("-")
+        .pass_stdin(r#"
+a = (2,
+  3 ,
+ 4,
+5,
+   6  ,
+   7,
+  8,
+     9
+)
+b = ('a', 'b', 'c', 'd',)
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    a = (2, 3, 4, 5, 6, 7, 8, 9)
+    b = ('a', 'b', 'c', 'd',)
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
+fn multiple_overlapping_ranges_in_adjacent_statement() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--stdin-filename", "test.py", "--range=2-3", "--range=4-7", "--range=11-12:35", "--range=12:74-17", "--range=21-22", "--range=29-30", "--range=25-30"])
+        .arg("-")
+        .pass_stdin(r#"
+def partition(array,      begin,
+  end):
+    pivot = begin
+    for i in range(                    begin+1,
+
+                                            end +              1):
+        if array[i] <= array[begin]:
+            pivot   +=    1
+            array[i], array[                  pivot ] = array[
+                      pivot], array[           i]
+    array[pivot], array[begin               ] = array[begin
+
+          ], array[
+
+              pivot
+
+
+
+
+
+
+    ]
+    return   pivot
+
+
+
+def quicksort(array, begin=0, end=None):
+    if end is   None:
+        end = len(     array) - 1
+    def _quicksort(array, begin                           , end):
+        if begin >= end:
+            return
+        pivot = partition(array, begin, end)
+        _quicksort(array, begin, pivot-1)
+        _quicksort(array, pivot+1, end)
+    return _quicksort(array, begin, end)
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def partition(array, begin, end):
+        pivot = begin
+        for i in range(begin + 1, end + 1):
+            if array[i] <= array[begin]:
+                pivot   +=    1
+                array[i], array[pivot] = array[pivot], array[i]
+        array[pivot], array[begin] = array[begin], array[pivot]
+        return   pivot
+
+
+    def quicksort(array, begin=0, end=None):
+        if end is None:
+            end = len(     array) - 1
+        def _quicksort(array, begin                           , end):
+            if begin >= end:
+                return
+            pivot = partition(array, begin, end)
+            _quicksort(array, begin, pivot-1)
+            _quicksort(array, pivot+1, end)
+        return _quicksort(array, begin, end)
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
 fn range_missing_line() -> Result<()> {
     let test = CliTest::new()?;
     assert_cmd_snapshot!(test.format_command()

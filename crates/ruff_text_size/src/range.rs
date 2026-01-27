@@ -269,6 +269,30 @@ impl TextRange {
         self.cover(TextRange::empty(offset))
     }
 
+    /// Checks if the text ranges overlap or touch each other.
+    #[must_use]
+    pub fn overlap_or_touch(&self, other: &Self) -> bool {
+        (self.start <= other.start && other.start <= self.end)
+            || (other.start <= self.start && self.start <= other.end)
+    }
+
+    /// Joins the two text ranges.
+    #[must_use]
+    pub fn joined(&self, other: &Self) -> Self {
+        Self {
+            start: if self.start < other.start {
+                self.start
+            } else {
+                other.start
+            },
+            end: if self.end > other.end {
+                self.end
+            } else {
+                other.end
+            },
+        }
+    }
+
     /// Add an offset to this range.
     ///
     /// Note that this is not appropriate for changing where a `TextRange` is
@@ -438,6 +462,19 @@ impl TextRange {
     #[must_use]
     pub fn to_std_range(&self) -> Range<usize> {
         (*self).into()
+    }
+}
+
+impl PartialOrd for TextRange {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TextRange {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.start.cmp(&other.start).then(self.end.cmp(&other.end))
     }
 }
 
