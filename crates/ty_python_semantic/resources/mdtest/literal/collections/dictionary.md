@@ -75,3 +75,42 @@ reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 # revealed: dict[Unknown | int, Unknown | int]
 reveal_type({x: y for x, y in enumerate(range(42))})
 ```
+
+## Key narrowing
+
+```py
+from typing import TypedDict
+
+x1 = {"a": 1, "b": "2"}
+reveal_type(x1)  # revealed: dict[Unknown | str, Unknown | int | str]
+reveal_type(x1["a"])  # revealed: Literal[1]
+reveal_type(x1["b"])  # revealed: Literal["2"]
+
+x1["a"] = 2
+reveal_type(x1["a"])  # revealed: Literal[2]
+
+x2: dict[str, int | str] = {"a": 1, "b": "2"}
+reveal_type(x2)  # revealed: dict[str, int | str]
+reveal_type(x2["a"])  # revealed: Literal[1]
+reveal_type(x2["b"])  # revealed: Literal["2"]
+
+class TD(TypedDict):
+    x: int
+
+x3: dict[int, int | TD] = {1: 1, 2: {"x": 1}}
+reveal_type(x3)  # revealed: dict[int, int | TD]
+reveal_type(x3[1])  # revealed: Literal[1]
+reveal_type(x3[2])  # revealed: TD
+
+x4 = x3
+# TODO: This should reveal `Literal[1]`.
+reveal_type(x4[1])  # revealed: int | TD
+
+x5 = {1: 1, 2: {"x": 2, "y": "3"}}
+reveal_type(x5[1])  # revealed: Literal[1]
+reveal_type(x5[2])  # revealed: dict[Unknown | str, Unknown | int | str]
+# TODO: This should reveal `Literal[2]`.
+reveal_type(x5[2]["x"])  # revealed: Unknown | int | str
+# TODO: This should reveal `Literal["3"]`.
+reveal_type(x5[2]["y"])  # revealed: Unknown | int | str
+```

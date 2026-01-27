@@ -51,6 +51,18 @@ impl PlaceExpr {
         let member_expression = MemberExpr::try_from_expr(expr)?;
         Some(Self::Member(Member::new(member_expression)))
     }
+
+    /// Tries to create a `PlaceExpr` from a subscript expression.
+    ///
+    /// Returns `None` if the expression is not a valid place expression and `Some` otherwise.
+    pub(crate) fn try_from_subscript_expr(
+        subscript_value: &ast::Expr,
+        subscript_slice: &ast::Expr,
+    ) -> Option<Self> {
+        let member_expression =
+            MemberExpr::try_from_subscript_expr(subscript_value, subscript_slice)?;
+        Some(Self::Member(Member::new(member_expression)))
+    }
 }
 
 impl std::fmt::Display for PlaceExpr {
