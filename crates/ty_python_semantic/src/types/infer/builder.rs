@@ -9161,6 +9161,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Union(union) => {
                     union.try_map(db, |element| propagate_callable_kind(db, *element, kind))
                 }
+                Type::TypeAlias(alias) => propagate_callable_kind(db, alias.value_type(db), kind),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 _ => None,
