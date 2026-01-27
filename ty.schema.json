@@ -990,6 +990,16 @@
             }
           ]
         },
+        "isinstance-against-typed-dict": {
+          "title": "reports runtime checks against `TypedDict` classes",
+          "description": "## What it does\nReports runtime checks against `TypedDict` classes.\nThis includes explicit calls to `isinstance()`/`issubclass()` and implicit\nchecks performed by `match` class patterns.\n\n## Why is this bad?\nUsing a `TypedDict` class in these contexts raises `TypeError` at runtime.\n\n## Examples\n```python\nfrom typing_extensions import TypedDict\n\nclass Movie(TypedDict):\n    name: str\n    director: str\n\ndef f(arg: object, arg2: type):\n    isinstance(arg, Movie)  # error: [isinstance-against-typed-dict]\n    issubclass(arg2, Movie)  # error: [isinstance-against-typed-dict]\n\ndef g(arg: object):\n    match arg:\n        case Movie():  # error: [isinstance-against-typed-dict]\n            pass\n```\n\n## References\n- [Typing specification: `TypedDict`](https://typing.python.org/en/latest/spec/typeddict.html)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",

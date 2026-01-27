@@ -72,6 +72,7 @@ use crate::types::diagnostic::{
     TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
     report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
     report_runtime_check_against_non_runtime_checkable_protocol,
+    report_runtime_check_against_typed_dict,
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
@@ -1845,7 +1846,14 @@ impl KnownFunction {
 
                 match second_argument {
                     Type::ClassLiteral(class) => {
-                        if let Some(protocol_class) = class.into_protocol_class(db)
+                        if class.is_typed_dict(db) {
+                            report_runtime_check_against_typed_dict(
+                                context,
+                                call_expression,
+                                *class,
+                                self,
+                            );
+                        } else if let Some(protocol_class) = class.into_protocol_class(db)
                             && !protocol_class.is_runtime_checkable(db)
                         {
                             report_runtime_check_against_non_runtime_checkable_protocol(
@@ -2022,6 +2030,10 @@ impl KnownFunction {
             _ => {}
         }
     }
+
+    pub(crate) fn name(self) -> &'static str {
+        self.into()
+    }
 }
 
 #[cfg(test)]
@@ -2037,7 +2049,7 @@ pub(crate) mod tests {
         let db = setup_db();
 
         for function in KnownFunction::iter() {
-            let function_name: &'static str = function.into();
+            let function_name = function.name();
 
             let module = match function {
                 KnownFunction::Len
