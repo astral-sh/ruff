@@ -355,40 +355,43 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    let source_type = match path.and_then(|path| settings.linter.extension.get(path)) {
-        None => path.map(SourceType::from).unwrap_or_default(),
-        Some(language) => SourceType::Python(PySourceType::from(language)),
-    };
+    let (source_type, py_source_type) = match path
+        .and_then(|path| settings.linter.extension.get(path))
+    {
+        None => match path.map(SourceType::from).unwrap_or_default() {
+            SourceType::Toml(source_type) if source_type.is_pyproject() => {
+                if !settings
+                    .linter
+                    .rules
+                    .iter_enabled()
+                    .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                {
+                    return Ok(Diagnostics::default());
+                }
 
-    let py_source_type = match source_type {
-        SourceType::Toml(source_type) if source_type.is_pyproject() => {
-            if !settings
-                .linter
-                .rules
-                .iter_enabled()
-                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
-            {
-                return Ok(Diagnostics::default());
+                let path = path.unwrap();
+                let source_file =
+                    SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();
+
+                match fix_mode {
+                    flags::FixMode::Diff | flags::FixMode::Generate => {}
+                    flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{contents}")?,
+                }
+
+                return Ok(Diagnostics {
+                    inner: lint_pyproject_toml(&source_file, &settings.linter),
+                    fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
+                    notebook_indexes: FxHashMap::default(),
+                });
             }
 
-            let path = path.unwrap();
-            let source_file =
-                SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();
-
-            match fix_mode {
-                flags::FixMode::Diff | flags::FixMode::Generate => {}
-                flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{contents}")?,
-            }
-
-            return Ok(Diagnostics {
-                inner: lint_pyproject_toml(&source_file, &settings.linter),
-                fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
-                notebook_indexes: FxHashMap::default(),
-            });
+            SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
+            source_type @ SourceType::Python(py_source_type) => (source_type, py_source_type),
+        },
+        Some(language) => {
+            let py_source_type = PySourceType::from(language);
+            (SourceType::Python(py_source_type), py_source_type)
         }
-
-        SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
-        SourceType::Python(py_source_type) => py_source_type,
     };
 
     // Extract the sources from the file.
