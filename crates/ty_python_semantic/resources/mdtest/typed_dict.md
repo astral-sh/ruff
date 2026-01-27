@@ -2365,6 +2365,44 @@ def match_with_dict(u: Foo | Bar | dict):
             reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
 ```
 
+## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases
+
+PEP 695 type aliases are transparently resolved when narrowing tagged unions:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict, Literal
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+
+class Bar(TypedDict):
+    tag: Literal["bar"]
+
+type Thing = Foo | Bar
+
+def test_if(x: Thing):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Bar
+```
+
+PEP 695 type aliases also work in `match` statements:
+
+```py
+def test_match(x: Thing):
+    match x["tag"]:
+        case "foo":
+            reveal_type(x)  # revealed: Foo
+        case "bar":
+            reveal_type(x)  # revealed: Bar
+```
+
 ## Only annotated declarations are allowed in the class body
 
 <!-- snapshot-diagnostics -->

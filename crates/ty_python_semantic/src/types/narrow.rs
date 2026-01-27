@@ -1811,6 +1811,7 @@ fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) ->
             .elements(db)
             .iter()
             .any(|union_member_ty| is_typeddict_or_union_with_typeddicts(db, *union_member_ty)),
+        Type::TypeAlias(alias) => is_typeddict_or_union_with_typeddicts(db, alias.value_type(db)),
         _ => false,
     }
 }
@@ -1857,6 +1858,9 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
                     }
                     _ => true,
                 })
+        }
+        Type::TypeAlias(alias) => {
+            all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
         }
         _ => true,
     }
