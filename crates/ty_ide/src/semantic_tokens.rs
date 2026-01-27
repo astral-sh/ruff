@@ -1664,6 +1664,65 @@ w5: "float
     }
 
     #[test]
+    fn str_annotation_nested() {
+        let test = SemanticTokenTest::new(
+            r#"
+x: int
+y: "int"
+z: "'int'"
+w: """'"int"'"""
+
+a: list[int | str] | None
+b: list["int | str"] | None
+c: "list[int | str] | None"
+d: "list[int | str]" | "None"
+e: 'list["int | str"] | "None"'
+f: """'list["int | str"]' | 'None'""" 
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 1..2: Variable [definition]
+        "int" @ 4..7: Class
+        "y" @ 8..9: Variable [definition]
+        "int" @ 12..15: Class
+        "z" @ 17..18: Variable [definition]
+        "'int'" @ 21..26: String
+        "w" @ 28..29: Variable [definition]
+        "'\"int\"'" @ 34..41: String
+        "a" @ 46..47: Variable [definition]
+        "list" @ 49..53: Class
+        "int" @ 54..57: Class
+        "str" @ 60..63: Class
+        "None" @ 67..71: BuiltinConstant
+        "b" @ 72..73: Variable [definition]
+        "list" @ 75..79: Class
+        "int" @ 81..84: Class
+        "str" @ 87..90: Class
+        "None" @ 95..99: BuiltinConstant
+        "c" @ 100..101: Variable [definition]
+        "list" @ 104..108: Class
+        "int" @ 109..112: Class
+        "str" @ 115..118: Class
+        "None" @ 122..126: BuiltinConstant
+        "d" @ 128..129: Variable [definition]
+        "list" @ 132..136: Class
+        "int" @ 137..140: Class
+        "str" @ 143..146: Class
+        "None" @ 152..156: BuiltinConstant
+        "e" @ 158..159: Variable [definition]
+        "list" @ 162..166: Class
+        "\"int | str\"" @ 167..178: String
+        "\"None\"" @ 182..188: String
+        "f" @ 190..191: Variable [definition]
+        "'list[\"int | str\"]'" @ 196..215: String
+        "'None'" @ 218..224: String
+        "#);
+    }
+
+    #[test]
     fn attribute_classification() {
         let test = SemanticTokenTest::new(
             "
