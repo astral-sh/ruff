@@ -273,7 +273,7 @@ FAST002 FastAPI dependency without `Annotated`
 85 |     another_optional_param: int = Query(42, description="Another optional"),
    |
 help: Replace with `typing_extensions.Annotated`
-info: Automatic fix unavailable: a required parameter ('...') comes after an optional parameter. Consider reordering arguments to enable the fix.
+info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_2.py:85:5

@@ -102,29 +102,6 @@ impl Violation for FastApiNonAnnotatedDependency {
     }
 }
 
-#[derive(Debug)]
-enum AutofixSkipped {
-    EllipsisAfterDefault,
-    RequiredAfterOptional,
-    ImportError,
-}
-
-impl AutofixSkipped {
-    fn message(&self) -> &'static str {
-        match self {
-            Self::EllipsisAfterDefault => {
-                "Automatic fix unavailable: a required parameter ('...') comes after an optional parameter. Consider reordering arguments to enable the fix."
-            }
-            Self::RequiredAfterOptional => {
-                "Automatic fix unavailable: a required parameter comes after an optional parameter. Consider reordering arguments to enable the fix."
-            }
-            Self::ImportError => {
-                "Automatic fix is not available because `Annotated` could not be imported."
-            }
-        }
-    }
-}
-
 /// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
     checker: &Checker,
@@ -274,10 +251,8 @@ fn create_diagnostic(
         parameter.range,
     );
 
-    let try_generate_fix = || -> Result<Fix, AutofixSkipped> {
-        let (import_edit, binding) = importer
-            .import(parameter.range.start())
-            .map_err(|_| AutofixSkipped::ImportError)?;
+    let try_generate_fix = || {
+        let (import_edit, binding) = importer.import(parameter.range.start())?;
 
         // Each of these classes takes a single, optional default
         // argument, followed by kw-only arguments
@@ -309,7 +284,8 @@ fn create_diagnostic(
 
                 if is_default_argument_ellipsis && seen_default {
                     // For ellipsis after a parameter with default, can't remove the default
-                    return Err(AutofixSkipped::EllipsisAfterDefault);
+                    diagnostic.info("Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.");
+                    return Ok(None);
                 }
 
                 if !is_default_argument_ellipsis {
@@ -340,7 +316,8 @@ fn create_diagnostic(
             }
             _ => {
                 if seen_default {
-                    return Err(AutofixSkipped::RequiredAfterOptional);
+                    diagnostic.info("Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.");
+                    return Ok(None);
                 }
                 format!(
                     "{parameter_name}: {binding}[{annotation}, {default_}]",
@@ -351,21 +328,17 @@ fn create_diagnostic(
             }
         };
         let parameter_edit = Edit::range_replacement(content, parameter.range);
-        Ok(Fix::unsafe_edits(import_edit, [parameter_edit]))
+        Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
     };
 
     // make sure we set `seen_default` if we bail out of `try_generate_fix` early. we could
     // `match` on the result directly, but still calling `try_set_optional_fix` avoids
     // duplicating the debug logging here
-    match try_generate_fix() {
-        Ok(fix) => {
-            diagnostic.set_fix(fix);
-        }
-        Err(reason) => {
-            diagnostic.info(reason.message());
-            seen_default = true;
-        }
+    let fix: anyhow::Result<Option<Fix>> = try_generate_fix();
+    if fix.is_err() {
+        seen_default = true;
     }
+    diagnostic.try_set_optional_fix(|| fix);
 
     seen_default
 }
