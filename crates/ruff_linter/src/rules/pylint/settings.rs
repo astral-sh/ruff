@@ -195,8 +195,10 @@ impl Default for Settings {
             allow_magic_values: vec![
                 AllowedValue::Int(0),
                 AllowedValue::Int(1),
+                AllowedValue::Int(-1),
                 AllowedValue::Float(0.0),
                 AllowedValue::Float(1.0),
+                AllowedValue::Float(-1.0),
                 AllowedValue::String(String::new()),
                 AllowedValue::String("__main__".to_string()),
             ],
