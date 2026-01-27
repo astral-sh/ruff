@@ -5297,20 +5297,23 @@ impl<'db> Type<'db> {
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
+        //
         // The logic is roughly as follows:
+        //
         // 1. If `__new__` is defined anywhere in the MRO (except for `object`, since it is always
-        //    present), we call it and analyze outcome. We then analyze `__init__` call, but only
-        //    if it is defined somewhere except object. This is because `object.__init__`
-        //    allows arbitrary arguments if and only if `__new__` is defined, but typeshed
-        //    defines `__init__` for `object` with no arguments.
-        // 2. If `__new__` is not found, we call `__init__`. Here, we allow it to fallback all
+        //    present), we call it and analyze outcome. If it does not return an instance of the
+        //    class being constructed, `__init__` will not be invoked at runtime. We can skip the
+        //    rest of the analysis, and immediately return the return type of `__new__` as the
+        //    result of the constructor call.
+        //
+        // 2. We then analyze `__init__` call, but only if it is defined somewhere except `object`.
+        //    This is because `object.__init__` allows arbitrary arguments if and only if `__new__`
+        //    is defined, but typeshed defines `__init__` for `object` with no arguments.
+        //
+        // 3. If `__new__` is not found, we call `__init__`. Here, we allow it to fallback all
         //    the way to `object` (single `self` argument call). This time it is correct to
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
-        //
-        // We use the return type of `__new__` to refine the constructed instance type when it
-        // returns an instance of the class (or subclass). If it returns an unrelated type, we
-        // skip `__init__` and return that type instead.
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
@@ -5321,13 +5324,10 @@ impl<'db> Type<'db> {
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
         let new_method = self_type.lookup_dunder_new(db);
 
-        // Construct an instance type that we can use to look up the `__init__` instance method.
-        // This performs the same logic as `Type::to_instance`, except for generic class literals.
+        // Lookup the `__init__` instance method in the MRO.
         let init_ty = self_type
             .to_instance(db)
             .expect("type should be convertible to instance type");
-
-        // Lookup the `__init__` instance method in the MRO.
         let init_method = init_ty.member_lookup_with_policy(
             db,
             "__init__".into(),
@@ -5375,6 +5375,8 @@ impl<'db> Type<'db> {
 
         let argument_types = infer_argument_types(bindings);
 
+        // Analyze a call to the `__new__` method, if present (modulo the intricacies described
+        // above).
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
                 Place::Defined(DefinedPlace {
@@ -5399,40 +5401,29 @@ impl<'db> Type<'db> {
             }
         });
 
+        // As a first assumption, assume that the result of the constructor call will be an
+        // instance of the class type. Note that we use `self` here, not `self_type`, so that if
+        // constructor argument inference fails, we fall back to the default specialization.
+        let default_instance_ty = self
+            .to_instance(db)
+            .expect("type should be convertible to instance type");
+
+        // The __init__ method will only be invoked if __new__ returns an instance of the class
+        // being constructed. If it doesn't, we can immediately use the return type of __new__ as
+        // the result of the constructor call.
         let new_return_ty = new_call_outcome
             .as_ref()
             .and_then(|result| result.as_ref().ok())
             .map(|bindings| bindings.return_type(db));
-        let default_instance_ty = self
-            .to_instance(db)
-            .expect("type should be convertible to instance type");
-        // Only treat `__new__` return types as authoritative when they are fully informative;
-        // `Any`/`Unknown` are too permissive to determine whether `__init__` should run.
-        let new_return_is_informative = new_return_ty.is_some_and(|ty| {
-            let contains_noninformative = |ty| {
-                matches!(
-                    ty,
-                    Type::Dynamic(
-                        DynamicType::Any | DynamicType::Unknown | DynamicType::UnknownGeneric(_)
-                    )
-                )
-            };
-            !any_over_type(db, ty, &contains_noninformative, true)
-        });
-        let new_return_is_subtype = new_return_is_informative
-            && new_return_ty.is_some_and(|ty| ty.is_subtype_of(db, default_instance_ty));
-        let new_return_is_related = new_return_is_subtype;
-        let new_return_is_same_class = generic_origin
-            .and_then(|origin| origin.as_static())
-            .is_some_and(|origin| {
-                new_return_ty.is_some_and(|ty| ty.specialization_of(db, origin).is_some())
-            });
-        let new_return_allows_init =
-            !new_return_is_informative || new_return_is_related || new_return_is_same_class;
+        if let Some(new_return_ty) = new_return_ty {
+            let new_return_allows_init = new_return_ty.is_assignable_to(db, default_instance_ty);
+            if !new_return_allows_init {
+                return Ok(new_return_ty);
+            }
+        }
 
-        let init_call_outcome = if new_call_outcome.is_none()
-            || (new_return_allows_init && !init_method.is_undefined())
-        {
+        // If __init__ exists and could be invoked at runtime, analyze a call to it.
+        let init_call_outcome = if new_call_outcome.is_none() || !init_method.is_undefined() {
             let call_result = match init_ty
                 .member_lookup_with_policy(
                     db,
@@ -5470,21 +5461,14 @@ impl<'db> Type<'db> {
             None
         };
 
-        if matches!(new_call_outcome, Some(Ok(_))) {
-            if let Some(new_return_ty) = new_return_ty {
-                if new_return_is_informative
-                    && !new_return_is_related
-                    && !new_return_is_same_class
-                {
-                    return Ok(new_return_ty);
-                }
-            }
-        }
-
-        // Note that we use `self` here, not `self_type`, so that if constructor argument inference
-        // fails, we fall back to the default specialization.
-        let instance_ty = if new_return_is_subtype {
-            new_return_ty.unwrap_or(default_instance_ty)
+        // The return type of the constructor call will typically be an instance of the class being
+        // constructed. (At this point we have ruled out __new__ return an instance of an unrelated
+        // class.) However, __new__ might return a more precise type (most often, a specific
+        // specialization). If so, use that.
+        let instance_ty = if let Some(new_return_ty) = new_return_ty
+            && new_return_ty.is_subtype_of(db, default_instance_ty)
+        {
+            new_return_ty
         } else {
             default_instance_ty
         };
