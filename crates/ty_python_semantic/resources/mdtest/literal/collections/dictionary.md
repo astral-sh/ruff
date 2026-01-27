@@ -102,15 +102,9 @@ reveal_type(x3)  # revealed: dict[int, int | TD]
 reveal_type(x3[1])  # revealed: Literal[1]
 reveal_type(x3[2])  # revealed: TD
 
-x4 = x3
-# TODO: This should reveal `Literal[1]`.
-reveal_type(x4[1])  # revealed: int | TD
-
-x5 = {1: 1, 2: {"x": 2, "y": "3"}}
-reveal_type(x5[1])  # revealed: Literal[1]
-reveal_type(x5[2])  # revealed: dict[Unknown | str, Unknown | int | str]
-# TODO: This should reveal `Literal[2]`.
-reveal_type(x5[2]["x"])  # revealed: Unknown | int | str
-# TODO: This should reveal `Literal["3"]`.
-reveal_type(x5[2]["y"])  # revealed: Unknown | int | str
+x4 = {1: 1, 2: {"x": 2, "y": "3"}}
+reveal_type(x4[1])  # revealed: Literal[1]
+reveal_type(x4[2])  # revealed: dict[Unknown | str, Unknown | int | str]
+reveal_type(x4[2]["x"])  # revealed: Literal[2]
+reveal_type(x4[2]["y"])  # revealed: Literal["3"]
 ```

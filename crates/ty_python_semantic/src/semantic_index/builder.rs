@@ -31,6 +31,7 @@ use crate::semantic_index::definition::{
     StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
@@ -757,6 +758,61 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (definition, num_definitions)
     }
 
+    // Creates a definition for each key in the dictionary, based on the outer target in the
+    // dictionary assignment.
+    fn add_dict_key_assignment_definitions(
+        &mut self,
+        targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for target in targets {
+            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+                self.add_dict_key_assignment_definitions_impl(target, dict, assignment);
+            }
+        }
+    }
+
+    fn add_dict_key_assignment_definitions_impl(
+        &mut self,
+        target: MemberExprBuilder,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for item in &dict.items {
+            let Some(key) = item.key.as_ref() else {
+                continue;
+            };
+
+            let Some(member_expr) = MemberExprBuilder::visit_subscript_expr(target.clone(), key)
+            else {
+                continue;
+            };
+
+            // Recurse into nested dictionaries.
+            if let ast::Expr::Dict(dict_value) = &item.value {
+                self.add_dict_key_assignment_definitions_impl(
+                    member_expr.clone(),
+                    dict_value,
+                    assignment,
+                );
+            }
+
+            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
+                let place_id = self.add_place(place_expr);
+
+                self.add_definition(
+                    place_id,
+                    DictKeyAssignmentNodeRef {
+                        key,
+                        assignment,
+                        value: &item.value,
+                    },
+                );
+            }
+        }
+    }
+
     fn record_expression_narrowing_constraint(
         &mut self,
         predicate_node: &ast::Expr,
@@ -990,34 +1046,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
         self.record_narrowing_constraint(predicate);
         (predicate, pattern_predicate)
-    }
-
-    fn add_dict_key_assignment_definitions(
-        &mut self,
-        targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
-        dict: &'ast ast::ExprDict,
-        assignment: Definition<'db>,
-    ) {
-        for item in &dict.items {
-            let Some(key) = item.key.as_ref() else {
-                continue;
-            };
-
-            for target in targets {
-                if let Some(place_expr) = PlaceExpr::try_from_subscript_expr(target, key) {
-                    let place_id = self.add_place(place_expr);
-
-                    self.add_definition(
-                        place_id,
-                        DictKeyAssignmentNodeRef {
-                            key,
-                            assignment,
-                            value: &item.value,
-                        },
-                    );
-                }
-            }
-        }
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type

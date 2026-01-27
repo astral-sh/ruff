@@ -8189,28 +8189,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        // Infer the type of target to use as type context.
-        let target = match assignment.kind(self.db()) {
-            DefinitionKind::Assignment(assignment) => assignment.target(self.module()),
-            DefinitionKind::AnnotatedAssignment(assignment) => assignment.target(self.module()),
-            _ => unreachable!(),
-        };
-        let tcx = infer_definition_types(self.db(), assignment).expression_type(target);
-        // let tcx = infer_definition_types(self.db(), assignment).binding_type(assignment);
+        let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
 
-        let mut elements = [[Some(key), Some(value)]].into_iter();
-        let mut infer_element_ty =
-            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-
-        // Infer the value type with type context.
-        self.infer_collection_literal(
-            KnownClass::Dict,
-            &mut elements,
-            &mut infer_element_ty,
-            TypeContext::new(Some(tcx)),
-        );
-
-        let value_ty = self.expression_type(value);
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }
