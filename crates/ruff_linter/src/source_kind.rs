@@ -18,7 +18,7 @@ use crate::text_helpers::ShowNonprinting;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SourceKind {
-    /// The source contains Python source codea, and whether it's a stub.
+    /// The source contains Python source code, and whether it's a stub.
     Python(String, bool),
     /// The source contains a Jupyter notebook.
     IpyNotebook(Box<Notebook>),
@@ -34,21 +34,24 @@ impl SourceKind {
     pub fn as_ipy_notebook(&self) -> Option<&Notebook> {
         match self {
             SourceKind::IpyNotebook(notebook) => Some(notebook),
-            _ => None,
+            SourceKind::Python(_, _) => None,
+            SourceKind::Markdown(_) => None,
         }
     }
 
     pub fn as_python(&self) -> Option<&str> {
         match self {
             SourceKind::Python(code, _) => Some(code),
-            _ => None,
+            SourceKind::Markdown(_) => None,
+            SourceKind::IpyNotebook(_) => None,
         }
     }
 
     pub fn as_markdown(&self) -> Option<&str> {
         match self {
             SourceKind::Markdown(code) => Some(code),
-            _ => None,
+            SourceKind::Python(_, _) => None,
+            SourceKind::IpyNotebook(_) => None,
         }
     }
 
@@ -77,7 +80,8 @@ impl SourceKind {
         match self {
             Self::IpyNotebook(_) => PySourceType::Ipynb,
             Self::Python(_, true) => PySourceType::Stub,
-            _ => PySourceType::Python,
+            Self::Python(_, false) => PySourceType::Python,
+            Self::Markdown(_) => PySourceType::Python,
         }
     }
 
