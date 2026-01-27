@@ -71,6 +71,7 @@ use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
     TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
     report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
+    report_issubclass_check_against_protocol_with_non_method_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
     report_runtime_check_against_typed_dict,
 };
@@ -1853,15 +1854,26 @@ impl KnownFunction {
                                 *class,
                                 self,
                             );
-                        } else if let Some(protocol_class) = class.into_protocol_class(db)
-                            && !protocol_class.is_runtime_checkable(db)
-                        {
-                            report_runtime_check_against_non_runtime_checkable_protocol(
-                                context,
-                                call_expression,
-                                protocol_class,
-                                self,
-                            );
+                        } else if let Some(protocol_class) = class.into_protocol_class(db) {
+                            if !protocol_class.is_runtime_checkable(db) {
+                                report_runtime_check_against_non_runtime_checkable_protocol(
+                                    context,
+                                    call_expression,
+                                    protocol_class,
+                                    self,
+                                );
+                            } else if self == KnownFunction::IsSubclass {
+                                let non_method_members =
+                                    protocol_class.interface(db).non_method_members(db);
+                                if !non_method_members.is_empty() {
+                                    report_issubclass_check_against_protocol_with_non_method_members(
+                                        context,
+                                        call_expression,
+                                        protocol_class,
+                                        &non_method_members,
+                                    );
+                                }
+                            }
                         }
 
                         if self == KnownFunction::IsInstance {
