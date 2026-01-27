@@ -6060,6 +6060,7 @@ impl<'db> Type<'db> {
                         }
                         TypeMapping::ApplySpecialization(_) |
                         TypeMapping::UniqueSpecialization { .. } |
+                        TypeMapping::ScopeCallableTypevars { .. } |
                         TypeMapping::PromoteLiterals(_) |
                         TypeMapping::BindSelf { .. } |
                         TypeMapping::ReplaceSelf { .. } |
@@ -6282,6 +6283,7 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
+                TypeMapping::ScopeCallableTypevars { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
@@ -6295,6 +6297,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
+                TypeMapping::ScopeCallableTypevars { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
@@ -6357,6 +6360,9 @@ impl<'db> Type<'db> {
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         let matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
+            if bound_typevar.binding_context(db) == BindingContext::Synthetic {
+                return None;
+            }
             match bound_typevar.typevar(db).kind(db) {
                 TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::TypingSelf
                     if binding_context.is_none_or(|binding_context| {
@@ -6973,6 +6979,10 @@ pub enum TypeMapping<'a, 'db> {
         // A list of synthetic type variables, and the types they replaced.
         specialization: RefCell<Vec<(BoundTypeVarInstance<'db>, Type<'db>)>>,
     },
+    /// Re-scope typevars that only appear within `Callable` signatures to those callables.
+    ScopeCallableTypevars {
+        scoped: &'a rustc_hash::FxHashSet<BoundTypeVarIdentity<'db>>,
+    },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     PromoteLiterals(PromoteLiteralsMode),
@@ -7024,6 +7034,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 )
             }
             TypeMapping::UniqueSpecialization { .. }
+            | TypeMapping::ScopeCallableTypevars { .. }
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
@@ -7058,6 +7069,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::PromoteLiterals(mode) => TypeMapping::PromoteLiterals(mode.flip()),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
+            | TypeMapping::ScopeCallableTypevars { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
@@ -8701,6 +8713,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::UniqueSpecialization { .. }
+            | TypeMapping::ScopeCallableTypevars { .. }
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
@@ -11607,7 +11620,8 @@ impl<'db> PEP695TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+        let ty = definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value);
+        GenericContext::scope_callable_typevars_in_type(db, definition, ty)
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {

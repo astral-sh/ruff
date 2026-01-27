@@ -117,17 +117,17 @@ use crate::types::typed_dict::{
     validate_typed_dict_key_assignment,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding,
+    CallableType, CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet,
+    InternedType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
     ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
     StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    TypeContext, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -2530,7 +2530,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let declared_ty = self.file_expression_type(returns);
+            let mut declared_ty = self.file_expression_type(returns);
+            let definition = self.index.expect_single_definition(function);
+            let mut parameter_types = Vec::new();
+            for param in function.parameters.iter_non_variadic_params() {
+                if let Some(annotation) = param.annotation() {
+                    parameter_types.push(self.file_expression_type(annotation));
+                }
+                if let Some(default) = param.default() {
+                    parameter_types.push(self.file_expression_type(default));
+                }
+            }
+            if let Some(vararg) = function.parameters.vararg.as_deref()
+                && let Some(annotation) = vararg.annotation()
+            {
+                parameter_types.push(self.file_expression_type(annotation));
+            }
+            if let Some(kwarg) = function.parameters.kwarg.as_deref()
+                && let Some(annotation) = kwarg.annotation()
+            {
+                parameter_types.push(self.file_expression_type(annotation));
+            }
+            let parameter_typevars =
+                GenericContext::collect_bound_typevars_from_types(self.db(), parameter_types, true);
+            let return_typevars_all =
+                GenericContext::collect_bound_typevars_from_types(self.db(), [declared_ty], true);
+            let return_typevars_outer =
+                GenericContext::collect_bound_typevars_from_types(self.db(), [declared_ty], false);
+
+            let parameter_identities: FxHashSet<_> = parameter_typevars
+                .iter()
+                .map(|typevar| typevar.identity(self.db()))
+                .collect();
+            let return_outer_identities: FxHashSet<_> = return_typevars_outer
+                .iter()
+                .map(|typevar| typevar.identity(self.db()))
+                .collect();
+
+            let mut scoped = FxHashSet::default();
+            for typevar in return_typevars_all {
+                if typevar.binding_context(self.db()) == BindingContext::Definition(definition)
+                    && !typevar.typevar(self.db()).is_self(self.db())
+                    && !parameter_identities.contains(&typevar.identity(self.db()))
+                    && !return_outer_identities.contains(&typevar.identity(self.db()))
+                {
+                    scoped.insert(typevar.identity(self.db()));
+                }
+            }
+
+            if !scoped.is_empty() {
+                declared_ty = declared_ty.apply_type_mapping(
+                    self.db(),
+                    &TypeMapping::ScopeCallableTypevars { scoped: &scoped },
+                    TypeContext::default(),
+                );
+            }
             let expected_ty = match declared_ty {
                 Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(self.db()),
                 ty => ty,
@@ -5889,6 +5943,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_expression(value, tcx)
                 };
 
+                let value_ty = GenericContext::scope_callable_typevars_in_type(
+                    self.db(),
+                    definition,
+                    value_ty,
+                );
+
                 self.typevar_binding_context = previous_typevar_binding_context;
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
@@ -8029,6 +8089,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
+
+            let inferred_ty =
+                GenericContext::scope_callable_typevars_in_type(self.db(), definition, inferred_ty);
 
             if is_pep_613_type_alias {
                 let inferred_ty =

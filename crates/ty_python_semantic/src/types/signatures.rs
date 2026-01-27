@@ -25,10 +25,10 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, infer_complete_scope_types,
-    todo_type,
+    ApplySpecialization, ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity,
+    BoundTypeVarInstance, CallableType, CallableTypeKind, FindLegacyTypeVarsVisitor, KnownClass,
+    MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext, TypeMapping,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -140,6 +140,12 @@ impl<'db> CallableSignature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if let TypeMapping::ScopeCallableTypevars { scoped } = type_mapping {
+            return Self::from_overloads(self.overloads.iter().map(|signature| {
+                signature.scope_callable_typevars(db, scoped, tcx, visitor)
+            }));
+        }
+
         fn try_apply_type_mapping_for_paramspec<'db>(
             db: &'db dyn Db,
             self_signature: &Signature<'db>,
@@ -702,8 +708,78 @@ impl<'db> Signature<'db> {
             legacy_generic_context,
         );
 
+        let mut parameter_types = Vec::new();
+        for param in &parameters {
+            parameter_types.push(param.annotated_type());
+            if let Some(ty) = param.default_type() {
+                parameter_types.push(ty);
+            }
+        }
+
+        let parameter_typevars =
+            GenericContext::collect_bound_typevars_from_types(db, parameter_types, true);
+        let return_typevars_all =
+            GenericContext::collect_bound_typevars_from_types(db, [return_ty], true);
+        let return_typevars_outer =
+            GenericContext::collect_bound_typevars_from_types(db, [return_ty], false);
+
+        let parameter_identities: rustc_hash::FxHashSet<_> = parameter_typevars
+            .iter()
+            .map(|typevar| typevar.identity(db))
+            .collect();
+        let return_outer_identities: rustc_hash::FxHashSet<_> = return_typevars_outer
+            .iter()
+            .map(|typevar| typevar.identity(db))
+            .collect();
+
+        let mut scoped = rustc_hash::FxHashSet::default();
+        for typevar in return_typevars_all {
+            if typevar.binding_context(db) == BindingContext::Definition(definition)
+                && !typevar.typevar(db).is_self(db)
+                && !parameter_identities.contains(&typevar.identity(db))
+                && !return_outer_identities.contains(&typevar.identity(db))
+            {
+                scoped.insert(typevar.identity(db));
+            }
+        }
+
+        if scoped.is_empty() {
+            return Self {
+                generic_context: full_generic_context,
+                definition: Some(definition),
+                parameters,
+                return_ty,
+            };
+        }
+
+        let type_mapping = TypeMapping::ScopeCallableTypevars { scoped: &scoped };
+        let parameters = parameters.apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let return_ty = return_ty.apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+
+        let generic_context = full_generic_context.and_then(|context| {
+            let filtered: Vec<_> = context
+                .variables(db)
+                .filter(|typevar| !scoped.contains(&typevar.identity(db)))
+                .collect();
+            if filtered.is_empty() {
+                None
+            } else {
+                Some(GenericContext::from_typevar_instances(db, filtered))
+            }
+        });
+
         Self {
-            generic_context: full_generic_context,
+            generic_context,
             definition: Some(definition),
             parameters,
             return_ty,
@@ -824,6 +900,96 @@ impl<'db> Signature<'db> {
             return_ty: self
                 .return_ty
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        }
+    }
+
+    fn scope_callable_typevars(
+        &self,
+        db: &'db dyn Db,
+        scoped: &rustc_hash::FxHashSet<BoundTypeVarIdentity<'db>>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let mut signature_types = Vec::new();
+        for param in &self.parameters {
+            signature_types.push(param.annotated_type());
+            if let Some(ty) = param.default_type() {
+                signature_types.push(ty);
+            }
+        }
+        signature_types.push(self.return_ty);
+
+        let local_typevars = GenericContext::collect_bound_typevars_from_types(
+            db,
+            signature_types,
+            false,
+        )
+        .into_iter()
+        .filter(|typevar| scoped.contains(&typevar.identity(db)))
+        .collect::<Vec<_>>();
+
+        if local_typevars.is_empty() {
+            let type_mapping = TypeMapping::ScopeCallableTypevars { scoped };
+            return Self {
+                generic_context: self
+                    .generic_context
+                    .map(|context| type_mapping.update_signature_generic_context(db, context)),
+                definition: self.definition,
+                parameters: self
+                    .parameters
+                    .apply_type_mapping_impl(db, &type_mapping, tcx, visitor),
+                return_ty: self
+                    .return_ty
+                    .apply_type_mapping_impl(db, &type_mapping, tcx, visitor),
+            };
+        }
+
+        let mut replacement_types = Vec::with_capacity(local_typevars.len());
+        let mut synthetic_typevars = Vec::with_capacity(local_typevars.len());
+        for typevar in &local_typevars {
+            let synthetic =
+                BoundTypeVarInstance::new(db, typevar.typevar(db), BindingContext::Synthetic, None);
+            synthetic_typevars.push(synthetic);
+            replacement_types.push(Type::TypeVar(synthetic));
+        }
+
+        let replacement_context =
+            GenericContext::from_typevar_instances(db, local_typevars.iter().copied());
+        let replacement_mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+            generic_context: replacement_context,
+            types: &replacement_types,
+            skip: None,
+        });
+
+        let parameters = self.parameters.apply_type_mapping_impl(
+            db,
+            &replacement_mapping,
+            tcx,
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let return_ty = self.return_ty.apply_type_mapping_impl(
+            db,
+            &replacement_mapping,
+            tcx,
+            &ApplyTypeMappingVisitor::default(),
+        );
+
+        let type_mapping = TypeMapping::ScopeCallableTypevars { scoped };
+        let parameters = parameters.apply_type_mapping_impl(db, &type_mapping, tcx, visitor);
+        let return_ty = return_ty.apply_type_mapping_impl(db, &type_mapping, tcx, visitor);
+
+        let generic_context = GenericContext::merge_optional(
+            db,
+            self.generic_context
+                .map(|context| type_mapping.update_signature_generic_context(db, context)),
+            Some(GenericContext::from_typevar_instances(db, synthetic_typevars)),
+        );
+
+        Self {
+            generic_context,
+            definition: self.definition,
+            parameters,
+            return_ty,
         }
     }
 

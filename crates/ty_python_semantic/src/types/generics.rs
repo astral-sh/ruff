@@ -24,8 +24,9 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
+    CallableType, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
+    walk_callable_type, walk_known_instance_type,
     TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     UnionType, declaration_type, walk_type_var_bounds,
 };
@@ -442,6 +443,126 @@ impl<'db> GenericContext<'db> {
             return None;
         }
         Some(Self::from_typevar_instances(db, variables))
+    }
+
+    /// Returns the bound typevars that appear in the provided types.
+    ///
+    /// If `include_callables` is false, any nested `Callable` types are treated as atomic and
+    /// will not be traversed.
+    pub(crate) fn collect_bound_typevars_from_types(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = Type<'db>>,
+        include_callables: bool,
+    ) -> FxOrderSet<BoundTypeVarInstance<'db>> {
+        struct CollectBoundTypeVars<'db> {
+            include_callables: bool,
+            typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectBoundTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                let bound_typevar = if bound_typevar.is_paramspec(db) {
+                    bound_typevar.without_paramspec_attr(db)
+                } else {
+                    bound_typevar
+                };
+                self.typevars.borrow_mut().insert(bound_typevar);
+            }
+
+            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+                if self.include_callables {
+                    walk_callable_type(db, callable, self);
+                }
+            }
+
+            fn visit_known_instance_type(
+                &self,
+                db: &'db dyn Db,
+                known_instance: KnownInstanceType<'db>,
+            ) {
+                if matches!(known_instance, KnownInstanceType::NewType(_)) {
+                    return;
+                }
+                walk_known_instance_type(db, known_instance, self);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let collector = CollectBoundTypeVars {
+            include_callables,
+            typevars: RefCell::new(FxOrderSet::default()),
+            recursion_guard: TypeCollector::default(),
+        };
+
+        for ty in types {
+            collector.visit_type(db, ty);
+        }
+
+        collector.typevars.into_inner()
+    }
+
+    /// Returns the typevars bound to `binding_context` that appear only inside `Callable` types.
+    pub(crate) fn callable_scoped_typevars_for_types(
+        db: &'db dyn Db,
+        binding_context: Definition<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+        let types: Vec<Type<'db>> = types.into_iter().collect();
+
+        let all = Self::collect_bound_typevars_from_types(
+            db,
+            types.iter().copied(),
+            true,
+        );
+        let outer = Self::collect_bound_typevars_from_types(
+            db,
+            types.iter().copied(),
+            false,
+        );
+        let outer_identities: FxHashSet<_> =
+            outer.iter().map(|typevar| typevar.identity(db)).collect();
+
+        let mut scoped = FxHashSet::default();
+        for typevar in all {
+            if typevar.binding_context(db) == BindingContext::Definition(binding_context)
+                && !typevar.typevar(db).is_self(db)
+                && !outer_identities.contains(&typevar.identity(db))
+            {
+                scoped.insert(typevar.identity(db));
+            }
+        }
+
+        scoped
+    }
+
+    /// Re-scope any typevars bound to `binding_context` that appear only within `Callable` types.
+    pub(crate) fn scope_callable_typevars_in_type(
+        db: &'db dyn Db,
+        binding_context: Definition<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        let scoped = Self::callable_scoped_typevars_for_types(db, binding_context, [ty]);
+        if scoped.is_empty() {
+            ty
+        } else {
+            ty.apply_type_mapping(
+                db,
+                &TypeMapping::ScopeCallableTypevars { scoped: &scoped },
+                TypeContext::default(),
+            )
+        }
     }
 
     pub(crate) fn merge_pep695_and_legacy(
