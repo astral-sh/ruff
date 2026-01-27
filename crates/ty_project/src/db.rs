@@ -387,21 +387,6 @@ impl SalsaMemoryDump {
     pub fn display_mypy_primer(&self) -> impl fmt::Display + '_ {
         struct DisplayShort<'a>(&'a SalsaMemoryDump);
 
-        fn round_memory(total: usize) -> usize {
-            // Round the number to the nearest power of 1.05. This gives us a
-            // 2.5% threshold before the memory usage number is considered to have
-            // changed.
-            //
-            // TODO: Small changes in memory usage may cause the number to be rounded
-            // into the next power if it happened to already be close to the threshold.
-            // This also means that differences may surface as a result of small changes
-            // over time that are unrelated to the current change. Ideally we could compare
-            // the exact numbers across runs and compute the difference, but we don't have
-            // the infrastructure for that currently.
-            const BASE: f64 = 1.05;
-            BASE.powf(bytes_to_mb(total).log(BASE).round()) as usize
-        }
-
         impl fmt::Display for DisplayShort<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let SalsaMemoryDump {
@@ -416,27 +401,27 @@ impl SalsaMemoryDump {
 
                 writeln!(
                     f,
-                    "TOTAL MEMORY USAGE: ~{}MB",
-                    round_memory(
+                    "TOTAL MEMORY USAGE: ~{:.0}MB",
+                    bytes_to_mb(
                         total_metadata + total_fields + total_memo_fields + total_memo_metadata
                     )
                 )?;
 
                 writeln!(
                     f,
-                    "    struct metadata = ~{}MB",
-                    round_memory(total_metadata)
+                    "    struct metadata = ~{:.0}MB",
+                    bytes_to_mb(total_metadata)
                 )?;
-                writeln!(f, "    struct fields = ~{}MB", round_memory(total_fields))?;
+                writeln!(f, "    struct fields = ~{:.0}MB", bytes_to_mb(total_fields))?;
                 writeln!(
                     f,
-                    "    memo metadata = ~{}MB",
-                    round_memory(total_memo_metadata)
+                    "    memo metadata = ~{:.0}MB",
+                    bytes_to_mb(total_memo_metadata)
                 )?;
                 writeln!(
                     f,
-                    "    memo fields = ~{}MB",
-                    round_memory(total_memo_fields)
+                    "    memo fields = ~{:.0}MB",
+                    bytes_to_mb(total_memo_fields)
                 )?;
 
                 Ok(())
