@@ -778,6 +778,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 Type::unknown()
             }
+            ast::Expr::NoneLiteral(_) => {
+                self.infer_expression(slice, TypeContext::default());
+                KnownClass::NoneType.to_subclass_of(self.db())
+            }
             ast::Expr::Subscript(
                 subscript @ ast::ExprSubscript {
                     value,
