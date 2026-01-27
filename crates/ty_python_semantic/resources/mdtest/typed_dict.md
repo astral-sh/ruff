@@ -2198,6 +2198,52 @@ class WackyInt(int):
 _: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
 ```
 
+Intersections containing a TypedDict with literal fields can be narrowed with equality checks.
+Since `Foo` requires `tag == "foo"`, the else branch is `Never`:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+def _(x: Intersection[Foo, Any]):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo & Any
+    else:
+        reveal_type(x)  # revealed: Never
+```
+
+But intersections with non-literal fields cannot be narrowed:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+def _(x: Intersection[NonLiteralTD, Any]):
+    if x["tag"] == 42:
+        reveal_type(x)  # revealed: NonLiteralTD & Any
+    else:
+        reveal_type(x)  # revealed: NonLiteralTD & Any
+```
+
+This is especially important when the field type is disjoint from the comparison literal.
+Even though `str` and `int` are disjoint, we can't narrow here because a `str` subclass
+could override `__eq__` to return `True`. Without proper handling, this would wrongly
+narrow to `Never`:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+class StrTagTD(TypedDict):
+    tag: str
+
+def _(x: Intersection[StrTagTD, Any]):
+    if x["tag"] == 42:
+        reveal_type(x)  # revealed: StrTagTD & Any
+    else:
+        reveal_type(x)  # revealed: StrTagTD & Any
+```
+
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
 
 ```py

@@ -1897,6 +1897,13 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         Type::TypeAlias(alias) => {
             all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
         }
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .all(|intersection_member_ty| match intersection_member_ty {
+                Type::TypedDict(td) => matching_field_is_literal(td),
+                _ => true,
+            }),
 
         // For non-TypedDict types, there's no field to check, so we return true
         // (meaning "no non-literal fields found that would block narrowing").
@@ -1918,7 +1925,6 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         | Type::SpecialForm(_)
         | Type::KnownInstance(_)
         | Type::PropertyInstance(_)
-        | Type::Intersection(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::IntLiteral(_)
