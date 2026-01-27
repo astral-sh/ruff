@@ -9984,6 +9984,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tuple: &ast::ExprTuple,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        /// If a tuple literal has more elements than this constant,
+        /// we promote `Literal` types when inferring the elements of the tuple.
+        /// This provides a huge speedup on files that have very large unannotated tuple literals.
+        const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
+
         let ast::ExprTuple {
             range: _,
             node_index: _,
@@ -10043,8 +10048,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let mut infer_element = |elt: &ast::Expr| {
+            let annotated_elt_ty = annotated_elt_tys.by_ref().next();
             let ctx = if can_use_type_context {
-                let annotated_elt_ty = annotated_elt_tys.by_ref().next();
                 let expected = if elt.is_starred_expr() {
                     let expected_element = annotated_elt_ty.unwrap_or_else(Type::object);
                     Some(KnownClass::Iterable.to_specialized_instance(db, &[expected_element]))
@@ -10055,7 +10060,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 TypeContext::default()
             };
-            self.infer_expression(elt, ctx)
+            if tuple.len() > MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE {
+                // Promote literals for very large unannotated tuples,
+                // to avoid pathological performance issues
+                self.infer_expression(elt, ctx).promote_literals(db, ctx)
+            } else {
+                self.infer_expression(elt, ctx)
+            }
         };
 
         let mut builder = TupleSpecBuilder::with_capacity(elts.len());
