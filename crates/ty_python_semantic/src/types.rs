@@ -987,9 +987,10 @@ impl<'db> Type<'db> {
             | DynamicType::Unknown
             | DynamicType::UnknownGeneric(_)
             | DynamicType::Divergent(_) => false,
-            DynamicType::Todo(_) | DynamicType::TodoStarredExpression | DynamicType::TodoUnpack => {
-                true
-            }
+            DynamicType::Todo(_)
+            | DynamicType::TodoStarredExpression
+            | DynamicType::TodoUnpack
+            | DynamicType::TodoTypeVarTuple => true,
         })
     }
 
@@ -5859,9 +5860,7 @@ impl<'db> Type<'db> {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
-                Some(KnownClass::TypeVarTuple) => Ok(todo_type!(
-                    "Support for `typing.TypeVarTuple` instances in type expressions"
-                )),
+                Some(KnownClass::TypeVarTuple) => Ok(Type::Dynamic(DynamicType::TodoTypeVarTuple)),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id
@@ -6731,7 +6730,7 @@ impl<'db> Type<'db> {
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression)
+            Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression | DynamicType::TodoTypeVarTuple)
             | Self::Callable(_)
             | Self::TypeIs(_)
             | Self::TypeGuard(_) => None,
@@ -7397,8 +7396,10 @@ pub enum DynamicType<'db> {
     Todo(TodoType),
     /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
     TodoUnpack,
-    /// A special Todo-variant for `*Ts`, so that we can treat it specially in `Generic[Unpack[Ts]]`
+    /// A special Todo-variant for `*Ts`, so that we can treat it specially in `Generic[*Ts]`
     TodoStarredExpression,
+    /// A special Todo-variant for `TypeVarTuple` instances encountered in type expressions
+    TodoTypeVarTuple,
     /// A type that is determined to be divergent during recursive type inference.
     Divergent(DivergentType),
 }
@@ -7431,6 +7432,7 @@ impl std::fmt::Display for DynamicType<'_> {
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
             DynamicType::TodoUnpack => f.write_str("@Todo(typing.Unpack)"),
             DynamicType::TodoStarredExpression => f.write_str("@Todo(StarredExpression)"),
+            DynamicType::TodoTypeVarTuple => f.write_str("@Todo(TypeVarTuple)"),
             DynamicType::Divergent(_) => f.write_str("Divergent"),
         }
     }
@@ -8261,7 +8263,8 @@ impl<'db> TypeVarInstance<'db> {
                 Type::Dynamic(dynamic) => match dynamic {
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression => Parameters::todo(),
+                    | DynamicType::TodoStarredExpression
+                    | DynamicType::TodoTypeVarTuple => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)

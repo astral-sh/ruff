@@ -12889,7 +12889,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression,
+                    | DynamicType::TodoStarredExpression
+                    | DynamicType::TodoTypeVarTuple,
                 ),
                 _,
                 _,
@@ -12899,7 +12900,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression,
+                    | DynamicType::TodoStarredExpression
+                    | DynamicType::TodoTypeVarTuple,
                 ),
                 _,
             ) => Some(todo),
@@ -14339,7 +14341,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // updating all of the subscript logic below to use custom callables for all of the _other_
                 // special cases, too.
                 if class.is_tuple(self.db()) {
-                    return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
+                    return tuple_generic_alias(
+                        self.db(),
+                        self.infer_tuple_type_expression(subscript),
+                    );
                 } else if class.is_known(self.db(), KnownClass::Type) {
                     let argument_ty = self.infer_type_expression(slice);
                     return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
@@ -14382,7 +14387,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             Type::SpecialForm(SpecialFormType::Tuple) => {
-                return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
+                return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(subscript));
             }
             Type::SpecialForm(SpecialFormType::Literal) => {
                 match self.infer_literal_parameter_type(slice) {
