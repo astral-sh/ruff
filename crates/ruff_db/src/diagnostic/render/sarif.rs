@@ -80,7 +80,7 @@ impl SarifRenderer<'_> {
                         "name": self.tool.name,
                         "informationUri": self.tool.information_uri,
                         "rules": rules,
-                        "version": crate::program_version().unwrap_or_else(|| "unknown"),
+                        "version": crate::program_version().unwrap_or("unknown"),
                     }
                 },
                 "results": results,
