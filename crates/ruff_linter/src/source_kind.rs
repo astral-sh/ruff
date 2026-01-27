@@ -134,15 +134,14 @@ impl SourceKind {
         source_type: SourceType,
     ) -> Result<Option<Self>, SourceError> {
         match source_type {
+            SourceType::Python(PySourceType::Ipynb) => {
+                let notebook = Notebook::from_source_code(&source_code)?;
+                Ok(notebook
+                    .is_python_notebook()
+                    .then_some(Self::IpyNotebook(Box::new(notebook))))
+            }
             SourceType::Python(py_source_type) => {
-                if py_source_type.is_ipynb() {
-                    let notebook = Notebook::from_source_code(&source_code)?;
-                    Ok(notebook
-                        .is_python_notebook()
-                        .then_some(Self::IpyNotebook(Box::new(notebook))))
-                } else {
-                    Ok(Some(Self::Python(source_code, py_source_type.is_stub())))
-                }
+                Ok(Some(Self::Python(source_code, py_source_type.is_stub())))
             }
             SourceType::Toml(_) => Ok(None),
             SourceType::Markdown => Ok(Some(Self::Markdown(source_code))),
