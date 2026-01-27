@@ -630,6 +630,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match &*tuple.slice {
             ast::Expr::Tuple(elements) => {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
+                    if element.is_starred_expr()
+                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                    {
+                        let mut diagnostic =
+                            builder.into_diagnostic("Invalid `tuple` specialization");
+                        diagnostic
+                            .set_primary_message("`...` cannot be used after an unpacked element");
+                    }
                     self.infer_expression(ellipsis, TypeContext::default());
                     let result =
                         TupleType::homogeneous(self.db(), self.infer_type_expression(element));
@@ -646,6 +654,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut first_unpacked_variadic_tuple = None;
 
                 for element in elements {
+                    if element.is_ellipsis_literal_expr()
+                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                    {
+                        let mut diagnostic =
+                            builder.into_diagnostic("Invalid `tuple` specialization");
+                        diagnostic.set_primary_message(
+                            "`...` can only be used as the second element \
+                            in a two-element `tuple` specialization",
+                        );
+                    }
                     let element_ty = self.infer_type_expression(element);
                     return_todo |=
                         element_could_alter_type_of_whole_tuple(element, element_ty, self);
@@ -714,6 +732,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ty
             }
             single_element => {
+                if single_element.is_ellipsis_literal_expr()
+                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                {
+                    let mut diagnostic = builder.into_diagnostic("Invalid `tuple` specialization");
+                    diagnostic.set_primary_message(
+                        "`...` can only be used as the second element \
+                            in a two-element `tuple` specialization",
+                    );
+                }
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {

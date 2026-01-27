@@ -187,6 +187,22 @@ def func3(t: tuple[*Ts]):
     t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
 ```
 
+## Ellipses in the wrong place in a `tuple` specialization
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+a: tuple[...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+b: tuple[*tuple[int, ...], ...]
+# error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
+c: tuple[int, str, ...]
+```
+
 ## Invalid AST nodes in string annotations
 
 Invalid AST nodes should also be rejected when they appear in string annotations:
