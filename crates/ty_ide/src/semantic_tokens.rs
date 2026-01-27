@@ -1689,9 +1689,9 @@ f: """'list["int | str"]' | 'None'"""
         "y" @ 8..9: Variable [definition]
         "int" @ 12..15: Class
         "z" @ 17..18: Variable [definition]
-        "'int'" @ 21..26: String
+        "int" @ 22..25: Class
         "w" @ 28..29: Variable [definition]
-        "'\"int\"'" @ 34..41: String
+        "\"int\"" @ 35..40: String
         "a" @ 46..47: Variable [definition]
         "list" @ 49..53: Class
         "int" @ 54..57: Class
@@ -1714,11 +1714,13 @@ f: """'list["int | str"]' | 'None'"""
         "None" @ 152..156: BuiltinConstant
         "e" @ 158..159: Variable [definition]
         "list" @ 162..166: Class
-        "\"int | str\"" @ 167..178: String
-        "\"None\"" @ 182..188: String
+        "int" @ 168..171: Class
+        "str" @ 174..177: Class
+        "None" @ 183..187: BuiltinConstant
         "f" @ 190..191: Variable [definition]
-        "'list[\"int | str\"]'" @ 196..215: String
-        "'None'" @ 218..224: String
+        "list" @ 197..201: Class
+        "\"int | str\"" @ 202..213: String
+        "None" @ 219..223: BuiltinConstant
         "#);
     }
 
