@@ -758,6 +758,10 @@
     "Alias": {
       "type": "string"
     },
+    "AllowedFloatValue": {
+      "type": "number",
+      "format": "double"
+    },
     "AllowedValue": {
       "anyOf": [
         {
@@ -768,33 +772,7 @@
           "format": "int64"
         },
         {
-          "type": "number",
-          "format": "double"
-        },
-        {
-          "type": "object",
-          "required": [
-            "imag",
-            "real"
-          ],
-          "properties": {
-            "imag": {
-              "type": "number",
-              "format": "double"
-            },
-            "real": {
-              "type": "number",
-              "format": "double"
-            }
-          }
-        },
-        {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8",
-            "minimum": 0.0
-          }
+          "$ref": "#/definitions/AllowedFloatValue"
         }
       ]
     },
