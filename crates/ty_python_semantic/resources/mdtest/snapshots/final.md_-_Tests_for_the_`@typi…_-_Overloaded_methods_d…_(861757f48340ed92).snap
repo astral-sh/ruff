@@ -93,50 +93,42 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 22 | class Bad:
 23 |     @overload
 24 |     @final
-25 |     def f(self, x: str) -> str: ...
+25 |     def f(self, x: str) -> str: ...  # error: [invalid-overload]
 26 |     @overload
 27 |     def f(self, x: int) -> int: ...
-28 | 
-29 |     # error: [invalid-overload]
-30 |     def f(self, x: int | str) -> int | str:
-31 |         return x
-32 | 
-33 |     @final
+28 |     def f(self, x: int | str) -> int | str:
+29 |         return x
+30 | 
+31 |     @final
+32 |     @overload
+33 |     def g(self, x: str) -> str: ...  # error: [invalid-overload]
 34 |     @overload
-35 |     def g(self, x: str) -> str: ...
-36 |     @overload
-37 |     def g(self, x: int) -> int: ...
+35 |     def g(self, x: int) -> int: ...
+36 |     def g(self, x: int | str) -> int | str:
+37 |         return x
 38 | 
-39 |     # error: [invalid-overload]
-40 |     def g(self, x: int | str) -> int | str:
-41 |         return x
-42 | 
-43 |     @overload
-44 |     def h(self, x: str) -> str: ...
-45 |     @overload
-46 |     @final
-47 |     def h(self, x: int) -> int: ...
-48 | 
-49 |     # error: [invalid-overload]
-50 |     def h(self, x: int | str) -> int | str:
-51 |         return x
-52 | 
-53 |     @overload
-54 |     def i(self, x: str) -> str: ...
-55 |     @final
-56 |     @overload
-57 |     def i(self, x: int) -> int: ...
-58 | 
-59 |     # error: [invalid-overload]
-60 |     def i(self, x: int | str) -> int | str:
-61 |         return x
-62 | 
-63 | class ChildOfBad(Bad):
-64 |     # TODO: these should all cause us to emit Liskov violations as well
-65 |     f = None  # error: [override-of-final-method]
-66 |     g = None  # error: [override-of-final-method]
-67 |     h = None  # error: [override-of-final-method]
-68 |     i = None  # error: [override-of-final-method]
+39 |     @overload
+40 |     def h(self, x: str) -> str: ...
+41 |     @overload
+42 |     @final
+43 |     def h(self, x: int) -> int: ...  # error: [invalid-overload]
+44 |     def h(self, x: int | str) -> int | str:
+45 |         return x
+46 | 
+47 |     @overload
+48 |     def i(self, x: str) -> str: ...
+49 |     @final
+50 |     @overload
+51 |     def i(self, x: int) -> int: ...  # error: [invalid-overload]
+52 |     def i(self, x: int | str) -> int | str:
+53 |         return x
+54 | 
+55 | class ChildOfBad(Bad):
+56 |     # TODO: these should all cause us to emit Liskov violations as well
+57 |     f = None  # error: [override-of-final-method]
+58 |     g = None  # error: [override-of-final-method]
+59 |     h = None  # error: [override-of-final-method]
+60 |     i = None  # error: [override-of-final-method]
 ```
 
 # Diagnostics
@@ -234,6 +226,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
    |         --- First overload defined here
 30 |     @overload
 31 |     @final
+   |     ------
 32 |     # error: [invalid-overload]
 33 |     def bar(self, x: int) -> int: ...
    |         ^^^
@@ -252,6 +245,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 36 |     def baz(self, x: str) -> str: ...
    |         --- First overload defined here
 37 |     @final
+   |     ------
 38 |     @overload
 39 |     # error: [invalid-overload]
 40 |     def baz(self, x: int) -> int: ...
@@ -380,29 +374,19 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:30:9
+  --> src/main.py:24:5
    |
-29 |     # error: [invalid-overload]
-30 |     def f(self, x: int | str) -> int | str:
-   |         -
-   |         |
-   |         Implementation defined here
-31 |         return x
-   |
-info: rule `invalid-overload` is enabled by default
-
-```
-
-```
-error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:40:9
-   |
-39 |     # error: [invalid-overload]
-40 |     def g(self, x: int | str) -> int | str:
-   |         -
-   |         |
-   |         Implementation defined here
-41 |         return x
+22 | class Bad:
+23 |     @overload
+24 |     @final
+   |     ------
+25 |     def f(self, x: str) -> str: ...  # error: [invalid-overload]
+   |         ^
+26 |     @overload
+27 |     def f(self, x: int) -> int: ...
+28 |     def f(self, x: int | str) -> int | str:
+   |         - Implementation defined here
+29 |         return x
    |
 info: rule `invalid-overload` is enabled by default
 
@@ -410,14 +394,20 @@ info: rule `invalid-overload` is enabled by default
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:50:9
+  --> src/main.py:31:5
    |
-49 |     # error: [invalid-overload]
-50 |     def h(self, x: int | str) -> int | str:
-   |         -
-   |         |
-   |         Implementation defined here
-51 |         return x
+29 |         return x
+30 |
+31 |     @final
+   |     ------
+32 |     @overload
+33 |     def g(self, x: str) -> str: ...  # error: [invalid-overload]
+   |         ^
+34 |     @overload
+35 |     def g(self, x: int) -> int: ...
+36 |     def g(self, x: int | str) -> int | str:
+   |         - Implementation defined here
+37 |         return x
    |
 info: rule `invalid-overload` is enabled by default
 
@@ -425,14 +415,36 @@ info: rule `invalid-overload` is enabled by default
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:60:9
+  --> src/main.py:42:5
    |
-59 |     # error: [invalid-overload]
-60 |     def i(self, x: int | str) -> int | str:
-   |         -
-   |         |
-   |         Implementation defined here
-61 |         return x
+40 |     def h(self, x: str) -> str: ...
+41 |     @overload
+42 |     @final
+   |     ------
+43 |     def h(self, x: int) -> int: ...  # error: [invalid-overload]
+   |         ^
+44 |     def h(self, x: int | str) -> int | str:
+   |         - Implementation defined here
+45 |         return x
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
+  --> src/main.py:49:5
+   |
+47 |     @overload
+48 |     def i(self, x: str) -> str: ...
+49 |     @final
+   |     ------
+50 |     @overload
+51 |     def i(self, x: int) -> int: ...  # error: [invalid-overload]
+   |         ^
+52 |     def i(self, x: int | str) -> int | str:
+   |         - Implementation defined here
+53 |         return x
    |
 info: rule `invalid-overload` is enabled by default
 
@@ -440,22 +452,23 @@ info: rule `invalid-overload` is enabled by default
 
 ```
 error[override-of-final-method]: Cannot override `Bad.f`
-  --> src/main.py:65:5
+  --> src/main.py:57:5
    |
-63 | class ChildOfBad(Bad):
-64 |     # TODO: these should all cause us to emit Liskov violations as well
-65 |     f = None  # error: [override-of-final-method]
+55 | class ChildOfBad(Bad):
+56 |     # TODO: these should all cause us to emit Liskov violations as well
+57 |     f = None  # error: [override-of-final-method]
    |     ^ Overrides a definition from superclass `Bad`
-66 |     g = None  # error: [override-of-final-method]
-67 |     h = None  # error: [override-of-final-method]
+58 |     g = None  # error: [override-of-final-method]
+59 |     h = None  # error: [override-of-final-method]
    |
 info: `Bad.f` is decorated with `@final`, forbidding overrides
-  --> src/main.py:30:9
+  --> src/main.py:28:9
    |
-29 |     # error: [invalid-overload]
-30 |     def f(self, x: int | str) -> int | str:
+26 |     @overload
+27 |     def f(self, x: int) -> int: ...
+28 |     def f(self, x: int | str) -> int | str:
    |         - `Bad.f` defined here
-31 |         return x
+29 |         return x
    |
 help: Remove the override of `f`
 info: rule `override-of-final-method` is enabled by default
@@ -464,22 +477,23 @@ info: rule `override-of-final-method` is enabled by default
 
 ```
 error[override-of-final-method]: Cannot override `Bad.g`
-  --> src/main.py:66:5
+  --> src/main.py:58:5
    |
-64 |     # TODO: these should all cause us to emit Liskov violations as well
-65 |     f = None  # error: [override-of-final-method]
-66 |     g = None  # error: [override-of-final-method]
+56 |     # TODO: these should all cause us to emit Liskov violations as well
+57 |     f = None  # error: [override-of-final-method]
+58 |     g = None  # error: [override-of-final-method]
    |     ^ Overrides a definition from superclass `Bad`
-67 |     h = None  # error: [override-of-final-method]
-68 |     i = None  # error: [override-of-final-method]
+59 |     h = None  # error: [override-of-final-method]
+60 |     i = None  # error: [override-of-final-method]
    |
 info: `Bad.g` is decorated with `@final`, forbidding overrides
-  --> src/main.py:40:9
+  --> src/main.py:36:9
    |
-39 |     # error: [invalid-overload]
-40 |     def g(self, x: int | str) -> int | str:
+34 |     @overload
+35 |     def g(self, x: int) -> int: ...
+36 |     def g(self, x: int | str) -> int | str:
    |         - `Bad.g` defined here
-41 |         return x
+37 |         return x
    |
 help: Remove the override of `g`
 info: rule `override-of-final-method` is enabled by default
@@ -488,21 +502,22 @@ info: rule `override-of-final-method` is enabled by default
 
 ```
 error[override-of-final-method]: Cannot override `Bad.h`
-  --> src/main.py:67:5
+  --> src/main.py:59:5
    |
-65 |     f = None  # error: [override-of-final-method]
-66 |     g = None  # error: [override-of-final-method]
-67 |     h = None  # error: [override-of-final-method]
+57 |     f = None  # error: [override-of-final-method]
+58 |     g = None  # error: [override-of-final-method]
+59 |     h = None  # error: [override-of-final-method]
    |     ^ Overrides a definition from superclass `Bad`
-68 |     i = None  # error: [override-of-final-method]
+60 |     i = None  # error: [override-of-final-method]
    |
 info: `Bad.h` is decorated with `@final`, forbidding overrides
-  --> src/main.py:50:9
+  --> src/main.py:44:9
    |
-49 |     # error: [invalid-overload]
-50 |     def h(self, x: int | str) -> int | str:
+42 |     @final
+43 |     def h(self, x: int) -> int: ...  # error: [invalid-overload]
+44 |     def h(self, x: int | str) -> int | str:
    |         - `Bad.h` defined here
-51 |         return x
+45 |         return x
    |
 help: Remove the override of `h`
 info: rule `override-of-final-method` is enabled by default
@@ -511,20 +526,21 @@ info: rule `override-of-final-method` is enabled by default
 
 ```
 error[override-of-final-method]: Cannot override `Bad.i`
-  --> src/main.py:68:5
+  --> src/main.py:60:5
    |
-66 |     g = None  # error: [override-of-final-method]
-67 |     h = None  # error: [override-of-final-method]
-68 |     i = None  # error: [override-of-final-method]
+58 |     g = None  # error: [override-of-final-method]
+59 |     h = None  # error: [override-of-final-method]
+60 |     i = None  # error: [override-of-final-method]
    |     ^ Overrides a definition from superclass `Bad`
    |
 info: `Bad.i` is decorated with `@final`, forbidding overrides
-  --> src/main.py:60:9
+  --> src/main.py:52:9
    |
-59 |     # error: [invalid-overload]
-60 |     def i(self, x: int | str) -> int | str:
+50 |     @overload
+51 |     def i(self, x: int) -> int: ...  # error: [invalid-overload]
+52 |     def i(self, x: int | str) -> int | str:
    |         - `Bad.i` defined here
-61 |         return x
+53 |         return x
    |
 help: Remove the override of `i`
 info: rule `override-of-final-method` is enabled by default

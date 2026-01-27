@@ -694,10 +694,10 @@ class Foo:
 
     @overload
     @final
+    # error: [invalid-overload]
     def method2(self, x: int) -> int: ...
     @overload
     def method2(self, x: str) -> str: ...
-    # error: [invalid-overload]
     def method2(self, x: int | str) -> int | str:
         return x
 
@@ -705,8 +705,8 @@ class Foo:
     def method3(self, x: int) -> int: ...
     @overload
     @final
-    def method3(self, x: str) -> str: ...
     # error: [invalid-overload]
+    def method3(self, x: str) -> str: ...
     def method3(self, x: int | str) -> int | str:
         return x
 ```
@@ -774,18 +774,18 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    def method(self, x: str) -> str: ...
     # error: [invalid-overload]
+    def method(self, x: str) -> str: ...
     def method(self, x: int | str) -> int | str:
         return x
 
 class Sub3(Base):
     @overload
     @override
+    # error: [invalid-overload]
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
-    # error: [invalid-overload]
     def method(self, x: int | str) -> int | str:
         return x
 ```
