@@ -117,12 +117,12 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
-    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
+    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
     TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
     TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
     binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
@@ -12415,10 +12415,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 let constraints = constraints.constraints(self.db());
                 let result = constraints.negate(self.db());
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(TrackedConstraintSet::new(
-                    self.db(),
-                    result,
-                )))
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    InternedConstraintSet::new(self.db(), result),
+                ))
             }
 
             (ast::UnaryOp::Not, ty) => ty
@@ -13060,7 +13059,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let right = right.constraints(self.db());
                 let result = left.and(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(self.db(), result),
+                    InternedConstraintSet::new(self.db(), result),
                 )))
             }
 
@@ -13073,7 +13072,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let right = right.constraints(self.db());
                 let result = left.or(self.db(), || right);
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(self.db(), result),
+                    InternedConstraintSet::new(self.db(), result),
                 )))
             }
 
