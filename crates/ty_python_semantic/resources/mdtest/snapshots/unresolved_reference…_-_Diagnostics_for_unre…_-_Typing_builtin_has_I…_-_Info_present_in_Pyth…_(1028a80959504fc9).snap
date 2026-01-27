@@ -27,7 +27,6 @@ error[unresolved-reference]: Name `List` used when not defined
   |      ^^^^ Did you mean `list`?
 2 | bar: Type  # error: [unresolved-reference]
   |
-info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unresolved-reference` is enabled by default
 
 ```
@@ -40,7 +39,6 @@ error[unresolved-reference]: Name `Type` used when not defined
 2 | bar: Type  # error: [unresolved-reference]
   |      ^^^^ Did you mean `type`?
   |
-info: Python 3.9 was assumed when resolving types because it was specified on the command line
 info: rule `unresolved-reference` is enabled by default
 
 ```
