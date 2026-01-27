@@ -1202,6 +1202,260 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_string_annotation_nested1() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class | int'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
+        some docs
+
+        ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass | int'] | None"
+          |           ^^-^^^^
+          |           | |
+          |           | Cursor offset
+          |           source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested2() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
+        some docs
+
+        ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:17
+          |
+        2 | x: "list['int | MyClass'] | None"
+          |                 ^^-^^^^
+          |                 | |
+          |                 | Cursor offset
+          |                 source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested3() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | None'] | My<CURSOR>Class"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
+        some docs
+
+        ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:26
+          |
+        2 | x: "list['int | None'] | MyClass"
+          |                          ^^-^^^^
+          |                          | |
+          |                          | Cursor offset
+          |                          source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested4() {
+        let test = cursor_test(
+            r#"
+        x: "list['int' | 'My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
+        some docs
+
+        ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:19
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+          |                   ^^-^^^^
+          |                   | |
+          |                   | Cursor offset
+          |                   source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested5() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class' | 'str'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
+        some docs
+
+        ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+          |           ^^-^^^^
+          |           | |
+          |           | Cursor offset
+          |           source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_too_nested1() {
+        let test = cursor_test(
+            r#"
+        x: """'list["My<CURSOR>Class" | "str"]' | None"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:13
+          |
+        2 | x: """'list["MyClass" | "str"]' | None"""
+          |             ^^^-^^^^^
+          |             |  |
+          |             |  Cursor offset
+          |             source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_too_nested2() {
+        let test = cursor_test(
+            r#"
+        x: """'list["int" | "str"]' | My<CURSOR>Class"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
+        some docs
+
+        ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:31
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+          |                               ^^-^^^^
+          |                               | |
+          |                               | Cursor offset
+          |                               source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_overload_type_disambiguated1() {
         let test = CursorTest::builder()
             .source(
