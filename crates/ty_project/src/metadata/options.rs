@@ -282,15 +282,21 @@ impl Options {
         } else {
             let mut roots = vec![];
             let src = project_root.join("src");
+            let is_package = |dir: &SystemPath| {
+                system.is_file(&dir.join("__init__.py"))
+                    || system.is_file(&dir.join("__init__.pyi"))
+            };
 
-            if system.is_directory(&src) {
+            if system.is_directory(&src) && !is_package(&src) {
                 // Default to `src` and the project root if `src` exists and the root hasn't been specified.
                 // This corresponds to the `src-layout`
                 tracing::debug!(
                     "Including `.` and `./src` in `environment.root` because a `./src` directory exists"
                 );
                 roots.push(src);
-            } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
+            } else if system.is_directory(&project_root.join(project_name).join(project_name))
+                && !is_package(&project_root.join(project_name))
+            {
                 // `src-layout` but when the folder isn't called `src` but has the same name as the project.
                 // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
                 tracing::debug!(
@@ -304,11 +310,7 @@ impl Options {
             }
 
             let python = project_root.join("python");
-            if system.is_directory(&python)
-                && !system.is_file(&python.join("__init__.py"))
-                && !system.is_file(&python.join("__init__.pyi"))
-                && !roots.contains(&python)
-            {
+            if system.is_directory(&python) && !is_package(&python) && !roots.contains(&python) {
                 // If a `./python` directory exists, include it as a source root. This is the recommended layout
                 // for maturin-based rust/python projects [1].
                 //
