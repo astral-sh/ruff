@@ -1625,16 +1625,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            for (decorator, name) in [
-                (FunctionDecorators::FINAL, "final"),
-                (FunctionDecorators::OVERRIDE, "override"),
+            for (function, decorator) in [
+                (KnownFunction::Final, FunctionDecorators::FINAL),
+                (KnownFunction::Override, FunctionDecorators::OVERRIDE),
             ] {
                 if let Some(implementation) = implementation {
                     for overload in overloads {
                         if !overload.has_known_decorator(self.db(), decorator) {
                             continue;
                         }
-                        let function_node = function.node(self.db(), self.file(), self.module());
+                        let function_node = overload.node(self.db(), self.file(), self.module());
                         let Some(builder) = self
                             .context
                             .report_lint(&INVALID_OVERLOAD, &function_node.name)
@@ -1643,8 +1643,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         };
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "`@{name}` decorator should be applied only to the \
-                                overload implementation"
+                                overload implementation",
+                            name = function.name()
                         ));
+                        if let Some(decorator) =
+                            overload.find_known_decorator_span(self.db(), function)
+                        {
+                            diagnostic.annotate(Annotation::secondary(decorator));
+                        }
                         diagnostic.annotate(
                             self.context
                                 .secondary(implementation.focus_range(self.db(), self.module()))
@@ -1669,8 +1675,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         };
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "`@{name}` decorator should be applied only to the \
-                                first overload"
+                                first overload",
+                            name = function.name()
                         ));
+                        if let Some(decorator) =
+                            overload.find_known_decorator_span(self.db(), function)
+                        {
+                            diagnostic.annotate(Annotation::secondary(decorator));
+                        }
                         diagnostic.annotate(
                             self.context
                                 .secondary(first_overload.focus_range(self.db(), self.module()))

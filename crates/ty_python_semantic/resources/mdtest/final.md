@@ -279,21 +279,17 @@ class ChildOfGood(Good):
 class Bad:
     @overload
     @final
-    def f(self, x: str) -> str: ...
+    def f(self, x: str) -> str: ...  # error: [invalid-overload]
     @overload
     def f(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
     def f(self, x: int | str) -> int | str:
         return x
 
     @final
     @overload
-    def g(self, x: str) -> str: ...
+    def g(self, x: str) -> str: ...  # error: [invalid-overload]
     @overload
     def g(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
     def g(self, x: int | str) -> int | str:
         return x
 
@@ -301,9 +297,7 @@ class Bad:
     def h(self, x: str) -> str: ...
     @overload
     @final
-    def h(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
+    def h(self, x: int) -> int: ...  # error: [invalid-overload]
     def h(self, x: int | str) -> int | str:
         return x
 
@@ -311,9 +305,7 @@ class Bad:
     def i(self, x: str) -> str: ...
     @final
     @overload
-    def i(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
+    def i(self, x: int) -> int: ...  # error: [invalid-overload]
     def i(self, x: int | str) -> int | str:
         return x
 
