@@ -14,58 +14,29 @@ B036 `yield` in context manager without `try`/`finally` is not protected against
 B036 `yield` in context manager without `try`/`finally` is not protected against exceptions
   --> B036.py:18:9
    |
-16 | def bad_try_without_finally():
-17 |     try:
+16 | def bad_with_code_after_yield():
+17 |     with other_cm():
 18 |         yield  # B036
    |         ^^^^^
-19 |     except Exception:
-20 |         pass
+19 |         print("cleanup")
    |
 
 B036 `yield` in context manager without `try`/`finally` is not protected against exceptions
-  --> B036.py:26:9
+  --> B036.py:25:9
    |
-24 | def bad_with_code_after_yield():
-25 |     with other_cm():
-26 |         yield  # B036
+23 | def bad_nested_conditional_not_last():
+24 |     if condition:
+25 |         yield  # B036
    |         ^^^^^
-27 |         print("cleanup")
+26 |     print("after if")
    |
 
 B036 `yield` in context manager without `try`/`finally` is not protected against exceptions
-  --> B036.py:33:9
+  --> B036.py:32:9
    |
-31 | def bad_nested_conditional():
-32 |     if condition:
-33 |         yield  # B036
+30 | def bad_nested_in_loop_not_last():
+31 |     for i in range(10):
+32 |         yield  # B036
    |         ^^^^^
+33 |     print("after loop")
    |
-
-B036 `yield` in context manager without `try`/`finally` is not protected against exceptions
-  --> B036.py:39:9
-   |
-37 | def bad_nested_in_loop():
-38 |     for i in range(10):
-39 |         yield  # B036
-   |         ^^^^^
-   |
-
-B036 `yield` in context manager without `try`/`finally` is not protected against exceptions
-   --> B036.py:187:9
-    |
-185 | def bad_try_with_else():
-186 |     try:
-187 |         yield  # B036
-    |         ^^^^^
-188 |     except Exception:
-189 |         pass
-    |
-
-B036 `yield` in context manager without `try`/`finally` is not protected against exceptions
-   --> B036.py:199:9
-    |
-197 |         do_something()
-198 |     except Exception:
-199 |         yield  # B036
-    |         ^^^^^
-    |
