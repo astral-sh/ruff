@@ -9,3 +9,6 @@ fi
 
 # Install clippy and rustfmt for the active toolchain.
 rustup component add clippy rustfmt
+
+# Install cargo-nextest
+cargo install --locked cargo-nextest
