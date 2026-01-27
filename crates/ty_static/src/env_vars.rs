@@ -27,8 +27,8 @@ impl EnvVars {
     /// Accepted values:
     ///
     /// * `short` - Display short memory report
-    /// * `mypy_primer` - Display `mypy_primer` format and suppress workspace diagnostics
     /// * `full` - Display full memory report
+    /// * `json` - Display machine-readable JSON format and suppress workspace diagnostics
     #[attr_hidden]
     pub const TY_MEMORY_REPORT: &'static str = "TY_MEMORY_REPORT";
 
