@@ -9726,11 +9726,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             MultiInferenceState::Panic => {
                 let previous = self.expressions.insert(expression.into(), ty);
-                // TODO: We store (sub)string annotations now but the code is a bit inconsistent about
-                // only doing it once, so downgrade this into `MultiInferenceState::Overwrite`
-                if !self.deferred_state.in_string_annotation() {
-                    assert_eq!(previous, None);
-                }
+                assert_eq!(previous, None);
             }
 
             MultiInferenceState::Overwrite => {

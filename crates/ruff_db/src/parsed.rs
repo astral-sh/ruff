@@ -4,10 +4,11 @@ use std::sync::Arc;
 use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
 use ruff_python_ast::{
-    AnyRootNodeRef, HasNodeIndex, ModExpression, ModModule, NodeIndex, StringLiteral,
+    AnyRootNodeRef, HasNodeIndex, ModExpression, ModModule, NodeIndex, NodeIndexError,
+    StringLiteral,
 };
 use ruff_python_parser::{
-    ParseError, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
+    ParseError, ParseErrorType, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
 };
 
 use crate::Db;
@@ -56,7 +57,25 @@ pub fn parsed_string_annotation(
     let expr = parse_string_annotation(source, string)?;
 
     // We need the sub-ast of the string annotation to be indexed
-    indexed::ensure_indexed(&expr, string.node_index().load());
+    indexed::ensure_indexed(&expr, string.node_index().load()).map_err(|err| {
+        let message = match err {
+            NodeIndexError::NoParent => {
+                "Internal Error: string annotation's parent had no NodeIndex".to_owned()
+            }
+            NodeIndexError::OutOfIndices => {
+                "File too long, ran out of encoding space for string annotations".to_owned()
+            }
+            NodeIndexError::OutOfSubIndices => {
+                "Substring annotation is too complex, ran out of encoding space".to_owned()
+            }
+            NodeIndexError::TooNested => "Too many levels of nested string annotations".to_owned(),
+        };
+
+        ParseError {
+            error: ParseErrorType::OtherError(message),
+            location: string.range,
+        }
+    })?;
 
     Ok(expr)
 }
@@ -187,33 +206,26 @@ mod indexed {
 
     /// Ensure the following sub-AST is indexed, using the parent node's index
     /// as a basis for unambiguous AST node indices.
-    pub fn ensure_indexed(parsed: &Parsed<ModExpression>, parent_node_index: NodeIndex) {
-        // High level idea:
-        //
-        // With 0x0000_00AB we want to shift away all the leading 0's so we
-        // have 0xAB00_0000, and then start counting up from there. To avoid
-        // ambiguity around 0, we actually only shift up to the second-most
-        // significant digit and then set the most significant digit to 1.
-        //
-        // Because these are 32-bit, you would need *gigabytes* of code in
-        // a single python file to cause any conflicts, so we don't try to
-        // handle those conflicts at all.
-        //
-        // We panic here if no proper parent because this really should never
-        // happen and if it does any fallback we do will break invariants
-        // that code needs to depend on.
-        let parent = parent_node_index
-            .as_u32()
-            .expect("Indexed string annotations must have a valid parent node index");
-        let space = parent.leading_zeros();
-        let index = parent << space.saturating_sub(1) | (1 << 31);
-
+    pub fn ensure_indexed(
+        parsed: &Parsed<ModExpression>,
+        parent_node_index: NodeIndex,
+    ) -> Result<(), NodeIndexError> {
+        let parent_index = parent_node_index.as_u32().ok_or(NodeIndexError::NoParent)?;
+        let (index, max_index) = sub_indices(parent_index)?;
         let mut visitor = Visitor {
+            overflowed: false,
             nodes: Some(Vec::new()),
             index,
+            max_index,
         };
 
         AnyNodeRef::from(parsed.syntax()).visit_source_order(&mut visitor);
+
+        if visitor.overflowed {
+            return Err(NodeIndexError::OutOfSubIndices);
+        }
+
+        Ok(())
     }
 
     impl IndexedModule {
@@ -223,6 +235,8 @@ mod indexed {
             let mut visitor = Visitor {
                 nodes: Some(Vec::new()),
                 index: 0,
+                max_index: MAX_REAL_INDEX,
+                overflowed: false,
             };
 
             let mut inner = Arc::new(IndexedModule {
@@ -261,7 +275,9 @@ mod indexed {
     /// A visitor that collects nodes in source order.
     pub struct Visitor<'a> {
         pub index: u32,
+        pub max_index: u32,
         pub nodes: Option<Vec<AnyRootNodeRef<'a>>>,
+        pub overflowed: bool,
     }
 
     impl<'a> Visitor<'a> {
@@ -270,7 +286,13 @@ mod indexed {
             T: HasNodeIndex + std::fmt::Debug,
             AnyRootNodeRef<'a>: From<&'a T>,
         {
-            node.node_index().set(NodeIndex::from(self.index));
+            // Only check on write (the maximum is orders of magnitude less than u32::MAX)
+            if self.index > self.max_index {
+                self.overflowed = true;
+            } else {
+                node.node_index().set(NodeIndex::from(self.index));
+            }
+
             if let Some(nodes) = &mut self.nodes {
                 nodes.push(AnyRootNodeRef::from(node));
             }
