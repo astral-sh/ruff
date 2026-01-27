@@ -160,7 +160,6 @@ impl Terminal {
                     let is_not_implemented = raise.exc.as_ref().is_some_and(|exc| {
                         let exc = map_callable(exc);
                         semantic.match_builtin_expr(exc, "NotImplementedError")
-                            || semantic.match_builtin_expr(exc, "NotImplemented")
                     });
 
                     if is_not_implemented {
