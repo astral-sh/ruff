@@ -1816,7 +1816,38 @@ fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) ->
             .iter()
             .any(|union_member_ty| is_typeddict_or_union_with_typeddicts(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_typeddict_or_union_with_typeddicts(db, alias.value_type(db)),
-        _ => false,
+
+        Type::Dynamic(_)
+        | Type::Never
+        | Type::FunctionLiteral(_)
+        | Type::BoundMethod(_)
+        | Type::KnownBoundMethod(_)
+        | Type::WrapperDescriptor(_)
+        | Type::DataclassDecorator(_)
+        | Type::DataclassTransformer(_)
+        | Type::Callable(_)
+        | Type::ModuleLiteral(_)
+        | Type::ClassLiteral(_)
+        | Type::GenericAlias(_)
+        | Type::SubclassOf(_)
+        | Type::NominalInstance(_)
+        | Type::ProtocolInstance(_)
+        | Type::SpecialForm(_)
+        | Type::KnownInstance(_)
+        | Type::PropertyInstance(_)
+        | Type::AlwaysTruthy
+        | Type::AlwaysFalsy
+        | Type::IntLiteral(_)
+        | Type::BooleanLiteral(_)
+        | Type::StringLiteral(_)
+        | Type::EnumLiteral(_)
+        | Type::LiteralString
+        | Type::BytesLiteral(_)
+        | Type::TypeVar(_)
+        | Type::BoundSuper(_)
+        | Type::TypeIs(_)
+        | Type::TypeGuard(_)
+        | Type::NewTypeInstance(_) => false,
     }
 }
 
@@ -1866,7 +1897,41 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         Type::TypeAlias(alias) => {
             all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
         }
-        _ => true,
+
+        // For non-TypedDict types, there's no field to check, so we return true
+        // (meaning "no non-literal fields found that would block narrowing").
+        Type::Dynamic(_)
+        | Type::Never
+        | Type::FunctionLiteral(_)
+        | Type::BoundMethod(_)
+        | Type::KnownBoundMethod(_)
+        | Type::WrapperDescriptor(_)
+        | Type::DataclassDecorator(_)
+        | Type::DataclassTransformer(_)
+        | Type::Callable(_)
+        | Type::ModuleLiteral(_)
+        | Type::ClassLiteral(_)
+        | Type::GenericAlias(_)
+        | Type::SubclassOf(_)
+        | Type::NominalInstance(_)
+        | Type::ProtocolInstance(_)
+        | Type::SpecialForm(_)
+        | Type::KnownInstance(_)
+        | Type::PropertyInstance(_)
+        | Type::Intersection(_)
+        | Type::AlwaysTruthy
+        | Type::AlwaysFalsy
+        | Type::IntLiteral(_)
+        | Type::BooleanLiteral(_)
+        | Type::StringLiteral(_)
+        | Type::EnumLiteral(_)
+        | Type::LiteralString
+        | Type::BytesLiteral(_)
+        | Type::TypeVar(_)
+        | Type::BoundSuper(_)
+        | Type::TypeIs(_)
+        | Type::TypeGuard(_)
+        | Type::NewTypeInstance(_) => true,
     }
 }
 
