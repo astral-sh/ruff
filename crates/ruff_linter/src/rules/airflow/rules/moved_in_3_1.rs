@@ -10,12 +10,10 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::TextRange;
 
 /// ## What it does
-/// Checks for uses of deprecated Airflow functions and values.
+/// Checks for uses of deprecated or moved Airflow functions and values in Airflow 3.1.
 ///
 /// ## Why is this bad?
-/// Airflow 3.1 removed various deprecated functions, members, and other
-/// values. Some have more modern replacements. Others are considered too niche
-/// and not worth continued maintenance in Airflow.
+/// Airflow 3.1 deprecated or moved various functions, members, and other values.
 ///
 /// ## Example
 /// ```python
@@ -209,7 +207,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ] => Replacement::SourceModuleMovedWithMessage {
             module: "airflow.sdk.execution_time.macros",
             name: rest.to_string(),
-            message: "With apache-airflow-task-sdk>=1.1.0,<=1.1.6. Please import from `airflow.sdk` for apache-airflow-task-sdk>1.1.6.",
+            message: "Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.",
             suggest_fix: true,
         },
 

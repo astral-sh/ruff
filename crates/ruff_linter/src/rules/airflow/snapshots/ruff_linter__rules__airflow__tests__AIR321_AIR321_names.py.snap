@@ -316,7 +316,7 @@ AIR321 [*] `airflow.macros.ds_add` is moved in Airflow 3.1
 78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
 79 | datetime_diff_for_humans(
    |
-help: `ds_add` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. With apache-airflow-task-sdk>=1.1.0,<=1.1.6. Please import from `airflow.sdk` for apache-airflow-task-sdk>1.1.6.
+help: `ds_add` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
 68 | 
 69 | # airflow.macros
 70 | from airflow.macros import (
@@ -340,7 +340,7 @@ AIR321 [*] `airflow.macros.ds_format` is moved in Airflow 3.1
 79 | datetime_diff_for_humans(
 80 |     dt(2026, 1, 1, 21, 30, 0),
    |
-help: `ds_format` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. With apache-airflow-task-sdk>=1.1.0,<=1.1.6. Please import from `airflow.sdk` for apache-airflow-task-sdk>1.1.6.
+help: `ds_format` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
 69 | # airflow.macros
 70 | from airflow.macros import (
 71 |     ds_add,
@@ -364,7 +364,7 @@ AIR321 [*] `airflow.macros.datetime_diff_for_humans` is moved in Airflow 3.1
 80 |     dt(2026, 1, 1, 21, 30, 0),
 81 |     since=dt(2026, 1, 2, 21, 30, 0)
    |
-help: `datetime_diff_for_humans` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. With apache-airflow-task-sdk>=1.1.0,<=1.1.6. Please import from `airflow.sdk` for apache-airflow-task-sdk>1.1.6.
+help: `datetime_diff_for_humans` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
 70 | from airflow.macros import (
 71 |     ds_add,
 72 |     ds_format,
@@ -387,7 +387,7 @@ AIR321 [*] `airflow.macros.ds_format_locale` is moved in Airflow 3.1
 84 |
 85 | # airflow.io
    |
-help: `ds_format_locale` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. With apache-airflow-task-sdk>=1.1.0,<=1.1.6. Please import from `airflow.sdk` for apache-airflow-task-sdk>1.1.6.
+help: `ds_format_locale` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
 71 |     ds_add,
 72 |     ds_format,
 73 |     datetime_diff_for_humans,

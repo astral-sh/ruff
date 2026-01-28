@@ -195,28 +195,35 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
     let replacement = match qualified_name.segments() {
         // airflow.datasets.metadata
-        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::Rename {
+        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
-            name: "Metadata",
+            name: "Metadata".to_string(),
+            version: "1.0.0",
         },
         // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::Rename {
-            module: "airflow.sdk",
-            name: "Asset",
-        },
+        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk",
+                name: "Asset".to_string(),
+                version: "1.0.0",
+            }
+        }
         ["airflow", "datasets", rest] => match *rest {
             "DatasetAliasEvent" => Replacement::None,
-            "DatasetAlias" => Replacement::Rename {
+            "DatasetAlias" => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "AssetAlias",
+                name: "AssetAlias".to_string(),
+                version: "1.0.0",
             },
-            "DatasetAll" => Replacement::Rename {
+            "DatasetAll" => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "AssetAll",
+                name: "AssetAll".to_string(),
+                version: "1.0.0",
             },
-            "DatasetAny" => Replacement::Rename {
+            "DatasetAny" => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "AssetAny",
+                name: "AssetAny".to_string(),
+                version: "1.0.0",
             },
             "expand_alias_to_datasets" => Replacement::Rename {
                 module: "airflow.models.asset",
@@ -230,9 +237,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "decorators",
             rest @ ("dag" | "task" | "task_group" | "setup" | "teardown"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: (*rest).to_string(),
+            version: "1.0.0",
         },
         [
             "airflow",
@@ -243,26 +251,30 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             | "TaskDecorator"
             | "get_unique_task_id"
             | "task_decorator_factory"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.bases.decorator",
             name: (*rest).to_string(),
+            version: "1.0.0",
         },
 
         // airflow.io
-        ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMoved {
+        ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "ObjectStoragePath".to_string(),
+            version: "1.0.0",
         },
-        ["airflow", "io", "store", "attach"] => Replacement::SourceModuleMoved {
+        ["airflow", "io", "store", "attach"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.io",
             name: "attach".to_string(),
+            version: "1.0.0",
         },
 
         // airflow.models
         ["airflow", "models", rest @ ("Connection" | "Variable")] => {
-            Replacement::SourceModuleMoved {
+            Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
                 name: (*rest).to_string(),
+                version: "1.0.0",
             }
         }
         [
@@ -270,9 +282,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "models",
             ..,
             rest @ ("Param" | "ParamsDict" | "DagParam"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.definitions.param",
             name: (*rest).to_string(),
+            version: "1.0.0",
         },
 
         // airflow.models.baseoperator
@@ -281,20 +294,25 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "models",
             "baseoperator",
             rest @ ("chain" | "chain_linear" | "cross_downstream"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: (*rest).to_string(),
+            version: "1.0.0",
         },
-        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::Rename {
-            module: "airflow.sdk",
-            name: "BaseOperatorLink",
-        },
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk",
+                name: "BaseOperatorLink".to_string(),
+                version: "1.0.0",
+            }
+        }
 
         // airflow.model..DAG
         ["airflow", "models", "dag", "DAG"] | ["airflow", "models", "DAG"] | ["airflow", "DAG"] => {
-            Replacement::SourceModuleMoved {
+            Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
                 name: "DAG".to_string(),
+                version: "1.0.0",
             }
         }
 
@@ -304,9 +322,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "sensors",
             "base",
             rest @ ("BaseSensorOperator" | "PokeReturnValue"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: (*rest).to_string(),
+            version: "1.0.0",
         },
 
         ["airflow", "sensors", "base", "poke_mode_only"] => Replacement::SourceModuleMovedToSDK {
@@ -327,9 +346,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "utils",
             "dag_parsing_context",
             "get_parsing_context",
-        ] => Replacement::Rename {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
-            name: "get_parsing_context",
+            name: "get_parsing_context".to_string(),
+            version: "1.0.0",
         },
 
         _ => return,
