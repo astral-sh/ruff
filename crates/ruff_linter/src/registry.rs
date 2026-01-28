@@ -365,7 +365,7 @@ impl Rule {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 3] = &[
     (
         Rule::BlankLineBeforeClass,
         Rule::IncorrectBlankLineBeforeClass,
@@ -377,6 +377,12 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
         Rule::MultiLineSummarySecondLine,
         "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
          incompatible. Ignoring `multi-line-summary-second-line`.",
+    ),
+    (
+        Rule::UnnecessaryMultilineDocstring,
+        Rule::OneLineDocstringShouldBeMultiLine,
+        "`unnecessary-multiline-docstring` (D200) and `one-line-docstring-should-be-multi-line` \
+         (D219) are incompatible. Ignoring `one-line-docstring-should-be-multi-line`.",
     ),
 ];
 
