@@ -394,6 +394,15 @@ impl<'db> OverloadLiteral<'db> {
             return None;
         }
 
+        // These can both happen in edge cases involving not-yet-complete function definitions
+        // (invalid syntax).
+        if previous_overload.name(db) != self.name(db) {
+            return None;
+        }
+        if previous_overload.body_scope(db).file(db) != self.file(db) {
+            return None;
+        }
+
         Some(previous_literal)
     }
 
