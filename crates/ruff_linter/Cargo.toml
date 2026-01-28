@@ -42,7 +42,6 @@ globset = { workspace = true }
 hashbrown = { workspace = true }
 imperative = { workspace = true }
 is-macro = { workspace = true }
-is-wsl = { workspace = true }
 itertools = { workspace = true }
 jiff = { workspace = true }
 libcst = { workspace = true }
