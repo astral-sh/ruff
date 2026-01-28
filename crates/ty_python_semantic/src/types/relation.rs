@@ -704,6 +704,13 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
+            // Fast path: `object` is only a subtype/assignable to a protocol if the protocol
+            // is equivalent to `object` (handled above). Otherwise, not all objects satisfy
+            // the protocol.
+            (Type::NominalInstance(source), Type::ProtocolInstance(_)) if source.is_object() => {
+                ConstraintSet::from(false)
+            }
+
             // Fast path: `object` is only a subtype/assignable to unions that contain a type
             // that can definitely accept `object`. If a union contains only types that cannot
             // accept `object`, we can short-circuit to false.
