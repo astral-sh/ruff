@@ -8,28 +8,28 @@ import contextlib
 @contextmanager
 def bad1():
     print("start")
-    yield  # B036
+    yield  # RUF070
     print("cleanup")
 
 
 @contextmanager
 def bad_with_code_after_yield():
     with other_cm():
-        yield  # B036
+        yield  # RUF070
         print("cleanup")
 
 
 @contextmanager
 def bad_nested_conditional_not_last():
     if condition:
-        yield  # B036
+        yield  # RUF070
     print("after if")
 
 
 @contextmanager
 def bad_nested_in_loop_not_last():
     for i in range(10):
-        yield  # B036
+        yield  # RUF070
     print("after loop")
 
 

@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF070 Context manager does not catch exceptions
+  --> RUF070.py:11:5
+   |
+ 9 | def bad1():
+10 |     print("start")
+11 |     yield  # RUF070
+   |     ^^^^^
+12 |     print("cleanup")
+   |
+
+RUF070 Context manager does not catch exceptions
+  --> RUF070.py:18:9
+   |
+16 | def bad_with_code_after_yield():
+17 |     with other_cm():
+18 |         yield  # RUF070
+   |         ^^^^^
+19 |         print("cleanup")
+   |
+
+RUF070 Context manager does not catch exceptions
+  --> RUF070.py:25:9
+   |
+23 | def bad_nested_conditional_not_last():
+24 |     if condition:
+25 |         yield  # RUF070
+   |         ^^^^^
+26 |     print("after if")
+   |
+
+RUF070 Context manager does not catch exceptions
+  --> RUF070.py:32:9
+   |
+30 | def bad_nested_in_loop_not_last():
+31 |     for i in range(10):
+32 |         yield  # RUF070
+   |         ^^^^^
+33 |     print("after loop")
+   |

@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -49,29 +49,24 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `contextlib.contextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.14")]
-pub(crate) struct ContextManagerWithoutFinally;
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+pub(crate) struct FallibleContextManager;
 
-impl Violation for ContextManagerWithoutFinally {
+impl Violation for FallibleContextManager {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`yield` in context manager without `try`/`finally` is not protected against exceptions"
-            .to_string()
+        "Context manager does not catch exceptions".to_string()
     }
 }
 
-/// B036
-pub(crate) fn contextmanager_without_finally(checker: &Checker, function_def: &StmtFunctionDef) {
+/// RUF070
+pub(crate) fn fallible_context_manager(checker: &Checker, function_def: &StmtFunctionDef) {
     if !has_contextmanager_decorator(checker, function_def) {
         return;
     }
 
-    let mut visitor = YieldFinallyVisitor::default();
+    let mut visitor = YieldFinallyVisitor::new(checker);
     visitor.visit_body_with_terminal(&function_def.body, true);
-
-    for unprotected_yield in visitor.unprotected_yields {
-        checker.report_diagnostic(ContextManagerWithoutFinally, unprotected_yield);
-    }
 }
 
 fn has_contextmanager_decorator(checker: &Checker, function_def: &StmtFunctionDef) -> bool {
@@ -88,15 +83,41 @@ fn has_contextmanager_decorator(checker: &Checker, function_def: &StmtFunctionDe
     })
 }
 
-#[derive(Default)]
-struct YieldFinallyVisitor {
-    unprotected_yields: Vec<TextRange>,
+/// Visits the body of a `@contextmanager` function to find unprotected `yield` statements.
+///
+/// A `yield` is considered protected (and not flagged) if any of the following hold:
+/// - It is inside a `try` block that has `finally` or `except` handlers.
+/// - It is the last statement in a `with` block body (the context manager's `__exit__`
+///   handles cleanup).
+/// - It is in a terminal position (last statement in the function body, or immediately
+///   followed by `return`), meaning there is no cleanup code that could be skipped.
+struct YieldFinallyVisitor<'a, 'b> {
+    /// The checker used to emit diagnostics.
+    checker: &'a Checker<'b>,
+    /// Whether the visitor is currently inside a `try` block that has
+    /// `finally` or `except` handlers.
     in_protected_try: bool,
+    /// Whether the visitor is at the last statement in a `with` block body,
+    /// where the `with` statement's `__exit__` provides exception handling.
     in_with_last_statement: bool,
+    /// Whether the visitor is at a terminal position: the last statement in
+    /// the function body, or a `yield` immediately before a `return`.
     in_terminal_position: bool,
 }
 
-impl Visitor<'_> for YieldFinallyVisitor {
+impl<'a, 'b> YieldFinallyVisitor<'a, 'b> {
+    /// Creates a new visitor with the given checker.
+    fn new(checker: &'a Checker<'b>) -> Self {
+        Self {
+            checker,
+            in_protected_try: false,
+            in_with_last_statement: false,
+            in_terminal_position: false,
+        }
+    }
+}
+
+impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
@@ -185,7 +206,8 @@ impl Visitor<'_> for YieldFinallyVisitor {
                     && !self.in_with_last_statement
                     && !self.in_terminal_position
                 {
-                    self.unprotected_yields.push(expr.range());
+                    self.checker
+                        .report_diagnostic(FallibleContextManager, expr.range());
                 }
             }
             Expr::Lambda(_) => {}
@@ -194,7 +216,11 @@ impl Visitor<'_> for YieldFinallyVisitor {
     }
 }
 
-impl YieldFinallyVisitor {
+impl YieldFinallyVisitor<'_, '_> {
+    /// Visits each statement in `body`, tracking whether each is in a terminal position.
+    ///
+    /// A statement is considered terminal if it is the last in the body (when `terminal` is true)
+    /// or if it is a yield statement immediately followed by a `return`.
     fn visit_body_with_terminal(&mut self, body: &[Stmt], terminal: bool) {
         for (i, stmt) in body.iter().enumerate() {
             let is_last = i == body.len() - 1;
@@ -210,6 +236,10 @@ impl YieldFinallyVisitor {
         }
     }
 
+    /// Visits the body of a `with` statement, handling the last statement specially.
+    ///
+    /// The last statement in a `with` block inherits terminal status from the parent context
+    /// and is additionally marked as a "with last statement" if it is a yield.
     fn visit_with_body(&mut self, body: &[Stmt]) {
         if body.is_empty() {
             return;
@@ -239,6 +269,7 @@ impl YieldFinallyVisitor {
         self.in_terminal_position = prev_terminal;
     }
 
+    /// Returns `true` if the statement is an expression statement containing a `yield` or `yield from`.
     fn is_yield_statement(stmt: &Stmt) -> bool {
         matches!(
             stmt,
