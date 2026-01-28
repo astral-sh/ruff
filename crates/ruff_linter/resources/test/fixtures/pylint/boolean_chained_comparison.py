@@ -54,6 +54,18 @@ c = int(input())
 if a >= b and b >= c:  # [boolean-chained-comparison]
     pass
 
+a = int(input())
+b = int(input())
+c = int(input())
+if b > a and c >= b:  # [boolean-chained-comparison]
+    pass
+
+a = int(input())
+b = int(input())
+c = int(input())
+if a < b and c >= b:  # [boolean-chained-comparison]
+    pass
+
 # -----------------------
 # multiple fixes examples
 # -----------------------
@@ -134,7 +146,7 @@ a<b<c and c<d
 # more involved examples (all should error and fix)
 a < ( # sneaky comment
 	b
-  # more comments 
+  # more comments
 ) and b < c
 
 (
