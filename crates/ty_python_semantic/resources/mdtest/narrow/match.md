@@ -349,10 +349,10 @@ class Answer(Enum):
 
         match self:
             case Answer.YES:
-                reveal_type(self)  # revealed: Self@is_yes
+                reveal_type(self)  # revealed: Self@is_yes & Literal[Answer.YES]
                 return True
             case Answer.NO | Answer.MAYBE:
-                reveal_type(self)  # revealed: Self@is_yes & ~Literal[Answer.YES]
+                reveal_type(self)  # revealed: (Self@is_yes & Literal[Answer.NO]) | (Self@is_yes & Literal[Answer.MAYBE])
                 return False
             case _:
                 assert_never(self)  # no error
@@ -362,7 +362,7 @@ class Answer(Enum):
 
         match self:
             case Answer.YES:
-                reveal_type(self)  # revealed: Self@assert_yes
+                reveal_type(self)  # revealed: Self@assert_yes & Literal[Answer.YES]
                 return self
             case _:
                 reveal_type(self)  # revealed: Self@assert_yes & ~Literal[Answer.YES]
