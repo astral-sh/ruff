@@ -1,4 +1,5 @@
 use ruff_db::files::{File, FilePath};
+use ruff_db::parsed::parsed_string_annotation;
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
@@ -353,16 +354,15 @@ impl<'db> SemanticModel<'db> {
         &self,
         string_expr: &ExprStringLiteral,
     ) -> Option<(Parsed<ModExpression>, Self)> {
-        // String annotations can't contain string annotations
-        if self.in_string_annotation_expr.is_some() {
-            return None;
-        }
-
         // Ask the inference engine whether this is actually a string annotation
         let expr = ExprRef::StringLiteral(string_expr);
         let index = semantic_index(self.db, self.file);
-        let file_scope = index.expression_scope_id(&expr);
+        // When looking up scopes, use the expr in the top-level AST
+        // (we might be trying to enter a sub-sub-AST, so this isn't silly)
+        let file_scope = index.expression_scope_id(&self.expr_ref_in_ast(expr));
         let scope = file_scope.to_scope_id(self.db, self.file);
+        // When querying whether the expr is a string annotation, we do however use the actual expr
+        // (the inference engine should record this information even for sub-nodes)
         if !infer_complete_scope_types(self.db, scope).is_string_annotation(expr) {
             return None;
         }
@@ -374,12 +374,15 @@ impl<'db> SemanticModel<'db> {
         // are not in the File's AST!
         let source = source_text(self.db, self.file);
         let string_literal = string_expr.as_single_part_string()?;
-        let ast =
-            ruff_python_parser::parse_string_annotation(source.as_str(), string_literal).ok()?;
+        let ast = parsed_string_annotation(source.as_str(), string_literal).ok()?;
         let model = Self {
             db: self.db,
             file: self.file,
-            in_string_annotation_expr: Some(Box::new(Expr::StringLiteral(string_expr.clone()))),
+            // Use expr_in_ast here because we might be entering a sub-sub-AST
+            in_string_annotation_expr: Some(Box::new(
+                self.expr_in_ast(&Expr::StringLiteral(string_expr.clone()))
+                    .clone(),
+            )),
         };
         Some((ast, model))
     }
