@@ -2977,7 +2977,7 @@ pub(super) fn report_invalid_assignment<'db>(
             let components = qualified_name.components_excluding_self();
 
             if !components.is_empty() && components[0] == "numbers" {
-                let numeric_flag = match value_ty {
+                let is_numeric = match value_ty {
                     Type::IntLiteral(_) | Type::BooleanLiteral(_) => true,
                     Type::NominalInstance(value_instance) => {
                         let value_class = value_instance.class(context.db());
@@ -2994,7 +2994,7 @@ pub(super) fn report_invalid_assignment<'db>(
                     _ => false,
                 };
 
-                if numeric_flag {
+                if is_numeric {
                     diag.info(
                         "Types from the `numbers` module aren't supported for static type checking. \
                          Consider using a protocol instead, such as `typing.SupportsFloat`",
