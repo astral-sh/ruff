@@ -2801,22 +2801,28 @@ impl<'db> Type<'db> {
                         widening,
                     }),
                 qualifiers,
-            } => (
-                intersection
-                    .map_with_boundness(db, |elem| {
-                        Place::Defined(DefinedPlace {
-                            ty: elem
-                                .try_call_dunder_get(db, instance, owner)
-                                .map_or(*elem, |(ty, _)| ty),
-                            origin,
-                            definedness: boundness,
-                            widening,
-                        })
+            } => {
+                let mapped = intersection.map_with_boundness(db, |elem| {
+                    Place::Defined(DefinedPlace {
+                        ty: elem
+                            .try_call_dunder_get(db, instance, owner)
+                            .map_or(*elem, |(ty, _)| ty),
+                        origin,
+                        definedness: boundness,
+                        widening,
                     })
-                    .with_qualifiers(qualifiers),
-                // TODO: Discover data descriptors in intersections.
-                AttributeKind::NormalOrNonDataDescriptor,
-            ),
+                });
+                let place = if mapped.is_undefined() {
+                    attribute.place
+                } else {
+                    mapped
+                };
+                (
+                    place.with_qualifiers(qualifiers),
+                    // TODO: Discover data descriptors in intersections.
+                    AttributeKind::NormalOrNonDataDescriptor,
+                )
+            }
 
             PlaceAndQualifiers {
                 place:
@@ -12702,13 +12708,18 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
+        // For pure negation types (no positive elements), there's nothing to map.
+        if self.positive(db).is_empty() {
+            return Place::Undefined;
+        }
+
         let mut builder = IntersectionBuilder::new(db);
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
         let mut origin = TypeOrigin::Declared;
-        for ty in self.positive_elements_or_object(db) {
-            let ty_member = transform_fn(&ty);
+        for ty in self.positive(db) {
+            let ty_member = transform_fn(ty);
             match ty_member {
                 Place::Undefined => {}
                 Place::Defined(DefinedPlace {
