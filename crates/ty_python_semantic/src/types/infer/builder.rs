@@ -9161,9 +9161,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Union(union) => {
                     union.try_map(db, |element| propagate_callable_kind(db, *element, kind))
                 }
+                Type::TypeAlias(alias) => propagate_callable_kind(db, alias.value_type(db), kind),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
-                _ => None,
+                Type::Intersection(_) => None,
+                // All other types cannot have a callable kind propagated to them.
+                Type::Dynamic(_)
+                | Type::Never
+                | Type::FunctionLiteral(_)
+                | Type::BoundMethod(_)
+                | Type::KnownBoundMethod(_)
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::EnumLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)
+                | Type::TypeVar(_)
+                | Type::BoundSuper(_)
+                | Type::TypeIs(_)
+                | Type::TypeGuard(_)
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_) => None,
             }
         }
 
