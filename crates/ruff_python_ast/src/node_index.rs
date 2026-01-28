@@ -78,11 +78,14 @@ impl NodeIndex {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum NodeIndexError {
-    TooNested,
-    OutOfSubIndices,
     NoParent,
-    OutOfIndices,
+    TooNested,
+    ExhaustedSubIndices,
+    ExhaustedSubSubIndices,
+    OverflowedIndices,
+    OverflowedSubIndices,
 }
 
 const MAX_LEVEL: u32 = 2;
@@ -94,7 +97,7 @@ const SUB_SUB_NODES: u32 = 8;
 pub const MAX_REAL_INDEX: u32 = (1 << LEVEL_SHIFT) - 1;
 
 /// sub-AST level is stored in the top two bits
-fn sub_ast_level(index: u32) -> u32 {
+pub fn sub_ast_level(index: u32) -> u32 {
     (index & LEVEL_MASK) >> LEVEL_SHIFT
 }
 
@@ -106,10 +109,10 @@ pub fn sub_indices(index: u32) -> Result<(u32, u32), NodeIndexError> {
     }
     let next_level = (level + 1) << LEVEL_SHIFT;
     let without_level = index & !LEVEL_MASK;
-    let nodes_in_level = if level == 0 {
-        SUB_NODES
+    let (nodes_in_level, error_kind) = if level == 0 {
+        (SUB_NODES, NodeIndexError::OverflowedIndices)
     } else if level == 1 {
-        SUB_SUB_NODES
+        (SUB_SUB_NODES, NodeIndexError::OverflowedSubIndices)
     } else {
         unreachable!(
             "Someone made a mistake updating the encoding of node indices: {index:08X} had level {level}"
@@ -119,10 +122,10 @@ pub fn sub_indices(index: u32) -> Result<(u32, u32), NodeIndexError> {
     // If this overflows the file has hundreds of thousands of lines of code,
     // but that *can* happen (we just can't support string annotations that deep)
     let sub_index_without_level = without_level
-        .checked_mul(SUB_NODES)
-        .ok_or(NodeIndexError::OutOfIndices)?;
+        .checked_mul(nodes_in_level)
+        .ok_or(error_kind)?;
     if sub_index_without_level > MAX_REAL_INDEX {
-        return Err(NodeIndexError::OutOfIndices);
+        return Err(error_kind);
     }
 
     let first_index = sub_index_without_level | next_level;

@@ -128,12 +128,12 @@ reveal_type(Aliases.not_forward)  # revealed: str
 ```py
 a: "int" = 1
 b: "'int'" = 1
-# error: [invalid-syntax-in-forward-annotation] "Too many levels of nested string annotations"
+# error: [invalid-syntax-in-forward-annotation] "too many levels of nested string annotations, remove the redundant nested quotes"
 c: """'"int"'""" = 1
 d: "Foo"
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Foo`"
 e: "Foo" = 1
-# error: [invalid-syntax-in-forward-annotation] "too complex"
+# error: [invalid-syntax-in-forward-annotation] "nested string annotation is too long, remove the redundant nested quotes"
 f: "'str | int | bool | Foo | Bar'" = 1
 
 class Foo: ...

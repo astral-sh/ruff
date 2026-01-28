@@ -60,15 +60,21 @@ pub fn parsed_string_annotation(
     indexed::ensure_indexed(&expr, string.node_index().load()).map_err(|err| {
         let message = match err {
             NodeIndexError::NoParent => {
-                "Internal Error: string annotation's parent had no NodeIndex".to_owned()
+                "internal error: string annotation's parent had no NodeIndex".to_owned()
             }
-            NodeIndexError::OutOfIndices => {
-                "File too long, ran out of encoding space for string annotations".to_owned()
+            NodeIndexError::TooNested => "too many levels of nested string annotations, remove the redundant nested quotes".to_owned(),
+            NodeIndexError::OverflowedIndices => {
+                "file too long for string annotations, either break up the file or don't use string annotations".to_owned()
             }
-            NodeIndexError::OutOfSubIndices => {
-                "Substring annotation is too complex, ran out of encoding space".to_owned()
+            NodeIndexError::OverflowedSubIndices => {
+                "file too long for nested string annotations, remove the redundant nested quotes".to_owned()
             }
-            NodeIndexError::TooNested => "Too many levels of nested string annotations".to_owned(),
+            NodeIndexError::ExhaustedSubIndices => {
+                "string annotation is too long, consider introducing type aliases to simplify".to_owned()
+            }
+            NodeIndexError::ExhaustedSubSubIndices => {
+                "nested string annotation is too long, remove the redundant nested quotes".to_owned()
+            }
         };
 
         ParseError {
@@ -222,7 +228,12 @@ mod indexed {
         AnyNodeRef::from(parsed.syntax()).visit_source_order(&mut visitor);
 
         if visitor.overflowed {
-            return Err(NodeIndexError::OutOfSubIndices);
+            let level = sub_ast_level(parent_index);
+            if level == 0 {
+                return Err(NodeIndexError::ExhaustedSubIndices);
+            } else {
+                return Err(NodeIndexError::ExhaustedSubSubIndices);
+            }
         }
 
         Ok(())
