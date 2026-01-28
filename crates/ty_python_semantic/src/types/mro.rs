@@ -429,12 +429,12 @@ impl<'db> Mro<'db> {
         let mut seen = FxHashSet::default();
         seen.insert(self_base);
 
-        // Use a placeholder class literal for try_from_type.
+        // Use a placeholder class literal for `try_from_type`.
         let placeholder_class: ClassLiteral<'db> =
             KnownClass::Object.try_to_class_literal(db).unwrap().into();
 
         for base_type in dynamic.explicit_bases(db) {
-            // Convert Type to ClassBase, falling back to Unknown if conversion fails.
+            // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
             let base = ClassBase::try_from_type(db, *base_type, placeholder_class)
                 .unwrap_or_else(ClassBase::unknown);
 

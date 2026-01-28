@@ -651,7 +651,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Infer deferred types for all definitions.
-        // Save the definitions for later validation (some may be dynamic classes).
         let deferred_definitions: Vec<_> = std::mem::take(&mut self.deferred).into_iter().collect();
         for definition in &deferred_definitions {
             self.extend_definition(infer_deferred_types(self.db(), *definition));
@@ -7402,8 +7401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Deferred inference for assigned `type()` calls.
     ///
     /// Infers the bases argument that was skipped during initial inference to handle
-    /// forward references and recursive definitions. This matches the pattern used
-    /// by `typing.NamedTuple`.
+    /// forward references and recursive definitions.
     fn infer_builtins_type_deferred(&mut self, definition: Definition<'db>, call_expr: &ast::Expr) {
         let db = self.db();
 
@@ -7431,10 +7429,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Restore the previous context.
         self.typevar_binding_context = previous_context;
 
+        // Extract and validate bases.
+        let Some(bases) = self.extract_explicit_bases(bases_arg, bases_type) else {
+            return;
+        };
+
         // Validate individual bases for special types that aren't allowed in dynamic classes.
-        // This is local validation that doesn't require calling explicit_bases().
         let name = dynamic_class.name(db);
-        self.validate_dynamic_type_bases(bases_arg, bases_type, name);
+        self.validate_dynamic_type_bases(bases_arg, &bases, name);
     }
 
     /// Iterate over all dynamic class definitions (created using `type()` calls) to check that
@@ -7444,37 +7446,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let module = self.module();
 
-        // Find all deferred definitions that are dynamic classes.
-        // These are the `type()` calls that had deferred bases inference.
-        let dynamic_class_definitions: Vec<_> = deferred_definitions
-            .iter()
-            .filter_map(|definition| {
-                // Only check assignment definitions (type() calls).
-                let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-                    return None;
-                };
+        for definition in deferred_definitions {
+            // Only check assignment definitions (`type()` calls).
+            let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+                continue;
+            };
 
-                // Get the binding type for this definition.
-                let ty = binding_type(db, *definition);
+            // Get the binding type for this definition.
+            let ty = binding_type(db, *definition);
 
-                // Check if it's a dynamic class with a Definition anchor.
-                let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = ty else {
-                    return None;
-                };
+            // Check if it's a dynamic class with a Definition anchor.
+            let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = ty else {
+                continue;
+            };
 
-                // Only check classes with Definition anchors (assigned type() calls).
-                // Dangling type() calls are validated eagerly during inference.
-                let DynamicClassAnchor::Definition(_) = dynamic_class.anchor(db) else {
-                    return None;
-                };
+            // Only check classes with Definition anchors (i.e., assigned `type()` calls).
+            // Dangling `type()` calls are validated eagerly during inference.
+            let DynamicClassAnchor::Definition(_) = dynamic_class.anchor(db) else {
+                continue;
+            };
 
-                let value = assignment.value(module);
-                let call_expr = value.as_call_expr()?;
-                Some((dynamic_class, call_expr))
-            })
-            .collect();
+            let value = assignment.value(module);
+            let Some(call_expr) = value.as_call_expr() else {
+                continue;
+            };
 
-        for (dynamic_class, call_expr) in dynamic_class_definitions {
             self.check_dynamic_class_definition(dynamic_class, call_expr);
         }
     }
@@ -7589,7 +7585,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let db = self.db();
 
-        // A valid 3-argument type() call must have a bases argument.
+        // A valid 3-argument type() call must have a `bases` argument.
         let Some(bases) = call_expr.arguments.args.get(1) else {
             return;
         };
@@ -7597,7 +7593,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Check for MRO errors.
         if self.report_dynamic_mro_errors(dynamic_class, call_expr, bases) {
             // MRO succeeded, check for instance-layout-conflict.
-            // Compute disjoint bases from explicit_bases().
             let mut disjoint_bases = IncompatibleBases::default();
             let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
 
@@ -7832,7 +7827,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Extract name and base classes.
         let name = if let Type::StringLiteral(literal) = name_type {
-            ast::name::Name::new(literal.value(db))
+            Name::new(literal.value(db))
         } else {
             if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
@@ -7844,10 +7839,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     name_type.display(db)
                 ));
             }
-            ast::name::Name::new_static("<unknown>")
+            Name::new_static("<unknown>")
         };
 
         let scope = self.scope();
+
+        // For dangling calls, extract bases eagerly (they'll be stored in the anchor
+        // and used for validation). Also validate that bases is a tuple type.
+        let explicit_bases = bases_type.and_then(|ty| self.extract_explicit_bases(bases_arg, ty));
 
         // Create the anchor for identifying this dynamic class.
         // - For assigned `type()` calls, the Definition uniquely identifies the class,
@@ -7868,16 +7867,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_u32()
                 .expect("call node should not be NodeIndex::NONE");
 
-            // Extract explicit bases from the bases tuple type (which was inferred eagerly).
-            let explicit_bases = Self::extract_explicit_bases(
-                db,
-                bases_type.expect("bases_type should be Some for dangling calls"),
-            );
+            // Use [Unknown] as fallback if bases extraction failed (e.g., not a tuple).
+            let anchor_bases = explicit_bases
+                .clone()
+                .unwrap_or_else(|| Box::from([Type::unknown()]));
 
             DynamicClassAnchor::ScopeOffset {
                 scope,
                 offset: call_u32 - anchor_u32,
-                explicit_bases,
+                explicit_bases: anchor_bases,
             }
         };
 
@@ -7892,9 +7890,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
         // deferred along with bases inference.
-        if let Some(bases_type) = bases_type {
+        if let Some(explicit_bases) = &explicit_bases {
             // Validate bases and collect disjoint bases for diagnostics.
-            let mut disjoint_bases = self.validate_dynamic_type_bases(bases_arg, bases_type, &name);
+            let mut disjoint_bases =
+                self.validate_dynamic_type_bases(bases_arg, explicit_bases, &name);
 
             // Check for MRO errors.
             if self.report_dynamic_mro_errors(dynamic_class, call_expr, bases_arg) {
@@ -8655,16 +8654,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Extract explicit base types from a bases tuple type.
     ///
-    /// This is used for dangling `type()` calls where bases are computed eagerly
-    /// and stored directly on the `DynamicClassAnchor::ScopeOffset` variant.
-    fn extract_explicit_bases(db: &'db dyn Db, bases_type: Type<'db>) -> Box<[Type<'db>]> {
-        let Some(tuple_spec) = bases_type.tuple_instance_spec(db) else {
-            return Box::from([Type::unknown()]);
-        };
-        let Some(elements) = tuple_spec.as_fixed_length() else {
-            return Box::from([Type::unknown()]);
-        };
-        elements.elements_slice().iter().copied().collect()
+    /// Emits a diagnostic if `bases_type` is not a valid tuple type.
+    ///
+    /// Returns `None` if the bases cannot be extracted.
+    fn extract_explicit_bases(
+        &mut self,
+        bases_node: &ast::Expr,
+        bases_type: Type<'db>,
+    ) -> Option<Box<[Type<'db>]>> {
+        let db = self.db();
+        // Check if bases_type is a tuple; emit diagnostic if not.
+        if bases_type.tuple_instance_spec(db).is_none()
+            && !bases_type.is_assignable_to(
+                db,
+                Type::homogeneous_tuple(db, KnownClass::Type.to_instance(db)),
+            )
+            && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
+        {
+            let mut diagnostic =
+                builder.into_diagnostic("Invalid argument to parameter 2 (`bases`) of `type()`");
+            diagnostic.set_primary_message(format_args!(
+                "Expected `tuple[type, ...]`, found `{}`",
+                bases_type.display(db)
+            ));
+        }
+        bases_type.fixed_tuple_elements(db)
     }
 
     /// Validate base classes from the second argument of a `type()` call.
@@ -8677,52 +8691,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn validate_dynamic_type_bases(
         &mut self,
         bases_node: &ast::Expr,
-        bases_type: Type<'db>,
-        name: &ast::name::Name,
+        bases: &[Type<'db>],
+        name: &Name,
     ) -> IncompatibleBases<'db> {
         let db = self.db();
 
         // Get AST nodes for base expressions (for diagnostics).
         let bases_tuple_elts = bases_node.as_tuple_expr().map(|t| t.elts.as_slice());
 
-        // We use a placeholder class literal for try_from_type (the subclass parameter is only
+        // We use a placeholder class literal for `try_from_type` (the subclass parameter is only
         // used for Protocol/TypedDict detection which doesn't apply here).
         let placeholder_class: ClassLiteral<'db> =
             KnownClass::Object.try_to_class_literal(db).unwrap().into();
 
         let mut disjoint_bases = IncompatibleBases::default();
 
-        let Some(tuple_spec) = bases_type.tuple_instance_spec(db) else {
-            // The `bases` argument is not a tuple. Emit a diagnostic.
-            if !bases_type.is_assignable_to(
-                db,
-                Type::homogeneous_tuple(db, KnownClass::Type.to_instance(db)),
-            ) {
-                if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
-                {
-                    let mut diagnostic = builder
-                        .into_diagnostic("Invalid argument to parameter 2 (`bases`) of `type()`");
-                    diagnostic.set_primary_message(format_args!(
-                        "Expected `tuple[type, ...]`, found `{}`",
-                        bases_type.display(db)
-                    ));
-                }
-            }
-            return disjoint_bases;
-        };
-        let Some(tuple) = tuple_spec.as_fixed_length() else {
-            return disjoint_bases;
-        };
-
         // Check each base for special cases that are not allowed for dynamic classes.
-        for (idx, base) in tuple.elements_slice().iter().enumerate() {
+        for (idx, base) in bases.iter().enumerate() {
             let diagnostic_node = bases_tuple_elts
                 .and_then(|elts| elts.get(idx))
                 .unwrap_or(bases_node);
 
             // Try to convert to ClassBase to check for special cases.
             let Some(class_base) = ClassBase::try_from_type(db, *base, placeholder_class) else {
-                // Can't convert - will be handled by InvalidBases error from try_mro.
+                // Can't convert; will be handled by `InvalidBases` error from `try_mro`.
                 continue;
             };
 

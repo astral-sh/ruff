@@ -5163,14 +5163,9 @@ impl<'db> DynamicClassLiteral<'db> {
 
             // For variable-length tuples (like `tuple[type, ...]`), we can't statically
             // determine the bases, so return Unknown.
-            let Some(tuple_spec) = bases_type.tuple_instance_spec(db) else {
-                return Box::from([Type::unknown()]);
-            };
-            let Some(elements) = tuple_spec.as_fixed_length() else {
-                return Box::from([Type::unknown()]);
-            };
-
-            elements.elements_slice().iter().copied().collect()
+            bases_type
+                .fixed_tuple_elements(db)
+                .unwrap_or_else(|| Box::from([Type::unknown()]))
         }
 
         match self.anchor(db) {
