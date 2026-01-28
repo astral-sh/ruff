@@ -9,11 +9,12 @@
     "dev:build": "npm run dev:build --workspace ty-playground && npm run dev:build --workspace ruff-playground",
     "fmt": "prettier --cache -w .",
     "fmt:check": "prettier --cache --check .",
-    "lint": "eslint --cache --ext .ts,.tsx ruff/src ty/src",
+    "lint": "eslint --cache --ext .ts,.tsx ruff/src ty/src ty-embed/src",
     "tsc": "tsc"
   },
   "workspaces": [
     "ty",
+    "ty-embed",
     "ruff",
     "shared"
   ],
