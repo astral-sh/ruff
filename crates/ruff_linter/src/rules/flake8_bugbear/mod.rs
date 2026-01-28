@@ -73,6 +73,7 @@ mod tests {
     #[test_case(Rule::LoopIteratorMutation, Path::new("B909.py"))]
     #[test_case(Rule::MutableContextvarDefault, Path::new("B039.py"))]
     #[test_case(Rule::BatchedWithoutExplicitStrict, Path::new("B911.py"))]
+    #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -83,7 +84,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
