@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
@@ -24,10 +24,10 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
+    CallableType, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionType, declaration_type, walk_type_var_bounds,
+    UnionType, declaration_type, walk_callable_type, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -481,6 +481,149 @@ impl<'db> GenericContext<'db> {
             return None;
         }
         Some(Self::from_typevar_instances(db, variables))
+    }
+
+    pub(crate) fn remove_callable_only_typevars(
+        db: &'db dyn Db,
+        generic_context: Option<Self>,
+        parameters: &Parameters<'db>,
+        return_type: Type<'db>,
+    ) -> (Option<Self>, Type<'db>) {
+        #[derive(Default)]
+        struct TypeVarLocations<'db> {
+            found_outside_callable_return: FxHashSet<BoundTypeVarInstance<'db>>,
+            found_inside_callable_return:
+                FxHashMap<CallableType<'db>, FxOrderSet<BoundTypeVarInstance<'db>>>,
+        }
+
+        impl<'db> TypeVarLocations<'db> {
+            fn finalize(
+                self,
+                db: &'db dyn Db,
+            ) -> (
+                FxHashSet<BoundTypeVarInstance<'db>>,
+                FxHashMap<CallableType<'db>, CallableType<'db>>,
+            ) {
+                let mut found_only_inside_callable_return = FxHashSet::default();
+                let replacements = self
+                    .found_inside_callable_return
+                    .into_iter()
+                    .filter_map(|(callable, mut bound_typevars)| {
+                        // Only keep the typevars that appear _only_ in this callable.
+                        bound_typevars.retain(|bound_typevar| {
+                            !self.found_outside_callable_return.contains(bound_typevar)
+                        });
+                        if bound_typevars.is_empty() {
+                            return None;
+                        }
+
+                        found_only_inside_callable_return.extend(bound_typevars.iter().copied());
+
+                        let generic_context =
+                            GenericContext::from_typevar_instances(db, bound_typevars);
+                        let signatures = callable
+                            .signatures(db)
+                            .with_inherited_generic_context(db, generic_context);
+                        let replacement = CallableType::new(db, signatures, callable.kind(db));
+                        Some((callable, replacement))
+                    })
+                    .collect();
+                (found_only_inside_callable_return, replacements)
+            }
+        }
+
+        struct FindTypeVarLocations<'db> {
+            locations: RefCell<TypeVarLocations<'db>>,
+            recursion_guard: TypeCollector<'db>,
+            in_return_type: Cell<bool>,
+            in_callable_type: Cell<Option<CallableType<'db>>>,
+        }
+
+        impl<'db> TypeVisitor<'db> for FindTypeVarLocations<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                let bound_typevar = if bound_typevar.is_paramspec(db) {
+                    bound_typevar.without_paramspec_attr(db)
+                } else {
+                    bound_typevar
+                };
+
+                let mut locations = self.locations.borrow_mut();
+                if self.in_return_type.get()
+                    && let Some(callable) = self.in_callable_type.get()
+                {
+                    locations
+                        .found_inside_callable_return
+                        .entry(callable)
+                        .or_default()
+                        .insert(bound_typevar);
+                } else {
+                    locations
+                        .found_outside_callable_return
+                        .insert(bound_typevar);
+                }
+            }
+
+            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+                // Note: We only consider the outermost Callables in the return type.
+                if self.in_return_type.get() && self.in_callable_type.get().is_none() {
+                    self.in_callable_type.set(Some(callable));
+                    walk_callable_type(db, callable, self);
+                    self.in_callable_type.set(None);
+                } else {
+                    walk_callable_type(db, callable, self);
+                }
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        // If the function in question is not generic, then there are no typevars, and we don't
+        // have to worry about which ones appear in return type Callables.
+        let Some(generic_context) = generic_context else {
+            return (None, return_type);
+        };
+
+        // Find which typevars appear only inside a Callable in the return type annotation.
+        let find_typevar_locations = FindTypeVarLocations {
+            locations: RefCell::default(),
+            recursion_guard: TypeCollector::default(),
+            in_return_type: Cell::new(false),
+            in_callable_type: Cell::new(None),
+        };
+        for param in parameters {
+            find_typevar_locations.visit_type(db, param.annotated_type());
+        }
+        find_typevar_locations.in_return_type.set(true);
+        find_typevar_locations.visit_type(db, return_type);
+
+        // Then update those Callables to be generic.
+        let (found_only_inside_callable_return, replacements) =
+            find_typevar_locations.locations.into_inner().finalize(db);
+        let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
+        let return_type = return_type.apply_type_mapping(db, &type_mapping, TypeContext::default());
+
+        // And lastly remove those typevars from the function's generic context.
+        let mut kept_typevars = generic_context
+            .variables(db)
+            .filter(|bound_typevar| !found_only_inside_callable_return.contains(bound_typevar))
+            .peekable();
+        let generic_context = if kept_typevars.peek().is_none() {
+            None
+        } else {
+            Some(GenericContext::from_typevar_instances(db, kept_typevars))
+        };
+
+        (generic_context, return_type)
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {

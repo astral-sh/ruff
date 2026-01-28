@@ -100,15 +100,12 @@ def decorator_factory[T]() -> Callable[[T], T]:
     return decorator
 
 # Note that `decorator_factory` returns a generic callable, but is not itself generic!
-# TODO: revealed: None
-# revealed: ty_extensions.GenericContext[T@decorator_factory]
+# revealed: None
 reveal_type(generic_context(decorator_factory))
 
-# TODO: revealed: [T](T, /) -> T
-# revealed: (Unknown, /) -> Unknown
+# revealed: [T](T, /) -> T
 reveal_type(decorator_factory())
-# TODO: revealed: ty_extensions.GenericContext[T@bind_context_tbd]
-# revealed: None
+# revealed: ty_extensions.GenericContext[T@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 ```
 

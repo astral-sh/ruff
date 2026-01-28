@@ -2,6 +2,7 @@ use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
+use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -6110,7 +6111,8 @@ impl<'db> Type<'db> {
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
                         TypeMapping::ReplaceParameterDefaults |
-                        TypeMapping::EagerExpansion => self,
+                        TypeMapping::EagerExpansion |
+                        TypeMapping::RescopeReturnCallables(_) => self,
                     }
                 }
                 KnownInstanceType::UnionType(instance) => {
@@ -6333,6 +6335,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
             }
@@ -6345,7 +6348,8 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
                 TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion => self,
+                TypeMapping::EagerExpansion |
+                TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -7039,6 +7043,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
+
+    /// Updates any `Callable` types in a function signature return type to be generic if possible.
+    RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -7073,7 +7080,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
-            | TypeMapping::EagerExpansion => context,
+            | TypeMapping::EagerExpansion
+            | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf {
                 binding_context, ..
             } => context.remove_self(db, *binding_context),
@@ -7107,7 +7115,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
-            | TypeMapping::EagerExpansion => self.clone(),
+            | TypeMapping::EagerExpansion
+            | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
 }
@@ -8749,7 +8758,8 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
-            | TypeMapping::EagerExpansion => Type::TypeVar(self),
+            | TypeMapping::EagerExpansion
+            | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
             }
@@ -10661,6 +10671,10 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
+            return replacements.get(&self).copied().unwrap_or(self);
+        }
+
         CallableType::new(
             db,
             self.signatures(db)
