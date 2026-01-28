@@ -11,10 +11,12 @@ name, and not just by its numeric position within the tuple:
 from typing import NamedTuple, Sequence
 from ty_extensions import static_assert, is_subtype_of, is_assignable_to, reveal_mro
 
+
 class Person(NamedTuple):
     id: int
     name: str
     age: int | None = None
+
 
 alice = Person(1, "Alice", 42)
 alice = Person(id=1, name="Alice", age=42)
@@ -185,9 +187,11 @@ a "dangling call". The types are still properly inferred:
 ```py
 from typing import NamedTuple
 
+
 class Point(NamedTuple("Point", [("x", int), ("y", int)])):
     def magnitude(self) -> float:
         return (self.x**2 + self.y**2) ** 0.5
+
 
 p = Point(3, 4)
 reveal_type(p.x)  # revealed: int
@@ -201,16 +205,24 @@ same scope. This allows recursive types:
 ```py
 from typing import NamedTuple
 
+
 class Node(NamedTuple("Node", [("value", int), ("next", "Node | None")])):
     pass
+
 
 n = Node(1, None)
 reveal_type(n.value)  # revealed: int
 reveal_type(n.next)  # revealed: Node | None
 
+
 class A(NamedTuple("A", [("x", "B | None")])): ...
+
+
 class B(NamedTuple("B", [("x", "C")])): ...
+
+
 class C(NamedTuple("C", [("x", "A")])): ...
+
 
 reveal_type(A(x=B(x=C(x=A(x=None)))))  # revealed: A
 
@@ -228,11 +240,13 @@ internal NamedTuple name (if different from the class name) won't work:
 ```py
 from typing import NamedTuple
 
+
 # The string "X" in "next"'s type refers to the internal name, not "BadNode", so it won't resolve:
 #
 # error: [unresolved-reference] "Name `X` used when not defined"
 class BadNode(NamedTuple("X", [("value", int), ("next", "X | None")])):
     pass
+
 
 n = BadNode(1, None)
 reveal_type(n.value)  # revealed: int
@@ -245,9 +259,11 @@ Dangling calls cannot contain other dangling calls; that's an invalid type form:
 ```py
 from ty_extensions import reveal_mro
 
+
 # error: [invalid-type-form]
 class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A" | None)]))])):
     pass
+
 
 # revealed: (<class 'A'>, <class 'B'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
@@ -371,8 +387,10 @@ Similarly for `collections.namedtuple`:
 import collections
 from ty_extensions import reveal_mro
 
+
 def get_field_names() -> tuple[str, *tuple[str, ...]]:
     return ("x", "y")
+
 
 field_names = get_field_names()
 NT = collections.namedtuple("NT", field_names)
@@ -393,8 +411,10 @@ properly inherited:
 from typing import NamedTuple
 from ty_extensions import reveal_mro
 
+
 class Url(NamedTuple("Url", [("host", str), ("path", str)])):
     pass
+
 
 reveal_type(Url)  # revealed: <class 'Url'>
 # revealed: (<class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:7'>, <class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:11'>, <class 'tuple[str, str]'>, <class 'Sequence[str]'>, <class 'Reversible[str]'>, <class 'Collection[str]'>, <class 'Iterable[str]'>, <class 'Container[str]'>, typing.Protocol, typing.Generic, <class 'object'>)
@@ -421,11 +441,13 @@ Subclasses can add methods that use inherited fields:
 from typing import NamedTuple
 from typing_extensions import Self
 
+
 class Url(NamedTuple("Url", [("host", str), ("port", int)])):
     def with_port(self, port: int) -> Self:
         reveal_type(self.host)  # revealed: str
         reveal_type(self.port)  # revealed: int
         return self._replace(port=port)
+
 
 url = Url("localhost", 8080)
 reveal_type(url.with_port(9000))  # revealed: Url
@@ -437,6 +459,7 @@ outer class is just a regular class inheriting from it. This is equivalent to:
 ```py
 class _Foo(NamedTuple): ...
 
+
 class Foo(_Foo):  # Regular class, not a namedtuple
     ...
 ```
@@ -447,6 +470,7 @@ Because the outer class is not itself a namedtuple, it can use `super()` and ove
 from collections import namedtuple
 from typing import NamedTuple
 
+
 class ExtType(namedtuple("ExtType", "code data")):
     """Override __new__ to add validation."""
 
@@ -455,6 +479,7 @@ class ExtType(namedtuple("ExtType", "code data")):
             raise TypeError("code must be int")
         return super().__new__(cls, code, data)
 
+
 class Url(NamedTuple("Url", [("host", str), ("path", str)])):
     """Override __new__ to normalize the path."""
 
@@ -462,6 +487,7 @@ class Url(NamedTuple("Url", [("host", str), ("path", str)])):
         if path and not path.startswith("/"):
             path = "/" + path
         return super().__new__(cls, host, path)
+
 
 # Both work correctly.
 ext = ExtType(42, b"hello")
@@ -481,6 +507,7 @@ from typing import NamedTuple
 from typing_extensions import Self
 
 fields = [("host", str), ("port", int)]
+
 
 # error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 class Url(NamedTuple("Url", fields)):
@@ -876,12 +903,14 @@ Fields without default values must come before fields with.
 ```py
 from typing import NamedTuple
 
+
 class Location(NamedTuple):
     altitude: float = 0.0
     # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `latitude` defined here without a default value"
     latitude: float
     # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `longitude` defined here without a default value"
     longitude: float
+
 
 class StrangeLocation(NamedTuple):
     altitude: float
@@ -890,6 +919,7 @@ class StrangeLocation(NamedTuple):
     altitude: float = 0.0
     latitude: float  # error: [invalid-named-tuple]
     longitude: float  # error: [invalid-named-tuple]
+
 
 class VeryStrangeLocation(NamedTuple):
     altitude: float = 0.0
@@ -907,9 +937,11 @@ Multiple inheritance is not supported for `NamedTuple` classes except with `Gene
 ```py
 from typing import NamedTuple, Protocol
 
+
 # error: [invalid-named-tuple] "NamedTuple class `C` cannot use multiple inheritance except with `Generic[]`"
 class C(NamedTuple, object):
     id: int
+
 
 # fmt: off
 
@@ -919,6 +951,7 @@ class D(
 ): ...
 
 # fmt: on
+
 
 # error: [invalid-named-tuple]
 class E(NamedTuple, Protocol): ...
@@ -932,11 +965,14 @@ from abc import ABC
 from collections import namedtuple
 from typing import NamedTuple
 
+
 class Point(namedtuple("Point", ["x", "y"]), ABC):
     """No error - functional namedtuple inheritance allows multiple inheritance."""
 
+
 class Url(NamedTuple("Url", [("host", str), ("port", int)]), ABC):
     """No error - typing.NamedTuple functional syntax also allows multiple inheritance."""
+
 
 p = Point(1, 2)
 reveal_type(p.x)  # revealed: Any
@@ -956,10 +992,12 @@ methods (`__lt__`, `__le__`, `__gt__`, `__ge__`).
 from collections import namedtuple
 from typing import NamedTuple
 
+
 # typing.NamedTuple inherits tuple methods
 class Point(NamedTuple):
     x: int
     y: int
+
 
 p = Point(1, 2)
 reveal_type(p.count(1))  # revealed: int
@@ -980,9 +1018,11 @@ from collections import namedtuple
 from functools import total_ordering
 from typing import NamedTuple
 
+
 # No error - __lt__ is inherited from the tuple base class
 @total_ordering
 class Point(namedtuple("Point", "x y")): ...
+
 
 p1 = Point(1, 2)
 p2 = Point(3, 4)
@@ -990,11 +1030,13 @@ p2 = Point(3, 4)
 reveal_type(p1 < p2)  # revealed: Any | Literal[False]
 reveal_type(p1 <= p2)  # revealed: Any | Literal[True]
 
+
 # Same for typing.NamedTuple - no error
 @total_ordering
 class Person(NamedTuple):
     name: str
     age: int
+
 
 alice = Person("Alice", 30)
 bob = Person("Bob", 25)
@@ -1010,12 +1052,15 @@ synthesized `__new__` signature:
 ```py
 from typing import NamedTuple
 
+
 class User(NamedTuple):
     id: int
     name: str
 
+
 class SuperUser(User):
     level: int
+
 
 # This is fine:
 alice = SuperUser(1, "Alice")
@@ -1032,11 +1077,13 @@ flagged.
 ```py
 from typing import NamedTuple
 
+
 class User(NamedTuple):
     id: int
     name: str
     age: int | None
     nickname: str
+
 
 class SuperUser(User):
     # TODO: this should be an error because it implies that the `id` attribute on
@@ -1058,6 +1105,7 @@ class SuperUser(User):
 
         # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
         self.nickname = "Bob"
+
 
 james = SuperUser(0, "James", 42, "Jimmy")
 
@@ -1139,9 +1187,11 @@ The following attributes are available on `NamedTuple` classes / instances:
 ```py
 from typing import NamedTuple
 
+
 class Person(NamedTuple):
     name: str
     age: int | None = None
+
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
@@ -1170,11 +1220,14 @@ from typing import NamedTuple, Generic, TypeVar
 
 T = TypeVar("T")
 
+
 class Box(NamedTuple, Generic[T]):
     content: T
 
+
 class IntBox(Box[int]):
     pass
+
 
 reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 ```
@@ -1224,6 +1277,7 @@ from typing_extensions import Self
 
 field_names = ["host", "port"]
 
+
 class Url(namedtuple("Url", field_names)):
     def with_port(self, port: int) -> Self:
         # Fields are unknown, so attribute access returns `Any`.
@@ -1267,7 +1321,9 @@ At runtime, `NamedTuple` is a function, and we understand this:
 import types
 import typing
 
+
 def expects_functiontype(x: types.FunctionType): ...
+
 
 expects_functiontype(typing.NamedTuple)
 ```
@@ -1300,8 +1356,10 @@ def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x.__add__)
     reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
 
+
 def _(y: type[typing.NamedTuple]):
     reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+
 
 # error: [invalid-type-form] "Special form `typing.NamedTuple` expected no type parameter"
 def _(z: typing.NamedTuple[int]): ...
@@ -1315,9 +1373,11 @@ all NamedTuple implementations automatically compatible:
 from typing import NamedTuple, Protocol, Iterable, Any
 from ty_extensions import static_assert, is_assignable_to
 
+
 class Point(NamedTuple):
     x: int
     y: int
+
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
@@ -1342,6 +1402,7 @@ static_assert(is_assignable_to(NamedTuple, tuple))
 static_assert(is_assignable_to(NamedTuple, tuple[object, ...]))
 static_assert(is_assignable_to(NamedTuple, tuple[Any, ...]))
 
+
 def expects_tuple(x: tuple[object, ...]): ...
 def _(x: NamedTuple):
     expects_tuple(x)  # fine
@@ -1355,11 +1416,13 @@ This is a regression test for <https://github.com/astral-sh/ty/issues/322>. Make
 ```py
 from typing import NamedTuple
 
+
 class Vec2(NamedTuple):
     x: float = 0.0
     y: float = 0.0
 
     def __getattr__(self, attrs: str): ...
+
 
 Vec2(0.0, 0.0)
 ```
@@ -1372,6 +1435,7 @@ Using `super()` in a method of a `NamedTuple` class will raise an exception at r
 
 ```py
 from typing import NamedTuple
+
 
 class F(NamedTuple):
     x: int
@@ -1411,8 +1475,10 @@ However, classes that **inherit from** a `NamedTuple` class (but don't directly 
 ```py
 from typing import NamedTuple
 
+
 class Base(NamedTuple):
     x: int
+
 
 class Child(Base):
     def method(self):
@@ -1432,8 +1498,10 @@ Using `super()` on a `NamedTuple` class also works fine if it occurs outside the
 ```py
 from typing import NamedTuple
 
+
 class F(NamedTuple):
     x: int
+
 
 super(F, F(42))  # fine
 ```
@@ -1445,12 +1513,15 @@ super(F, F(42))  # fine
 ```py
 from typing import NamedTuple
 
+
 class Foo(NamedTuple):
     # error: [invalid-named-tuple] "NamedTuple field `_bar` cannot start with an underscore"
     _bar: int
 
+
 class Bar(NamedTuple):
     x: int
+
 
 class Baz(Bar):
     _whatever: str  # `Baz` is not a NamedTuple class, so this is fine
@@ -1486,6 +1557,7 @@ assign to these attributes (without type annotations) will raise an `AttributeEr
 ```py
 from typing import NamedTuple
 
+
 class F(NamedTuple):
     x: int
 
@@ -1519,6 +1591,7 @@ However, other attributes (including those starting with underscores) can be ass
 ```py
 from typing import NamedTuple
 
+
 class G(NamedTuple):
     x: int
 
@@ -1535,6 +1608,7 @@ underscore field name check):
 ```py
 from typing import NamedTuple
 
+
 class H(NamedTuple):
     x: int
     # This is a field declaration, not an override. It's not flagged as an override,
@@ -1548,6 +1622,7 @@ The check also applies to assignments within conditional blocks:
 ```py
 from typing import NamedTuple
 
+
 class I(NamedTuple):
     x: int
 
@@ -1560,6 +1635,7 @@ Method definitions with prohibited names are also flagged:
 
 ```py
 from typing import NamedTuple
+
 
 class J(NamedTuple):
     x: int
@@ -1580,8 +1656,10 @@ not subject to these restrictions:
 ```py
 from typing import NamedTuple
 
+
 class Base(NamedTuple):
     x: int
+
 
 class Child(Base):
     # This is fine - Child is not directly a NamedTuple
@@ -1597,6 +1675,7 @@ instantiating the class at runtime:
 from dataclasses import dataclass
 from typing import NamedTuple
 
+
 @dataclass
 # error: [invalid-dataclass] "`NamedTuple` class `Foo` cannot be decorated with `@dataclass`"
 class Foo(NamedTuple):
@@ -1610,6 +1689,7 @@ The same error occurs with `dataclasses.dataclass` used with parentheses:
 from dataclasses import dataclass
 from typing import NamedTuple
 
+
 @dataclass()
 # error: [invalid-dataclass]
 class Bar(NamedTuple):
@@ -1621,6 +1701,7 @@ It also applies when using `frozen=True` or other dataclass parameters:
 ```py
 from dataclasses import dataclass
 from typing import NamedTuple
+
 
 @dataclass(frozen=True)
 # error: [invalid-dataclass]
@@ -1634,8 +1715,10 @@ Classes that inherit from a `NamedTuple` class also cannot be decorated with `@d
 from dataclasses import dataclass
 from typing import NamedTuple
 
+
 class Base(NamedTuple):
     x: int
+
 
 @dataclass
 # error: [invalid-dataclass]
@@ -1650,10 +1733,12 @@ from dataclasses import dataclass
 from collections import namedtuple
 from typing import NamedTuple
 
+
 @dataclass
 # error: [invalid-dataclass]
 class Foo(namedtuple("Foo", ["x", "y"])):
     pass
+
 
 @dataclass
 # error: [invalid-dataclass]
@@ -1678,8 +1763,10 @@ X = dataclass(NamedTuple("X", [("x", int)]))
 ```py
 from typing import NamedTuple
 
+
 def coinflip() -> bool:
     return True
+
 
 class Foo(NamedTuple):
     if coinflip():
@@ -1700,9 +1787,11 @@ This is a regression test for <https://github.com/astral-sh/ty/issues/2522>.
 from typing import NamedTuple, Generic, TypeVar
 from typing_extensions import Self
 
+
 class Base(NamedTuple):
     x: int
     y: int
+
 
 class Child(Base):
     def __new__(cls, x: int, y: int) -> Self:
@@ -1710,12 +1799,15 @@ class Child(Base):
         reveal_type(instance)  # revealed: Self@__new__
         return instance
 
+
 reveal_type(Child(1, 2))  # revealed: Child
 
 T = TypeVar("T")
 
+
 class GenericBase(NamedTuple, Generic[T]):
     x: T
+
 
 class ConcreteChild(GenericBase[str]):
     def __new__(cls, x: str) -> "ConcreteChild":
@@ -1723,11 +1815,13 @@ class ConcreteChild(GenericBase[str]):
         reveal_type(instance)  # revealed: Self@__new__
         return instance
 
+
 class GenericChild(GenericBase[T]):
     def __new__(cls, x: T) -> Self:
         instance = super().__new__(cls, x)
         reveal_type(instance)  # revealed: @Todo(super in generic class)
         return instance
+
 
 reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]
 ```

@@ -98,10 +98,12 @@ def exhaustiveness_using_containment_checks():
 from enum import Enum
 from typing import assert_never
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
+
 
 def if_else_exhaustive(x: Color):
     if x == Color.RED:
@@ -115,6 +117,7 @@ def if_else_exhaustive(x: Color):
 
         assert_never(x)
 
+
 def if_else_exhaustive_no_assertion(x: Color) -> int:
     if x == Color.RED:
         return 1
@@ -122,6 +125,7 @@ def if_else_exhaustive_no_assertion(x: Color) -> int:
         return 2
     elif x == Color.BLUE:
         return 3
+
 
 def if_else_non_exhaustive(x: Color):
     if x == Color.RED:
@@ -133,6 +137,7 @@ def if_else_non_exhaustive(x: Color):
 
         # this diagnostic is correct: inferred type of `x` is `Literal[Color.GREEN]`
         assert_never(x)  # error: [type-assertion-failure]
+
 
 def match_exhaustive(x: Color):
     match x:
@@ -147,6 +152,7 @@ def match_exhaustive(x: Color):
 
             assert_never(x)
 
+
 def match_exhaustive_2(x: Color):
     match x:
         case Color.RED:
@@ -158,6 +164,7 @@ def match_exhaustive_2(x: Color):
 
             assert_never(x)
 
+
 def match_exhaustive_no_assertion(x: Color) -> int:
     match x:
         case Color.RED:
@@ -166,6 +173,7 @@ def match_exhaustive_no_assertion(x: Color) -> int:
             return 2
         case Color.BLUE:
             return 3
+
 
 def match_non_exhaustive(x: Color):
     match x:
@@ -384,6 +392,7 @@ def no_invalid_return_diagnostic_here_either[T](x: A[T]) -> ASub[T]:
 ```py
 from typing import assert_never
 
+
 def as_pattern_exhaustive(subject: int | str):
     match subject:
         case int() as x:
@@ -394,6 +403,7 @@ def as_pattern_exhaustive(subject: int | str):
             no_diagnostic_here
 
             assert_never(subject)
+
 
 def as_pattern_non_exhaustive(subject: int | str):
     match subject:
@@ -410,6 +420,7 @@ def as_pattern_non_exhaustive(subject: int | str):
 
 ```py
 from enum import Enum
+
 
 class Answer(Enum):
     YES = "yes"

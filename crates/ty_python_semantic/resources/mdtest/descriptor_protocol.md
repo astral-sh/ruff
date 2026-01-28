@@ -16,6 +16,7 @@ descriptor that returns a constant value:
 ```py
 from typing import Literal
 
+
 class Ten:
     def __get__(self, instance: object, owner: type | None = None) -> Literal[10]:
         return 10
@@ -23,8 +24,10 @@ class Ten:
     def __set__(self, instance: object, value: Literal[10]) -> None:
         pass
 
+
 class C:
     ten: Ten = Ten()
+
 
 c = C()
 
@@ -66,8 +69,10 @@ class FlexibleInt:
     def __set__(self, instance: object, value: int | str) -> None:
         self._value = int(value)
 
+
 class C:
     flexible_int: FlexibleInt = FlexibleInt()
+
 
 c = C()
 
@@ -97,6 +102,7 @@ non-data descriptors.
 ```py
 from typing import Literal
 
+
 class DataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
         return "data"
@@ -104,9 +110,11 @@ class DataDescriptor:
     def __set__(self, instance: object, value: int) -> None:
         pass
 
+
 class NonDataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
         return "non-data"
+
 
 class C:
     data_descriptor = DataDescriptor()
@@ -122,6 +130,7 @@ class C:
         # However, for non-data descriptors, instance attributes do take precedence.
         # So it is possible to override them.
         self.non_data_descriptor = 1
+
 
 c = C()
 
@@ -148,12 +157,14 @@ all possible results accordingly. We start by defining a data and a non-data des
 ```py
 from typing import Literal
 
+
 class DataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
         return "data"
 
     def __set__(self, instance: object, value: int) -> None:
         pass
+
 
 class NonDataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
@@ -186,7 +197,9 @@ descriptor here:
 class C2:
     def f(self):
         self.attr = "normal"
+
     attr = NonDataDescriptor()
+
 
 reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
 
@@ -201,13 +214,16 @@ Descriptors only work when used as class variables. When put in instances, they 
 ```py
 from typing import Literal
 
+
 class Ten:
     def __get__(self, instance: object, owner: type | None = None) -> Literal[10]:
         return 10
 
+
 class C:
     def __init__(self):
         self.ten: Ten = Ten()
+
 
 reveal_type(C().ten)  # revealed: Ten
 
@@ -233,12 +249,14 @@ To verify this, we define a data and a non-data descriptor:
 ```py
 from typing import Literal, Any
 
+
 class DataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
         return "data"
 
     def __set__(self, instance: object, value: int) -> None:
         pass
+
 
 class NonDataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
@@ -253,9 +271,11 @@ class Meta1(type):
     meta_data_descriptor: DataDescriptor = DataDescriptor()
     meta_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
 
+
 class C1(metaclass=Meta1):
     class_data_descriptor: DataDescriptor = DataDescriptor()
     class_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
+
 
 reveal_type(C1.meta_data_descriptor)  # revealed: Literal["data"]
 reveal_type(C1.meta_non_data_descriptor)  # revealed: Literal["non-data"]
@@ -293,6 +313,7 @@ class Meta2(type):
     meta_data_descriptor1: DataDescriptor = DataDescriptor()
     meta_data_descriptor2: DataDescriptor = DataDescriptor()
 
+
 class ClassLevelDataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["class level data descriptor"]:
         return "class level data descriptor"
@@ -300,9 +321,11 @@ class ClassLevelDataDescriptor:
     def __set__(self, instance: object, value: str) -> None:
         pass
 
+
 class C2(metaclass=Meta2):
     meta_data_descriptor1: Literal["value on class"] = "value on class"
     meta_data_descriptor2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
+
 
 reveal_type(C2.meta_data_descriptor1)  # revealed: Literal["data"]
 reveal_type(C2.meta_data_descriptor2)  # revealed: Literal["data"]
@@ -326,11 +349,13 @@ class Meta3(type):
     meta_non_data_descriptor1: NonDataDescriptor = NonDataDescriptor()
     meta_non_data_descriptor2: NonDataDescriptor = NonDataDescriptor()
 
+
 class C3(metaclass=Meta3):
     meta_attribute1: Literal["value on class"] = "value on class"
     meta_attribute2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
     meta_non_data_descriptor1: Literal["value on class"] = "value on class"
     meta_non_data_descriptor2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
+
 
 reveal_type(C3.meta_attribute1)  # revealed: Literal["value on class"]
 reveal_type(C3.meta_attribute2)  # revealed: Literal["class level data descriptor"]
@@ -346,7 +371,9 @@ class Meta4(type):
     meta_attribute: Literal["value on metaclass"] = "value on metaclass"
     meta_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
 
+
 class C4(metaclass=Meta4): ...
+
 
 reveal_type(C4.meta_attribute)  # revealed: Literal["value on metaclass"]
 reveal_type(C4.meta_non_data_descriptor)  # revealed: Literal["non-data"]
@@ -385,6 +412,7 @@ metaclass attribute (unless it's a data descriptor, which always takes precedenc
 
 ```py
 from typing import Any
+
 
 def _(flag: bool):
     class Meta6(type):
@@ -448,6 +476,7 @@ when it is accessed on an instance. A real-world example of this is the `__get__
 ```py
 from typing_extensions import Literal, LiteralString, overload
 
+
 class Descriptor:
     @overload
     def __get__(self, instance: None, owner: type, /) -> Literal["called on class object"]: ...
@@ -459,8 +488,10 @@ class Descriptor:
         else:
             return "called on class object"
 
+
 class C:
     d: Descriptor = Descriptor()
+
 
 reveal_type(C.d)  # revealed: Literal["called on class object"]
 
@@ -479,12 +510,15 @@ class SomeCallable:
     def __call__(self, x: int) -> str:
         return "a"
 
+
 class Descriptor:
     def __get__(self, instance: object, owner: type | None = None) -> SomeCallable:
         return SomeCallable()
 
+
 class B:
     __call__: Descriptor = Descriptor()
+
 
 b_instance = B()
 reveal_type(b_instance(1))  # revealed: str
@@ -511,6 +545,7 @@ class C:
     @name.setter
     def name(self, value: str | None) -> None:
         self._value = value
+
 
 c = C()
 
@@ -550,6 +585,7 @@ class Base:
     def other(self, v: float) -> None:
         self.value = v
 
+
 class Derived(Base):
     @property
     def other(self) -> float:
@@ -573,6 +609,7 @@ class DontAssignToMe:
     @property
     def immutable(self): ...
 
+
 # error: [invalid-assignment]
 DontAssignToMe().immutable = "the properties, they are a-changing"
 ```
@@ -595,6 +632,7 @@ class C:
     def get_name(cls) -> str:
         return cls.__name__
 
+
 c1 = C.factory("test")  # okay
 
 reveal_type(c1)  # revealed: C
@@ -612,6 +650,7 @@ class C:
     def helper(value: str) -> str:
         return value
 
+
 reveal_type(C.helper("42"))  # revealed: str
 c = C()
 reveal_type(c.helper("string"))  # revealed: str
@@ -628,8 +667,10 @@ import types
 from inspect import getattr_static
 from ty_extensions import static_assert, is_subtype_of, TypeOf
 
+
 def f(x: object) -> str:
     return "a"
+
 
 reveal_type(f)  # revealed: def f(x: object) -> str
 reveal_type(f.__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
@@ -654,6 +695,7 @@ We can also bind the free function `f` to an instance of a class `C`:
 
 ```py
 class C: ...
+
 
 bound_method = wrapper_descriptor(f, C(), C)
 
@@ -708,24 +750,30 @@ This test makes sure that we call `__get__` with the right argument types for va
 ```py
 from __future__ import annotations
 
+
 class TailoredForClassObjectAccess:
     def __get__(self, instance: None, owner: type[C]) -> int:
         return 1
+
 
 class TailoredForInstanceAccess:
     def __get__(self, instance: C, owner: type[C] | None = None) -> str:
         return "a"
 
+
 class TailoredForMetaclassAccess:
     def __get__(self, instance: type[C], owner: type[Meta]) -> bytes:
         return b"a"
 
+
 class Meta(type):
     metaclass_access: TailoredForMetaclassAccess = TailoredForMetaclassAccess()
+
 
 class C(metaclass=Meta):
     class_object_access: TailoredForClassObjectAccess = TailoredForClassObjectAccess()
     instance_access: TailoredForInstanceAccess = TailoredForInstanceAccess()
+
 
 reveal_type(C.class_object_access)  # revealed: int
 reveal_type(C().instance_access)  # revealed: str
@@ -752,8 +800,10 @@ class Descriptor:
     def __get__(self) -> int:
         return 1
 
+
 class C:
     descriptor: Descriptor = Descriptor()
+
 
 # TODO: This should be an error
 reveal_type(C.descriptor)  # revealed: int
@@ -772,8 +822,10 @@ call `__get__`" on the descriptor object (leading us to infer `Unknown`):
 class BrokenDescriptor:
     __get__: None = None
 
+
 class Foo:
     desc: BrokenDescriptor = BrokenDescriptor()
+
 
 # TODO: this raises `TypeError` at runtime due to the implicit call to `__get__`;
 # we should emit a diagnostic
@@ -794,8 +846,10 @@ class Descriptor:
     def __set__(self, instance: object, value: int) -> None:
         pass
 
+
 class C:
     descriptor = Descriptor()
+
 
 C.descriptor = "something else"
 reveal_type(C.descriptor)  # revealed: Literal["something else"]
@@ -811,9 +865,11 @@ class DataDescriptor:
     def __set__(self, instance: int, value) -> None:
         pass
 
+
 class NonDataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> int:
         return 1
+
 
 def _(flag: bool):
     class PossiblyUnbound:
@@ -840,6 +896,7 @@ def _(flag: bool):
 def _(flag: bool):
     class MaybeDescriptor:
         if flag:
+
             def __get__(self, instance: object, owner: type | None = None) -> int:
                 return 1
 
@@ -859,35 +916,45 @@ descriptor protocol on the callable's `__call__` method:
 ```py
 from __future__ import annotations
 
+
 class ReturnedCallable2:
     def __call__(self, descriptor: Descriptor1, instance: None, owner: type[C]) -> int:
         return 1
+
 
 class ReturnedCallable1:
     def __call__(self, descriptor: Descriptor2, instance: Callable1, owner: type[Callable1]) -> ReturnedCallable2:
         return ReturnedCallable2()
 
+
 class Callable3:
     def __call__(self, descriptor: Descriptor3, instance: Callable2, owner: type[Callable2]) -> ReturnedCallable1:
         return ReturnedCallable1()
 
+
 class Descriptor3:
     __get__: Callable3 = Callable3()
+
 
 class Callable2:
     __call__: Descriptor3 = Descriptor3()
 
+
 class Descriptor2:
     __get__: Callable2 = Callable2()
+
 
 class Callable1:
     __call__: Descriptor2 = Descriptor2()
 
+
 class Descriptor1:
     __get__: Callable1 = Callable1()
 
+
 class C:
     d: Descriptor1 = Descriptor1()
+
 
 reveal_type(C.d)  # revealed: int
 ```

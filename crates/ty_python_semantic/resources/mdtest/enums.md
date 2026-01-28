@@ -6,10 +6,12 @@
 from enum import Enum
 from typing import Literal
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
+
 
 reveal_type(Color.RED)  # revealed: Literal[Color.RED]
 reveal_type(Color.RED.name)  # revealed: Literal["RED"]
@@ -32,18 +34,22 @@ Simple enums with integer or string values:
 from enum import Enum
 from ty_extensions import enum_members
 
+
 class ColorInt(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
 
+
 # revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
 reveal_type(enum_members(ColorInt))
+
 
 class ColorStr(Enum):
     RED = "red"
     GREEN = "green"
     BLUE = "blue"
+
 
 # revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
 reveal_type(enum_members(ColorStr))
@@ -55,10 +61,12 @@ reveal_type(enum_members(ColorStr))
 from enum import IntEnum
 from ty_extensions import enum_members
 
+
 class ColorInt(IntEnum):
     RED = 1
     GREEN = 2
     BLUE = 3
+
 
 # revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
 reveal_type(enum_members(ColorInt))
@@ -72,6 +80,7 @@ Attributes on the enum class that are declared are not considered members of the
 from enum import Enum
 from ty_extensions import enum_members
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
@@ -80,6 +89,7 @@ class Answer(Enum):
 
     # TODO: this could be considered an error:
     non_member_1: str = "some value"
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -92,9 +102,11 @@ from enum import Enum
 from typing import Final
 from ty_extensions import enum_members
 
+
 class Answer(Enum):
     YES: Final = 1
     NO: Final = 2
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -110,12 +122,15 @@ from enum import Enum
 from ty_extensions import enum_members
 from typing import Callable, Literal
 
+
 def identity(x) -> int:
     return x
+
 
 class Descriptor:
     def __get__(self, instance, owner):
         return 0
+
 
 class Answer(Enum):
     YES = 1
@@ -138,6 +153,7 @@ class Answer(Enum):
         return ""
 
     class NestedClass: ...
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -174,12 +190,14 @@ Enum attributes defined using `enum.property` take precedence over generated att
 ```py
 from enum import Enum, property as enum_property
 
+
 class Choices(Enum):
     A = 1
     B = 2
 
     @enum_property
     def value(self) -> Any: ...
+
 
 # TODO: This should be `Any` - overridden by `@enum_property`
 reveal_type(Choices.A.value)  # revealed: Literal[1]
@@ -194,6 +212,7 @@ from enum import Enum
 from ty_extensions import enum_members
 from types import DynamicClassAttribute
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
@@ -201,6 +220,7 @@ class Answer(Enum):
     @DynamicClassAttribute
     def dynamic_property(self) -> str:
         return "dynamic value"
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -232,11 +252,13 @@ Enum members can have aliases, which are not considered separate members:
 from enum import Enum
 from ty_extensions import enum_members
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
 
     DEFINITELY = YES
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -249,12 +271,14 @@ If a value is duplicated, we also treat that as an alias:
 ```py
 from enum import Enum
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
 
     red = 1
     green = 2
+
 
 # revealed: tuple[Literal["RED"], Literal["GREEN"]]
 reveal_type(enum_members(Color))
@@ -269,6 +293,7 @@ Multiple aliases to the same member are also supported. This is a regression tes
 ```py
 from ty_extensions import enum_members
 
+
 class ManyAliases(Enum):
     real_member = "real_member"
     alias1 = "real_member"
@@ -276,6 +301,7 @@ class ManyAliases(Enum):
     alias3 = "real_member"
 
     other_member = "other_real_member"
+
 
 # revealed: tuple[Literal["real_member"], Literal["other_member"]]
 reveal_type(enum_members(ManyAliases))
@@ -334,6 +360,7 @@ class Mixed(Enum):
     MANUAL_2 = -2
     AUTO_2 = auto()
 
+
 reveal_type(Mixed.MANUAL_1.value)  # revealed: Literal[-1]
 reveal_type(Mixed.AUTO_1.value)  # revealed: Literal[1]
 reveal_type(Mixed.MANUAL_2.value)  # revealed: Literal[-2]
@@ -345,15 +372,19 @@ When using `auto()` with `StrEnum`, the value is the lowercase name of the membe
 ```py
 from enum import StrEnum, auto
 
+
 class Answer(StrEnum):
     YES = auto()
     NO = auto()
 
+
 reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
 reveal_type(Answer.NO.value)  # revealed: Literal["no"]
 
+
 class SingleMember(StrEnum):
     SINGLE = auto()
+
 
 reveal_type(SingleMember.SINGLE.value)  # revealed: Literal["single"]
 ```
@@ -363,9 +394,11 @@ Using `auto()` with `IntEnum` also works as expected:
 ```py
 from enum import IntEnum, auto
 
+
 class Answer(IntEnum):
     YES = auto()
     NO = auto()
+
 
 reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
@@ -376,9 +409,11 @@ As does using `auto()` for other enums that use `int` as a mixin:
 ```py
 from enum import Enum, auto
 
+
 class Answer(int, Enum):
     YES = auto()
     NO = auto()
+
 
 reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
@@ -392,27 +427,35 @@ effect of using `auto()` will be for an arbitrary non-integer mixin, so for anyt
 ```python
 from enum import Enum, auto
 
+
 class A(str, Enum):
     X = auto()
     Y = auto()
 
+
 reveal_type(A.X.value)  # revealed: Any
+
 
 class B(bytes, Enum):
     X = auto()
     Y = auto()
 
+
 reveal_type(B.X.value)  # revealed: Any
+
 
 class C(tuple, Enum):
     X = auto()
     Y = auto()
 
+
 reveal_type(C.X.value)  # revealed: Any
+
 
 class D(float, Enum):
     X = auto()
     Y = auto()
+
 
 reveal_type(D.X.value)  # revealed: Any
 ```
@@ -422,11 +465,13 @@ Combining aliases with `auto()`:
 ```py
 from enum import Enum, auto
 
+
 class Answer(Enum):
     YES = auto()
     NO = auto()
 
     DEFINITELY = YES
+
 
 # TODO: This should ideally be `tuple[Literal["YES"], Literal["NO"]]`
 # revealed: tuple[Literal["YES"], Literal["NO"], Literal["DEFINITELY"]]
@@ -463,6 +508,7 @@ reveal_type(Answer.OTHER)
 from enum import Enum, member
 from ty_extensions import enum_members
 
+
 class Answer(Enum):
     yes = member(1)
     no = member(2)
@@ -470,6 +516,7 @@ class Answer(Enum):
     @member
     def maybe(self) -> None:
         return
+
 
 # revealed: tuple[Literal["yes"], Literal["no"], Literal["maybe"]]
 reveal_type(enum_members(Answer))
@@ -484,12 +531,14 @@ treated as a non-member:
 from enum import Enum
 from ty_extensions import enum_members
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
 
     __private_member = 3
     __maybe__ = 4
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"], Literal["__maybe__"]]
 reveal_type(enum_members(Answer))
@@ -504,6 +553,7 @@ whitespace-delimited list of names:
 from enum import Enum
 from ty_extensions import enum_members
 
+
 class Answer(Enum):
     _ignore_ = "IGNORED _other_ignored       also_ignored"
 
@@ -513,6 +563,7 @@ class Answer(Enum):
     IGNORED = 3
     _other_ignored = "test"
     also_ignored = "test2"
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -530,6 +581,7 @@ class Answer2(Enum):
     MAYBE = 3
     _other = "test"
 
+
 # TODO: This should be `tuple[Literal["YES"], Literal["NO"]]`
 # revealed: tuple[Literal["YES"], Literal["NO"], Literal["MAYBE"], Literal["_other"]]
 reveal_type(enum_members(Answer2))
@@ -544,9 +596,11 @@ conflicting with `Enum.name` and `Enum.value`):
 from enum import Enum
 from ty_extensions import enum_members
 
+
 class Answer(Enum):
     name = 1
     value = 2
+
 
 # revealed: tuple[Literal["name"], Literal["value"]]
 reveal_type(enum_members(Answer))
@@ -560,10 +614,12 @@ reveal_type(Answer.value)  # revealed: Literal[Answer.value]
 ```py
 from enum import Enum
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
+
 
 for color in Color:
     reveal_type(color)  # revealed: Color
@@ -579,24 +635,30 @@ Methods and non-member attributes defined in the enum class can be accessed on e
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
 
     def is_yes(self) -> bool:
         return self == Answer.YES
+
     constant: int = 1
+
 
 reveal_type(Answer.YES.is_yes())  # revealed: bool
 reveal_type(Answer.YES.constant)  # revealed: int
+
 
 class MyEnum(Enum):
     def some_method(self) -> None:
         pass
 
+
 class MyAnswer(MyEnum):
     YES = 1
     NO = 2
+
 
 reveal_type(MyAnswer.YES.some_method())  # revealed: None
 ```
@@ -606,9 +668,11 @@ reveal_type(MyAnswer.YES.some_method())  # revealed: None
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
+
 
 def _(answer: type[Answer]) -> None:
     reveal_type(answer.YES)  # revealed: Literal[Answer.YES]
@@ -622,6 +686,7 @@ from enum import Enum
 from typing import Callable
 import sys
 
+
 class Printer(Enum):
     STDOUT = 1
     STDERR = 2
@@ -631,6 +696,7 @@ class Printer(Enum):
             print(msg)
         elif self == Printer.STDERR:
             print(msg, file=sys.stderr)
+
 
 Printer.STDOUT("Hello, world!")
 Printer.STDERR("An error occurred!")
@@ -649,15 +715,19 @@ callable("Another error!")
 from enum import Enum
 from typing import Literal
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
 
+
 reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
+
 
 def _(red_or_blue: Literal[Color.RED, Color.BLUE]):
     reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
+
 
 def _(any_color: Color):
     # TODO: Literal["RED", "GREEN", "BLUE"]
@@ -706,14 +776,17 @@ An enum with one or more defined members cannot be subclassed. They are implicit
 ```py
 from enum import Enum
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
 
+
 # error: [subclass-of-final-class] "Class `ExtendedColor` cannot inherit from final class `Color`"
 class ExtendedColor(Color):
     YELLOW = 4
+
 
 def f(color: Color):
     if isinstance(color, int):
@@ -726,13 +799,16 @@ An `Enum` subclass without any defined members can be subclassed:
 from enum import Enum
 from ty_extensions import enum_members
 
+
 class MyEnum(Enum):
     def some_method(self) -> None:
         pass
 
+
 class Answer(MyEnum):
     YES = 1
     NO = 2
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -743,13 +819,17 @@ reveal_type(enum_members(Answer))
 ```py
 from enum import Enum
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
 
+
 reveal_type(type(Answer.YES))  # revealed: <class 'Answer'>
 
+
 class NoMembers(Enum): ...
+
 
 def _(answer: Answer, no_members: NoMembers):
     reveal_type(type(answer))  # revealed: <class 'Answer'>
@@ -763,6 +843,7 @@ from enum import Enum
 from typing import Literal
 from ty_extensions import enum_members
 
+
 class Answer(Enum):
     YES = 1
     NO = 2
@@ -770,6 +851,7 @@ class Answer(Enum):
     @classmethod
     def yes(cls) -> "Literal[Answer.YES]":
         return Answer.YES
+
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -786,13 +868,16 @@ prior to Python 3.11.
 ```py
 from enum import Enum, EnumMeta
 
+
 class CustomEnumSubclass(Enum):
     def custom_method(self) -> int:
         return 0
 
+
 class EnumWithCustomEnumSubclass(CustomEnumSubclass):
     NO = 0
     YES = 1
+
 
 reveal_type(EnumWithCustomEnumSubclass.NO)  # revealed: Literal[EnumWithCustomEnumSubclass.NO]
 reveal_type(EnumWithCustomEnumSubclass.NO.custom_method())  # revealed: int
@@ -873,10 +958,12 @@ To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
 from enum import Enum
 from typing_extensions import assert_never
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
+
 
 def color_name(color: Color) -> str:
     if color is Color.RED:
@@ -888,6 +975,7 @@ def color_name(color: Color) -> str:
     else:
         assert_never(color)
 
+
 # No `invalid-return-type` error here because the implicit `else` branch is detected as unreachable:
 def color_name_without_assertion(color: Color) -> str:
     if color is Color.RED:
@@ -897,6 +985,7 @@ def color_name_without_assertion(color: Color) -> str:
     elif color is Color.BLUE:
         return "Blue"
 
+
 def color_name_misses_one_variant(color: Color) -> str:
     if color is Color.RED:
         return "Red"
@@ -905,8 +994,10 @@ def color_name_misses_one_variant(color: Color) -> str:
     else:
         assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 
+
 class Singleton(Enum):
     VALUE = 1
+
 
 def singleton_check(value: Singleton) -> str:
     if value is Singleton.VALUE:
@@ -978,9 +1069,11 @@ def singleton_check(value: Singleton) -> str:
 ```py
 from enum import Enum
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
+
 
 reveal_type(Color.RED == Color.RED)  # revealed: Literal[True]
 reveal_type(Color.RED != Color.RED)  # revealed: Literal[False]
@@ -991,12 +1084,14 @@ reveal_type(Color.RED != Color.RED)  # revealed: Literal[False]
 ```py
 from enum import Enum
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
 
     def __eq__(self, other: object) -> bool:
         return False
+
 
 reveal_type(Color.RED == Color.RED)  # revealed: bool
 ```
@@ -1006,12 +1101,14 @@ reveal_type(Color.RED == Color.RED)  # revealed: bool
 ```py
 from enum import Enum
 
+
 class Color(Enum):
     RED = 1
     GREEN = 2
 
     def __ne__(self, other: object) -> bool:
         return False
+
 
 reveal_type(Color.RED != Color.RED)  # revealed: bool
 ```
@@ -1049,6 +1146,7 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
+
 # error: [invalid-generic-enum] "Enum class `F` cannot be generic"
 class F(Enum, Generic[T]):
     A = 1
@@ -1064,6 +1162,7 @@ from enum import Enum
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
+
 
 # error: [invalid-generic-enum] "Enum class `G` cannot be generic"
 class G(Generic[T], Enum):

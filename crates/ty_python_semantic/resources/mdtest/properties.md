@@ -15,6 +15,7 @@ class C:
     def my_property(self) -> int:
         return 1
 
+
 reveal_type(C().my_property)  # revealed: int
 ```
 
@@ -41,6 +42,7 @@ class C:
     def my_property(self, value: int) -> None:
         pass
 
+
 c = C()
 reveal_type(c.my_property)  # revealed: int
 c.my_property = 2
@@ -56,10 +58,12 @@ A property that returns `Self` refers to an instance of the class:
 ```py
 from typing_extensions import Self
 
+
 class Path:
     @property
     def parent(self) -> Self:
         raise NotImplementedError
+
 
 reveal_type(Path().parent)  # revealed: Path
 ```
@@ -75,6 +79,7 @@ class Node:
     @parent.setter
     def parent(self, value: Self) -> None:
         pass
+
 
 root = Node()
 child = Node()
@@ -101,6 +106,7 @@ class C:
     @my_property.getter
     def my_property(self) -> str:
         return "a"
+
 
 c = C()
 reveal_type(c.my_property)  # revealed: str
@@ -129,6 +135,7 @@ class C:
     def my_property(self) -> None:
         pass
 
+
 c = C()
 reveal_type(c.my_property)  # revealed: int
 c.my_property = 2
@@ -148,6 +155,7 @@ class C:
     def attr(self) -> int:
         return 1
 
+
 c = C()
 
 # error: [invalid-assignment]
@@ -162,7 +170,9 @@ When attempting to read a write-only property, we emit an error:
 class C:
     def attr_setter(self, value: int) -> None:
         pass
+
     attr = property(fset=attr_setter)
+
 
 c = C()
 c.attr = 1
@@ -179,6 +189,7 @@ class C:
     @property
     def attr(self) -> int:
         return 1
+
     # error: [invalid-argument-type] "Argument to bound method `setter` is incorrect: Expected `(Any, Any, /) -> None`, found `def attr(self) -> None`"
     @attr.setter
     def attr(self) -> None:
@@ -205,7 +216,9 @@ Properties can also be constructed manually using the `property` class. We parti
 class C:
     def attr_getter(self) -> int:
         return 1
+
     attr = property(attr_getter)
+
 
 c = C()
 reveal_type(c.attr)  # revealed: Unknown | int
@@ -221,7 +234,9 @@ the getter).
 class C:
     def attr_getter(self) -> int:
         return 1
+
     attr: property = property(attr_getter)
+
 
 c = C()
 reveal_type(c.attr)  # revealed: Unknown

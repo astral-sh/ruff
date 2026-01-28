@@ -40,7 +40,9 @@ And finally write a normal Python code block that makes use of the custom stubs:
 ```py
 b: BuiltinClass = builtin_symbol
 
+
 class OtherClass: ...
+
 
 o: OtherClass = builtin_symbol  # error: [invalid-assignment]
 

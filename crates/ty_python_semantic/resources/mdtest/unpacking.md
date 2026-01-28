@@ -180,9 +180,11 @@ class Iterator:
     def __next__(self) -> int:
         return 42
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 a, b = Iterable()
 reveal_type(a)  # revealed: int
@@ -196,9 +198,11 @@ class Iterator:
     def __next__(self) -> int:
         return 42
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 a, (b, c), d = (1, Iterable(), 2)
 reveal_type(a)  # revealed: Literal[1]
@@ -607,6 +611,7 @@ reveal_type(c)  # revealed: list[Literal["c", "d"]]
 ```py
 from typing_extensions import LiteralString
 
+
 def _(s: LiteralString):
     a, b, *c = s
     reveal_type(a)  # revealed: LiteralString
@@ -815,6 +820,7 @@ def _(arg: tuple[int, int, int] | tuple[int, str, bytes] | tuple[int, int, str])
 ```py
 from typing import Literal
 
+
 def _(arg: tuple[int, tuple[str, bytes]] | tuple[tuple[int, bytes], Literal["ab"]]):
     a, (b, c) = arg
     reveal_type(a)  # revealed: int | tuple[int, bytes]
@@ -888,6 +894,7 @@ def _(flag: bool):
 ```py
 from typing import Literal
 
+
 def _(arg: tuple[int, int] | Literal["ab"]):
     a, b = arg
     reveal_type(a)  # revealed: int | Literal["a"]
@@ -901,9 +908,11 @@ class Iterator:
     def __next__(self) -> tuple[int, int] | tuple[int, str]:
         return (1, 2)
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 (a, b), c = Iterable()
 reveal_type(a)  # revealed: int
@@ -918,9 +927,11 @@ class Iterator:
     def __next__(self) -> bytes:
         return b""
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 def _(arg: tuple[int, str] | Iterable):
     a, b = arg
@@ -1004,9 +1015,11 @@ class Iterator:
     def __next__(self) -> tuple[int, int]:
         return (1, 2)
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 for a, b in Iterable():
     reveal_type(a)  # revealed: int
@@ -1020,9 +1033,11 @@ class Iterator:
     def __next__(self) -> bytes:
         return b""
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 def _(arg: tuple[tuple[int, str], Iterable]):
     for a, b in arg:
@@ -1044,6 +1059,7 @@ class ContextManager:
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
 
+
 with ContextManager() as (a, b):
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: int
@@ -1058,6 +1074,7 @@ class ContextManager:
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
+
 
 with ContextManager() as (a, b):
     reveal_type(a)  # revealed: int
@@ -1074,6 +1091,7 @@ class ContextManager:
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
 
+
 with ContextManager() as (a, (b, c)):
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: str
@@ -1089,6 +1107,7 @@ class ContextManager:
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
+
 
 with ContextManager() as (a, *b):
     reveal_type(a)  # revealed: int
@@ -1113,6 +1132,7 @@ class ContextManager:
 
     def __exit__(self, *args) -> None:
         pass
+
 
 # error: [invalid-assignment] "Not enough values to unpack: Expected 3"
 with ContextManager() as (a, b, c):
@@ -1189,9 +1209,11 @@ class Iterator:
     def __next__(self) -> tuple[int, int]:
         return (1, 2)
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 # revealed: tuple[int, int]
 [reveal_type((a, b)) for a, b in Iterable()]
@@ -1204,9 +1226,11 @@ class Iterator:
     def __next__(self) -> bytes:
         return b""
 
+
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
+
 
 def _(arg: tuple[tuple[int, str], Iterable]):
     # revealed: tuple[int | bytes, str | bytes]

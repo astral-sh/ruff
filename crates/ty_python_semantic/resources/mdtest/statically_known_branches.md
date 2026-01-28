@@ -13,9 +13,11 @@ If we can statically determine that the condition is always true, then we can al
 ```py
 import sys
 
+
 class C:
     if sys.version_info >= (3, 9):
         SomeFeature: str = "available"
+
 
 # C.SomeFeature is unconditionally available here, because we are on Python 3.9 or newer:
 reveal_type(C.SomeFeature)  # revealed: str
@@ -37,6 +39,7 @@ import typing
 
 if typing.TYPE_CHECKING:
     from module import SomeType
+
 
 # `SomeType` is unconditionally available here for type checkers:
 def f(s: SomeType) -> None: ...
@@ -173,6 +176,7 @@ demonstrate this, since semantic index building is inherently single-module:
 ```py
 from typing import Literal
 
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True
@@ -258,6 +262,7 @@ Just for comparison, we still infer the combined type if the condition is not st
 def flag() -> bool:
     return True
 
+
 x = 1
 
 if flag():
@@ -287,6 +292,7 @@ reveal_type(x)  # revealed: Literal[2]
 def flag() -> bool:
     return True
 
+
 x = 1
 
 if flag():
@@ -305,6 +311,7 @@ reveal_type(x)  # revealed: Literal[2, 4]
 def flag() -> bool:
     return True
 
+
 x = 1
 
 if flag():
@@ -322,6 +329,7 @@ reveal_type(x)  # revealed: Literal[2, 3]
 ```py
 def flag() -> bool:
     return True
+
 
 x = 1
 
@@ -342,6 +350,7 @@ Make sure that we include bindings from all non-`False` branches:
 ```py
 def flag() -> bool:
     return True
+
 
 x = 1
 
@@ -371,6 +380,7 @@ Make sure that we only include the binding from the first `elif True` branch:
 def flag() -> bool:
     return True
 
+
 x = 1
 
 if flag():
@@ -395,6 +405,7 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 def flag() -> bool:
     return True
 
+
 x = 1
 
 if flag():
@@ -410,6 +421,7 @@ reveal_type(x)  # revealed: Literal[2, 3]
 ```py
 def flag() -> bool:
     return True
+
 
 x = 1
 
@@ -457,6 +469,7 @@ reveal_type(x)  # revealed: Literal[1]
 def flag() -> bool:
     return True
 
+
 x = 1
 
 if True:
@@ -473,6 +486,7 @@ reveal_type(x)  # revealed: Literal[1, 2]
 ```py
 def flag() -> bool:
     return True
+
 
 x = 1
 
@@ -518,6 +532,7 @@ reveal_type(x)  # revealed: Literal[1]
 ```py
 def flag() -> bool:
     return True
+
 
 x = 1
 
@@ -570,6 +585,7 @@ reveal_type(x)  # revealed: Literal[3]
 def flag() -> bool:
     return True
 
+
 x = 1
 
 if True:
@@ -588,6 +604,7 @@ reveal_type(x)  # revealed: Literal[2, 3]
 ```py
 def flag() -> bool:
     return True
+
 
 x = 1
 
@@ -640,6 +657,7 @@ reveal_type(x)  # revealed: Literal[4]
 def flag() -> bool:
     return True
 
+
 x = 1
 
 if False:
@@ -662,6 +680,7 @@ reveal_type(x)  # revealed: Literal[3, 4]
 ```py
 def may_raise() -> None: ...
 
+
 x = 1
 
 try:
@@ -680,6 +699,7 @@ reveal_type(x)  # revealed: Literal[2, 4]
 
 ```py
 def may_raise() -> None: ...
+
 
 x = 1
 
@@ -702,6 +722,7 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 ```py
 def may_raise() -> None: ...
 
+
 x = 1
 
 if True:
@@ -722,6 +743,7 @@ reveal_type(x)  # revealed: Literal[3, 4]
 
 ```py
 def may_raise() -> None: ...
+
 
 x = 1
 
@@ -749,6 +771,7 @@ reveal_type(x)  # revealed: Literal[5]
 def iterable() -> list[object]:
     return [1, ""]
 
+
 x = 1
 
 for _ in iterable():
@@ -764,6 +787,7 @@ reveal_type(x)  # revealed: Literal[1, 3]
 ```py
 def iterable() -> list[object]:
     return [1, ""]
+
 
 x = 1
 
@@ -784,6 +808,7 @@ reveal_type(x)  # revealed: Literal[3]
 def iterable() -> list[object]:
     return [1, ""]
 
+
 x = 1
 
 if True:
@@ -800,6 +825,7 @@ reveal_type(x)  # revealed: Literal[1, 2]
 ```py
 def iterable() -> list[object]:
     return [1, ""]
+
 
 x = 1
 
@@ -819,6 +845,7 @@ reveal_type(x)  # revealed: Literal[3]
 ```py
 def iterable() -> list[object]:
     return [1, ""]
+
 
 x = 1
 
@@ -947,6 +974,7 @@ Make sure that we still infer the combined type if the condition is not statical
 def flag() -> bool:
     return True
 
+
 x = 1
 
 while flag():
@@ -1002,6 +1030,7 @@ do not panic in the original scenario:
 ```py
 def flag() -> bool:
     return True
+
 
 while True:
     if flag():
@@ -1072,6 +1101,7 @@ Make sure we don't infer a static truthiness in case there is a case guard:
 def flag() -> bool:
     return True
 
+
 x = 1
 
 match "a":
@@ -1122,6 +1152,7 @@ For definitely-false cases, the presence of a guard has no influence:
 ```py
 def flag() -> bool:
     return True
+
 
 x = 1
 
@@ -1220,6 +1251,7 @@ x: str
 if False:
     x: int
 
+
 def f() -> None:
     reveal_type(x)  # revealed: str
 ```
@@ -1233,6 +1265,7 @@ if True:
     pass
 else:
     x: int
+
 
 def f() -> None:
     reveal_type(x)  # revealed: str
@@ -1288,6 +1321,7 @@ reveal_type(x)  # revealed: int
 def flag() -> bool:
     return True
 
+
 x: str
 
 if flag():
@@ -1308,16 +1342,21 @@ reveal_type(x)  # revealed: str | int
 def f() -> int:
     return 1
 
+
 def g() -> int:
     return 1
 
+
 if True:
+
     def f() -> str:
         return ""
 
 else:
+
     def g() -> str:
         return ""
+
 
 reveal_type(f())  # revealed: str
 reveal_type(g())  # revealed: int
@@ -1327,12 +1366,15 @@ reveal_type(g())  # revealed: int
 
 ```py
 if True:
+
     class C:
         x: int = 1
 
 else:
+
     class C:
         x: str = "a"
+
 
 reveal_type(C.x)  # revealed: int
 ```
@@ -1345,6 +1387,7 @@ class C:
         x: int = 1
     else:
         x: str = "a"
+
 
 reveal_type(C.x)  # revealed: int
 ```
@@ -1404,6 +1447,7 @@ unbound:
 def flag() -> bool:
     return True
 
+
 if flag():
     x = 1
 
@@ -1416,6 +1460,7 @@ x
 ```py
 def flag() -> bool:
     return True
+
 
 if False:
     if True:
@@ -1480,6 +1525,7 @@ z
 if True:
     x = 1
 
+
 def f():
     # x is always bound, no error
     x
@@ -1524,6 +1570,7 @@ from module import symbol
 ```py
 def flag() -> bool:
     return True
+
 
 if flag():
     symbol = 1

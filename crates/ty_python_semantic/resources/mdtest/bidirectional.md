@@ -55,8 +55,10 @@ reveal_type(b)  # revealed: list[list[int]]
 ```py
 from typing import TypedDict
 
+
 class TD(TypedDict):
     x: int
+
 
 d1 = {"x": 1}
 d2: TD = {"x": 1}
@@ -69,8 +71,10 @@ reveal_type(d2)  # revealed: TD
 reveal_type(d3)  # revealed: dict[str, int]
 reveal_type(d4)  # revealed: TD
 
+
 def _() -> TD:
     return {"x": 1}
+
 
 def _() -> TD:
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
@@ -160,6 +164,7 @@ Function parameter annotations:
 ```py
 def b(x: list[Literal[1]]): ...
 
+
 b([1])
 ```
 
@@ -169,6 +174,7 @@ Bound method parameter annotations:
 class C:
     def __init__(self, x: list[Literal[1]]): ...
     def foo(self, x: list[Literal[1]]): ...
+
 
 C([1]).foo([1])
 ```
@@ -186,6 +192,7 @@ Declared attribute types:
 class E:
     a: list[Literal[1]]
     b: list[Literal[1]]
+
 
 def _(e: E):
     e.a = [1]
@@ -242,14 +249,18 @@ For union targets, each element of the union is considered as a separate type co
 ```py
 from typing import Literal
 
+
 class X:
     x: list[int | str]
+
 
 class Y:
     x: list[int | None]
 
+
 def lst[T](x: T) -> list[T]:
     return [x]
+
 
 def _(xy: X | Y):
     xy.x = lst(1)
@@ -340,23 +351,30 @@ Similarly, the value type for augmented assignment dunder calls is inferred with
 ```py
 from typing import TypedDict
 
+
 def lst[T](x: T) -> list[T]:
     return [x]
+
 
 class Bar(TypedDict, closed=False):
     bar: list[int]
 
+
 def _(bar: Bar):
     bar |= reveal_type({"bar": lst(1)})  # revealed: Bar
+
 
 class Bar2(TypedDict):
     bar: list[int | None]
 
+
 class X:
     def __ior__(self, other: Bar2): ...
 
+
 def _(x: X):
     x |= reveal_type({"bar": lst(1)})  # revealed: Bar2
+
 
 def _(x: X | Bar):
     x |= {"bar": lst(1)}
@@ -435,11 +453,14 @@ def _(a: object, b: object, flag: bool):
 ```py
 from typing import TypedDict
 
+
 class TD(TypedDict):
     y: int
 
+
 class X:
     td: TD
+
 
 def _(x: X, flag: bool):
     if flag:
