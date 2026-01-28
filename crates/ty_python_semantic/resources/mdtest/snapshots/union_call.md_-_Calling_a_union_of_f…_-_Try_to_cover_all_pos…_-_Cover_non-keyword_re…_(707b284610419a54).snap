@@ -67,23 +67,24 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 52 |     # error: [too-many-positional-arguments]
 53 |     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
 54 |     # error: [missing-argument]
-55 |     # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound `str` of type variable `T`"
-56 |     # error: [invalid-argument-type] "Argument to function `f5` is incorrect: Expected `str`, found `Literal[3]`"
-57 |     # error: [no-matching-overload] "No overload of function `f6` matches arguments"
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+55 |     # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Expected `str & Unknown`, found `Literal[3]`"
+56 |     # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound `str` of type variable `T`"
+57 |     # error: [invalid-argument-type] "Argument to function `f5` is incorrect: Expected `str`, found `Literal[3]`"
+58 |     # error: [no-matching-overload] "No overload of function `f6` matches arguments"
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
 ```
 
 # Diagnostics
 
 ```
 error[call-non-callable]: Object of type `Literal[5]` is not callable
-  --> src/mdtest_snippet.py:60:9
+  --> src/mdtest_snippet.py:61:9
    |
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
    |         ^^^^
    |
 info: Union variant `Literal[5]` is incompatible with this call site
@@ -94,11 +95,11 @@ info: rule `call-non-callable` is enabled by default
 
 ```
 error[call-non-callable]: Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)
-  --> src/mdtest_snippet.py:60:9
+  --> src/mdtest_snippet.py:61:9
    |
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
    |         ^^^^
    |
 info: Union variant `PossiblyNotCallable` is incompatible with this call site
@@ -109,11 +110,11 @@ info: rule `call-non-callable` is enabled by default
 
 ```
 error[missing-argument]: No argument provided for required parameter `b` of function `f3`
-  --> src/mdtest_snippet.py:60:9
+  --> src/mdtest_snippet.py:61:9
    |
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
    |         ^^^^
    |
 info: Union variant `def f3(a: int, b: int) -> int` is incompatible with this call site
@@ -124,11 +125,11 @@ info: rule `missing-argument` is enabled by default
 
 ```
 error[no-matching-overload]: No overload of function `f6` matches arguments
-  --> src/mdtest_snippet.py:60:9
+  --> src/mdtest_snippet.py:61:9
    |
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
    |         ^^^^
    |
 info: First overload defined here
@@ -160,11 +161,11 @@ info: rule `no-matching-overload` is enabled by default
 
 ```
 error[invalid-argument-type]: Argument to function `f2` is incorrect
-  --> src/mdtest_snippet.py:60:11
+  --> src/mdtest_snippet.py:61:11
    |
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
    |           ^ Expected `str`, found `Literal[3]`
    |
 info: Function defined here
@@ -184,11 +185,11 @@ info: rule `invalid-argument-type` is enabled by default
 
 ```
 error[invalid-argument-type]: Argument to function `f4` is incorrect
-  --> src/mdtest_snippet.py:60:11
+  --> src/mdtest_snippet.py:61:11
    |
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
    |           ^ Argument type `Literal[3]` does not satisfy upper bound `str` of type variable `T`
    |
 info: Type variable defined here
@@ -207,12 +208,36 @@ info: rule `invalid-argument-type` is enabled by default
 ```
 
 ```
-error[invalid-argument-type]: Argument to function `f5` is incorrect
-  --> src/mdtest_snippet.py:60:11
+error[invalid-argument-type]: Argument to function `f4` is incorrect
+  --> src/mdtest_snippet.py:61:11
    |
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
+   |           ^ Expected `str & Unknown`, found `Literal[3]`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:13:5
+   |
+11 |     return 0
+12 |
+13 | def f4[T: str](x: T) -> int:
+   |     ^^         ---- Parameter declared here
+14 |     return 0
+   |
+info: Union variant `def f4[T](x: T@f4) -> int` is incompatible with this call site
+info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f5` is incorrect
+  --> src/mdtest_snippet.py:61:11
+   |
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
    |           ^ Expected `str`, found `Literal[3]`
    |
 info: Matching overload defined here
@@ -235,11 +260,11 @@ info: rule `invalid-argument-type` is enabled by default
 
 ```
 error[too-many-positional-arguments]: Too many positional arguments to function `f1`: expected 0, got 1
-  --> src/mdtest_snippet.py:60:11
+  --> src/mdtest_snippet.py:61:11
    |
-58 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-59 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
-60 |     x = f(3)
+59 |     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
+60 |     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+61 |     x = f(3)
    |           ^
    |
 info: Union variant `def f1() -> int` is incompatible with this call site
