@@ -508,120 +508,10 @@ impl Session {
                     .clone()
                     .combine(options.global),
             );
-            let workspace_options = self
-                .initialization_options
-                .options
-                .workspace
-                .clone()
-                .combine(options.workspace);
-
-            tracing::debug!("Initializing workspace `{url}`: {workspace_options:#?}");
-
-            let unknown_options = &options.unknown;
-            if !unknown_options.is_empty() {
-                warn_about_unknown_options(client, Some(&url), unknown_options);
+            if !options.unknown.is_empty() {
+                warn_about_unknown_options(client, Some(&url), &options.unknown);
             }
-
-            let Ok(root) = url.to_file_path() else {
-                tracing::debug!("Ignoring workspace with non-path root: {url}");
-                continue;
-            };
-
-            // Realistically I don't think this can fail because we got the path from a Url
-            let root = match SystemPathBuf::from_path_buf(root) {
-                Ok(root) => root,
-                Err(root) => {
-                    tracing::debug!(
-                        "Ignoring workspace with non-UTF8 root: {root}",
-                        root = root.display()
-                    );
-                    continue;
-                }
-            };
-
-            let workspace_settings = workspace_options.into_settings(&root, client);
-            let Some(workspace) = self.workspaces.initialize(&root, workspace_settings) else {
-                continue;
-            };
-
-            // For now, create one project database per workspace.
-            // In the future, index the workspace directories to find all projects
-            // and create a project database for each.
-            let system = LSPSystem::new(
-                self.index.as_ref().unwrap().clone(),
-                self.native_system.clone(),
-            );
-
-            let configuration_file = workspace
-                .settings
-                .project_options_overrides()
-                .and_then(|settings| settings.config_file_override.as_ref());
-
-            let metadata = if let Some(configuration_file) = configuration_file {
-                ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
-            } else {
-                ProjectMetadata::discover(&root, &system)
-            };
-
-            let project = metadata
-                .context("Failed to discover project configuration")
-                .and_then(|mut metadata| {
-                    metadata
-                        .apply_configuration_files(&system)
-                        .context("Failed to apply configuration files")?;
-
-                    if let Some(overrides) = workspace.settings.project_options_overrides() {
-                        metadata.apply_overrides(overrides);
-                    }
-
-                    ProjectDatabase::new(metadata, system.clone())
-                });
-
-            let (root, db) = match project {
-                Ok(db) => (root, db),
-                Err(err) => {
-                    tracing::error!(
-                        "Failed to create project for workspace `{url}`: {err:#}. \
-                        Falling back to default settings"
-                    );
-
-                    client.show_error_message(format!(
-                        "Failed to load project for workspace {url}. {}",
-                        self.client_name.log_guidance(),
-                    ));
-
-                    let db_with_default_settings = ProjectMetadata::from_options(
-                        Options::default(),
-                        root,
-                        None,
-                        MisconfigurationMode::UseDefault,
-                    )
-                    .context("Failed to convert default options to metadata")
-                    .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                    .expect("Default configuration to be valid");
-                    let default_root = db_with_default_settings
-                        .project()
-                        .root(&db_with_default_settings)
-                        .to_path_buf();
-
-                    (default_root, db_with_default_settings)
-                }
-            };
-
-            // Carry forward diagnostic state if any exists
-            let previous = self.projects.remove(&root);
-            let untracked = previous
-                .map(|state| state.untracked_files_with_pushed_diagnostics)
-                .unwrap_or_default();
-            self.projects.insert(
-                root.clone(),
-                ProjectState {
-                    db,
-                    untracked_files_with_pushed_diagnostics: untracked,
-                },
-            );
-
-            publish_settings_diagnostics(self, client, root);
+            self.initialize_workspace_folder(client, &url, options.workspace);
         }
 
         if let Some(global_options) = global_options {
@@ -640,6 +530,124 @@ impl Session {
             self.workspaces.all_initialized(),
             "All workspaces should be initialized after calling `initialize_workspaces`"
         );
+    }
+
+    pub(crate) fn initialize_workspace_folder(
+        &mut self,
+        client: &Client,
+        url: &Url,
+        options: WorkspaceOptions,
+    ) {
+        let options = self
+            .initialization_options
+            .options
+            .workspace
+            .clone()
+            .combine(options);
+
+        tracing::debug!("Initializing workspace `{url}`: {options:#?}");
+
+        let Ok(root) = url.to_file_path() else {
+            tracing::debug!("Ignoring workspace with non-path root: {url}");
+            return;
+        };
+
+        // Realistically I don't think this can fail because we got the path from a Url
+        let root = match SystemPathBuf::from_path_buf(root) {
+            Ok(root) => root,
+            Err(root) => {
+                tracing::debug!(
+                    "Ignoring workspace with non-UTF8 root: {root}",
+                    root = root.display()
+                );
+                return;
+            }
+        };
+
+        let settings = options.into_settings(&root, client);
+        let Some(workspace) = self.workspaces.initialize(&root, settings) else {
+            tracing::debug!("Ignoring workspace `{url}` since it was not registered");
+            return;
+        };
+
+        // For now, create one project database per workspace.
+        // In the future, index the workspace directories to find all projects
+        // and create a project database for each.
+        let system = LSPSystem::new(
+            self.index.as_ref().unwrap().clone(),
+            self.native_system.clone(),
+        );
+
+        let configuration_file = workspace
+            .settings
+            .project_options_overrides()
+            .and_then(|settings| settings.config_file_override.as_ref());
+
+        let metadata = if let Some(configuration_file) = configuration_file {
+            ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
+        } else {
+            ProjectMetadata::discover(&root, &system)
+        };
+
+        let project = metadata
+            .context("Failed to discover project configuration")
+            .and_then(|mut metadata| {
+                metadata
+                    .apply_configuration_files(&system)
+                    .context("Failed to apply configuration files")?;
+
+                if let Some(overrides) = workspace.settings.project_options_overrides() {
+                    metadata.apply_overrides(overrides);
+                }
+
+                ProjectDatabase::new(metadata, system.clone())
+            });
+
+        let (root, db) = match project {
+            Ok(db) => (root, db),
+            Err(err) => {
+                tracing::error!(
+                    "Failed to create project for workspace `{url}`: {err:#}. \
+                        Falling back to default settings"
+                );
+
+                client.show_error_message(format!(
+                    "Failed to load project for workspace {url}. {}",
+                    self.client_name.log_guidance(),
+                ));
+
+                let db_with_default_settings = ProjectMetadata::from_options(
+                    Options::default(),
+                    root,
+                    None,
+                    MisconfigurationMode::UseDefault,
+                )
+                .context("Failed to convert default options to metadata")
+                .and_then(|metadata| ProjectDatabase::new(metadata, system))
+                .expect("Default configuration to be valid");
+                let default_root = db_with_default_settings
+                    .project()
+                    .root(&db_with_default_settings)
+                    .to_path_buf();
+
+                (default_root, db_with_default_settings)
+            }
+        };
+
+        // Carry forward diagnostic state if any exists
+        let previous = self.projects.remove(&root);
+        let untracked = previous
+            .map(|state| state.untracked_files_with_pushed_diagnostics)
+            .unwrap_or_default();
+        self.projects.insert(
+            root.clone(),
+            ProjectState {
+                db,
+                untracked_files_with_pushed_diagnostics: untracked,
+            },
+        );
+
+        publish_settings_diagnostics(self, client, root);
     }
 
     pub(crate) fn take_deferred_messages(&mut self) -> Option<Message> {
