@@ -424,6 +424,190 @@ user3 = User({"name": None, "age": 25})
 user4 = User({"name": "Charlie", "age": 30, "extra": True})
 ```
 
+## Constructing TypedDict from existing TypedDict
+
+A `TypedDict` can be constructed from an existing `TypedDict` of the same type using either
+positional argument passing or keyword unpacking:
+
+```py
+from typing import TypedDict
+
+class Data(TypedDict):
+    id: int
+    name: str
+    value: float
+
+def process_data_positional(data: Data) -> Data:
+    return Data(data)
+
+def process_data_unpacking(data: Data) -> Data:
+    return Data(**data)
+```
+
+Constructing from a compatible TypedDict (with same fields) works:
+
+```py
+from typing import TypedDict
+
+class PersonBase(TypedDict):
+    name: str
+    age: int
+
+class PersonAlias(TypedDict):
+    name: str
+    age: int
+
+def copy_person(p: PersonBase) -> PersonAlias:
+    return PersonAlias(**p)
+
+def copy_person_positional(p: PersonBase) -> PersonAlias:
+    return PersonAlias(p)
+```
+
+Unpacking a TypedDict with extra keys flags the extra keys as errors, for consistency with the
+behavior when passing all keys as explicit keyword arguments:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int
+
+class Employee(Person):
+    employee_id: int
+
+def get_person_from_employee(emp: Employee) -> Person:
+    # error: [invalid-key] "Unknown key "employee_id" for TypedDict `Person`"
+    return Person(**emp)
+```
+
+However, the positional form allows extra keys, by analogy with the fact that assignment
+`p: Person = emp` is allowed (structural subtyping). It's not consistent that `Person(emp)` is more
+lenient than `Person(**emp)`; ultimately this is because extra keys _should_ be always allowed for a
+non-closed `TypedDict`, but we want to disallow explicit extra keys in order to catch typos, and so
+we have to bite the inconsistency bullet somewhere.
+
+```py
+def get_person_from_employee_positional(emp: Employee) -> Person:
+    return Person(emp)
+```
+
+Type mismatches in unpacked TypedDict fields should be detected:
+
+```py
+from typing import TypedDict
+
+class Source(TypedDict):
+    name: int  # Note: int, not str
+    age: int
+
+class Target(TypedDict):
+    name: str
+    age: int
+
+def convert(src: Source) -> Target:
+    # error: [invalid-argument-type]
+    return Target(**src)
+
+def convert_positional(src: Source) -> Target:
+    # error: [invalid-argument-type]
+    return Target(src)
+```
+
+Unpacking `Never` or a dynamic type (`Any`, `Unknown`) passes unconditionally, since these types can
+have any keys:
+
+```py
+from typing import Any, TypedDict, Never
+
+class Info(TypedDict):
+    name: str
+    value: int
+
+def unpack_never(data: Never) -> Info:
+    return Info(**data)
+
+def unpack_any(data: Any) -> Info:
+    return Info(**data)
+```
+
+PEP 695 type aliases to TypedDict types are also supported:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    id: int
+    name: str
+
+type RecordAlias = Record
+
+def process_aliased(data: RecordAlias) -> Record:
+    return Record(data)
+
+def process_aliased_unpacking(data: RecordAlias) -> Record:
+    return Record(**data)
+```
+
+Intersection types containing a TypedDict (e.g., from truthiness narrowing) are also supported. With
+`total=False`, TypedDicts can be empty (falsy), so truthiness narrowing creates an intersection:
+
+```py
+from typing import TypedDict
+
+class OptionalInfo(TypedDict, total=False):
+    id: int
+    name: str
+
+def process_truthy(data: OptionalInfo) -> OptionalInfo:
+    if data:
+        reveal_type(data)  # revealed: OptionalInfo & ~AlwaysFalsy
+        # Here data is `OptionalInfo & ~AlwaysFalsy`, but we can still construct OptionalInfo from it
+        return OptionalInfo(data)
+    return {}
+
+def process_truthy_unpacking(data: OptionalInfo) -> OptionalInfo:
+    if data:
+        return OptionalInfo(**data)
+    return {}
+```
+
+When we have an intersection of multiple TypedDict types, we extract ALL keys from ALL TypedDicts
+(union of keys), because a value of an intersection type must satisfy all TypedDicts and therefore
+has all their keys. For keys that appear in multiple TypedDicts, the types are intersected:
+
+```py
+from typing import TypedDict
+from ty_extensions import Intersection
+
+class TdA(TypedDict):
+    name: str
+    a_only: int
+
+class TdB(TypedDict):
+    name: str
+    b_only: int
+
+class NameOnly(TypedDict):
+    name: str
+
+# Positional form allows extra keys (like assignment)
+def construct_from_intersection(data: Intersection[TdA, TdB]) -> NameOnly:
+    return NameOnly(data)
+
+# Unpacking form flags extra keys as errors
+def construct_from_intersection_unpacking(data: Intersection[TdA, TdB]) -> NameOnly:
+    # error: [invalid-key] "Unknown key "a_only" for TypedDict `NameOnly`"
+    # error: [invalid-key] "Unknown key "b_only" for TypedDict `NameOnly`"
+    return NameOnly(**data)
+```
+
 ## Optional fields with `total=False`
 
 By default, all fields in a `TypedDict` are required (`total=True`). You can make all fields
@@ -761,7 +945,7 @@ _: Mapping[str, int] = alice
 _: Mapping[str, str | int | None] = alice
 ```
 
-They *cannot* be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
+They _cannot_ be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
 ways:
 
 ```py
@@ -834,7 +1018,7 @@ a: A = a_from_b(b_from_c(c))
 a["y"] = 42
 ```
 
-If the additional, optional item in the target is read-only, the requirements are *somewhat*
+If the additional, optional item in the target is read-only, the requirements are _somewhat_
 relaxed. In this case, because the source might contain have undeclared extra items of any type, the
 target item must be assignable from `object`:
 
@@ -1386,7 +1570,7 @@ def _(person: Person) -> None:
     type(person).__optional_keys__  # error: [unresolved-attribute]
 ```
 
-But they *can* be accessed on `type[Person]`, because this function would accept the class object
+But they _can_ be accessed on `type[Person]`, because this function would accept the class object
 `Person` as an argument:
 
 ```py
@@ -1863,7 +2047,7 @@ class DisjointTD2(TypedDict):
 static_assert(is_disjoint_from(DisjointTD1, DisjointTD2))
 ```
 
-However, note that most pairs of non-final classes are *not* disjoint from each other, even if
+However, note that most pairs of non-final classes are _not_ disjoint from each other, even if
 neither inherits from the other, because we could define a third class that multiply-inherits from
 both. `TypedDict` disjointness takes this into account. For example:
 
@@ -1908,7 +2092,7 @@ static_assert(not is_disjoint_from(CommonSubTD, NonDisjointTD2))
 
 We made the important fields `ReadOnly` above, because those only establish disjointness when
 they're disjoint themselves. However, the rules for mutable fields are stricter. Mutable fields in
-common need to have *compatible* types (in the fully-static case, equivalent types):
+common need to have _compatible_ types (in the fully-static case, equivalent types):
 
 ```py
 from typing import Any, Generic, TypeVar
@@ -2018,7 +2202,7 @@ static_assert(is_disjoint_from(ReadOnlyBoolTD, IntTD))
 With mutability above we were able to make the simplifying assumption that the "third `TypedDict`
 that's assignable to both" has only mutable fields, because a mutable field is always assignable to
 its immutable counterpart. However, `Required` vs `NotRequired` are more complicated, because a a
-`Required` field is *not* necessarily assignable to its `NotRequired` counterpart. In particular, if
+`Required` field is _not_ necessarily assignable to its `NotRequired` counterpart. In particular, if
 a `NotRequired` field is also mutable (intuitively, if we're allowed to `del` it), then no
 `Required` field is ever assignable to it. So, if either side is `NotRequired` and mutable, and the
 other side is `Required` (regardless of mutability), then that's sufficient to establish
@@ -2265,7 +2449,7 @@ def _(u: Foo | Bar | NotADict):
 It would be nice if we could also narrow `TypedDict` unions by checking whether a key (which only
 shows up in a subset of the union members) is present, but that isn't generally correct, because
 "extra items" are allowed by default. For example, even though `Bar` here doesn't define a `"foo"`
-field, it could be *assigned to* with another `TypedDict` that does:
+field, it could be _assigned to_ with another `TypedDict` that does:
 
 ```py
 from typing_extensions import Literal
