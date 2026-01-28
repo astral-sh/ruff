@@ -202,10 +202,10 @@ class Public:
     # Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
     b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: Literal[1]
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# error: [invalid-assignment] "Object of type `None` is not assignable to attribute `a` of type `Literal[1]`"
 Public.a = None
 ```
 
@@ -225,10 +225,10 @@ class Public:
 
 # TODO: these should raise an error. Once we fix this, update the section description and the table
 # on top of this document.
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: Literal[1]
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# error: [invalid-assignment] "Object of type `None` is not assignable to attribute `a` of type `Literal[1]`"
 Public.a = None
 ```
 

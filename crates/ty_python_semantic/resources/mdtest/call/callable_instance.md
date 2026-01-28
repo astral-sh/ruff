@@ -54,7 +54,7 @@ class NonCallable:
     __call__ = 1
 
 a = NonCallable()
-# error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+# error: [call-non-callable] "Object of type `NonCallable` is not callable"
 reveal_type(a())  # revealed: Unknown
 ```
 

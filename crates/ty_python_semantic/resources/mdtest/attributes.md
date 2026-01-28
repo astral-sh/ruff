@@ -137,6 +137,7 @@ class C:
         self.bound_in_body_declared_in_init: str | None
 
         if flag:
+            # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to attribute `bound_in_body_and_init` of type `None`"
             self.bound_in_body_and_init = "a"
 
 c_instance = C(True)
@@ -149,9 +150,9 @@ reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
 # TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
 # which is planned in https://github.com/astral-sh/ruff/issues/14297
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: str | None
 
-reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
+reveal_type(c_instance.bound_in_body_and_init)  # revealed: None | Unknown | Literal["a"]
 ```
 
 #### Variable defined in non-`__init__` method
@@ -272,10 +273,10 @@ class C:
 
 c_instance = C()
 
-reveal_type(c_instance.a1)  # revealed: Unknown | Literal[1]
-reveal_type(c_instance.b1)  # revealed: Unknown | Literal["a"]
-reveal_type(c_instance.c1)  # revealed: Unknown | int
-reveal_type(c_instance.d1)  # revealed: Unknown | str
+reveal_type(c_instance.a1)  # revealed: Literal[1]
+reveal_type(c_instance.b1)  # revealed: Literal["a"]
+reveal_type(c_instance.c1)  # revealed: int
+reveal_type(c_instance.d1)  # revealed: str
 
 reveal_type(c_instance.a2)  # revealed: Unknown | Literal[1]
 
@@ -717,14 +718,14 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-reveal_type(C.pure_class_variable2)  # revealed: Unknown | Literal[1]
+reveal_type(C.pure_class_variable2)  # revealed: Literal[1]
 
 c_instance = C()
 
 # It is okay to access a pure class variable on an instance.
 reveal_type(c_instance.pure_class_variable1)  # revealed: str
 
-reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown | Literal[1]
+reveal_type(c_instance.pure_class_variable2)  # revealed: Literal[1]
 
 # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
 c_instance.pure_class_variable1 = "value set on instance"
@@ -803,12 +804,12 @@ class C:
 
 reveal_type(C.variable_with_class_default1)  # revealed: str
 
-reveal_type(C.variable_with_class_default2)  # revealed: Unknown | Literal[1]
+reveal_type(C.variable_with_class_default2)  # revealed: Literal[1]
 
 c_instance = C()
 
 reveal_type(c_instance.variable_with_class_default1)  # revealed: str
-reveal_type(c_instance.variable_with_class_default2)  # revealed: Unknown | Literal[1]
+reveal_type(c_instance.variable_with_class_default2)  # revealed: Literal[1]
 
 c_instance.variable_with_class_default1 = "value set on instance"
 
@@ -937,8 +938,8 @@ reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
 reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
 
 # TODO: Both of these should be `str`
-reveal_type(Derived.overwritten_in_subclass_body)  # revealed: Unknown | None
-reveal_type(Derived().overwritten_in_subclass_body)  # revealed: Unknown | None | str
+reveal_type(Derived.overwritten_in_subclass_body)  # revealed: None
+reveal_type(Derived().overwritten_in_subclass_body)  # revealed: None | str
 
 reveal_type(Derived.redeclared_in_method_with_same_type)  # revealed: str | None
 reveal_type(Derived().redeclared_in_method_with_same_type)  # revealed: str | None
@@ -959,13 +960,13 @@ reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str
 reveal_type(Derived().pure_attribute)  # revealed: str | None
 
 # TODO: This should be `str`
-reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: Unknown | None | str
+reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: None | str
 
 reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
 
-# TODO: Both of these should be `Unknown | Literal["intermediate", "base"]`
-reveal_type(Derived.undeclared)  # revealed: Unknown | Literal["intermediate"]
-reveal_type(Derived().undeclared)  # revealed: Unknown | Literal["intermediate"]
+# TODO: Both of these should be `Literal["intermediate", "base"]`
+reveal_type(Derived.undeclared)  # revealed: Literal["intermediate"]
+reveal_type(Derived().undeclared)  # revealed: Literal["intermediate"]
 
 reveal_type(Derived().pure_undeclared)  # revealed: Unknown | Literal["intermediate", "base"]
 ```
@@ -1015,7 +1016,7 @@ def _(flag: bool):
             # TODO: Neither mypy nor pyright show an error here, but we could consider emitting a conflicting-declaration diagnostic here.
             attr2: Literal["class value"] = "class value"
 
-    reveal_type(C3.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
+    reveal_type(C3.attr1)  # revealed: Literal["metaclass value", "class value"]
     reveal_type(C3.attr2)  # revealed: Literal["metaclass value", "class value"]
 ```
 
@@ -1047,7 +1048,7 @@ def _(flag1: bool, flag2: bool):
             attr1 = "class value"
 
     # error: [possibly-missing-attribute]
-    reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
+    reveal_type(C5.attr1)  # revealed: Literal["metaclass value", "class value"]
 ```
 
 ## Invalid access to attribute
@@ -1204,7 +1205,7 @@ def _(flag: bool):
             x = 2
             y: int | str = "b"
 
-    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(C1.x)  # revealed: Literal[1, 2]
     reveal_type(C1.y)  # revealed: int | str
 
     C1.y = 100
@@ -1219,7 +1220,7 @@ def _(flag: bool):
             x = 4
             y: int | str = "d"
 
-    reveal_type(C2.x)  # revealed: Unknown | Literal[3, 4]
+    reveal_type(C2.x)  # revealed: Literal[3, 4]
     reveal_type(C2.y)  # revealed: int | str
 
     C2.y = 100
@@ -1239,7 +1240,7 @@ def _(flag: bool):
             y: int | str = "f"
 
     class C3(metaclass=Meta3): ...
-    reveal_type(C3.x)  # revealed: Unknown | Literal[5, 6]
+    reveal_type(C3.x)  # revealed: Literal[5, 6]
     reveal_type(C3.y)  # revealed: int | str
 
     C3.y = 100
@@ -1257,7 +1258,7 @@ def _(flag: bool):
             y: int | str = "h"
 
     class C4(metaclass=Meta4): ...
-    reveal_type(C4.x)  # revealed: Unknown | Literal[7, 8]
+    reveal_type(C4.x)  # revealed: Literal[7, 8]
     reveal_type(C4.y)  # revealed: int | str
 
     C4.y = 100
@@ -1286,13 +1287,13 @@ def _(flag1: bool, flag2: bool):
     C = C1 if flag1 else C2 if flag2 else C3
 
     # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
-    reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
+    reveal_type(C.x)  # revealed: Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
     # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
-    reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
+    reveal_type(C().x)  # revealed: Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
     C().x = 100
@@ -1318,17 +1319,17 @@ def _(flag: bool, flag1: bool, flag2: bool):
     C = C1 if flag1 else C2 if flag2 else C3
 
     # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
-    reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
+    reveal_type(C.x)  # revealed: Literal[1, 2, 3]
 
-    # error: [possibly-missing-attribute]
+    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
     # Note: we might want to consider ignoring possibly-missing diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
     # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
-    reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
+    reveal_type(C().x)  # revealed: Literal[1, 2, 3]
 
-    # error: [possibly-missing-attribute]
+    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
     C().x = 100
 ```
 
@@ -1373,10 +1374,12 @@ def _(flag: bool):
         if flag:
             x = 2
 
-    reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+    reveal_type(Bar.x)  # revealed: Literal[2, 1]
+    # error: [invalid-assignment] "Object of type `Literal[3]` is not assignable to attribute `x` of type `Literal[2, 1]`"
     Bar.x = 3
 
-    reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
+    reveal_type(Bar().x)  # revealed: Literal[2, 1]
+    # error: [invalid-assignment] "Object of type `Literal[3]` is not assignable to attribute `x` of type `Literal[2, 1]`"
     Bar().x = 3
 ```
 
@@ -1393,15 +1396,17 @@ def _(flag: bool):
             x = 2
 
     # error: [possibly-missing-attribute]
-    reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+    reveal_type(Bar.x)  # revealed: Literal[2, 1]
 
     # error: [possibly-missing-attribute]
+    # error: [invalid-assignment] "Object of type `Literal[3]` is not assignable to attribute `x` of type `Literal[2, 1]`"
     Bar.x = 3
 
     # error: [possibly-missing-attribute]
-    reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
+    reveal_type(Bar().x)  # revealed: Literal[2, 1]
 
     # error: [possibly-missing-attribute]
+    # error: [invalid-assignment] "Object of type `Literal[3]` is not assignable to attribute `x` of type `Literal[2, 1]`"
     Bar().x = 3
 ```
 
@@ -1478,8 +1483,9 @@ class A:
 class B(A): ...
 class C(B): ...
 
-reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
+reveal_type(C.X)  # revealed: Literal["foo"]
 
+# error: [invalid-assignment] "Object of type `Literal["bar"]` is not assignable to attribute `X` of type `Literal["foo"]`"
 C.X = "bar"
 ```
 
@@ -1505,8 +1511,9 @@ class A(B, C): ...
 reveal_mro(A)
 
 # `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
-reveal_type(A.X)  # revealed: Unknown | Literal[42]
+reveal_type(A.X)  # revealed: Literal[42]
 
+# error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `X` of type `Literal[42]`"
 A.X = 100
 ```
 

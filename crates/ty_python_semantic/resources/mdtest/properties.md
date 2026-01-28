@@ -169,7 +169,7 @@ c.attr = 1
 
 # TODO: An error should be emitted here.
 # See https://github.com/astral-sh/ruff/issues/16298 for more details.
-reveal_type(c.attr)  # revealed: Unknown
+reveal_type(c.attr)  # revealed: Never
 ```
 
 ### Wrong setter signature
@@ -208,14 +208,13 @@ class C:
     attr = property(attr_getter)
 
 c = C()
-reveal_type(c.attr)  # revealed: Unknown | int
+reveal_type(c.attr)  # revealed: int
 ```
 
-But note that we return `Unknown | int` because we did not declare the `attr` attribute. This is
-consistent with how we usually treat attributes, but here, if we try to declare `attr` as
-`property`, we fail to understand the property, since the `property` declaration shadows the more
-precise type that we infer for `property(attr_getter)` (which includes the actual information about
-the getter).
+But note that we return `int` because we did not declare the `attr` attribute. This is consistent
+with how we usually treat attributes, but here, if we try to declare `attr` as `property`, we fail
+to understand the property, since the `property` declaration shadows the more precise type that we
+infer for `property(attr_getter)` (which includes the actual information about the getter).
 
 ```py
 class C:

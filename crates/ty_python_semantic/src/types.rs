@@ -39,8 +39,8 @@ pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening,
-    builtins_module_scope, imported_symbol, known_module_symbol,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
+    imported_symbol, known_module_symbol,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
@@ -2765,7 +2765,6 @@ impl<'db> Type<'db> {
                         ty: Type::Union(union),
                         origin,
                         definedness: boundness,
-                        widening,
                     }),
                 qualifiers,
             } => (
@@ -2777,7 +2776,6 @@ impl<'db> Type<'db> {
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
                             definedness: boundness,
-                            widening,
                         })
                     })
                     .with_qualifiers(qualifiers),
@@ -2798,7 +2796,6 @@ impl<'db> Type<'db> {
                         ty: Type::Intersection(intersection),
                         origin,
                         definedness: boundness,
-                        widening,
                     }),
                 qualifiers,
             } => (
@@ -2810,7 +2807,6 @@ impl<'db> Type<'db> {
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
                             definedness: boundness,
-                            widening,
                         })
                     })
                     .with_qualifiers(qualifiers),
@@ -2824,7 +2820,6 @@ impl<'db> Type<'db> {
                         ty: attribute_ty,
                         origin,
                         definedness: boundness,
-                        widening,
                     }),
                 qualifiers: _,
             } => {
@@ -2836,7 +2831,6 @@ impl<'db> Type<'db> {
                             ty: return_ty,
                             origin,
                             definedness: boundness,
-                            widening,
                         })
                         .into(),
                         attribute_kind,
@@ -2954,20 +2948,17 @@ impl<'db> Type<'db> {
                     ty: meta_attr_ty,
                     origin: meta_origin,
                     definedness: Definedness::PossiblyUndefined,
-                    ..
                 }),
                 AttributeKind::DataDescriptor,
                 Place::Defined(DefinedPlace {
                     ty: fallback_ty,
                     origin: fallback_origin,
                     definedness: fallback_boundness,
-                    widening: fallback_widening,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: fallback_boundness,
-                widening: fallback_widening,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -2998,20 +2989,17 @@ impl<'db> Type<'db> {
                     ty: meta_attr_ty,
                     origin: meta_origin,
                     definedness: meta_attr_boundness,
-                    ..
                 }),
                 AttributeKind::NormalOrNonDataDescriptor,
                 Place::Defined(DefinedPlace {
                     ty: fallback_ty,
                     origin: fallback_origin,
                     definedness: fallback_boundness,
-                    widening: fallback_widening,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: meta_attr_boundness.max(fallback_boundness),
-                widening: fallback_widening,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -8890,7 +8878,6 @@ impl<'db> TypeVarConstraints<'db> {
                     ty: ty_member,
                     origin: member_origin,
                     definedness: member_boundness,
-                    ..
                 }) => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
@@ -8914,7 +8901,6 @@ impl<'db> TypeVarConstraints<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
                 })
             },
             qualifiers,
@@ -10029,7 +10015,7 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
                     .member(context.db(), "__bool__")
-                    .into_lookup_result(context.db())
+                    .into_lookup_result()
                     .ok()
                     .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
                 {
@@ -10057,7 +10043,7 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
                     .member(context.db(), "__bool__")
-                    .into_lookup_result(context.db())
+                    .into_lookup_result()
                     .ok()
                     .and_then(|quals| quals.inner_type().function_spans(context.db()))
                     .and_then(|spans| Some((spans.name, spans.return_type?)))
@@ -12073,7 +12059,6 @@ impl<'db> UnionType<'db> {
                     ty: ty_member,
                     origin: member_origin,
                     definedness: member_boundness,
-                    ..
                 }) => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
@@ -12099,7 +12084,6 @@ impl<'db> UnionType<'db> {
                 } else {
                     Definedness::AlwaysDefined
                 },
-                widening: Widening::None,
             })
         }
     }
@@ -12129,7 +12113,6 @@ impl<'db> UnionType<'db> {
                     ty: ty_member,
                     origin: member_origin,
                     definedness: member_boundness,
-                    ..
                 }) => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
@@ -12155,7 +12138,6 @@ impl<'db> UnionType<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    widening: Widening::None,
                 })
             },
             qualifiers,
@@ -12715,7 +12697,6 @@ impl<'db> IntersectionType<'db> {
                     ty: ty_member,
                     origin: member_origin,
                     definedness: member_boundness,
-                    ..
                 }) => {
                     origin = origin.merge(member_origin);
                     all_unbound = false;
@@ -12739,7 +12720,6 @@ impl<'db> IntersectionType<'db> {
                 } else {
                     Definedness::PossiblyUndefined
                 },
-                widening: Widening::None,
             })
         }
     }
@@ -12767,7 +12747,6 @@ impl<'db> IntersectionType<'db> {
                     ty: ty_member,
                     origin: member_origin,
                     definedness: member_boundness,
-                    ..
                 }) => {
                     origin = origin.merge(member_origin);
                     all_unbound = false;
@@ -12792,7 +12771,6 @@ impl<'db> IntersectionType<'db> {
                     } else {
                         Definedness::PossiblyUndefined
                     },
-                    widening: Widening::None,
                 })
             },
             qualifiers,
