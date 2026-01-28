@@ -24,6 +24,20 @@ impl AllowedValue {
         literal_expr: LiteralExpressionRef<'_>,
         allowed_values: &[AllowedValue],
     ) -> bool {
+        fn float_as_i64(value: f64) -> Option<i64> {
+            #[allow(clippy::cast_precision_loss)]
+            if value.is_finite()
+                && value.fract() == 0.0
+                && value >= i64::MIN as f64
+                && value <= i64::MAX as f64
+            {
+                #[allow(clippy::cast_possible_truncation)]
+                Some(value as i64)
+            } else {
+                None
+            }
+        }
+
         match literal_expr {
             LiteralExpressionRef::StringLiteral(ExprStringLiteral { value, .. }) => {
                 let string_value = value.to_str();
@@ -41,6 +55,8 @@ impl AllowedValue {
                         allowed_values.iter().any(|allowed| {
                             if let AllowedValue::Int(allowed_int) = allowed {
                                 *allowed_int == int_value
+                            } else if let AllowedValue::Float(allowed_float) = allowed {
+                                float_as_i64(allowed_float.value()) == Some(int_value)
                             } else {
                                 false
                             }
@@ -51,9 +67,14 @@ impl AllowedValue {
                 }
                 Number::Float(f) => {
                     let float_value = AllowedFloatValue::new(*f);
+                    let float_as_int = float_as_i64(*f);
                     allowed_values.iter().any(|allowed| {
                         if let AllowedValue::Float(allowed_float) = allowed {
                             *allowed_float == float_value
+                        } else if let (AllowedValue::Int(allowed_int), Some(int_value)) =
+                            (allowed, float_as_int)
+                        {
+                            *allowed_int == int_value
                         } else {
                             false
                         }
