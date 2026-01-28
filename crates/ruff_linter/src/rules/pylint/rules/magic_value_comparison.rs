@@ -23,7 +23,9 @@ use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 /// "magic" value definition, namely `0`, `1`, `0.0`, `1.0`, `""`, and
 /// `"__main__"`. It also exempts comparisons against `sys.version`,
 /// `sys.version_info`, and `sys.implementation.version`.
-/// These defaults can be configured using `lint.pylint.allow-magic-values`.
+/// These can be configured using the `lint.pylint.allow-magic-values`,
+/// `lint.pylint.extend-allowed-magic-values`, and `lint.pylint.allow-magic-value-types`
+/// settings.
 ///
 /// ## Example
 /// ```python
@@ -49,6 +51,7 @@ use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 /// ## Options
 /// - `lint.pylint.allow-magic-value-types`
 /// - `lint.pylint.allow-magic-values`
+/// - `lint.pylint.extend-allowed-magic-values`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]
