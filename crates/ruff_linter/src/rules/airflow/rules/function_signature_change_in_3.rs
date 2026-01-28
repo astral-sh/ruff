@@ -111,21 +111,31 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
             ["airflow", "models" | "sdk", .., "BaseOperatorLink"]
         )
     }) {
-        // Count positional parameters
-        let positional_params: Vec<_> = function_def
-            .parameters
-            .posonlyargs
-            .iter()
-            .chain(function_def.parameters.args.iter())
-            .collect();
+        let parameters = &function_def.parameters;
+        let positional_count = parameters.posonlyargs.len() + parameters.args.len();
 
-        // Deprecated: exactly 3 positional args where 3rd is not "ti_key"
-        if positional_params.len() == 3 && positional_params[2].name().as_str() != "ti_key" {
+        let is_valid_signature = match positional_count {
+            // check valid signature `def get_link(self, operator, *, ti_key)`
+            2 => parameters
+                .kwonlyargs
+                .iter()
+                .any(|p| p.name().as_str() == "ti_key"),
+            // check valid signature `def get_link(self, operator, ti_key)`
+            3 => parameters
+                .posonlyargs
+                .iter()
+                .chain(parameters.args.iter())
+                .nth(2)
+                .is_some_and(|p| p.name().as_str() == "ti_key"),
+            _ => false,
+        };
+
+        if !is_valid_signature {
             checker.report_diagnostic(
                 Airflow3IncompatibleFunctionSignature {
                     function_name: "get_link".to_string(),
                     change: FunctionSignatureChange::Message(
-                        "The third positional argument needs to be named as `ti_key`. Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)`.",
+                        "Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.",
                     ),
                 },
                 function_def.name.range(),
