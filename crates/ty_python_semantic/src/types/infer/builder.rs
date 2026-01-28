@@ -12573,8 +12573,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                     }
-                    // For bounded TypeVars or unconstrained TypeVars, fall through to default handling.
-                    _ => match operand_type.try_call_dunder(
+                    // For bounded TypeVars with union bounds (like `bound=float` which becomes
+                    // `int | float`), we need to delegate to the bound type.
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        self.infer_unary_expression_type(op, bound, unary)
+                    }
+                    // For unconstrained TypeVars, fall through to default handling.
+                    None => match operand_type.try_call_dunder(
                         self.db(),
                         unary_dunder_method,
                         CallArguments::none(),
@@ -13785,6 +13790,86 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     })
                 }),
             ),
+
+            // Similar to `NewType`s, `TypeVar`s with union bounds (like `bound=float` which becomes
+            // `int | float`) need to delegate to the bound type.
+            //
+            // When both operands are the same bounded TypeVar, we check the comparison on the bound
+            // type paired with itself.
+            (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
+                if left_tvar.identity(self.db()) == right_tvar.identity(self.db()) =>
+            {
+                match left_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
+                        try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
+                            visitor.visit((left, op, right), || {
+                                self.infer_binary_type_comparison(bound, op, bound, range, visitor)
+                            })
+                        }),
+                    ),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        // For constrained TypeVars, check each constraint paired with itself.
+                        let mut builder = UnionBuilder::new(self.db());
+                        for &constraint in constraints.elements(self.db()) {
+                            builder = builder.add(self.infer_binary_type_comparison(
+                                constraint,
+                                op,
+                                constraint,
+                                range,
+                                visitor,
+                            )?);
+                        }
+                        Some(Ok(builder.build()))
+                    }
+                    None => None, // Fall through to default handling
+                }
+            }
+            // When the left operand is a bounded TypeVar and the right is not a TypeVar,
+            // delegate to the bound type.
+            (Type::TypeVar(left_tvar), right) if !right.is_type_var() => {
+                match left_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
+                        try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
+                            visitor.visit((left, op, right), || {
+                                self.infer_binary_type_comparison(bound, op, right, range, visitor)
+                            })
+                        }),
+                    ),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        let mut builder = UnionBuilder::new(self.db());
+                        for &constraint in constraints.elements(self.db()) {
+                            builder = builder.add(self.infer_binary_type_comparison(
+                                constraint, op, right, range, visitor,
+                            )?);
+                        }
+                        Some(Ok(builder.build()))
+                    }
+                    None => None,
+                }
+            }
+            // When the right operand is a bounded TypeVar and the left is not a TypeVar,
+            // delegate to the bound type.
+            (left, Type::TypeVar(right_tvar)) if !left.is_type_var() => {
+                match right_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
+                        try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
+                            visitor.visit((left, op, right), || {
+                                self.infer_binary_type_comparison(left, op, bound, range, visitor)
+                            })
+                        }),
+                    ),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        let mut builder = UnionBuilder::new(self.db());
+                        for &constraint in constraints.elements(self.db()) {
+                            builder = builder.add(self.infer_binary_type_comparison(
+                                left, op, constraint, range, visitor,
+                            )?);
+                        }
+                        Some(Ok(builder.build()))
+                    }
+                    None => None,
+                }
+            }
 
             (Type::IntLiteral(n), Type::IntLiteral(m)) => Some(match op {
                 ast::CmpOp::Eq => Ok(Type::BooleanLiteral(n == m)),
