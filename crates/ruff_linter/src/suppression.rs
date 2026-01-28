@@ -504,13 +504,12 @@ impl<'a> SuppressionsBuilder<'a> {
             let mut count = 0;
             let last_indent = before
                 .iter()
-                .filter(|token| matches!(token.kind(), TokenKind::Indent | TokenKind::Dedent))
                 .rfind(|token| {
-                    // ignore matching dedents and indents above until we find
+                    // look for the last indent not matched by a dedent
                     count += match token.kind() {
                         TokenKind::Dedent => 1,
                         TokenKind::Indent => -1,
-                        _ => 0,
+                        _ => return false,
                     };
                     token.kind() == TokenKind::Indent && count < 0
                 })
