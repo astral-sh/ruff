@@ -1,0 +1,287 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: abstract.md - Tests regarding abstract classes - Instantiation is forbidden
+mdtest path: crates/ty_python_semantic/resources/mdtest/abstract.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | import abc
+ 2 | from typing import Protocol
+ 3 | 
+ 4 | class Foo(abc.ABC):
+ 5 |     @abc.abstractmethod
+ 6 |     def bar(self): ...
+ 7 | 
+ 8 | class Spam(Foo): ...
+ 9 | 
+10 | # error: [call-non-callable] "Cannot instantiate `Spam` with unimplemented abstract method `bar`"
+11 | Spam()
+12 | 
+13 | class Foo2(abc.ABC):
+14 |     @abc.abstractmethod
+15 |     def bar(self): ...
+16 |     @abc.abstractmethod
+17 |     def bar2(self): ...
+18 | 
+19 | # error: [call-non-callable] "Cannot instantiate `Foo2` with unimplemented abstract methods `bar` and `bar2`"
+20 | Foo2()
+21 | 
+22 | class Spam2(Foo2): ...
+23 | 
+24 | # error: [call-non-callable]
+25 | Spam2()
+26 | 
+27 | class Foo3(Protocol):
+28 |     def bar(self) -> int: ...
+29 | 
+30 | class Spam3(Foo3): ...
+31 | 
+32 | # error: [call-non-callable]
+33 | Spam3()
+34 | from abc import ABC, abstractmethod
+35 | from dataclasses import dataclass
+36 | from functools import total_ordering
+37 | 
+38 | class AbstractOrdered(ABC):
+39 |     @abstractmethod
+40 |     def __lt__(self, other): ...
+41 | 
+42 | @dataclass(order=True)
+43 | class ConcreteOrdered(AbstractOrdered): ...
+44 | 
+45 | ConcreteOrdered()  # fine
+46 | 
+47 | @total_ordering
+48 | class AlsoConreteOrdered(AbstractOrdered):
+49 |     def __gt__(self, other): ...
+50 | 
+51 | # total_ordering does not override a comparison method
+52 | # if it already exists in the MRO, even if the one that
+53 | # exists in the MRO is abstract!
+54 | #
+55 | # error: [call-non-callable]
+56 | AlsoConreteOrdered()
+57 | class AbstractMixin(ABC):
+58 |     @abstractmethod
+59 |     def bar(self): ...
+60 | 
+61 | class ConcreteMixin:
+62 |     def bar(self): ...
+63 | 
+64 | class Sub1(AbstractMixin, ConcreteMixin): ...
+65 | class Sub2(ConcreteMixin, AbstractMixin): ...
+66 | 
+67 | Sub1()  # error: [call-non-callable]
+68 | Sub2()  # fine
+69 | from typing import Protocol
+70 | 
+71 | class Abstract(Protocol):
+72 |     def a(self) -> int: ...
+73 |     def b(self) -> int: ...
+74 |     def c(self) -> int: ...
+75 |     def d(self) -> int: ...
+76 |     def e(self) -> int: ...
+77 |     def f(self) -> int: ...
+78 |     def g(self) -> int: ...
+79 |     def h(self) -> int: ...
+80 |     def i(self) -> int: ...
+81 |     def k(self) -> int: ...
+82 | 
+83 | class StillSadlyAbstract(Abstract): ...
+84 | 
+85 | StillSadlyAbstract()  # error: [call-non-callable]
+```
+
+# Diagnostics
+
+```
+error[call-non-callable]: Cannot instantiate abstract class `Spam`
+  --> src/mdtest_snippet.py:11:1
+   |
+10 | # error: [call-non-callable] "Cannot instantiate `Spam` with unimplemented abstract method `bar`"
+11 | Spam()
+   | ^^^^^^ Abstract method `bar` is unimplemented
+12 |
+13 | class Foo2(abc.ABC):
+   |
+  ::: src/mdtest_snippet.py:6:9
+   |
+ 4 | class Foo(abc.ABC):
+ 5 |     @abc.abstractmethod
+ 6 |     def bar(self): ...
+   |         --- `bar` declared as abstract
+ 7 |
+ 8 | class Spam(Foo): ...
+   |
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[call-non-callable]: Cannot instantiate abstract class `Foo2`
+  --> src/mdtest_snippet.py:20:1
+   |
+19 | # error: [call-non-callable] "Cannot instantiate `Foo2` with unimplemented abstract methods `bar` and `bar2`"
+20 | Foo2()
+   | ^^^^^^ `Foo2` has unimplemented abstract methods
+21 |
+22 | class Spam2(Foo2): ...
+   |
+info: Abstract methods `bar` and `bar2` are unimplemented
+  --> src/mdtest_snippet.py:15:9
+   |
+13 | class Foo2(abc.ABC):
+14 |     @abc.abstractmethod
+15 |     def bar(self): ...
+   |         --- `bar` declared as abstract
+16 |     @abc.abstractmethod
+17 |     def bar2(self): ...
+   |
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[call-non-callable]: Cannot instantiate abstract class `Spam2`
+  --> src/mdtest_snippet.py:25:1
+   |
+24 | # error: [call-non-callable]
+25 | Spam2()
+   | ^^^^^^^ `Spam2` has unimplemented abstract methods
+26 |
+27 | class Foo3(Protocol):
+   |
+info: Abstract methods `bar` and `bar2` are unimplemented
+  --> src/mdtest_snippet.py:15:9
+   |
+13 | class Foo2(abc.ABC):
+14 |     @abc.abstractmethod
+15 |     def bar(self): ...
+   |         --- `bar` declared as abstract
+16 |     @abc.abstractmethod
+17 |     def bar2(self): ...
+   |
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[call-non-callable]: Cannot instantiate abstract class `Spam3`
+  --> src/mdtest_snippet.py:33:1
+   |
+32 | # error: [call-non-callable]
+33 | Spam3()
+   | ^^^^^^^ Abstract method `bar` is unimplemented
+34 | from abc import ABC, abstractmethod
+35 | from dataclasses import dataclass
+   |
+  ::: src/mdtest_snippet.py:28:9
+   |
+27 | class Foo3(Protocol):
+28 |     def bar(self) -> int: ...
+   |         --- `bar` declared as abstract
+29 |
+30 | class Spam3(Foo3): ...
+   |
+info: `Spam3.bar` is implicitly abstract because `Spam3` is a `Protocol` class and `bar` lacks an implementation
+  --> src/mdtest_snippet.py:30:7
+   |
+28 |     def bar(self) -> int: ...
+29 |
+30 | class Spam3(Foo3): ...
+   |       ----------- `Spam3` declared here
+31 |
+32 | # error: [call-non-callable]
+   |
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[call-non-callable]: Cannot instantiate abstract class `AlsoConreteOrdered`
+  --> src/mdtest_snippet.py:56:1
+   |
+54 | #
+55 | # error: [call-non-callable]
+56 | AlsoConreteOrdered()
+   | ^^^^^^^^^^^^^^^^^^^^ Abstract method `__lt__` is unimplemented
+57 | class AbstractMixin(ABC):
+58 |     @abstractmethod
+   |
+  ::: src/mdtest_snippet.py:40:9
+   |
+38 | class AbstractOrdered(ABC):
+39 |     @abstractmethod
+40 |     def __lt__(self, other): ...
+   |         ------ `__lt__` declared as abstract
+41 |
+42 | @dataclass(order=True)
+   |
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[call-non-callable]: Cannot instantiate abstract class `Sub1`
+  --> src/mdtest_snippet.py:67:1
+   |
+65 | class Sub2(ConcreteMixin, AbstractMixin): ...
+66 |
+67 | Sub1()  # error: [call-non-callable]
+   | ^^^^^^ Abstract method `bar` is unimplemented
+68 | Sub2()  # fine
+69 | from typing import Protocol
+   |
+  ::: src/mdtest_snippet.py:59:9
+   |
+57 | class AbstractMixin(ABC):
+58 |     @abstractmethod
+59 |     def bar(self): ...
+   |         --- `bar` declared as abstract
+60 |
+61 | class ConcreteMixin:
+   |
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[call-non-callable]: Cannot instantiate abstract class `StillSadlyAbstract`
+  --> src/mdtest_snippet.py:85:1
+   |
+83 | class StillSadlyAbstract(Abstract): ...
+84 |
+85 | StillSadlyAbstract()  # error: [call-non-callable]
+   | ^^^^^^^^^^^^^^^^^^^^ `StillSadlyAbstract` has unimplemented abstract methods
+   |
+info: 10 abstract methods are unimplemented, including `a`, `b` and `c`
+  --> src/mdtest_snippet.py:72:9
+   |
+71 | class Abstract(Protocol):
+72 |     def a(self) -> int: ...
+   |         - `a` declared as abstract
+73 |     def b(self) -> int: ...
+74 |     def c(self) -> int: ...
+   |
+info: Use `--verbose` to see all 10 unimplemented abstract methods
+info: `StillSadlyAbstract.a` is implicitly abstract because `StillSadlyAbstract` is a `Protocol` class and `a` lacks an implementation
+  --> src/mdtest_snippet.py:83:7
+   |
+81 |     def k(self) -> int: ...
+82 |
+83 | class StillSadlyAbstract(Abstract): ...
+   |       ---------------------------- `StillSadlyAbstract` declared here
+84 |
+85 | StillSadlyAbstract()  # error: [call-non-callable]
+   |
+info: rule `call-non-callable` is enabled by default
+
+```

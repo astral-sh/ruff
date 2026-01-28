@@ -79,7 +79,10 @@ T = TypeVar("T")
 class CanIndex(Protocol[T]):
     def __getitem__(self, index: int, /) -> T: ...
 
-class ExplicitlyImplements(CanIndex[T]): ...
+class ExplicitlyImplements(CanIndex[T]):
+    def __getitem__(self, index: int, /) -> T:
+        raise NotImplementedError
+
 class SubProtocol(CanIndex[T], Protocol): ...
 
 def takes_in_list(x: list[T]) -> list[T]:

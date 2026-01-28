@@ -939,7 +939,7 @@ from ty_extensions import reveal_mro
 class MyProtocol(Protocol):
     def method(self) -> int: ...
 
-ProtoImpl = type("ProtoImpl", (MyProtocol,), {})
+ProtoImpl = type("ProtoImpl", (MyProtocol,), {"method": lambda self: 42})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
 reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 

@@ -1,7 +1,5 @@
 use itertools::{Either, EitherOrBoth, Itertools};
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
-};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
@@ -57,7 +55,7 @@ use crate::semantic_index::{
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    AbstractMethod, ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
+    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
     MetaclassErrorKind, MethodDecorator, NamedTupleField, NamedTupleSpec,
 };
@@ -80,7 +78,8 @@ use crate::types::diagnostic::{
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
     UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
-    hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
+    hint_if_stdlib_submodule_exists_on_other_versions,
+    report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
     report_conflicting_metaclass_from_bases, report_duplicate_bases, report_implicit_return_type,
@@ -1406,9 +1405,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let abstract_methods = class_type.abstract_methods(db);
 
         // If there are no abstract methods, we're done.
-        let Some((first_method_name, abstract_method)) = abstract_methods.iter().next() else {
+        let Some(abstract_method) = abstract_methods.first(db) else {
             return;
         };
+        let method_name = abstract_method.name;
 
         let Some(builder) = self
             .context
@@ -1421,38 +1421,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Final class `{}` does not implement abstract {}",
             class.name(db),
             if abstract_methods.len() == 1 {
-                format!("method `{first_method_name}`")
+                format!("method `{method_name}`")
             } else {
-                format!("methods {}", format_enumeration(abstract_methods.keys()))
+                format!("methods {}", format_enumeration(abstract_methods.names()))
             }
         ));
 
-        let AbstractMethod {
-            defining_class,
-            definition,
-            explicitly_abstract,
-        } = abstract_method;
-
-        let module = parsed_module(db, definition.file(db)).load(db);
-        let span = Span::from(definition.focus_range(db, &module));
+        let defining_class = abstract_method.defining_class;
         let defining_class_name = defining_class.name(db);
-        let secondary_annotation = Annotation::secondary(span).message(format_args!(
-            "`{first_method_name}` defined as abstract on superclass `{defining_class_name}`",
-        ));
+        let secondary_annotation = Annotation::secondary(abstract_method.span(db));
+        let secondary_annotation = if defining_class.class_literal(db).as_static() == Some(class) {
+            secondary_annotation.message(format_args!("`{method_name}` declared as abstract",))
+        } else {
+            secondary_annotation.message(format_args!(
+                "`{method_name}` declared as abstract on superclass `{defining_class_name}`",
+            ))
+        };
         diagnostic.annotate(secondary_annotation);
-        if !explicitly_abstract {
-            let mut sub = SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format_args!(
-                    "`{defining_class_name}.{first_method_name}` is implicitly abstract \
-                    because `{defining_class_name}` is a `Protocol` class \
-                    and `{first_method_name}` lacks an implementation",
-                ),
-            );
-            sub.annotate(
-                Annotation::primary(defining_class.definition_span(db))
-                    .message(format_args!("`{defining_class_name}` declared here")),
-            );
+        if let Some(sub) = abstract_method.explanatory_subdiagnostic(db) {
             diagnostic.sub(sub);
         }
     }
@@ -11188,6 +11174,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         call_expression,
                         protocol,
                     );
+                } else {
+                    let abstract_methods = class.abstract_methods(self.db());
+                    if !abstract_methods.is_empty() {
+                        report_attempted_instantiation_of_abstract_class(
+                            &self.context,
+                            call_expression,
+                            class,
+                            &abstract_methods,
+                        );
+                    }
                 }
             }
 
