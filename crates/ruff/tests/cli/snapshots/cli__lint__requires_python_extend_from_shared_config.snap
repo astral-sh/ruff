@@ -76,7 +76,7 @@ linter.rules.should_fix = [
 linter.per_file_ignores = {}
 linter.safety_table.forced_safe = []
 linter.safety_table.forced_unsafe = []
-linter.unresolved_target_version = 3.10
+linter.unresolved_target_version = 3.11
 linter.per_file_target_version = {}
 linter.preview = disabled
 linter.explicit_preview_rules = false
@@ -265,7 +265,7 @@ linter.ruff.strictly_empty_init_modules = false
 
 # Formatter Settings
 formatter.exclude = []
-formatter.unresolved_target_version = 3.10
+formatter.unresolved_target_version = 3.11
 formatter.per_file_target_version = {}
 formatter.preview = disabled
 formatter.line_width = 88
@@ -280,7 +280,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
-analyze.target_version = 3.10
+analyze.target_version = 3.11
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
