@@ -63,3 +63,16 @@ if __name__ == "__main__":
         filename = sys.argv[1]
         unsafe_archive_handler(filename)
         managed_members_archive_handler(filename)
+
+import zipfile
+from pathlib import Path
+
+def zipfile_safe_handler(filename):
+    asset_path = Path("path/to/your/archive.zip")
+    extract_dir = Path("path/to/extract/directory")
+
+    with zipfile.ZipFile(asset_path, "r") as zf:
+        zf.extractall(extract_dir)
+
+    zf2 = zipfile.ZipFile(asset_path, "r")
+    zf2.extractall(extract_dir)
