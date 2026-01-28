@@ -717,7 +717,88 @@ impl GotoTarget<'_> {
     ) -> Option<GotoTarget<'a>> {
         tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
-        match covering_node.node() {
+        let node = covering_node.node();
+
+        // Special-case subscripts: if the cursor lands on a literal index/key, slice bound, or
+        // slice inside `value[...]`, retarget the covering node to the parent `ExprSubscript`.
+        // Non-literal subscripts (e.g. `value[a<CURSOR>b]`) still hover the identifier itself.
+        // This avoids "no hover" on literals and lets hover/goto show the subscript result type.
+        // TODO: Consider a dedicated GotoTarget for literal subscripts to enable goto-declaration
+        // for TypedDict keys (https://github.com/astral-sh/ty/issues/2630).
+        if let Some(expr) = node.as_expr_ref() {
+            let enclosing_subscript_with_slice_range =
+                |range: TextRange| -> Option<&'a ast::ExprSubscript> {
+                    covering_node.ancestors().find_map(|node| {
+                        let AnyNodeRef::ExprSubscript(subscript) = node else {
+                            return None;
+                        };
+                        (subscript.slice.range() == range).then_some(subscript)
+                    })
+                };
+
+            // 1. Cursor on the `ExprSlice` itself (e.g. `values[<CURSOR>:2]`,
+            // `values[:<CURSOR>2]`).
+            if expr.is_slice_expr()
+                && let Some(subscript) = enclosing_subscript_with_slice_range(expr.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 2. Cursor on a literal or signed-literal `ExprSubscript.slice` (e.g. `values[0]`,
+            // `person["name"]`, `values[-1]` where the covering node is the bracketed
+            // expression).
+            let slice_expr_range = if expr.is_literal_expr() {
+                Some(expr.range())
+            } else if let Some(unary_op) = expr.unary_op_expr()
+                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand.is_literal_expr()
+            {
+                Some(unary_op.range())
+            } else {
+                None
+            };
+
+            if let Some(slice_range) = slice_expr_range
+                && let Some(subscript) = enclosing_subscript_with_slice_range(slice_range)
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 3. Cursor on the unary-op operand for `values[-1]` (e.g. `values[-<CURSOR>1]`,
+            // covering node is the inner literal and parent is `ExprUnaryOp`).
+            if expr.is_literal_expr()
+                && let Some(AnyNodeRef::ExprUnaryOp(unary_op)) = covering_node.parent()
+                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand.is_literal_expr()
+                && unary_op.operand.range() == expr.range()
+                && let Some(subscript) = enclosing_subscript_with_slice_range(unary_op.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 4. Cursor on a literal or signed-literal `ExprSlice` bound (e.g. `values[1:<CURSOR>2]`,
+            // `values[:-<CURSOR>1]`).
+            if slice_expr_range.is_some()
+                && let Some(slice) = covering_node.ancestors().find_map(|node| match node {
+                    AnyNodeRef::ExprSlice(slice) => Some(slice),
+                    _ => None,
+                })
+                && let Some(subscript) = enclosing_subscript_with_slice_range(slice.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 5. Cursor immediately before the `[` (e.g. `values<CURSOR>[0]` or
+            // `values<CURSOR>[1:]`).
+            if let Some(AnyNodeRef::ExprSubscript(subscript)) = covering_node.parent()
+                && subscript.value.range() == expr.range()
+                && expr.range().end() == offset
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+        }
+
+        match node {
             AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
                 Some(AnyNodeRef::StmtFunctionDef(function)) => {
                     Some(GotoTarget::FunctionDef(function))
