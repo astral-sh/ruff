@@ -18,8 +18,9 @@ use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 /// or named constants.
 ///
 /// Some common values and object types are ignored by this rule be default.
-/// These can be configured using the `lint.pylint.allow-magic-values` and
-/// `lint.pylint.allow-magic-value-types` settings, respectively.
+/// These can be configured using the `lint.pylint.allow-magic-values`,
+/// `lint.pylint.extend-allowed-magic-values`, and `lint.pylint.allow-magic-value-types`
+/// settings.
 ///
 /// ## Example
 /// ```python
@@ -45,6 +46,7 @@ use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 /// ## Options
 /// - `lint.pylint.allow-magic-value-types`
 /// - `lint.pylint.allow-magic-values`
+/// - `lint.pylint.extend-allowed-magic-values`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]

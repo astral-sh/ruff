@@ -2809,7 +2809,17 @@
           }
         },
         "allow-magic-values": {
-          "description": "Specific literal values to ignore when used as \"magic values\" (see `PLR2004`).",
+          "description": "Specific literal values to ignore when used as \"magic values\" (see `PLR2004`).\n\nWhen set, this option replaces the defaults entirely.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/AllowedValue"
+          }
+        },
+        "extend-allowed-magic-values": {
+          "description": "Additional literal values to ignore when used as \"magic values\" (see `PLR2004`),\nin addition to the default set.\n\nThis option is used to extend the default set without replacing it.\nIf `allow-magic-values` is set, this option is ignored.",
           "type": [
             "array",
             "null"
