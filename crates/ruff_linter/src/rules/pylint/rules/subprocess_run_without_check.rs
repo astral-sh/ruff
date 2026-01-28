@@ -49,7 +49,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", safety = "unsafe")]
 pub(crate) struct SubprocessRunWithoutCheck;
 
 impl Violation for SubprocessRunWithoutCheck {

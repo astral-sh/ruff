@@ -62,7 +62,7 @@ use ruff_python_ast::PythonVersion;
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [type parameter lists]: https://docs.python.org/3/reference/compound_stmts.html#type-params
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", safety = "unsafe")]
 pub(crate) struct ClassWithMixedTypeVars;
 
 impl Violation for ClassWithMixedTypeVars {

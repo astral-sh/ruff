@@ -54,7 +54,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Iterators and Iterables in Python: Run Efficient Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.278")]
+#[violation_metadata(stable_since = "v0.0.278", safety = "unsafe")]
 pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     iterable: SourceCodeSnippet,
 }

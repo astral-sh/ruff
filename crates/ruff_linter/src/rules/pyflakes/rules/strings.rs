@@ -156,7 +156,7 @@ impl Violation for PercentFormatExpectedSequence {
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.142")]
+#[violation_metadata(stable_since = "v0.0.142", safety = "unsafe")]
 pub(crate) struct PercentFormatExtraNamedArguments {
     missing: Vec<String>,
 }
@@ -414,7 +414,7 @@ impl Violation for StringDotFormatInvalidFormat {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.139")]
+#[violation_metadata(stable_since = "v0.0.139", safety = "unsafe")]
 pub(crate) struct StringDotFormatExtraNamedArguments {
     missing: Vec<Name>,
 }
@@ -466,7 +466,7 @@ impl Violation for StringDotFormatExtraNamedArguments {
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.139")]
+#[violation_metadata(stable_since = "v0.0.139", safety = "unsafe")]
 pub(crate) struct StringDotFormatExtraPositionalArguments {
     missing: Vec<String>,
 }

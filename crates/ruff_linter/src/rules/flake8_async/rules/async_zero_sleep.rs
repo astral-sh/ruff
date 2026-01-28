@@ -49,7 +49,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     )
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", safety = "unsafe")]
 pub(crate) struct AsyncZeroSleep {
     module: AsyncModule,
 }

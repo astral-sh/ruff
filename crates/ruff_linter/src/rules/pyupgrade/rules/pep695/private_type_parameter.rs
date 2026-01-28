@@ -66,7 +66,7 @@ use crate::{
 /// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", safety = "display-only")]
 pub(crate) struct PrivateTypeParameter {
     kind: ParamKind,
 }

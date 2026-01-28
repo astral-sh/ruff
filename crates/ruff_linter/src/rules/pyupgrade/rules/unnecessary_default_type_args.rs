@@ -63,7 +63,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", safety = "unsafe")]
 pub(crate) struct UnnecessaryDefaultTypeArgs;
 
 impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {

@@ -54,7 +54,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.1")]
+#[violation_metadata(preview_since = "v0.1.1", safety = "unsafe")]
 pub(crate) struct UnspecifiedEncoding {
     function_name: String,
     mode: ModeArgument,

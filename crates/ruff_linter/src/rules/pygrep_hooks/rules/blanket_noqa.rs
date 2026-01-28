@@ -39,7 +39,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.200")]
+#[violation_metadata(stable_since = "v0.0.200", safety = "unsafe")]
 pub(crate) struct BlanketNOQA {
     missing_colon: bool,
     file_exemption: bool,

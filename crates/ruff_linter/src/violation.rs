@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 
+use ruff_diagnostics::Applicability;
 use serde::Serialize;
 
 use ruff_db::diagnostic::Diagnostic;
@@ -44,6 +45,8 @@ pub trait ViolationMetadata {
 
     /// Returns the 1-based line where the violation is declared.
     fn line() -> u32;
+
+    fn applicability() -> Applicability;
 }
 
 pub trait Violation: ViolationMetadata + Sized {

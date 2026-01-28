@@ -46,7 +46,7 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.169")]
+#[violation_metadata(stable_since = "v0.0.169", safety = "unsafe")]
 pub(crate) struct RelativeImports {
     strictness: Strictness,
 }

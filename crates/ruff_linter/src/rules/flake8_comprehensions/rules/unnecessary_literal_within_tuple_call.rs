@@ -48,7 +48,7 @@ use crate::rules::flake8_comprehensions::helpers;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.66")]
+#[violation_metadata(stable_since = "v0.0.66", safety = "unsafe")]
 pub(crate) struct UnnecessaryLiteralWithinTupleCall {
     literal_kind: TupleLiteralKind,
 }

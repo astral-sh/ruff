@@ -36,7 +36,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// This rule's fix is marked as unsafe, as it doesn't properly handle bound
 /// exceptions that are shadowed between the `except` and `raise` statements.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231")]
+#[violation_metadata(stable_since = "v0.0.231", safety = "unsafe")]
 pub(crate) struct VerboseRaise;
 
 impl AlwaysFixableViolation for VerboseRaise {

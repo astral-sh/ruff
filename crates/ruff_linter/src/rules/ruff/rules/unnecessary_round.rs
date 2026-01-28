@@ -34,7 +34,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// The fix is marked unsafe if it is not possible to guarantee that the first argument of
 /// `round()` is of type `int`, or if the fix deletes comments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", safety = "unsafe")]
 pub(crate) struct UnnecessaryRound;
 
 impl AlwaysFixableViolation for UnnecessaryRound {
