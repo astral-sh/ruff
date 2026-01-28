@@ -2663,6 +2663,35 @@ pub struct IsortOptions {
     )]
     pub length_sort_straight: Option<bool>,
 
+    /// Sort imports by their fully-qualified names.
+    ///
+    /// By default, `from X import Y` statements are sorted by the module name (`X`) first,
+    /// then by the member name (`Y`). When enabled, they are sorted by the fully-qualified
+    /// name `X.Y` instead.
+    ///
+    /// For example, with this option disabled (default):
+    /// ```python
+    /// from collections import OrderedDict
+    /// from collections.abc import Mapping
+    /// ```
+    ///
+    /// With `sort-by-qualified-name = true`:
+    /// ```python
+    /// from collections.abc import Mapping  # collections.abc.Mapping
+    /// from collections import OrderedDict  # collections.OrderedDict
+    /// ```
+    ///
+    /// This only affects `from X import Y` statements. Regular `import X` statements
+    /// already sort by the full module name.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            sort-by-qualified-name = true
+        "#
+    )]
+    pub sort_by_qualified_name: Option<bool>,
+
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
     ///
@@ -2892,6 +2921,7 @@ impl IsortOptions {
             from_first,
             length_sort: self.length_sort.unwrap_or(false),
             length_sort_straight: self.length_sort_straight.unwrap_or(false),
+            sort_by_qualified_name: self.sort_by_qualified_name.unwrap_or(false),
         })
     }
 }
