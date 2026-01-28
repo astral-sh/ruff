@@ -1,5 +1,6 @@
 use crate::semantic_index::member::{
-    Member, MemberExpr, MemberExprRef, MemberTable, MemberTableBuilder, ScopedMemberId,
+    Member, MemberExpr, MemberExprBuilder, MemberExprRef, MemberTable, MemberTableBuilder,
+    ScopedMemberId,
 };
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
@@ -48,7 +49,14 @@ impl PlaceExpr {
             return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
         }
 
-        let member_expression = MemberExpr::try_from_expr(expr)?;
+        MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr)
+    }
+
+    /// Tries to create a `PlaceExpr` from a member expression.
+    ///
+    /// Returns `None` if the expression is not a valid place expression and `Some` otherwise.
+    pub(super) fn try_from_member_expr(builder: MemberExprBuilder) -> Option<Self> {
+        let member_expression = MemberExpr::try_from_builder(builder)?;
         Some(Self::Member(Member::new(member_expression)))
     }
 }

@@ -26,8 +26,8 @@ inferred based on the `TypedDict` definition:
 ```py
 alice: Person = {"name": "Alice", "age": 30}
 
-reveal_type(alice["name"])  # revealed: str
-reveal_type(alice["age"])  # revealed: int | None
+reveal_type(alice["name"])  # revealed: Literal["Alice"]
+reveal_type(alice["age"])  # revealed: Literal[30]
 
 # error: [invalid-key] "Unknown key "non_existing" for TypedDict `Person`"
 reveal_type(alice["non_existing"])  # revealed: Unknown
@@ -140,7 +140,7 @@ reveal_type(plot2["y"])  # revealed: list[int | None]
 
 plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
 reveal_type(plot3["y"])  # revealed: list[int | None]
-reveal_type(plot3["x"])  # revealed: list[int | None] | None
+reveal_type(plot3["x"])  # revealed: list[int | None]
 
 Y = "y"
 X = "x"
@@ -194,8 +194,8 @@ class Person(TypedDict):
 ```py
 alice: Person = {"inner": {"name": "Alice", "age": 30}}
 
-reveal_type(alice["inner"]["name"])  # revealed: str
-reveal_type(alice["inner"]["age"])  # revealed: int | None
+reveal_type(alice["inner"]["name"])  # revealed: Literal["Alice"]
+reveal_type(alice["inner"]["age"])  # revealed: Literal[30]
 
 # error: [invalid-key] "Unknown key "non_existing" for TypedDict `Inner`"
 reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
@@ -778,7 +778,7 @@ alice: Person = {"name": "Alice"}
 # error: [invalid-argument-type] "Argument to function `dangerous` is incorrect: Expected `dict[str, object]`, found `Person`"
 dangerous(alice)
 
-reveal_type(alice["name"])  # revealed: str
+reveal_type(alice["name"])  # revealed: Literal["Alice"]
 ```
 
 Likewise, `dict`s are not assignable to typed dictionaries:
