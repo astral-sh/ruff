@@ -907,6 +907,11 @@ def unknown(
 Dynamic types do not cancel each other out. Intersecting an unknown set of values with the negation
 of another unknown set of values is not necessarily empty, so we keep the positive contribution:
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Any
 from ty_extensions import Intersection, Not, Unknown
@@ -924,6 +929,50 @@ def unknown(
 ) -> None:
     reveal_type(i1)  # revealed: Unknown
     reveal_type(i2)  # revealed: Unknown
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def covariant(
+    i1: Intersection[Covariant[Any], Not[Covariant[Any]]],
+    i2: Intersection[Not[Covariant[Any]], Covariant[Any]],
+) -> None:
+    reveal_type(i1)  # revealed: Covariant[Any]
+    reveal_type(i2)  # revealed: Covariant[Any]
+
+class Contravariant[T]:
+    def receive(self, input: T): ...
+
+def contravariant(
+    i1: Intersection[Contravariant[Any], Not[Contravariant[Any]]],
+    i2: Intersection[Not[Contravariant[Any]], Contravariant[Any]],
+) -> None:
+    reveal_type(i1)  # revealed: Contravariant[Any]
+    reveal_type(i2)  # revealed: Contravariant[Any]
+
+class Invariant[T]:
+    mutable_attribute: T
+
+def invariant(
+    i1: Intersection[Invariant[Any], Not[Invariant[Any]]],
+    i2: Intersection[Not[Invariant[Any]], Invariant[Any]],
+) -> None:
+    reveal_type(i1)  # revealed: Invariant[Any]
+    reveal_type(i2)  # revealed: Invariant[Any]
+
+class Bivariant[T]: ...
+
+# Because of bivariance, the specialisation here is meaningless;
+# `Bivariant[Any]` is arguably still a fully static type, even
+# though it is specialised with a gradual form! Thus self-cancellation
+# here is fine:
+def bivariant(
+    i1: Intersection[Bivariant[Any], Not[Bivariant[Any]]],
+    i2: Intersection[Not[Bivariant[Any]], Bivariant[Any]],
+) -> None:
+    reveal_type(i1)  # revealed: Never
+    reveal_type(i2)  # revealed: Never
 ```
 
 ### Mixed dynamic types
