@@ -305,3 +305,15 @@ def f():
         result = []
         for NL_INDEX in range(3):
             result.append(NL_INDEX)
+
+# PERF401 false negative #21648
+def f():
+    xs = []
+    for [x, y] in [(1, 2)]:
+        xs.append(x + y)  # PERF401
+
+def f():
+    data = []
+    data.append("initial")
+    for x in range(5):
+        data.append(x)  # PERF401 (Should suggest .extend, not list comprehension)
