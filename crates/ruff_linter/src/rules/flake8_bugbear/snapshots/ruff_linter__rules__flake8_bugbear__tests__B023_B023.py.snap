@@ -244,3 +244,14 @@ B023 Function definition does not bind loop variable `i`
 174 |             return [lambda: i for i in range(3)]  # error
     |                             ^
     |
+
+B023 Function definition does not bind loop variable `value`
+   --> B023.py:231:20
+    |
+229 |     def add_one():
+230 |         def _add_one_inner():
+231 |             return value + 1  # Should trigger B023 - value is loop variable, not bound
+    |                    ^^^^^
+232 |
+233 |         return _add_one_inner
+    |
