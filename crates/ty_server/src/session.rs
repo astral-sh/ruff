@@ -447,13 +447,25 @@ impl Session {
         self.projects.values_mut()
     }
 
+    /// Initializes a sequence of workspace folders identified by URL
+    /// along with its corresponding options.
+    ///
+    /// This is meant to be called when a response from a
+    /// `workspace/configuration` request is received. (This is where
+    /// the `ClientOptions` comes from.)
+    ///
+    /// It is legal to call this on URLs corresponding to workspace
+    /// folders that are already initialized. When that occurs,
+    /// they are skipped by this routine. That is, they are not
+    /// re-initialized.
+    ///
+    /// The client provided is used to show error messages, publish
+    /// diagnostics related to configuration and register capabilities.
     pub(crate) fn initialize_workspace_folders(
         &mut self,
-        workspace_folders: Vec<(Url, ClientOptions)>,
         client: &Client,
+        workspace_folders: Vec<(Url, ClientOptions)>,
     ) {
-        assert!(!self.workspaces.all_initialized());
-
         // Every workspace folder can come with its own
         // global options. In theory, these can have different
         // values. At time of writing (2026-01-28), AG has been
@@ -525,13 +537,16 @@ impl Session {
         }
 
         self.register_capabilities(client);
-
-        assert!(
-            self.workspaces.all_initialized(),
-            "All workspaces should be initialized after calling `initialize_workspaces`"
-        );
     }
 
+    /// Initializes a single workspace folder with the given URL
+    /// and options.
+    ///
+    /// If this workspace folder has already been initialized, then
+    /// this is a no-op.
+    ///
+    /// The client provided is used to show error messages and publish
+    /// diagnostics related to configuration.
     pub(crate) fn initialize_workspace_folder(
         &mut self,
         client: &Client,
@@ -565,10 +580,18 @@ impl Session {
         };
 
         let settings = options.into_settings(&root, client);
-        let Some(workspace) = self.workspaces.initialize(&root, settings) else {
+        let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
             tracing::debug!("Ignoring workspace `{url}` since it was not registered");
             return;
         };
+        if workspace.is_initialized() {
+            tracing::debug!(
+                "Ignoring workspace initialization for `{url}` \
+                 since it has already been initialized"
+            );
+            return;
+        }
+        workspace.initialize(settings);
 
         // For now, create one project database per workspace.
         // In the future, index the workspace directories to find all projects
@@ -1237,7 +1260,6 @@ impl ClientName {
 #[derive(Debug, Default)]
 pub(crate) struct Workspaces {
     workspaces: BTreeMap<SystemPathBuf, Workspace>,
-    uninitialized: usize,
 }
 
 impl Workspaces {
@@ -1264,31 +1286,11 @@ impl Workspaces {
             Workspace {
                 url,
                 settings: Arc::new(WorkspaceSettings::default()),
+                initialized: false,
             },
         );
 
-        self.uninitialized += 1;
-
         Ok(())
-    }
-
-    /// Initializes the workspace with the resolved client settings for the workspace.
-    ///
-    /// ## Returns
-    ///
-    /// `None` if URL doesn't map to a valid path or if the workspace is not registered.
-    pub(crate) fn initialize(
-        &mut self,
-        path: &SystemPath,
-        settings: WorkspaceSettings,
-    ) -> Option<&mut Workspace> {
-        if let Some(workspace) = self.workspaces.get_mut(path) {
-            workspace.settings = Arc::new(settings);
-            self.uninitialized -= 1;
-            Some(workspace)
-        } else {
-            None
-        }
     }
 
     /// Returns a reference to the workspace for the given path, [`None`] if there's no workspace
@@ -1296,6 +1298,15 @@ impl Workspaces {
     pub(crate) fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
         self.workspaces
             .range(..=path.as_ref().to_path_buf())
+            .next_back()
+            .map(|(_, db)| db)
+    }
+
+    /// Returns a mutable reference to the workspace for the given path,
+    /// [`None`] if there's no workspace registered for the path.
+    pub(crate) fn for_path_mut(&mut self, path: impl AsRef<SystemPath>) -> Option<&mut Workspace> {
+        self.workspaces
+            .range_mut(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, db)| db)
     }
@@ -1317,7 +1328,7 @@ impl Workspaces {
     ///
     /// [initialized]: Workspaces::initialize
     pub(crate) fn all_initialized(&self) -> bool {
-        self.uninitialized == 0
+        self.workspaces.values().all(Workspace::is_initialized)
     }
 }
 
@@ -1334,7 +1345,19 @@ impl<'a> IntoIterator for &'a Workspaces {
 pub(crate) struct Workspace {
     /// The workspace root URL as sent by the client during initialization.
     url: Url,
+    /// The settings for this workspace.
+    ///
+    /// The settings here have already been "combined" with the initialization
+    /// settings for the LSP.
     settings: Arc<WorkspaceSettings>,
+    /// Whether this workspace has been initialized or not.
+    ///
+    /// If a workspace hasn't been initialized, then it is still
+    /// generally usable. It just means that its settings may not
+    /// be correct. That is, a workspace is considered initialized
+    /// when the configuration from a `workspace/configuration`
+    /// request has been received and set on this workspace.
+    initialized: bool,
 }
 
 impl Workspace {
@@ -1348,6 +1371,15 @@ impl Workspace {
 
     pub(crate) fn settings_arc(&self) -> Arc<WorkspaceSettings> {
         self.settings.clone()
+    }
+
+    pub(crate) fn is_initialized(&self) -> bool {
+        self.initialized
+    }
+
+    pub(crate) fn initialize(&mut self, settings: WorkspaceSettings) {
+        self.settings = Arc::new(settings);
+        self.initialized = true;
     }
 }
 
