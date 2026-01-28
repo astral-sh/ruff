@@ -501,9 +501,19 @@ impl<'a> SuppressionsBuilder<'a> {
             indents.clear();
 
             let (before, after) = tokens.split_at(suppression.range.start());
+            let mut count = 0;
             let last_indent = before
                 .iter()
-                .rfind(|token| token.kind() == TokenKind::Indent)
+                .filter(|token| matches!(token.kind(), TokenKind::Indent | TokenKind::Dedent))
+                .rfind(|token| {
+                    // ignore matching dedents and indents above until we find
+                    count += match token.kind() {
+                        TokenKind::Dedent => 1,
+                        TokenKind::Indent => -1,
+                        _ => 0,
+                    };
+                    token.kind() == TokenKind::Indent && count < 0
+                })
                 .map(|token| self.source.slice(token))
                 .unwrap_or_default();
 
