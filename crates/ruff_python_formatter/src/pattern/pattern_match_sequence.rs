@@ -126,16 +126,18 @@ impl SequenceType {
             // ```
             let open_parentheses_count =
                 SimpleTokenizer::new(source, TextRange::new(pattern.start(), elt.start()))
+                    .kinds()
                     .skip_trivia()
-                    .filter(|token| token.kind() == SimpleTokenKind::LParen)
+                    .filter(|&token| token == SimpleTokenKind::LParen)
                     .count();
 
             // Count the number of close parentheses.
             let close_parentheses_count =
                 SimpleTokenizer::new(source, TextRange::new(elt.end(), elt.end()))
+                    .kinds()
                     .skip_trivia()
-                    .take_while(|token| token.kind() != SimpleTokenKind::Comma)
-                    .filter(|token| token.kind() == SimpleTokenKind::RParen)
+                    .take_while(|&token| token != SimpleTokenKind::Comma)
+                    .filter(|&token| token == SimpleTokenKind::RParen)
                     .count();
 
             if open_parentheses_count > close_parentheses_count {
