@@ -1145,6 +1145,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::UnpackedTypedDict(_) => {
+                    // Unpack[TypedDict] cannot be subscripted further
+                    self.infer_type_expression(&subscript.slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic("`Unpack[TypedDict]` cannot be subscripted");
+                    }
+                    Type::unknown()
+                }
             },
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
@@ -1677,8 +1685,52 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 inferred_type
             }
             SpecialFormType::Unpack => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`Unpack[]` special form")
+                let inner_ty = self.infer_type_expression(arguments_slice);
+
+                match inner_ty {
+                    // Unpack[TypedDict] - PEP 692: more precise **kwargs typing
+                    Type::TypedDict(typed_dict) => {
+                        Type::KnownInstance(KnownInstanceType::UnpackedTypedDict(typed_dict))
+                    }
+                    // TypeVarTuple case - for variadic generics (PEP 646)
+                    // TypeVarTuple instances appear as NominalInstance with KnownClass::TypeVarTuple
+                    Type::NominalInstance(instance)
+                        if instance.has_known_class(self.db(), KnownClass::TypeVarTuple) =>
+                    {
+                        // TODO: Implement proper support for Unpack[TypeVarTuple]
+                        todo_type!("`Unpack[TypeVarTuple]` special form")
+                    }
+                    // Unpack[tuple[...]] - for variadic generics (PEP 646)
+                    Type::NominalInstance(instance)
+                        if instance.has_known_class(self.db(), KnownClass::Tuple) =>
+                    {
+                        // TODO: Implement proper support for Unpack[tuple[...]]
+                        todo_type!("`Unpack[tuple[...]]` special form")
+                    }
+                    // Dynamic types - propagate todo for Unpack special form
+                    Type::Dynamic(
+                        DynamicType::Todo(_)
+                        | DynamicType::TodoUnpack
+                        | DynamicType::TodoStarredExpression
+                        | DynamicType::TodoTypeVarTuple,
+                    ) => todo_type!("`Unpack[]` special form"),
+                    // Any/Unknown types - propagate
+                    Type::Dynamic(
+                        DynamicType::Any | DynamicType::Unknown | DynamicType::UnknownGeneric(_),
+                    ) => inner_ty,
+                    _ => {
+                        // Error: Unpack can only be used with TypedDict, TypeVarTuple, or tuple
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "`Unpack` must be used with a TypedDict, TypeVarTuple, or tuple type, got `{}`",
+                                inner_ty.display(self.db())
+                            ));
+                        }
+                        Type::unknown()
+                    }
+                }
             }
             SpecialFormType::NoReturn
             | SpecialFormType::Never
