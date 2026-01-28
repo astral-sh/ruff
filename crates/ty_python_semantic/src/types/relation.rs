@@ -704,6 +704,59 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
+            // Fast path: `object` is only a subtype/assignable to unions that contain a type
+            // that can definitely accept `object`. If a union contains only types that cannot
+            // accept `object`, we can short-circuit to false.
+            (Type::NominalInstance(source), Type::Union(union)) if source.is_object() => {
+                let elements = union.elements(db);
+                let mut has_complex = false;
+                for &elem in elements.iter() {
+                    match elem {
+                        _ if elem.is_object() => return ConstraintSet::from(true),
+                        Type::Dynamic(_)
+                            if relation.is_assignability()
+                                || relation.is_constraint_set_assignability() =>
+                        {
+                            return ConstraintSet::from(true);
+                        }
+                        Type::TypeVar(typevar)
+                            if (relation.is_assignability()
+                                || relation.is_constraint_set_assignability())
+                                && typevar.is_inferable(db, inferable)
+                                && typevar
+                                    .typevar(db)
+                                    .upper_bound(db)
+                                    .is_none_or(|bound| bound.is_object()) =>
+                        {
+                            return ConstraintSet::from(true);
+                        }
+                        Type::TypeVar(_)
+                        | Type::ProtocolInstance(_)
+                        | Type::Intersection(_)
+                        | Type::Union(_)
+                        | Type::TypeAlias(_) => {
+                            has_complex = true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                if has_complex {
+                    elements.iter().when_any(db, |&elem_ty| {
+                        self.has_relation_to_impl(
+                            db,
+                            elem_ty,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+                } else {
+                    ConstraintSet::from(false)
+                }
+            }
+
             // `Never` is the bottom type, the empty set.
             (_, Type::Never) => ConstraintSet::from(false),
 
