@@ -5895,10 +5895,23 @@ impl<'db> Type<'db> {
                 .expect("type should be convertible to instance type");
 
             // Check if we should skip `__new__`/`__init__` evaluation.
-            // Skip if: return type is not assignable to instance, is Never, or contains Any.
-            let skip_new_init = !metaclass_return_type.is_assignable_to(db, instance_ty)
-                || metaclass_return_type.is_never()
-                || matches!(metaclass_return_type, Type::Dynamic(DynamicType::Any));
+            // Per the spec: "If the evaluated return type of the `__call__` method indicates
+            // something other than an instance of the class being constructed, a type checker
+            // should assume that the metaclass `__call__` method is overriding `type.__call__`."
+            //
+            // We skip if:
+            // - The return type is `Never` (class is not instantiable)
+            // - The return type is a concrete non-instance type (explicit override)
+            //
+            // We do NOT skip if:
+            // - The return type is `Any` or `Unknown` (dynamic/unannotated, assume normal behavior)
+            // - The return type is a subtype of the instance type
+            //
+            // Many metaclasses (SQLModel, Pydantic, etc.) use `-> Any` because the actual return
+            // type is dynamic, but at runtime they still return an instance of the class.
+            let skip_new_init = metaclass_return_type.is_never()
+                || (!metaclass_return_type.is_dynamic()
+                    && !metaclass_return_type.is_subtype_of(db, instance_ty));
 
             // If there are argument errors or we should skip `__new__`/`__init__`, return metaclass result.
             if call_result.is_err() || skip_new_init {
@@ -5925,6 +5938,12 @@ impl<'db> Type<'db> {
             // Continue to validate `__new__`/`__init__` below.
         }
 
+        // Note that we use `self` here, not `self_type`, so that if constructor argument inference
+        // fails, we fail back to the default specialization.
+        let instance_ty = self
+            .to_instance(db)
+            .expect("type should be convertible to instance type");
+
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
                 Place::Defined(DefinedPlace {
@@ -5949,7 +5968,95 @@ impl<'db> Type<'db> {
             }
         });
 
+        // Check if `__new__` has an explicit `-> Any` return type annotation.
+        // Per the spec: "an explicit return type of `Any` should be treated as a type that is
+        // not an instance of the class being constructed."
+        //
+        // We need to distinguish this from `Any` that comes from dynamic inheritance (e.g.,
+        // `class Foo(Any): ...`). In the latter case, looking up `__new__` returns `Any` directly
+        // (not a function), whereas explicit `-> Any` gives us a real function with that annotation.
+        let new_has_explicit_any_return = new_method.as_ref().is_some_and(|new_method| {
+            if let Place::Defined(DefinedPlace { ty, .. }) =
+                new_method.place.try_call_dunder_get(db, self_type)
+            {
+                // Check if it's a real function with explicit `-> Any` annotation
+                let signature = match ty {
+                    Type::FunctionLiteral(func) => Some(func.signature(db)),
+                    Type::BoundMethod(method) => Some(method.function(db).signature(db)),
+                    // If the method itself is Any (from dynamic inheritance), not explicit
+                    _ => None,
+                };
+                signature.is_some_and(|sig| {
+                    sig.overloads.iter().any(|overload| {
+                        // Check if return type contains Any (either directly or in a union)
+                        any_over_type(
+                            db,
+                            overload.return_ty,
+                            &|ty| matches!(ty, Type::Dynamic(DynamicType::Any)),
+                            false,
+                        )
+                    })
+                })
+            } else {
+                false
+            }
+        });
+
+        // Extract the return type from `__new__` if it was called successfully.
+        // Per the spec: "If the evaluated return type of `__new__` is not the class being
+        // constructed (or a subclass thereof), a type checker should assume that the `__init__`
+        // method will not be called."
+        //
+        // We filter out:
+        // 1. `Unknown` since it indicates an unannotated `__new__` method (e.g., synthesized
+        //    methods like tuple's `__new__`). Per spec, unannotated returns should be treated
+        //    as returning `Self`.
+        // 2. `Any` from dynamic inheritance (but NOT explicit `-> Any` annotations).
+        // 3. Types containing type variables (like `Self` or `C[T]`) since they represent the
+        //    class instance with unresolved type parameters and should use the instance type.
+        let new_return_type = new_call_outcome
+            .as_ref()
+            .and_then(|result| result.as_ref().ok())
+            .map(|bindings| bindings.return_type(db))
+            .map(|ty| {
+                // Always filter out Unknown (unannotated returns)
+                ty.filter_union(db, |elem| !elem.is_unknown())
+            })
+            .map(|ty| {
+                if new_has_explicit_any_return {
+                    // Keep Any if explicitly annotated
+                    ty
+                } else {
+                    // Filter out Any from dynamic inheritance
+                    ty.filter_union(db, |elem| !matches!(elem, Type::Dynamic(DynamicType::Any)))
+                }
+            })
+            .filter(|ty| !ty.is_unknown() && !ty.has_typevar(db))
+            .filter(|ty| {
+                new_has_explicit_any_return || !matches!(ty, Type::Dynamic(DynamicType::Any))
+            });
+
+        // Determine the return type based on `__new__` return type.
+        // Only use the `__new__` return type if it returns something that is not a subtype of
+        // the class being constructed (e.g., `int | A`). Otherwise, use the instance type so that
+        // proper generic specialization can be applied.
+        let return_ty = new_return_type
+            .filter(|return_ty| !return_ty.is_subtype_of(db, instance_ty))
+            .unwrap_or(instance_ty);
+
+        // Per the spec: "If the evaluated return type of `__new__` is not the class being
+        // constructed (or a subclass thereof), a type checker should assume that the `__init__`
+        // method will not be called."
+        //
+        // This affects error reporting: if `__new__` returns something that's not an instance of
+        // the class (like `int`), we should not report `__init__` errors since it won't be called
+        // at runtime. However, we still evaluate `__init__` for specialization purposes.
+        let should_report_init_errors = new_return_type
+            .map(|ty| ty.is_subtype_of(db, instance_ty))
+            .unwrap_or(true);
+
         // Call `__init__` if `__new__` was not called, or if `__init__` is explicitly defined.
+        // We always call `__init__` when defined to extract specialization information.
         let init_call_outcome = if new_call_outcome.is_none() || !init_method.is_undefined() {
             let call_result = match init_ty
                 .member_lookup_with_policy(
@@ -5987,34 +6094,6 @@ impl<'db> Type<'db> {
         } else {
             None
         };
-
-        // Note that we use `self` here, not `self_type`, so that if constructor argument inference
-        // fails, we fail back to the default specialization.
-        let instance_ty = self
-            .to_instance(db)
-            .expect("type should be convertible to instance type");
-
-        // Extract the return type from `__new__` if it was called successfully.
-        // Filter out:
-        // 1. Dynamic types (`Unknown`, `Any`) since they indicate the `__new__` method doesn't
-        //    have an explicit return type annotation (e.g., synthesized methods like tuple's
-        //    `__new__`) or is inherited from `Any`.
-        // 2. Types containing unresolved type variables (like `Self`) since they need to be
-        //    resolved by the constructor machinery, not used directly.
-        let new_return_type = new_call_outcome
-            .as_ref()
-            .and_then(|result| result.as_ref().ok())
-            .map(|bindings| bindings.return_type(db))
-            .map(|ty| ty.filter_union(db, |elem| !elem.is_dynamic()))
-            .filter(|ty| !ty.is_dynamic() && !ty.has_typevar(db));
-
-        // Determine the return type based on `__new__` return type.
-        // Only use the `__new__` return type if it returns something that is not a subclass of
-        // the class being constructed (e.g., `int | A`). Otherwise, use the instance type so that
-        // proper generic specialization can be applied.
-        let return_ty = new_return_type
-            .filter(|return_ty| !return_ty.is_assignable_to(db, instance_ty))
-            .unwrap_or(instance_ty);
 
         match (generic_origin, new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
@@ -6066,7 +6145,13 @@ impl<'db> Type<'db> {
 
             (_, None | Some(Ok(_)), Some(Err(error))) => {
                 // No custom `__new__` or it was called and succeeded, but `__init__` failed.
-                Err(ConstructorCallError::Init(return_ty, error))
+                // Per spec: if `__new__` returns something that's not an instance of the class,
+                // we should not report `__init__` errors since it won't be called at runtime.
+                if should_report_init_errors {
+                    Err(ConstructorCallError::Init(return_ty, error))
+                } else {
+                    Ok(return_ty)
+                }
             }
             (_, Some(Err(error)), None | Some(Ok(_))) => {
                 // Custom `__new__` was called and failed, but init is ok.
@@ -6074,9 +6159,15 @@ impl<'db> Type<'db> {
             }
             (_, Some(Err(new_error)), Some(Err(init_error))) => {
                 // Custom `__new__` was called and failed, and `__init__` is also not ok.
-                Err(ConstructorCallError::NewAndInit(
-                    return_ty, new_error, init_error,
-                ))
+                // Per spec: if `__new__` returns something that's not an instance of the class,
+                // we should not report `__init__` errors.
+                if should_report_init_errors {
+                    Err(ConstructorCallError::NewAndInit(
+                        return_ty, new_error, init_error,
+                    ))
+                } else {
+                    Err(ConstructorCallError::New(return_ty, new_error))
+                }
             }
         }
     }

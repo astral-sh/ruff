@@ -147,6 +147,32 @@ reveal_type(MyConfig(1))  # revealed: type
 MyConfig(1).get("key")
 ```
 
+### Metaclass `__call__` returning `Any`
+
+When a metaclass `__call__` returns `Any`, we treat it as "dynamic/unknown" and proceed to check
+`__new__`/`__init__` normally. This is because many metaclasses (like SQLModel, Pydantic, etc.) use
+`-> Any` because the actual return type is dynamic, but at runtime they still return an instance of
+the class.
+
+```py
+from typing import Any
+
+class Meta(type):
+    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+        return super().__call__(*args, **kwargs)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# __init__ IS checked because Any is treated as "unknown", not "definitely not an instance"
+# error: [missing-argument]
+reveal_type(Foo())  # revealed: Foo
+
+# error: [invalid-argument-type]
+reveal_type(Foo("wrong"))  # revealed: Foo
+```
+
 ## Default
 
 ```py

@@ -58,6 +58,50 @@ class NoAnnotation:
 reveal_type(NoAnnotation())  # revealed: NoAnnotation
 ```
 
+### `__new__` returning `Any`
+
+Per the spec: "an explicit return type of `Any` should be treated as a type that is not an instance
+of the class being constructed." This means `__init__` is not called, and `Any` is returned.
+
+```py
+from typing import Any
+
+class ReturnsAny:
+    def __new__(cls) -> Any:
+        return 42
+
+    def __init__(self, x: int) -> None:
+        # This is not called when __new__ returns Any
+        pass
+
+# __init__ is not checked because __new__ returns Any
+reveal_type(ReturnsAny())  # revealed: Any
+
+a: Any = ReturnsAny()  # OK
+b: int = ReturnsAny()  # OK (Any is assignable to int)
+```
+
+### `__new__` returning a union containing `Any`
+
+When `__new__` returns a union containing `Any`, we treat it as not an instance of the class (since
+the union contains a non-instance type).
+
+```py
+from typing import Any
+
+class MaybeAny:
+    def __new__(cls, value: int) -> "MaybeAny | Any":
+        if value > 0:
+            return object.__new__(cls)
+        return None
+
+    def __init__(self, value: int) -> None:
+        pass
+
+# The union contains Any, so __init__ is not checked
+reveal_type(MaybeAny(1))  # revealed: MaybeAny | Any
+```
+
 ## Deferred resolution of bases
 
 ### Only the stringified name is deferred
