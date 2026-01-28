@@ -12702,6 +12702,8 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
+        let is_pure_negation = self.positive(db).is_empty();
+
         let mut builder = IntersectionBuilder::new(db);
 
         let mut all_unbound = true;
@@ -12725,6 +12727,14 @@ impl<'db> IntersectionType<'db> {
 
                     builder = builder.add_positive(ty_member);
                 }
+            }
+        }
+
+        // For pure negation types (e.g., `~AlwaysFalsy`), preserve the negative
+        // contributions so they aren't lost when we fall back to `object`.
+        if is_pure_negation {
+            for ty in self.negative(db) {
+                builder = builder.add_negative(*ty);
             }
         }
 
