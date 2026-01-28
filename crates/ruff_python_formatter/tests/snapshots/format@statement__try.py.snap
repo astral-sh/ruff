@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/try.py
 ---
 ## Input
 ```python
@@ -693,7 +692,7 @@ finally:
 try:
     pass
 # These parens can be removed on 3.14+ but not earlier
-except (BaseException, Exception, ValueError):
+except BaseException, Exception, ValueError:
     pass
 # But black won't remove these parentheses
 except (ZeroDivisionError,):
@@ -715,7 +714,7 @@ except (
 try:
     pass
 # They can also be omitted for `except*`
-except* (BaseException, Exception, ValueError):
+except* BaseException, Exception, ValueError:
     pass
 
 # But parentheses are still required in the presence of an `as` binding
@@ -755,22 +754,4 @@ except* (BaseException, Exception, ValueError) as e:
  finally:
  
      def f():
-@@ -190,7 +193,7 @@
- try:
-     pass
- # These parens can be removed on 3.14+ but not earlier
--except (BaseException, Exception, ValueError):
-+except BaseException, Exception, ValueError:
-     pass
- # But black won't remove these parentheses
- except (ZeroDivisionError,):
-@@ -212,7 +215,7 @@
- try:
-     pass
- # They can also be omitted for `except*`
--except* (BaseException, Exception, ValueError):
-+except* BaseException, Exception, ValueError:
-     pass
- 
- # But parentheses are still required in the presence of an `as` binding
 ```

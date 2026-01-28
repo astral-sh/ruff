@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fluent.py
 ---
 ## Input
 ```python
@@ -67,7 +66,8 @@ x = a.b()
 x = a.b().c()
 
 x = (
-    a.b()
+    a
+    .b()
     .c()
     .d
 )
@@ -75,7 +75,8 @@ x = (
 x = a.b.c.d().e()
 
 x = (
-    a.b.c()
+    a.b
+    .c()
     .d.e()
     .f.g()
 )
@@ -94,7 +95,8 @@ x = (
 )
 
 x = (
-    a.b()[
+    a
+    .b()[
         0
     ]
     .c.d()[
@@ -123,41 +125,4 @@ x = (
 x = (
     a.b().d
 ).e()
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -7,7 +7,8 @@
- x = a.b().c()
- 
- x = (
--    a.b()
-+    a
-+    .b()
-     .c()
-     .d
- )
-@@ -15,7 +16,8 @@
- x = a.b.c.d().e()
- 
- x = (
--    a.b.c()
-+    a.b
-+    .c()
-     .d.e()
-     .f.g()
- )
-@@ -34,7 +36,8 @@
- )
- 
- x = (
--    a.b()[
-+    a
-+    .b()[
-         0
-     ]
-     .c.d()[
 ```

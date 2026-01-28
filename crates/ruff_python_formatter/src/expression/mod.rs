@@ -854,6 +854,9 @@ impl<'a> First<'a> {
 /// will close on the previous line and the dot gets its own line, otherwise the line will start
 /// with the closing parentheses/bracket and the dot follows immediately after.
 ///
+/// We also track the position of the leftmost call or
+/// subscript on an attribute in the chain and break just before the dot.
+///
 /// Below, the left hand side of the addition has only a single attribute access after a call, the
 /// second `.filter`. The first `.filter` is a call, but it doesn't follow a call. The right hand
 /// side has two, the `.limit_results` after the call and the `.filter` after the subscript, so it
@@ -867,7 +870,8 @@ impl<'a> First<'a> {
 ///     ).filter(
 ///         entry__pub_date__year=2008,
 ///     )
-///     + Blog.objects.filter(
+///     + Blog.objects
+///       .filter(
 ///         entry__headline__contains="McCartney",
 ///     )
 ///     .limit_results[:10]
@@ -875,22 +879,6 @@ impl<'a> First<'a> {
 ///         entry__pub_date__year=2010,
 ///     )
 /// ).all()
-/// ```
-///
-/// In [`preview`](crate::preview::is_fluent_layout_split_first_call_enabled), we also track the position of the leftmost call or
-/// subscript on an attribute in the chain and break just before the dot.
-///
-/// So, for example, the right-hand summand in the above expression
-/// would get formatted as:
-/// ```python
-///     Blog.objects
-///     .filter(
-///         entry__headline__contains="McCartney",
-///     )
-///     .limit_results[:10]
-///     .filter(
-///         entry__pub_date__year=2010,
-///     )
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum CallChainLayout {
