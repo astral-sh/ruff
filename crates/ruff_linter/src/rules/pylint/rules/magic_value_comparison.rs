@@ -88,10 +88,8 @@ fn is_magic_value(
     }
 
     // Check if the literal value is in the allowed values list
-    if let Some(allowed_value) = AllowedValue::try_from_literal_expr(literal_expr) {
-        if allowed_values.contains(&allowed_value) {
-            return false;
-        }
+    if AllowedValue::matches(literal_expr, allowed_values) {
+        return false;
     }
 
     match literal_expr {

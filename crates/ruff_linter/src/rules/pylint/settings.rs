@@ -20,17 +20,48 @@ pub enum AllowedValue {
 }
 
 impl AllowedValue {
-    pub fn try_from_literal_expr(literal_expr: LiteralExpressionRef<'_>) -> Option<Self> {
+    pub fn matches(
+        literal_expr: LiteralExpressionRef<'_>,
+        allowed_values: &[AllowedValue],
+    ) -> bool {
         match literal_expr {
             LiteralExpressionRef::StringLiteral(ExprStringLiteral { value, .. }) => {
-                Some(AllowedValue::String(value.to_str().to_string()))
+                let string_value = value.to_str();
+                allowed_values.iter().any(|allowed| {
+                    if let AllowedValue::String(s) = allowed {
+                        s.as_str() == string_value
+                    } else {
+                        false
+                    }
+                })
             }
             LiteralExpressionRef::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
-                Number::Float(f) => Some(AllowedValue::Float(AllowedFloatValue::new(*f))),
-                Number::Int(i) => i.as_i64().map(AllowedValue::Int),
-                Number::Complex { .. } => None,
+                Number::Int(i) => {
+                    if let Some(int_value) = i.as_i64() {
+                        allowed_values.iter().any(|allowed| {
+                            if let AllowedValue::Int(allowed_int) = allowed {
+                                *allowed_int == int_value
+                            } else {
+                                false
+                            }
+                        })
+                    } else {
+                        false
+                    }
+                }
+                Number::Float(f) => {
+                    let float_value = AllowedFloatValue::new(*f);
+                    allowed_values.iter().any(|allowed| {
+                        if let AllowedValue::Float(allowed_float) = allowed {
+                            *allowed_float == float_value
+                        } else {
+                            false
+                        }
+                    })
+                }
+                Number::Complex { .. } => false,
             },
-            _ => None,
+            _ => false,
         }
     }
 }
