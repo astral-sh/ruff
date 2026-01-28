@@ -717,7 +717,7 @@ impl<'db> Type<'db> {
             (Type::NominalInstance(source), Type::Union(union)) if source.is_object() => {
                 let elements = union.elements(db);
                 let mut has_complex = false;
-                for &elem in elements.iter() {
+                for &elem in elements {
                     match elem {
                         _ if elem.is_object() => return ConstraintSet::from(true),
                         Type::Dynamic(_)
