@@ -41,7 +41,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// For example:
 ///
 /// ```python
-/// def func(a, b): return a + b
+/// def func(a, b):
+///     return a + b
+///
 ///
 /// foo = lambda x, y: func(x, y)
 /// ```
