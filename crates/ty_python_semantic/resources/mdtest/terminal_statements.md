@@ -14,6 +14,7 @@ def f(cond: bool) -> str:
         raise ValueError
     return x
 
+
 def g(cond: bool):
     if cond:
         x = "test"
@@ -44,6 +45,7 @@ def resolved_reference(cond: bool) -> str:
         return "early"
     return x  # no possibly-unresolved-reference diagnostic!
 
+
 def return_in_then_branch(cond: bool):
     if cond:
         x = "terminal"
@@ -53,6 +55,7 @@ def return_in_then_branch(cond: bool):
         x = "test"
         reveal_type(x)  # revealed: Literal["test"]
     reveal_type(x)  # revealed: Literal["test"]
+
 
 def return_in_else_branch(cond: bool):
     if cond:
@@ -64,6 +67,7 @@ def return_in_else_branch(cond: bool):
         return
     reveal_type(x)  # revealed: Literal["test"]
 
+
 def return_in_both_branches(cond: bool):
     if cond:
         x = "terminal1"
@@ -73,6 +77,7 @@ def return_in_both_branches(cond: bool):
         x = "terminal2"
         reveal_type(x)  # revealed: Literal["terminal2"]
         return
+
 
 def return_in_try(cond: bool):
     x = "before"
@@ -89,6 +94,7 @@ def return_in_try(cond: bool):
         reveal_type(x)  # revealed: Literal["before", "test"]
     reveal_type(x)  # revealed: Literal["before", "test"]
 
+
 def return_in_nested_then_branch(cond1: bool, cond2: bool):
     if cond1:
         x = "test1"
@@ -104,6 +110,7 @@ def return_in_nested_then_branch(cond1: bool, cond2: bool):
         reveal_type(x)  # revealed: Literal["test2"]
     reveal_type(x)  # revealed: Literal["test1", "test2"]
 
+
 def return_in_nested_else_branch(cond1: bool, cond2: bool):
     if cond1:
         x = "test1"
@@ -118,6 +125,7 @@ def return_in_nested_else_branch(cond1: bool, cond2: bool):
             return
         reveal_type(x)  # revealed: Literal["test2"]
     reveal_type(x)  # revealed: Literal["test1", "test2"]
+
 
 def return_in_both_nested_branches(cond1: bool, cond2: bool):
     if cond1:
@@ -157,6 +165,7 @@ def resolved_reference(cond: bool) -> str:
             continue
         return x
 
+
 def continue_in_then_branch(cond: bool, i: int):
     x = "before"
     for _ in range(i):
@@ -170,6 +179,7 @@ def continue_in_then_branch(cond: bool, i: int):
         reveal_type(x)  # revealed: Literal["loop"]
     # TODO: Should be Literal["before", "loop", "continue"]
     reveal_type(x)  # revealed: Literal["before", "loop"]
+
 
 def continue_in_else_branch(cond: bool, i: int):
     x = "before"
@@ -185,6 +195,7 @@ def continue_in_else_branch(cond: bool, i: int):
     # TODO: Should be Literal["before", "loop", "continue"]
     reveal_type(x)  # revealed: Literal["before", "loop"]
 
+
 def continue_in_both_branches(cond: bool, i: int):
     x = "before"
     for _ in range(i):
@@ -198,6 +209,7 @@ def continue_in_both_branches(cond: bool, i: int):
             continue
     # TODO: Should be Literal["before", "continue1", "continue2"]
     reveal_type(x)  # revealed: Literal["before"]
+
 
 def continue_in_nested_then_branch(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -218,6 +230,7 @@ def continue_in_nested_then_branch(cond1: bool, cond2: bool, i: int):
     # TODO: Should be Literal["before", "loop1", "loop2", "continue"]
     reveal_type(x)  # revealed: Literal["before", "loop1", "loop2"]
 
+
 def continue_in_nested_else_branch(cond1: bool, cond2: bool, i: int):
     x = "before"
     for _ in range(i):
@@ -236,6 +249,7 @@ def continue_in_nested_else_branch(cond1: bool, cond2: bool, i: int):
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
     # TODO: Should be Literal["before", "loop1", "loop2", "continue"]
     reveal_type(x)  # revealed: Literal["before", "loop1", "loop2"]
+
 
 def continue_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -275,6 +289,7 @@ def resolved_reference(cond: bool) -> str:
         return x
     return x  # error: [unresolved-reference]
 
+
 def break_in_then_branch(cond: bool, i: int):
     x = "before"
     for _ in range(i):
@@ -287,6 +302,7 @@ def break_in_then_branch(cond: bool, i: int):
             reveal_type(x)  # revealed: Literal["loop"]
         reveal_type(x)  # revealed: Literal["loop"]
     reveal_type(x)  # revealed: Literal["before", "break", "loop"]
+
 
 def break_in_else_branch(cond: bool, i: int):
     x = "before"
@@ -301,6 +317,7 @@ def break_in_else_branch(cond: bool, i: int):
         reveal_type(x)  # revealed: Literal["loop"]
     reveal_type(x)  # revealed: Literal["before", "loop", "break"]
 
+
 def break_in_both_branches(cond: bool, i: int):
     x = "before"
     for _ in range(i):
@@ -313,6 +330,7 @@ def break_in_both_branches(cond: bool, i: int):
             reveal_type(x)  # revealed: Literal["break2"]
             break
     reveal_type(x)  # revealed: Literal["before", "break1", "break2"]
+
 
 def break_in_nested_then_branch(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -332,6 +350,7 @@ def break_in_nested_then_branch(cond1: bool, cond2: bool, i: int):
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
     reveal_type(x)  # revealed: Literal["before", "loop1", "break", "loop2"]
 
+
 def break_in_nested_else_branch(cond1: bool, cond2: bool, i: int):
     x = "before"
     for _ in range(i):
@@ -349,6 +368,7 @@ def break_in_nested_else_branch(cond1: bool, cond2: bool, i: int):
             reveal_type(x)  # revealed: Literal["loop2"]
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
     reveal_type(x)  # revealed: Literal["before", "loop1", "loop2", "break"]
+
 
 def break_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -409,6 +429,7 @@ def raise_in_then_branch(cond: bool):
     # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
     reveal_type(x)  # revealed: Literal["before", "raise", "else"]
 
+
 def raise_in_else_branch(cond: bool):
     x = "before"
     try:
@@ -433,6 +454,7 @@ def raise_in_else_branch(cond: bool):
         reveal_type(x)  # revealed: Literal["before", "else", "raise"]
     # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
     reveal_type(x)  # revealed: Literal["before", "else", "raise"]
+
 
 def raise_in_both_branches(cond: bool):
     x = "before"
@@ -461,6 +483,7 @@ def raise_in_both_branches(cond: bool):
         reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
     # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
     reveal_type(x)  # revealed: Literal["before", "raise1", "raise2"]
+
 
 def raise_in_nested_then_branch(cond1: bool, cond2: bool):
     x = "before"
@@ -492,6 +515,7 @@ def raise_in_nested_then_branch(cond1: bool, cond2: bool):
     # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
     reveal_type(x)  # revealed: Literal["before", "else1", "raise", "else2"]
 
+
 def raise_in_nested_else_branch(cond1: bool, cond2: bool):
     x = "before"
     try:
@@ -521,6 +545,7 @@ def raise_in_nested_else_branch(cond1: bool, cond2: bool):
         reveal_type(x)  # revealed: Literal["before", "else1", "else2", "raise"]
     # Exceptions can occur anywhere, so "before" and "raise" are valid possibilities
     reveal_type(x)  # revealed: Literal["before", "else1", "else2", "raise"]
+
 
 def raise_in_both_nested_branches(cond1: bool, cond2: bool):
     x = "before"
@@ -584,6 +609,7 @@ invalid return type.
 from typing import NoReturn
 import sys
 
+
 def f() -> NoReturn:
     sys.exit(1)
 ```
@@ -594,10 +620,12 @@ Let's try cases where the function annotated with `NoReturn` is some sub-express
 from typing import NoReturn
 import sys
 
+
 # TODO: this is currently not yet supported
 # error: [invalid-return-type]
 def _() -> NoReturn:
     3 + sys.exit(1)
+
 
 # TODO: this is currently not yet supported
 # error: [invalid-return-type]
@@ -613,6 +641,7 @@ If a variable's type is a union, and some types in the union result in a functio
 ```py
 from typing import NoReturn
 import sys
+
 
 def g(x: int | None):
     if x is None:
@@ -631,6 +660,7 @@ should not give any diagnostics.
 ```py
 import sys
 
+
 def _(flag: bool):
     if flag:
         x = 3
@@ -645,6 +675,7 @@ a call with `NoReturn`.
 
 ```py
 import sys
+
 
 def _():
     try:
@@ -664,6 +695,7 @@ similar to the ones for `return` above.
 ```py
 import sys
 
+
 def call_in_then_branch(cond: bool):
     if cond:
         x = "terminal"
@@ -674,6 +706,7 @@ def call_in_then_branch(cond: bool):
         reveal_type(x)  # revealed: Literal["test"]
     reveal_type(x)  # revealed: Literal["test"]
 
+
 def call_in_else_branch(cond: bool):
     if cond:
         x = "test"
@@ -683,6 +716,7 @@ def call_in_else_branch(cond: bool):
         reveal_type(x)  # revealed: Literal["terminal"]
         sys.exit()
     reveal_type(x)  # revealed: Literal["test"]
+
 
 def call_in_both_branches(cond: bool):
     if cond:
@@ -695,6 +729,7 @@ def call_in_both_branches(cond: bool):
         sys.exit()
 
     reveal_type(x)  # revealed: Never
+
 
 def call_in_nested_then_branch(cond1: bool, cond2: bool):
     if cond1:
@@ -711,6 +746,7 @@ def call_in_nested_then_branch(cond1: bool, cond2: bool):
         reveal_type(x)  # revealed: Literal["test2"]
     reveal_type(x)  # revealed: Literal["test1", "test2"]
 
+
 def call_in_nested_else_branch(cond1: bool, cond2: bool):
     if cond1:
         x = "test1"
@@ -725,6 +761,7 @@ def call_in_nested_else_branch(cond1: bool, cond2: bool):
             sys.exit()
         reveal_type(x)  # revealed: Literal["test2"]
     reveal_type(x)  # revealed: Literal["test1", "test2"]
+
 
 def call_in_both_nested_branches(cond1: bool, cond2: bool):
     if cond1:
@@ -751,15 +788,18 @@ evaluation algorithm when evaluating the constraints.
 ```py
 from typing import NoReturn, overload
 
+
 @overload
 def f(x: int) -> NoReturn: ...
 @overload
 def f(x: str) -> int: ...
 def f(x): ...
 
+
 # No errors
 def _() -> NoReturn:
     f(3)
+
 
 # This should be an error because of implicitly returning `None`
 # error: [invalid-return-type]
@@ -777,6 +817,7 @@ import sys
 
 from typing import NoReturn
 
+
 class C:
     def __call__(self) -> NoReturn:
         sys.exit()
@@ -784,9 +825,11 @@ class C:
     def die(self) -> NoReturn:
         sys.exit()
 
+
 # No "implicitly returns `None`" diagnostic
 def _() -> NoReturn:
     C()()
+
 
 # No "implicitly returns `None`" diagnostic
 def _() -> NoReturn:
@@ -807,6 +850,7 @@ def top_level_return(cond1: bool, cond2: bool):
 
     def g():
         reveal_type(x)  # revealed: Literal[1, 2, 3]
+
     if cond1:
         if cond2:
             x = 2
@@ -814,11 +858,13 @@ def top_level_return(cond1: bool, cond2: bool):
             x = 3
     return
 
+
 def return_from_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
         reveal_type(x)  # revealed: Literal[1, 2, 3]
+
     if cond1:
         if cond2:
             x = 2
@@ -826,11 +872,13 @@ def return_from_if(cond1: bool, cond2: bool):
             x = 3
         return
 
+
 def return_from_nested_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
         reveal_type(x)  # revealed: Literal[1, 2, 3]
+
     if cond1:
         if cond2:
             x = 2

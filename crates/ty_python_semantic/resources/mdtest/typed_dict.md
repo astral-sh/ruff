@@ -60,11 +60,14 @@ from typing import Literal, Final
 NAME = "name"
 AGE = "age"
 
+
 def non_literal() -> str:
     return "name"
 
+
 def name_or_age() -> Literal["name", "age"]:
     return "name"
+
 
 carol: Person = {NAME: "Carol", AGE: 20}
 
@@ -76,8 +79,10 @@ reveal_type(carol[name_or_age()])  # revealed: str | int | None
 FINAL_NAME: Final = "name"
 FINAL_AGE: Final = "age"
 
+
 def _():
     carol: Person = {FINAL_NAME: "Carol", FINAL_AGE: 20}
+
 
 CAPITALIZED_NAME = "Name"
 
@@ -85,8 +90,10 @@ CAPITALIZED_NAME = "Name"
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 dave: Person = {CAPITALIZED_NAME: "Dave", "age": 20}
 
+
 def age() -> Literal["age"] | None:
     return "age"
+
 
 eve: Person = {"na" + "me": "Eve", age() or "age": 20}
 ```
@@ -129,10 +136,13 @@ class Plot(TypedDict):
     y: list[int | None]
     x: list[int | None] | None
 
+
 plot1: Plot = {"y": [1, 2, 3], "x": None}
+
 
 def homogeneous_list[T](*args: T) -> list[T]:
     return list(args)
+
 
 reveal_type(homogeneous_list(1, 2, 3))  # revealed: list[int]
 plot2: Plot = {"y": homogeneous_list(1, 2, 3), "x": None}
@@ -148,8 +158,10 @@ X = "x"
 plot4: Plot = {Y: [1, 2, 3], X: None}
 plot5: Plot = {Y: homogeneous_list(1, 2, 3), X: None}
 
+
 class Items(TypedDict):
     items: list[int | str]
+
 
 items1: Items = {"items": homogeneous_list(1, 2, 3)}
 ITEMS = "items"
@@ -183,9 +195,11 @@ Nested `TypedDict` fields are also supported.
 ```py
 from typing import TypedDict
 
+
 class Inner(TypedDict):
     name: str
     age: int | None
+
 
 class Person(TypedDict):
     inner: Inner
@@ -209,14 +223,18 @@ alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     age: int | None
 
+
 class House:
     owner: Person
 
+
 house = House()
+
 
 def accepts_person(p: Person) -> None:
     pass
@@ -323,14 +341,18 @@ literal:
 from typing import TypedDict
 from typing_extensions import NotRequired
 
+
 class Foo(TypedDict):
     foo: int
+
 
 x1: Foo | None = {"foo": 1}
 reveal_type(x1)  # revealed: Foo
 
+
 class Bar(TypedDict):
     bar: int
+
 
 x2: Foo | Bar = {"foo": 1}
 reveal_type(x2)  # revealed: Foo
@@ -345,18 +367,22 @@ reveal_type(x4)  # revealed: Bar
 x5: Foo | Bar = {"baz": 1}
 reveal_type(x5)  # revealed: Foo | Bar
 
+
 class FooBar1(TypedDict):
     foo: int
     bar: int
+
 
 class FooBar2(TypedDict):
     foo: int
     bar: int
 
+
 class FooBar3(TypedDict):
     foo: int
     bar: int
     baz: NotRequired[int]
+
 
 x6: FooBar1 | FooBar2 = {"foo": 1, "bar": 1}
 reveal_type(x6)  # revealed: FooBar1 | FooBar2
@@ -373,11 +399,14 @@ In doing so, may have to infer the same type with multiple distinct type context
 ```py
 from typing import TypedDict
 
+
 class NestedFoo(TypedDict):
     foo: list[FooBar1]
 
+
 class NestedBar(TypedDict):
     foo: list[FooBar2]
+
 
 x1: NestedFoo | NestedBar = {"foo": [{"foo": 1, "bar": 1}]}
 reveal_type(x1)  # revealed: NestedFoo | NestedBar
@@ -390,9 +419,11 @@ Users should be able to ignore TypedDict validation errors with `# type: ignore`
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     age: int
+
 
 alice_bad: Person = {"name": None}  # type: ignore
 Person(name=None, age=30)  # type: ignore
@@ -407,9 +438,11 @@ correctly:
 ```py
 from typing import TypedDict
 
+
 class User(TypedDict):
     name: str
     age: int
+
 
 # Valid usage - all required fields provided
 user1 = User({"name": "Alice", "age": 30})
@@ -432,13 +465,16 @@ positional argument passing or keyword unpacking:
 ```py
 from typing import TypedDict
 
+
 class Data(TypedDict):
     id: int
     name: str
     value: float
 
+
 def process_data_positional(data: Data) -> Data:
     return Data(data)
+
 
 def process_data_unpacking(data: Data) -> Data:
     return Data(**data)
@@ -449,16 +485,20 @@ Constructing from a compatible TypedDict (with same fields) works:
 ```py
 from typing import TypedDict
 
+
 class PersonBase(TypedDict):
     name: str
     age: int
+
 
 class PersonAlias(TypedDict):
     name: str
     age: int
 
+
 def copy_person(p: PersonBase) -> PersonAlias:
     return PersonAlias(**p)
+
 
 def copy_person_positional(p: PersonBase) -> PersonAlias:
     return PersonAlias(p)
@@ -470,12 +510,15 @@ behavior when passing all keys as explicit keyword arguments:
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     age: int
 
+
 class Employee(Person):
     employee_id: int
+
 
 def get_person_from_employee(emp: Employee) -> Person:
     # error: [invalid-key] "Unknown key "employee_id" for TypedDict `Person`"
@@ -498,17 +541,21 @@ Type mismatches in unpacked TypedDict fields should be detected:
 ```py
 from typing import TypedDict
 
+
 class Source(TypedDict):
     name: int  # Note: int, not str
     age: int
+
 
 class Target(TypedDict):
     name: str
     age: int
 
+
 def convert(src: Source) -> Target:
     # error: [invalid-argument-type]
     return Target(**src)
+
 
 def convert_positional(src: Source) -> Target:
     # error: [invalid-argument-type]
@@ -521,12 +568,15 @@ have any keys:
 ```py
 from typing import Any, TypedDict, Never
 
+
 class Info(TypedDict):
     name: str
     value: int
 
+
 def unpack_never(data: Never) -> Info:
     return Info(**data)
+
 
 def unpack_any(data: Any) -> Info:
     return Info(**data)
@@ -561,9 +611,11 @@ Intersection types containing a TypedDict (e.g., from truthiness narrowing) are 
 ```py
 from typing import TypedDict
 
+
 class OptionalInfo(TypedDict, total=False):
     id: int
     name: str
+
 
 def process_truthy(data: OptionalInfo) -> OptionalInfo:
     if data:
@@ -571,6 +623,7 @@ def process_truthy(data: OptionalInfo) -> OptionalInfo:
         # Here data is `OptionalInfo & ~AlwaysFalsy`, but we can still construct OptionalInfo from it
         return OptionalInfo(data)
     return {}
+
 
 def process_truthy_unpacking(data: OptionalInfo) -> OptionalInfo:
     if data:
@@ -586,20 +639,25 @@ has all their keys. For keys that appear in multiple TypedDicts, the types are i
 from typing import TypedDict
 from ty_extensions import Intersection
 
+
 class TdA(TypedDict):
     name: str
     a_only: int
+
 
 class TdB(TypedDict):
     name: str
     b_only: int
 
+
 class NameOnly(TypedDict):
     name: str
+
 
 # Positional form allows extra keys (like assignment)
 def construct_from_intersection(data: Intersection[TdA, TdB]) -> NameOnly:
     return NameOnly(data)
+
 
 # Unpacking form flags extra keys as errors
 def construct_from_intersection_unpacking(data: Intersection[TdA, TdB]) -> NameOnly:
@@ -616,9 +674,11 @@ optional by setting `total=False`:
 ```py
 from typing import TypedDict
 
+
 class OptionalPerson(TypedDict, total=False):
     name: str
     age: int | None
+
 
 # All fields are optional with total=False
 charlie = OptionalPerson()
@@ -654,17 +714,20 @@ all keys are required by default, `total=False` means that all keys are non-requ
 ```py
 from typing_extensions import TypedDict, Required, NotRequired, Final
 
+
 # total=False by default, but id is explicitly Required
 class Message(TypedDict, total=False):
     id: Required[int]  # Always required, even though total=False
     content: str  # Optional due to total=False
     timestamp: NotRequired[str]  # Explicitly optional (redundant here)
 
+
 # total=True by default, but content is explicitly NotRequired
 class User(TypedDict):
     name: str  # Required due to total=True (default)
     email: Required[str]  # Explicitly required (redundant here)
     bio: NotRequired[str]  # Optional despite total=True
+
 
 ID: Final = "id"
 
@@ -675,8 +738,10 @@ msg3 = Message(id=3, timestamp="2024-01-01")  # id required, timestamp optional
 msg4: Message = {"id": 4}  # id required, content optional
 msg5: Message = {ID: 5}  # id required, content optional
 
+
 def msg() -> Message:
     return {ID: 1}
+
 
 # Valid User constructions
 user1 = User(name="Alice", email="alice@example.com")  # required fields
@@ -716,15 +781,19 @@ from typing import TypedDict
 from typing_extensions import ReadOnly
 from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
+
 class Person(TypedDict):
     name: str
+
 
 class Employee(TypedDict):
     name: str
     employee_id: int
 
+
 class Robot(TypedDict):
     name: int
+
 
 static_assert(is_assignable_to(Employee, Person))
 
@@ -742,11 +811,14 @@ cover keys that are explicitly marked `NotRequired`, and also all the keys in a 
 ```py
 from typing_extensions import NotRequired
 
+
 class Spy1(TypedDict):
     name: NotRequired[str]
 
+
 class Spy2(TypedDict, total=False):
     name: str
+
 
 # invalid because `Spy1` and `Spy2` might be missing `name`
 static_assert(not is_assignable_to(Spy1, Person))
@@ -756,11 +828,14 @@ static_assert(not is_assignable_to(Spy2, Person))
 static_assert(not is_assignable_to(Person, Spy1))
 static_assert(not is_assignable_to(Person, Spy2))
 
+
 class Amnesiac1(TypedDict):
     name: NotRequired[ReadOnly[str]]
 
+
 class Amnesiac2(TypedDict, total=False):
     name: ReadOnly[str]
+
 
 # invalid because `Amnesiac1` and `Amnesiac2` might be missing `name`
 static_assert(not is_assignable_to(Amnesiac1, Person))
@@ -781,41 +856,54 @@ test all the permutations:
 from typing import Any
 from typing_extensions import ReadOnly
 
+
 class RequiredMutableInt(TypedDict):
     x: int
+
 
 class RequiredReadOnlyInt(TypedDict):
     x: ReadOnly[int]
 
+
 class NotRequiredMutableInt(TypedDict):
     x: NotRequired[int]
+
 
 class NotRequiredReadOnlyInt(TypedDict):
     x: NotRequired[ReadOnly[int]]
 
+
 class RequiredMutableBool(TypedDict):
     x: bool
+
 
 class RequiredReadOnlyBool(TypedDict):
     x: ReadOnly[bool]
 
+
 class NotRequiredMutableBool(TypedDict):
     x: NotRequired[bool]
+
 
 class NotRequiredReadOnlyBool(TypedDict):
     x: NotRequired[ReadOnly[bool]]
 
+
 class RequiredMutableAny(TypedDict):
     x: Any
+
 
 class RequiredReadOnlyAny(TypedDict):
     x: ReadOnly[Any]
 
+
 class NotRequiredMutableAny(TypedDict):
     x: NotRequired[Any]
 
+
 class NotRequiredReadOnlyAny(TypedDict):
     x: NotRequired[ReadOnly[Any]]
+
 
 # fmt: off
 static_assert(    is_assignable_to( RequiredMutableInt,      RequiredMutableInt))
@@ -925,9 +1013,11 @@ All typed dictionaries can be assigned to `Mapping[str, object]`:
 ```py
 from typing import Mapping, TypedDict
 
+
 class Person(TypedDict):
     name: str
     age: int | None
+
 
 alice = Person(name="Alice", age=30)
 # Always assignable.
@@ -951,11 +1041,14 @@ ways:
 ```py
 from typing import TypedDict
 
+
 def dangerous(d: dict[str, object]) -> None:
     d["name"] = 1
 
+
 class Person(TypedDict):
     name: str
+
 
 alice: Person = {"name": "Alice"}
 
@@ -994,23 +1087,29 @@ only thing standing in the way of this unsound example:
 ```py
 from typing_extensions import TypedDict, NotRequired
 
+
 class C(TypedDict):
     x: int
     y: str
 
+
 class B(TypedDict):
     x: int
+
 
 class A(TypedDict):
     x: int
     y: NotRequired[object]  # incompatible with both C and (surprisingly!) B
 
+
 def b_from_c(c: C) -> B:
     return c  # allowed
+
 
 def a_from_b(b: B) -> A:
     # error: [invalid-return-type] "Return type does not match returned value: expected `A`, found `B`"
     return b
+
 
 # The [invalid-return-type] error above is the only thing that keeps us from corrupting the type of c['y'].
 c: C = {"x": 1, "y": "hello"}
@@ -1025,16 +1124,20 @@ target item must be assignable from `object`:
 ```py
 from typing_extensions import ReadOnly
 
+
 class A2(TypedDict):
     x: int
     y: NotRequired[ReadOnly[object]]
 
+
 def a2_from_b(b: B) -> A2:
     return b  # allowed
+
 
 class A3(TypedDict):
     x: int
     y: NotRequired[ReadOnly[int]]  # not assignable from `object`
+
 
 def a3_from_b(b: B) -> A3:
     return b  # error: [invalid-return-type]
@@ -1046,11 +1149,14 @@ def a3_from_b(b: B) -> A3:
 from typing_extensions import TypedDict, ReadOnly, NotRequired
 from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
+
 class Inner1(TypedDict):
     name: str
 
+
 class Inner2(TypedDict):
     name: str
+
 
 class Outer1(TypedDict):
     a: Inner1
@@ -1058,11 +1164,13 @@ class Outer1(TypedDict):
     c: NotRequired[Inner1]
     d: ReadOnly[NotRequired[Inner1]]
 
+
 class Outer2(TypedDict):
     a: Inner2
     b: ReadOnly[Inner2]
     c: NotRequired[Inner2]
     d: ReadOnly[NotRequired[Inner2]]
+
 
 def _(o1: Outer1, o2: Outer2):
     static_assert(is_assignable_to(Outer1, Outer2))
@@ -1076,8 +1184,10 @@ This also extends to gradual types:
 ```py
 from typing import Any
 
+
 class Inner3(TypedDict):
     name: Any
+
 
 class Outer3(TypedDict):
     a: Inner3
@@ -1085,11 +1195,13 @@ class Outer3(TypedDict):
     c: NotRequired[Inner3]
     d: ReadOnly[NotRequired[Inner3]]
 
+
 class Outer4(TypedDict):
     a: Any
     b: ReadOnly[Any]
     c: NotRequired[Any]
     d: ReadOnly[NotRequired[Any]]
+
 
 def _(o1: Outer1, o2: Outer2, o3: Outer3, o4: Outer4):
     static_assert(is_assignable_to(Outer3, Outer1))
@@ -1130,19 +1242,23 @@ types:
 from typing_extensions import Any, TypedDict, ReadOnly, assert_type
 from ty_extensions import is_assignable_to, is_equivalent_to, static_assert
 
+
 class Foo(TypedDict):
     x: int
     y: Any
+
 
 # exactly the same fields
 class Bar(TypedDict):
     x: int
     y: Any
 
+
 # the same fields but in a different order
 class Baz(TypedDict):
     y: Any
     x: int
+
 
 static_assert(is_assignable_to(Foo, Bar))
 static_assert(is_equivalent_to(Foo, Bar))
@@ -1175,34 +1291,43 @@ equivalence:
 class FewerFields(TypedDict):
     x: int
 
+
 static_assert(is_assignable_to(Foo, FewerFields))
 static_assert(not is_equivalent_to(Foo, FewerFields))
+
 
 class DifferentMutability(TypedDict):
     x: int
     y: ReadOnly[Any]
 
+
 static_assert(is_assignable_to(Foo, DifferentMutability))
 static_assert(not is_equivalent_to(Foo, DifferentMutability))
+
 
 class MoreFields(TypedDict):
     x: int
     y: Any
     z: str
 
+
 static_assert(not is_assignable_to(Foo, MoreFields))
 static_assert(not is_equivalent_to(Foo, MoreFields))
+
 
 class DifferentFieldStaticType(TypedDict):
     x: str
     y: Any
 
+
 static_assert(not is_assignable_to(Foo, DifferentFieldStaticType))
 static_assert(not is_equivalent_to(Foo, DifferentFieldStaticType))
+
 
 class DifferentFieldGradualType(TypedDict):
     x: int
     y: Any | str
+
 
 static_assert(is_assignable_to(Foo, DifferentFieldGradualType))
 static_assert(not is_equivalent_to(Foo, DifferentFieldGradualType))
@@ -1214,24 +1339,30 @@ static_assert(not is_equivalent_to(Foo, DifferentFieldGradualType))
 from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import TypedDict, Required, NotRequired
 
+
 class Foo1(TypedDict, total=False):
     x: int
     y: str
+
 
 class Foo2(TypedDict):
     y: NotRequired[str]
     x: NotRequired[int]
 
+
 static_assert(is_equivalent_to(Foo1, Foo2))
 static_assert(is_equivalent_to(Foo1 | int, int | Foo2))
+
 
 class Bar1(TypedDict, total=False):
     x: int
     y: Required[str]
 
+
 class Bar2(TypedDict):
     y: str
     x: NotRequired[int]
+
 
 static_assert(is_equivalent_to(Bar1, Bar2))
 static_assert(is_equivalent_to(Bar1 | int, int | Bar2))
@@ -1243,24 +1374,30 @@ static_assert(is_equivalent_to(Bar1 | int, int | Bar2))
 from typing_extensions import TypedDict
 from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
 
+
 class Node1(TypedDict):
     value: int
     next: "Node1" | None
+
 
 class Node2(TypedDict):
     value: int
     next: "Node2" | None
 
+
 static_assert(is_assignable_to(Node1, Node2))
 static_assert(is_equivalent_to(Node1, Node2))
+
 
 class Person1(TypedDict):
     name: str
     friends: list["Person1"]
 
+
 class Person2(TypedDict):
     name: str
     friends: list["Person2"]
+
 
 static_assert(is_assignable_to(Person1, Person2))
 static_assert(is_equivalent_to(Person1, Person2))
@@ -1276,11 +1413,14 @@ names, the warning makes that clear:
 ```py
 from typing import TypedDict, cast
 
+
 class Foo2(TypedDict):
     x: int
 
+
 class Bar2(TypedDict):
     x: int
+
 
 foo: Foo2 = {"x": 1}
 _ = cast(Foo2, foo)  # error: [redundant-cast]
@@ -1294,15 +1434,19 @@ _ = cast(Bar2, foo)  # error: [redundant-cast]
 ```py
 from typing import TypedDict, Final, Literal, Any
 
+
 class Person(TypedDict):
     name: str
     age: int | None
 
+
 class Animal(TypedDict):
     name: str
 
+
 NAME_FINAL: Final = "name"
 AGE_FINAL: Final[Literal["age"]] = "age"
+
 
 def _(
     person: Person,
@@ -1345,17 +1489,21 @@ def _(
 from typing_extensions import TypedDict, Final, Literal, LiteralString, Any
 from ty_extensions import Intersection
 
+
 class Person(TypedDict):
     name: str
     surname: str
     age: int | None
 
+
 class Animal(TypedDict):
     name: str
     legs: int
 
+
 NAME_FINAL: Final = "name"
 AGE_FINAL: Final[Literal["age"]] = "age"
+
 
 def _(person: Person):
     person["name"] = "Alice"
@@ -1364,12 +1512,15 @@ def _(person: Person):
     # error: [invalid-key] "Unknown key "naem" for TypedDict `Person` - did you mean "name"?"
     person["naem"] = "Alice"
 
+
 def _(person: Person):
     person[NAME_FINAL] = "Alice"
     person[AGE_FINAL] = 30
 
+
 def _(person: Person, literal_key: Literal["age"]):
     person[literal_key] = 22
+
 
 def _(person: Person, union_of_keys: Literal["name", "surname"]):
     person[union_of_keys] = "unknown"
@@ -1377,6 +1528,7 @@ def _(person: Person, union_of_keys: Literal["name", "surname"]):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `Literal[1]`"
     # error: [invalid-assignment] "Invalid assignment to key "surname" with declared type `str` on TypedDict `Person`: value of type `Literal[1]`"
     person[union_of_keys] = 1
+
 
 def _(being: Person | Animal):
     being["name"] = "Being"
@@ -1388,6 +1540,7 @@ def _(being: Person | Animal):
     # error: [invalid-key] "Unknown key "surname" for TypedDict `Animal` - did you mean "name"?"
     being["surname"] = "unknown"
 
+
 def _(centaur: Intersection[Person, Animal]):
     centaur["name"] = "Chiron"
     centaur["age"] = 100
@@ -1396,11 +1549,13 @@ def _(centaur: Intersection[Person, Animal]):
     # error: [invalid-key] "Unknown key "unknown" for TypedDict `Person`"
     centaur["unknown"] = "value"
 
+
 def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):
     person[union_of_keys] = unknown_value
 
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
     person[union_of_keys] = None
+
 
 def _(person: Person, str_key: str, literalstr_key: LiteralString):
     # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`."
@@ -1408,6 +1563,7 @@ def _(person: Person, str_key: str, literalstr_key: LiteralString):
 
     # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`."
     person[literalstr_key] = None
+
 
 def _(person: Person, unknown_key: Any):
     # No error here:
@@ -1421,10 +1577,12 @@ Assignments to keys that are marked `ReadOnly` will produce an error:
 ```py
 from typing_extensions import TypedDict, ReadOnly, Required
 
+
 class Person(TypedDict, total=False):
     id: ReadOnly[Required[int]]
     name: str
     age: int | None
+
 
 alice: Person = {"id": 1, "name": "Alice", "age": 30}
 alice["age"] = 31  # okay
@@ -1441,6 +1599,7 @@ class Config(TypedDict):
     host: ReadOnly[str]
     port: ReadOnly[int]
 
+
 config: Config = {"host": "localhost", "port": 8080}
 
 # error: [invalid-assignment] "Cannot assign to key "host" on TypedDict `Config`: key is marked read-only"
@@ -1455,10 +1614,12 @@ config["port"] = 80
 from typing import TypedDict
 from typing_extensions import NotRequired
 
+
 class Person(TypedDict):
     name: str
     age: int | None
     extra: NotRequired[str]
+
 
 def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
@@ -1508,9 +1669,11 @@ of a `TypedDict` type will return `dict`:
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     age: int | None
+
 
 def _(p: Person) -> None:
     reveal_type(type(p))  # revealed: <class 'dict[str, object]'>
@@ -1525,9 +1688,11 @@ on inhabitants of the type defined by the class:
 # error: [unresolved-attribute] "Class `Person` has no attribute `name`"
 Person.name
 
+
 def _(P: type[Person]):
     # error: [unresolved-attribute] "Object of type `type[Person]` has no attribute `name`"
     P.name
+
 
 def _(p: Person) -> None:
     # error: [unresolved-attribute] "Object of type `Person` has no attribute `name`"
@@ -1543,9 +1708,11 @@ def _(p: Person) -> None:
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     age: int | None
+
 
 reveal_type(Person.__total__)  # revealed: bool
 reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
@@ -1579,6 +1746,7 @@ def accepts_typed_dict_class(t_person: type[Person]) -> None:
     reveal_type(t_person.__required_keys__)  # revealed: frozenset[str]
     reveal_type(t_person.__optional_keys__)  # revealed: frozenset[str]
 
+
 accepts_typed_dict_class(Person)
 ```
 
@@ -1589,16 +1757,20 @@ accepts_typed_dict_class(Person)
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
 
+
 class Employee(Person):
     employee_id: int
+
 
 alice: Employee = {"name": "Alice", "employee_id": 1}
 
 # error: [missing-typed-dict-key] "Missing required key 'employee_id' in TypedDict `Employee` constructor"
 eve: Employee = {"name": "Eve"}
+
 
 def combine(p: Person, e: Employee):
     reveal_type(p.copy())  # revealed: Person
@@ -1617,14 +1789,17 @@ original requirement status, while new fields follow the child class's `total` s
 ```py
 from typing import TypedDict
 
+
 # Case 1: total=True parent, total=False child
 class PersonBase(TypedDict):
     id: int  # required (from total=True)
     name: str  # required (from total=True)
 
+
 class PersonOptional(PersonBase, total=False):
     age: int  # optional (from total=False)
     email: str  # optional (from total=False)
+
 
 # Inherited fields keep their original requirement status
 person1 = PersonOptional(id=1, name="Alice")  # Valid - id/name still required
@@ -1638,13 +1813,16 @@ person_invalid1 = PersonOptional(name="Bob")
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `PersonOptional` constructor"
 person_invalid2 = PersonOptional(id=2)
 
+
 # Case 2: total=False parent, total=True child
 class PersonBaseOptional(TypedDict, total=False):
     id: int  # optional (from total=False)
     name: str  # optional (from total=False)
 
+
 class PersonRequired(PersonBaseOptional):  # total=True by default
     age: int  # required (from total=True)
+
 
 # New fields in child are required, inherited fields stay optional
 person4 = PersonRequired(age=30)  # Valid - only age required, id/name optional
@@ -1660,13 +1838,16 @@ This also works with `Required` and `NotRequired`:
 ```py
 from typing_extensions import TypedDict, Required, NotRequired
 
+
 # Case 3: Mixed inheritance with Required/NotRequired
 class PersonMixed(TypedDict, total=False):
     id: Required[int]  # required despite total=False
     name: str  # optional due to total=False
 
+
 class Employee(PersonMixed):  # total=True by default
     department: str  # required due to total=True
+
 
 # id stays required (Required override), name stays optional, department is required
 emp1 = Employee(id=1, department="Engineering")  # Valid
@@ -1692,9 +1873,11 @@ from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
 T = TypeVar("T")
 
+
 class TaggedData(TypedDict, Generic[T]):
     data: T
     tag: str
+
 
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
@@ -1702,11 +1885,14 @@ p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 # error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData[int]`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 
+
 class Items(TypedDict, Generic[T]):
     items: list[T]
 
+
 def homogeneous_list(*args: T) -> list[T]:
     return list(args)
+
 
 items1: Items[int] = {"items": [1, 2, 3]}
 items2: Items[str] = {"items": ["a", "b", "c"]}
@@ -1773,9 +1959,11 @@ static_assert(not is_subtype_of(Items[Any], Items[int]))
 from __future__ import annotations
 from typing import TypedDict
 
+
 class Node(TypedDict):
     name: str
     parent: Node | None
+
 
 root: Node = {"name": "root", "parent": None}
 child: Node = {"name": "child", "parent": root}
@@ -1794,9 +1982,11 @@ class Person(TypedDict):
     name: str
     parent: Person | None
 
+
 def _(node: Node, person: Person):
     _: Person = node
     _: Node = person
+
 
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
@@ -1840,6 +2030,7 @@ x: TypedDict = {"name": "Alice"}
 ```py
 from typing_extensions import Required, NotRequired, ReadOnly
 
+
 def bad(
     # error: [invalid-type-form] "`Required` is not allowed in function parameter annotations"
     a: Required[int],
@@ -1857,12 +2048,15 @@ Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a
 ```py
 from typing import TypedDict
 
+
 class MyDict(dict):
     pass
+
 
 class Person(TypedDict):
     name: str
     age: int | None
+
 
 # error: [invalid-assignment] "Object of type `MyDict` is not assignable to `Person`"
 x: Person = MyDict({"name": "Alice", "age": 30})
@@ -1873,9 +2067,11 @@ x: Person = MyDict({"name": "Alice", "age": 30})
 ```py
 from typing import TypedDict
 
+
 class Person(TypedDict):
     name: str
     age: int | None
+
 
 def _(obj: object, obj2: type):
     # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used as the second argument to `isinstance`"
@@ -1906,29 +2102,38 @@ Snapshot tests for diagnostic messages including suggestions:
 ```py
 from typing import TypedDict, Final
 
+
 class Person(TypedDict):
     name: str
     age: int | None
 
+
 def access_invalid_literal_string_key(person: Person):
     person["naem"]  # error: [invalid-key]
 
+
 NAME_KEY: Final = "naem"
+
 
 def access_invalid_key(person: Person):
     person[NAME_KEY]  # error: [invalid-key]
 
+
 def access_with_str_key(person: Person, str_key: str):
     person[str_key]  # error: [invalid-key]
+
 
 def write_to_key_with_wrong_type(person: Person):
     person["age"] = "42"  # error: [invalid-assignment]
 
+
 def write_to_non_existing_key(person: Person):
     person["naem"] = "Alice"  # error: [invalid-key]
 
+
 def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
+
 
 def create_with_invalid_string_key():
     # error: [invalid-key]
@@ -1943,9 +2148,11 @@ Assignment to `ReadOnly` keys:
 ```py
 from typing_extensions import ReadOnly
 
+
 class Employee(TypedDict):
     id: ReadOnly[int]
     name: str
+
 
 def write_to_readonly_key(employee: Employee):
     employee["id"] = 42  # error: [invalid-assignment]
@@ -1967,9 +2174,11 @@ def write_to_non_existing_key_single_quotes(person: Person):
 from typing import TypedDict as TD
 from typing_extensions import Required
 
+
 class UserWithAlias(TD, total=False):
     name: Required[str]
     age: int
+
 
 user_empty = UserWithAlias(name="Alice")  # name is required
 user_partial = UserWithAlias(name="Alice", age=30)
@@ -1989,15 +2198,19 @@ treated as a `TypedDict`:
 ```py
 from typing import TypedDict as TD
 
+
 class TypedDict:
     def __init__(self):
         pass
 
+
 class NotActualTypedDict(TypedDict, total=True):
     name: str
 
+
 class ActualTypedDict(TD, total=True):
     name: str
+
 
 not_td = NotActualTypedDict()
 reveal_type(not_td)  # revealed: NotActualTypedDict
@@ -2020,15 +2233,19 @@ from typing import TypedDict, final
 from typing_extensions import ReadOnly
 from ty_extensions import static_assert, is_disjoint_from
 
+
 # Two simple disjoint types, to avoid relying on `@disjoint_base` special cases for built-ins like
 # `int` and `str`.
 @final
 class Final1: ...
 
+
 @final
 class Final2: ...
 
+
 static_assert(is_disjoint_from(Final1, Final2))
+
 
 class DisjointTD1(TypedDict):
     # Make this example `ReadOnly` because that actually ends up checking the field types for
@@ -2039,10 +2256,12 @@ class DisjointTD1(TypedDict):
     common1: object
     common2: object
 
+
 class DisjointTD2(TypedDict):
     disjoint: ReadOnly[Final2]
     common1: object
     common2: object
+
 
 static_assert(is_disjoint_from(DisjointTD1, DisjointTD2))
 ```
@@ -2054,14 +2273,21 @@ both. `TypedDict` disjointness takes this into account. For example:
 ```py
 from ty_extensions import is_assignable_to
 
+
 class NonFinal1: ...
+
+
 class NonFinal2: ...
+
+
 class CommonSub(NonFinal1, NonFinal2): ...
+
 
 static_assert(not is_disjoint_from(NonFinal1, NonFinal2))
 static_assert(not is_assignable_to(NonFinal1, NonFinal2))
 static_assert(is_assignable_to(CommonSub, NonFinal1))
 static_assert(is_assignable_to(CommonSub, NonFinal2))
+
 
 class NonDisjointTD1(TypedDict):
     non_disjoint: ReadOnly[NonFinal1]
@@ -2069,14 +2295,17 @@ class NonDisjointTD1(TypedDict):
     # fields are in. Only shared field names can establish disjointness.
     extra1: int
 
+
 class NonDisjointTD2(TypedDict):
     extra2: str
     non_disjoint: ReadOnly[NonFinal2]
+
 
 class CommonSubTD(TypedDict):
     extra2: str
     extra1: int
     non_disjoint: ReadOnly[CommonSub]
+
 
 # The first two TDs above are not assignable in either direction...
 static_assert(not is_assignable_to(NonDisjointTD1, NonDisjointTD2))
@@ -2097,11 +2326,14 @@ common need to have _compatible_ types (in the fully-static case, equivalent typ
 ```py
 from typing import Any, Generic, TypeVar
 
+
 class IntTD(TypedDict):
     x: int
 
+
 class BoolTD(TypedDict):
     x: bool
+
 
 # `bool` is assignable to `int`, but `int` is not assignable to `bool`. If `x` was `ReadOnly` (even,
 # as we'll see below, only on the `int` side), then these two TDs would not be disjoint, but in this
@@ -2115,11 +2347,14 @@ static_assert(is_disjoint_from(BoolTD, IntTD))
 # other for the same reason.) However, `bool` is *not* compatible with `int | Any`, because there's
 # no materialization that's equivalent to `bool`.
 
+
 class IntOrAnyTD(TypedDict):
     x: int | Any
 
+
 class BoolOrAnyTD(TypedDict):
     x: bool | Any
+
 
 static_assert(not is_disjoint_from(IntTD, IntOrAnyTD))
 static_assert(not is_disjoint_from(IntOrAnyTD, IntTD))
@@ -2136,8 +2371,10 @@ static_assert(not is_disjoint_from(BoolOrAnyTD, BoolTD))
 
 # `Any` is compatible with everything.
 
+
 class AnyTD(TypedDict):
     x: Any
+
 
 static_assert(not is_disjoint_from(IntTD, AnyTD))
 static_assert(not is_disjoint_from(AnyTD, IntTD))
@@ -2151,23 +2388,29 @@ static_assert(not is_disjoint_from(AnyTD, AnyTD))
 
 # This works with generic `TypedDict`s too.
 
+
 class TwoIntsTD(TypedDict):
     x: int
     y: int
+
 
 class TwoBoolsTD(TypedDict):
     x: bool
     y: bool
 
+
 class IntBoolTD(TypedDict):
     x: int
     y: bool
 
+
 T = TypeVar("T")
+
 
 class TwoGenericTD(TypedDict, Generic[T]):
     x: T
     y: T
+
 
 static_assert(not is_disjoint_from(TwoGenericTD[Any], TwoIntsTD))
 static_assert(not is_disjoint_from(TwoGenericTD[int], TwoIntsTD))
@@ -2188,8 +2431,10 @@ isn't assignable to the immutable side:
 class ReadOnlyIntTD(TypedDict):
     x: ReadOnly[int]
 
+
 class ReadOnlyBoolTD(TypedDict):
     x: ReadOnly[bool]
+
 
 static_assert(not is_disjoint_from(ReadOnlyIntTD, ReadOnlyBoolTD))
 static_assert(not is_disjoint_from(ReadOnlyBoolTD, ReadOnlyIntTD))
@@ -2211,11 +2456,14 @@ disjointness:
 ```py
 from typing_extensions import NotRequired
 
+
 class NotRequiredIntTD(TypedDict):
     x: NotRequired[int]
 
+
 class NotRequiredReadOnlyIntTD(TypedDict):
     x: NotRequired[ReadOnly[int]]
+
 
 static_assert(is_disjoint_from(NotRequiredIntTD, IntTD))
 static_assert(is_disjoint_from(IntTD, NotRequiredIntTD))
@@ -2233,8 +2481,10 @@ check:
 class NotRequiredBoolTD(TypedDict):
     x: NotRequired[bool]
 
+
 class NotRequiredReadOnlyBoolTD(TypedDict):
     x: NotRequired[ReadOnly[bool]]
+
 
 static_assert(not is_disjoint_from(IntTD, IntTD))
 static_assert(is_disjoint_from(IntTD, BoolTD))
@@ -2280,10 +2530,13 @@ static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnl
 from typing import TypedDict, Mapping
 from ty_extensions import static_assert, is_disjoint_from
 
+
 class TD(TypedDict):
     x: int
 
+
 class RegularNonTD: ...
+
 
 static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
@@ -2310,17 +2563,22 @@ given a distinct `Literal` type/value. We can narrow the union by constraining t
 ```py
 from typing import TypedDict, Literal
 
+
 class Foo(TypedDict):
     tag: Literal["foo"]
+
 
 class Bar(TypedDict):
     tag: Literal[42]
 
+
 class Baz(TypedDict):
     tag: Literal[b"baz"]  # `BytesLiteral` is supported.
 
+
 class Bing(TypedDict):
     tag: Literal["bing"]
+
 
 def _(u: Foo | Bar | Baz | Bing):
     if u["tag"] == "foo":
@@ -2338,6 +2596,7 @@ We can descend into intersections to discover `TypedDict` types that need narrow
 ```py
 from collections.abc import Mapping
 from ty_extensions import Intersection
+
 
 def _(u: Foo | Intersection[Bar, Mapping[str, int]]):
     if u["tag"] == "foo":
@@ -2362,8 +2621,10 @@ anything about the type of `x`. Here's an example where narrowing would be tempt
 ```py
 from ty_extensions import is_assignable_to, static_assert
 
+
 class NonLiteralTD(TypedDict):
     tag: int
+
 
 def _(u: Foo | NonLiteralTD):
     if u["tag"] == "foo":
@@ -2373,11 +2634,13 @@ def _(u: Foo | NonLiteralTD):
         # ...(even though we can here)...
         reveal_type(u)  # revealed: NonLiteralTD
 
+
 # ...because `NonLiteralTD["tag"]` could be assigned to with one of these, which would make the
 # first condition above true at runtime!
 class WackyInt(int):
     def __eq__(self, other):
         return True
+
 
 _: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
 ```
@@ -2388,6 +2651,7 @@ Intersections containing a TypedDict with literal fields can be narrowed with eq
 ```py
 from ty_extensions import Intersection
 from typing import Any
+
 
 def _(x: Intersection[Foo, Any]):
     if x["tag"] == "foo":
@@ -2401,6 +2665,7 @@ But intersections with non-literal fields cannot be narrowed:
 ```py
 from ty_extensions import Intersection
 from typing import Any
+
 
 def _(x: Intersection[NonLiteralTD, Any]):
     if x["tag"] == 42:
@@ -2417,8 +2682,10 @@ though `str` and `int` are disjoint, we can't narrow here because a `str` subcla
 from ty_extensions import Intersection
 from typing import Any
 
+
 class StrTagTD(TypedDict):
     tag: str
+
 
 def _(x: Intersection[StrTagTD, Any]):
     if x["tag"] == 42:
@@ -2436,10 +2703,12 @@ def _(u: Foo | Bar | dict):
         # false negative in `is_disjoint_impl`.
         reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
 
+
 # The negation(s) will simplify out if we add something to the union that doesn't inherit from
 # `dict`. It just needs to support indexing with a string key.
 class NotADict:
     def __getitem__(self, key): ...
+
 
 def _(u: Foo | Bar | NotADict):
     if u["tag"] == 42:
@@ -2454,11 +2723,14 @@ field, it could be _assigned to_ with another `TypedDict` that does:
 ```py
 from typing_extensions import Literal
 
+
 class Foo(TypedDict):
     foo: int
 
+
 class Bar(TypedDict):
     bar: int
+
 
 def disappointment(u: Foo | Bar, v: Literal["foo"]):
     if "foo" in u:
@@ -2473,10 +2745,12 @@ def disappointment(u: Foo | Bar, v: Literal["foo"]):
     else:
         reveal_type(u)  # revealed: Bar
 
+
 # ...because `u` could turn out to be one of these.
 class FooBar(TypedDict):
     foo: int
     bar: int
+
 
 static_assert(is_assignable_to(FooBar, Foo))
 static_assert(is_assignable_to(FooBar, Bar))
@@ -2489,6 +2763,7 @@ that contain `TypedDict`s, and unions that contain intersections that contain `T
 ```py
 from typing_extensions import Literal, Any
 from ty_extensions import Intersection, is_assignable_to, static_assert
+
 
 def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Literal["bar"]):
     reveal_type(u)  # revealed: Foo | (Bar & Any)
@@ -2570,8 +2845,10 @@ Narrowing is restricted to `Literal` tags:
 ```py
 from ty_extensions import is_assignable_to, static_assert
 
+
 class NonLiteralTD(TypedDict):
     tag: int
+
 
 def match_non_literal(u: Foo | NonLiteralTD):
     match u["tag"]:
@@ -2638,7 +2915,9 @@ PEP 695 type aliases also work with `in`/`not in` narrowing:
 class Baz(TypedDict):
     baz: int
 
+
 type ThingWithBaz = Foo | Baz
+
 
 def test_in(x: ThingWithBaz):
     if "baz" not in x:
@@ -2653,11 +2932,13 @@ Nested PEP 695 type aliases (an alias referring to another alias) also work:
 type Inner = Foo | Bar
 type Outer = Inner
 
+
 def test_nested_if(x: Outer):
     if x["tag"] == "foo":
         reveal_type(x)  # revealed: Foo
     else:
         reveal_type(x)  # revealed: Bar
+
 
 def test_nested_match(x: Outer):
     match x["tag"]:
@@ -2666,8 +2947,10 @@ def test_nested_match(x: Outer):
         case "bar":
             reveal_type(x)  # revealed: Bar
 
+
 type InnerWithBaz = Foo | Baz
 type OuterWithBaz = InnerWithBaz
+
 
 def test_nested_in(x: OuterWithBaz):
     if "baz" not in x:
@@ -2687,6 +2970,7 @@ not allowed to have a value.
 ```py
 from typing import TypedDict
 
+
 class Foo(TypedDict):
     """docstring"""
 
@@ -2698,12 +2982,14 @@ class Foo(TypedDict):
     # As a non-standard but common extension, we interpret `...` as equivalent to `pass`.
     ...
 
+
 class Bar(TypedDict):
     a: int
     # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
     42
     # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
     b: str = "hello"
+
     # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
     def bar(self): ...
 ```
@@ -2728,6 +3014,7 @@ when instantiating the class at runtime:
 from dataclasses import dataclass
 from typing import TypedDict
 
+
 @dataclass
 # error: [invalid-dataclass] "`TypedDict` class `Foo` cannot be decorated with `@dataclass`"
 class Foo(TypedDict):
@@ -2741,6 +3028,7 @@ The same error occurs with `dataclasses.dataclass` used with parentheses:
 from dataclasses import dataclass
 from typing import TypedDict
 
+
 @dataclass()
 # error: [invalid-dataclass]
 class Bar(TypedDict):
@@ -2752,6 +3040,7 @@ It also applies when using `frozen=True` or other dataclass parameters:
 ```py
 from dataclasses import dataclass
 from typing import TypedDict
+
 
 @dataclass(frozen=True)
 # error: [invalid-dataclass]
@@ -2766,8 +3055,10 @@ TypedDict classes and cannot be decorated with `@dataclass`:
 from dataclasses import dataclass
 from typing import TypedDict
 
+
 class Base(TypedDict):
     x: int
+
 
 @dataclass
 # error: [invalid-dataclass]
@@ -2781,6 +3072,7 @@ for it. Once functional `TypedDict` support is added, this should also emit an e
 ```py
 from dataclasses import dataclass
 from typing import TypedDict
+
 
 # TODO: This should error once functional TypedDict is supported
 @dataclass
@@ -2797,7 +3089,9 @@ A `TypedDict` may not inherit from a non-`TypedDict`:
 ```py
 from typing import TypedDict
 
+
 class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
+
 
 # This even fails at runtime!
 class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
@@ -2807,6 +3101,8 @@ It is invalid to pass non-`bool`s to the `total` and `closed` keyword arguments:
 
 ```py
 class Bar(TypedDict, total=42): ...  # error: [invalid-argument-type]
+
+
 class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
 ```
 
@@ -2830,7 +3126,9 @@ Specifying a custom metaclass is not permitted:
 ```py
 from abc import ABCMeta
 
+
 class Spam(TypedDict, metaclass=ABCMeta): ...  # error: [invalid-typed-dict-header]
+
 
 # This one works at runtime, but the metaclass is still `typing._TypedDictMeta`,
 # so there doesn't seem to be any reason why you'd want to do this

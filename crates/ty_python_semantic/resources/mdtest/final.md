@@ -8,18 +8,29 @@ Don't do this:
 import typing_extensions
 from typing import final
 
+
 @final
 class A: ...
 
+
 class B(A): ...  # error: 9 [subclass-of-final-class] "Class `B` cannot inherit from final class `A`"
+
 
 @typing_extensions.final
 class C: ...
 
+
 class D(C): ...  # error: [subclass-of-final-class]
+
+
 class E: ...
+
+
 class F: ...
+
+
 class G: ...
+
 
 # fmt: off
 class H(
@@ -42,39 +53,30 @@ def lossy_decorator(fn: Callable) -> Callable: ...
 class Parent:
     @final
     def foo(self): ...
-
     @final
     @property
     def my_property1(self) -> int: ...
-
     @property
     @final
     def my_property2(self) -> int: ...
-
     @property
     @final
     def my_property3(self) -> int: ...
-
     @final
     @classmethod
     def class_method1(cls) -> int: ...
-
     @classmethod
     @final
     def class_method2(cls) -> int: ...
-
     @final
     @staticmethod
     def static_method1() -> int: ...
-
     @staticmethod
     @final
     def static_method2() -> int: ...
-
     @lossy_decorator
     @final
     def decorated_1(self): ...
-
     @final
     @lossy_decorator
     def decorated_2(self): ...
@@ -87,31 +89,23 @@ class Child(Parent):
     def foo(self): ...
     @property
     def my_property1(self) -> int: ...  # error: [override-of-final-method]
-
     @property
     def my_property2(self) -> int: ...  # error: [override-of-final-method]
     @my_property2.setter
     def my_property2(self, x: int) -> None: ...
-
     @property
     def my_property3(self) -> int: ...  # error: [override-of-final-method]
     @my_property3.deleter
     def my_proeprty3(self) -> None: ...
-
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-
     @staticmethod
     def static_method1() -> int: ...  # error: [override-of-final-method]
-
     @classmethod
     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
-
     @staticmethod
     def static_method2() -> int: ...  # error: [override-of-final-method]
-
     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
-
     @lossy_decorator
     def decorated_2(self): ...  # TODO: should emit [override-of-final-method]
 
@@ -175,6 +169,7 @@ class Baz(Foo):
 ```py
 from typing import final
 
+
 class Foo:
     @final
     def f(self): ...
@@ -184,6 +179,7 @@ class Foo:
 
 ```py
 import module1
+
 
 class Foo(module1.Foo):
     def f(self): ...  # error: [override-of-final-method]
@@ -207,7 +203,6 @@ class Good:
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...
-
     @final
     @overload
     def baz(self, x: str) -> str: ...
@@ -219,7 +214,6 @@ class ChildOfGood(Good):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-
     @overload
     def baz(self, x: str) -> str: ...
     @overload
@@ -232,7 +226,6 @@ class Bad:
     @final
     # error: [invalid-overload]
     def bar(self, x: int) -> int: ...
-
     @overload
     def baz(self, x: str) -> str: ...
     @final
@@ -245,7 +238,6 @@ class ChildOfBad(Bad):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-
     @overload
     def baz(self, x: str) -> str: ...
     @overload
@@ -257,6 +249,7 @@ class ChildOfBad(Bad):
 ```py
 from typing import overload, final
 
+
 class Good:
     @overload
     def f(self, x: str) -> str: ...
@@ -265,6 +258,7 @@ class Good:
     @final
     def f(self, x: int | str) -> int | str:
         return x
+
 
 class ChildOfGood(Good):
     @overload
@@ -275,6 +269,7 @@ class ChildOfGood(Good):
     # error: [override-of-final-method]
     def f(self, x: int | str) -> int | str:
         return x
+
 
 class Bad:
     @overload
@@ -309,6 +304,7 @@ class Bad:
     def i(self, x: int | str) -> int | str:
         return x
 
+
 class ChildOfBad(Bad):
     # TODO: these should all cause us to emit Liskov violations as well
     f = None  # error: [override-of-final-method]
@@ -335,12 +331,15 @@ type qualifier as travelling *across* scopes.
 ```py
 from typing import final
 
+
 class A:
     @final
     def method(self) -> None: ...
 
+
 class B:
     method = A.method
+
 
 class C(B):
     def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
@@ -357,6 +356,7 @@ diagnostic but do not provide an autofix (since the function may be defined in a
 
 ```py
 from typing import final
+
 
 class Base:
     @final
@@ -375,6 +375,7 @@ def replacement_method() -> None: ...
 from base import Base
 from other import replacement_method
 
+
 class Derived(Base):
     method = replacement_method  # error: [override-of-final-method]
 ```
@@ -384,9 +385,11 @@ class Derived(Base):
 ```py
 from typing import final
 
+
 class A:
     @final
     def __init__(self) -> None: ...
+
 
 class B(A):
     def __init__(self) -> None: ...  # error: [override-of-final-method]
@@ -401,13 +404,16 @@ class B(A):
 ```py
 from typing import final
 
+
 class A:
     @final
     def f(self): ...
 
+
 class B(A):
     @final
     def f(self): ...  # error: [override-of-final-method]
+
 
 class C(B):
     @final
@@ -420,6 +426,7 @@ class C(B):
 ```py
 from typing import final, Final
 
+
 @final
 @final
 @final
@@ -434,6 +441,7 @@ class A:
     @final
     def method(self): ...
 
+
 @final
 @final
 @final
@@ -442,8 +450,10 @@ class A:
 class B:
     method: Final = A.method
 
+
 class C(A):  # error: [subclass-of-final-class]
     def method(self): ...  # error: [override-of-final-method]
+
 
 class D(B):  # error: [subclass-of-final-class]
     # TODO: we should emit a diagnostic here
@@ -455,9 +465,11 @@ class D(B):  # error: [subclass-of-final-class]
 ```py
 from typing import final, Any
 
+
 class Parent:
     @final
     def method(self) -> None: ...
+
 
 class Child(Parent):
     def __init__(self) -> None:
@@ -471,36 +483,53 @@ class Child(Parent):
 ```py
 from typing import final
 
+
 def coinflip() -> bool:
     return False
 
+
 class A:
     if coinflip():
+
         @final
         def method1(self) -> None: ...
+
     else:
+
         def method1(self) -> None: ...
 
     if coinflip():
+
         def method2(self) -> None: ...
+
     else:
+
         @final
         def method2(self) -> None: ...
 
     if coinflip():
+
         @final
         def method3(self) -> None: ...
+
     else:
+
         @final
         def method3(self) -> None: ...
 
     if coinflip():
+
         def method4(self) -> None: ...
+
     elif coinflip():
+
         @final
         def method4(self) -> None: ...
+
     else:
+
         def method4(self) -> None: ...
+
 
 class B(A):
     def method1(self) -> None: ...  # error: [override-of-final-method]
@@ -515,19 +544,26 @@ class B(A):
     method4 = 42
     unrelated = 56  # fmt: skip
 
+
 # Possible overrides of possibly `@final` methods...
 class C(A):
     if coinflip():
+
         def method1(self) -> None: ...  # error: [override-of-final-method]
+
     else:
         pass
 
     if coinflip():
+
         def method2(self) -> None: ...  # error: [override-of-final-method]
+
     else:
+
         def method2(self) -> None: ...
 
     if coinflip():
+
         def method3(self) -> None: ...  # error: [override-of-final-method]
 
     # TODO: we should emit Liskov violations here too:
@@ -651,10 +687,12 @@ clear from the use of `@abstractmethod`.
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @abstractmethod
     def foo(self) -> int:
         raise NotImplementedError
+
 
 @final
 class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
@@ -669,6 +707,7 @@ class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `De
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @abstractmethod
     def foo(self) -> int: ...
@@ -677,9 +716,11 @@ class Base(ABC):
     @abstractmethod
     def baz(self) -> None: ...
 
+
 @final
 class MissingAll(Base):  # error: [abstract-method-in-final-class]
     pass
+
 
 @final
 class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
@@ -696,9 +737,11 @@ class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
 from abc import abstractmethod
 from typing import Protocol, final
 
+
 class MyProtocol(Protocol):
     @abstractmethod
     def method(self) -> int: ...
+
 
 @final
 class Implementer(MyProtocol):  # error: [abstract-method-in-final-class]
@@ -711,11 +754,13 @@ class Implementer(MyProtocol):  # error: [abstract-method-in-final-class]
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @abstractmethod
     def foo(self) -> int: ...
     @abstractmethod
     def bar(self) -> str: ...
+
 
 @final
 class FullyImplemented(Base):
@@ -734,12 +779,15 @@ class FullyImplemented(Base):
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class GrandParent(ABC):
     @abstractmethod
     def method(self) -> int: ...
 
+
 class Parent(GrandParent):
     pass
+
 
 @final
 class Child(Parent):  # error: [abstract-method-in-final-class]
@@ -755,16 +803,20 @@ a subclass. A `@final` class inheriting from that subclass must implement it.
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class GreatGrandparent(ABC):
     @abstractmethod
     def f(self): ...
 
+
 class Grandparent(GreatGrandparent):
     def f(self): ...
+
 
 class Parent(Grandparent):
     @abstractmethod
     def f(self): ...
+
 
 @final
 class Child(Parent):  # error: [abstract-method-in-final-class]
@@ -779,11 +831,14 @@ A dynamic class created with `type()` can provide concrete implementations of ab
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @abstractmethod
     def foo(self) -> int: ...
 
+
 DynamicMiddle = type("DynamicMiddle", (Base,), {"foo": lambda self: 42})
+
 
 @final
 class Final(DynamicMiddle):  # No error; `foo` is implemented by `DynamicMiddle`
@@ -798,9 +853,11 @@ subclasses.
 ```py
 from abc import ABC, abstractmethod
 
+
 class Base(ABC):
     @abstractmethod
     def foo(self) -> int: ...
+
 
 class Derived(Base):  # No error - not final, can be subclassed
     pass
@@ -814,9 +871,11 @@ Enum classes cannot be subclassed if they have any members, so they are treated 
 from abc import abstractmethod
 from enum import Enum
 
+
 class Stringable:
     @abstractmethod
     def stringify(self) -> str: ...
+
 
 class MyEnum(Stringable, Enum):  # error: [abstract-method-in-final-class]
     A = 1
@@ -832,6 +891,7 @@ never be implemented by a subclass.
 from abc import abstractmethod
 from typing import final
 
+
 @final
 class Broken:  # error: [abstract-method-in-final-class]
     @abstractmethod
@@ -846,16 +906,19 @@ A `@final` class must also implement abstract properties.
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @property
     @abstractmethod
     def value(self) -> int: ...
+
 
 @final
 class Good(Base):
     @property
     def value(self) -> int:
         return 42
+
 
 @final
 class Bad(Base):  # error: [abstract-method-in-final-class]
@@ -868,6 +931,7 @@ A property with an abstract setter (but concrete getter) is also abstract:
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @property
     def value(self) -> int:
@@ -877,11 +941,13 @@ class Base(ABC):
     @abstractmethod
     def value(self, v: int) -> None: ...
 
+
 @final
 class Good(Base):
     @Base.value.setter
     def value(self, v: int) -> None:
         pass
+
 
 @final
 class Bad(Base):  # error: [abstract-method-in-final-class]
@@ -895,6 +961,7 @@ property deleters, so this is a TODO test:
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @property
     def value(self) -> int:
@@ -907,6 +974,7 @@ class Base(ABC):
     @value.deleter
     @abstractmethod
     def value(self) -> None: ...
+
 
 @final
 # TODO: should emit [abstract-method-in-final-class]
@@ -924,14 +992,17 @@ value (`f: int = 42`) also overrides the abstract property.
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @property
     @abstractmethod
     def f(self) -> int: ...
 
+
 @final
 class Child1(Base):
     f = 42  # OK: binding overrides the abstract property
+
 
 @final
 class Child2(Base):
@@ -947,9 +1018,11 @@ method. Attempting to instantiate the class will still fail at runtime.
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @abstractmethod
     def method(self) -> int: ...
+
 
 @final
 class Bad(Base):  # error: [abstract-method-in-final-class]
@@ -962,10 +1035,12 @@ The same applies to abstract properties:
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @property
     @abstractmethod
     def f(self) -> int: ...
+
 
 @final
 class BadChild(Base):  # error: [abstract-method-in-final-class]
@@ -980,16 +1055,19 @@ A `@final` class must also implement abstract classmethods.
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @classmethod
     @abstractmethod
     def make(cls) -> "Base": ...
+
 
 @final
 class Good(Base):
     @classmethod
     def make(cls) -> "Good":
         return cls()
+
 
 @final
 class Bad(Base):  # error: [abstract-method-in-final-class]
@@ -1004,16 +1082,19 @@ A `@final` class must also implement abstract staticmethods.
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @staticmethod
     @abstractmethod
     def create() -> int: ...
+
 
 @final
 class Good(Base):
     @staticmethod
     def create() -> int:
         return 42
+
 
 @final
 class Bad(Base):  # error: [abstract-method-in-final-class]
@@ -1034,6 +1115,7 @@ from abc import (
 )
 from typing import final
 
+
 class Base(ABC):
     @abstractproperty  # error: [deprecated]
     def value(self) -> int:
@@ -1046,6 +1128,7 @@ class Base(ABC):
     @abstractstaticmethod  # error: [deprecated]
     def create() -> int:
         return 0
+
 
 @final
 # TODO: should emit [abstract-method-in-final-class] for `value`, `make`, and `create`

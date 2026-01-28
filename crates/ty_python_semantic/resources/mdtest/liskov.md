@@ -72,7 +72,7 @@ class Sub8(Super):
     def method(self, x: int, *args, **kwargs): ...  # fine
 
 class Sub9(Super):
-    def method(self, x: int, extra_positional_arg=42, /): ... # fine
+    def method(self, x: int, extra_positional_arg=42, /): ...  # fine
 
 class Sub10(Super):
     def method(self, x: int, extra_pos_or_kw_arg=42): ...  # fine
@@ -474,6 +474,7 @@ class D(C):
 ```py
 class Bad:
     x: int
+
     def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
         return self.x == other.x
 ```
@@ -615,8 +616,10 @@ have bigger problems:
 ```py
 from __future__ import annotations
 
+
 class MaybeEqWhile:
     while ...:
+
         def __eq__(self, other: MaybeEqWhile) -> bool:
             return True
 ```
