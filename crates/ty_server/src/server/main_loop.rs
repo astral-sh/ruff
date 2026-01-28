@@ -151,7 +151,7 @@ impl Server {
 
                     Action::InitializeWorkspaces(workspaces_with_options) => {
                         self.session
-                            .initialize_workspaces(workspaces_with_options, &client);
+                            .initialize_workspace_folders(workspaces_with_options, &client);
                         // We do this here after workspaces have been initialized
                         // so that the file watcher globs can take project search
                         // paths into account.
@@ -213,7 +213,7 @@ impl Server {
                 "Client does not support workspace configuration, initializing workspaces \
                 using the initialization options"
             );
-            self.session.initialize_workspaces(
+            self.session.initialize_workspace_folders(
                 self.session
                     .workspaces()
                     .urls()

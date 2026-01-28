@@ -442,36 +442,80 @@ impl Session {
         self.projects.values_mut()
     }
 
-    pub(crate) fn initialize_workspaces(
+    pub(crate) fn initialize_workspace_folders(
         &mut self,
-        workspace_settings: Vec<(Url, ClientOptions)>,
+        workspace_folders: Vec<(Url, ClientOptions)>,
         client: &Client,
     ) {
         assert!(!self.workspaces.all_initialized());
 
-        // These are the options combined from all the global options received by the server for
-        // each workspace via the workspace configuration request.
-        let mut combined_global_options: Option<GlobalOptions> = None;
+        // Every workspace folder can come with its own
+        // global options. In theory, these can have different
+        // values. At time of writing (2026-01-28), AG has been
+        // unable to make VS Code cause this. This is because
+        // the ty VS Code extension scopes its settings to the
+        // "window":
+        // https://github.com/astral-sh/ty-vscode/blob/e68f26549a920926d8a6bced942dfaf32313f851/package.json#L107
+        //
+        // So at least in theory, there is a semantic mismatch
+        // between the LSP protocol and ty's LSP's understanding
+        // of what settings are global and which aren't.
+        //
+        // We used to try and combine these global options across
+        // multiple workspace folders. But when we did that, we
+        // didn't actually support multiple workspace folders. We
+        // always took the first workspace folder and ignored the
+        // rest.
+        //
+        // In a world where we support multiple workspace folders,
+        // we also need to support possibly _adding_ (or removing)
+        // new workspace folders dynamically (that's the
+        // `workspace/didChangeWorkspaceFolders` notification).
+        // This in turn means that global options can change based
+        // on new workspace folders being added.
+        //
+        // Should we try to merge the existing global options with
+        // the new ones? What if a workspace folder is removed? Should
+        // we try to update our global options based on that?
+        //
+        // It should be clear that there are many different
+        // permutations of possibilities here. Perhaps the best
+        // choice is to find a way to get rid of global options
+        // entirely and make all settings specific to workspace
+        // folders.
+        //
+        // In any case, our current strategy for now is to just use the
+        // most recent global options received (after being combined
+        // with the global options received at initialization time).
+        // Doing anything more complicated seems unwarranted unless
+        // real users are having problems as a result of this.
+        //
+        // Note that this is a divergence from previous behavior:
+        // https://github.com/astral-sh/ruff/pull/19614
+        let mut global_options: Option<GlobalOptions> = None;
 
-        for (url, options) in workspace_settings {
-            // Combine the global options specified during initialization with the
-            // workspace-specific options to create the final workspace options.
-            let ClientOptions {
-                global, workspace, ..
-            } = self
+        for (url, options) in workspace_folders {
+            // Last setting wins.
+            global_options = Some(
+                self.initialization_options
+                    .options
+                    .global
+                    .clone()
+                    .combine(options.global),
+            );
+            let workspace_options = self
                 .initialization_options
                 .options
+                .workspace
                 .clone()
-                .combine(options.clone());
+                .combine(options.workspace);
 
-            tracing::debug!("Initializing workspace `{url}`: {workspace:#?}");
+            tracing::debug!("Initializing workspace `{url}`: {workspace_options:#?}");
 
             let unknown_options = &options.unknown;
             if !unknown_options.is_empty() {
                 warn_about_unknown_options(client, Some(&url), unknown_options);
             }
-
-            combined_global_options.combine_with(Some(global));
 
             let Ok(root) = url.to_file_path() else {
                 tracing::debug!("Ignoring workspace with non-path root: {url}");
@@ -490,7 +534,7 @@ impl Session {
                 }
             };
 
-            let workspace_settings = workspace.into_settings(&root, client);
+            let workspace_settings = workspace_options.into_settings(&root, client);
             let Some(workspace) = self.workspaces.initialize(&root, workspace_settings) else {
                 continue;
             };
@@ -575,7 +619,7 @@ impl Session {
             publish_settings_diagnostics(self, client, root);
         }
 
-        if let Some(global_options) = combined_global_options {
+        if let Some(global_options) = global_options {
             let global_settings = global_options.into_settings();
             if global_settings.diagnostic_mode().is_workspace() {
                 for project in self.projects.values_mut() {
