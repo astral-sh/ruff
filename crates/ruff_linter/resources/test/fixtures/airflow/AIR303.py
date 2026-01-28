@@ -92,12 +92,16 @@ class ValidOperatorLink2(BaseOperatorLink):
         pass
 
 # not exactly 3 positional args
-class ValidOperatorLink3(BaseOperatorLink):
+class InvalidOperatorLink3(BaseOperatorLink):
     def get_link(self, operator):
         pass
 
-class ValidOperatorLink4(BaseOperatorLink):
+class InvalidOperatorLink4(BaseOperatorLink):
     def get_link(self, operator, ti_key, extra):
+        pass
+
+class InvalidOperatorLink5(BaseOperatorLink):
+    def get_link(self, operator, *, something):
         pass
 
 # Not a subclass of BaseOperatorLink
@@ -117,20 +121,24 @@ class DeprecatedOperatorLink2(BaseOperatorLink):
         pass
 
 # keyword-only ti_key
-class ValidOperatorLink5(BaseOperatorLink):
+class ValidOperatorLink3(BaseOperatorLink):
     def get_link(self, operator, *, ti_key):
         pass
 
 # positional ti_key with correct name
-class ValidOperatorLink6(BaseOperatorLink):
+class ValidOperatorLink4(BaseOperatorLink):
     def get_link(self, operator, ti_key):
         pass
 
 # not exactly 3 positional args
-class ValidOperatorLink7(BaseOperatorLink):
+class InvalidOperatorLink6(BaseOperatorLink):
     def get_link(self, operator):
         pass
 
-class ValidOperatorLink8(BaseOperatorLink):
+class InvalidOperatorLink7(BaseOperatorLink):
     def get_link(self, operator, ti_key, extra):
+        pass
+
+class InvalidOperatorLink8(BaseOperatorLink):
+    def get_link(self, operator, *, something):
         pass
