@@ -234,14 +234,17 @@ pub(crate) fn lint_path(
                     ..Diagnostics::default()
                 });
             }
-            SourceType::Toml(_) => return Ok(Diagnostics::default()),
+            SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
             SourceType::Python(source_type) => source_type,
         },
     };
 
     // Extract the sources from the file.
-    let source_kind = match SourceKind::from_path(path, source_type) {
-        Ok(Some(source_kind)) => source_kind,
+    let source_kind = match SourceKind::from_path(path, SourceType::Python(source_type)) {
+        Ok(Some(source_kind)) => match source_kind {
+            SourceKind::Markdown(_) => return Ok(Diagnostics::default()), // skip linting markdown
+            _ => source_kind,
+        },
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
@@ -352,10 +355,10 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    let source_type = match path.and_then(|path| settings.linter.extension.get(path)) {
+    let (source_type, py_source_type) = match path
+        .and_then(|path| settings.linter.extension.get(path))
+    {
         None => match path.map(SourceType::from).unwrap_or_default() {
-            SourceType::Python(source_type) => source_type,
-
             SourceType::Toml(source_type) if source_type.is_pyproject() => {
                 if !settings
                     .linter
@@ -382,9 +385,13 @@ pub(crate) fn lint_stdin(
                 });
             }
 
-            SourceType::Toml(_) => return Ok(Diagnostics::default()),
+            SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
+            source_type @ SourceType::Python(py_source_type) => (source_type, py_source_type),
         },
-        Some(language) => PySourceType::from(language),
+        Some(language) => {
+            let py_source_type = PySourceType::from(language);
+            (SourceType::Python(py_source_type), py_source_type)
+        }
     };
 
     // Extract the sources from the file.
@@ -410,7 +417,7 @@ pub(crate) fn lint_stdin(
                 settings.unsafe_fixes,
                 &settings.linter,
                 &source_kind,
-                source_type,
+                py_source_type,
             ) {
                 match fix_mode {
                     flags::FixMode::Apply => {
@@ -443,7 +450,7 @@ pub(crate) fn lint_stdin(
                     &settings.linter,
                     noqa,
                     &source_kind,
-                    source_type,
+                    py_source_type,
                     ParseSource::None,
                 );
 
@@ -463,7 +470,7 @@ pub(crate) fn lint_stdin(
                 &settings.linter,
                 noqa,
                 &source_kind,
-                source_type,
+                py_source_type,
                 ParseSource::None,
             );
             let transformed = source_kind;

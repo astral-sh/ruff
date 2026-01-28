@@ -1039,6 +1039,9 @@ pub enum DiagnosticId {
     /// Use of an invalid command-line option.
     InvalidCliOption,
 
+    /// Experimental feature requires preview mode.
+    PreviewFeature,
+
     /// An internal assumption was violated.
     ///
     /// This indicates a bug in the program rather than a user error.
@@ -1091,6 +1094,7 @@ impl DiagnosticId {
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
             DiagnosticId::Unformatted => "unformatted",
             DiagnosticId::InvalidCliOption => "invalid-cli-option",
+            DiagnosticId::PreviewFeature => "preview-feature",
             DiagnosticId::InternalError => "internal-error",
         }
     }

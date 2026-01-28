@@ -69,7 +69,7 @@ pub(crate) fn add_noqa(
             {
                 return None;
             }
-            let source_kind = match SourceKind::from_path(path, source_type) {
+            let source_kind = match SourceKind::from_path(path, SourceType::Python(source_type)) {
                 Ok(Some(source_kind)) => source_kind,
                 Ok(None) => return None,
                 Err(e) => {
