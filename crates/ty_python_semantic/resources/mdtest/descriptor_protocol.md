@@ -194,6 +194,99 @@ reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
 C2().attr = 1
 ```
 
+### Union of descriptor and non-descriptor types
+
+When an attribute is typed as a union where some elements are data descriptors and some are not,
+assignments should validate against the descriptor's `__set__` method for the descriptor case:
+
+```py
+from typing import Any
+
+class DescriptorWithSet:
+    def __set__(self, instance: object, value: Any) -> None: ...
+
+class NoSet:
+    pass
+
+class MyModel:
+    state: DescriptorWithSet | NoSet = DescriptorWithSet()
+
+m = MyModel()
+# This is valid because `DescriptorWithSet.__set__` accepts `Any`
+m.state = 1
+m.state = "hello"
+```
+
+When the descriptor's `__set__` method has a more restrictive type, only compatible values are
+allowed:
+
+```py
+from typing import Any
+
+class IntDescriptor:
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class NoSet:
+    pass
+
+class MyModel:
+    state: IntDescriptor | NoSet = IntDescriptor()
+
+m = MyModel()
+m.state = 1
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `state` on type `MyModel` with custom `__set__` method"
+m.state = "hello"
+```
+
+Multiple descriptors in a union where both have `__set__`:
+
+```py
+from typing import Any
+
+class IntDescriptor:
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class StrDescriptor:
+    def __set__(self, instance: object, value: str) -> None: ...
+
+class MyModel:
+    state: IntDescriptor | StrDescriptor = IntDescriptor()
+
+m = MyModel()
+# For a union of descriptors, we call __set__ on the union of elements that have __set__.
+# The value must be acceptable to all descriptors in the union.
+# error: [invalid-assignment]
+m.state = 1  # int is accepted by IntDescriptor but not StrDescriptor
+# error: [invalid-assignment]
+m.state = "hello"  # str is accepted by StrDescriptor but not IntDescriptor
+```
+
+When a class has both a union descriptor class attribute and an instance annotation, the instance
+annotation takes precedence for the non-descriptor elements:
+
+```py
+from typing import Any
+
+class DescriptorWithSet:
+    def __set__(self, instance: object, value: Any) -> None: ...
+
+class NoSet:
+    pass
+
+class MyModel:
+    state: DescriptorWithSet | NoSet = DescriptorWithSet()
+    def __init__(self):
+        self.state: int
+
+m = MyModel()
+# For descriptor elements, __set__ is called (which accepts Any).
+# For non-descriptor elements, the value goes to instance dict, checked against `int`.
+m.state = 1
+
+# error: [invalid-assignment] "Object of type `Literal["hello"]` is not assignable to attribute `state` of type `int`"
+m.state = "hello"
+```
+
 ### Descriptors only work when used as class variables
 
 Descriptors only work when used as class variables. When put in instances, they have no effect.
