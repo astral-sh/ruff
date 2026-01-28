@@ -745,12 +745,58 @@ Y = type("Y", bases, {})
 
 ## Cyclic functional class definitions
 
+### Self-referential
+
 Self-referential class definitions using `type()` are detected. The name being defined is referenced
 in the bases tuple before it's available:
 
 ```pyi
 # error: [unresolved-reference] "Name `X` used when not defined"
 X = type("X", (X,), {})
+```
+
+### No string literal bases
+
+String literals directly in the bases tuple are not valid class bases:
+
+```py
+# error: [invalid-base] "Invalid class base with type `Literal["X"]`"
+X = type("X", ("X",), {})
+```
+
+### Forward references via string annotations
+
+However, forward references via string annotations are supported, similar to regular class
+definitions. This works with `NamedTuple` where field annotations can be forward references:
+
+```py
+from typing import NamedTuple
+
+# Forward reference in NamedTuple field annotation
+X = type("X", (NamedTuple("NT", [("field", "X | int")]),), {})
+reveal_type(X)  # revealed: <class 'X'>
+```
+
+### Static class inheriting from dynamic class with forward ref
+
+Forward references also work when a static class inherits from a dynamic class that references it:
+
+```py
+from typing import NamedTuple
+
+# Static class inheriting from dynamic class with forward ref back to static class
+class Y(type("X", (NamedTuple("NT", [("field", "Y | int")]),), {})): ...
+
+reveal_type(Y)  # revealed: <class 'Y'>
+```
+
+Forward references via subscript annotations on generic bases are supported:
+
+```py
+# Forward reference to X via subscript annotation in tuple base
+# (This fails at runtime, but we should handle it without panicking)
+X = type("X", (tuple["X | None"],), {})
+reveal_type(X)  # revealed: <class 'X'>
 ```
 
 ## Dynamic class names (non-literal strings)
