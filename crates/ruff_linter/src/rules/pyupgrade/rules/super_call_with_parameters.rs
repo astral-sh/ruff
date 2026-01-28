@@ -88,7 +88,6 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     }
 
     let mut parents = checker.semantic().current_statements();
-
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
@@ -128,14 +127,17 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    let (
-        Expr::Name(ast::ExprName {
-            id: first_arg_id, ..
-        }),
-        Expr::Name(ast::ExprName {
-            id: second_arg_id, ..
-        }),
-    ) = (first_arg, second_arg)
+    let first_arg_id = match first_arg {
+        // Simple case: super(MyClass, self)
+        Expr::Name(ast::ExprName { id, .. }) => id,
+        // Nested class case: super(OuterClass.InnerClass, self)
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => &attr.id,
+        _ => return,
+    };
+
+    let Expr::Name(ast::ExprName {
+        id: second_arg_id, ..
+    }) = second_arg
     else {
         return;
     };

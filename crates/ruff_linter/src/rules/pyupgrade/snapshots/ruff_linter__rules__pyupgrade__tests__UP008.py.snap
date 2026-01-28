@@ -494,3 +494,20 @@ help: Remove `super()` parameters
 211 | 
 212 | # Must be ignored
 note: This is an unsafe fix and may change runtime behavior
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:318:18
+    |
+316 |     class Inner(Base):
+317 |         def __init__(self, foo):
+318 |             super(Outer.Inner, self).__init__(foo)  # Should trigger UP008
+    |                  ^^^^^^^^^^^^^^^^^^^
+    |
+help: Remove `super()` parameters
+315 | 
+316 |     class Inner(Base):
+317 |         def __init__(self, foo):
+    -             super(Outer.Inner, self).__init__(foo)  # Should trigger UP008
+318 +             super().__init__(foo)  # Should trigger UP008
+319 | 
+note: This is an unsafe fix and may change runtime behavior
