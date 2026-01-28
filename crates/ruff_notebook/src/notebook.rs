@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 use thiserror::Error;
 
-use ruff_diagnostics::{SourceMap, SourceMarker};
+use ruff_diagnostics::SourceMap;
 use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -228,37 +228,35 @@ impl Notebook {
 
     /// Update the cell offsets as per the given [`SourceMap`].
     fn update_cell_offsets(&mut self, source_map: &SourceMap) {
-        // When there are multiple cells without any edits, the offsets of those
-        // cells will be updated using the same marker. So, we can keep track of
-        // the last marker used to update the offsets and check if it's still
-        // the closest marker to the current offset.
-        let mut last_marker: Option<&SourceMarker> = None;
-
         // The first offset is always going to be at 0, so skip it.
-        for offset in self.cell_offsets.iter_mut().skip(1).rev() {
-            let closest_marker = match last_marker {
-                Some(marker) if marker.source() <= *offset => marker,
-                _ => {
-                    let Some(marker) = source_map
-                        .markers()
-                        .iter()
-                        .rev()
-                        .find(|marker| marker.source() <= *offset)
-                    else {
-                        // There are no markers above the current offset, so we can
-                        // stop here.
-                        break;
-                    };
-                    last_marker = Some(marker);
-                    marker
-                }
+        for offset in self.cell_offsets.iter_mut().skip(1) {
+            let markers = source_map.markers();
+            // Find the last marker that starts at or before the current offset.
+            let idx = markers.partition_point(|m| m.source() <= *offset);
+            if idx == 0 {
+                // If there are no markers at or before the current offset, we assume that the
+                // offset is unchanged.
+                continue;
+            }
+            let m1_idx = idx - 1;
+            let m1 = &markers[m1_idx];
+
+            let mut new_offset = match m1.source().cmp(&m1.dest()) {
+                Ordering::Less => *offset + (m1.dest() - m1.source()),
+                Ordering::Greater => *offset - (m1.source() - m1.dest()),
+                Ordering::Equal => *offset,
             };
 
-            match closest_marker.source().cmp(&closest_marker.dest()) {
-                Ordering::Less => *offset += closest_marker.dest() - closest_marker.source(),
-                Ordering::Greater => *offset -= closest_marker.source() - closest_marker.dest(),
-                Ordering::Equal => (),
+            // If there's a next marker, we need to ensure that the new offset doesn't go beyond
+            // the start of the next segment. This handles cases where the current segment was
+            // shortened or deleted.
+            if let Some(m2) = markers.get(m1_idx + 1) {
+                if new_offset > m2.dest() {
+                    new_offset = m2.dest();
+                }
             }
+
+            *offset = new_offset;
         }
     }
 
@@ -610,5 +608,82 @@ print("after empty cells")
         let expected = std::fs::read_to_string(&path).unwrap();
         let actual = super::round_trip(&path).unwrap();
         assert_eq!(actual, expected);
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/22797>.
+    ///
+    /// When applying W391 fix to a notebook with multiple empty cells, the
+    /// `update_cell_offsets` function incorrectly calculated cell boundaries
+    /// when content was deleted (trailing newlines removed). Offsets for cells
+    /// in the affected range would overshoot into deleted regions, causing
+    /// invalid `start > end` ranges in `update_cell_content` and a panic.
+    ///
+    /// The fix clamps each cell's new offset to the destination of the *next*
+    /// marker if the calculated offset would exceed it.
+    #[test]
+    fn update_with_multi_empty_cells() {
+        use ruff_diagnostics::SourceMap;
+
+        let mut notebook = Notebook::from_path(&notebook_path("empty_cells.ipynb")).unwrap();
+
+        // The notebook has 5 cells:
+        // Cell 0: "\n\n\n" (3 newlines)
+        // Cells 1-4: empty
+
+        // Verify initial source and offsets.
+        assert_eq!(notebook.source_code(), "\n\n\n\n\n\n\n\n");
+        let initial_offsets: Vec<u32> = notebook
+            .cell_offsets()
+            .iter()
+            .map(ruff_text_size::TextSize::to_u32)
+            .collect();
+        // [0, 4, 5, 6, 7, 8] - each cell separated by \n, first cell has content "\n\n\n"
+        assert_eq!(initial_offsets, vec![0, 4, 5, 6, 7, 8]);
+
+        // Create a SourceMap that simulates W391 fix: delete trailing newlines
+        // from first cell (delete chars at positions 1, 2, 3 - keeping only first newline).
+        //
+        // Source: "\n\n\n\n..." (len=8)
+        // Target: "\n\n..."    (len=5, deleting 3 chars from first cell)
+        //
+        // Markers:
+        // - (0, 0): start of content, unchanged
+        // - (4, 1): after deletion of 3 chars from first cell
+        //
+        // This simulates content being shortened, which previously caused
+        // the panic when multiple cells followed the shortened content.
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(0.into(), 0.into());
+        source_map.push_marker(4.into(), 1.into());
+
+        // The transformed content after the "fix":
+        // First cell now only has "\n" instead of "\n\n\n"
+        // Overall: "\n" + "\n" + "\n" + "\n" + "\n" = 5 newlines
+        let transformed = "\n\n\n\n\n".to_string();
+
+        // This should NOT panic with the fix in place.
+        notebook.update(&source_map, transformed.clone());
+
+        // Verify the update succeeded
+        assert_eq!(notebook.source_code(), transformed);
+
+        // Verify that offsets are correctly clamped
+        let updated_offsets: Vec<u32> = notebook
+            .cell_offsets()
+            .iter()
+            .map(ruff_text_size::TextSize::to_u32)
+            .collect();
+        // All offsets should be valid (non-decreasing and <= content length)
+        for i in 0..updated_offsets.len() - 1 {
+            assert!(
+                updated_offsets[i] <= updated_offsets[i + 1],
+                "Offsets should be non-decreasing: {updated_offsets:?}",
+            );
+        }
+        let content_len = u32::try_from(transformed.len()).unwrap();
+        assert!(
+            *updated_offsets.last().unwrap() <= content_len,
+            "Last offset should not exceed content length"
+        );
     }
 }
