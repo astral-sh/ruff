@@ -243,6 +243,30 @@ impl<'db> ProtocolInterface<'db> {
         Self::new(db, members)
     }
 
+    /// Synthesize a new protocol interface with the given attribute members.
+    ///
+    /// Unlike `with_property_members`, this creates `Other` (attribute) members
+    /// which are checked for type compatibility during protocol satisfaction.
+    pub(super) fn with_attribute_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, Type<'db>)>,
+    {
+        let members: BTreeMap<_, _> = members
+            .into_iter()
+            .map(|(name, ty)| {
+                (
+                    Name::new(name),
+                    ProtocolMemberData {
+                        qualifiers: TypeQualifiers::default(),
+                        kind: ProtocolMemberKind::Other(ty.normalized(db)),
+                        definition: None,
+                    },
+                )
+            })
+            .collect();
+        Self::new(db, members)
+    }
+
     fn empty(db: &'db dyn Db) -> Self {
         Self::new(db, BTreeMap::default())
     }

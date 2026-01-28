@@ -138,6 +138,23 @@ impl<'db> Type<'db> {
         ))
     }
 
+    /// Synthesize a protocol instance type with a given set of attribute members.
+    ///
+    /// Unlike `protocol_with_readonly_members`, this creates attribute members
+    /// which are checked for type compatibility during protocol satisfaction.
+    pub(super) fn protocol_with_attribute_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    where
+        M: IntoIterator<Item = (&'a str, Type<'db>)>,
+    {
+        Self::ProtocolInstance(ProtocolInstanceType::synthesized(
+            SynthesizedProtocolType::new(
+                db,
+                ProtocolInterface::with_attribute_members(db, members),
+                &NormalizedVisitor::default(),
+            ),
+        ))
+    }
+
     /// Return `true` if `self` conforms to the interface described by `protocol`.
     pub(super) fn satisfies_protocol(
         self,

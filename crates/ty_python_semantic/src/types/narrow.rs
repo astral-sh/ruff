@@ -1359,67 +1359,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let args = &*expr_call.arguments.args;
 
                 if function == KnownFunction::HasAttr {
-                    let [first_arg, second_arg] = args else {
-                        return None;
-                    };
-                    let first_arg = PlaceExpr::try_from_expr(first_arg)?;
-                    let place = self.expect_place(&first_arg);
-
-                    let attr = inference
-                        .expression_type(second_arg)
-                        .as_string_literal()?
-                        .value(self.db);
-
-                    if !is_identifier(attr) {
-                        return None;
-                    }
-
-                    // Since `hasattr` only checks if an attribute is readable,
-                    // the type of the protocol member should be a read-only property that returns `object`.
-                    let constraint =
-                        Type::protocol_with_readonly_members(self.db, [(attr, Type::object())]);
-
-                    return Some(NarrowingConstraints::from_iter([(
-                        place,
-                        NarrowingConstraint::intersection(
-                            constraint.negate_if(self.db, !is_positive),
-                        ),
-                    )]));
+                    return self.evaluate_hasattr_call(inference, args, is_positive);
                 }
 
                 if function == KnownFunction::GetAttr {
-                    let [first_arg, second_arg, ..] = args else {
-                        return None;
-                    };
-                    let first_arg = PlaceExpr::try_from_expr(first_arg)?;
-
-                    let attr = inference
-                        .expression_type(second_arg)
-                        .as_string_literal()?
-                        .value(self.db);
-
-                    if !is_identifier(attr) {
-                        return None;
-                    }
-
-                    // Narrow the member `x.attr` based on truthiness of `getattr(x, "attr")`.
-                    // This is equivalent to how `if x.attr:` narrows `x.attr`.
-                    //
-                    // The member place might not exist if `getattr` was aliased (e.g., `ga = getattr`),
-                    // in which case the builder wouldn't have created the place.
-                    let member_expr = first_arg.extend_with_attr(attr);
-                    let member_place = self.places().place_id(&member_expr)?;
-
-                    let constraint = if is_positive {
-                        Type::AlwaysFalsy.negate(self.db)
-                    } else {
-                        Type::AlwaysTruthy.negate(self.db)
-                    };
-
-                    return Some(NarrowingConstraints::from_iter([(
-                        member_place,
-                        NarrowingConstraint::intersection(constraint),
-                    )]));
+                    return self.evaluate_getattr_call(inference, args, is_positive);
                 }
 
                 // Other functions like `isinstance`, `issubclass`, etc. take exactly two arguments.
@@ -1458,6 +1402,77 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             _ => None,
         }
+    }
+
+    /// Helper to evaluate `hasattr(obj, "attr")` narrowing.
+    fn evaluate_hasattr_call(
+        &mut self,
+        inference: &ExpressionInference<'db>,
+        args: &[ast::Expr],
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let [first_arg, second_arg] = args else {
+            return None;
+        };
+        let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+        let place = self.expect_place(&first_arg);
+
+        let attr = inference
+            .expression_type(second_arg)
+            .as_string_literal()?
+            .value(self.db);
+
+        if !is_identifier(attr) {
+            return None;
+        }
+
+        // Since `hasattr` only checks if an attribute is readable,
+        // the type of the protocol member should be a read-only property that returns `object`.
+        let constraint = Type::protocol_with_readonly_members(self.db, [(attr, Type::object())]);
+
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::intersection(constraint.negate_if(self.db, !is_positive)),
+        )]))
+    }
+
+    /// Helper to evaluate `getattr(obj, "attr")` narrowing.
+    fn evaluate_getattr_call(
+        &mut self,
+        inference: &ExpressionInference<'db>,
+        args: &[ast::Expr],
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let [first_arg, second_arg, ..] = args else {
+            return None;
+        };
+        let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+        let place = self.expect_place(&first_arg);
+
+        let attr = inference
+            .expression_type(second_arg)
+            .as_string_literal()?
+            .value(self.db);
+
+        if !is_identifier(attr) {
+            return None;
+        }
+
+        // Narrow the object by intersecting with a protocol that has the attribute
+        // constrained by truthiness. When `x.flag` is accessed, the member lookup on
+        // `x & Protocol{flag: ~AlwaysFalsy}` returns `bool & ~AlwaysFalsy = Literal[True]`.
+        let attr_constraint = if is_positive {
+            Type::AlwaysFalsy.negate(self.db)
+        } else {
+            Type::AlwaysTruthy.negate(self.db)
+        };
+
+        let constraint = Type::protocol_with_attribute_members(self.db, [(attr, attr_constraint)]);
+
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::intersection(constraint),
+        )]))
     }
 
     // Helper to evaluate TypeGuard/TypeIs narrowing for a call expression.

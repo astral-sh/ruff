@@ -144,9 +144,8 @@ def _(x: C):
 
 ## Aliased getattr
 
-TODO: Narrowing doesn't work when `getattr` is aliased, because the member place is created at AST
-level (when the builder sees a bare `getattr` name) but narrowing uses type information to identify
-the function.
+Narrowing works even when `getattr` is aliased, because places are created when the attribute is
+accessed (e.g., `x.flag`) and narrowing uses type information to identify the `getattr` function:
 
 ```py
 class C:
@@ -155,5 +154,7 @@ class C:
 def _(x: C):
     ga = getattr
     if ga(x, "flag"):
-        reveal_type(x.flag)  # revealed: bool
+        reveal_type(x.flag)  # revealed: Literal[True]
+    else:
+        reveal_type(x.flag)  # revealed: Literal[False]
 ```
