@@ -424,6 +424,97 @@ user3 = User({"name": None, "age": 25})
 user4 = User({"name": "Charlie", "age": 30, "extra": True})
 ```
 
+## Constructing TypedDict from existing TypedDict
+
+A `TypedDict` can be constructed from an existing `TypedDict` of the same type using either
+positional argument passing or keyword unpacking:
+
+```py
+from typing import TypedDict
+
+class Data(TypedDict):
+    id: int
+    name: str
+    value: float
+
+# Positional argument: Data(existing_data)
+def process_data_positional(data: Data) -> Data:
+    return Data(data)  # Valid - data already satisfies all required keys
+
+# Keyword unpacking: Data(**existing_data)
+def process_data_unpacking(data: Data) -> Data:
+    return Data(**data)  # Valid - data already satisfies all required keys
+
+reveal_type(process_data_positional({"id": 1, "name": "test", "value": 1.0}))  # revealed: Data
+reveal_type(process_data_unpacking({"id": 1, "name": "test", "value": 1.0}))  # revealed: Data
+```
+
+Constructing from a compatible TypedDict (with same fields) works:
+
+```py
+from typing import TypedDict
+
+class PersonBase(TypedDict):
+    name: str
+    age: int
+
+class PersonAlias(TypedDict):
+    name: str
+    age: int
+
+# Constructing one from another with the same fields
+def copy_person(p: PersonBase) -> PersonAlias:
+    return PersonAlias(**p)
+
+def copy_person_positional(p: PersonBase) -> PersonAlias:
+    return PersonAlias(p)
+```
+
+Note: Unpacking a TypedDict with extra keys into one with fewer keys will flag unknown keys:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int
+
+class Employee(Person):
+    employee_id: int
+
+# Extra keys from Employee are flagged as unknown for Person
+def get_person_from_employee(emp: Employee) -> Person:
+    # error: [invalid-key] "Unknown key "employee_id" for TypedDict `Person`"
+    return Person(**emp)
+
+# Positional form also flags extra keys
+def get_person_from_employee_positional(emp: Employee) -> Person:
+    # error: [invalid-key] "Unknown key "employee_id" for TypedDict `Person`"
+    return Person(emp)
+```
+
+Type mismatches in unpacked TypedDict fields should be detected:
+
+```py
+from typing import TypedDict
+
+class Source(TypedDict):
+    name: int  # Note: int, not str
+    age: int
+
+class Target(TypedDict):
+    name: str
+    age: int
+
+def convert(src: Source) -> Target:
+    # error: [invalid-argument-type]
+    return Target(**src)
+
+def convert_positional(src: Source) -> Target:
+    # error: [invalid-argument-type]
+    return Target(src)
+```
+
 ## Optional fields with `total=False`
 
 By default, all fields in a `TypedDict` are required (`total=True`). You can make all fields

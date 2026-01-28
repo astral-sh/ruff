@@ -745,15 +745,41 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     error_node: AnyNodeRef<'ast>,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
 ) {
-    let has_positional_dict = arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
+    let db = context.db();
 
-    let provided_keys = if has_positional_dict {
+    // Check for a single positional argument that is a dict literal
+    let has_positional_dict_literal = arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
+
+    // Check for a single positional argument that is a TypedDict
+    let positional_typed_dict = if arguments.args.len() == 1
+        && arguments.keywords.is_empty()
+        && !has_positional_dict_literal
+    {
+        match expression_type_fn(&arguments.args[0]) {
+            Type::TypedDict(td) => Some(td),
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    let provided_keys = if has_positional_dict_literal {
         validate_from_dict_literal(
             context,
             typed_dict,
             arguments,
             error_node,
             &expression_type_fn,
+        )
+    } else if let Some(source_typed_dict) = positional_typed_dict {
+        // Positional TypedDict argument: e.g., `Data(other_data)` where `other_data: Data`
+        validate_from_typed_dict(
+            context,
+            typed_dict,
+            source_typed_dict,
+            arguments,
+            error_node,
+            db,
         )
     } else {
         validate_from_keywords(
@@ -811,25 +837,63 @@ fn validate_from_dict_literal<'db, 'ast>(
     provided_keys
 }
 
+/// Validates a `TypedDict` constructor call with a single positional `TypedDict` argument
+/// e.g. `Person(other_person)` where `other_person: Person`
+fn validate_from_typed_dict<'db: 'ast, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    target_typed_dict: TypedDictType<'db>,
+    source_typed_dict: TypedDictType<'db>,
+    arguments: &'ast Arguments,
+    error_node: AnyNodeRef<'ast>,
+    db: &'db dyn Db,
+) -> OrderSet<&'ast str> {
+    let mut provided_keys = OrderSet::new();
+    let source_arg = &arguments.args[0];
+
+    // Add all keys from the source TypedDict and validate type compatibility
+    for (key_name, field) in source_typed_dict.items(db) {
+        provided_keys.insert(key_name.as_str());
+
+        // Validate that the field type is compatible with the target TypedDict
+        validate_typed_dict_key_assignment(
+            context,
+            target_typed_dict,
+            None,
+            key_name.as_str(),
+            field.declared_ty,
+            error_node,
+            source_arg,
+            source_arg,
+            TypedDictAssignmentKind::Constructor,
+            true,
+        );
+    }
+
+    provided_keys
+}
+
 /// Validates a `TypedDict` constructor call with keywords
-/// e.g. `Person(name="Alice", age=30)`
-fn validate_from_keywords<'db, 'ast>(
+/// e.g. `Person(name="Alice", age=30)` or `Person(**other_typed_dict)`
+fn validate_from_keywords<'db: 'ast, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     error_node: AnyNodeRef<'ast>,
     expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
 ) -> OrderSet<&'ast str> {
-    let provided_keys: OrderSet<&str> = arguments
+    let db = context.db();
+
+    // Collect keys from explicit keyword arguments
+    let mut provided_keys: OrderSet<&str> = arguments
         .keywords
         .iter()
         .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.as_str()))
         .collect();
 
-    // Validate that each key is assigned a type that is compatible with the keys's value type
+    // Validate that each key is assigned a type that is compatible with the key's value type
     for keyword in &arguments.keywords {
         if let Some(arg_name) = &keyword.arg {
-            // Get the already-inferred argument type
+            // Explicit keyword argument: e.g., `name="Alice"`
             let arg_type = expression_type_fn(&keyword.value);
             validate_typed_dict_key_assignment(
                 context,
@@ -843,6 +907,28 @@ fn validate_from_keywords<'db, 'ast>(
                 TypedDictAssignmentKind::Constructor,
                 true,
             );
+        } else {
+            // Keyword unpacking: e.g., `**other_typed_dict`
+            let unpacked_type = expression_type_fn(&keyword.value);
+            if let Type::TypedDict(unpacked_typed_dict) = unpacked_type {
+                // Add all keys from the unpacked TypedDict to provided_keys
+                // and validate that the types are compatible
+                for (key_name, field) in unpacked_typed_dict.items(db) {
+                    provided_keys.insert(key_name.as_str());
+                    validate_typed_dict_key_assignment(
+                        context,
+                        typed_dict,
+                        None,
+                        key_name.as_str(),
+                        field.declared_ty,
+                        error_node,
+                        keyword,
+                        &keyword.value,
+                        TypedDictAssignmentKind::Constructor,
+                        true,
+                    );
+                }
+            }
         }
     }
 
