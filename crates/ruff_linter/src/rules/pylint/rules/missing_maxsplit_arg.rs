@@ -11,13 +11,13 @@ use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
-/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without
-/// `maxsplit=1`
+/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without a
+/// `maxsplit=1` argument.
 ///
 /// ## Why is this bad?
 /// Calling `str.split()` or `str.rsplit()` without passing `maxsplit=1` splits on every delimiter in the
 /// string. When accessing only the first or last element of the result, it
-/// would be more efficient to only split once.
+/// would be more efficient to split only once.
 ///
 /// ## Example
 /// ```python
@@ -38,10 +38,11 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or `**kwargs` arguments, as
-/// adding a `maxsplit` argument to such a call may lead to duplicated arguments.
+/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or
+/// `**kwargs` arguments, as adding a `maxsplit` argument to such a call may lead to duplicate
+/// arguments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.11.12")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct MissingMaxsplitArg {
     actual_split_type: String,
     suggested_split_type: String,
