@@ -28,3 +28,18 @@ class MyError(ArgumentError):
 from typing import Any
 def func(arg: Any):
     pass
+
+# import function from six.moves => ok
+import sys
+from six.moves import reload_module
+reload_module(sys)
+
+# import function from typing_extensions => ok
+from typing import Literal
+from typing_extensions import get_origin
+get_origin(Literal[42])
+
+# import type from collections.abc => ok
+from collections.abc import Set
+class ListBasedSet(Set):
+    pass

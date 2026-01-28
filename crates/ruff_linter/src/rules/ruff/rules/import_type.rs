@@ -11,6 +11,9 @@ use ruff_python_ast::Identifier;
 
 static MODULES_WHITELIST: &'static [&'static str] = &[
     "typing",
+    "six.moves",
+    "collections.abc",
+    "typing_extensions",
     "__future__",
 ];
 
