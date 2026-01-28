@@ -1431,6 +1431,8 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.reveal_mro`
     RevealMro,
+    /// `struct.unpack`
+    Unpack,
 }
 
 impl KnownFunction {
@@ -1504,6 +1506,9 @@ impl KnownFunction {
             | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
+            Self::Unpack => {
+                matches!(module, KnownModule::Struct)
+            }
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
             Self::NamedTuple => matches!(module, KnownModule::Collections),
@@ -2114,6 +2119,7 @@ pub(crate) mod tests {
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,
                 KnownFunction::TotalOrdering => KnownModule::Functools,
+                KnownFunction::Unpack => KnownModule::Struct,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)
