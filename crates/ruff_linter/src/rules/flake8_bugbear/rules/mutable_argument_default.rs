@@ -7,7 +7,10 @@ use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
-use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_python_semantic::analyze::typing::{
+    find_binding_value, is_immutable_annotation, is_mutable_expr,
+};
+use ruff_python_stdlib::str;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -142,6 +145,30 @@ fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
             elts.iter().any(|e| is_guaranteed_mutable_expr(e, semantic))
         }
         Expr::Named(ast::ExprNamed { value, .. }) => is_guaranteed_mutable_expr(value, semantic),
+        Expr::Name(name) => {
+            // Exclude UPPER_CASE constants (PEP 8 convention - meant to be read-only)
+            if str::is_cased_uppercase(&name.id) {
+                return false;
+            }
+            // Resolve the name in the current scope (module-level, function-level, etc.)
+            // This can resolve constants, non-constants, and any name in the current scope
+            let Some(binding_id) = semantic.only_binding(name) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            // Only check assignments (not imports, function parameters, etc.)
+            // This restriction ensures we only flag cases where a mutable object is explicitly
+            // assigned to a name, which is then used as a default argument.
+            if !binding.kind.is_assignment() {
+                return false;
+            }
+            // Get the assigned value and check if it's mutable
+            if let Some(value) = find_binding_value(binding, semantic) {
+                is_guaranteed_mutable_expr(value, semantic)
+            } else {
+                false
+            }
+        }
         _ => is_mutable_expr(expr, semantic),
     }
 }
