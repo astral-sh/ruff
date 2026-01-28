@@ -26,8 +26,8 @@ inferred based on the `TypedDict` definition:
 ```py
 alice: Person = {"name": "Alice", "age": 30}
 
-reveal_type(alice["name"])  # revealed: str
-reveal_type(alice["age"])  # revealed: int | None
+reveal_type(alice["name"])  # revealed: Literal["Alice"]
+reveal_type(alice["age"])  # revealed: Literal[30]
 
 # error: [invalid-key] "Unknown key "non_existing" for TypedDict `Person`"
 reveal_type(alice["non_existing"])  # revealed: Unknown
@@ -140,7 +140,7 @@ reveal_type(plot2["y"])  # revealed: list[int | None]
 
 plot3: Plot = {"y": homogeneous_list(1, 2, 3), "x": homogeneous_list(1, 2, 3)}
 reveal_type(plot3["y"])  # revealed: list[int | None]
-reveal_type(plot3["x"])  # revealed: list[int | None] | None
+reveal_type(plot3["x"])  # revealed: list[int | None]
 
 Y = "y"
 X = "x"
@@ -194,8 +194,8 @@ class Person(TypedDict):
 ```py
 alice: Person = {"inner": {"name": "Alice", "age": 30}}
 
-reveal_type(alice["inner"]["name"])  # revealed: str
-reveal_type(alice["inner"]["age"])  # revealed: int | None
+reveal_type(alice["inner"]["name"])  # revealed: Literal["Alice"]
+reveal_type(alice["inner"]["age"])  # revealed: Literal[30]
 
 # error: [invalid-key] "Unknown key "non_existing" for TypedDict `Inner`"
 reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
@@ -778,7 +778,7 @@ alice: Person = {"name": "Alice"}
 # error: [invalid-argument-type] "Argument to function `dangerous` is incorrect: Expected `dict[str, object]`, found `Person`"
 dangerous(alice)
 
-reveal_type(alice["name"])  # revealed: str
+reveal_type(alice["name"])  # revealed: Literal["Alice"]
 ```
 
 Likewise, `dict`s are not assignable to typed dictionaries:
@@ -1651,6 +1651,21 @@ from typing import TypedDict
 x: TypedDict = {"name": "Alice"}
 ```
 
+### `ReadOnly`, `Required` and `NotRequired` not allowed in parameter annotations
+
+```py
+from typing_extensions import Required, NotRequired, ReadOnly
+
+def bad(
+    # error: [invalid-type-form] "`Required` is not allowed in function parameter annotations"
+    a: Required[int],
+    # error: [invalid-type-form] "`NotRequired` is not allowed in function parameter annotations"
+    b: NotRequired[int],
+    # error: [invalid-type-form] "`ReadOnly` is not allowed in function parameter annotations"
+    c: ReadOnly[int],
+): ...
+```
+
 ### `dict`-subclass inhabitants
 
 Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a subclass:
@@ -1669,7 +1684,7 @@ class Person(TypedDict):
 x: Person = MyDict({"name": "Alice", "age": 30})
 ```
 
-### Cannot be used in `isinstance` tests
+### Cannot be used in `isinstance` tests or `issubclass` tests
 
 ```py
 from typing import TypedDict
@@ -1678,9 +1693,24 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-def _(obj: object) -> bool:
-    # TODO: this should be an error
-    return isinstance(obj, Person)
+def _(obj: object, obj2: type):
+    # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used as the second argument to `isinstance`"
+    isinstance(obj, Person)
+    # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used as the second argument to `issubclass`"
+    issubclass(obj2, Person)
+```
+
+They also cannot be used in class patterns for `match` statements:
+
+```py
+def f(x: object):
+    match x:
+        # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used in a class pattern"
+        case Person():
+            pass
+        # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used in a class pattern"
+        case object(parent=Person()):
+            pass
 ```
 
 ## Diagnostics
@@ -2168,6 +2198,51 @@ class WackyInt(int):
 _: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
 ```
 
+Intersections containing a TypedDict with literal fields can be narrowed with equality checks. Since
+`Foo` requires `tag == "foo"`, the else branch is `Never`:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+def _(x: Intersection[Foo, Any]):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo & Any
+    else:
+        reveal_type(x)  # revealed: Never
+```
+
+But intersections with non-literal fields cannot be narrowed:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+def _(x: Intersection[NonLiteralTD, Any]):
+    if x["tag"] == 42:
+        reveal_type(x)  # revealed: NonLiteralTD & Any
+    else:
+        reveal_type(x)  # revealed: NonLiteralTD & Any
+```
+
+This is especially important when the field type is disjoint from the comparison literal. Even
+though `str` and `int` are disjoint, we can't narrow here because a `str` subclass could override
+`__eq__` to return `True`. Without proper handling, this would wrongly narrow to `Never`:
+
+```py
+from ty_extensions import Intersection
+from typing import Any
+
+class StrTagTD(TypedDict):
+    tag: str
+
+def _(x: Intersection[StrTagTD, Any]):
+    if x["tag"] == 42:
+        reveal_type(x)  # revealed: StrTagTD & Any
+    else:
+        reveal_type(x)  # revealed: StrTagTD & Any
+```
+
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
 
 ```py
@@ -2335,6 +2410,88 @@ def match_with_dict(u: Foo | Bar | dict):
             reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
 ```
 
+## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases
+
+PEP 695 type aliases are transparently resolved when narrowing tagged unions:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict, Literal
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+
+class Bar(TypedDict):
+    tag: Literal["bar"]
+
+type Thing = Foo | Bar
+
+def test_if(x: Thing):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Bar
+```
+
+PEP 695 type aliases also work in `match` statements:
+
+```py
+def test_match(x: Thing):
+    match x["tag"]:
+        case "foo":
+            reveal_type(x)  # revealed: Foo
+        case "bar":
+            reveal_type(x)  # revealed: Bar
+```
+
+PEP 695 type aliases also work with `in`/`not in` narrowing:
+
+```py
+class Baz(TypedDict):
+    baz: int
+
+type ThingWithBaz = Foo | Baz
+
+def test_in(x: ThingWithBaz):
+    if "baz" not in x:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo | Baz
+```
+
+Nested PEP 695 type aliases (an alias referring to another alias) also work:
+
+```py
+type Inner = Foo | Bar
+type Outer = Inner
+
+def test_nested_if(x: Outer):
+    if x["tag"] == "foo":
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Bar
+
+def test_nested_match(x: Outer):
+    match x["tag"]:
+        case "foo":
+            reveal_type(x)  # revealed: Foo
+        case "bar":
+            reveal_type(x)  # revealed: Bar
+
+type InnerWithBaz = Foo | Baz
+type OuterWithBaz = InnerWithBaz
+
+def test_nested_in(x: OuterWithBaz):
+    if "baz" not in x:
+        reveal_type(x)  # revealed: Foo
+    else:
+        reveal_type(x)  # revealed: Foo | Baz
+```
+
 ## Only annotated declarations are allowed in the class body
 
 <!-- snapshot-diagnostics -->
@@ -2445,6 +2602,62 @@ from typing import TypedDict
 @dataclass
 class Foo(TypedDict("Foo", {"x": int, "y": str})):
     pass
+```
+
+## Class header validation
+
+<!-- snapshot-diagnostics -->
+
+A `TypedDict` may not inherit from a non-`TypedDict`:
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
+
+# This even fails at runtime!
+class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
+```
+
+It is invalid to pass non-`bool`s to the `total` and `closed` keyword arguments:
+
+```py
+class Bar(TypedDict, total=42): ...  # error: [invalid-argument-type]
+class Baz(TypedDict, closed=None): ...  # error: [invalid-argument-type]
+```
+
+And it's also invalid to pass an object of type `bool` -- according to the spec:
+
+> The value must be exactly `True` or `False`; other expressions are not allowed.
+
+```py
+def f(is_total: bool):
+    class VeryDynamic(TypedDict, total=is_total): ...  # error: [invalid-argument-type]
+```
+
+Unknown keyword arguments are detected:
+
+```py
+class Bazzzz(TypedDict, weird=56): ...  # error: [unknown-argument]
+```
+
+Specifying a custom metaclass is not permitted:
+
+```py
+from abc import ABCMeta
+
+class Spam(TypedDict, metaclass=ABCMeta): ...  # error: [invalid-typed-dict-header]
+
+# This one works at runtime, but the metaclass is still `typing._TypedDictMeta`,
+# so there doesn't seem to be any reason why you'd want to do this
+class Ham(TypedDict, metaclass=type): ...  # error: [invalid-typed-dict-header]
+```
+
+And variadic keywords are also banned:
+
+```py
+def f(kwargs: dict):
+    class Eggs(TypedDict, **kwargs): ...  # error: [invalid-typed-dict-header]
 ```
 
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly

@@ -589,7 +589,7 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:6:12
       |
     5 | [[tool.ty.overrides]]
@@ -635,7 +635,7 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:7:12
       |
     5 | [[tool.ty.overrides]]

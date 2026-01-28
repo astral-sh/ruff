@@ -1125,7 +1125,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1791,7 +1791,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -2911,9 +2911,9 @@ checksum = "943f41321c63ef1c92fd763bfe054d2668f7f225a5c29f0105903dc2fc04ba30"
 
 [[package]]
 name = "regex-syntax"
-version = "0.8.6"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
+checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "ron"
@@ -2931,7 +2931,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.14.13"
+version = "0.14.14"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2966,6 +2966,7 @@ dependencies = [
  "ruff_graph",
  "ruff_linter",
  "ruff_macros",
+ "ruff_markdown",
  "ruff_notebook",
  "ruff_options_metadata",
  "ruff_python_ast",
@@ -3191,7 +3192,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.14.13"
+version = "0.14.14"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3263,6 +3264,18 @@ dependencies = [
  "regex",
  "ruff_python_trivia",
  "syn",
+]
+
+[[package]]
+name = "ruff_markdown"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "regex",
+ "ruff_python_ast",
+ "ruff_python_formatter",
+ "ruff_python_trivia",
+ "ruff_workspace",
 ]
 
 [[package]]
@@ -3549,7 +3562,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.14.13"
+version = "0.14.14"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3647,7 +3660,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -3665,7 +3678,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=9860ff6ca0f1f8f3a8d6b832020002790b501254#9860ff6ca0f1f8f3a8d6b832020002790b501254"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3690,12 +3703,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=9860ff6ca0f1f8f3a8d6b832020002790b501254#9860ff6ca0f1f8f3a8d6b832020002790b501254"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
 
 [[package]]
 name = "salsa-macros"
 version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=9860ff6ca0f1f8f3a8d6b832020002790b501254#9860ff6ca0f1f8f3a8d6b832020002790b501254"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4049,7 +4062,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -4512,6 +4525,8 @@ dependencies = [
  "compact_str",
  "get-size2",
  "insta",
+ "regex",
+ "regex-syntax",
  "ruff_db",
  "ruff_memory_usage",
  "ruff_python_ast",
@@ -5189,7 +5204,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]

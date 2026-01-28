@@ -19,6 +19,8 @@ ruff_python_stdlib = { workspace = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true }
+regex = { workspace = true }
+regex-syntax = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 strum = { workspace = true }

@@ -740,6 +740,21 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
 }
 
 #[test]
+fn gitlab_empty_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "1")?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=gitlab"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    []
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn github_diagnostics() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "test.py",

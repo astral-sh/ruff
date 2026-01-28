@@ -144,6 +144,10 @@ pub(crate) fn analyze_graph(
                             debug!("Ignoring TOML file: {}", path.display());
                             continue;
                         }
+                        SourceType::Markdown => {
+                            debug!("Ignoring Markdown file: {}", path.display());
+                            continue;
+                        }
                     },
                     Some(language) => PySourceType::from(language),
                 };
@@ -164,7 +168,10 @@ pub(crate) fn analyze_graph(
                 let result = inner_result.clone();
                 scope.spawn(move |_| {
                     // Extract source code (handles both .py and .ipynb files)
-                    let source_kind = match SourceKind::from_path(path.as_std_path(), source_type) {
+                    let source_kind = match SourceKind::from_path(
+                        path.as_std_path(),
+                        SourceType::Python(source_type),
+                    ) {
                         Ok(Some(source_kind)) => source_kind,
                         Ok(None) => {
                             debug!("Skipping non-Python notebook: {path}");

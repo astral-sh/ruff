@@ -279,21 +279,17 @@ class ChildOfGood(Good):
 class Bad:
     @overload
     @final
-    def f(self, x: str) -> str: ...
+    def f(self, x: str) -> str: ...  # error: [invalid-overload]
     @overload
     def f(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
     def f(self, x: int | str) -> int | str:
         return x
 
     @final
     @overload
-    def g(self, x: str) -> str: ...
+    def g(self, x: str) -> str: ...  # error: [invalid-overload]
     @overload
     def g(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
     def g(self, x: int | str) -> int | str:
         return x
 
@@ -301,9 +297,7 @@ class Bad:
     def h(self, x: str) -> str: ...
     @overload
     @final
-    def h(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
+    def h(self, x: int) -> int: ...  # error: [invalid-overload]
     def h(self, x: int | str) -> int | str:
         return x
 
@@ -311,9 +305,7 @@ class Bad:
     def i(self, x: str) -> str: ...
     @final
     @overload
-    def i(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
+    def i(self, x: int) -> int: ...  # error: [invalid-overload]
     def i(self, x: int | str) -> int | str:
         return x
 
@@ -352,6 +344,39 @@ class B:
 
 class C(B):
     def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
+```
+
+## Overriding a `@final` method by assigning a function to a class variable
+
+When a subclass overrides a `@final` method by assigning a function to a class variable, we emit a
+diagnostic but do not provide an autofix (since the function may be defined in a different file).
+
+<!-- snapshot-diagnostics -->
+
+`base.py`:
+
+```py
+from typing import final
+
+class Base:
+    @final
+    def method(self) -> None: ...
+```
+
+`other.py`:
+
+```py
+def replacement_method() -> None: ...
+```
+
+`derived.py`:
+
+```py
+from base import Base
+from other import replacement_method
+
+class Derived(Base):
+    method = replacement_method  # error: [override-of-final-method]
 ```
 
 ## Constructor methods are also checked
