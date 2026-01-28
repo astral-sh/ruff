@@ -214,7 +214,7 @@ mod indexed {
         let (index, max_index) = sub_indices(parent_index)?;
         let mut visitor = Visitor {
             overflowed: false,
-            nodes: Some(Vec::new()),
+            nodes: None,
             index,
             max_index,
         };
