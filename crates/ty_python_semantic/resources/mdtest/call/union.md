@@ -99,6 +99,48 @@ def _(flag: bool):
     reveal_type(x)  # revealed: int | str
 ```
 
+## Union of class constructors uses strict checking
+
+A call on a union of class objects must satisfy every constructor.
+
+```py
+class A:
+    def __init__(self, x: int) -> None: ...
+
+class B:
+    def __init__(self, x: str) -> None: ...
+
+def _(flag: bool):
+    cls = A if flag else B
+    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `str`, found `Literal[1]`"
+    reveal_type(cls(1))  # revealed: A | B
+```
+
+## Conditional constructor aliases
+
+When a constructor alias depends on runtime configuration, we conservatively require the call to
+satisfy every possible constructor.
+
+```py
+import os
+
+if os.environ.get("USE_FAST") == "1":
+    class Fast:
+        def __init__(self, x: int, y: int) -> None: ...
+
+    Rational = Fast
+else:
+    class Slow:
+        def __init__(self, x: int) -> None: ...
+
+    Rational = Slow
+
+def _(x: int, y: int):
+    # TODO: Relax this if/when we can model runtime config / optional dependencies.
+    # error: [too-many-positional-arguments]
+    Rational(x, y)
+```
+
 ## Any non-callable variant
 
 ```py
