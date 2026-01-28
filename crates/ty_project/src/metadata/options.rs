@@ -888,26 +888,25 @@ impl Rules {
                 ValueSource::Editor => LintSource::Editor,
             };
 
+            let mut set_lint_level = |lint| {
+                if let Ok(severity) = Severity::try_from(**level) {
+                    selection.enable(lint, severity, lint_source);
+                } else {
+                    selection.disable(lint);
+                }
+            };
+
             // Handle "all" as a special case - apply the level to all rules
             if rule_name.eq_ignore_ascii_case("all") {
                 for lint in registry.lints() {
-                    if let Ok(severity) = Severity::try_from(**level) {
-                        selection.enable(*lint, severity, lint_source);
-                    } else {
-                        // ignore
-                        selection.disable(*lint);
-                    }
+                    set_lint_level(*lint);
                 }
                 continue;
             }
 
             match registry.get(rule_name) {
                 Ok(lint) => {
-                    if let Ok(severity) = Severity::try_from(**level) {
-                        selection.enable(lint, severity, lint_source);
-                    } else {
-                        selection.disable(lint);
-                    }
+                    set_lint_level(lint);
                 }
                 Err(error) => {
                     // `system_path_to_file` can return `Err` if the file was deleted since the configuration
