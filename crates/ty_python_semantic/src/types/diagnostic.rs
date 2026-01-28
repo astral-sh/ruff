@@ -2968,6 +2968,42 @@ pub(super) fn report_invalid_assignment<'db>(
         let message = diag.primary_message().to_string();
         diag.set_concise_message(message);
     }
+
+    // special case message
+    match target_ty {
+        Type::NominalInstance(target_instance) => {
+            let class = target_instance.class(context.db());
+            let qualified_name = class.qualified_name(context.db());
+            let components = qualified_name.components_excluding_self();
+
+            if !components.is_empty() && components[0] == "numbers" {
+                let numeric_flag = match value_ty {
+                    Type::IntLiteral(_) | Type::BooleanLiteral(_) => true,
+                    Type::NominalInstance(value_instance) => {
+                        let value_class = value_instance.class(context.db());
+                        value_class.known(context.db()).map_or(false, |known| {
+                            matches!(
+                                known,
+                                KnownClass::Int
+                                    | KnownClass::Float
+                                    | KnownClass::Complex
+                                    | KnownClass::Bool
+                            )
+                        })
+                    }
+                    _ => false,
+                };
+
+                if numeric_flag {
+                    diag.info(
+                        "Types from the `numbers` module aren't supported for static type checking. \
+                         Consider using a protocol instead, such as `typing.SupportsFloat`",
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 pub(super) fn report_invalid_attribute_assignment(
