@@ -2970,39 +2970,36 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     // special case message
-    match target_ty {
-        Type::NominalInstance(target_instance) => {
-            let class = target_instance.class(context.db());
-            let qualified_name = class.qualified_name(context.db());
-            let components = qualified_name.components_excluding_self();
+    if let Type::NominalInstance(target_instance) = target_ty {
+        let class = target_instance.class(context.db());
+        let qualified_name = class.qualified_name(context.db());
+        let components = qualified_name.components_excluding_self();
 
-            if !components.is_empty() && components[0] == "numbers" {
-                let is_numeric = match value_ty {
-                    Type::IntLiteral(_) | Type::BooleanLiteral(_) => true,
-                    Type::NominalInstance(value_instance) => {
-                        let value_class = value_instance.class(context.db());
-                        value_class.known(context.db()).map_or(false, |known| {
-                            matches!(
-                                known,
-                                KnownClass::Int
-                                    | KnownClass::Float
-                                    | KnownClass::Complex
-                                    | KnownClass::Bool
-                            )
-                        })
-                    }
-                    _ => false,
-                };
-
-                if is_numeric {
-                    diag.info(
-                        "Types from the `numbers` module aren't supported for static type checking. \
-                         Consider using a protocol instead, such as `typing.SupportsFloat`",
-                    );
+        if !components.is_empty() && components[0] == "numbers" {
+            let is_numeric = match value_ty {
+                Type::IntLiteral(_) | Type::BooleanLiteral(_) => true,
+                Type::NominalInstance(value_instance) => {
+                    let value_class = value_instance.class(context.db());
+                    value_class.known(context.db()).is_some_and(|known| {
+                        matches!(
+                            known,
+                            KnownClass::Int
+                                | KnownClass::Float
+                                | KnownClass::Complex
+                                | KnownClass::Bool
+                        )
+                    })
                 }
+                _ => false,
+            };
+
+            if is_numeric {
+                diag.info(
+                    "Types from the `numbers` module aren't supported for static type checking. \
+                     Consider using a protocol instead, such as `typing.SupportsFloat`",
+                );
             }
         }
-        _ => {}
     }
 }
 
