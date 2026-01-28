@@ -1826,9 +1826,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
                 self.infer_dict_key_assignment_definition(
-                    dict_key_assignment.key(self.module()),
                     dict_key_assignment.value(self.module()),
                     dict_key_assignment.assignment,
+                    definition,
+                );
+            }
+            DefinitionKind::ListElementAssignment(list_element_assignment) => {
+                self.infer_list_element_assignment_definition(
+                    list_element_assignment.element(self.module()),
+                    list_element_assignment.assignment,
                     definition,
                 );
             }
@@ -1965,12 +1971,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Add a binding for the given definition.
-    ///
-    /// Returns the result of the `infer_value_ty` closure, which is called with the declared type
-    /// as type context.
     fn add_binding<'a>(
         &mut self,
-        node: AnyNodeRef<'a>,
+        node: Option<AnyNodeRef<'a>>,
         binding: Definition<'db>,
     ) -> AddBinding<'db, 'a> {
         let db = self.db();
@@ -2067,6 +2070,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(conflicting) = conflicting {
             // TODO point out the conflicting declarations in the diagnostic?
             let place = place_table.place(binding.place(db));
+            let node = node.expect("synthesized place cannot have conflicting declarations");
+
             if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
                 builder.into_diagnostic(format_args!(
                     "Conflicting declared types for `{place}`: {}",
@@ -2097,38 +2102,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If the place is unbound and its an attribute or subscript place, fall back to normal
         // attribute/subscript inference on the root type.
-        let declared_ty =
-            if resolved_place.is_undefined() && !place_table.place(place_id).is_symbol() {
-                if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-                    let value_type =
-                        self.infer_maybe_standalone_expression(value, TypeContext::default());
-                    if let Place::Defined(DefinedPlace {
-                        ty,
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    }) = value_type.member(db, attr).place
-                    {
-                        // TODO: also consider qualifiers on the attribute
-                        Some(ty)
-                    } else {
-                        None
-                    }
-                } else if let AnyNodeRef::ExprSubscript(
-                    subscript @ ast::ExprSubscript {
-                        value, slice, ctx, ..
-                    },
-                ) = node
+        let declared_ty = if resolved_place.is_undefined()
+            && !place_table.place(place_id).is_symbol()
+        {
+            if let Some(AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. })) = node {
+                let value_type =
+                    self.infer_maybe_standalone_expression(value, TypeContext::default());
+                if let Place::Defined(DefinedPlace {
+                    ty,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) = value_type.member(db, attr).place
                 {
-                    let value_ty = self.infer_expression(value, TypeContext::default());
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
+                    // TODO: also consider qualifiers on the attribute
+                    Some(ty)
                 } else {
                     None
                 }
+            } else if let Some(AnyNodeRef::ExprSubscript(
+                subscript @ ast::ExprSubscript {
+                    value, slice, ctx, ..
+                },
+            )) = node
+            {
+                let value_ty = self.infer_expression(value, TypeContext::default());
+                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
             } else {
                 None
             }
-            .or_else(|| resolved_place.ignore_possibly_undefined());
+        } else {
+            None
+        }
+        .or_else(|| resolved_place.ignore_possibly_undefined());
 
         AddBinding {
             declared_ty,
@@ -2993,7 +2999,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::unknown()
             };
 
-            self.add_binding(parameter.into(), definition)
+            self.add_binding(Some(parameter.into()), definition)
                 .insert(self, ty);
         }
     }
@@ -3059,7 +3065,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         } else {
             let inferred_ty = Type::homogeneous_tuple(self.db(), Type::unknown());
-            self.add_binding(parameter.into(), definition)
+            self.add_binding(Some(parameter.into()), definition)
                 .insert(self, inferred_ty);
         }
     }
@@ -3202,7 +3208,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &[KnownClass::Str.to_instance(self.db()), Type::unknown()],
             );
 
-            self.add_binding(parameter.into(), definition)
+            self.add_binding(Some(parameter.into()), definition)
                 .insert(self, inferred_ty);
         }
     }
@@ -3649,7 +3655,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         self.store_expression_type(target, target_ty);
-        self.add_binding(target.into(), definition)
+        self.add_binding(Some(target.into()), definition)
             .insert(self, target_ty);
     }
 
@@ -3803,7 +3809,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         self.add_binding(
-            except_handler_definition.node(self.module()).into(),
+            Some(except_handler_definition.node(self.module()).into()),
             definition,
         )
         .insert(self, symbol_ty);
@@ -4211,7 +4217,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // against the subject expression type (which we can query via `infer_expression_types`)
         // and extract the type at the `index` position if the pattern matches. This will be
         // similar to the logic in `self.infer_assignment_definition`.
-        self.add_binding(pattern.into(), definition)
+        self.add_binding(Some(pattern.into()), definition)
             .insert(self, todo_type!("`match` pattern definition types"));
     }
 
@@ -5791,7 +5797,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let target = assignment.target(self.module());
 
-        let add = self.add_binding(target.into(), definition);
+        let add = self.add_binding(Some(target.into()), definition);
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
@@ -8205,7 +8211,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let target_ty = self.infer_augment_assignment(assignment);
-        self.add_binding(assignment.into(), definition)
+        self.add_binding(Some(assignment.into()), definition)
             .insert(self, target_ty);
     }
 
@@ -8245,14 +8251,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_dict_key_assignment_definition(
         &mut self,
-        key: &'ast ast::Expr,
         value: &'ast ast::Expr,
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
         let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
-        self.add_binding(key.into(), definition)
-            .insert(self, value_ty);
+        self.add_binding(None, definition).insert(self, value_ty);
+    }
+
+    fn infer_list_element_assignment_definition(
+        &mut self,
+        element: &'ast ast::Expr,
+        assignment: Definition<'db>,
+        definition: Definition<'db>,
+    ) {
+        let element_ty = infer_definition_types(self.db(), assignment).expression_type(element);
+        self.add_binding(None, definition).insert(self, element_ty);
     }
 
     fn infer_type_alias_statement(&mut self, node: &ast::StmtTypeAlias) {
@@ -8319,7 +8333,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         self.store_expression_type(target, loop_var_value_type);
-        self.add_binding(target.into(), definition)
+        self.add_binding(Some(target.into()), definition)
             .insert(self, loop_var_value_type);
     }
 
@@ -8892,12 +8906,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         // Get this package's absolute module name by resolving `.`, and make sure it exists
         let Ok(thispackage_name) = ModuleName::package_for_file(self.db(), self.file()) else {
-            self.add_binding(import_from.into(), definition)
+            self.add_binding(Some(import_from.into()), definition)
                 .insert(self, Type::unknown());
             return;
         };
         let Some(module) = resolve_module(self.db(), self.file(), &thispackage_name) else {
-            self.add_binding(import_from.into(), definition)
+            self.add_binding(Some(import_from.into()), definition)
                 .insert(self, Type::unknown());
             return;
         };
@@ -8922,7 +8936,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .next()
                 .and_then(ModuleName::new)
         }) else {
-            self.add_binding(import_from.into(), definition)
+            self.add_binding(Some(import_from.into()), definition)
                 .insert(self, Type::unknown());
             return;
         };
@@ -8938,13 +8952,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // We explicitly don't introduce a *declaration* because it's actual ok
             // (and fairly common) to overwrite this import with a function or class
             // and we don't want it to be a type error to do so.
-            self.add_binding(import_from.into(), definition)
+            self.add_binding(Some(import_from.into()), definition)
                 .insert(self, submodule_type);
             return;
         }
 
         // That didn't work, try to produce diagnostics
-        self.add_binding(import_from.into(), definition)
+        self.add_binding(Some(import_from.into()), definition)
             .insert(self, Type::unknown());
 
         let settings = self.db().analysis_settings(self.file());
@@ -10880,7 +10894,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         self.expressions.insert(target.into(), target_type);
-        self.add_binding(target.into(), definition)
+        self.add_binding(Some(target.into()), definition)
             .insert(self, target_type);
     }
 
@@ -10911,7 +10925,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = named;
 
-        let add = self.add_binding(named.target.as_ref().into(), definition);
+        let add = self.add_binding(Some(named.target.as_ref().into()), definition);
 
         let ty = self.infer_expression(value, add.type_context());
         self.store_expression_type(target, ty);
@@ -15961,7 +15975,7 @@ impl<V> IntoIterator for VecSet<V> {
 struct AddBinding<'db, 'ast> {
     declared_ty: Option<Type<'db>>,
     binding: Definition<'db>,
-    node: AnyNodeRef<'ast>,
+    node: Option<AnyNodeRef<'ast>>,
     qualifiers: TypeQualifiers,
     is_local: bool,
 }
@@ -16039,19 +16053,16 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         }
 
         if !bound_ty.is_assignable_to(db, declared_ty) {
-            report_invalid_assignment(
-                &builder.context,
-                self.node,
-                self.binding,
-                declared_ty,
-                bound_ty,
-            );
+            let node = self
+                .node
+                .expect("invalid declaration for synthesized place");
+            report_invalid_assignment(&builder.context, node, self.binding, declared_ty, bound_ty);
 
             // Allow declarations to override inference in case of invalid assignment.
             bound_ty = declared_ty;
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
-        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = self.node {
+        if let Some(AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. })) = self.node {
             let value_ty = builder.try_expression_type(value).unwrap_or_else(|| {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
@@ -16064,7 +16075,8 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             {
                 bound_ty = declared_ty;
             }
-        } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = self.node {
+        } else if let Some(AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. })) = self.node
+        {
             let value_ty = builder
                 .try_expression_type(value)
                 .unwrap_or_else(|| builder.infer_expression(value, TypeContext::default()));

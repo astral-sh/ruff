@@ -27,8 +27,8 @@ use crate::semantic_index::definition::{
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
     DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
     ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
-    ImportFromSubmoduleDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, ListElementAssignmentNodeRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
@@ -791,9 +791,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             };
 
-            // Recurse into nested dictionaries.
-            if let ast::Expr::Dict(dict_value) = &item.value {
-                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
+            // Recurse into nested lists and dictionaries.
+            match &item.value {
+                ast::Expr::Dict(dict) => {
+                    self.add_dict_key_assignment_definitions_impl(&member_expr, dict, assignment);
+                }
+                ast::Expr::List(list) => self.add_list_element_assignment_definitions_impl(
+                    &member_expr,
+                    list,
+                    assignment,
+                ),
+                _ => {}
             }
 
             if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
@@ -802,9 +810,64 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.add_definition(
                     place_id,
                     DictKeyAssignmentNodeRef {
-                        key,
                         assignment,
                         value: &item.value,
+                    },
+                );
+            }
+        }
+    }
+
+    // Creates a definition for each key-value assignment in the dictionary.
+    //
+    // If there are multiple targets, a given key-value definition will be created multiple
+    // times for each target.
+    fn add_list_element_assignment_definitions(
+        &mut self,
+        targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
+        list: &'ast ast::ExprList,
+        assignment: Definition<'db>,
+    ) {
+        for target in targets {
+            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+                self.add_list_element_assignment_definitions_impl(&target, list, assignment);
+            }
+        }
+    }
+
+    fn add_list_element_assignment_definitions_impl(
+        &mut self,
+        target: &MemberExprBuilder,
+        list: &'ast ast::ExprList,
+        assignment: Definition<'db>,
+    ) {
+        for (i, element) in list.elts.iter().enumerate() {
+            let member_expr = MemberExprBuilder::visit_index_subscript_expr(
+                target.clone(),
+                &ast::Int::small(i as u64),
+            );
+
+            // Recurse into nested lists and dictionaries.
+            match element {
+                ast::Expr::Dict(dict) => {
+                    self.add_dict_key_assignment_definitions_impl(&member_expr, dict, assignment);
+                }
+                ast::Expr::List(list) => self.add_list_element_assignment_definitions_impl(
+                    &member_expr,
+                    list,
+                    assignment,
+                ),
+                _ => {}
+            }
+
+            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
+                let place_id = self.add_place(place_expr);
+
+                self.add_definition(
+                    place_id,
+                    ListElementAssignmentNodeRef {
+                        element,
+                        assignment,
                     },
                 );
             }
@@ -2545,12 +2608,20 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     },
                                 );
 
-                                if let ast::Expr::Dict(dict) = &*node.value {
-                                    self.add_dict_key_assignment_definitions(
-                                        &node.targets,
-                                        dict,
-                                        assignment,
-                                    );
+                                match &*node.value {
+                                    ast::Expr::Dict(dict) => self
+                                        .add_dict_key_assignment_definitions(
+                                            &node.targets,
+                                            dict,
+                                            assignment,
+                                        ),
+                                    ast::Expr::List(list) => self
+                                        .add_list_element_assignment_definitions(
+                                            &node.targets,
+                                            list,
+                                            assignment,
+                                        ),
+                                    _ => {}
                                 }
                             }
                             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
@@ -2565,12 +2636,20 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     },
                                 );
 
-                                if let Some(ast::Expr::Dict(dict)) = ann_assign.value.as_deref() {
-                                    self.add_dict_key_assignment_definitions(
-                                        [&*ann_assign.target],
-                                        dict,
-                                        assignment,
-                                    );
+                                match ann_assign.value.as_deref() {
+                                    Some(ast::Expr::Dict(dict)) => self
+                                        .add_dict_key_assignment_definitions(
+                                            [&*ann_assign.target],
+                                            dict,
+                                            assignment,
+                                        ),
+                                    Some(ast::Expr::List(list)) => self
+                                        .add_list_element_assignment_definitions(
+                                            [&*ann_assign.target],
+                                            list,
+                                            assignment,
+                                        ),
+                                    _ => {}
                                 }
                             }
                             Some(CurrentAssignment::AugAssign(aug_assign)) => {

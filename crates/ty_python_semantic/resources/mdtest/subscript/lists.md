@@ -11,7 +11,8 @@ A list can be indexed into with:
 x = [1, 2, 3]
 reveal_type(x)  # revealed: list[Unknown | int]
 
-reveal_type(x[0])  # revealed: Unknown | int
+reveal_type(x[0])  # revealed: Literal[1]
+reveal_type(x[1])  # revealed: Literal[2]
 
 reveal_type(x[0:1])  # revealed: list[Unknown | int]
 

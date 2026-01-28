@@ -116,4 +116,10 @@ reveal_type(x5["a"])  # revealed: Literal[1]
 reveal_type(x5["b"])  # revealed: dict[str, int | TD]
 reveal_type(x5["b"]["c"])  # revealed: Literal[2]
 reveal_type(x5["b"]["d"])  # revealed: TD
+
+x6: dict[str, list[int | dict[str, int | TD]]] = {"a": [1], "b": [{"c": 2, "d": {"td": 1}}]}
+reveal_type(x6["a"][0])  # revealed: Literal[1]
+reveal_type(x6["b"][0])  # revealed: dict[str, int | TD]
+reveal_type(x6["b"][0]["c"])  # revealed: Literal[2]
+reveal_type(x6["b"][0]["d"])  # revealed: TD
 ```

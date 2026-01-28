@@ -264,8 +264,10 @@ impl MemberExprBuilder {
                 value: ast::Number::Int(index),
                 ..
             }) => {
-                let _ = write!(path, "{index}");
-                segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
+                return Some(MemberExprBuilder::visit_index_subscript_expr(
+                    MemberExprBuilder { path, segments },
+                    index,
+                ));
             }
             // Handle negative integer subscripts, like `x[-1]`.
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
@@ -319,6 +321,22 @@ impl MemberExprBuilder {
         }
 
         Some(MemberExprBuilder { path, segments })
+    }
+
+    pub(super) fn visit_index_subscript_expr(
+        subscript_value: MemberExprBuilder,
+        index: &ast::Int,
+    ) -> MemberExprBuilder {
+        let MemberExprBuilder {
+            mut path,
+            mut segments,
+        } = subscript_value;
+        let start_offset = path.text_len();
+
+        let _ = write!(path, "{index}");
+        segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
+
+        MemberExprBuilder { path, segments }
     }
 }
 

@@ -276,6 +276,7 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef<'ast>),
     AugmentedAssignment(&'ast ast::StmtAugAssign),
     DictKeyAssignment(DictKeyAssignmentNodeRef<'ast, 'db>),
+    ListElementAssignment(ListElementAssignmentNodeRef<'ast, 'db>),
     Comprehension(ComprehensionDefinitionNodeRef<'ast, 'db>),
     VariadicPositionalParameter(&'ast ast::Parameter),
     VariadicKeywordParameter(&'ast ast::Parameter),
@@ -378,6 +379,12 @@ impl<'ast, 'db> From<DictKeyAssignmentNodeRef<'ast, 'db>> for DefinitionNodeRef<
     }
 }
 
+impl<'ast, 'db> From<ListElementAssignmentNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node_ref: ListElementAssignmentNodeRef<'ast, 'db>) -> Self {
+        Self::ListElementAssignment(node_ref)
+    }
+}
+
 impl<'ast, 'db> From<WithItemDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
     fn from(node_ref: WithItemDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::WithItem(node_ref)
@@ -450,8 +457,13 @@ pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
-    pub(crate) key: &'ast ast::Expr,
     pub(crate) value: &'ast ast::Expr,
+    pub(crate) assignment: Definition<'db>,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ListElementAssignmentNodeRef<'ast, 'db> {
+    pub(crate) element: &'ast ast::Expr,
     pub(crate) assignment: Definition<'db>,
 }
 
@@ -565,12 +577,17 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
             DefinitionNodeRef::DictKeyAssignment(DictKeyAssignmentNodeRef {
-                key,
                 value,
                 assignment,
             }) => DefinitionKind::DictKeyAssignment(DictKeyAssignmentKind {
-                key: AstNodeRef::new(parsed, key),
                 value: AstNodeRef::new(parsed, value),
+                assignment,
+            }),
+            DefinitionNodeRef::ListElementAssignment(ListElementAssignmentNodeRef {
+                element,
+                assignment,
+            }) => DefinitionKind::ListElementAssignment(ListElementAssignmentKind {
+                element: AstNodeRef::new(parsed, element),
                 assignment,
             }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
@@ -681,7 +698,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
-            Self::DictKeyAssignment(node) => DefinitionNodeKey(NodeKey::from_node(node.key)),
+            Self::DictKeyAssignment(node) => DefinitionNodeKey(NodeKey::from_node(node.value)),
+            Self::ListElementAssignment(node) => {
+                DefinitionNodeKey(NodeKey::from_node(node.element))
+            }
             Self::For(ForStmtDefinitionNodeRef {
                 target,
                 iterable: _,
@@ -767,6 +787,7 @@ pub enum DefinitionKind<'db> {
     AnnotatedAssignment(AnnotatedAssignmentDefinitionKind),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
     DictKeyAssignment(DictKeyAssignmentKind<'db>),
+    ListElementAssignment(ListElementAssignmentKind<'db>),
     For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind<'db>),
     VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
@@ -842,7 +863,10 @@ impl DefinitionKind<'_> {
                 aug_assign.node(module).target.range()
             }
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
-                dict_key_assignment.key.node(module).range()
+                dict_key_assignment.value.node(module).range()
+            }
+            DefinitionKind::ListElementAssignment(list_element_assignment) => {
+                list_element_assignment.element.node(module).range()
             }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
@@ -894,7 +918,10 @@ impl DefinitionKind<'_> {
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
-                dict_key_assignment.key.node(module).range()
+                dict_key_assignment.value.node(module).range()
+            }
+            DefinitionKind::ListElementAssignment(list_element_assignment) => {
+                list_element_assignment.element.node(module).range()
             }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
@@ -959,6 +986,7 @@ impl DefinitionKind<'_> {
             }
             // all of these bind values without declaring a type
             DefinitionKind::DictKeyAssignment(_)
+            | DefinitionKind::ListElementAssignment(_)
             | DefinitionKind::NamedExpression(_)
             | DefinitionKind::Assignment(_)
             | DefinitionKind::AugmentedAssignment(_)
@@ -1179,18 +1207,25 @@ impl AnnotatedAssignmentDefinitionKind {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct DictKeyAssignmentKind<'db> {
-    pub(crate) key: AstNodeRef<ast::Expr>,
     pub(crate) value: AstNodeRef<ast::Expr>,
     pub(crate) assignment: Definition<'db>,
 }
 
 impl DictKeyAssignmentKind<'_> {
-    pub(crate) fn key<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.key.node(module)
-    }
-
     pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.value.node(module)
+    }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct ListElementAssignmentKind<'db> {
+    pub(crate) element: AstNodeRef<ast::Expr>,
+    pub(crate) assignment: Definition<'db>,
+}
+
+impl ListElementAssignmentKind<'_> {
+    pub(crate) fn element<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.element.node(module)
     }
 }
 

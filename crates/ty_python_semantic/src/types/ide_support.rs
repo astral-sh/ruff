@@ -1410,6 +1410,7 @@ mod resolve_definition {
             | DefinitionKind::AnnotatedAssignment(_)
             | DefinitionKind::AugmentedAssignment(_)
             | DefinitionKind::DictKeyAssignment(_)
+            | DefinitionKind::ListElementAssignment(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::VariadicPositionalParameter(_)
