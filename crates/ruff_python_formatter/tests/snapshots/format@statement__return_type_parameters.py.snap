@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return_type_parameters.py
 ---
 ## Input
 ```python
@@ -411,4 +410,22 @@ def test_return_multiline_string_binary_expression_return_type_annotation(
     bbbbbbbbbbbbbbbbbbbbbbbbb,
 ]:
     pass
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -143,9 +143,7 @@
+ 
+ def parameters_overlong_subscript_return_type_with_overlong_single_element(
+     a,
+-) -> list[
+-    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+-]:
++) -> list[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]:
+     pass
+ 
+ 
 ```
