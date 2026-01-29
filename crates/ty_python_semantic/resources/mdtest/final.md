@@ -734,7 +734,7 @@ class P(Protocol):
     # (`Unknown`) is assignable to `None`. Nonetheless, we consider this method
     # implicitly abstract anyway, since the distinction based on the return type
     # would probably be subtle and surprising to many users. This also matches the
-    # behaviour of all other ytpe checkers
+    # behaviour of all other type checkers
     def still_abstractmethod(self): ...
 
 @final
