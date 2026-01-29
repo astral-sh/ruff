@@ -1348,6 +1348,33 @@ def _(kwargs: dict[str, int] | int):
     f(**InvalidMapping())
 ```
 
+### Not a mapping with overloaded function
+
+When `**kwargs` with a non-mapping type is passed to an overloaded function, the error should report
+the specific mapping type error.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, **kwargs: int) -> int: ...
+@overload
+def f(x: str, **kwargs: str) -> str: ...
+```
+
+```py
+from overloaded import f
+
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `None`"
+f(1, **None)
+
+def _(kwargs: dict[str, int] | int):
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `dict[str, int] | int`"
+    f(1, **kwargs)
+```
+
 ### Generic
 
 For a generic keywords parameter, the type variable should be specialized to the value type of the

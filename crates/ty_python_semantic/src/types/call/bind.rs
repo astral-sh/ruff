@@ -3622,15 +3622,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         } else {
             let mut value_type_fallback = |argument_type: Type<'db>| {
-                let Some((key_type, value_type)) = argument_type.unpack_keys_and_items(self.db)
-                else {
-                    self.errors.push(BindingError::KeywordsNotAMapping {
-                        argument_index: adjusted_argument_index,
-                        provided_ty: argument_type,
-                    });
-
-                    return None;
-                };
+                let (key_type, value_type) = argument_type.unpack_keys_and_items(self.db)?;
 
                 if !key_type
                     .when_assignable_to(
@@ -4237,10 +4229,6 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         provided_ty: Type<'db>,
     },
-    KeywordsNotAMapping {
-        argument_index: Option<usize>,
-        provided_ty: Type<'db>,
-    },
     /// One or more required parameters (that is, with no default) is not supplied by any argument.
     MissingArguments {
         parameters: ParameterContexts,
@@ -4340,7 +4328,6 @@ impl<'db> BindingError<'db> {
             // Matching errors: the overload doesn't apply to these arguments
             Self::InvalidArgumentType { .. }
             | Self::InvalidKeyType { .. }
-            | Self::KeywordsNotAMapping { .. }
             | Self::MissingArguments { .. }
             | Self::UnknownArgument { .. }
             | Self::PositionalOnlyParameterAsKwarg { .. }
@@ -4530,25 +4517,6 @@ impl<'db> BindingError<'db> {
                 let mut diag = builder.into_diagnostic(
                     "Argument expression after ** must be a mapping with `str` key type",
                 );
-                diag.set_primary_message(format_args!("Found `{provided_ty_display}`"));
-
-                if let Some(union_diag) = union_diag {
-                    union_diag.add_union_context(context.db(), &mut diag);
-                }
-            }
-
-            Self::KeywordsNotAMapping {
-                argument_index,
-                provided_ty,
-            } => {
-                let range = Self::get_node(node, *argument_index);
-                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
-                    return;
-                };
-
-                let provided_ty_display = provided_ty.display(context.db());
-                let mut diag =
-                    builder.into_diagnostic("Argument expression after ** must be a mapping type");
                 diag.set_primary_message(format_args!("Found `{provided_ty_display}`"));
 
                 if let Some(union_diag) = union_diag {
