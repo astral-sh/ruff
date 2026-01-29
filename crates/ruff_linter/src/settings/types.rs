@@ -500,6 +500,11 @@ impl ExtensionMapping {
         let ext = path.extension()?.to_str()?;
         self.0.get(ext).copied()
     }
+
+    /// Return the [`Language`] for a given file extension.
+    pub fn get_extension(&self, ext: &str) -> Option<Language> {
+        self.0.get(ext).copied()
+    }
 }
 
 impl From<FxHashMap<String, Language>> for ExtensionMapping {
