@@ -607,6 +607,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "213") => rules::pydocstyle::rules::MultiLineSummarySecondLine,
         (Pydocstyle, "214") => rules::pydocstyle::rules::OverindentedSection,
         (Pydocstyle, "215") => rules::pydocstyle::rules::OverindentedSectionUnderline,
+        (Pydocstyle, "219") => rules::pydocstyle::rules::OneLineDocstringShouldBeMultiLine,
         (Pydocstyle, "300") => rules::pydocstyle::rules::TripleSingleQuotes,
         (Pydocstyle, "301") => rules::pydocstyle::rules::EscapeSequenceInDocstring,
         (Pydocstyle, "400") => rules::pydocstyle::rules::MissingTrailingPeriod,
