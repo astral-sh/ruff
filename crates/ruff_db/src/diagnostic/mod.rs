@@ -10,6 +10,11 @@ pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
     github::{DisplayGithubDiagnostics, GithubRenderer},
 };
+
+#[cfg(feature = "serde")]
+pub use self::render::sarif::{
+    DisplaySarifDiagnostics, RuleMetadata, RuleMetadataProvider, SarifRenderer, SarifToolInfo,
+};
 use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
 

@@ -115,7 +115,7 @@ exit_code: 1
       "tool": {
         "driver": {
           "informationUri": "https://github.com/astral-sh/ruff",
-          "name": "ruff",
+          "name": "Ruff",
           "rules": [
             {
               "fullDescription": {
@@ -156,7 +156,7 @@ exit_code: 1
               }
             }
           ],
-          "version": "[VERSION]"
+          "version": "[VERSION] (f482ba003 2026-01-27)"
         }
       }
     }
