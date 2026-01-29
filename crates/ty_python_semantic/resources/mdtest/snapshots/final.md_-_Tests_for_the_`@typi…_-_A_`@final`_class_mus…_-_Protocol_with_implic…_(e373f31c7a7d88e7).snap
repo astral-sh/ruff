@@ -22,7 +22,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
   7 |     # (`Unknown`) is assignable to `None`. Nonetheless, we consider this method
   8 |     # implicitly abstract anyway, since the distinction based on the return type
   9 |     # would probably be subtle and surprising to many users. This also matches the
- 10 |     # behaviour of all other ytpe checkers
+ 10 |     # behaviour of all other type checkers
  11 |     def still_abstractmethod(self): ...
  12 | 
  13 | @final
@@ -172,7 +172,7 @@ error[abstract-method-in-final-class]: Final class `Q` does not implement abstra
   --> src/mdtest_snippet.py:11:9
    |
  9 |     # would probably be subtle and surprising to many users. This also matches the
-10 |     # behaviour of all other ytpe checkers
+10 |     # behaviour of all other type checkers
 11 |     def still_abstractmethod(self): ...
    |         -------------------- `still_abstractmethod` defined as abstract on superclass `P`
 12 |

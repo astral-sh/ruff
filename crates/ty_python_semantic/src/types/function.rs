@@ -799,7 +799,7 @@ impl<'db> FunctionLiteral<'db> {
     /// statements, or if it is a `Protocol` method that only has a docstring,
     /// or if it is a `Protocol` method whose body only consists of a single
     /// `raise NotImplementedError` statement.
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn as_abstract_method(
         self,
         db: &'db dyn Db,
