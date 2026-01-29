@@ -15098,7 +15098,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
-            if typevars_len == 0 {
+            if let Type::GenericAlias(alias) = value_ty
+                && let spec = alias.specialization(self.db())
+                && spec
+                    .types(self.db())
+                    .contains(&Type::Dynamic(DynamicType::TodoTypeVarTuple))
+            {
+                // Avoid false-positive errors when specializing a class
+                // that's generic over a legacy TypeVarTuple
+            } else if typevars_len == 0 {
                 // Type parameter list cannot be empty, so if we reach here, `value_ty` is not a generic type.
                 if let Some(builder) = self
                     .context

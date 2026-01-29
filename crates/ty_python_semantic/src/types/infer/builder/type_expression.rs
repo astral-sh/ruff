@@ -713,7 +713,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 let ty = if return_todo {
-                    Some(TupleType::homogeneous(self.db(), todo_type!("PEP 646")))
+                    Some(TupleType::homogeneous(
+                        self.db(),
+                        Type::Dynamic(DynamicType::TodoTypeVarTuple),
+                    ))
                 } else {
                     TupleType::new(self.db(), &element_types.build())
                 };
@@ -738,7 +741,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {
-                    Some(TupleType::homogeneous(self.db(), todo_type!("PEP 646")))
+                    Some(TupleType::homogeneous(
+                        self.db(),
+                        Type::Dynamic(DynamicType::TodoTypeVarTuple),
+                    ))
                 } else {
                     TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
                 }
