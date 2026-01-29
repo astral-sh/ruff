@@ -705,6 +705,217 @@ class Implementer(MyProtocol):  # error: [abstract-method-in-final-class]
     pass
 ```
 
+### Protocol with implicitly abstract methods
+
+<!-- snapshot-diagnostics -->
+
+A method in a `Protocol` class can be "implicitly abstract" if one of the two following conditions
+are met:
+
+1. The function body only consists of `...` and/or `pass` statements, and the return type is not
+    assignable to `None`.
+1. The function body only consists of `raise NotImplementedError` or `raise NotImplementedError()`,
+    and the return type is not assignable to `Never`.
+
+```py
+from typing_extensions import Protocol, final, Never
+
+class P(Protocol):
+    # Other type checkers consider this method implicitly abstract,
+    # but we do not, because there'd be no unsoundness here if a subclass of this
+    # class were to be instantiated without the method having been overridden:
+    # the function returns `None`, and the inferred return type of the function
+    # (`Unknown`) is assignable to `None`
+    def not_abstractmethod(self): ...
+
+@final
+class Q(P): ...
+
+class R(Protocol):
+    # same here
+    def also_not_abstractmethod(self) -> None: ...
+
+@final
+class S(R): ...
+
+class Raises(Protocol):
+    def not_abstractmethod(self):
+        raise NotImplementedError
+
+@final
+class RaisesSub(Raises): ...
+
+class AlsoRaises(Protocol):
+    def also_not_abstractmethod(self) -> Never:
+        raise NotImplementedError
+
+@final
+class AlsoRaisesSub(Protocol): ...
+
+class RaisesDifferentException(Protocol):
+    def not_abstractmethod(self) -> int:
+        raise TypeError
+
+@final
+class RaisesDifferentSub(RaisesDifferentException): ...
+
+class RaisesMultiple(Protocol):
+    def not_abstractmethod(self) -> int:
+        raise NotImplementedError
+        raise NotImplementedError
+
+@final
+class RaisesMultipleSub(RaisesMultiple): ...
+
+class HasAbstract(Protocol):
+    def a(self) -> int: ...
+
+class HasAbstract2(Protocol):
+    def a(self) -> int:
+        pass
+
+class HasAbstract3(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+
+class HasAbstract4(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        ...
+
+class HasAbstract5(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        pass
+
+class HasAbstract6(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        pass
+        ...
+        pass
+        ...
+        pass
+        pass
+        pass
+        ...
+
+class HasAbstract7(Protocol):
+    def a(self) -> int:
+        raise NotImplementedError
+
+class HasAbstract8(Protocol):
+    def a(self) -> int:
+        raise NotImplementedError()
+
+class HasAbstract9(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        raise NotImplementedError
+
+class HasAbstract10(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        raise NotImplementedError()
+
+@final
+class HasAbstractSub(HasAbstract): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract2Sub(HasAbstract2): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract3Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract4Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract5Sub(HasAbstract5): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract6Sub(HasAbstract6): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract7Sub(HasAbstract7): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract8Sub(HasAbstract8): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract9Sub(HasAbstract9): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract10Sub(HasAbstract10): ...  # error: [abstract-method-in-final-class]
+```
+
+### `Protocol` methods in stub files are never implicitly abstract
+
+Methods in stub files are generally allowed to have stub bodies, so methods on `Protocol` classes in
+stub files are only inferred as being abstract if they are explicitly decorated with
+`@abstractmethod`:
+
+`stub.pyi`:
+
+```pyi
+from abc import abstractmethod
+from typing import Protocol
+
+class Abstract(Protocol):
+    @abstractmethod
+    def a(self) -> int: ...
+
+class NotAbstract(Protocol):
+    def a(self) -> int: ...
+```
+
+`main.py`:
+
+```py
+from typing import final
+from stub import Abstract, NotAbstract
+
+@final
+class Bad(Abstract): ...  # error: [abstract-method-in-final-class]
+
+@final
+class Fine(NotAbstract): ...
+```
+
+### `@final` `Protocol` classes are excluded
+
+We allow `@final` `Protocol` classes to have unimplemented abstract methods. Unlike non-`Protocol`
+classes, it is possible to subtype a `Protocol` class without explicitly subclassing it, so an
+`@final` `Protocol` class with unimplemented abstract methods is not inherently broken in the same
+way as an `@final` non-`Protocol` class:
+
+```py
+from typing import final, Protocol
+from ty_extensions import static_assert, is_subtype_of
+
+class Base(Protocol):
+    def abstract(self) -> int: ...
+
+@final
+class Sub(Base, Protocol):  # No error
+    def also_abstract(self) -> int: ...
+
+# This is rejected:
+#
+# error: [subclass-of-final-class]
+class SubclassesSub(Sub): ...
+
+# But this is fine:
+class ImplementsSubWithoutSubclassing:
+    def abstract(self) -> int:
+        return 42
+
+    def also_abstract(self) -> int:
+        return 56
+
+static_assert(is_subtype_of(ImplementsSubWithoutSubclassing, Sub))
+```
+
 ### Fully implemented final class is fine
 
 ```py
