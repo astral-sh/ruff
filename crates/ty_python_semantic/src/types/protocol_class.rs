@@ -281,6 +281,15 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db).contains_key(name)
     }
 
+    /// Returns the `__call__` method's callable type if this protocol has a `__call__` method member.
+    pub(super) fn call_method(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
+        self.member_by_name(db, "__call__")
+            .and_then(|member| match member.kind {
+                ProtocolMemberKind::Method(callable) => Some(callable),
+                _ => None,
+            })
+    }
+
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_by_name(db, name)
             .map(|member| PlaceAndQualifiers {
