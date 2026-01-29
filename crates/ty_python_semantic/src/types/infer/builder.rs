@@ -6430,11 +6430,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_newtype_assignment_deferred(arguments);
             return;
         }
+        let is_typevar = &|t| {
+            matches!(
+                t,
+                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+            )
+        };
+        let db = self.db();
+        let is_generic = |ty| any_over_type(db, ty, is_typevar, false);
         for arg in arguments.args.iter().skip(1) {
-            self.infer_type_expression(arg);
+            let constraint = self.infer_type_expression(arg);
+
+            if is_generic(constraint)
+                && let Some(builder) = self.context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, arg)
+            {
+                builder.into_diagnostic("TypeVar constraint cannot be generic");
+            }
         }
         if let Some(bound) = arguments.find_keyword("bound") {
-            self.infer_type_expression(&bound.value);
+            let bound_type = self.infer_type_expression(&bound.value);
+
+            if is_generic(bound_type)
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, bound)
+            {
+                builder.into_diagnostic("TypeVar upper bound cannot be generic");
+            }
         }
         if let Some(default) = arguments.find_keyword("default") {
             if matches!(

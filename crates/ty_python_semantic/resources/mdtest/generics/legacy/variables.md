@@ -444,18 +444,26 @@ def constrained(x: T_constrained):
 A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 
 ```py
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Generic
 
 S = TypeVar("S")
 
-# TODO: error
+# error: [invalid-legacy-type-variable] "TypeVar upper bound cannot be generic"
 T = TypeVar("T", bound=list[S])
 
-# TODO: error
+# error: [invalid-legacy-type-variable] "TypeVar constraint cannot be generic"
 U = TypeVar("U", list["T"], str)
 
-# TODO: error
+# error: [invalid-legacy-type-variable] "TypeVar constraint cannot be generic"
 V = TypeVar("V", list["V"], str)
+
+# error: [invalid-legacy-type-variable] "TypeVar constraint cannot be generic"
+# error: [invalid-legacy-type-variable] "TypeVar constraint cannot be generic"
+W = TypeVar("W", list[list[list[list["V"]]]], V)
+
+class Foo(Generic[S]):
+    # error: [invalid-legacy-type-variable] "TypeVar upper bound cannot be generic"
+    T = TypeVar("T", bound=S)
 ```
 
 However, they are lazily evaluated and can cyclically refer to their own type:
