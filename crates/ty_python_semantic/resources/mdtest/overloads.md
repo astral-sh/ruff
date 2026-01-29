@@ -329,9 +329,8 @@ At least two `@overload`-decorated definitions must be present.
 from typing import overload
 
 @overload
-def func(x: int) -> int: ...
-
 # error: [invalid-overload]
+def func(x: int) -> int: ...
 def func(x: int | str) -> int | str:
     return x
 ```
@@ -357,16 +356,16 @@ non-`@overload`-decorated definition (for the same function/method).
 from typing import overload
 
 @overload
+# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
+    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: str) -> str: ...
 ```
 
@@ -433,10 +432,10 @@ class Fine(metaclass=CustomAbstractMetaclass):
 class Foo:
     @overload
     @abstractmethod
+    # error: [invalid-overload]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
-    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 ```
 
@@ -446,17 +445,17 @@ And, the `@abstractmethod` decorator must be present on all the `@overload`-ed m
 class PartialFoo1(ABC):
     @overload
     @abstractmethod
+    # error: [invalid-overload]
     def f(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 
 class PartialFoo(ABC):
     @overload
+    # error: [invalid-overload]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
-    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 ```
 
@@ -498,11 +497,10 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     @overload
-    def c() -> None: ...
+    # not all overloads are in a `TYPE_CHECKING` block, so this is an error
+    def c() -> None: ...  # error: [invalid-overload]
 
-# not all overloads are in a `TYPE_CHECKING` block, so this is an error
 @overload
-# error: [invalid-overload]
 def c(x: int) -> int: ...
 ```
 

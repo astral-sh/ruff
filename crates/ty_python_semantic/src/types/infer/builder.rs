@@ -1497,7 +1497,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Check that the overloaded function has at least two overloads
             if let [single_overload] = overloads {
-                let function_node = function.node(self.db(), self.file(), self.module());
+                let function_node = single_overload.node(self.db(), self.file(), self.module());
                 if let Some(builder) = self
                     .context
                     .report_lint(&INVALID_OVERLOAD, &function_node.name)
@@ -1506,11 +1506,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "Overloaded function `{}` requires at least two overloads",
                         &function_node.name
                     ));
-                    diagnostic.annotate(
-                        self.context
-                            .secondary(single_overload.focus_range(self.db(), self.module()))
-                            .message(format_args!("Only one overload defined here")),
-                    );
+                    diagnostic.set_primary_message("Only one overload defined here");
                 }
             }
 
@@ -1552,7 +1548,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if implementation_required {
-                    let function_node = function.node(self.db(), self.file(), self.module());
+                    let function_node = overloads[0].node(self.db(), self.file(), self.module());
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_OVERLOAD, &function_node.name)
