@@ -5,6 +5,7 @@
 
 use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
+use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -12,16 +13,21 @@ use crate::{
     lint::LintId,
     place::{DefinedPlace, Place},
     semantic_index::{
-        definition::DefinitionKind, place::ScopedPlaceId, place_table, scope::ScopeId,
-        symbol::ScopedSymbolId, use_def_map,
+        definition::{Definition, DefinitionKind},
+        place::ScopedPlaceId,
+        place_table,
+        scope::ScopeId,
+        symbol::ScopedSymbolId,
+        use_def_map,
     },
     types::{
-        ClassBase, ClassType, KnownClass, StaticClassLiteral, Type,
-        class::CodeGeneratorKind,
+        CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
+        StaticClassLiteral, Type,
+        class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
-            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
-            OVERRIDE_OF_FINAL_METHOD, report_invalid_method_override,
+            INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE,
+            INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD, report_invalid_method_override,
             report_overridden_final_method,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
@@ -113,10 +119,12 @@ fn check_class_declaration<'db>(
         first_reachable_definition,
     } = member;
 
+    let instance_of_class = Type::instance(db, class);
+
     let Place::Defined(DefinedPlace {
         ty: type_on_subclass_instance,
         ..
-    }) = Type::instance(db, class).member(db, &member.name).place
+    }) = instance_of_class.member(db, &member.name).place
     else {
         return;
     };
@@ -131,24 +139,36 @@ fn check_class_declaration<'db>(
     // `NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`, etc.)
     // that cannot be overwritten. Attempting to assign to these attributes (without type
     // annotations) or define methods with these names will raise an `AttributeError` at runtime.
-    if class_kind == Some(CodeGeneratorKind::NamedTuple)
-        && configuration.check_prohibited_named_tuple_attrs()
-        && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
-        && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
-        && let Some(bad_definition) = use_def_map(db, class_scope)
-            .reachable_bindings(ScopedPlaceId::Symbol(symbol_id))
-            .filter_map(|binding| binding.binding.definition())
-            .find(|def| !matches!(def.kind(db), DefinitionKind::AnnotatedAssignment(_)))
-        && let Some(builder) = context.report_lint(
-            &INVALID_NAMED_TUPLE,
-            bad_definition.focus_range(db, context.module()),
-        )
-    {
-        let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Cannot overwrite NamedTuple attribute `{}`",
-            &member.name
-        ));
-        diagnostic.info("This will cause the class creation to fail at runtime");
+    match class_kind {
+        Some(CodeGeneratorKind::NamedTuple) => {
+            if configuration.check_prohibited_named_tuple_attrs()
+                && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
+                && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
+                && let Some(bad_definition) = use_def_map(db, class_scope)
+                    .reachable_bindings(ScopedPlaceId::Symbol(symbol_id))
+                    .filter_map(|binding| binding.binding.definition())
+                    .find(|def| !matches!(def.kind(db), DefinitionKind::AnnotatedAssignment(_)))
+                && let Some(builder) = context.report_lint(
+                    &INVALID_NAMED_TUPLE,
+                    bad_definition.focus_range(db, context.module()),
+                )
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Cannot overwrite NamedTuple attribute `{}`",
+                    &member.name
+                ));
+                diagnostic.info("This will cause the class creation to fail at runtime");
+            }
+        }
+        Some(policy @ CodeGeneratorKind::DataclassLike(_)) => check_post_init_signature(
+            context,
+            configuration,
+            class,
+            member,
+            *first_reachable_definition,
+            policy,
+        ),
+        Some(CodeGeneratorKind::TypedDict) | None => {}
     }
 
     let mut subclass_overrides_superclass_declaration = false;
@@ -390,6 +410,7 @@ bitflags! {
         const EXPLICIT_OVERRIDE = 1 << 1;
         const FINAL_METHOD_OVERRIDDEN = 1 << 2;
         const PROHIBITED_NAMED_TUPLE_ATTR = 1 << 3;
+        const INVALID_DATACLASS = 1 << 4;
     }
 }
 
@@ -412,6 +433,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE)) {
             config |= OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR;
         }
+        if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS)) {
+            config |= OverrideRulesConfig::INVALID_DATACLASS;
+        }
 
         config
     }
@@ -432,6 +456,10 @@ impl OverrideRulesConfig {
 
     const fn check_prohibited_named_tuple_attrs(self) -> bool {
         self.contains(OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR)
+    }
+
+    const fn check_invalid_dataclasses(self) -> bool {
+        self.contains(OverrideRulesConfig::INVALID_DATACLASS)
     }
 }
 
@@ -501,5 +529,72 @@ fn extract_underlying_functions<'db>(
             }
         }
         _ => None,
+    }
+}
+
+fn check_post_init_signature<'db>(
+    context: &InferContext<'db, '_>,
+    configuration: OverrideRulesConfig,
+    class: ClassType<'db>,
+    member: &Member<'db>,
+    definition: Definition<'db>,
+    policy: CodeGeneratorKind<'db>,
+) {
+    let db = context.db();
+
+    if configuration.check_invalid_dataclasses()
+        && member.name == "__post_init__"
+        && let Some((static_class, spec)) = class.static_class_literal(db)
+    {
+        let init_var_fields = static_class
+            .fields(db, spec, policy)
+            .iter()
+            .filter(|(_, field)| {
+                matches!(
+                    field.kind,
+                    FieldKind::Dataclass {
+                        init_only: true,
+                        ..
+                    }
+                )
+            });
+
+        let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
+            .with_annotated_type(Type::instance(db, class));
+
+        let following_parameters = init_var_fields.map(|(name, field)| {
+            Parameter::positional_only(Some(name.clone())).with_annotated_type(field.declared_ty)
+        });
+
+        let parameters = Parameters::new(
+            db,
+            std::iter::once(first_parameter).chain(following_parameters),
+        );
+
+        let expected_signature =
+            CallableType::single(db, Signature::new(parameters, Type::object()));
+
+        if member
+            .ty
+            .is_assignable_to(db, Type::Callable(expected_signature))
+        {
+            return;
+        }
+
+        let Some(builder) = context.report_lint(
+            &INVALID_DATACLASS,
+            definition.focus_range(db, context.module()),
+        ) else {
+            return;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Invalid `__post_init__` signature for dataclass `{}`",
+            class.name(db)
+        ));
+        diagnostic.info(
+            "`__post_init__` methods must accept all `InitVar` fields \
+            as positional-only parameters",
+        );
     }
 }

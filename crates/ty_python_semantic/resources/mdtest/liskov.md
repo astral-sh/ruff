@@ -411,7 +411,7 @@ python-version = "3.13"
 ```
 
 ```pyi
-from dataclasses import dataclass
+from dataclasses import dataclass, InitVar
 from typing_extensions import Self
 
 class Grandparent: ...
@@ -425,14 +425,14 @@ class Child(Parent):
 
 @dataclass(init=False)
 class DataSuper:
-    x: int
+    x: InitVar[int]
 
     def __post_init__(self, x: int) -> None:
         self.x = x
 
 @dataclass(init=False)
 class DataSub(DataSuper):
-    y: str
+    y: InitVar[str]
 
     def __post_init__(self, x: int, y: str) -> None:
         self.y = y
