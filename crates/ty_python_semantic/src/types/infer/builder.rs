@@ -520,19 +520,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or(self.fallback_type())
     }
 
-    /// Returns `true` if `ty` is a `ParamSpec` type or a union of a `ParamSpec` with `Unknown`.
-    fn is_paramspec(&self, ty: Type<'db>) -> bool {
-        match ty {
-            Type::TypeVar(tv) => tv.is_paramspec(self.db()),
-            Type::Union(u) => matches!(
-                u.elements(self.db()),
-                [Type::TypeVar(tv), other] | [other, Type::TypeVar(tv)]
-                    if tv.is_paramspec(self.db()) && other.is_unknown()
-            ),
-            _ => false,
-        }
-    }
-
     /// Get the type of an expression from any scope in the same file.
     ///
     /// If the expression is in the current scope, and we are inferring the entire scope, just look
@@ -11138,18 +11125,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for keyword in arguments.keywords.iter().filter(|k| k.arg.is_none()) {
             let mapping_type = self.expression_type(&keyword.value);
 
-            let is_paramspec = matches!(
-                mapping_type,
-                Type::TypeVar(tv) if tv.is_paramspec(self.db())
-            ) || matches!(
-                mapping_type,
-                Type::Union(u) if matches!(
-                    u.elements(self.db()),
-                    [Type::TypeVar(tv), other] | [other, Type::TypeVar(tv)]
-                        if tv.is_paramspec(self.db()) && other.is_unknown()
-                )
-            );
-            if is_paramspec || mapping_type.unpack_keys_and_items(self.db()).is_some() {
+            if mapping_type.as_paramspec_typevar(self.db()).is_some()
+                || mapping_type.unpack_keys_and_items(self.db()).is_some()
+            {
                 continue;
             }
 

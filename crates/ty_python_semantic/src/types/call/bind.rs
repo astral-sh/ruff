@@ -2840,40 +2840,24 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
 
         let variadic_type = match argument_type {
-            Some(argument_type @ Type::Union(union)) => {
-                // When accessing an instance attribute that is a `P.args`, the type we infer is
-                // `Unknown | P.args`. This needs to be special cased here to avoid calling
-                // `iterate` on it which will lose the `ParamSpec` information as it will return
-                // `object` that comes from the upper bound of `P.args`. What we want is to always
-                // use the `P.args` type to perform type checking against the parameter type. This
-                // will allow us to error when `*args: P.args` is matched against, for example,
-                // `n: int` and correctly type check when `*args: P.args` is matched against
-                // `*args: P.args` (another ParamSpec).
-                match union.elements(db) {
-                    [paramspec @ Type::TypeVar(typevar), other]
-                    | [other, paramspec @ Type::TypeVar(typevar)]
-                        if typevar.is_paramspec(db) && other.is_unknown() =>
-                    {
-                        VariadicArgumentType::ParamSpec(*paramspec)
-                    }
-                    _ => {
-                        // TODO: Same todo comment as in the non-paramspec case below
-                        VariadicArgumentType::Other(argument_type.iterate(db))
-                    }
-                }
-            }
-            Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
-                VariadicArgumentType::ParamSpec(paramspec)
-            }
-            Some(argument_type) => {
+            // When accessing an instance attribute that is a `P.args`, the type we infer is
+            // `Unknown | P.args`. This needs to be special cased here to avoid calling
+            // `iterate` on it which will lose the `ParamSpec` information as it will return
+            // `object` that comes from the upper bound of `P.args`. What we want is to always
+            // use the `P.args` type to perform type checking against the parameter type. This
+            // will allow us to error when `*args: P.args` is matched against, for example,
+            // `n: int` and correctly type check when `*args: P.args` is matched against
+            // `*args: P.args` (another ParamSpec).
+            Some(argument_type) => match argument_type.as_paramspec_typevar(db) {
+                Some(paramspec) => VariadicArgumentType::ParamSpec(paramspec),
                 // TODO: `Type::iterate` internally handles unions, but in a lossy way.
                 // It might be superior here to manually map over the union and call `try_iterate`
                 // on each element, similar to the way that `unpacker.rs` does in the `unpack_inner` method.
                 // It might be a bit of a refactor, though.
                 // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
                 // for more details. --Alex
-                VariadicArgumentType::Other(argument_type.iterate(db))
-            }
+                None => VariadicArgumentType::Other(argument_type.iterate(db)),
+            },
             None => VariadicArgumentType::None,
         };
 
@@ -2985,20 +2969,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             };
 
             let value_type = match argument_type {
-                Some(argument_type @ Type::Union(union)) => {
-                    // See the comment in `match_variadic` for why we special case this situation.
-                    match union.elements(db) {
-                        [paramspec @ Type::TypeVar(typevar), other]
-                        | [other, paramspec @ Type::TypeVar(typevar)]
-                            if typevar.is_paramspec(db) && other.is_unknown() =>
-                        {
-                            *paramspec
-                        }
-                        _ => dunder_getitem_return_type(argument_type),
-                    }
-                }
-                Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => paramspec,
-                Some(argument_type) => dunder_getitem_return_type(argument_type),
+                Some(argument_type) => argument_type
+                    .as_paramspec_typevar(db)
+                    .unwrap_or_else(|| dunder_getitem_return_type(argument_type)),
                 None => Type::unknown(),
             };
 
@@ -3641,21 +3614,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 Some(value_type)
             };
 
-            let value_type = match argument_type {
-                Type::Union(union) => {
-                    // See the comment in `match_variadic` for why we special case this situation.
-                    match union.elements(self.db) {
-                        [paramspec @ Type::TypeVar(typevar), other]
-                        | [other, paramspec @ Type::TypeVar(typevar)]
-                            if typevar.is_paramspec(self.db) && other.is_unknown() =>
-                        {
-                            Some(*paramspec)
-                        }
-                        _ => value_type_fallback(argument_type),
-                    }
-                }
-                Type::TypeVar(typevar) if typevar.is_paramspec(self.db) => Some(argument_type),
-                _ => value_type_fallback(argument_type),
+            let value_type = if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
+                Some(paramspec)
+            } else {
+                value_type_fallback(argument_type)
             };
 
             let Some(value_type) = value_type else {

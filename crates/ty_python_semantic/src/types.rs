@@ -3826,6 +3826,26 @@ impl<'db> Type<'db> {
         non_negative_int_literal(db, return_ty)
     }
 
+    /// If this type is a `ParamSpec` type variable, or a union of a `ParamSpec` with `Unknown`,
+    /// returns the `ParamSpec` type variable. Otherwise, returns `None`.
+    ///
+    /// `ParamSpec` type variables can appear as `P | Unknown` because of how they are inferred.
+    /// See the comment in `match_variadic` in `bind.rs` for details.
+    fn as_paramspec_typevar(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::TypeVar(tv) if tv.is_paramspec(db) => Some(self),
+            Type::Union(union) => match union.elements(db) {
+                [paramspec @ Type::TypeVar(tv), other] | [other, paramspec @ Type::TypeVar(tv)]
+                    if tv.is_paramspec(db) && other.is_unknown() =>
+                {
+                    Some(*paramspec)
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     /// Returns the key and value types of this object if it was unpacked using `**`,
     /// or `None` if the object does not support unpacking.
     fn unpack_keys_and_items(self, db: &'db dyn Db) -> Option<(Type<'db>, Type<'db>)> {
