@@ -45,7 +45,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, PythonVersion, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
-use ty_module_resolver::{Module, ModuleName};
+use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -3017,6 +3017,26 @@ pub(super) fn report_invalid_assignment<'db>(
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.primary_message().to_string();
         diag.set_concise_message(message);
+    }
+
+    // special case message
+    if let Type::NominalInstance(target_instance) = target_ty {
+        let db = context.db();
+        let file = target_instance.class(db).class_literal(db).file(db);
+        if let Some(module) = file_to_module(db, file)
+            && module.is_known(db, KnownModule::Numbers)
+        {
+            let is_numeric = [KnownClass::Int, KnownClass::Float, KnownClass::Complex]
+                .iter()
+                .any(|numeric| value_ty.is_subtype_of(db, numeric.to_instance(db)));
+
+            if is_numeric {
+                diag.info(
+                    "Types from the `numbers` module aren't supported for static type checking",
+                );
+                diag.help("Consider using a protocol instead, such as `typing.SupportsFloat`");
+            }
+        }
     }
 }
 
