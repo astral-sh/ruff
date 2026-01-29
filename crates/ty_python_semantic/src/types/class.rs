@@ -27,8 +27,8 @@ use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionBodyKind, FunctionDecorators,
-    KnownFunction, function_body_kind, is_implicit_classmethod, is_implicit_staticmethod,
+    AbstractMethodKind, DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
+    is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
@@ -1025,79 +1025,24 @@ impl<'db> ClassType<'db> {
     /// The value of the map is a struct containing information about the abstract method.
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, AbstractMethod<'db>> {
-        fn function_as_abstract_method<'db>(
-            db: &'db dyn Db,
-            function: FunctionType<'db>,
-            definition: Definition<'db>,
-            defining_class: ClassType<'db>,
-        ) -> Option<AbstractMethod<'db>> {
-            if function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
-                return Some(AbstractMethod {
-                    defining_class,
-                    definition,
-                    explicitly_abstract: true,
-                });
-            }
-
-            let file = function.file(db);
-
-            // Functions in protocol classes are implicitly abstract if:
-            // - They always raise `NotImplementedError` and they have a return type
-            //   that is not assignable to `Never`, or
-            // - They have "stub bodies" (only `...` and/or `pass`) and they have a return type
-            //   that is not assignable to `None`.
-            if !file.is_stub(db) && defining_class.is_protocol(db) {
-                let module = parsed_module(db, file).load(db);
-                let node = function
-                    .literal(db)
-                    .last_definition(db)
-                    .node(db, file, &module);
-                let body_kind = function_body_kind(db, node, |expr| {
-                    definition_expression_type(db, function.definition(db), expr)
-                });
-                let is_abstract = match body_kind {
-                    FunctionBodyKind::Stub => function
-                        .signature(db)
-                        .iter()
-                        .any(|sig| !sig.return_ty.is_assignable_to(db, Type::none(db))),
-                    FunctionBodyKind::AlwaysRaisesNotImplementedError => function
-                        .signature(db)
-                        .iter()
-                        .any(|sig| !sig.return_ty.is_assignable_to(db, Type::Never)),
-                    FunctionBodyKind::Regular => false,
-                };
-                return is_abstract.then_some(AbstractMethod {
-                    defining_class,
-                    definition,
-                    explicitly_abstract: false,
-                });
-            }
-            None
-        }
-
         fn type_as_abstract_method<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
-            definition: Definition<'db>,
             defining_class: ClassType<'db>,
-        ) -> Option<AbstractMethod<'db>> {
+        ) -> Option<AbstractMethodKind> {
             match ty {
-                Type::FunctionLiteral(function) => {
-                    function_as_abstract_method(db, function, definition, defining_class)
-                }
+                Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
                 Type::BoundMethod(method) => {
-                    function_as_abstract_method(db, method.function(db), definition, defining_class)
+                    method.function(db).as_abstract_method(db, defining_class)
                 }
                 Type::PropertyInstance(property) => {
                     // A property is abstract if either its getter or setter is abstract.
                     property
                         .getter(db)
-                        .and_then(|getter| {
-                            type_as_abstract_method(db, getter, definition, defining_class)
-                        })
+                        .and_then(|getter| type_as_abstract_method(db, getter, defining_class))
                         .or_else(|| {
                             property.setter(db).and_then(|setter| {
-                                type_as_abstract_method(db, setter, definition, defining_class)
+                                type_as_abstract_method(db, setter, defining_class)
                             })
                         })
                 }
@@ -1133,7 +1078,12 @@ impl<'db> ClassType<'db> {
                 let Some(definition) = place_and_definition.first_definition else {
                     continue;
                 };
-                if let Some(abstract_method) = type_as_abstract_method(db, ty, definition, class) {
+                if let Some(kind) = type_as_abstract_method(db, ty, class) {
+                    let abstract_method = AbstractMethod {
+                        defining_class: class,
+                        definition,
+                        kind,
+                    };
                     abstract_methods.insert(name.clone(), abstract_method);
                 } else {
                     // If this method is concrete, remove it from the map of abstract methods.
@@ -2076,7 +2026,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
 pub(super) struct AbstractMethod<'db> {
     pub(super) defining_class: ClassType<'db>,
     pub(super) definition: Definition<'db>,
-    pub(super) explicitly_abstract: bool,
+    pub(super) kind: AbstractMethodKind,
 }
 
 /// A filter that describes which methods are considered when looking for implicit attribute assignments

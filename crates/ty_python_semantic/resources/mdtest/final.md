@@ -709,48 +709,77 @@ class Implementer(MyProtocol):  # error: [abstract-method-in-final-class]
 
 <!-- snapshot-diagnostics -->
 
-A method in a `Protocol` class can be "implicitly abstract" if one of the two following conditions
-are met:
+A method in a `Protocol` class can be "implicitly abstract" if one of the following conditions are
+met:
 
-1. The function body only consists of `...` and/or `pass` statements, and the return type is not
-    assignable to `None`.
+1. The function body only consists of `...` and/or `pass` statements
+1. The function is an overloaded function without an implementation
 1. The function body only consists of `raise NotImplementedError` or `raise NotImplementedError()`,
     and the return type is not assignable to `Never`.
 
+In either case, we also allow the function to have a docstring and still be considered implicitly
+abstract.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
-from typing_extensions import Protocol, final, Never
+from typing_extensions import Protocol, final, Never, overload
 
 class P(Protocol):
-    # Other type checkers consider this method implicitly abstract,
-    # but we do not, because there'd be no unsoundness here if a subclass of this
+    # There'd be no unsoundness here if a subclass of this
     # class were to be instantiated without the method having been overridden:
     # the function returns `None`, and the inferred return type of the function
-    # (`Unknown`) is assignable to `None`
-    def not_abstractmethod(self): ...
+    # (`Unknown`) is assignable to `None`. Nonetheless, we consider this method
+    # implicitly abstract anyway, since the distinction based on the return type
+    # would probably be subtle and surprising to many users. This also matches the
+    # behaviour of all other ytpe checkers
+    def still_abstractmethod(self): ...
 
 @final
-class Q(P): ...
+class Q(P): ...  # error: [abstract-method-in-final-class]
 
 class R(Protocol):
     # same here
-    def also_not_abstractmethod(self) -> None: ...
+    def also_still_abstractmethod(self) -> None: ...
 
 @final
-class S(R): ...
+class S(R): ...  # error: [abstract-method-in-final-class]
 
 class Raises(Protocol):
-    def not_abstractmethod(self):
+    def even_this_is_abstract(self):
         raise NotImplementedError
 
 @final
-class RaisesSub(Raises): ...
+class RaisesSub(Raises): ...  # error: [abstract-method-in-final-class]
 
 class AlsoRaises(Protocol):
-    def also_not_abstractmethod(self) -> Never:
+    def also_abstractmethod(self) -> Never:
         raise NotImplementedError
 
 @final
-class AlsoRaisesSub(Protocol): ...
+class AlsoRaisesSub(AlsoRaises): ...  # error: [abstract-method-in-final-class]
+
+type NotImplementedErrorAlias = NotImplementedError
+
+def _(x: NotImplementedErrorAlias):
+    class Strange(Protocol):
+        def weird_abstractmethod(self):
+            raise x
+
+    @final
+    class StrangeSub(Strange): ...  # error: [abstract-method-in-final-class]
+
+class HasOverloads(Protocol):
+    @overload
+    def foo(self) -> int: ...
+    @overload
+    def foo(self, x: int) -> str: ...
+
+@final
+class HasOverloadSub(HasOverloads): ...  # error: [abstract-method-in-final-class]
 
 class RaisesDifferentException(Protocol):
     def not_abstractmethod(self) -> int:

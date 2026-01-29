@@ -1431,7 +1431,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let AbstractMethod {
             defining_class,
             definition,
-            explicitly_abstract,
+            kind,
         } = abstract_method;
 
         let module = parsed_module(db, definition.file(db)).load(db);
@@ -1441,7 +1441,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "`{first_method_name}` defined as abstract on superclass `{defining_class_name}`",
         ));
         diagnostic.annotate(secondary_annotation);
-        if !explicitly_abstract {
+        if !kind.is_explicit() {
             let mut sub = SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
                 format_args!(
