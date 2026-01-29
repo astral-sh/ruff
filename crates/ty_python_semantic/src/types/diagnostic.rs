@@ -102,6 +102,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_ARGUMENTS);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
+    registry.register_lint(&INVALID_MATCH_PATTERN);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
@@ -1632,6 +1633,28 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid match patterns.
+    ///
+    /// ## Why is this bad?
+    /// Such called patterns lead to runtime errors.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def _(foo):
+    ///     bar = "bar"
+    ///     match foo:
+    ///         case bar():    # class pattern must refer to a class
+    ///             ...
+    /// ```
+    pub(crate) static INVALID_MATCH_PATTERN = {
+        summary: "detect invalid match patterns",
+        status: LintStatus::stable("0.0.18"),
         default_level: Level::Error,
     }
 }
@@ -3973,6 +3996,22 @@ pub(crate) fn report_invalid_arguments_to_callable(
     builder.into_diagnostic(format_args!(
         "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
     ));
+}
+
+pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
+    context: &InferContext,
+    pattern_cls: T,
+    cls_ty: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern_cls) else {
+        return;
+    };
+    let db = context.db();
+    let class_display = cls_ty.display(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "`{class_display}` cannot be used in a class pattern because it is not a type"
+    ));
+    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(

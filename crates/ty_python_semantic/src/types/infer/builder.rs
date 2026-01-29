@@ -94,11 +94,11 @@ use crate::types::diagnostic::{
     report_cannot_pop_required_field_on_typed_dict, report_conflicting_metaclass_from_bases,
     report_duplicate_bases, report_implicit_return_type, report_instance_layout_conflict,
     report_invalid_arguments_to_annotated, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
-    report_invalid_return_type, report_invalid_total_ordering,
+    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
+    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_named_tuple_field_with_leading_underscore,
@@ -5070,8 +5070,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     protocol_class,
                 );
             }
-        } else {
-            // TODO: emit diagnostic
+        } else if !matches!(cls_ty, Type::Dynamic(_))
+            && !cls_ty.is_subtype_of(self.db(), KnownClass::Type.to_instance(self.db()))
+        {
+            report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);
         }
     }
 

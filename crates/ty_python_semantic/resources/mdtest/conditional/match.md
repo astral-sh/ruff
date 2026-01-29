@@ -435,3 +435,51 @@ def _(answer: Answer | None):
     x = Foo()
     reveal_type(x)  # revealed: Foo
 ```
+
+## Invalid class patterns
+
+For class patterns, CPython first checks that the "class" is an instance of `type`, and then uses
+`isinstance` to check the match.
+
+If the "class" is not an instance of "type", we raise a diagnostic.
+
+```py
+Foo = "foo"
+
+match 42:
+    case Foo():  # error: [invalid-match-pattern]
+        ...
+
+Foo = int | str
+
+match 42:
+    case Foo():  # error: [invalid-match-pattern]
+        ...
+```
+
+We also raise a diagnostic if the class cannot be used with `isinstance`.
+
+```py
+from typing import Any, TypedDict
+
+Foo = Any
+
+match 42:
+    case Foo():  # TODO: error: [invalid-match-pattern]
+        ...
+
+class Foo(TypedDict): ...
+
+match 42:
+    case Foo():  # error: [isinstance-against-typed-dict] # TODO: unify this (?)
+        ...
+```
+
+Don't raise any diagnostic for `Unknown` types.
+
+```py
+def _f(Foo):
+    reveal_type(Foo)  # revealed: Unknown
+    match 42:
+        case Foo(): ...
+```
