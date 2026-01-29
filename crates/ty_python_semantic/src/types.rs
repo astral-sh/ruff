@@ -6375,6 +6375,10 @@ impl<'db> Type<'db> {
                     // `P.kwargs`.
                     Some(bound_typevar.without_paramspec_attr(db))
                 }
+                TypeVarKind::TypeVarTuple => {
+                    // For legacy TypeVarTuple, include it in the generic context
+                    Some(*bound_typevar)
+                }
                 _ => None,
             }
         };
@@ -6514,10 +6518,29 @@ impl<'db> Type<'db> {
                     ty.inner(db)
                         .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }
-                KnownInstanceType::SubscriptedProtocol(_)
-                | KnownInstanceType::SubscriptedGeneric(_)
-                | KnownInstanceType::TypeVar(_)
-                | KnownInstanceType::TypeAliasType(_)
+                KnownInstanceType::TypeVar(typevar) => {
+                    // Only handle TypeVarTuples here - regular TypeVars should not be touched
+                    if typevar.is_typevartuple(db) {
+                        let context = match binding_context {
+                            Some(def) => BindingContext::Definition(def),
+                            None => BindingContext::Synthetic,
+                        };
+                        let bound_typevar = BoundTypeVarInstance::new(db, typevar, context, None);
+                        if let Some(bound_typevar) = matching_typevar(&bound_typevar) {
+                            typevars.insert(bound_typevar);
+                        }
+                    }
+                }
+                KnownInstanceType::SubscriptedGeneric(context)
+                | KnownInstanceType::SubscriptedProtocol(context) => {
+                    // Traverse into the generic context to find TypeVarTuples
+                    for variable in context.variables(db) {
+                        if let Some(variable) = matching_typevar(&variable) {
+                            typevars.insert(variable);
+                        }
+                    }
+                }
+                KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_)
@@ -7874,6 +7897,10 @@ pub enum TypeVarKind {
     Pep695ParamSpec,
     /// `Alias: typing.TypeAlias = T`
     Pep613Alias,
+    /// `Ts = TypeVarTuple("Ts")`
+    TypeVarTuple,
+    /// `def foo[*Ts]() -> None: ...`
+    Pep695TypeVarTuple,
 }
 
 impl TypeVarKind {
@@ -7883,6 +7910,10 @@ impl TypeVarKind {
 
     const fn is_paramspec(self) -> bool {
         matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
+    }
+
+    const fn is_typevartuple(self) -> bool {
+        matches!(self, Self::TypeVarTuple | Self::Pep695TypeVarTuple)
     }
 }
 
@@ -8027,6 +8058,10 @@ impl<'db> TypeVarInstance<'db> {
 
     pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
         self.kind(db).is_paramspec()
+    }
+
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_typevartuple()
     }
 
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {

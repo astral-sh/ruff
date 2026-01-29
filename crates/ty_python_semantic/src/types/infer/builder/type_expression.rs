@@ -541,6 +541,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let starred_type = self.infer_type_expression(value);
         if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
             starred_type
+        } else if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = starred_type
+            && typevar.is_typevartuple(self.db())
+        {
+            // *Ts unpacks a TypeVarTuple - return the TypeVar directly
+            starred_type
         } else {
             Type::Dynamic(DynamicType::TodoStarredExpression)
         }
@@ -1677,7 +1682,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 inferred_type
             }
             SpecialFormType::Unpack => {
-                self.infer_type_expression(arguments_slice);
+                let inner_ty = self.infer_type_expression(arguments_slice);
+                // If the argument is a TypeVarTuple, return it directly
+                // Unpack[Ts] in type contexts essentially means "expand Ts here"
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = inner_ty
+                    && typevar.is_typevartuple(self.db())
+                {
+                    return inner_ty;
+                }
                 todo_type!("`Unpack[]` special form")
             }
             SpecialFormType::NoReturn

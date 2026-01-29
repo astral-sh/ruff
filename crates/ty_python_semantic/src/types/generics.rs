@@ -413,8 +413,15 @@ impl<'db> GenericContext<'db> {
                 };
                 Some(typevar.with_binding_context(db, binding_context))
             }
-            // TODO: Support this!
-            ast::TypeParam::TypeVarTuple(_) => None,
+            ast::TypeParam::TypeVarTuple(node) => {
+                let definition = index.expect_single_definition(node);
+                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                    declaration_type(db, definition).inner_type()
+                else {
+                    return None;
+                };
+                Some(typevar.with_binding_context(db, binding_context))
+            }
         }
     }
 

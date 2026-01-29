@@ -7127,11 +7127,26 @@ mod tests {
         Ts = TypeVarTuple('Ts')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r#"
 
         from typing_extensions import TypeVarTuple
-        Ts = TypeVarTuple([name=]'Ts')
+        Ts[: TypeVar] = TypeVarTuple([name=]'Ts')
         ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:1
+          |
+        2 | from typing_extensions import TypeVarTuple
+        3 | Ts = TypeVarTuple('Ts')
+          | ^^
+          |
+        info: Source
+         --> main2.py:3:6
+          |
+        2 | from typing_extensions import TypeVarTuple
+        3 | Ts[: TypeVar] = TypeVarTuple([name=]'Ts')
+          |      ^^^^^^^
+          |
+
         info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:761:30
             |
@@ -7143,13 +7158,20 @@ mod tests {
         763 |             def __new__(cls, name: str) -> Self: ...
             |
         info: Source
-         --> main2.py:3:20
+         --> main2.py:3:31
           |
         2 | from typing_extensions import TypeVarTuple
-        3 | Ts = TypeVarTuple([name=]'Ts')
-          |                    ^^^^
+        3 | Ts[: TypeVar] = TypeVarTuple([name=]'Ts')
+          |                               ^^^^
           |
-        ");
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing_extensions import TypeVarTuple
+        Ts: TypeVar = TypeVarTuple('Ts')
+        "#);
     }
 
     #[test]
