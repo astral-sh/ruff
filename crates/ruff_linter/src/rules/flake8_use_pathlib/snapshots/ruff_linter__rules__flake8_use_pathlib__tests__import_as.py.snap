@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
+PTH100 [*] `os.path.abspath()` should be replaced by `Path.resolve()`
  --> import_as.py:7:5
   |
 5 | q = "bar"
@@ -12,6 +12,19 @@ PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
 9 | aaa = foo.mkdir(p)
   |
 help: Replace with `Path(...).resolve()`
+1  | import os as foo
+2  | import os.path as foo_p
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+7  | 
+   - a = foo_p.abspath(p)
+8  + a = pathlib.Path(p).resolve()
+9  | aa = foo.chmod(p)
+10 | aaa = foo.mkdir(p)
+11 | foo.makedirs(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH101 `os.chmod()` should be replaced by `Path.chmod()`
   --> import_as.py:8:6
