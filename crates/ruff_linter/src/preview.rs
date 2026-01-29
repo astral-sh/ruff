@@ -65,11 +65,6 @@ pub(crate) const fn is_fix_os_path_getatime_enabled(settings: &LinterSettings) -
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/18922
-pub(crate) const fn is_fix_os_path_getctime_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_abspath_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
