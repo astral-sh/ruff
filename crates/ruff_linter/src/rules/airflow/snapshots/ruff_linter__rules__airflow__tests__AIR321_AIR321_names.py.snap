@@ -1,0 +1,505 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR321 `airflow.utils.setup_teardown.BaseSetupTeardownContext` is moved in Airflow 3.1
+  --> AIR321_names.py:9:1
+   |
+ 7 | )
+ 8 |
+ 9 | BaseSetupTeardownContext()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+10 | SetupTeardownContext()
+   |
+help: `BaseSetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
+
+AIR321 `airflow.utils.setup_teardown.SetupTeardownContext` is moved in Airflow 3.1
+  --> AIR321_names.py:10:1
+   |
+ 9 | BaseSetupTeardownContext()
+10 | SetupTeardownContext()
+   | ^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | # airflow.utils.xcom
+   |
+help: `SetupTeardownContext` has been moved to `airflow.sdk.definitions._internal.setup_teardown` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
+
+AIR321 `airflow.utils.xcom.XCOM_RETURN_KEY` is moved in Airflow 3.1
+  --> AIR321_names.py:15:1
+   |
+13 | from airflow.utils.xcom import XCOM_RETURN_KEY
+14 |
+15 | XCOM_RETURN_KEY
+   | ^^^^^^^^^^^^^^^
+16 |
+17 | # airflow.utils.task_group
+   |
+help: `XCOM_RETURN_KEY` has been moved to `airflow.models.xcom` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
+
+AIR321 [*] `airflow.utils.task_group.TaskGroup` is moved in Airflow 3.1
+  --> AIR321_names.py:20:1
+   |
+18 | from airflow.utils.task_group import TaskGroup
+19 |
+20 | TaskGroup()
+   | ^^^^^^^^^
+21 |
+22 | # airflow.utils.timezone
+   |
+help: `TaskGroup` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+15 | XCOM_RETURN_KEY
+16 | 
+17 | # airflow.utils.task_group
+   - from airflow.utils.task_group import TaskGroup
+18 + from airflow.sdk import TaskGroup
+19 | 
+20 | TaskGroup()
+21 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.utils.timezone.coerce_datetime` is moved in Airflow 3.1
+  --> AIR321_names.py:36:1
+   |
+34 | current_time = dt.now()
+35 |
+36 | coerce_datetime(v=current_time, tz=None)
+   | ^^^^^^^^^^^^^^^
+37 | convert_to_utc(current_time)
+38 | datetime(2026, 1, 1, 21, 30, 0)
+   |
+help: `coerce_datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+22 | # airflow.utils.timezone
+23 | from datetime import datetime as dt
+24 | from airflow.utils.timezone import (
+   -     coerce_datetime,
+25 |     convert_to_utc,
+26 |     datetime,
+27 |     make_naive,
+--------------------------------------------------------------------------------
+29 |     utc,
+30 |     utcnow,
+31 | )
+32 + from airflow.sdk.timezone import coerce_datetime
+33 | 
+34 | current_time = dt.now()
+35 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.utils.timezone.convert_to_utc` is moved in Airflow 3.1
+  --> AIR321_names.py:37:1
+   |
+36 | coerce_datetime(v=current_time, tz=None)
+37 | convert_to_utc(current_time)
+   | ^^^^^^^^^^^^^^
+38 | datetime(2026, 1, 1, 21, 30, 0)
+39 | make_naive(current_time, tz=None)
+   |
+help: `convert_to_utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+23 | from datetime import datetime as dt
+24 | from airflow.utils.timezone import (
+25 |     coerce_datetime,
+   -     convert_to_utc,
+26 |     datetime,
+27 |     make_naive,
+28 |     parse,
+29 |     utc,
+30 |     utcnow,
+31 | )
+32 + from airflow.sdk.timezone import convert_to_utc
+33 | 
+34 | current_time = dt.now()
+35 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.utils.timezone.datetime` is moved in Airflow 3.1
+  --> AIR321_names.py:38:1
+   |
+36 | coerce_datetime(v=current_time, tz=None)
+37 | convert_to_utc(current_time)
+38 | datetime(2026, 1, 1, 21, 30, 0)
+   | ^^^^^^^^
+39 | make_naive(current_time, tz=None)
+40 | parse("2026-01-01 21:30:00")
+   |
+help: `datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+24 | from airflow.utils.timezone import (
+25 |     coerce_datetime,
+26 |     convert_to_utc,
+   -     datetime,
+27 |     make_naive,
+28 |     parse,
+29 |     utc,
+30 |     utcnow,
+31 | )
+32 + from airflow.sdk.timezone import datetime
+33 | 
+34 | current_time = dt.now()
+35 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.utils.timezone.make_naive` is moved in Airflow 3.1
+  --> AIR321_names.py:39:1
+   |
+37 | convert_to_utc(current_time)
+38 | datetime(2026, 1, 1, 21, 30, 0)
+39 | make_naive(current_time, tz=None)
+   | ^^^^^^^^^^
+40 | parse("2026-01-01 21:30:00")
+41 | utc
+   |
+help: `make_naive` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+25 |     coerce_datetime,
+26 |     convert_to_utc,
+27 |     datetime,
+   -     make_naive,
+28 |     parse,
+29 |     utc,
+30 |     utcnow,
+31 | )
+32 + from airflow.sdk.timezone import make_naive
+33 | 
+34 | current_time = dt.now()
+35 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.utils.timezone.parse` is moved in Airflow 3.1
+  --> AIR321_names.py:40:1
+   |
+38 | datetime(2026, 1, 1, 21, 30, 0)
+39 | make_naive(current_time, tz=None)
+40 | parse("2026-01-01 21:30:00")
+   | ^^^^^
+41 | utc
+42 | utcnow()
+   |
+help: `parse` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+26 |     convert_to_utc,
+27 |     datetime,
+28 |     make_naive,
+   -     parse,
+29 |     utc,
+30 |     utcnow,
+31 | )
+32 + from airflow.sdk.timezone import parse
+33 | 
+34 | current_time = dt.now()
+35 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.utils.timezone.utc` is moved in Airflow 3.1
+  --> AIR321_names.py:41:1
+   |
+39 | make_naive(current_time, tz=None)
+40 | parse("2026-01-01 21:30:00")
+41 | utc
+   | ^^^
+42 | utcnow()
+   |
+help: `utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+27 |     datetime,
+28 |     make_naive,
+29 |     parse,
+   -     utc,
+30 |     utcnow,
+31 | )
+32 + from airflow.sdk.timezone import utc
+33 | 
+34 | current_time = dt.now()
+35 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.utils.timezone.utcnow` is moved in Airflow 3.1
+  --> AIR321_names.py:42:1
+   |
+40 | parse("2026-01-01 21:30:00")
+41 | utc
+42 | utcnow()
+   | ^^^^^^
+43 |
+44 | # airflow.utils.decorators
+   |
+help: `utcnow` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+28 |     make_naive,
+29 |     parse,
+30 |     utc,
+   -     utcnow,
+31 | )
+32 + from airflow.sdk.timezone import utcnow
+33 | 
+34 | current_time = dt.now()
+35 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 `airflow.utils.decorators.remove_task_decorator` is moved in Airflow 3.1
+  --> AIR321_names.py:50:1
+   |
+48 | )
+49 |
+50 | remove_task_decorator()
+   | ^^^^^^^^^^^^^^^^^^^^^
+51 | fixup_decorator_warning_stack()
+   |
+help: `remove_task_decorator` has been moved to `airflow.sdk.definitions._internal.decorators` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
+
+AIR321 `airflow.utils.decorators.fixup_decorator_warning_stack` is moved in Airflow 3.1
+  --> AIR321_names.py:51:1
+   |
+50 | remove_task_decorator()
+51 | fixup_decorator_warning_stack()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+52 |
+53 | # airflow.models.abstractoperator
+   |
+help: `fixup_decorator_warning_stack` has been moved to `airflow.sdk.definitions._internal.decorators` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
+
+AIR321 `airflow.models.abstractoperator.AbstractOperator` is moved in Airflow 3.1
+  --> AIR321_names.py:60:1
+   |
+58 | )
+59 |
+60 | AbstractOperator()
+   | ^^^^^^^^^^^^^^^^
+61 | NotMapped()
+62 | TaskStateChangeCallback()
+   |
+help: `AbstractOperator` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
+
+AIR321 `airflow.models.abstractoperator.NotMapped` is moved in Airflow 3.1
+  --> AIR321_names.py:61:1
+   |
+60 | AbstractOperator()
+61 | NotMapped()
+   | ^^^^^^^^^
+62 | TaskStateChangeCallback()
+   |
+help: `NotMapped` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
+
+AIR321 `airflow.models.abstractoperator.TaskStateChangeCallback` is moved in Airflow 3.1
+  --> AIR321_names.py:62:1
+   |
+60 | AbstractOperator()
+61 | NotMapped()
+62 | TaskStateChangeCallback()
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+63 |
+64 | # airflow.models.baseoperator
+   |
+help: `TaskStateChangeCallback` has been moved to `airflow.sdk.definitions._internal.abstractoperator` since Airflow 3.1. This is an internal module which is not suggested to be used and is subject to change without notice.
+
+AIR321 [*] `airflow.models.baseoperator.BaseOperator` is moved in Airflow 3.1
+  --> AIR321_names.py:67:1
+   |
+65 | from airflow.models.baseoperator import BaseOperator
+66 |
+67 | BaseOperator()
+   | ^^^^^^^^^^^^
+68 |
+69 | # airflow.macros
+   |
+help: `BaseOperator` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+62 | TaskStateChangeCallback()
+63 | 
+64 | # airflow.models.baseoperator
+   - from airflow.models.baseoperator import BaseOperator
+65 + from airflow.sdk import BaseOperator
+66 | 
+67 | BaseOperator()
+68 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.macros.ds_add` is moved in Airflow 3.1
+  --> AIR321_names.py:77:1
+   |
+75 | )
+76 |
+77 | ds_add("2026-01-01", 5)
+   | ^^^^^^
+78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
+79 | datetime_diff_for_humans(
+   |
+help: `ds_add` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
+68 | 
+69 | # airflow.macros
+70 | from airflow.macros import (
+   -     ds_add,
+71 |     ds_format,
+72 |     datetime_diff_for_humans,
+73 |     ds_format_locale,
+74 | )
+75 + from airflow.sdk.execution_time.macros import ds_add
+76 | 
+77 | ds_add("2026-01-01", 5)
+78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.macros.ds_format` is moved in Airflow 3.1
+  --> AIR321_names.py:78:1
+   |
+77 | ds_add("2026-01-01", 5)
+78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
+   | ^^^^^^^^^
+79 | datetime_diff_for_humans(
+80 |     dt(2026, 1, 1, 21, 30, 0),
+   |
+help: `ds_format` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
+69 | # airflow.macros
+70 | from airflow.macros import (
+71 |     ds_add,
+   -     ds_format,
+72 |     datetime_diff_for_humans,
+73 |     ds_format_locale,
+74 | )
+75 + from airflow.sdk.execution_time.macros import ds_format
+76 | 
+77 | ds_add("2026-01-01", 5)
+78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.macros.datetime_diff_for_humans` is moved in Airflow 3.1
+  --> AIR321_names.py:79:1
+   |
+77 | ds_add("2026-01-01", 5)
+78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
+79 | datetime_diff_for_humans(
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+80 |     dt(2026, 1, 1, 21, 30, 0),
+81 |     since=dt(2026, 1, 2, 21, 30, 0)
+   |
+help: `datetime_diff_for_humans` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
+70 | from airflow.macros import (
+71 |     ds_add,
+72 |     ds_format,
+   -     datetime_diff_for_humans,
+73 |     ds_format_locale,
+74 | )
+75 + from airflow.sdk.execution_time.macros import datetime_diff_for_humans
+76 | 
+77 | ds_add("2026-01-01", 5)
+78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.macros.ds_format_locale` is moved in Airflow 3.1
+  --> AIR321_names.py:83:1
+   |
+81 |     since=dt(2026, 1, 2, 21, 30, 0)
+82 | )
+83 | ds_format_locale("01/01/2026", "%d/%m/%Y", "EEEE dd MMMM yyyy", "en_US")
+   | ^^^^^^^^^^^^^^^^
+84 |
+85 | # airflow.io
+   |
+help: `ds_format_locale` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
+71 |     ds_add,
+72 |     ds_format,
+73 |     datetime_diff_for_humans,
+   -     ds_format_locale,
+74 | )
+75 + from airflow.sdk.execution_time.macros import ds_format_locale
+76 | 
+77 | ds_add("2026-01-01", 5)
+78 | ds_format("2026-01-01", "%Y-%m-%d", "%m-%d-%y")
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.io.get_fs` is moved in Airflow 3.1
+  --> AIR321_names.py:92:1
+   |
+90 | )
+91 |
+92 | get_fs()
+   | ^^^^^^
+93 | has_fs()
+94 | Properties()
+   |
+help: `get_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+84 | 
+85 | # airflow.io
+86 | from airflow.io import (
+   -     get_fs,
+87 |     has_fs,
+88 |     Properties,
+89 | )
+90 + from airflow.sdk.io import get_fs
+91 | 
+92 | get_fs()
+93 | has_fs()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.io.has_fs` is moved in Airflow 3.1
+  --> AIR321_names.py:93:1
+   |
+92 | get_fs()
+93 | has_fs()
+   | ^^^^^^
+94 | Properties()
+   |
+help: `has_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+85 | # airflow.io
+86 | from airflow.io import (
+87 |     get_fs,
+   -     has_fs,
+88 |     Properties,
+89 | )
+90 + from airflow.sdk.io import has_fs
+91 | 
+92 | get_fs()
+93 | has_fs()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.io.Properties` is moved in Airflow 3.1
+  --> AIR321_names.py:94:1
+   |
+92 | get_fs()
+93 | has_fs()
+94 | Properties()
+   | ^^^^^^^^^^
+95 |
+96 | # airflow.secrets.cache
+   |
+help: `Properties` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+86 | from airflow.io import (
+87 |     get_fs,
+88 |     has_fs,
+   -     Properties,
+89 | )
+90 + from airflow.sdk.io import Properties
+91 | 
+92 | get_fs()
+93 | has_fs()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.secrets.cache.SecretCache` is moved in Airflow 3.1
+   --> AIR321_names.py:98:1
+    |
+ 96 | # airflow.secrets.cache
+ 97 | from airflow.secrets.cache import SecretCache
+ 98 | SecretCache()
+    | ^^^^^^^^^^^
+ 99 |
+100 | # airflow.hooks
+    |
+help: `SecretCache` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+94  | Properties()
+95  | 
+96  | # airflow.secrets.cache
+    - from airflow.secrets.cache import SecretCache
+97  + from airflow.sdk import SecretCache
+98  | SecretCache()
+99  | 
+100 | # airflow.hooks
+note: This is an unsafe fix and may change runtime behavior
+
+AIR321 [*] `airflow.hooks.base.BaseHook` is moved in Airflow 3.1
+   --> AIR321_names.py:102:1
+    |
+100 | # airflow.hooks
+101 | from airflow.hooks.base import BaseHook
+102 | BaseHook()
+    | ^^^^^^^^
+    |
+help: `BaseHook` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
+98  | SecretCache()
+99  | 
+100 | # airflow.hooks
+    - from airflow.hooks.base import BaseHook
+101 + from airflow.sdk import BaseHook
+102 | BaseHook()
+note: This is an unsafe fix and may change runtime behavior
