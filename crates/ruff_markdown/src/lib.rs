@@ -45,7 +45,12 @@ pub fn format_code_blocks(
     for capture in MARKDOWN_CODE_BLOCK.captures_iter(source) {
         let (_, [before, code_indent, language, code, after]) = capture.extract();
 
-        let py_source_type = PySourceType::from_extension(language);
+        let py_source_type = PySourceType::from(
+            settings
+                .extension
+                .get(&Path::new("foo.py").with_extension(language))
+                .unwrap_or_default(),
+        );
         let unformatted_code = dedent(code);
         let options = settings.to_format_options(py_source_type, &unformatted_code, path);
 
