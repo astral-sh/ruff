@@ -32,12 +32,12 @@ impl Int {
     pub const ONE: Int = Int(Number::Small(1));
 
     /// Create an [`Int`] to represent a value that can be represented as an `i64`.
-    fn small(value: u64) -> Self {
+    pub fn small(value: u64) -> Self {
         Self(Number::Small(value))
     }
 
     /// Create an [`Int`] to represent a value that cannot be represented as an `i64`.
-    fn big(value: impl Into<Box<str>>) -> Self {
+    pub fn big(value: impl Into<Box<str>>) -> Self {
         Self(Number::Big(value.into()))
     }
 
