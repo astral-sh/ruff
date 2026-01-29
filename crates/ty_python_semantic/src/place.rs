@@ -261,9 +261,16 @@ impl<'db> Place<'db> {
                     ty: Type::Intersection(intersection),
                     ..
                 },
-            ) => intersection.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
-            }),
+            ) => {
+                if intersection.is_pure_negation(db) {
+                    self
+                } else {
+                    intersection.map_with_boundness(db, |elem| {
+                        Place::Defined(DefinedPlace { ty: *elem, ..place })
+                            .try_call_dunder_get(db, owner)
+                    })
+                }
+            }
 
             Place::Defined(defined) => {
                 if let Some((dunder_get_return_ty, _)) =

@@ -12667,6 +12667,12 @@ impl<'db> IntersectionType<'db> {
         ConstraintSet::from(sorted_self == other.normalized(db))
     }
 
+    /// Returns `true` if this intersection has no positive contributions,
+    /// i.e., it is purely a negation type (e.g. `~AlwaysFalsy`).
+    pub(crate) fn is_pure_negation(self, db: &'db dyn Db) -> bool {
+        self.positive(db).is_empty()
+    }
+
     /// Returns an iterator over the positive elements of the intersection. If
     /// there are no positive elements, returns a single `object` type.
     pub(crate) fn positive_elements_or_object(
@@ -12702,8 +12708,6 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
-        let is_pure_negation = self.positive(db).is_empty();
-
         let mut builder = IntersectionBuilder::new(db);
 
         let mut all_unbound = true;
@@ -12727,14 +12731,6 @@ impl<'db> IntersectionType<'db> {
 
                     builder = builder.add_positive(ty_member);
                 }
-            }
-        }
-
-        // For pure negation types (e.g., `~AlwaysFalsy`), preserve the negative
-        // contributions so they aren't lost when we fall back to `object`.
-        if is_pure_negation {
-            for ty in self.negative(db) {
-                builder = builder.add_negative(*ty);
             }
         }
 
