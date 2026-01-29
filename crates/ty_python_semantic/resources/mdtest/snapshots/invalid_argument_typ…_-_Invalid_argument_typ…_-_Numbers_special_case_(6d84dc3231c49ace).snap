@@ -1,0 +1,51 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Numbers special case
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from numbers import Number
+2 | 
+3 | def f(
+4 |     x: Number,
+5 | ): ...
+6 | 
+7 | f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+ --> src/mdtest_snippet.py:7:3
+  |
+5 | ): ...
+6 |
+7 | f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+  |   ^ Expected `Number`, found `Literal[5]`
+  |
+info: Types from the `numbers` module aren't supported for static type checking
+help: Consider using a protocol instead, such as `typing.SupportsFloat`
+info: Function defined here
+ --> src/mdtest_snippet.py:3:5
+  |
+1 | from numbers import Number
+2 |
+3 | def f(
+  |     ^
+4 |     x: Number,
+  |     --------- Parameter declared here
+5 | ): ...
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
