@@ -42,39 +42,30 @@ def lossy_decorator(fn: Callable) -> Callable: ...
 class Parent:
     @final
     def foo(self): ...
-
     @final
     @property
     def my_property1(self) -> int: ...
-
     @property
     @final
     def my_property2(self) -> int: ...
-
     @property
     @final
     def my_property3(self) -> int: ...
-
     @final
     @classmethod
     def class_method1(cls) -> int: ...
-
     @classmethod
     @final
     def class_method2(cls) -> int: ...
-
     @final
     @staticmethod
     def static_method1() -> int: ...
-
     @staticmethod
     @final
     def static_method2() -> int: ...
-
     @lossy_decorator
     @final
     def decorated_1(self): ...
-
     @final
     @lossy_decorator
     def decorated_2(self): ...
@@ -87,31 +78,23 @@ class Child(Parent):
     def foo(self): ...
     @property
     def my_property1(self) -> int: ...  # error: [override-of-final-method]
-
     @property
     def my_property2(self) -> int: ...  # error: [override-of-final-method]
     @my_property2.setter
     def my_property2(self, x: int) -> None: ...
-
     @property
     def my_property3(self) -> int: ...  # error: [override-of-final-method]
     @my_property3.deleter
     def my_proeprty3(self) -> None: ...
-
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-
     @staticmethod
     def static_method1() -> int: ...  # error: [override-of-final-method]
-
     @classmethod
     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
-
     @staticmethod
     def static_method2() -> int: ...  # error: [override-of-final-method]
-
     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
-
     @lossy_decorator
     def decorated_2(self): ...  # TODO: should emit [override-of-final-method]
 
@@ -207,7 +190,6 @@ class Good:
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...
-
     @final
     @overload
     def baz(self, x: str) -> str: ...
@@ -219,7 +201,6 @@ class ChildOfGood(Good):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-
     @overload
     def baz(self, x: str) -> str: ...
     @overload
@@ -232,7 +213,6 @@ class Bad:
     @final
     # error: [invalid-overload]
     def bar(self, x: int) -> int: ...
-
     @overload
     def baz(self, x: str) -> str: ...
     @final
@@ -245,7 +225,6 @@ class ChildOfBad(Bad):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-
     @overload
     def baz(self, x: str) -> str: ...
     @overload
@@ -478,11 +457,13 @@ class A:
     if coinflip():
         @final
         def method1(self) -> None: ...
+
     else:
         def method1(self) -> None: ...
 
     if coinflip():
         def method2(self) -> None: ...
+
     else:
         @final
         def method2(self) -> None: ...
@@ -490,15 +471,18 @@ class A:
     if coinflip():
         @final
         def method3(self) -> None: ...
+
     else:
         @final
         def method3(self) -> None: ...
 
     if coinflip():
         def method4(self) -> None: ...
+
     elif coinflip():
         @final
         def method4(self) -> None: ...
+
     else:
         def method4(self) -> None: ...
 
@@ -519,11 +503,13 @@ class B(A):
 class C(A):
     if coinflip():
         def method1(self) -> None: ...  # error: [override-of-final-method]
+
     else:
         pass
 
     if coinflip():
         def method2(self) -> None: ...  # error: [override-of-final-method]
+
     else:
         def method2(self) -> None: ...
 
