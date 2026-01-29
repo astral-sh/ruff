@@ -23,19 +23,24 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     let typed_dict_key = match &goto_target {
-        GotoTarget::Expression(ast::ExprRef::Subscript(subscript)) => {
+        GotoTarget::Expression(ast::ExprRef::Subscript(subscript))
+        | GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
             typed_dict_key_hover(&model, subscript)
         }
         _ => None,
     };
 
-    let docs = goto_target
-        .get_definition_targets(
-            &model,
-            ty_python_semantic::ImportAliasResolution::ResolveAliases,
-        )
-        .and_then(|definitions| definitions.docstring(db))
-        .map(HoverContent::Docstring);
+    let docs = if typed_dict_key.is_some() {
+        None
+    } else {
+        goto_target
+            .get_definition_targets(
+                &model,
+                ty_python_semantic::ImportAliasResolution::ResolveAliases,
+            )
+            .and_then(|definitions| definitions.docstring(db))
+            .map(HoverContent::Docstring)
+    };
 
     let mut contents = Vec::new();
     if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
@@ -3532,14 +3537,14 @@ def function():
         The person's full legal name
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:11:1
+          --> main.py:11:8
            |
         10 | person: Person = {"name": "Sarah"}
         11 | person["name"]
-           | ^^^^^^^^^^-^^^
-           | |         |
-           | |         Cursor offset
-           | source
+           |        ^^^-^^
+           |        |  |
+           |        |  Cursor offset
+           |        source
            |
         "#);
     }
