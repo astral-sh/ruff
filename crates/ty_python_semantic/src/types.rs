@@ -2792,28 +2792,32 @@ impl<'db> Type<'db> {
                 },
             ),
 
-            PlaceAndQualifiers {
+            attribute @ PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
                         ty: Type::Intersection(intersection),
                         origin,
-                        definedness: boundness,
+                        definedness,
                         widening,
                     }),
                 qualifiers,
             } => (
-                intersection
-                    .map_with_boundness(db, |elem| {
-                        Place::Defined(DefinedPlace {
-                            ty: elem
-                                .try_call_dunder_get(db, instance, owner)
-                                .map_or(*elem, |(ty, _)| ty),
-                            origin,
-                            definedness: boundness,
-                            widening,
+                if intersection.positive(db).is_empty() {
+                    attribute
+                } else {
+                    intersection
+                        .map_with_boundness(db, |elem| {
+                            Place::Defined(DefinedPlace {
+                                ty: elem
+                                    .try_call_dunder_get(db, instance, owner)
+                                    .map_or(*elem, |(ty, _)| ty),
+                                origin,
+                                definedness,
+                                widening,
+                            })
                         })
-                    })
-                    .with_qualifiers(qualifiers),
+                        .with_qualifiers(qualifiers)
+                },
                 // TODO: Discover data descriptors in intersections.
                 AttributeKind::NormalOrNonDataDescriptor,
             ),
@@ -12665,12 +12669,6 @@ impl<'db> IntersectionType<'db> {
         }
 
         ConstraintSet::from(sorted_self == other.normalized(db))
-    }
-
-    /// Returns `true` if this intersection has no positive contributions,
-    /// i.e., it is purely a negation type (e.g. `~AlwaysFalsy`).
-    pub(crate) fn is_pure_negation(self, db: &'db dyn Db) -> bool {
-        self.positive(db).is_empty()
     }
 
     /// Returns an iterator over the positive elements of the intersection. If
