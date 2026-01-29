@@ -45,12 +45,15 @@ pub fn format_code_blocks(
     for capture in MARKDOWN_CODE_BLOCK.captures_iter(source) {
         let (_, [before, code_indent, language, code, after]) = capture.extract();
 
-        let py_source_type = PySourceType::from(
-            settings
-                .extension
-                .get(&Path::new("foo.py").with_extension(language))
-                .unwrap_or_default(),
-        );
+        // map code block to source type, accounting for configured extension mappings
+        let py_source_type = match settings
+            .extension
+            .get_extension(&language.to_ascii_lowercase())
+        {
+            None => PySourceType::from_extension(language),
+            Some(language) => PySourceType::from(language),
+        };
+
         let unformatted_code = dedent(code);
         let options = settings.to_format_options(py_source_type, &unformatted_code, path);
 
@@ -87,6 +90,7 @@ pub fn format_code_blocks(
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_linter::settings::types::{ExtensionMapping, ExtensionPair, Language};
     use ruff_workspace::FormatterSettings;
 
     use crate::{MarkdownResult, format_code_blocks};
@@ -191,5 +195,28 @@ fn (foo: &str) -> &str {
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
             @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_extension_mapping() {
+        // format "py" mapped as "pyi" instead
+        let code = r#"
+```py
+def foo(): ...
+def bar(): ...
+```
+        "#;
+        let mapping = ExtensionMapping::from_iter([ExtensionPair {
+            extension: "py".to_string(),
+            language: Language::Pyi,
+        }]);
+        assert_snapshot!(format_code_blocks(
+            code,
+            None,
+            &FormatterSettings {
+                extension: mapping,
+                ..Default::default()
+            }
+        ), @"Unchanged");
     }
 }
