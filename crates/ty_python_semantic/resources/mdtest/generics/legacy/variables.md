@@ -448,21 +448,21 @@ from typing import Any, TypeVar, Generic
 
 S = TypeVar("S")
 
-# error: [invalid-legacy-type-variable] "TypeVar upper bound cannot be generic"
+# error: [invalid-type-variable-bound] "TypeVar upper bound cannot be generic"
 T = TypeVar("T", bound=list[S])
 
-# error: [invalid-legacy-type-variable] "TypeVar constraint cannot be generic"
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
 U = TypeVar("U", list["T"], str)
 
-# error: [invalid-legacy-type-variable] "TypeVar constraint cannot be generic"
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
 V = TypeVar("V", list["V"], str)
 
-# error: [invalid-legacy-type-variable] "TypeVar constraint cannot be generic"
-# error: [invalid-legacy-type-variable] "TypeVar constraint cannot be generic"
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
 W = TypeVar("W", list[list[list[list["V"]]]], V)
 
 class Foo(Generic[S]):
-    # error: [invalid-legacy-type-variable] "TypeVar upper bound cannot be generic"
+    # error: [invalid-type-variable-bound] "TypeVar upper bound cannot be generic"
     T = TypeVar("T", bound=S)
 ```
 
