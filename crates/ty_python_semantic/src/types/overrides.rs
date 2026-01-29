@@ -22,8 +22,8 @@ use crate::{
         use_def_map,
     },
     types::{
-        CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type, TypeQualifiers,
+        CallableType, CallableTypeKind, ClassBase, ClassType, KnownClass, Parameter, Parameters,
+        Signature, StaticClassLiteral, SubclassOfType, Type, TypeQualifiers,
         class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
@@ -34,6 +34,7 @@ use crate::{
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        signatures::CallableSignature,
     },
 };
 
@@ -339,7 +340,53 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
+            // For bound methods, filter out overloads whose self type is disjoint from the
+            // subclass instance type before checking assignability. For example, `str.__iter__`
+            // has an overload with `self: LiteralString`, which is disjoint from any `str`
+            // subclass. We should ignore such overloads when checking if the subclass method
+            // is a valid override.
+            let superclass_type_filtered = if let Type::BoundMethod(bound_method) = superclass_type
+            {
+                let function = bound_method.function(db);
+
+                // For classmethods, the overload's first parameter has a class type
+                // (e.g., `cls: type[FinalOther]`), so we need to compare against
+                // `type[Sub]` (the class type), not `Sub` (the instance type).
+                let receiver_type = if function.is_classmethod(db) {
+                    SubclassOfType::from(db, class)
+                } else {
+                    instance_of_class
+                };
+
+                let filtered_signature = function
+                    .signature(db)
+                    .filter_overloads_for_receiver(db, receiver_type);
+
+                if let Some(filtered) = filtered_signature {
+                    // Use typing_self_type to match what BoundMethodType::into_callable_type
+                    // does: for @classmethod, this converts the bound instance via
+                    // .to_instance(db), ensuring correct self-type binding.
+                    let self_type = bound_method.typing_self_type(db);
+                    Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::from_overloads(
+                            filtered
+                                .overloads
+                                .iter()
+                                .map(|sig| sig.bind_self(db, Some(self_type))),
+                        ),
+                        CallableTypeKind::FunctionLike,
+                    ))
+                } else {
+                    // If all overloads were filtered out, use the original type
+                    superclass_type
+                }
+            } else {
+                superclass_type
+            };
+
+            let Some(superclass_type_as_callable) =
+                superclass_type_filtered.try_upcast_to_callable(db)
             else {
                 continue;
             };

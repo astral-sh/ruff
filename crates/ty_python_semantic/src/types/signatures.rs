@@ -94,6 +94,56 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    /// Filter out overloads whose first parameter (self) type is disjoint from the receiver type.
+    ///
+    /// This is used during method override checking to ignore overloads that cannot apply to
+    /// the subclass. For example, `str.__iter__` has an overload with `self: LiteralString`,
+    /// which is disjoint from any `str` subclass (since `LiteralString` must be an instance
+    /// of exactly `str`). When checking if `MyStr(str).__iter__` is a valid override, we should
+    /// ignore that overload.
+    ///
+    /// Returns `None` if all overloads are filtered out (which would indicate a bug, since
+    /// at least one overload should be applicable).
+    pub(crate) fn filter_overloads_for_receiver(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+    ) -> Option<Self> {
+        let filtered: SmallVec<[Signature<'db>; 1]> = self
+            .overloads
+            .iter()
+            .filter(|signature| {
+                // Get the first parameter (self) type from the signature
+                let Some(first_param) = signature.parameters().get(0) else {
+                    // No parameters means no self type constraint, so include this overload
+                    return true;
+                };
+
+                let self_type = first_param.annotated_type();
+
+                // If the self type is unknown/dynamic, include this overload
+                if self_type.is_unknown() || self_type.is_dynamic() {
+                    return true;
+                }
+
+                // Check if the receiver type is disjoint from the self type.
+                // If they are disjoint, this overload cannot apply to the receiver,
+                // so we should filter it out.
+                !receiver_type.is_disjoint_from(db, self_type)
+            })
+            .cloned()
+            .collect();
+
+        // If all overloads were filtered out, return None
+        if filtered.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            overloads: filtered,
+        })
+    }
+
     pub(crate) fn with_inherited_generic_context(
         &self,
         db: &'db dyn Db,
