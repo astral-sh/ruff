@@ -244,3 +244,15 @@ def f[T: Foo](x: T) -> T:
     needs_a_foo(x)  # error: [invalid-argument-type]
     return x
 ```
+
+## Numbers special case
+
+```py
+from numbers import Number
+
+def f(
+    x: Number,
+): ...
+
+f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+```
