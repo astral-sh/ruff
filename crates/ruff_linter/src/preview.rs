@@ -51,10 +51,6 @@ pub(crate) const fn is_fix_manual_list_comprehension_enabled(settings: &LinterSe
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/18763
-pub(crate) const fn is_fix_os_path_getsize_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
 // https://github.com/astral-sh/ruff/pull/18922
 pub(crate) const fn is_fix_os_path_getmtime_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
