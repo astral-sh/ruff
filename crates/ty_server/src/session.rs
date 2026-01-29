@@ -27,11 +27,10 @@ use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use options::GlobalOptions;
 use ty_python_semantic::MisconfigurationMode;
 
 pub(crate) use self::options::InitializationOptions;
-pub use self::options::{ClientOptions, DiagnosticMode, WorkspaceOptions};
+pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
@@ -678,6 +677,9 @@ impl Session {
 
     /// Adds an uninitialized workspace to this session.
     ///
+    /// This returns `true` when this workspace is added and `false`
+    /// when it has already been added.
+    ///
     /// If there was a problem adding the workspace folder (e.g., the
     /// path derived from the given URL is not valid UTF-8), then an
     /// error is returned and no workspace folder is registered.
@@ -685,7 +687,7 @@ impl Session {
     /// To initialize the workspace folder, callers must initiate
     /// a request for workspace folder configuration via
     /// `Session::request_uninitialized_workspace_folder_configuration`.
-    pub(crate) fn register_workspace_folder(&mut self, url: Url) -> anyhow::Result<()> {
+    pub(crate) fn register_workspace_folder(&mut self, url: Url) -> anyhow::Result<bool> {
         self.workspaces.register(url)
     }
 
@@ -1477,14 +1479,17 @@ pub(crate) struct Workspaces {
 impl Workspaces {
     /// Registers a new workspace with the given URL and default settings for the workspace.
     ///
-    /// It's the caller's responsibility to later call [`initialize`] with the resolved settings
-    /// for this workspace. Registering and initializing a workspace is a two-step process because
-    /// the workspace are announced to the server during the `initialize` request, but the
-    /// resolved settings are only available after the client has responded to the `workspace/configuration`
-    /// request.
+    /// This returns `true` when this workspace is added and `false`
+    /// when it has already been added.
     ///
-    /// [`initialize`]: Workspaces::initialize
-    fn register(&mut self, url: Url) -> anyhow::Result<()> {
+    /// It's the caller's responsibility to later call
+    /// [`Session::request_uninitialized_workspace_folder_configurations`] with
+    /// the resolved settings for this workspace. Registering and initializing
+    /// a workspace is a two-step process because the workspace are announced
+    /// to the server during the `initialize` request, but the resolved
+    /// settings are only available after the client has responded to the
+    /// `workspace/configuration` request.
+    fn register(&mut self, url: Url) -> anyhow::Result<bool> {
         let path = url
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
@@ -1492,6 +1497,10 @@ impl Workspaces {
         // Realistically I don't think this can fail because we got the path from a Url
         let system_path = SystemPathBuf::from_path_buf(path)
             .map_err(|_| anyhow!("Workspace URL is not valid UTF8"))?;
+
+        if self.workspaces.contains_key(&system_path) {
+            return Ok(false);
+        }
 
         self.workspaces.insert(
             system_path,
@@ -1501,8 +1510,7 @@ impl Workspaces {
                 initialized: false,
             },
         );
-
-        Ok(())
+        Ok(true)
     }
 
     /// Unregisters a workspace folder at the given path.
