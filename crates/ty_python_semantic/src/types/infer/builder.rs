@@ -3,6 +3,7 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
@@ -13,7 +14,7 @@ use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::is_keyword;
 use ruff_python_stdlib::typing::as_pep_585_generic;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_module_resolver::{
@@ -775,6 +776,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let mut disjoint_bases = IncompatibleBases::default();
+            let mut protocol_base_with_generic_context = None;
 
             // (5) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
@@ -812,23 +814,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         continue;
                     }
-                    // Note that unlike several of the other errors caught in this function,
-                    // this does not lead to the class creation failing at runtime,
-                    // but it is semantically invalid.
-                    Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)) => {
-                        if class_node.type_params.is_none() {
-                            continue;
-                        }
-                        let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_GENERIC_CLASS, &class_node.bases()[i])
+                    Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(new_context)) => {
+                        let Some((previous_index, previous_context)) =
+                            protocol_base_with_generic_context
                         else {
                             continue;
                         };
-                        builder.into_diagnostic(
+                        let prior_node = &class_node.bases()[previous_index];
+                        let Some(builder) =
+                            self.context.report_lint(&INVALID_GENERIC_CLASS, prior_node)
+                        else {
+                            continue;
+                        };
+                        let mut diagnostic = builder.into_diagnostic(
                             "Cannot both inherit from subscripted `Protocol` \
-                            and use PEP 695 type variables",
+                                and subscripted `Generic`",
                         );
+                        if let ast::Expr::Subscript(prior_node) = prior_node
+                            && new_context == previous_context
+                        {
+                            diagnostic.help("Remove the type parameters from the `Protocol` base");
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
+                                TextRange::new(prior_node.value.end(), prior_node.end()),
+                            )));
+                        }
+                        continue;
+                    }
+                    // Note that unlike several of the other errors caught in this function,
+                    // this does not lead to the class creation failing at runtime,
+                    // but it is semantically invalid.
+                    Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)) => {
+                        if let Some(type_params) = class_node.type_params.as_deref() {
+                            let Some(builder) = self
+                                .context
+                                .report_lint(&INVALID_GENERIC_CLASS, &class_node.bases()[i])
+                            else {
+                                continue;
+                            };
+                            let mut diagnostic = builder.into_diagnostic(
+                                "Cannot both inherit from subscripted `Protocol` \
+                                and use PEP 695 type variables",
+                            );
+                            if let ast::Expr::Subscript(node) = &class_node.bases()[i] {
+                                let source = source_text(self.db(), self.file());
+                                let type_params_range = TextRange::new(
+                                    type_params.start().saturating_add(TextSize::new(1)),
+                                    type_params.end().saturating_sub(TextSize::new(1)),
+                                );
+                                if source[node.slice.range()] == source[type_params_range] {
+                                    diagnostic.help(
+                                        "Remove the type parameters from the `Protocol` base",
+                                    );
+                                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
+                                        TextRange::new(node.value.end(), node.end()),
+                                    )));
+                                }
+                            }
+                        } else if protocol_base_with_generic_context.is_none() {
+                            protocol_base_with_generic_context = Some((i, context));
+                        }
                         continue;
                     }
                     Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
