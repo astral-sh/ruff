@@ -2982,7 +2982,7 @@ pub(super) fn report_invalid_assignment<'db>(
 
             if is_numeric {
                 diag.info(
-                    "Types from the `numbers` module aren't supported for static type checking.",
+                    "Types from the `numbers` module aren't supported for static type checking",
                 );
                 diag.help("Consider using a protocol instead, such as `typing.SupportsFloat`");
             }

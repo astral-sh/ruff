@@ -31,7 +31,7 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `Num
   |    |
   |    Declared type
   |
-info: Types from the `numbers` module aren't supported for static type checking.
+info: Types from the `numbers` module aren't supported for static type checking
 help: Consider using a protocol instead, such as `typing.SupportsFloat`
 info: rule `invalid-assignment` is enabled by default
 
