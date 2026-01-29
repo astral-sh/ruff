@@ -2976,22 +2976,9 @@ pub(super) fn report_invalid_assignment<'db>(
         if let Some(module) = file_to_module(db, file)
             && module.is_known(db, KnownModule::Numbers)
         {
-            let is_numeric = match value_ty {
-                Type::IntLiteral(_) | Type::BooleanLiteral(_) => true,
-                Type::NominalInstance(value_instance) => {
-                    let value_class = value_instance.class(db);
-                    value_class.known(db).is_some_and(|known| {
-                        matches!(
-                            known,
-                            KnownClass::Int
-                                | KnownClass::Float
-                                | KnownClass::Complex
-                                | KnownClass::Bool
-                        )
-                    })
-                }
-                _ => false,
-            };
+            let is_numeric = [KnownClass::Int, KnownClass::Float, KnownClass::Complex]
+                .iter()
+                .any(|numeric| value_ty.is_subtype_of(db, numeric.to_instance(db)));
 
             if is_numeric {
                 diag.info(
