@@ -420,8 +420,11 @@ expects_type_p_of_str(P[str])
 # Not OK if the specializations don't line up:
 expects_type_p(P[int])  # error: [invalid-argument-type]
 expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
-expects_type_p_of_int(P)  # error: [invalid-argument-type]
 expects_type_p_of_str(P[int])  # error: [invalid-argument-type]
+
+# OK if we can choose an implicit assignable specialization:
+expects_type_p_of_int(P)
+expects_type_p_of_str(P)
 ```
 
 This also works with `ParamSpec`:
