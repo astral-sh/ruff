@@ -525,9 +525,91 @@ def _(x: object):
         x.push(42)
 ```
 
+## Generic classes with bounded type parameters
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When a generic class has a type parameter with an upper bound, the top materialization uses that
+bound instead of `object`:
+
+```py
+class Base:
+    def method(self) -> str:
+        return "base"
+
+class BoundedCovariant[T: Base]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, BoundedCovariant):
+        reveal_type(x)  # revealed: BoundedCovariant[Base]
+        reveal_type(x.get())  # revealed: Base
+        reveal_type(x.get().method())  # revealed: str
+```
+
+## Generic classes with constrained type parameters
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When a type parameter has constraints (e.g., `T: (str, bytes)`), the top materialization
+produces a union of class types, one for each constraint:
+
+```py
+class ConstrainedCovariant[T: (str, bytes)]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, ConstrainedCovariant):
+        reveal_type(x)  # revealed: ConstrainedCovariant[str] | ConstrainedCovariant[bytes]
+        reveal_type(x.get())  # revealed: str | bytes
+```
+
+This also applies to `os.PathLike`, which has a constrained type parameter:
+
+```py
+import os
+
+def narrow_to_pathlike(src: str | os.PathLike[str]) -> None:
+    if isinstance(src, str | os.PathLike):
+        reveal_type(src)  # revealed: str | PathLike[str]
+
+def narrow_object_to_pathlike(x: object) -> None:
+    if isinstance(x, os.PathLike):
+        reveal_type(x)  # revealed: PathLike[str] | PathLike[bytes]
+```
+
+## More complex narrowing with generics
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
 When more complex types are involved, the `Top[]` type may get simplified away.
 
 ```py
+from typing import Self
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def push(self, x: T) -> None: ...
+
+class Invariant[T]:
+    def push(self, x: T) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
 def _(x: list[int] | set[str]):
     if isinstance(x, list):
         reveal_type(x)  # revealed: list[int]

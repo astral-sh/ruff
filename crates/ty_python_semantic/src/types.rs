@@ -1295,6 +1295,33 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Maps a function over class types in this type, producing a new type.
+    ///
+    /// For union types, the function is applied to each element that is a class type.
+    /// For single class types, the function is applied directly.
+    /// For other types, returns the type unchanged.
+    pub(crate) fn map_class_types(
+        self,
+        db: &'db dyn Db,
+        f: impl Fn(&'db dyn Db, ClassType<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        match self {
+            Type::ClassLiteral(class_literal) => f(db, class_literal.default_specialization(db)),
+            Type::GenericAlias(alias) => f(db, ClassType::Generic(alias)),
+            Type::Union(union) => UnionType::from_elements(
+                db,
+                union.elements(db).iter().map(|element| match element {
+                    Type::ClassLiteral(class_literal) => {
+                        f(db, class_literal.default_specialization(db))
+                    }
+                    Type::GenericAlias(alias) => f(db, ClassType::Generic(*alias)),
+                    other => *other,
+                }),
+            ),
+            other => other,
+        }
+    }
+
     pub const fn is_property_instance(&self) -> bool {
         matches!(self, Type::PropertyInstance(..))
     }

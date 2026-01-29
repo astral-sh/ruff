@@ -139,12 +139,17 @@ impl ClassInfoConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
-        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
-            ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
-            }
-            ClassInfoConstraintFunction::IsSubclass => {
-                SubclassOfType::from(db, class.top_materialization(db))
+        // For classes with constrained TypeVars, top_materialization_type returns a union
+        // of class types. We need to convert each to instance/subclass types.
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| {
+            let class_type = class.top_materialization_type(db);
+            match self {
+                ClassInfoConstraintFunction::IsInstance => {
+                    class_type.map_class_types(db, Type::instance)
+                }
+                ClassInfoConstraintFunction::IsSubclass => {
+                    class_type.map_class_types(db, SubclassOfType::from)
+                }
             }
         };
 

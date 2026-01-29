@@ -48,8 +48,8 @@ use crate::types::{
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     DeprecatedInstance, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType,
     ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    TypeAliasType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder, VarianceInferable,
-    binding_type, declaration_type, determine_upper_bound,
+    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypedDictParams,
+    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -738,6 +738,18 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.top_materialization(db),
             Self::Dynamic(_) | Self::DynamicNamedTuple(_) => ClassType::NonGeneric(self),
+        }
+    }
+
+    /// Returns the top materialization as a `Type`, handling constrained `TypeVar`s specially.
+    ///
+    /// See [`StaticClassLiteral::top_materialization_type`] for details.
+    pub(crate) fn top_materialization_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Static(class) => class.top_materialization_type(db),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => {
+                Type::from(ClassType::NonGeneric(self))
+            }
         }
     }
 
@@ -2439,6 +2451,93 @@ impl<'db> StaticClassLiteral<'db> {
                     &ApplyTypeMappingVisitor::default(),
                 )
         })
+    }
+
+    /// Returns the top materialization as a `Type`, handling constrained `TypeVar`s specially.
+    ///
+    /// For generic classes with constrained `TypeVar`s (e.g., `class C[T: (str, bytes)]`), the
+    /// top materialization produces a union of class types, one for each constraint. For example,
+    /// `C` with `T: (str, bytes)` produces `C[str] | C[bytes]`, not `C[str | bytes]`.
+    ///
+    /// For bounded `TypeVar`s or unconstrained `TypeVar`s, this behaves the same as
+    /// `top_materialization`.
+    pub(crate) fn top_materialization_type(self, db: &'db dyn Db) -> Type<'db> {
+        let Some(generic_context) = self.generic_context(db) else {
+            // Non-generic class
+            return Type::from(ClassType::NonGeneric(self.into()));
+        };
+
+        // Check if any TypeVar has constraints
+        let constrained_typevars: Vec<_> = generic_context
+            .variables(db)
+            .filter_map(|bound_typevar| {
+                if let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                    bound_typevar.typevar(db).bound_or_constraints(db)
+                {
+                    Some((bound_typevar, constraints))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if constrained_typevars.is_empty() {
+            // No constrained TypeVars, use regular top_materialization
+            return Type::from(self.top_materialization(db));
+        }
+
+        // For each constrained TypeVar, we need to produce a union of class types.
+        // For now, we handle the simple case of a single constrained TypeVar.
+        // Multiple constrained TypeVars would require a Cartesian product.
+        //
+        // TODO: Handle multiple constrained TypeVars (Cartesian product of constraints)
+        if constrained_typevars.len() == 1 {
+            let (constrained_typevar, constraints) = &constrained_typevars[0];
+            let constraint_elements = constraints.elements(db);
+
+            // Build a union of class types, one for each constraint
+            let class_types: Vec<Type<'db>> = constraint_elements
+                .iter()
+                .map(|constraint| {
+                    // Create a specialization where the constrained TypeVar is mapped to this constraint
+                    let types: Vec<Type<'db>> = generic_context
+                        .variables(db)
+                        .map(|bound_typevar| {
+                            if bound_typevar.identity(db) == constrained_typevar.identity(db) {
+                                constraint.materialize(
+                                    db,
+                                    MaterializationKind::Top,
+                                    &ApplyTypeMappingVisitor::default(),
+                                )
+                            } else {
+                                // For other TypeVars, use the default materialization
+                                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound
+                                        .materialize(
+                                            db,
+                                            MaterializationKind::Top,
+                                            &ApplyTypeMappingVisitor::default(),
+                                        ),
+                                    _ => Type::object(),
+                                }
+                            }
+                        })
+                        .collect();
+                    let specialization = generic_context.specialize(db, types);
+                    Type::from(ClassType::Generic(GenericAlias::new(
+                        db,
+                        self,
+                        specialization,
+                    )))
+                })
+                .collect();
+
+            UnionType::from_elements(db, class_types)
+        } else {
+            // For multiple constrained TypeVars, fall back to the simple approach for now
+            // TODO: Implement Cartesian product of constraints
+            Type::from(self.top_materialization(db))
+        }
     }
 
     /// Returns the default specialization of this class. For non-generic classes, the class is

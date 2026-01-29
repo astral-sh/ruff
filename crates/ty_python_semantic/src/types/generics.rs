@@ -1187,6 +1187,31 @@ impl<'db> Specialization<'db> {
         if self.materialization_kind(db).is_some() {
             return self;
         }
+        // Helper to materialize a type, taking into account the TypeVar's upper bound
+        // when the type is dynamic (e.g., `unknown()`). For dynamic types, the standard
+        // materialization produces `object` for Top and `Never` for Bottom, but if the TypeVar
+        // has an upper bound, we should use that bound instead.
+        //
+        // Note: Constrained TypeVars are handled separately at a higher level (in
+        // ClassLiteral::top_materialization_type) because they require producing a union
+        // of class types, not a single specialization with a union type argument.
+        let materialize_with_typevar_bound =
+            |vartype: &Type<'db>,
+             bound_typevar: BoundTypeVarInstance<'db>,
+             mat_kind: MaterializationKind| {
+                if vartype.is_dynamic() {
+                    if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                        bound_typevar.typevar(db).bound_or_constraints(db)
+                    {
+                        return match mat_kind {
+                            MaterializationKind::Top => bound.materialize(db, mat_kind, visitor),
+                            MaterializationKind::Bottom => Type::Never,
+                        };
+                    }
+                }
+                vartype.materialize(db, mat_kind, visitor)
+            };
+
         let mut has_dynamic_invariant_typevar = false;
         let types: Box<[_]> = self
             .generic_context(db)
@@ -1197,17 +1222,26 @@ impl<'db> Specialization<'db> {
                     TypeVarVariance::Bivariant => {
                         // With bivariance, all specializations are subtypes of each other,
                         // so any materialization is acceptable.
-                        vartype.materialize(db, MaterializationKind::Top, visitor)
+                        materialize_with_typevar_bound(
+                            vartype,
+                            bound_typevar,
+                            MaterializationKind::Top,
+                        )
                     }
                     TypeVarVariance::Covariant => {
-                        vartype.materialize(db, materialization_kind, visitor)
+                        materialize_with_typevar_bound(vartype, bound_typevar, materialization_kind)
                     }
-                    TypeVarVariance::Contravariant => {
-                        vartype.materialize(db, materialization_kind.flip(), visitor)
-                    }
+                    TypeVarVariance::Contravariant => materialize_with_typevar_bound(
+                        vartype,
+                        bound_typevar,
+                        materialization_kind.flip(),
+                    ),
                     TypeVarVariance::Invariant => {
-                        let top_materialization =
-                            vartype.materialize(db, MaterializationKind::Top, visitor);
+                        let top_materialization = materialize_with_typevar_bound(
+                            vartype,
+                            bound_typevar,
+                            MaterializationKind::Top,
+                        );
                         if !vartype.is_equivalent_to(db, top_materialization) {
                             has_dynamic_invariant_typevar = true;
                         }
