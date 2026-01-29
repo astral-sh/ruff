@@ -39,7 +39,7 @@ use ruff_linter::{
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, MarkdownCode, QuoteStyle,
 };
 
 use crate::options::{
@@ -1207,6 +1207,7 @@ pub struct FormatConfiguration {
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,
     pub docstring_code_line_width: Option<DocstringCodeLineWidth>,
+    pub markdown_code_format: Option<MarkdownCode>,
 }
 
 impl FormatConfiguration {
@@ -1243,6 +1244,13 @@ impl FormatConfiguration {
                 }
             }),
             docstring_code_line_width: options.docstring_code_line_length,
+            markdown_code_format: options.markdown_code_format.map(|yes| {
+                if yes {
+                    MarkdownCode::Enabled
+                } else {
+                    MarkdownCode::Disabled
+                }
+            }),
         })
     }
 
@@ -1260,6 +1268,7 @@ impl FormatConfiguration {
             docstring_code_line_width: self
                 .docstring_code_line_width
                 .or(config.docstring_code_line_width),
+            markdown_code_format: self.markdown_code_format.or(config.markdown_code_format),
         }
     }
 }
