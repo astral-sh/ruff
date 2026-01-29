@@ -31,7 +31,9 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance};
+use crate::types::{
+    DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType,
+};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -2937,6 +2939,35 @@ fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
     Some(diag)
 }
 
+pub(super) fn note_numbers_module_not_supported<'db>(
+    db: &'db dyn Db,
+    diag: &mut Diagnostic,
+    target_ty: Type<'db>,
+    value_ty: Type<'db>,
+) {
+    const BUILTIN_NUMBERS: [KnownClass; 3] =
+        [KnownClass::Int, KnownClass::Float, KnownClass::Complex];
+
+    if let Type::NominalInstance(target_instance) = target_ty {
+        let file = target_instance.class(db).class_literal(db).file(db);
+        if let Some(module) = file_to_module(db, file)
+            && module.is_known(db, KnownModule::Numbers)
+        {
+            let is_numeric = value_ty.is_subtype_of(
+                db,
+                UnionType::from_elements(db, BUILTIN_NUMBERS.iter().map(|cls| cls.to_instance(db))),
+            );
+
+            if is_numeric {
+                diag.info(
+                    "Types from the `numbers` module aren't supported for static type checking",
+                );
+                diag.help("Consider using a protocol instead, such as `typing.SupportsFloat`");
+            }
+        }
+    }
+}
+
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
@@ -3020,24 +3051,7 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     // special case message
-    if let Type::NominalInstance(target_instance) = target_ty {
-        let db = context.db();
-        let file = target_instance.class(db).class_literal(db).file(db);
-        if let Some(module) = file_to_module(db, file)
-            && module.is_known(db, KnownModule::Numbers)
-        {
-            let is_numeric = [KnownClass::Int, KnownClass::Float, KnownClass::Complex]
-                .iter()
-                .any(|numeric| value_ty.is_subtype_of(db, numeric.to_instance(db)));
-
-            if is_numeric {
-                diag.info(
-                    "Types from the `numbers` module aren't supported for static type checking",
-                );
-                diag.help("Consider using a protocol instead, such as `typing.SupportsFloat`");
-            }
-        }
-    }
+    note_numbers_module_not_supported(context.db(), &mut diag, target_ty, value_ty);
 }
 
 pub(super) fn report_invalid_attribute_assignment(
