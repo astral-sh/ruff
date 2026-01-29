@@ -192,6 +192,7 @@ info: `P.still_abstractmethod` is implicitly abstract because `P` is a `Protocol
 4 |     # There'd be no unsoundness here if a subclass of this
 5 |     # class were to be instantiated without the method having been overridden:
   |
+help: Change the body of `still_abstractmethod` to `return` or `return None` if it was not intended to be abstract
 info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
@@ -221,6 +222,7 @@ info: `R.also_still_abstractmethod` is implicitly abstract because `R` is a `Pro
 17 |     # same here
 18 |     def also_still_abstractmethod(self) -> None: ...
    |
+help: Change the body of `also_still_abstractmethod` to `return` or `return None` if it was not intended to be abstract
 info: rule `abstract-method-in-final-class` is enabled by default
 
 ```

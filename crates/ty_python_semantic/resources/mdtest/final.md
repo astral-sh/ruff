@@ -714,8 +714,7 @@ met:
 
 1. The function body only consists of `...` and/or `pass` statements
 1. The function is an overloaded function without an implementation
-1. The function body only consists of `raise NotImplementedError` or `raise NotImplementedError()`,
-    and the return type is not assignable to `Never`.
+1. The function body only consists of `raise NotImplementedError` or `raise NotImplementedError()`
 
 In either case, we also allow the function to have a docstring and still be considered implicitly
 abstract.

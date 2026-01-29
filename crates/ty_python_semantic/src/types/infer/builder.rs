@@ -1455,6 +1455,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .message(format_args!("`{defining_class_name}` declared here")),
             );
             diagnostic.sub(sub);
+
+            // If the implicitly abstract method is defined in first-party code
+            // and the return type is assignable to `None`, they may not have intended
+            // for it to be implicitly abstract; add a clarificatory note:
+            if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
+                let function_type_as_callable = infer_definition_types(db, *definition)
+                    .binding_type(*definition)
+                    .try_upcast_to_callable(db);
+
+                if let Some(callables) = function_type_as_callable
+                    && Type::function_like_callable(
+                        db,
+                        Signature::new(Parameters::gradual_form(), Type::none(db)),
+                    )
+                    .is_assignable_to(db, callables.into_type(db))
+                {
+                    diagnostic.help(format_args!(
+                        "Change the body of `{first_method_name}` to `return` \
+                        or `return None` if it was not intended to be abstract"
+                    ));
+                }
+            }
         }
     }
 

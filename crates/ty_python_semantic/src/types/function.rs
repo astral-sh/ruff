@@ -818,7 +818,7 @@ impl<'db> FunctionLiteral<'db> {
         }
         let (_, implementation) = self.overloads_and_implementation(db);
         let Some(implementation) = implementation else {
-            return Some(AbstractMethodKind::Implicit);
+            return Some(AbstractMethodKind::ImplicitDueToStubBody);
         };
         let module = parsed_module(db, file).load(db);
         let node = implementation.node(db, file, &module);
@@ -826,8 +826,9 @@ impl<'db> FunctionLiteral<'db> {
             definition_expression_type(db, definition, expr)
         });
         match body_kind {
-            FunctionBodyKind::AlwaysRaisesNotImplementedError | FunctionBodyKind::Stub => {
-                Some(AbstractMethodKind::Implicit)
+            FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
+            FunctionBodyKind::AlwaysRaisesNotImplementedError => {
+                Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
             }
             FunctionBodyKind::Regular => None,
         }
@@ -841,12 +842,19 @@ pub(super) enum AbstractMethodKind {
     Explicit,
     /// The method is implicitly abstract due to being in a `Protocol` class without an
     /// implementation.
-    Implicit,
+    ImplicitDueToStubBody,
+    /// The method is implicitly abstract due to being in a `Protocol` class with a body that
+    /// solely consists of `raise NotImplementedError` statements.
+    ImplicitDueToAlwaysRaising,
 }
 
 impl AbstractMethodKind {
     pub(super) const fn is_explicit(self) -> bool {
         matches!(self, AbstractMethodKind::Explicit)
+    }
+
+    pub(super) const fn is_implicit_due_to_stub_body(self) -> bool {
+        matches!(self, AbstractMethodKind::ImplicitDueToStubBody)
     }
 }
 
