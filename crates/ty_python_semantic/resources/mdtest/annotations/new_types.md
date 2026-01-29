@@ -588,7 +588,7 @@ Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
 ## A `NewType` cannot be generic
 
 ```py
-from typing import Any, NewType, TypeVar
+from typing import Any, NewType, TypeVar, Generic
 
 # All of these are allowed.
 A = NewType("A", list)
@@ -601,6 +601,9 @@ C = NewType("C", list[T])  # error: [invalid-newtype]
 
 D = dict[str, T]
 E = NewType("E", D[T])  # error: [invalid-newtype]
+
+class Foo(Generic[T]):
+    N = NewType("N", list[T])  # error: [invalid-newtype]
 
 # this is fine: omitting the type argument means that this is equivalent
 # to `F = NewType("F", dict[str, Any])

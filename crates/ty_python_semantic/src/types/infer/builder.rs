@@ -6495,27 +6495,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     // Infer the deferred base type of a NewType.
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
         let inferred = self.infer_type_expression(&arguments.args[1]);
-        match inferred {
-            Type::NewTypeInstance(_) => return,
-            Type::NominalInstance(instance) => {
-                match instance.class(self.db()) {
-                    ClassType::NonGeneric(_) => {}
-                    ClassType::Generic(alias) => {
-                        let spec = alias.specialization(self.db());
-                        if spec.types(self.db()).iter().any(|t| {
-                            matches!(t, Type::KnownInstance(KnownInstanceType::TypeVar(_)))
-                        }) && let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
-                        {
-                            let mut diag =
-                                builder.into_diagnostic("invalid base for `typing.NewType`");
-                            diag.set_primary_message("A `NewType` base cannot be generic");
-                        }
-                    }
-                }
-                return;
+
+        let is_typevar = &|ty| {
+            matches!(
+                ty,
+                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+            )
+        };
+
+        if any_over_type(self.db(), inferred, &is_typevar, false) {
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
+            {
+                let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
+                diag.set_primary_message("A `NewType` base cannot be generic");
             }
+            return;
+        }
+
+        match inferred {
+            Type::NewTypeInstance(_) | Type::NominalInstance(_) => return,
             // There are exactly two union types allowed as bases for NewType: `int | float` and
             // `int | float | complex`. These are allowed because that's what `float` and `complex`
             // expand into in type position. We don't currently ask whether the union was implicit
