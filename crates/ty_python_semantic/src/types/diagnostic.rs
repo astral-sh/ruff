@@ -44,7 +44,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, PythonVersion, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
-use ty_module_resolver::{Module, ModuleName};
+use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -2971,16 +2971,16 @@ pub(super) fn report_invalid_assignment<'db>(
 
     // special case message
     if let Type::NominalInstance(target_instance) = target_ty {
-        let class = target_instance.class(context.db());
-        let qualified_name = class.qualified_name(context.db());
-        let components = qualified_name.components_excluding_self();
-
-        if !components.is_empty() && components[0] == "numbers" {
+        let db = context.db();
+        let file = target_instance.class(db).class_literal(db).file(db);
+        if let Some(module) = file_to_module(db, file)
+            && module.is_known(db, KnownModule::Numbers)
+        {
             let is_numeric = match value_ty {
                 Type::IntLiteral(_) | Type::BooleanLiteral(_) => true,
                 Type::NominalInstance(value_instance) => {
-                    let value_class = value_instance.class(context.db());
-                    value_class.known(context.db()).is_some_and(|known| {
+                    let value_class = value_instance.class(db);
+                    value_class.known(db).is_some_and(|known| {
                         matches!(
                             known,
                             KnownClass::Int
@@ -2995,9 +2995,9 @@ pub(super) fn report_invalid_assignment<'db>(
 
             if is_numeric {
                 diag.info(
-                    "Types from the `numbers` module aren't supported for static type checking. \
-                     Consider using a protocol instead, such as `typing.SupportsFloat`",
+                    "Types from the `numbers` module aren't supported for static type checking.",
                 );
+                diag.help("Consider using a protocol instead, such as `typing.SupportsFloat`");
             }
         }
     }
