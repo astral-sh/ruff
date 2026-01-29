@@ -53,7 +53,13 @@ T = TypeVar("T")
 class Bar0(Protocol[T]):
     x: T
 
+# Note that this class definition *will* actually succeed at runtime,
+# but is banned by the typing spec anyway
+# error: [invalid-generic-class] "Cannot both inherit from subscripted `Protocol` and subscripted `Generic`"
 class Bar1(Protocol[T], Generic[T]):
+    x: T
+
+class Bar1Point5(Protocol, Generic[T]):
     x: T
 
 class Bar2[T](Protocol):
@@ -193,8 +199,8 @@ reveal_mro(Fine)  # revealed: (<class 'Fine'>, typing.Protocol, typing.Generic, 
 
 class StillFine(Protocol, Generic[T], object): ...
 class EvenThis[T](Protocol, object): ...
-class OrThis(Protocol[T], Generic[T]): ...
-class AndThis(Protocol[T], Generic[T], object): ...
+class OrThis(Protocol, Generic[T]): ...
+class AndThis(Protocol, Generic[T], object): ...
 ```
 
 And multiple inheritance from a mix of protocol and non-protocol classes is fine as long as
@@ -280,6 +286,50 @@ static_assert(is_subtype_of(TypeOf[Protocol], typing._ProtocolMeta))
 
 # Could also be `Literal[True]`, but `bool` is fine:
 reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
+```
+
+## Diagnostics and autofixes for `Protocol` classes defined in invalid ways
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Foo(Protocol[T], Generic[T]): ...  # error: [invalid-generic-class]
+
+# fmt: off
+
+# error: [invalid-generic-class]
+class Bar(Protocol[
+  T,
+], Generic[T]): ...
+
+class Spam(  # docs
+  # error: [invalid-generic-class]
+  Protocol[  # some comment
+    # another comment
+    T,  # just love my comments
+    # very well documented code
+],  # important comma!
+  # and a newline...
+  Generic[  # look at this
+  # wow
+    T,  # wow
+    # wowwwwwww
+  ] # oof
+  # another newline?
+): ...
+
+# fmt: on
+
+class Foo[T](Protocol[T]): ...  # error: [invalid-generic-class]
 ```
 
 ## `typing.Protocol` versus `typing_extensions.Protocol`
