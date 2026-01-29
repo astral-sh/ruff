@@ -76,3 +76,14 @@ def zipfile_safe_handler(filename):
 
     zf2 = zipfile.ZipFile(asset_path, "r")
     zf2.extractall(extract_dir)
+
+class MyClass:
+    def extractall(self, path):
+        pass
+
+def custom_class_handler(filename):
+    mc = MyClass()
+    mc.extractall("path")
+
+    with MyClass() as mc2:
+        mc2.extractall("path")

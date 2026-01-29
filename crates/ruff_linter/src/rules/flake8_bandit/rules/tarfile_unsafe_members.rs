@@ -83,7 +83,7 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
                             vars.as_name_expr().is_some_and(|n| n.id == name.id)
                         })
                     }) {
-                        if is_zipfile(&item.context_expr, checker.semantic()) {
+                        if is_likely_safe_source(&item.context_expr, checker.semantic()) {
                             return;
                         }
                     }
@@ -96,7 +96,7 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
                     }),
                 ) = binding.statement(checker.semantic())
                 {
-                    if is_zipfile(value, checker.semantic()) {
+                    if is_likely_safe_source(value, checker.semantic()) {
                         return;
                     }
                 }
@@ -107,7 +107,7 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ast::ExprCall) {
     checker.report_diagnostic(TarfileUnsafeMembers, call.func.range());
 }
 
-fn is_zipfile(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_likely_safe_source(expr: &Expr, semantic: &SemanticModel) -> bool {
     let expr = if let Expr::Call(ast::ExprCall { func, .. }) = expr {
         func.as_ref()
     } else {
@@ -115,5 +115,5 @@ fn is_zipfile(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["zipfile", "ZipFile"]))
+        .is_some_and(|qualified_name| qualified_name.segments().first() != Some(&"tarfile"))
 }
