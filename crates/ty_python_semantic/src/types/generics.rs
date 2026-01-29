@@ -25,9 +25,10 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionType, declaration_type, walk_callable_type, walk_type_var_bounds,
+    KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionType, declaration_type, walk_callable_type,
+    walk_manual_pep_695_type_alias, walk_pep_695_type_alias, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -579,6 +580,20 @@ impl<'db> GenericContext<'db> {
                     self.in_callable_type.set(None);
                 } else {
                     walk_callable_type(db, callable, self);
+                }
+            }
+
+            fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+                // The default implementation would do this for us if we returned `true` from
+                // `should_visit_lazy_type_attributes`. However, this is the _only_ lazy type
+                // attribute that we want to recurse into, so we do it by hand.
+                match type_alias {
+                    TypeAliasType::PEP695(type_alias) => {
+                        walk_pep_695_type_alias(db, type_alias, self);
+                    }
+                    TypeAliasType::ManualPEP695(type_alias) => {
+                        walk_manual_pep_695_type_alias(db, type_alias, self);
+                    }
                 }
             }
 
