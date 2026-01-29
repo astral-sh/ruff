@@ -501,9 +501,18 @@ impl<'a> SuppressionsBuilder<'a> {
             indents.clear();
 
             let (before, after) = tokens.split_at(suppression.range.start());
+            let mut count = 0;
             let last_indent = before
                 .iter()
-                .rfind(|token| token.kind() == TokenKind::Indent)
+                .rfind(|token| {
+                    // look for the last indent not matched by a dedent
+                    count += match token.kind() {
+                        TokenKind::Dedent => 1,
+                        TokenKind::Indent => -1,
+                        _ => return false,
+                    };
+                    token.kind() == TokenKind::Indent && count < 0
+                })
                 .map(|token| self.source.slice(token))
                 .unwrap_or_default();
 
@@ -908,6 +917,74 @@ print('hello')
                         action: Enable,
                         codes: [
                             "foo",
+                        ],
+                        reason: "",
+                    },
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn single_range_suppression_after_dedent() {
+        let source = "
+def outer():
+    def inner():
+        pass
+
+    # ruff: disable[foo]
+    print('hello')
+    # ruff: enable[foo]
+
+# ruff: disable[bar]
+print('hello')
+# ruff: enable[bar]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo]\n    print('hello')\n    # ruff: enable[foo]",
+                    code: "foo",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: disable[foo]",
+                        action: Disable,
+                        codes: [
+                            "foo",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: SuppressionComment {
+                        text: "# ruff: enable[foo]",
+                        action: Enable,
+                        codes: [
+                            "foo",
+                        ],
+                        reason: "",
+                    },
+                },
+                Suppression {
+                    covered_source: "# ruff: disable[bar]\nprint('hello')\n# ruff: enable[bar]",
+                    code: "bar",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: disable[bar]",
+                        action: Disable,
+                        codes: [
+                            "bar",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: SuppressionComment {
+                        text: "# ruff: enable[bar]",
+                        action: Enable,
+                        codes: [
+                            "bar",
                         ],
                         reason: "",
                     },
