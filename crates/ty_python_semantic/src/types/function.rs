@@ -257,7 +257,7 @@ impl<'db> OverloadLiteral<'db> {
         )
     }
 
-    fn file(self, db: &'db dyn Db) -> File {
+    pub(super) fn file(self, db: &'db dyn Db) -> File {
         // NOTE: Do not use `self.definition(db).file(db)` here, as that could create a
         // cross-module dependency on the full AST.
         self.body_scope(db).file(db)

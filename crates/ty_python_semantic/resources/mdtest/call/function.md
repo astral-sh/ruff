@@ -70,6 +70,8 @@ def _(flag: bool):
 
 ## PEP-484 convention for positional-only parameters
 
+<!-- snapshot-diagnostics -->
+
 PEP 570, introduced in Python 3.8, added dedicated Python syntax for denoting positional-only
 parameters (the `/` in a function signature). However, functions implemented in C were able to have
 positional-only parameters prior to Python 3.8 (there was just no syntax for expressing this at the
@@ -94,15 +96,48 @@ f(1)
 f(__x=1)
 ```
 
-But not if they follow a non-positional-only parameter:
+But not if they follow a non-positional-only parameter. This is flagged with a different error code
+since (per the typing spec), this is likely a mistake from the user:
 
 ```py
+from typing import overload
+
+# error: [invalid-legacy-positional-parameter]
 def g(x: int, __y: str): ...
 
 g(x=1, __y="foo")
+
+# The earlier `g` definition is shadowed here,
+# but we still emit a diagnostic on the earlier definition
+def g(): ...
 ```
 
-And also not if they both start and end with `__`:
+Because the lint is a syntactic check, we emit it for each overload if multiple overloads violate
+the lint:
+
+```py
+import tkinter
+from typing import Callable, TypeVar, Any
+
+@overload
+def g2(x: int, __y: str): ...  # error: [invalid-legacy-positional-parameter]
+@overload
+def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
+def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
+
+T = TypeVar("T")
+
+def copy_type(f: T) -> Callable[[Any], T]:
+    return lambda x: x
+
+# Naively iterating over the overloads without checking that the overloads come from the same file
+# as the definition would cause us to panic on this function,
+# because the overloads are defined in `stdlib/tkinter/__init__.pyi`.
+@copy_type(tkinter.Text.__init__)
+def g3(self, *args: Any, **kwargs: Any) -> None: ...
+```
+
+Parameters are also not understood as positional-only if they both start and end with `__`:
 
 ```py
 def h(__x__: str): ...
@@ -128,7 +163,7 @@ class C:
     # (the name of the first parameter is irrelevant;
     # a staticmethod works the same as a free function in the global scope)
     @staticmethod
-    def static_method(self, __x: int): ...
+    def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
 
 # error: [positional-only-parameter-as-kwarg]
 C().method(__x=1)
