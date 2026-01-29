@@ -910,6 +910,26 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
+    fn self_binding_context(&self, db: &'db dyn Db) -> Option<BindingContext<'db>> {
+        let definition = self.definition?;
+        if let Some(self_typevar) = self
+            .generic_context
+            .and_then(|ctx| ctx.variables(db).find(|tv| tv.typevar(db).is_self(db)))
+        {
+            return Some(self_typevar.binding_context(db));
+        }
+
+        let scope = definition.scope(db);
+        let index = semantic_index(db, scope.file(db));
+        if let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db)) {
+            return Some(BindingContext::Definition(class_definition));
+        }
+
+        self.generic_context
+            .and_then(|ctx| ctx.variables(db).find(|tv| tv.typevar(db).is_self(db)))
+            .map(|tv| tv.binding_context(db))
+    }
+
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         let mut parameters = self.parameters.iter().cloned().peekable();
 
@@ -919,14 +939,14 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
+        // Only bind Self typevars that belong to this signature's generic context.
+        let self_binding_context = self.self_binding_context(db);
+
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
-        let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type {
-            let self_mapping = TypeMapping::BindSelf {
-                self_type,
-                binding_context,
-            };
+            let self_mapping =
+                TypeMapping::BindSelf(super::SelfBinding::new(db, self_type, self_binding_context));
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,
@@ -938,7 +958,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self
                 .generic_context
-                .map(|generic_context| generic_context.remove_self(db, binding_context)),
+                .map(|generic_context| generic_context.remove_self(db, self_binding_context)),
             definition: self.definition,
             parameters,
             return_ty,
@@ -946,10 +966,9 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        let self_mapping = TypeMapping::BindSelf {
-            self_type,
-            binding_context: self.definition.map(BindingContext::Definition),
-        };
+        let self_binding_context = self.self_binding_context(db);
+        let self_mapping =
+            TypeMapping::BindSelf(super::SelfBinding::new(db, self_type, self_binding_context));
         let parameters = self.parameters.apply_type_mapping_impl(
             db,
             &self_mapping,

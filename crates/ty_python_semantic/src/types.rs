@@ -76,7 +76,7 @@ use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{TypeKind, any_over_type};
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
@@ -827,6 +827,98 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
+fn type_contains_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    if let Type::TypeVar(typevar) = ty {
+        return typevar.typevar(db).is_self(db);
+    }
+
+    if let Type::NominalInstance(instance) = ty
+        && !instance.can_contain_self()
+    {
+        return false;
+    }
+
+    if matches!(TypeKind::from(ty), TypeKind::Atomic) {
+        return false;
+    }
+
+    any_over_type(
+        db,
+        ty,
+        &|inner_ty| matches!(inner_ty, Type::TypeVar(tv) if tv.typevar(db).is_self(db)),
+        false,
+    )
+}
+
+fn self_class_mro_for_self_type<'db>(
+    db: &'db dyn Db,
+    self_type: Type<'db>,
+) -> Option<Vec<ClassLiteral<'db>>> {
+    let class_literal = match self_type {
+        Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+        Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
+            typevar.typevar(db).upper_bound(db).and_then(|ty| match ty {
+                Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+                _ => None,
+            })
+        }
+        _ => None,
+    }?;
+
+    Some(
+        class_literal
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .map(|class| class.class_literal(db))
+            .collect(),
+    )
+}
+
+fn self_typevar_owner_class_literal<'db>(
+    db: &'db dyn Db,
+    bound_typevar: BoundTypeVarInstance<'db>,
+) -> Option<ClassLiteral<'db>> {
+    bound_typevar
+        .typevar(db)
+        .upper_bound(db)
+        .and_then(|ty| match ty {
+            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+            _ => None,
+        })
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub struct SelfBinding<'db> {
+    ty: Type<'db>,
+    class_mro: Option<Vec<ClassLiteral<'db>>>,
+    binding_context: Option<BindingContext<'db>>,
+}
+
+impl<'db> SelfBinding<'db> {
+    fn new(
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        binding_context: Option<BindingContext<'db>>,
+    ) -> Self {
+        Self {
+            ty: self_type,
+            class_mro: self_class_mro_for_self_type(db, self_type),
+            binding_context,
+        }
+    }
+
+    fn should_bind(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
+        if !bound_typevar.typevar(db).is_self(db) {
+            return false;
+        }
+
+        self.class_mro.as_ref().is_none_or(|class_mro| {
+            self_typevar_owner_class_literal(db, bound_typevar)
+                .is_none_or(|owner_class| class_mro.contains(&owner_class))
+        })
+    }
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -858,11 +950,37 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if this type contains a `Self` type variable.
     pub(crate) fn contains_self(&self, db: &'db dyn Db) -> bool {
-        any_over_type(
+        type_contains_self(db, *self)
+    }
+
+    pub(crate) fn supports_self_binding(&self, db: &'db dyn Db) -> bool {
+        if matches!(self, Type::FunctionLiteral(_) | Type::BoundMethod(_)) {
+            return false;
+        }
+        if !self.contains_self(db) {
+            return false;
+        }
+        if let Type::Callable(callable) = self {
+            matches!(callable.kind(db), CallableTypeKind::Regular)
+        } else {
+            true
+        }
+    }
+
+    pub(crate) fn bind_self_typevars(
+        self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        self_binding_context: Option<BindingContext<'db>>,
+    ) -> Self {
+        if !self.supports_self_binding(db) {
+            return self;
+        }
+
+        self.apply_type_mapping(
             db,
-            *self,
-            &|ty| matches!(ty, Type::TypeVar(tv) if tv.typevar(db).is_self(db)),
-            false,
+            &TypeMapping::BindSelf(SelfBinding::new(db, self_type, self_binding_context)),
+            TypeContext::default(),
         )
     }
 
@@ -3348,11 +3466,32 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => {
                 let fallback = self.instance_member(db, name_str);
 
+                // Bind `Self` in fallback types to the concrete instance.
+                let fallback = match self {
+                    Type::NominalInstance(instance) => {
+                        let self_type = Type::NominalInstance(instance);
+                        fallback.map_type(|ty| ty.bind_self_typevars(db, self_type, None))
+                    }
+                    Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
+                        fallback.map_type(|ty| ty.bind_self_typevars(db, self, None))
+                    }
+                    _ => fallback,
+                };
+
+                // `Self` type variables use `InstanceFallbackShadowsNonDataDescriptor::Yes`
+                // because instance attributes should shadow non-data descriptors on the class.
+                let instance_fallback_shadows = if matches!(self, Type::TypeVar(tv) if tv.typevar(db).is_self(db))
+                {
+                    InstanceFallbackShadowsNonDataDescriptor::Yes
+                } else {
+                    InstanceFallbackShadowsNonDataDescriptor::No
+                };
+
                 let result = self.invoke_descriptor_protocol(
                     db,
                     name_str,
                     fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    instance_fallback_shadows,
                     policy,
                 );
 
@@ -6049,7 +6188,7 @@ impl<'db> Type<'db> {
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
-            TypeMapping::BindSelf { self_type, .. } if self == *self_type => return self,
+            TypeMapping::BindSelf(binding) if self == binding.ty => return self,
             _ => {}
         }
 
@@ -6065,7 +6204,7 @@ impl<'db> Type<'db> {
                         TypeMapping::ApplySpecialization(_) |
                         TypeMapping::UniqueSpecialization { .. } |
                         TypeMapping::PromoteLiterals(_) |
-                        TypeMapping::BindSelf { .. } |
+                        TypeMapping::BindSelf(_) |
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
                         TypeMapping::ReplaceParameterDefaults |
@@ -6287,7 +6426,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf { .. } |
+                TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
@@ -6300,7 +6439,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf { .. } |
+                TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
                 TypeMapping::ReplaceParameterDefaults |
@@ -6984,10 +7123,7 @@ pub enum TypeMapping<'a, 'db> {
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
     /// Binds any `typing.Self` typevar with a particular `self` class.
-    BindSelf {
-        self_type: Type<'db>,
-        binding_context: Option<BindingContext<'db>>,
-    },
+    BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
@@ -7033,9 +7169,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion => context,
-            TypeMapping::BindSelf {
-                binding_context, ..
-            } => context.remove_self(db, *binding_context),
+            TypeMapping::BindSelf(binding) => context.remove_self(db, binding.binding_context),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
                 context.variables(db).map(|typevar| {
@@ -7063,7 +7197,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
-            | TypeMapping::BindSelf { .. }
+            | TypeMapping::BindSelf(_)
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion => self.clone(),
@@ -8478,10 +8612,10 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
-    /// Get the identity of this bound typevar.
+    /// Get a unique key for this bound typevar that includes binding context.
     ///
-    /// This is used for comparing whether two bound typevars represent the same logical typevar,
-    /// regardless of e.g. differences in their bounds or constraints due to materialization.
+    /// This is used as a key in maps/sets where we need to distinguish the same logical
+    /// typevar bound in different contexts (e.g., `T@foo` vs `T@bar`).
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         BoundTypeVarIdentity {
             identity: self.typevar(db).identity(db),
@@ -8563,9 +8697,17 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
-    /// differences in their bounds or constraints due to materialization.
+    /// Returns whether two bound typevars represent the same logical typevar.
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
+        if self.typevar(db).is_self(db) && other.typevar(db).is_self(db) {
+            if let (Some(left), Some(right)) = (
+                self_typevar_owner_class_literal(db, self),
+                self_typevar_owner_class_literal(db, other),
+            ) {
+                return left == right && self.paramspec_attr(db) == other.paramspec_attr(db);
+            }
+        }
+
         self.identity(db) == other.identity(db)
     }
 
@@ -8681,14 +8823,9 @@ impl<'db> BoundTypeVarInstance<'db> {
                     })
                     .unwrap_or(Type::TypeVar(self))
             }
-            TypeMapping::BindSelf {
-                self_type,
-                binding_context,
-            } => {
-                if self.typevar(db).is_self(db)
-                    && binding_context.is_none_or(|context| self.binding_context(db) == context)
-                {
-                    *self_type
+            TypeMapping::BindSelf(binding) => {
+                if binding.should_bind(db, self) {
+                    binding.ty
                 } else {
                     Type::TypeVar(self)
                 }

@@ -4987,6 +4987,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let mut first_tcx = None;
+        let bind_self = |ty: Type<'db>| ty.bind_self_typevars(db, object_ty, None);
 
         // A wrapper over `infer_value_ty` that allows inferring the value type multiple times
         // during attribute resolution.
@@ -5332,6 +5333,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }),
                         qualifiers,
                     } => {
+                        let meta_attr_ty = bind_self(meta_attr_ty);
                         if invalid_assignment_to_final(self, qualifiers) {
                             return false;
                         }
@@ -5383,6 +5385,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             } =
                                 object_ty.instance_member(db, attribute)
                             {
+                                let instance_attr_ty = bind_self(instance_attr_ty);
                                 let value_ty =
                                     infer_value_ty(self, TypeContext::new(Some(instance_attr_ty)));
                                 if invalid_assignment_to_final(self, qualifiers) {
@@ -5428,6 +5431,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             qualifiers,
                         } = object_ty.instance_member(db, attribute)
                         {
+                            let instance_attr_ty = bind_self(instance_attr_ty);
                             let value_ty =
                                 infer_value_ty(self, TypeContext::new(Some(instance_attr_ty)));
                             if invalid_assignment_to_final(self, qualifiers) {
