@@ -662,18 +662,15 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
-            // Fast path: `object` is not a subtype of any nominal instance type other than itself.
-            // This is important for performance when checking intersections with no positive
-            // elements (pure negations like `~str`), which are treated as having `object` as
-            // the implicit positive element.
-            (Type::NominalInstance(source), Type::NominalInstance(_)) if source.is_object() => {
-                ConstraintSet::from(false)
-            }
-
-            // Fast path: `object` (an instance type) is not a subtype of any `type[X]` (a class type).
-            (Type::NominalInstance(source), Type::SubclassOf(_)) if source.is_object() => {
-                ConstraintSet::from(false)
-            }
+            // Fast path for various types that we know `object` is never a subtype of
+            // (`object` can be a subtype of some protocols, but that case is handled above).
+            (
+                Type::NominalInstance(source),
+                Type::NominalInstance(_)
+                | Type::SubclassOf(_)
+                | Type::Callable(_)
+                | Type::ProtocolInstance(_),
+            ) if source.is_object() => ConstraintSet::from(false),
 
             // Fast path: `object` is not a subtype of any non-inferable type variable, since the
             // type variable could be specialized to a type smaller than `object`.
@@ -696,19 +693,6 @@ impl<'db> Type<'db> {
                         .is_none_or(|bound| bound.is_object()) =>
             {
                 ConstraintSet::from(true)
-            }
-
-            // Fast path: `object` is not a subtype of any callable type, since not all objects
-            // are callable.
-            (Type::NominalInstance(source), Type::Callable(_)) if source.is_object() => {
-                ConstraintSet::from(false)
-            }
-
-            // Fast path: `object` is only a subtype/assignable to a protocol if the protocol
-            // is equivalent to `object` (handled above). Otherwise, not all objects satisfy
-            // the protocol.
-            (Type::NominalInstance(source), Type::ProtocolInstance(_)) if source.is_object() => {
-                ConstraintSet::from(false)
             }
 
             // Fast path: `object` is only a subtype/assignable to unions that contain a type
