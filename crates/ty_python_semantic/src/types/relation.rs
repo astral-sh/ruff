@@ -1287,7 +1287,7 @@ impl<'db> Type<'db> {
                 .subclass_of()
                 .into_class(db)
                 .map(|subclass_of_class| {
-                    class.default_specialization(db).has_relation_to_impl(
+                    class.unknown_specialization(db).has_relation_to_impl(
                         db,
                         subclass_of_class,
                         inferable,
@@ -1303,7 +1303,7 @@ impl<'db> Type<'db> {
             // with final generic types, where `type[C[...]]` is simplified to the generic-alias
             // type `<class 'C[...]'>`, due to the fact that `C[...]` has no subclasses.
             (Type::ClassLiteral(class), Type::GenericAlias(target_alias)) => {
-                class.default_specialization(db).has_relation_to_impl(
+                class.unknown_specialization(db).has_relation_to_impl(
                     db,
                     ClassType::Generic(target_alias),
                     inferable,
@@ -2128,7 +2128,7 @@ impl<'db> Type<'db> {
 
             (Type::ClassLiteral(class_literal), other @ Type::GenericAlias(_))
             | (other @ Type::GenericAlias(_), Type::ClassLiteral(class_literal)) => class_literal
-                .default_specialization(db)
+                .unknown_specialization(db)
                 .into_generic_alias()
                 .when_none_or(|alias| {
                     other.is_disjoint_from_impl(

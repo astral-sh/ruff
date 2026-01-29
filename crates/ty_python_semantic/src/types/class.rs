@@ -520,6 +520,14 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns the unknown specialization for this class (same as default for non-generic).
+    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        match self {
+            Self::Static(class) => class.unknown_specialization(db),
+            Self::Dynamic(_) | Self::DynamicNamedTuple(_) => ClassType::NonGeneric(self),
+        }
+    }
+
     /// Returns the generic context if this is a generic class.
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.as_static().and_then(|class| class.generic_context(db))
