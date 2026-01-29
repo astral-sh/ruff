@@ -463,7 +463,7 @@ impl<'db> OverloadLiteral<'db> {
                 return false;
             }
 
-            if literal.is_staticmethod(db) {
+            if literal.is_staticmethod(db) && literal.name(db) != "__new__" {
                 return false;
             }
 

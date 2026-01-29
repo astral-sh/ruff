@@ -164,9 +164,14 @@ class C:
     # a staticmethod works the same as a free function in the global scope)
     @staticmethod
     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
+    # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
+    # parameter in a classmethod, and is always passed positionally at runtime,
+    # We therefore understand both `cls` and `__x` here as positional-only; we do not
+    # emit `[invalid-legacy-positional-parameter]` on the method.
+    def __new__(cls, __x: int): ...
 
 # error: [positional-only-parameter-as-kwarg]
-C().method(__x=1)
+C(42).method(__x=1)
 # error: [positional-only-parameter-as-kwarg]
 C.class_method(__x="1")
 C.static_method("x", __x=42)  # fine

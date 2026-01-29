@@ -61,12 +61,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/function.md
 46 |     # a staticmethod works the same as a free function in the global scope)
 47 |     @staticmethod
 48 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
-49 | 
-50 | # error: [positional-only-parameter-as-kwarg]
-51 | C().method(__x=1)
-52 | # error: [positional-only-parameter-as-kwarg]
-53 | C.class_method(__x="1")
-54 | C.static_method("x", __x=42)  # fine
+49 |     # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
+50 |     # parameter in a classmethod, and is always passed positionally at runtime,
+51 |     # We therefore understand both `cls` and `__x` here as positional-only; we do not
+52 |     # emit `[invalid-legacy-positional-parameter]` on the method.
+53 |     def __new__(cls, __x: int): ...
+54 | 
+55 | # error: [positional-only-parameter-as-kwarg]
+56 | C(42).method(__x=1)
+57 | # error: [positional-only-parameter-as-kwarg]
+58 | C.class_method(__x="1")
+59 | C.static_method("x", __x=42)  # fine
 ```
 
 # Diagnostics
@@ -172,8 +177,8 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
    |                       ----  ^^^ Parameter name begins with `__` but will not be treated as positional-only
    |                       |
    |                       Prior parameter here was positional-or-keyword
-49 |
-50 | # error: [positional-only-parameter-as-kwarg]
+49 |     # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
+50 |     # parameter in a classmethod, and is always passed positionally at runtime,
    |
 info: A parameter can only be positional-only if precedes all positional-or-keyword parameters
 info: rule `invalid-legacy-positional-parameter` is enabled by default
@@ -182,13 +187,13 @@ info: rule `invalid-legacy-positional-parameter` is enabled by default
 
 ```
 error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `method`
-  --> src/mdtest_snippet.py:51:12
+  --> src/mdtest_snippet.py:56:14
    |
-50 | # error: [positional-only-parameter-as-kwarg]
-51 | C().method(__x=1)
-   |            ^^^^^
-52 | # error: [positional-only-parameter-as-kwarg]
-53 | C.class_method(__x="1")
+55 | # error: [positional-only-parameter-as-kwarg]
+56 | C(42).method(__x=1)
+   |              ^^^^^
+57 | # error: [positional-only-parameter-as-kwarg]
+58 | C.class_method(__x="1")
    |
 info: Method signature here
   --> src/mdtest_snippet.py:42:9
@@ -206,13 +211,13 @@ info: rule `positional-only-parameter-as-kwarg` is enabled by default
 
 ```
 error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `class_method`
-  --> src/mdtest_snippet.py:53:16
+  --> src/mdtest_snippet.py:58:16
    |
-51 | C().method(__x=1)
-52 | # error: [positional-only-parameter-as-kwarg]
-53 | C.class_method(__x="1")
+56 | C(42).method(__x=1)
+57 | # error: [positional-only-parameter-as-kwarg]
+58 | C.class_method(__x="1")
    |                ^^^^^^^
-54 | C.static_method("x", __x=42)  # fine
+59 | C.static_method("x", __x=42)  # fine
    |
 info: Method signature here
   --> src/mdtest_snippet.py:44:9
