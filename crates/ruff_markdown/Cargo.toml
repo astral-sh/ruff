@@ -17,6 +17,7 @@ ruff_workspace = { workspace = true }
 
 insta = { workspace = true }
 regex = { workspace = true }
+fancy-regex = "0.17.0"
 
 [lints]
 workspace = true

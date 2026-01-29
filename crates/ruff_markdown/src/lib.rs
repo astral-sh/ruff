@@ -1,6 +1,6 @@
 use std::{path::Path, sync::LazyLock};
 
-use regex::Regex;
+use fancy_regex::Regex;
 use ruff_python_ast::PySourceType;
 use ruff_python_formatter::format_module_source;
 use ruff_python_trivia::textwrap::{dedent, indent};
@@ -20,13 +20,13 @@ static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?imsx)
                     (?<before>
-                        ^(?<indent>\ *)```[^\S\r\n]*
-                        (?<lang>(?:python|py|python3|py3|pyi)?)
+                        ^(?<indent>\ *)(?<fence>```+|~~~+)[^\S\r\n]*
+                        (?<language>(?:python|py|python3|py3|pyi)?)
                         (?:\ .*?)?\n
                     )
                     (?<code>.*?)
                     (?<after>
-                        ^\ *```[^\S\r\n]*$
+                        ^\ *\k<fence>[^\S\r\n]*$
                     )
                     ",
     )
@@ -43,10 +43,14 @@ pub fn format_code_blocks(
     let mut last_match = 0;
 
     for capture in MARKDOWN_CODE_BLOCK.captures_iter(source) {
-        let (_, [before, code_indent, language, code, after]) = capture.extract();
+        let Ok(capture) = capture else {
+            continue;
+        };
+        let language = capture.name("language").expect("no language");
+        let code = capture.name("code").expect("no code");
 
-        let py_source_type = PySourceType::from_extension(language);
-        let unformatted_code = dedent(code);
+        let py_source_type = PySourceType::from_extension(language.as_str());
+        let unformatted_code = dedent(code.as_str());
         let options = settings.to_format_options(py_source_type, &unformatted_code, path);
 
         // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
@@ -57,15 +61,14 @@ pub fn format_code_blocks(
         if let Ok(formatted_code) = formatted_code {
             if formatted_code.len() != unformatted_code.len() || formatted_code != *unformatted_code
             {
-                let m = capture.get_match();
-                formatted.push_str(&source[last_match..m.start()]);
+                let code_indent = capture.name("indent").expect("no indent").as_str();
+
+                formatted.push_str(&source[last_match..code.start()]);
 
                 let indented_code = indent(&formatted_code, code_indent);
-                // otherwise I need to deal with a result from write!
-                #[expect(clippy::format_push_string)]
-                formatted.push_str(&format!("{before}{indented_code}{after}"));
+                formatted.push_str(&indented_code);
 
-                last_match = m.end();
+                last_match = code.end();
                 changed = true;
             }
         }
