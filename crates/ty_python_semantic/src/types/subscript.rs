@@ -147,6 +147,8 @@ pub(crate) enum SubscriptErrorKind<'db> {
         origin: LegacyGenericOrigin,
         typevar_name: &'db str,
     },
+    /// A `TypeVarTuple` was provided to `Generic` or `Protocol` without being unpacked.
+    TypeVarTupleNotUnpacked { origin: LegacyGenericOrigin },
 }
 
 impl<'db> SubscriptError<'db> {
@@ -331,6 +333,14 @@ impl<'db> SubscriptErrorKind<'db> {
                     builder.into_diagnostic(format_args!(
                         "Type parameter `{typevar_name}` cannot appear multiple times \
                         in `{origin}` subscription",
+                    ));
+                }
+            }
+            Self::TypeVarTupleNotUnpacked { origin } => {
+                if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "`TypeVarTuple` must be unpacked with `*` or `Unpack[]` when \
+                        used as an argument to `{origin}`",
                     ));
                 }
             }

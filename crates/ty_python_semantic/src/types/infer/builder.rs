@@ -15252,6 +15252,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             NotYetSupported,
             /// A duplicate typevar was provided.
             DuplicateTypevar(&'db str),
+            /// A `TypeVarTuple` was provided but not unpacked.
+            TypeVarTupleMustBeUnpacked,
         }
 
         impl<'db> LegacyGenericContextError<'db> {
@@ -15259,7 +15261,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match self {
                     LegacyGenericContextError::InvalidArgument(_)
                     | LegacyGenericContextError::VariadicTupleArguments
-                    | LegacyGenericContextError::DuplicateTypevar(_) => Type::unknown(),
+                    | LegacyGenericContextError::DuplicateTypevar(_)
+                    | LegacyGenericContextError::TypeVarTupleMustBeUnpacked => Type::unknown(),
                     LegacyGenericContextError::NotYetSupported => {
                         todo_type!("ParamSpecs and TypeVarTuples")
                     }
@@ -15301,6 +15304,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 typevar.name(db),
                             ));
                         }
+                    } else if let Type::NominalInstance(instance) = argument_ty
+                        && instance.has_known_class(db, KnownClass::TypeVarTuple)
+                    {
+                        return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
                     } else if any_over_type(
                         db,
                         argument_ty,
@@ -15353,7 +15360,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             },
                         ))
                     }
-                    Err(error) => Ok(error.into_type()),
+                    Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked) => {
+                        Err(SubscriptError::new(
+                            Type::unknown(),
+                            SubscriptErrorKind::TypeVarTupleNotUnpacked {
+                                origin: LegacyGenericOrigin::Generic,
+                            },
+                        ))
+                    }
+                    Err(
+                        error @ (LegacyGenericContextError::NotYetSupported
+                        | LegacyGenericContextError::VariadicTupleArguments),
+                    ) => Ok(error.into_type()),
                 }
             }
             Type::SpecialForm(SpecialFormType::Protocol) => {
@@ -15379,7 +15397,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             },
                         ))
                     }
-                    Err(error) => Ok(error.into_type()),
+                    Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked) => {
+                        Err(SubscriptError::new(
+                            Type::unknown(),
+                            SubscriptErrorKind::TypeVarTupleNotUnpacked {
+                                origin: LegacyGenericOrigin::Protocol,
+                            },
+                        ))
+                    }
+                    Err(
+                        error @ (LegacyGenericContextError::NotYetSupported
+                        | LegacyGenericContextError::VariadicTupleArguments),
+                    ) => Ok(error.into_type()),
                 }
             }
             Type::SpecialForm(SpecialFormType::Concatenate) => {

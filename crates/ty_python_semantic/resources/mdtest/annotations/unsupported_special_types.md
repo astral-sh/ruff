@@ -45,3 +45,10 @@ class Baz[*Ts]: ...
 # TODO: false positive
 z: Baz[int, str, bytes]  # error: [not-subscriptable]
 ```
+
+And we also provide some basic validation in some cases:
+
+```py
+# error: [invalid-generic-class] "`TypeVarTuple` must be unpacked with `*` or `Unpack[]` when used as an argument to `Generic`"
+class Spam(Generic[Ts]): ...
+```
