@@ -59,7 +59,7 @@ pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails}
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
-    FunctionType, KnownFunction,
+    FunctionType, KnownFunction, is_implicit_staticmethod,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
@@ -210,6 +210,44 @@ fn definition_expression_type<'db>(
         // expression is in a type-params sub-scope
         infer_complete_scope_types(db, scope).expression_type(expression)
     }
+}
+
+fn decorator_expression_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> Type<'db> {
+    let file = definition.file(db);
+    let index = semantic_index(db, file);
+    let file_scope = index.expression_scope_id(expression);
+    let scope = file_scope.to_scope_id(db, file);
+    infer_complete_scope_types(db, scope).expression_type(expression)
+}
+
+// Cheap decorator-only check to avoid inferring full function types.
+fn definition_is_staticmethod_syntax<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return false;
+    };
+
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let function_node = function.node(&module);
+
+    if is_implicit_staticmethod(function_node.name.as_str()) {
+        return true;
+    }
+
+    if function_node.decorator_list.is_empty() {
+        return false;
+    }
+
+    function_node.decorator_list.iter().any(|decorator| {
+        match decorator_expression_type(db, definition, &decorator.expression) {
+            Type::ClassLiteral(class) => class.is_known(db, KnownClass::Staticmethod),
+            _ => false,
+        }
+    })
 }
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
@@ -5763,11 +5801,36 @@ impl<'db> Type<'db> {
                         });
                     };
 
-                    Ok(
-                        typing_self(db, scope_id, typevar_binding_context, class.into())
-                            .map(Type::TypeVar)
-                            .unwrap_or(*self),
-                    )
+                    // Create the bound Self type variable.
+                    let bound_self =
+                        typing_self(db, scope_id, typevar_binding_context, class.into());
+
+                    // `Self` cannot be used in a static method.
+                    if let Some(definition) =
+                        bound_self.and_then(|bound| bound.binding_context(db).definition())
+                    {
+                        if definition_is_staticmethod_syntax(db, definition) {
+                            return Err(InvalidTypeExpressionError {
+                                fallback_type: Type::unknown(),
+                                invalid_expressions: smallvec_inline![
+                                    InvalidTypeExpression::SelfInStaticMethod
+                                ],
+                            });
+                        }
+                    }
+
+                    // `Self` cannot be used in a metaclass (subclass of `type`).
+                    // We exclude `type` itself since it's defined in typeshed.
+                    if !class.is_known(db, KnownClass::Type) && class.is_metaclass(db) {
+                        return Err(InvalidTypeExpressionError {
+                            fallback_type: Type::unknown(),
+                            invalid_expressions: smallvec_inline![
+                                InvalidTypeExpression::SelfInMetaclass
+                            ],
+                        });
+                    }
+
+                    Ok(bound_self.map(Type::TypeVar).unwrap_or(*self))
                 }
                 // We ensure that `typing.TypeAlias` used in the expected position (annotating an
                 // annotated assignment statement) doesn't reach here. Using it in any other type
@@ -7634,6 +7697,10 @@ enum InvalidTypeExpression<'db> {
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(SpecialFormType),
+    /// `typing.Self` cannot be used in a static method
+    SelfInStaticMethod,
+    /// `typing.Self` cannot be used in a metaclass
+    SelfInMetaclass,
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }
@@ -7702,6 +7769,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
+                    InvalidTypeExpression::SelfInStaticMethod => {
+                        f.write_str("`Self` cannot be used in a static method")
+                    }
+                    InvalidTypeExpression::SelfInMetaclass => {
+                        f.write_str("`Self` cannot be used in a metaclass")
+                    }
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,

@@ -503,8 +503,20 @@ pub(crate) fn nearest_enclosing_class<'db>(
         })
 }
 
-/// Returns the type of the nearest enclosing function for the given scope.
+/// Returns the [`FunctionType`] for a function [`Definition`].
 ///
+/// Returns `None` if the definition's type is not a function literal.
+pub(crate) fn function_type_from_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<FunctionType<'db>> {
+    let inference = infer_definition_types(db, definition);
+    inference
+        .undecorated_type()
+        .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
+        .as_function_literal()
+}
+
 /// This function walks up the ancestor scopes starting from the given scope,
 /// and finds the closest (non-lambda) function definition.
 ///
@@ -519,11 +531,7 @@ pub(crate) fn nearest_enclosing_function<'db>(
         .find_map(|(_, ancestor_scope)| {
             let func = ancestor_scope.node().as_function()?;
             let definition = semantic.expect_single_definition(func);
-            let inference = infer_definition_types(db, definition);
-            inference
-                .undecorated_type()
-                .unwrap_or_else(|| inference.declaration_type(definition).inner_type())
-                .as_function_literal()
+            function_type_from_definition(db, definition)
         })
 }
 

@@ -492,6 +492,25 @@ D[K]().h()
 
 ## Protocols
 
+`Self` is valid in Protocols. When a class implements a protocol with `Self`, the `Self` refers to
+the implementing class:
+
+```py
+from typing import Self, Protocol
+
+class Copyable(Protocol):
+    def copy(self) -> Self: ...
+
+class MyClass:
+    def copy(self) -> "MyClass":
+        return MyClass()
+
+def make_copy(obj: Copyable) -> Copyable:
+    return obj.copy()
+
+reveal_type(make_copy(MyClass()))  # revealed: Copyable
+```
+
 TODO: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
 
 ## Annotations
@@ -573,20 +592,238 @@ class Foo:
         return Foo()
 
     @staticmethod
-    # TODO: The usage of `Self` here should be rejected because this is a static method
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
     def make() -> Self:
-        # error: [invalid-return-type]
         return Foo()
 
 class Bar(Generic[T]): ...
 
 # error: [invalid-type-form]
 class Baz(Bar[Self]): ...
+```
+
+## Static method edge cases
+
+`Self` cannot be used anywhere in a static method, including parameters, return types, nested
+functions, and default argument values.
+
+```py
+from typing import Self
+
+class StaticMethodTests:
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_return() -> Self:
+        pass
+
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_param(x: Self) -> None:
+        pass
+
+    @staticmethod
+    def with_nested_function() -> None:
+        # `Self` in nested function inside static method is also invalid
+        # because `Self` binds to the outermost method (the static method).
+        # error: [invalid-type-form] "`Self` cannot be used in a static method"
+        def inner() -> Self:
+            pass
+
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_default(x: int = 0, y: "Self | None" = None) -> None:
+        pass
+```
+
+## Aliased staticmethod decorator
+
+Using an aliased `staticmethod` decorator should still be detected:
+
+```py
+from typing import Self
+
+sm = staticmethod
+
+class AliasedStaticMethod:
+    @sm
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def aliased_static() -> Self:
+        pass
+```
+
+## `__new__` allows `Self`
+
+`__new__` is implicitly a static method, but unlike regular static methods, `Self` is valid in
+`__new__` because it receives a `cls` argument with type `type[Self]` and typically returns `Self`:
+
+```py
+from typing import Self
+
+class WithNew:
+    def __new__(cls) -> Self:
+        instance = object.__new__(cls)
+        return instance
+
+reveal_type(WithNew())  # revealed: WithNew
+
+class SubclassWithNew(WithNew):
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+reveal_type(SubclassWithNew())  # revealed: SubclassWithNew
+```
+
+## Stacked decorators with staticmethod
+
+When `@staticmethod` is stacked with other decorators, `Self` should still be invalid:
+
+```py
+from typing import Self, Callable, TypeVar
+
+T = TypeVar("T")
+
+def identity(f: T) -> T:
+    return f
+
+class StackedDecorators:
+    @staticmethod
+    @identity
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def static_then_identity() -> Self:
+        pass
+    # TODO: On Python <3.10, this should ideally be rejected, because `staticmethod` objects were not callable.
+    @identity
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def identity_then_static() -> Self:
+        pass
+```
+
+## Metaclass edge cases
+
+`Self` cannot be used in a metaclass because the semantics are confusing: in a metaclass, `self`
+refers to a class (the metaclass instance), not a regular object instance.
+
+```py
+from typing import Self
 
 class MyMetaclass(type):
-    # TODO: reject the Self usage. because self cannot be used within a metaclass.
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    registry: list[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
     def __new__(cls, name, bases, dct) -> Self:
         return cls(name, bases, dct)
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def instance_method(self) -> Self:
+        return self
+
+    @classmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def metaclass_classmethod(cls) -> Self:
+        return cls("", (), {})
+    # Note: static methods in metaclasses get the static method error, not metaclass error
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def metaclass_staticmethod() -> Self:
+        pass
+```
+
+## Indirect metaclass inheritance
+
+Classes that inherit from `type` indirectly (through another metaclass) are also metaclasses:
+
+```py
+from typing import Self
+from abc import ABCMeta
+
+class IndirectMetaclass(ABCMeta):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def method(self) -> Self:
+        return self
+
+class MultiLevelMeta(IndirectMetaclass):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def another_method(self) -> Self:
+        return self
+```
+
+## Classes using a metaclass are not metaclasses
+
+A class that uses a metaclass (via `metaclass=...`) is _not_ itself a metaclass. `Self` should be
+valid in such classes:
+
+```py
+from typing import Self
+
+class SomeMeta(type):
+    pass
+
+class UsesMetaclass(metaclass=SomeMeta):
+    def method(self) -> Self:
+        reveal_type(self)  # revealed: Self@method
+        return self
+
+reveal_type(UsesMetaclass().method())  # revealed: UsesMetaclass
+
+class SubclassOfMetaclassUser(UsesMetaclass):
+    def another(self) -> Self:
+        return self
+
+reveal_type(SubclassOfMetaclassUser().another())  # revealed: SubclassOfMetaclassUser
+```
+
+## Nested class inside a metaclass
+
+A nested class inside a metaclass is _not_ a metaclass (unless it also inherits from `type`):
+
+```py
+from typing import Self
+
+class OuterMeta(type):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def meta_method(self) -> Self:
+        return self
+
+    class NestedRegularClass:
+        # This is fine - NestedRegularClass is not a metaclass
+        def method(self) -> Self:
+            reveal_type(self)  # revealed: Self@method
+            return self
+
+    class NestedMetaclass(type):
+        # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+        def nested_meta_method(self) -> Self:
+            return self
+```
+
+## `builtins.staticmethod`
+
+Using the fully qualified `builtins.staticmethod` should also be detected:
+
+```py
+from typing import Self
+import builtins
+
+class BuiltinsStaticMethod:
+    @builtins.staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def method() -> Self:
+        pass
+```
+
+## EnumMeta is a metaclass
+
+`enum.EnumMeta` (or `enum.EnumType` in Python 3.11+) is a metaclass, so `Self` should be invalid:
+
+```py
+from typing import Self
+from enum import EnumMeta
+
+class CustomEnumMeta(EnumMeta):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def custom_method(self) -> Self:
+        return self
 ```
 
 ## Explicit annotations override implicit `Self`
