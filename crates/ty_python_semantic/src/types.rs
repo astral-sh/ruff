@@ -856,10 +856,6 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub const fn is_unknown_generic(&self) -> bool {
-        matches!(self, Type::Dynamic(DynamicType::UnknownGeneric(_)))
-    }
-
     pub(crate) const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -1195,6 +1191,15 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
+    }
+
+    pub(crate) fn has_unknown_generic(self, db: &'db dyn Db) -> bool {
+        any_over_type(
+            db,
+            self,
+            &|ty| matches!(ty, Type::Dynamic(DynamicType::UnknownGeneric(_))),
+            false,
+        )
     }
 
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
