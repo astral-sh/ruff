@@ -663,7 +663,8 @@ impl<'db> Type<'db> {
             }
 
             // Fast path for various types that we know `object` is never a subtype of
-            // (`object` can be a subtype of some protocols, but that case is handled above).
+            // (`object` can be a subtype of some protocols, or of itself, but those cases are
+            // handled above).
             (
                 Type::NominalInstance(source),
                 Type::NominalInstance(_)
@@ -678,21 +679,6 @@ impl<'db> Type<'db> {
                 if source.is_object() && !typevar.is_inferable(db, inferable) =>
             {
                 ConstraintSet::from(false)
-            }
-
-            // Fast path: `object` is assignable to any inferable type variable with no upper bound
-            // (or with `object` as its upper bound), which is the common case for generic
-            // type parameters like `_T` in `Iterator[_T]`.
-            (Type::NominalInstance(source), Type::TypeVar(typevar))
-                if source.is_object()
-                    && typevar.is_inferable(db, inferable)
-                    && relation.is_assignability()
-                    && typevar
-                        .typevar(db)
-                        .upper_bound(db)
-                        .is_none_or(|bound| bound.is_object()) =>
-            {
-                ConstraintSet::from(true)
             }
 
             // `Never` is the bottom type, the empty set.
