@@ -673,6 +673,125 @@ impl Session {
         publish_settings_diagnostics(self, client, root);
     }
 
+    /// Adds an uninitialized workspace to this session.
+    ///
+    /// If there was a problem adding the workspace folder (e.g., the
+    /// path derived from the given URL is not valid UTF-8), then an
+    /// error is returned and no workspace folder is registered.
+    ///
+    /// To initialize the workspace folder, callers must initiate
+    /// a request for workspace folder configuration via
+    /// `Session::request_uninitialized_workspace_folder_configuration`.
+    pub(crate) fn register_workspace_folder(&mut self, url: Url) -> anyhow::Result<()> {
+        self.workspaces.register(url)
+    }
+
+    /// Requests configuration for each registered but uninitialized
+    /// workspace folder in this session.
+    ///
+    /// When all workspace folders in this session are initialized, then
+    /// this is a no-op.
+    ///
+    /// Each uninitialized workspace folder will be fully initialized
+    /// once the configuration response is received (asynchronously).
+    /// When the client doesn't support requesting workspace
+    /// configuration, the workspace folder is initialized immediately
+    /// using the options this session was initialized with.
+    ///
+    /// Adding an uninitialized workspace to this session can be done
+    /// with `Session::register_workspace_folder`.
+    pub(crate) fn request_uninitialized_workspace_folder_configurations(
+        &mut self,
+        client: &Client,
+    ) {
+        // When all workspaces are already initialized, then
+        // there's nothing to do.
+        if self.workspaces().all_initialized() {
+            return;
+        }
+
+        let uninit_workspace_urls: Vec<Url> = self
+            .workspaces()
+            .into_iter()
+            .filter_map(|(_, workspace)| {
+                if workspace.is_initialized() {
+                    None
+                } else {
+                    Some(workspace.url().clone())
+                }
+            })
+            .collect();
+
+        if !self
+            .client_capabilities()
+            .supports_workspace_configuration()
+        {
+            tracing::info!(
+                "Client does not support workspace configuration, initializing workspaces \
+                 using the initialization options"
+            );
+            self.initialize_workspace_folders(
+                client,
+                uninit_workspace_urls
+                    .into_iter()
+                    .map(|url| (url, self.initialization_options().options.clone()))
+                    .collect::<Vec<_>>(),
+            );
+            return;
+        }
+
+        let items: Vec<lsp_types::ConfigurationItem> = uninit_workspace_urls
+            .iter()
+            .map(|url| lsp_types::ConfigurationItem {
+                scope_uri: Some(url.clone()),
+                section: Some("ty".to_string()),
+            })
+            .collect();
+
+        tracing::debug!("Requesting workspace configuration for workspaces");
+        client.send_request::<lsp_types::request::WorkspaceConfiguration>(
+            self,
+            lsp_types::ConfigurationParams { items },
+            move |client, result: Vec<serde_json::Value>| {
+                tracing::debug!("Received workspace configurations, initializing workspaces");
+
+                // This shouldn't fail because, as per the spec, the client needs to provide a
+                // `null` value even if it cannot provide a configuration for a workspace.
+                assert_eq!(
+                    result.len(),
+                    uninit_workspace_urls.len(),
+                    "Mismatch in number of workspace URLs ({}) and configuration results ({})",
+                    uninit_workspace_urls.len(),
+                    result.len()
+                );
+
+                let workspaces_with_options: Vec<_> = uninit_workspace_urls
+                    .into_iter()
+                    .zip(result)
+                    .map(|(url, value)| {
+                        if value.is_null() {
+                            tracing::debug!(
+                                "No workspace options provided for {url}, using default options"
+                            );
+                            return (url, ClientOptions::default());
+                        }
+                        let options: ClientOptions =
+                            serde_json::from_value(value).unwrap_or_else(|err| {
+                                tracing::error!(
+                                    "Failed to deserialize workspace options for {url}: {err}. \
+                                        Using default options"
+                                );
+                                ClientOptions::default()
+                            });
+                        (url, options)
+                    })
+                    .collect();
+
+                client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
+            },
+        );
+    }
+
     pub(crate) fn take_deferred_messages(&mut self) -> Option<Message> {
         if self.workspaces.all_initialized() {
             self.deferred_messages.pop_front()
@@ -1272,7 +1391,7 @@ impl Workspaces {
     /// request.
     ///
     /// [`initialize`]: Workspaces::initialize
-    pub(crate) fn register(&mut self, url: Url) -> anyhow::Result<()> {
+    fn register(&mut self, url: Url) -> anyhow::Result<()> {
         let path = url
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
@@ -1295,39 +1414,23 @@ impl Workspaces {
 
     /// Returns a reference to the workspace for the given path, [`None`] if there's no workspace
     /// registered for the path.
-    pub(crate) fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
+    fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
         self.workspaces
             .range(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, db)| db)
     }
 
-    /// Returns a mutable reference to the workspace for the given path,
-    /// [`None`] if there's no workspace registered for the path.
-    pub(crate) fn for_path_mut(&mut self, path: impl AsRef<SystemPath>) -> Option<&mut Workspace> {
-        self.workspaces
-            .range_mut(..=path.as_ref().to_path_buf())
-            .next_back()
-            .map(|(_, db)| db)
-    }
-
     /// Returns the client settings for the workspace at the given path, [`None`] if there's no
     /// workspace registered for the path.
-    pub(crate) fn settings_for_path(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<Arc<WorkspaceSettings>> {
+    fn settings_for_path(&self, path: impl AsRef<SystemPath>) -> Option<Arc<WorkspaceSettings>> {
         self.for_path(path).map(Workspace::settings_arc)
-    }
-
-    pub(crate) fn urls(&self) -> impl Iterator<Item = &Url> + '_ {
-        self.workspaces.values().map(Workspace::url)
     }
 
     /// Returns `true` if all workspaces have been [initialized].
     ///
     /// [initialized]: Workspaces::initialize
-    pub(crate) fn all_initialized(&self) -> bool {
+    fn all_initialized(&self) -> bool {
         self.workspaces.values().all(Workspace::is_initialized)
     }
 }
