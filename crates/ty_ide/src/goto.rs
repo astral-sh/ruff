@@ -16,6 +16,7 @@ use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
+    typed_dict_key_definition,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
@@ -222,6 +223,12 @@ pub(crate) enum GotoTarget<'a> {
         /// If the expression is a Name of some kind this is the name (just a cached result).
         name: Option<String>,
     },
+
+    /// Go to on a string-literal subscript key (e.g. `person["name"]`).
+    SubscriptStringLiteralKey {
+        subscript: &'a ast::ExprSubscript,
+        literal_key: &'a str,
+    },
 }
 
 /// The resolved definitions for a `GotoTarget`
@@ -366,6 +373,9 @@ impl GotoTarget<'_> {
             GotoTarget::UnaryOp { expression, .. } => {
                 let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
                 Some(ty)
+            }
+            GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
+                subscript.inferred_type(model)
             }
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
@@ -639,6 +649,12 @@ impl GotoTarget<'_> {
                     alias_resolution,
                 ))
             }
+
+            GotoTarget::SubscriptStringLiteralKey {
+                subscript,
+                literal_key,
+            } => typed_dict_key_definition(model, subscript, literal_key)
+                .map(|definition| vec![definition]),
         };
         definitions.map(Definitions)
     }
@@ -704,7 +720,9 @@ impl GotoTarget<'_> {
             }
             GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
             GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
-            GotoTarget::BinOp { .. } | GotoTarget::UnaryOp { .. } => None,
+            GotoTarget::BinOp { .. }
+            | GotoTarget::UnaryOp { .. }
+            | GotoTarget::SubscriptStringLiteralKey { .. } => None,
         }
     }
 
@@ -718,14 +736,21 @@ impl GotoTarget<'_> {
         tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
         let node = covering_node.node();
+        let string_annotation = match node {
+            AnyNodeRef::ExprStringLiteral(string_expr) => {
+                model.enter_string_annotation(string_expr)
+            }
+            _ => None,
+        };
 
         // Special-case subscripts: if the cursor lands on a literal index/key, slice bound, or
-        // slice inside `value[...]`, retarget the covering node to the parent `ExprSubscript`.
-        // Non-literal subscripts (e.g. `value[a<CURSOR>b]`) still hover the identifier itself.
-        // This avoids "no hover" on literals and lets hover/goto show the subscript result type.
-        // TODO: Consider a dedicated GotoTarget for literal subscripts to enable goto-declaration
-        // for TypedDict keys (https://github.com/astral-sh/ty/issues/2630).
-        if let Some(expr) = node.as_expr_ref() {
+        // slice inside `value[...]`, retarget to the parent `ExprSubscript` (or a string-literal
+        // key target). Non-literal subscripts (e.g. `value[a<CURSOR>b]`) still hover the
+        // identifier itself. This avoids "no hover" on literals and lets hover/goto show the
+        // subscript result type.
+        if let Some(expr) = node.as_expr_ref()
+            && string_annotation.is_none()
+        {
             let enclosing_subscript_with_slice_range =
                 |range: TextRange| -> Option<&'a ast::ExprSubscript> {
                     covering_node.ancestors().find_map(|node| {
@@ -761,6 +786,13 @@ impl GotoTarget<'_> {
             if let Some(slice_range) = slice_expr_range
                 && let Some(subscript) = enclosing_subscript_with_slice_range(slice_range)
             {
+                if let Some(literal) = subscript.slice.as_string_literal_expr() {
+                    let key = literal.value.to_str();
+                    return Some(GotoTarget::SubscriptStringLiteralKey {
+                        subscript,
+                        literal_key: key,
+                    });
+                }
                 return Some(GotoTarget::Expression(subscript.into()));
             }
 
@@ -985,7 +1017,7 @@ impl GotoTarget<'_> {
 
             node @ AnyNodeRef::ExprStringLiteral(string_expr) => {
                 // Check if we've clicked on a sub-GotoTarget inside a string annotation's sub-AST
-                if let Some((subast, submodel)) = model.enter_string_annotation(string_expr)
+                if let Some((subast, submodel)) = string_annotation
                     && let Some(sub_goto_target) = find_goto_target_impl(
                         &submodel,
                         subast.tokens(),
@@ -1077,6 +1109,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::Globals { identifier, .. } => identifier.range,
             GotoTarget::BinOp { operator_range, .. }
             | GotoTarget::UnaryOp { operator_range, .. } => *operator_range,
+            GotoTarget::SubscriptStringLiteralKey { subscript, .. } => subscript.slice.range(),
         }
     }
 }
