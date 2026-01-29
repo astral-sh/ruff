@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::semantic_index::definition::Definition;
-use ruff_db::files::FileRange;
+use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_text_size::{TextLen, TextRange};
@@ -54,6 +54,19 @@ impl TypeDefinition<'_> {
                 let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.full_range(db, &module))
             }
+        }
+    }
+
+    pub(super) fn file(&self, db: &dyn Db) -> Option<File> {
+        match self {
+            Self::Module(module) => module.file(db),
+            Self::StaticClass(definition)
+            | Self::DynamicClass(definition)
+            | Self::Function(definition)
+            | Self::TypeVar(definition)
+            | Self::TypeAlias(definition)
+            | Self::SpecialForm(definition)
+            | Self::NewType(definition) => Some(definition.file(db)),
         }
     }
 }

@@ -30,7 +30,7 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
     INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
     POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
-    report_numbers_module_not_supported,
+    note_numbers_module_not_supported,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -4428,12 +4428,6 @@ impl<'db> BindingError<'db> {
                 diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
-                report_numbers_module_not_supported(
-                    context.db(),
-                    &mut diag,
-                    *expected_ty,
-                    *provided_ty,
-                );
 
                 if let Type::Union(union) = provided_ty {
                     let union_elements = union.elements(context.db());
@@ -4521,6 +4515,21 @@ impl<'db> BindingError<'db> {
 
                 if let Some(union_diag) = union_diag {
                     union_diag.add_union_context(context.db(), &mut diag);
+                }
+
+                // If the type comes from first-party code, the user may have some control over
+                // the parameter annotation; provide additional context to help them fix it.
+                if callable_ty
+                    .definition(context.db())
+                    .and_then(|definition| definition.file(context.db()))
+                    .is_some_and(|file| context.db().should_check_file(file))
+                {
+                    note_numbers_module_not_supported(
+                        context.db(),
+                        &mut diag,
+                        *expected_ty,
+                        *provided_ty,
+                    );
                 }
             }
 

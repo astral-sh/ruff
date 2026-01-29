@@ -250,9 +250,10 @@ def f[T: Foo](x: T) -> T:
 ```py
 from numbers import Number
 
-def f(
-    x: Number,
-): ...
+def f(x: Number): ...
 
 f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+
+def g(x: float):
+    f(x)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `int | float`"
 ```
