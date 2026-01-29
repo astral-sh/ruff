@@ -658,6 +658,46 @@ class E(Enum):
     });
 }
 
+fn benchmark_recursive_union_type_alias_and_protocol(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[recursive_union_type_alias_and_protocol]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a regression test for https://github.com/astral-sh/ty/issues/1998
+                // Previously, the return type `TraceableValue` of the method was eagerly expanded until the limit was reached.
+                setup_micro_case(
+                    r#"
+                    from __future__ import annotations
+
+                    from typing import Protocol, Union
+
+                    class Traceable(Protocol):
+                        def trace_repr(self) -> TraceableValue:
+                            ...
+
+                    TraceableValue = Union[
+                        Traceable,
+                        bool,
+                        tuple["TraceableValue", ...],
+                    ]
+
+                    class FilledOutfit:
+                        def trace_repr(self) -> TraceableValue:
+                            return False
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -819,6 +859,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
+    benchmark_recursive_union_type_alias_and_protocol,
     benchmark_very_large_tuple,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
