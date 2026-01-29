@@ -293,6 +293,7 @@ reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 def f():
     if returns_bool():
         class C: ...
+
     else:
         class C: ...
 
