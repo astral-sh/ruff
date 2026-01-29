@@ -542,59 +542,63 @@ fn check_post_init_signature<'db>(
 ) {
     let db = context.db();
 
-    if configuration.check_invalid_dataclasses()
-        && member.name == "__post_init__"
-        && let Some((static_class, spec)) = class.static_class_literal(db)
-    {
-        let init_var_fields = static_class
-            .fields(db, spec, policy)
-            .iter()
-            .filter(|(_, field)| {
-                matches!(
-                    field.kind,
-                    FieldKind::Dataclass {
-                        init_only: true,
-                        ..
-                    }
-                )
-            });
+    if !configuration.check_invalid_dataclasses() {
+        return;
+    }
+    if member.name != "__post_init__" {
+        return;
+    }
+    let Some((static_class, spec)) = class.static_class_literal(db) else {
+        return;
+    };
 
-        let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
-            .with_annotated_type(Type::instance(db, class));
-
-        let following_parameters = init_var_fields.map(|(name, field)| {
-            Parameter::positional_only(Some(name.clone())).with_annotated_type(field.declared_ty)
+    let init_var_fields = static_class
+        .fields(db, spec, policy)
+        .iter()
+        .filter(|(_, field)| {
+            matches!(
+                field.kind,
+                FieldKind::Dataclass {
+                    init_only: true,
+                    ..
+                }
+            )
         });
 
-        let parameters = Parameters::new(
-            db,
-            std::iter::once(first_parameter).chain(following_parameters),
-        );
+    let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
+        .with_annotated_type(Type::instance(db, class));
 
-        let expected_signature =
-            CallableType::single(db, Signature::new(parameters, Type::object()));
+    let following_parameters = init_var_fields.map(|(name, field)| {
+        Parameter::positional_only(Some(name.clone())).with_annotated_type(field.declared_ty)
+    });
 
-        if member
-            .ty
-            .is_assignable_to(db, Type::Callable(expected_signature))
-        {
-            return;
-        }
+    let parameters = Parameters::new(
+        db,
+        std::iter::chain([first_parameter], following_parameters),
+    );
 
-        let Some(builder) = context.report_lint(
-            &INVALID_DATACLASS,
-            definition.focus_range(db, context.module()),
-        ) else {
-            return;
-        };
+    let expected_signature = CallableType::single(db, Signature::new(parameters, Type::object()));
 
-        let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Invalid `__post_init__` signature for dataclass `{}`",
-            class.name(db)
-        ));
-        diagnostic.info(
-            "`__post_init__` methods must accept all `InitVar` fields \
-            as positional-only parameters",
-        );
+    if member
+        .ty
+        .is_assignable_to(db, Type::Callable(expected_signature))
+    {
+        return;
     }
+
+    let Some(builder) = context.report_lint(
+        &INVALID_DATACLASS,
+        definition.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Invalid `__post_init__` signature for dataclass `{}`",
+        class.name(db)
+    ));
+    diagnostic.info(
+        "`__post_init__` methods must accept all `InitVar` fields \
+            as positional-only parameters",
+    );
 }

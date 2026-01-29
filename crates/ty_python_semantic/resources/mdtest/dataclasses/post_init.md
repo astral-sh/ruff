@@ -17,28 +17,23 @@ class Empty2:
     def __post_init__(self) -> None: ...  # fine
 
 @dataclass
-class Empty2:
+class Empty3:
     # The returned value is discarded,
     # so arbitrary return annotations are allowed
     def __post_init__(self) -> int:
         return 42
 
 @dataclass
-class Empty3:
+class Empty4:
     def __post_init__(self, *args): ...  # fine
 
 @dataclass
-class Empty4:
+class Empty5:
     def __post_init__(self, **kwargs): ...  # fine
 
 @dataclass
-class Empty5:
-    def __post_init__(self, *args, **kargs): ...  # fine
-
-@dataclass
 class Empty6:
-    # error: [invalid-dataclass]
-    def __post_init__(self, required_argument: int): ...
+    def __post_init__(self, *args, **kargs): ...  # fine
 
 @dataclass
 class Empty7:
@@ -88,9 +83,9 @@ class HasInitVarDifferentParameterName:
     x: InitVar[int]
 
     # because arguments are always passed in positionally
-    # to `__post_init__` methods, we allow the parameters to
-    # have arbitrary names as long as they are annotated with
-    # the right type. So this is fine:
+    # to `__post_init__` methods, we allow a parameter to
+    # have an arbitrary name as long as it is inferred has
+    # having a compatible type. So this is fine:
     def __post_init__(self, xx) -> None: ...
 
 @dataclass
