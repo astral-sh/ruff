@@ -792,6 +792,24 @@ impl Session {
         );
     }
 
+    /// Clears the diagnostics for the document identified by `uri`.
+    ///
+    /// This is done by notifying the client with an empty list of diagnostics for the document.
+    /// For notebook cells, this clears diagnostics for the specific cell.
+    /// For other document types, this clears diagnostics for the main document.
+    pub(crate) fn clear_diagnostics(&self, client: &Client, uri: &Url) {
+        if self.global_settings().diagnostic_mode().is_off() {
+            return;
+        }
+        client.send_notification::<lsp_types::notification::PublishDiagnostics>(
+            lsp_types::PublishDiagnosticsParams {
+                uri: uri.clone(),
+                diagnostics: vec![],
+                version: None,
+            },
+        );
+    }
+
     pub(crate) fn take_deferred_messages(&mut self) -> Option<Message> {
         if self.workspaces.all_initialized() {
             self.deferred_messages.pop_front()
