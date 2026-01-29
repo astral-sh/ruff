@@ -435,3 +435,21 @@ def _(answer: Answer | None):
     x = Foo()
     reveal_type(x)  # revealed: Foo
 ```
+
+## Invalid class patterns
+
+```py
+Foo = "foo"
+bar = 3
+
+match bar:
+  case Foo():   # error: [called-match-pattern-must-be-a-type]
+    ...
+
+class Foo:
+    ...
+
+match bar:
+  case Foo():
+    ...
+```
