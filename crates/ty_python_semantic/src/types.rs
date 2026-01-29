@@ -2792,28 +2792,32 @@ impl<'db> Type<'db> {
                 },
             ),
 
-            PlaceAndQualifiers {
+            attribute @ PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
                         ty: Type::Intersection(intersection),
                         origin,
-                        definedness: boundness,
+                        definedness,
                         widening,
                     }),
                 qualifiers,
             } => (
-                intersection
-                    .map_with_boundness(db, |elem| {
-                        Place::Defined(DefinedPlace {
-                            ty: elem
-                                .try_call_dunder_get(db, instance, owner)
-                                .map_or(*elem, |(ty, _)| ty),
-                            origin,
-                            definedness: boundness,
-                            widening,
+                if intersection.positive(db).is_empty() {
+                    attribute
+                } else {
+                    intersection
+                        .map_with_boundness(db, |elem| {
+                            Place::Defined(DefinedPlace {
+                                ty: elem
+                                    .try_call_dunder_get(db, instance, owner)
+                                    .map_or(*elem, |(ty, _)| ty),
+                                origin,
+                                definedness,
+                                widening,
+                            })
                         })
-                    })
-                    .with_qualifiers(qualifiers),
+                        .with_qualifiers(qualifiers)
+                },
                 // TODO: Discover data descriptors in intersections.
                 AttributeKind::NormalOrNonDataDescriptor,
             ),
