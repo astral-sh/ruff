@@ -409,8 +409,6 @@ reveal_type(x) # revealed: Literal[1]
 python-version = "3.12"
 ```
 
-`generic_list.py`:
-
 ```py
 from typing import Literal, Sequence
 
@@ -456,9 +454,14 @@ x11: Sequence[int | str] | Sequence[int | None] = [1, 2, 3]
 reveal_type(x11)  # revealed: list[Unknown | int]
 ```
 
-A function's arguments are also inferred using the type context:
+## Annotations influence generic call argument inference
 
-`typed_dict.py`:
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A function's arguments are also inferred using the type context:
 
 ```py
 from typing import TypedDict
@@ -466,40 +469,35 @@ from typing import TypedDict
 class TD(TypedDict):
     x: int
 
-def f[T](x: list[T]) -> T:
+def first[T](x: list[T]) -> T:
     return x[0]
 
-a: TD = f([{"x": 0}, {"x": 1}])
-reveal_type(a)  # revealed: TD
+x1: TD = first([{"x": 0}, {"x": 1}])
+reveal_type(x1)  # revealed: TD
 
-b: TD | None = f([{"x": 0}, {"x": 1}])
-reveal_type(b)  # revealed: TD
+x2: TD | None = first([{"x": 0}, {"x": 1}])
+reveal_type(x2)  # revealed: TD
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
 # error: [invalid-assignment] "Object of type `TD | dict[Unknown | str, Unknown | int]` is not assignable to `TD`"
-c: TD = f([{"y": 0}, {"x": 1}])
+x3: TD = first([{"y": 0}, {"x": 1}])
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
 # error: [invalid-assignment] "Object of type `TD | None | dict[Unknown | str, Unknown | int]` is not assignable to `TD | None`"
-c: TD | None = f([{"y": 0}, {"x": 1}])
+x4: TD | None = first([{"y": 0}, {"x": 1}])
 ```
 
 But not in a way that leads to assignability errors:
 
-`dict_any.py`:
-
 ```py
 from typing import TypedDict, Any
-
-class TD(TypedDict, total=False):
-    x: str
 
 class TD2(TypedDict):
     x: str
 
-def f(self, dt: dict[str, Any], key: str):
+def _(dt: dict[str, Any], key: str):
     x1: TD = dt.get(key, {})
     reveal_type(x1)  # revealed: Any
 
@@ -523,6 +521,55 @@ def f(self, dt: dict[str, Any], key: str):
 
     x8: TD2 | None = dt.get(key, {"x": 0})
     reveal_type(x8)  # revealed: Any
+```
+
+Partially specialized type context is not ignored:
+
+```py
+from typing import TypeVar
+
+U = TypeVar("U", default=Any)
+
+class X: ...
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+def two_lists[T](x: list[T | int], y: list[T | str]) -> T:
+    raise NotImplementedError
+
+def two_lists_default(x: list[U | int], y: list[U | str]) -> U:
+    raise NotImplementedError
+
+def dct[K, V](k: K, v: V) -> dict[K, V]:
+    return {k: v}
+
+def two_dicts[T](x: dict[T | int, Any], y: dict[T | str, Any]) -> T:
+    raise NotImplementedError
+
+def two_dicts_default(x: dict[U | int, Any], y: dict[U | str, Any]) -> U:
+    raise NotImplementedError
+
+def _():
+    # revealed: list[int | X]
+    # revealed: list[str | X]
+    x1 = two_lists(reveal_type(lst(X())), reveal_type(lst(X())))
+    reveal_type(x1)  # revealed: X
+
+    # revealed: list[int | X]
+    # revealed: list[str | X]
+    x2 = two_lists_default(reveal_type(lst(X())), reveal_type(lst(X())))
+    reveal_type(x2)  # revealed: X
+
+    # revealed: dict[int | X, Any]
+    # revealed: dict[str | X, Any]
+    x3 = two_dicts(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
+    reveal_type(x3)  # revealed: X
+
+    # revealed: dict[int | X, Any]
+    # revealed: dict[str | X, Any]
+    x4 = two_dicts_default(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
+    reveal_type(x4)  # revealed: X
 ```
 
 ## Prefer the declared type of generic classes

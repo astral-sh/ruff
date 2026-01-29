@@ -1538,12 +1538,31 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn mapped(
         &self,
         generic_context: GenericContext<'db>,
-        f: impl Fn(BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
+        f: impl Fn(BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
     ) -> Self {
         let mut types = self.types.clone();
         for (identity, variable) in generic_context.variables_inner(self.db) {
             if let Some(ty) = types.get_mut(identity) {
-                *ty = f(*identity, *variable, *ty);
+                *ty = f(*variable, *ty);
+            }
+        }
+
+        Self {
+            db: self.db,
+            inferable: self.inferable,
+            types,
+        }
+    }
+
+    pub(crate) fn with_default(
+        &self,
+        generic_context: GenericContext<'db>,
+        default_ty: impl Fn(BoundTypeVarInstance<'db>) -> Type<'db>,
+    ) -> Self {
+        let mut types = self.types.clone();
+        for (identity, variable) in generic_context.variables_inner(self.db) {
+            if let Entry::Vacant(entry) = types.entry(*identity) {
+                entry.insert(default_ty(*variable));
             }
         }
 
