@@ -72,3 +72,73 @@ Asset("asset1", {k: v for k, v in zip(["extra"], ["metadata"])})
 Asset("asset1")
 Asset("asset1", extra={"key": "value"})
 Asset(uri="asset1", extra={"key": "value"})
+
+
+from airflow.models.baseoperatorlink import BaseOperatorLink
+
+# 3 positional args, 3rd NOT named 'ti_key'
+class DeprecatedOperatorLink1(BaseOperatorLink):
+    def get_link(self, operator, dttm):
+        pass
+
+# keyword-only ti_key
+class ValidOperatorLink1(BaseOperatorLink):
+    def get_link(self, operator, *, ti_key):
+        pass
+
+# positional ti_key with correct name
+class ValidOperatorLink2(BaseOperatorLink):
+    def get_link(self, operator, ti_key):
+        pass
+
+# not exactly 3 positional args
+class InvalidOperatorLink3(BaseOperatorLink):
+    def get_link(self, operator):
+        pass
+
+class InvalidOperatorLink4(BaseOperatorLink):
+    def get_link(self, operator, ti_key, extra):
+        pass
+
+class InvalidOperatorLink5(BaseOperatorLink):
+    def get_link(self, operator, *, something):
+        pass
+
+# Not a subclass of BaseOperatorLink
+class NotOperatorLinkSubclass:
+    def get_link(self, operator, dttm):
+        pass
+
+# Not a class method
+def get_link(operator, dttm):
+    pass
+
+from airflow.sdk import BaseOperatorLink
+
+# 3 positional args, 3rd NOT named 'ti_key'
+class DeprecatedOperatorLink2(BaseOperatorLink):
+    def get_link(self, operator, dttm):
+        pass
+
+# keyword-only ti_key
+class ValidOperatorLink3(BaseOperatorLink):
+    def get_link(self, operator, *, ti_key):
+        pass
+
+# positional ti_key with correct name
+class ValidOperatorLink4(BaseOperatorLink):
+    def get_link(self, operator, ti_key):
+        pass
+
+# not exactly 3 positional args
+class InvalidOperatorLink6(BaseOperatorLink):
+    def get_link(self, operator):
+        pass
+
+class InvalidOperatorLink7(BaseOperatorLink):
+    def get_link(self, operator, ti_key, extra):
+        pass
+
+class InvalidOperatorLink8(BaseOperatorLink):
+    def get_link(self, operator, *, something):
+        pass
