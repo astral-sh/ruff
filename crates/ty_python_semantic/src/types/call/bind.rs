@@ -2659,6 +2659,9 @@ struct ArgumentMatcher<'a, 'db> {
     /// This is used to prevent variadic arguments from greedily matching parameters that will be
     /// explicitly provided via keyword arguments.
     explicit_keyword_parameters: FxHashSet<usize>,
+
+    /// Track matched `TypedDict` field names for `Unpack[TypedDict]` `**kwargs` (PEP 692)
+    matched_typed_dict_fields: FxHashSet<Name>,
 }
 
 impl<'a, 'db> ArgumentMatcher<'a, 'db> {
@@ -2690,6 +2693,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             num_synthetic_args: 0,
             variadic_argument_matched_to_variadic_parameter: false,
             explicit_keyword_parameters,
+            matched_typed_dict_fields: FxHashSet::default(),
         }
     }
 
@@ -2786,16 +2790,36 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
     fn match_keyword(
         &mut self,
+        db: &'db dyn Db,
         argument_index: usize,
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
         name: &str,
     ) -> Result<(), ()> {
-        let Some((parameter_index, parameter)) = self
-            .parameters
-            .keyword_by_name(name)
-            .or_else(|| self.parameters.keyword_variadic())
-        else {
+        // First try to find a named parameter
+        let found = self.parameters.keyword_by_name(name).or_else(|| {
+            // Fall back to keyword_variadic
+            let (param_idx, param) = self.parameters.keyword_variadic()?;
+
+            // If the **kwargs has Unpack[TypedDict] annotation, validate that the
+            // keyword name is a valid field of the TypedDict (PEP 692)
+            if let Type::KnownInstance(KnownInstanceType::UnpackedTypedDict(typed_dict)) =
+                param.annotated_type()
+            {
+                // Check if the keyword name is a valid field of the TypedDict
+                if typed_dict.items(db).contains_key(name) {
+                    Some((param_idx, param))
+                } else {
+                    // The keyword is not a valid field - return None to trigger UnknownArgument error
+                    None
+                }
+            } else {
+                // Regular **kwargs - accepts any keyword
+                Some((param_idx, param))
+            }
+        });
+
+        let Some((parameter_index, parameter)) = found else {
             if let Some((parameter_index, parameter)) =
                 self.parameters.positional_only_by_name(name)
             {
@@ -2813,6 +2837,16 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             }
             return Err(());
         };
+
+        // Track matched TypedDict field for Unpack[TypedDict] **kwargs
+        if parameter.is_keyword_variadic() {
+            if let Type::KnownInstance(KnownInstanceType::UnpackedTypedDict(_)) =
+                parameter.annotated_type()
+            {
+                self.matched_typed_dict_fields.insert(Name::new(name));
+            }
+        }
+
         self.assign_argument(
             argument_index,
             argument,
@@ -2958,6 +2992,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             // Special case TypedDict because we know which keys are present.
             for (name, field) in typed_dict.items(db) {
                 let _ = self.match_keyword(
+                    db,
                     argument_index,
                     Argument::Keywords,
                     Some(field.declared_ty),
@@ -3026,7 +3061,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
     }
 
-    fn finish(self) -> Box<[MatchedArgument<'db>]> {
+    fn finish(self, db: &'db dyn Db) -> Box<[MatchedArgument<'db>]> {
         if let Some(first_excess_argument_index) = self.first_excess_positional {
             self.errors.push(BindingError::TooManyPositionalArguments {
                 first_excess_argument_index: self.get_argument_index(first_excess_argument_index),
@@ -3069,6 +3104,28 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 parameters: ParameterContexts(missing),
                 paramspec: self.parameters.as_paramspec(),
             });
+        }
+
+        // Check for missing required TypedDict fields for Unpack[TypedDict] **kwargs (PEP 692)
+        if let Some((_, param)) = self.parameters.keyword_variadic() {
+            if let Type::KnownInstance(KnownInstanceType::UnpackedTypedDict(typed_dict)) =
+                param.annotated_type()
+            {
+                let missing_fields: Vec<Name> = typed_dict
+                    .items(db)
+                    .iter()
+                    .filter(|(name, field)| {
+                        field.is_required() && !self.matched_typed_dict_fields.contains(*name)
+                    })
+                    .map(|(name, _)| name.clone())
+                    .collect();
+
+                if !missing_fields.is_empty() {
+                    self.errors.push(BindingError::MissingTypedDictFields {
+                        fields: missing_fields,
+                    });
+                }
+            }
         }
 
         self.argument_matches.into_boxed_slice()
@@ -3332,7 +3389,29 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
-        let mut expected_ty = parameter.annotated_type();
+        let annotated_ty = parameter.annotated_type();
+
+        // For keyword arguments matched against **kwargs with Unpack[TypedDict],
+        // we need to check against the specific TypedDict field type (PEP 692)
+        let mut expected_ty = if parameter.is_keyword_variadic() {
+            if let (
+                Argument::Keyword(name),
+                Type::KnownInstance(KnownInstanceType::UnpackedTypedDict(typed_dict)),
+            ) = (argument, annotated_ty)
+            {
+                // Look up the field type in the TypedDict
+                typed_dict
+                    .items(self.db)
+                    .get(name)
+                    .map(|field| field.declared_ty)
+                    .unwrap_or(annotated_ty)
+            } else {
+                annotated_ty
+            }
+        } else {
+            annotated_ty
+        };
+
         if let Some(specialization) = self.specialization {
             argument_type = argument_type.apply_specialization(self.db, specialization);
             expected_ty = expected_ty.apply_specialization(self.db, specialization);
@@ -3606,12 +3685,60 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Type<'db>,
     ) {
-        if let Type::TypedDict(typed_dict) = argument_type {
-            for (argument_type, parameter_index) in typed_dict
+        if let Type::TypedDict(arg_typed_dict) = argument_type {
+            // Check if the parameter has Unpack[TypedDict] annotation
+            let parameters = self.signature.parameters();
+            let parameter_indices = &self.argument_matches[argument_index].parameters;
+
+            if let Some(&first_param_idx) = parameter_indices.first() {
+                let parameter = &parameters[first_param_idx];
+                if parameter.is_keyword_variadic() {
+                    if let Type::KnownInstance(KnownInstanceType::UnpackedTypedDict(
+                        param_typed_dict,
+                    )) = parameter.annotated_type()
+                    {
+                        // Check each field from the argument TypedDict against the parameter TypedDict
+                        for (field_name, arg_field) in arg_typed_dict.items(self.db) {
+                            if let Some(param_field) =
+                                param_typed_dict.items(self.db).get(field_name)
+                            {
+                                // Check type compatibility
+                                let expected_ty = param_field.declared_ty;
+                                let provided_ty = arg_field.declared_ty;
+
+                                if provided_ty
+                                    .when_assignable_to(
+                                        self.db,
+                                        expected_ty,
+                                        self.inferable_typevars,
+                                    )
+                                    .is_never_satisfied(self.db)
+                                {
+                                    self.errors.push(BindingError::InvalidArgumentType {
+                                        parameter: ParameterContext::new(
+                                            parameter,
+                                            first_param_idx,
+                                            false,
+                                        ),
+                                        argument_index: adjusted_argument_index,
+                                        expected_ty,
+                                        provided_ty,
+                                    });
+                                }
+                            }
+                            // Note: Extra fields in the argument TypedDict are handled by match_keyword_variadic
+                        }
+                        return;
+                    }
+                }
+            }
+
+            // Fallback: Regular TypedDict handling (non-Unpack case)
+            for (argument_type, parameter_index) in arg_typed_dict
                 .items(self.db)
                 .values()
                 .map(|field| field.declared_ty)
-                .zip(&self.argument_matches[argument_index].parameters)
+                .zip(parameter_indices)
             {
                 self.check_argument_type(
                     adjusted_argument_index,
@@ -3819,7 +3946,7 @@ impl<'db> Binding<'db> {
                     let _ = matcher.match_positional(argument_index, argument, None, false);
                 }
                 Argument::Keyword(name) => {
-                    let _ = matcher.match_keyword(argument_index, argument, None, name);
+                    let _ = matcher.match_keyword(db, argument_index, argument, None, name);
                 }
                 Argument::Variadic => {
                     let _ = matcher.match_variadic(db, argument_index, argument, argument_type);
@@ -3836,7 +3963,7 @@ impl<'db> Binding<'db> {
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
-        self.argument_matches = matcher.finish();
+        self.argument_matches = matcher.finish(db);
     }
 
     fn check_types(
@@ -4249,6 +4376,10 @@ pub(crate) enum BindingError<'db> {
         /// `**kwargs` are required.
         paramspec: Option<BoundTypeVarInstance<'db>>,
     },
+    /// Required `TypedDict` fields are missing for an `Unpack[TypedDict]` `**kwargs` parameter (PEP 692).
+    MissingTypedDictFields {
+        fields: Vec<Name>,
+    },
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
         argument_name: ast::name::Name,
@@ -4342,6 +4473,7 @@ impl<'db> BindingError<'db> {
             | Self::InvalidKeyType { .. }
             | Self::KeywordsNotAMapping { .. }
             | Self::MissingArguments { .. }
+            | Self::MissingTypedDictFields { .. }
             | Self::UnknownArgument { .. }
             | Self::PositionalOnlyParameterAsKwarg { .. }
             | Self::TooManyPositionalArguments { .. }
@@ -4624,6 +4756,28 @@ impl<'db> BindingError<'db> {
                                  could represent any set of parameters at runtime"
                             ),
                         ));
+                    }
+                }
+            }
+
+            Self::MissingTypedDictFields { fields } => {
+                if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, node) {
+                    let s = if fields.len() == 1 { "" } else { "s" };
+                    let field_names = fields
+                        .iter()
+                        .map(|name| format!("`{name}`"))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Missing required keyword argument{s} {field_names}{}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" for {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ));
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
                     }
                 }
             }
