@@ -453,3 +453,30 @@ def j(x: Container1.Item, y: Container2.Item) -> None:
     # error: [invalid-assignment] "Object of type `mdtest_snippet.Container2.Item` is not assignable to `mdtest_snippet.Container1.Item`"
     a: Container1.Item = y
 ```
+
+## Type alias used as type context for generic constructor calls
+
+When a PEP 695 type alias that expands to a union is used as the declared type for a variable
+assignment, it should guide generic constructor call specialization correctly.
+
+See: <https://github.com/astral-sh/ty/issues/2682>
+
+```py
+type MaybeList[T] = list[T] | T
+
+def test[X: int](items: list[X]) -> list[X]:
+    a: MaybeList[str | int] = list(items)
+    reveal_type(a)  # revealed: list[str | int]
+    return items
+```
+
+This should also work for non-generic function contexts:
+
+```py
+type MaybeList[T] = list[T] | T
+
+def test(items: list[int]) -> list[int]:
+    a: MaybeList[str | int] = list(items)
+    reveal_type(a)  # revealed: list[str | int]
+    return items
+```

@@ -11114,6 +11114,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             arguments,
         } = call_expression;
 
+        // Expand type aliases in the type context so that downstream code
+        // (like union narrowing and specialization inference) can see the
+        // underlying type structure (e.g., for PEP 695 type aliases).
+        let call_expression_tcx = call_expression_tcx.map(|ty| match ty {
+            Type::TypeAlias(alias) => alias.value_type(self.db()),
+            other => other,
+        });
+
         // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
         // then validate and return the TypedDict type.
         if let Some(tcx) = call_expression_tcx.annotation
