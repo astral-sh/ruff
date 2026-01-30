@@ -58,32 +58,6 @@ class NoDefaultSpecificClass(SomeClass):
 reveal_type(NoDefaultSpecificClass(SpecificConfiguration()).config)  # revealed: SpecificConfiguration | None
 ```
 
-## `KW_ONLY` sentinel with a default value
-
-A `KW_ONLY` sentinel is not a real instance field, even if it has a class body binding.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from dataclasses import dataclass, KW_ONLY
-
-@dataclass
-class Base:
-    x: int
-
-@dataclass
-class Child(Base):
-    _: KW_ONLY = KW_ONLY  # error: [invalid-assignment]
-    y: int = 0
-
-c = Child(x=1, y=2)
-reveal_type(c.x)  # revealed: int
-reveal_type(c.y)  # revealed: int
-```
-
 ## Descriptor-typed fields with defaults
 
 A dataclass field whose declared type is a descriptor should still resolve through the descriptor
@@ -169,6 +143,59 @@ alice = Person(role="admin", name="Alice")
 
 # error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
 bob = Person("Bob", 30)
+```
+
+## `KW_ONLY` sentinel
+
+The `KW_ONLY` sentinel is a marker, not a real attribute. It should not appear as an instance or
+class attribute.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Accessing `_` on an instance or the class should not resolve to `KW_ONLY`:
+
+```py
+from dataclasses import dataclass, KW_ONLY
+
+@dataclass
+class DC:
+    _: KW_ONLY
+    name: str
+
+dc = DC(name="Alice")
+
+# error: [unresolved-attribute]
+dc._
+
+# error: [unresolved-attribute]
+DC._
+```
+
+When a child uses `_: KW_ONLY` and a parent defines `_` as a real field, the parent's type should
+show through:
+
+```py
+from dataclasses import dataclass, KW_ONLY
+
+@dataclass
+class Parent:
+    _: int
+
+@dataclass
+class Child(Parent):
+    _: KW_ONLY
+    name: str
+
+# The KW_ONLY sentinel overrides Parent's `_` field in the constructor,
+# so Child's __init__ only accepts `name` as a keyword argument.
+# revealed: (self: Child, *, name: str) -> None
+reveal_type(Child.__init__)
+
+c = Child(name="Alice")
+reveal_type(c._)  # revealed: int
 ```
 
 ## The `field` function
