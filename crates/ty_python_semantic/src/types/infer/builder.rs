@@ -11621,10 +11621,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Since an unbound binding is recorded even for an undefined place,
                     // this can only happen if the code is unreachable
                     // and therefore it is correct to set the result to `Never`.
-                    let union = union.build();
-                    if union.is_assignable_to(db, ty) {
-                        ty = union;
-                    }
+                    ty = union.build();
                 }
             }
         }

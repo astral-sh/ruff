@@ -446,3 +446,23 @@ def foo():
         if isinstance(x, str):
             reveal_type(x)  # revealed: Never
 ```
+
+## Narrowing nonlocal variables with conditional assignments
+
+When a nonlocal variable is conditionally reassigned and then narrowed via an assertion, the
+narrowing constraint should be applied correctly, even when the enclosing scope's type was itself
+narrowed (e.g., via an `isinstance` check).
+
+```py
+def _(maybe_float: float | None, certain_int: int, flag: bool) -> None:
+    if isinstance(maybe_float, int):
+        return
+    x = maybe_float
+    def _() -> None:
+        nonlocal x
+        if flag:
+            x = certain_int
+        assert x is not None
+        reveal_type(x)  # revealed: int | float
+        +x
+```
