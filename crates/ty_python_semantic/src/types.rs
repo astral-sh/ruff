@@ -3362,13 +3362,7 @@ impl<'db> Type<'db> {
                     return Place::Undefined.into();
                 }
 
-                self.fallback_to_getattr(
-                    db,
-                    &name,
-                    result,
-                    policy,
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                )
+                self.fallback_to_getattr(db, &name, result, policy)
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -3418,17 +3412,7 @@ impl<'db> Type<'db> {
                 // attribute access falls back to `__getattr__`/`__getattribute__` on the
                 // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                 // lookup to hit the catch-all that only checks the meta-type (the metaclass).
-                //
-                // Additionally skip `type.__getattribute__` via `META_CLASS_NO_TYPE_FALLBACK`
-                // so we only find custom definitions on the metaclass itself.
-                self.fallback_to_getattr(
-                    db,
-                    &name,
-                    result,
-                    policy,
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                )
+                self.fallback_to_getattr(db, &name, result, policy)
             }
 
             // Unlike other objects, `super` has a unique member lookup behavior.
@@ -4718,18 +4702,12 @@ impl<'db> Type<'db> {
     ///
     /// If `result` is already always-defined, return it unchanged. Otherwise, fall back to calling
     /// `__getattribute__` (and then `__getattr__`) on the meta-type of `self`.
-    ///
-    /// `getattribute_policy` controls which `__getattribute__` definitions are considered:
-    /// - For instances, pass `MRO_NO_OBJECT_FALLBACK` to skip `object.__getattribute__`.
-    /// - For classes, additionally pass `META_CLASS_NO_TYPE_FALLBACK` to also skip
-    ///   `type.__getattribute__`.
     fn fallback_to_getattr(
         self,
         db: &'db dyn Db,
         name: &Name,
         result: PlaceAndQualifiers<'db>,
         policy: MemberLookupPolicy,
-        getattribute_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         let custom_getattr_result = || {
             if policy.no_getattr_lookup() {
@@ -4753,12 +4731,14 @@ impl<'db> Type<'db> {
                 return Place::Undefined.into();
             }
 
+            // Skip `object.__getattribute__`, which is the default mechanism we
+            // already model via the normal attribute-lookup path.
             self.try_call_dunder_with_policy(
                 db,
                 "__getattribute__",
                 &mut CallArguments::positional([Type::string_literal(db, name)]),
                 TypeContext::default(),
-                getattribute_policy,
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
             .map(|outcome| Place::bound(outcome.return_type(db)))
             // TODO: Handle call errors here.
