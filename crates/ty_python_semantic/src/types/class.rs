@@ -3964,6 +3964,9 @@ impl<'db> StaticClassLiteral<'db> {
             .into_iter()
             .rev()
             .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
+            // KW_ONLY sentinels are markers, not real fields. Exclude them so
+            // they cannot shadow an inherited field with the same name.
+            .filter(|(_, field)| !field.is_kw_only_sentinel(db))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
     }
@@ -4724,6 +4727,13 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// Returns `true` if `name` is a non-init-only field directly declared on this
+    /// dataclass (i.e., a field that corresponds to an instance attribute).
+    ///
+    /// This is used to decide whether a bare class-body annotation like `x: int`
+    /// should be treated as defining an instance attribute: dataclass fields are
+    /// implicitly assigned in `__init__`, so they behave as instance attributes
+    /// even though no explicit binding exists in the class body.
     fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
         let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
             return false;

@@ -155,27 +155,28 @@ class attribute.
 python-version = "3.12"
 ```
 
-Accessing `_` on an instance or the class should not resolve to `KW_ONLY`:
+Although `_` is the conventional name, any name can be used for the sentinel. Accessing the sentinel
+field on an instance or the class should not resolve to `KW_ONLY`:
 
 ```py
 from dataclasses import dataclass, KW_ONLY
 
 @dataclass
 class DC:
-    _: KW_ONLY
+    sentinel: KW_ONLY
     name: str
 
 dc = DC(name="Alice")
 
 # error: [unresolved-attribute]
-dc._
+dc.sentinel
 
 # error: [unresolved-attribute]
-DC._
+DC.sentinel
 ```
 
-When a child uses `_: KW_ONLY` and a parent defines `_` as a real field, the parent's type should
-show through:
+When a child uses `_: KW_ONLY` and a parent defines `_` as a real field, the parent's `_` field is
+inherited and the sentinel only affects subsequent fields in the child:
 
 ```py
 from dataclasses import dataclass, KW_ONLY
@@ -189,12 +190,11 @@ class Child(Parent):
     _: KW_ONLY
     name: str
 
-# The KW_ONLY sentinel overrides Parent's `_` field in the constructor,
-# so Child's __init__ only accepts `name` as a keyword argument.
-# revealed: (self: Child, *, name: str) -> None
+# Parent's `_: int` field is inherited; the sentinel makes `name` keyword-only.
+# revealed: (self: Child, _: int, *, name: str) -> None
 reveal_type(Child.__init__)
 
-c = Child(name="Alice")
+c = Child(1, name="Alice")
 reveal_type(c._)  # revealed: int
 ```
 
