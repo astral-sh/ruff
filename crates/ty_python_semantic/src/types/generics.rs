@@ -8,8 +8,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
+use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
@@ -30,6 +30,7 @@ use crate::types::{
     UnionType, declaration_type, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
+use ruff_db::parsed::parsed_module;
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -64,32 +65,25 @@ pub(crate) fn bind_typevar<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules.
-    // It is always bound to the outermost method in the nearest enclosing class.
+    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It
+    // is always bound to the outermost method in the nearest enclosing class. The walk looks for a
+    // (function, class) pair in the scope hierarchy. The caller (`typing_self`) is responsible for
+    // ensuring that `containing_scope` starts from the function body scope rather than the scope
+    // where the function is defined, so that the function itself appears in the ancestor chain.
     //
-    // The ancestor walk looks for a (function, class) pair in the scope hierarchy. We stop
-    // at the first class boundary (when the inner scope is a class) to avoid traversing past
-    // a nested class into an outer class. For example, in:
-    //
-    // ```python
-    // class Outer:
-    //     def method(self) -> None:
-    //         class Inner:
-    //             def get(self) -> Self: ...
-    // ```
-    //
-    // When resolving `Self` in `get`'s return annotation, the containing scope is the `Inner`
-    // class body. Without the class-boundary break, the walk would skip `Inner` and find
-    // `(method, Outer)`, incorrectly binding Self to `Outer` instead of `Inner`.
+    // We also match `FunctionTypeParameters` as a valid inner scope because for generic methods
+    // (e.g., `def foo[T](self) -> Self`), the type-params scope sits between the function body
+    // and the class body in the ancestor chain.
     if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
         for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
-            if inner.kind().is_class() {
-                break;
-            }
             if outer.kind().is_class() {
-                if let NodeWithScopeKind::Function(function) = inner.node() {
-                    let definition = index.expect_single_definition(function);
-                    return Some(typevar.with_binding_context(db, definition));
+                match inner.node() {
+                    NodeWithScopeKind::Function(function)
+                    | NodeWithScopeKind::FunctionTypeParameters(function) => {
+                        let definition = index.expect_single_definition(function);
+                        return Some(typevar.with_binding_context(db, definition));
+                    }
+                    _ => {}
                 }
             }
         }
@@ -106,11 +100,12 @@ pub(crate) fn bind_typevar<'db>(
 /// Create a `typing.Self` type variable for a given class.
 pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
-    function_scope_id: ScopeId,
+    scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    let index = semantic_index(db, function_scope_id.file(db));
+    let file = scope_id.file(db);
+    let index = semantic_index(db, file);
 
     let identity = TypeVarIdentity::new(
         db,
@@ -140,10 +135,47 @@ pub(crate) fn typing_self<'db>(
         None,
     );
 
+    // The `bind_typevar` Self loop walks ancestor scopes looking for a (function, class) pair.
+    // For this to work correctly, the walk must start from the function's own body scope, not the
+    // scope where the function is defined (e.g., the class body), so that the function itself
+    // appears in the ancestor chain. When `typevar_binding_context` is a function definition, we
+    // use the function's body scope; otherwise we fall back to the passed-in scope.
+    //
+    // For example, given:
+    //
+    // ```python
+    // class Outer:
+    //     def method(self) -> None:
+    //         class Inner:
+    //             def get(self) -> Self: ...
+    // ```
+    //
+    // Starting from `get`'s body scope, the ancestor chain is:
+    //
+    //   get body -> Inner class body -> method body -> Outer class body -> module
+    //
+    // The first (function, class) pair found is (get, Inner) -- correct.
+    //
+    // If we instead started from the scope where `get` is defined (i.e., the Inner class body),
+    // the chain would be:
+    //
+    //   Inner class body -> method body -> Outer class body -> module
+    //
+    // and the first match would be (method, Outer) -- wrong.
+    let containing_scope = typevar_binding_context
+        .and_then(|def| {
+            let DefinitionKind::Function(func_ref) = def.kind(db) else {
+                return None;
+            };
+            let module = parsed_module(db, file).load(db);
+            Some(index.node_scope(NodeWithScopeRef::Function(func_ref.node(&module))))
+        })
+        .unwrap_or_else(|| scope_id.file_scope_id(db));
+
     bind_typevar(
         db,
         index,
-        function_scope_id.file_scope_id(db),
+        containing_scope,
         typevar_binding_context,
         typevar,
     )

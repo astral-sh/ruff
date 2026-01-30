@@ -91,6 +91,22 @@ def free_function() -> None:
             reveal_type(self)  # revealed: Self@get
             return self
 
+class OuterWithClassmethod:
+    @classmethod
+    def factory(cls) -> None:
+        class Inner:
+            def get(self) -> Self:
+                reveal_type(self)  # revealed: Self@get
+                return self
+
+            @classmethod
+            def create(cls) -> Self:
+                reveal_type(cls)  # revealed: type[Self@create]
+                return cls()
+
+        reveal_type(Inner().get())  # revealed: Inner
+        reveal_type(Inner.create())  # revealed: Inner
+
 class NestedClassExplicitSelf:
     class Bar:
         def method_a(self) -> None:
