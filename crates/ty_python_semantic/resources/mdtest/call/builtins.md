@@ -198,6 +198,33 @@ reveal_type(dict(d_mixed, z=2))  # revealed: dict[str, int | tuple[int, int, int
 reveal_type(dict(d_mixed, z="x"))  # revealed: dict[str, int | tuple[int, int, int] | str]
 ```
 
+## Structural protocol matching is skipped for gradual types
+
+When a generic class structurally satisfies a protocol but has gradual type parameters (`Unknown`),
+we skip structural TypeVar inference. This avoids producing constraints containing `Unknown` that
+would change overload resolution behavior. The `max()` builtin is a good example: it accepts
+`Iterable[_T]`, and a class like `itertools.groupby` satisfies `Iterable` structurally. If the
+`groupby` instance has `Unknown` type parameters, we should not infer `_T` from the structural
+match, as that would produce an overly-specific type that interferes with overload resolution.
+
+```py
+from itertools import groupby
+
+def check_concrete(groups: groupby[str, str]) -> None:
+    # `groupby[str, str]` satisfies `Iterable` structurally (not nominally).
+    # With fully-static type parameters, structural matching infers `_T`
+    # from the protocol members, so `max` resolves correctly.
+    result = max(groups, key=lambda x: len(list(x[1])))
+    reveal_type(result)  # revealed: tuple[str, Iterator[str]] | Unknown
+
+def check_gradual(groups: groupby) -> None:
+    # Bare `groupby` has Unknown type parameters.
+    reveal_type(groups)  # revealed: groupby[Unknown, Unknown]
+    # With gradual type parameters, we skip structural TypeVar inference,
+    # so `max` should still work without producing false positive errors.
+    result = max(groups, key=lambda x: len(list(x[1])))
+```
+
 ## The builtin `NotImplemented` constant is not callable
 
 <!-- snapshot-diagnostics -->

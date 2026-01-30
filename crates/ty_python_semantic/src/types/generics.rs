@@ -2018,7 +2018,8 @@ impl<'db> SpecializationBuilder<'db> {
 
                 if let Some(formal_alias) = formal_alias {
                     let formal_origin = formal_alias.origin(self.db);
-                    for base in actual_nominal.class(self.db).iter_mro(self.db) {
+                    let actual_class = actual_nominal.class(self.db);
+                    for base in actual_class.iter_mro(self.db) {
                         let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
                             continue;
                         };
@@ -2048,7 +2049,24 @@ impl<'db> SpecializationBuilder<'db> {
                 // protocol instance and the MRO walk above didn't find a nominal match,
                 // use constraint-set assignability to infer type variable mappings from
                 // the protocol members.
-                if matches!(formal, Type::ProtocolInstance(_)) {
+                //
+                // We only apply this when:
+                // 1. The actual type's specialization is fully static (no Unknown/Any
+                //    type parameters). When the actual type contains gradual types, the
+                //    structural matching produces constraints that include those gradual
+                //    types, which can change overload resolution behavior in unhelpful
+                //    ways.
+                // 2. The actual type structurally satisfies the protocol. This avoids
+                //    the expensive constraint-set computation for types that clearly
+                //    don't match.
+                if matches!(formal, Type::ProtocolInstance(_))
+                    && !matches!(
+                        actual_nominal.class(self.db),
+                        ClassType::Generic(alias)
+                            if alias.specialization(self.db).types(self.db).iter().any(Type::is_dynamic)
+                    )
+                    && Type::NominalInstance(actual_nominal).is_assignable_to(self.db, formal)
+                {
                     let when = Type::NominalInstance(actual_nominal)
                         .when_constraint_set_assignable_to(self.db, formal, self.inferable);
                     self.add_type_mappings_from_constraint_set(formal, when, &mut f);
