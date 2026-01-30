@@ -1810,8 +1810,8 @@ impl<'db> Tuple<Type<'db>> {
         };
 
         TupleSpec::heterogeneous([
-            Type::IntLiteral(python_version.major.into()),
-            Type::IntLiteral(python_version.minor.into()),
+            Type::int_literal(python_version.major.into()),
+            Type::int_literal(python_version.minor.into()),
             int_instance_ty,
             release_level_ty,
             int_instance_ty,

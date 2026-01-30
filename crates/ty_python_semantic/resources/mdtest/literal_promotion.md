@@ -10,7 +10,9 @@ There are certain places where we promote literals to their common supertype.
 We also promote `float` to `int | float` and `complex` to `int | float | complex`, even when not in
 a type annotation.
 
-## All literal types are promotable
+## Implicitly inferred literal types are promotable
+
+Any literal types that are implicitly inferred are promotable:
 
 ```py
 from enum import Enum
@@ -18,34 +20,44 @@ from typing import Literal, LiteralString
 
 class MyEnum(Enum):
     A = 1
+    B = 2
 
 def promote[T](x: T) -> list[T]:
     return [x]
 
-def _(
-    lit1: Literal["x"],
-    lit2: LiteralString,
-    lit3: Literal[True],
-    lit4: Literal[b"x"],
-    lit5: Literal[MyEnum.A],
-):
-    reveal_type(promote(lit1))  # revealed: list[str]
-    reveal_type(promote(lit2))  # revealed: list[str]
-    reveal_type(promote(lit3))  # revealed: list[bool]
-    reveal_type(promote(lit4))  # revealed: list[bytes]
-    reveal_type(promote(lit5))  # revealed: list[MyEnum]
+x1 = "hello"
+reveal_type(x1)  # revealed: Literal["hello"]
+reveal_type(promote(x1))  # revealed: list[str]
 
-reveal_type(promote(3.14))  # revealed: list[int | float]
-reveal_type(promote(3.14j))  # revealed: list[int | float | complex]
+x2 = True
+reveal_type(x2)  # revealed: Literal[True]
+reveal_type(promote(x2))  # revealed: list[bool]
+
+x3 = b"hello"
+reveal_type(x3)  # revealed: Literal[b"hello"]
+reveal_type(promote(x3))  # revealed: list[bytes]
+
+x4 = MyEnum.A
+reveal_type(x4)  # revealed: Literal[MyEnum.A]
+reveal_type(promote(x4))  # revealed: list[MyEnum]
+
+x5 = 3.14
+reveal_type(x5)  # revealed: float
+reveal_type(promote(x5))  # revealed: list[int | float]
+
+x6 = 3.14j
+reveal_type(x6)  # revealed: complex
+reveal_type(promote(x6))  # revealed: list[int | float | complex]
 ```
 
 Function types are also promoted to their `Callable` form:
 
 ```py
-def lit6(_: int) -> int:
+def f(_: int) -> int:
     return 0
 
-reveal_type(promote(lit6))  # revealed: list[(_: int) -> int]
+reveal_type(f)  # revealed: def f(_: int) -> int
+reveal_type(promote(f))  # revealed: list[(_: int) -> int]
 ```
 
 ## Invariant collection literals are promoted
@@ -81,8 +93,7 @@ class Covariant[T]:
 
 class Contravariant[T]:
     def __init__(self, value: T): ...
-    def push(self, value: T) -> None:
-        pass
+    def push(self, value: T) -> None: ...
 
 class Invariant[T]:
     x: T
@@ -122,69 +133,6 @@ reveal_type(f10(1, 1))  # revealed: tuple[Invariant[int], Covariant[Literal[1]]]
 reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Covariant[Literal[1]]] | None
 ```
 
-## Invariant and contravariant literal arguments are respected
-
-If a literal type is present in non-covariant position in the return type, but also in non-covariant
-position in an argument type, we respect the explicitly annotated argument, and avoid promotion:
-
-```py
-from typing import Literal
-
-class Covariant[T]:
-    def pop(self) -> T:
-        raise NotImplementedError
-
-class Contravariant[T]:
-    def push(self, value: T) -> None:
-        pass
-
-class Invariant[T]:
-    x: T
-
-def f1[T](x: T) -> Invariant[T] | None: ...
-def f2[T](x: Covariant[T]) -> Invariant[T] | None: ...
-def f3[T](x: Invariant[T]) -> Invariant[T] | None: ...
-def f4[T](x: Contravariant[T]) -> Invariant[T] | None: ...
-def f5[T](x: Covariant[Invariant[T]]) -> Invariant[T] | None: ...
-def f6[T](x: Covariant[Invariant[T]]) -> Invariant[T] | None: ...
-def f7[T](x: Covariant[T], y: Invariant[T]) -> Invariant[T] | None: ...
-def f8[T](x: Invariant[T], y: Covariant[T]) -> Invariant[T] | None: ...
-def f9[T](x: Covariant[T], y: Contravariant[T]) -> Invariant[T] | None: ...
-def f10[T](x: Contravariant[T], y: Covariant[T]) -> Invariant[T] | None: ...
-def _(
-    lit: Literal[1],
-    cov: Covariant[Literal[1]],
-    inv: Invariant[Literal[1]],
-    cont: Contravariant[Literal[1]],
-    inv2: Covariant[Invariant[Literal[1]]],
-):
-    reveal_type(f1(lit))  # revealed: Invariant[int] | None
-    reveal_type(f2(cov))  # revealed: Invariant[int] | None
-
-    reveal_type(f3(inv))  # revealed: Invariant[Literal[1]] | None
-    reveal_type(f4(cont))  # revealed: Invariant[Literal[1]] | None
-    reveal_type(f5(inv2))  # revealed: Invariant[Literal[1]] | None
-    reveal_type(f6(inv2))  # revealed: Invariant[Literal[1]] | None
-    reveal_type(f7(cov, inv))  # revealed: Invariant[Literal[1]] | None
-    reveal_type(f8(inv, cov))  # revealed: Invariant[Literal[1]] | None
-    reveal_type(f9(cov, cont))  # revealed: Invariant[Literal[1]] | None
-    reveal_type(f10(cont, cov))  # revealed: Invariant[Literal[1]] | None
-```
-
-Note that we consider variance of _argument_ types, not parameters. If the literal is in covariant
-position in the declared parameter type, but invariant in the argument type, we still avoid
-promotion:
-
-```py
-from typing import Iterable
-
-class X[T]:
-    def __init__(self, x: Iterable[T]): ...
-
-def _(x: list[Literal[1]]):
-    reveal_type(X(x))  # revealed: X[Literal[1]]
-```
-
 ## Literals are promoted recursively
 
 ```py
@@ -193,71 +141,28 @@ from typing import Literal
 def promote[T](x: T) -> list[T]:
     return [x]
 
-def _(x: tuple[tuple[tuple[Literal[1]]]]):
-    reveal_type(promote(x))  # revealed: list[tuple[tuple[tuple[int]]]]
+x1 = ((((1),),),)
+reveal_type(promote(x1))  # revealed: list[tuple[tuple[tuple[int]]]]
 
-x1 = ([1, 2], [(3,), (4,)], ["5", "6"])
-reveal_type(x1)  # revealed: tuple[list[Unknown | int], list[Unknown | tuple[int]], list[Unknown | str]]
+x2 = ([1, 2], [(3,), (4,)], ["5", "6"])
+reveal_type(x2)  # revealed: tuple[list[Unknown | int], list[Unknown | tuple[int]], list[Unknown | str]]
 ```
 
 However, this promotion should not take place if the literal type appears in contravariant position:
 
 ```py
-from typing import Callable, Literal
-
 def in_negated_position(non_zero_number: int):
     if non_zero_number == 0:
         raise ValueError()
 
     reveal_type(non_zero_number)  # revealed: int & ~Literal[0]
-
     reveal_type([non_zero_number])  # revealed: list[Unknown | (int & ~Literal[0])]
-
-def in_parameter_position(callback: Callable[[Literal[1]], None]):
-    reveal_type(callback)  # revealed: (Literal[1], /) -> None
-
-    reveal_type([callback])  # revealed: list[Unknown | ((Literal[1], /) -> None)]
-
-def double_negation(callback: Callable[[Callable[[Literal[1]], None]], None]):
-    reveal_type(callback)  # revealed: ((Literal[1], /) -> None, /) -> None
-
-    reveal_type([callback])  # revealed: list[Unknown | (((int, /) -> None, /) -> None)]
-```
-
-Literal promotion should also not apply recursively to type arguments in contravariant/invariant
-position:
-
-```py
-class Bivariant[T]:
-    pass
-
-class Covariant[T]:
-    def pop(self) -> T:
-        raise NotImplementedError
-
-class Contravariant[T]:
-    def push(self, value: T) -> None:
-        pass
-
-class Invariant[T]:
-    x: T
-
-def _(
-    bivariant: Bivariant[Literal[1]],
-    covariant: Covariant[Literal[1]],
-    contravariant: Contravariant[Literal[1]],
-    invariant: Invariant[Literal[1]],
-):
-    reveal_type([bivariant])  # revealed: list[Unknown | Bivariant[int]]
-    reveal_type([covariant])  # revealed: list[Unknown | Covariant[int]]
-
-    reveal_type([contravariant])  # revealed: list[Unknown | Contravariant[Literal[1]]]
-    reveal_type([invariant])  # revealed: list[Unknown | Invariant[Literal[1]]]
 ```
 
 ## Literal annnotations are respected
 
-Explicitly annotated `Literal` types will prevent literal promotion:
+Literal types that are explicitly annotated will not be promoted, even if they are initially
+declared in a promotable position:
 
 ```py
 from enum import Enum
@@ -348,6 +253,8 @@ reveal_type(x22)  # revealed: X[Literal[1]]
 ```
 
 ## Literal annotations see through subtyping
+
+Literal annotations are respected even if the inferred type is a subtype of the declared type:
 
 ```py
 from typing import Any, Iterable, Literal, MutableSequence, Sequence
@@ -463,4 +370,86 @@ def h(x: TI) -> list[TI]:
     return [x]
 
 reveal_type(h(1))  # revealed: list[int]
+```
+
+## Literal annnotations from declaration are respected
+
+Literal types that are explicitly annotated when declared will not be promoted, even if they are
+later used in a promotable position:
+
+```py
+from typing import Literal
+
+def promote[T](x: T) -> list[T]:
+    return [x]
+
+x1 = "hello"
+reveal_type(x1)  # revealed: Literal["hello"]
+reveal_type([x1])  # revealed: list[Unknown | str]
+
+x2: Literal["hello"] = "hello"
+reveal_type(x2)  # revealed: Literal["hello"]
+reveal_type([x2])  # revealed: list[Unknown | Literal["hello"]]
+
+x3: tuple[Literal["hello"]] = ("hello",)
+reveal_type(x3)  # revealed: tuple[Literal["hello"]]
+reveal_type([x3])  # revealed: list[Unknown | tuple[Literal["hello"]]]
+
+def f() -> Literal["hello"]:
+    return "hello"
+
+def id[T](x: T) -> T:
+    return x
+
+reveal_type(f())  # revealed: Literal["hello"]
+reveal_type((f(),))  # revealed: tuple[Literal["hello"]]
+reveal_type([f()])  # revealed: list[Unknown | Literal["hello"]]
+reveal_type([id(f())])  # revealed: list[Unknown | Literal["hello"]]
+
+def _(x: tuple[Literal["hello"]]):
+    reveal_type(x)  # revealed: tuple[Literal["hello"]]
+    reveal_type([x])  # revealed: list[Unknown | tuple[Literal["hello"]]]
+
+type X = Literal["hello"]
+
+x4: X = "hello"
+reveal_type(x4)  # revealed: Literal["hello"]
+reveal_type([x4])  # revealed: list[Unknown | Literal["hello"]]
+```
+
+Literal promotability is respected by unions:
+
+```py
+from typing import Literal
+
+def _(flag: bool):
+    promotable1 = "age"
+    unpromotable1: Literal["age"] | None = "age" if flag else None
+
+    reveal_type(unpromotable1 or promotable1)  # revealed: Literal["age"]
+    reveal_type([unpromotable1 or promotable1])  # revealed: list[Unknown | Literal["age"]]
+
+    promotable2 = "age" if flag else None
+    unpromotable2: Literal["age"] = "age"
+
+    reveal_type(promotable2 or unpromotable2)  # revealed: Literal["age"]
+    reveal_type([promotable2 or unpromotable2])  # revealed: list[Unknown | Literal["age"]]
+
+    promotable3 = True
+    unpromotable3: Literal[True] | None = True if flag else None
+
+    reveal_type(unpromotable3 or promotable3)  # revealed: Literal[True]
+    reveal_type([unpromotable3 or promotable3])  # revealed: list[Unknown | Literal[True]]
+
+    promotable4 = True if flag else None
+    unpromotable4: Literal[True] = True
+
+    reveal_type(promotable4 or unpromotable4)  # revealed: Literal[True]
+    reveal_type([promotable4 or unpromotable4])  # revealed: list[Unknown | Literal[True]]
+
+type X = Literal[b"bar"]
+
+def _(x1: X | None, x2: X):
+    reveal_type([x1, x2])  # revealed: list[Unknown | Literal[b"bar"] | None]
+    reveal_type([x1 or x2])  # revealed: list[Unknown | Literal[b"bar"]]
 ```
