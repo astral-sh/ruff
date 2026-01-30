@@ -201,22 +201,8 @@ pub(crate) const fn is_future_required_preview_generics_enabled(settings: &Linte
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/20027
-pub(crate) const fn is_unnecessary_default_type_args_stubs_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/20169
 pub(crate) const fn is_fix_builtin_open_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20178
-pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
-    settings: &LinterSettings,
-) -> bool {
     settings.preview.is_enabled()
 }
 
