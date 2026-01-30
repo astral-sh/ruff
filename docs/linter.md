@@ -343,8 +343,6 @@ The full inline comment specification is as follows:
 
 #### Block-level
 
-*Range suppressions are currently only available in [preview mode](preview.md#preview).*
-
 To ignore one or more violations within a range or block of code, a "disable" comment
 followed by a matching "enable" comment can be used, like so:
 
@@ -400,7 +398,7 @@ The full range suppression comment specification is as follows:
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
   after the `#` symbol and `:` symbol, followed by either `disable` or `enable`
   to start or end a range respectively, immediately followed by `[`, any codes to
-  be suppressed, and ending with `]`. 
+  be suppressed, and ending with `]`.
 - Codes to be suppressed must be separated by commas, with optional whitespace
   before or after each code, and may be followed by an optional trailing comma
   after the last code.
