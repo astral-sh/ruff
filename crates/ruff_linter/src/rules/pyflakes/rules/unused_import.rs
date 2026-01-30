@@ -891,6 +891,7 @@ fn best_match<'a, 'b>(
 ) -> Option<&'a Binding<'b>> {
     bindings
         .iter()
+        .rev()
         .copied()
         .max_by_key(|binding| rank_matches(binding, prototype))
 }
