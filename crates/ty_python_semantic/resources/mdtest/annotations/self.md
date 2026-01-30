@@ -90,6 +90,13 @@ def free_function() -> None:
         def get(self) -> Self:
             reveal_type(self)  # revealed: Self@get
             return self
+
+class NestedClassExplicitSelf:
+    class Bar:
+        def method_a(self) -> None:
+            def first_param_is_explicit_self(this: Self) -> None:
+                reveal_type(this)  # revealed: Self@method_a
+                reveal_type(self)  # revealed: Self@method_a
 ```
 
 ## Type of (unannotated) `self` parameters
