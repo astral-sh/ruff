@@ -32,7 +32,7 @@ pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
-    infer_expression_type, infer_expression_types, infer_scope_types, static_expression_truthiness,
+    infer_expression_type, infer_expression_types, infer_scope_types,
 };
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::{CallableSignature, Signature};
