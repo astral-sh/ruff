@@ -2583,6 +2583,33 @@ def match_non_literal(u: Foo | NonLiteralTD):
             reveal_type(u)  # revealed: NonLiteralTD
 ```
 
+and it is also restricted to `match` patterns that solely consist of value patterns:
+
+```py
+class Config:
+    MODE: str = "default"
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+    data: int
+
+class Bar(TypedDict):
+    tag: Literal["bar"]
+    data: str
+
+def test_or_pattern_with_non_literal(u: Foo | Bar):
+    match u["tag"]:
+        case Config.MODE | "foo":
+            # Config.mode has type `str` (not a literal), which could match
+            # any string value at runtime. We cannot narrow based on "foo" alone
+            # because the actual match might have been against Config.mode.
+            reveal_type(u)  # revealed: Foo | Bar
+        case "bar":
+            # Since the previous case could match any string, this case can
+            # still narrow to `Bar` when tag equals "bar".
+            reveal_type(u)  # revealed: Bar
+```
+
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
 
 ```py
