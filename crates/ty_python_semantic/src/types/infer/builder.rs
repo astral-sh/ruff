@@ -16198,9 +16198,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 
             // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
 
-            let previous_definition = previous_bindings
-                .next()
-                .and_then(|r| r.binding.definition());
+            let previous_definition = previous_bindings.find_map(|r| r.binding.definition());
 
             if !self.is_local || previous_definition.is_some() {
                 let place = place_table.place(self.binding.place(db));
