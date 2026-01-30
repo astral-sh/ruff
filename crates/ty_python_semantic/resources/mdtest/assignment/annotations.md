@@ -16,6 +16,16 @@ reveal_type(y)  # revealed: Literal[1]
 x: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
 ```
 
+## Numbers special case
+
+<!-- snapshot-diagnostics -->
+
+```py
+from numbers import Number
+
+a: Number = 1  # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Number`"
+```
+
 ## Violates previous annotation
 
 ```py
@@ -59,7 +69,7 @@ reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 reveal_type(e)  # revealed: tuple[str, ...]
 
 reveal_type(f)  # revealed: tuple[str, *tuple[int, ...], bytes]
-reveal_type(g)  # revealed: tuple[@Todo(PEP 646), ...]
+reveal_type(g)  # revealed: tuple[@Todo(TypeVarTuple), ...]
 
 reveal_type(h)  # revealed: tuple[list[int], list[int]]
 reveal_type(i)  # revealed: tuple[str | int, str | int]
@@ -422,7 +432,7 @@ reveal_type(x4)  # revealed: list[int | tuple[int, int]]
 x5: list[int] = f(True)
 reveal_type(x5)  # revealed: list[int]
 
-# error: [invalid-assignment] "Object of type `list[int | str]` is not assignable to `list[int]`"
+# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[int]`"
 x6: list[int] = f("a")
 
 # error: [invalid-assignment] "Object of type `list[str]` is not assignable to `tuple[int]`"
@@ -805,21 +815,65 @@ def _(a: int, b: str, c: int | str):
     x5: int | str = f(lst(b))
     reveal_type(x5)  # revealed: str
 
-    x6: str | None = f(lst(b))
+    x6: str | int = f(lst(b))
     reveal_type(x6)  # revealed: str
 
-    x7: int | str = f(lst(c))
-    reveal_type(x7)  # revealed: int | str
+    x7: str | None = f(lst(b))
+    reveal_type(x7)  # revealed: str
 
     x8: int | str = f(lst(c))
     reveal_type(x8)  # revealed: int | str
 
+    x9: int | str = f(lst(c))
+    reveal_type(x9)  # revealed: int | str
+
     # TODO: Ideally this would reveal `int | str`. This is a known limitation of our
-    # call inference solver, and would # require an extra inference attempt without type
-    # context, or with type context # of subsets of the union, both of which are impractical
+    # call inference solver, and would require an extra inference attempt without type
+    # context, or with type context of subsets of the union, both of which are impractical
     # for performance reasons.
-    x9: int | str | None = f(lst(c))
-    reveal_type(x9)  # revealed: int | str | None
+    x10: int | str | None = f(lst(c))
+    reveal_type(x10)  # revealed: int | str | None
+```
+
+## Assignability diagnostics ignore declared type of generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The type displayed in an invalid assignment diagnostic should account for the type context, e.g., to
+avoid literal promotion:
+
+```py
+from typing import Literal, TypedDict
+
+def f[T](x: T) -> list[T]:
+    return [x]
+
+# error: [invalid-assignment] "Object of type `list[Literal["hello"] | int]` is not assignable to `list[Literal["hello"] | bool]`"
+x1: list[Literal["hello"] | bool] = ["hello", 1]
+
+class A(TypedDict):
+    bar: int
+
+# error: [invalid-assignment] "Object of type `list[A | int]` is not assignable to `list[A | bool]`"
+x2: list[A | bool] = [{"bar": 1}, 1]
+```
+
+However, the declared type of generic classes should be ignored if the specialization is not
+solvable:
+
+```py
+def g[T](x: list[T]) -> T:
+    return x[0]
+
+def _(a: int | None):
+    # error: [invalid-assignment] "Object of type `list[int | None]` is not assignable to `list[str]`"
+    y1: list[str] = f(a)
+
+    # error: [invalid-assignment] "Object of type `int | None` is not assignable to `str`"
+    y2: str = g(f(a))
 ```
 
 ## Forward annotation with unclosed string literal

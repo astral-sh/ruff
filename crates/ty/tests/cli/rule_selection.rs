@@ -589,7 +589,7 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:6:12
       |
     5 | [[tool.ty.overrides]]
@@ -635,7 +635,7 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:7:12
       |
     5 | [[tool.ty.overrides]]
@@ -885,6 +885,239 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+/// The "all" keyword can be used to set all rules to a specific severity
+#[test]
+fn cli_all_rules_ignore() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        import does_not_exit
+
+        y = 4 / 0
+
+        prin(y)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore all should disable all rules
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword works with --warn to set all rules to warn severity
+#[test]
+fn cli_all_rules_warn() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --warn all should make all rules warnings (not errors)
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--warn")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:2:1
+      |
+    2 | prin(x)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:2:6
+      |
+    2 | prin(x)  # unresolved-reference
+      |      ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword can be overridden by subsequent specific rule settings
+#[test]
+fn cli_all_rules_with_override() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        import does_not_exit
+
+        y = 4 / 0
+
+        prin(y)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore all followed by --error for a specific rule should
+    // disable all rules except the one specified
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("all")
+            .arg("--error")
+            .arg("unresolved-reference"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:6:1
+      |
+    4 | y = 4 / 0
+    5 |
+    6 | prin(y)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword is case-insensitive
+#[test]
+fn cli_all_rules_case_insensitive() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore ALL (uppercase) should work the same as --ignore all
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("ALL"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// A specific rule can be set first and then overridden by "all"
+#[test]
+fn cli_specific_then_all() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --error for a specific rule followed by --ignore all should
+    // ignore all rules (including the previously set one)
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--error")
+            .arg("unresolved-reference")
+            .arg("--ignore")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword works in configuration files
+#[test]
+fn configuration_all_rules() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "ignore"
+            unresolved-reference = "error"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            import does_not_exit
+
+            y = 4 / 0
+
+            prin(y)  # unresolved-reference
+            "#,
+        ),
+    ])?;
+
+    // The "all" rule should be processed first, ignoring all rules,
+    // then unresolved-reference should be enabled as error
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:6:1
+      |
+    4 | y = 4 / 0
+    5 |
+    6 | prin(y)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

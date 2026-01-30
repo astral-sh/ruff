@@ -218,7 +218,7 @@ be included in the signature of `__init__`. This is a case that we currently don
 @dataclass
 class D:
     # (x) is an expression, not a "simple name"
-    (x): int = 1
+    (x): int = 1  # fmt: skip
 
 # TODO: should ideally not include a `x` parameter
 reveal_type(D.__init__)  # revealed:(self: D, x: int = 1) -> None

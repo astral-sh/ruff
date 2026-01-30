@@ -31,10 +31,12 @@ jobs:
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+        with:
+          version: "0.9.26"
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"

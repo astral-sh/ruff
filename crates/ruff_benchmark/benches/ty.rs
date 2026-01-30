@@ -67,7 +67,6 @@ fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
 }
 
-#[expect(clippy::needless_update)]
 fn setup_tomllib_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
@@ -562,6 +561,49 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
+/// Micro-benchmark that tests our performance when slicing and unpacking
+/// a very large tuple that has many varied literal strings inside it.
+///
+/// Adapted from <https://github.com/MMD-Blender/blender_mmd_tools/blob/6ae13d6039763b6813832622c13da464983e93b3/mmd_tools/m17n.py>
+fn benchmark_very_large_tuple(criterion: &mut Criterion) {
+    /// Number of entries in the tuple -- must be >64 to trigger the literal-promotion optimization
+    const NUM_ENTRIES: usize = 65;
+
+    setup_rayon();
+
+    let mut code = "translations_tuple = (\n".to_string();
+    for i in 0..NUM_ENTRIES {
+        writeln!(
+            &mut code,
+            r#"    (("*", "Description {i}"), (("ref.path.{i}",), ()), ("ja_JP", "翻訳{i}", (False, ())), ("zh_HANS", "翻译{i}", (False, ()))),"#
+        )
+        .ok();
+    }
+    code.push_str(")\n\n");
+
+    // This slice operation (msg[2:]) is what triggers the expensive type inference:
+    // ty must compute the union of all possible slice results.
+    code.push_str(
+        "\
+for msg in translations_tuple:
+    for lang, trans, (is_fuzzy, comments) in msg[2:]:
+        pass
+",
+    );
+
+    criterion.bench_function("ty_micro[very_large_tuple]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 48;
 
@@ -777,6 +819,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
+    benchmark_very_large_tuple,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);
