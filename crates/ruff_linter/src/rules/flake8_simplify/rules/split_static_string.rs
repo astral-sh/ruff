@@ -192,11 +192,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     })
 }
 
-fn split_default(
-    str_value: &StringLiteralValue,
-    max_split: i32,
-    method: Method,
-) -> Option<Expr> {
+fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method) -> Option<Expr> {
     let string_val = str_value.to_str();
     match max_split.cmp(&0) {
         Ordering::Greater | Ordering::Equal => {
