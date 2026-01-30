@@ -8,8 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::{
-    is_future_required_preview_generics_enabled, is_optional_as_none_in_union_enabled,
-    is_unnecessary_default_type_args_stubs_enabled,
+    is_future_required_preview_generics_enabled, is_unnecessary_default_type_args_stubs_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{
@@ -101,10 +100,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     }
                     if checker.is_rule_enabled(Rule::DuplicateUnionMember)
                         // Avoid duplicate checks inside `Optional`
-                        && !(
-                            is_optional_as_none_in_union_enabled(checker.settings())
-                            && checker.semantic.inside_optional()
-                        )
+                        && !checker.semantic.inside_optional()
                     {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
                     }
@@ -1542,10 +1538,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::DuplicateUnionMember)
                     && checker.semantic.in_type_definition()
                     // Avoid duplicate checks inside `Optional`
-                    && !(
-                        is_optional_as_none_in_union_enabled(checker.settings())
-                        && checker.semantic.inside_optional()
-                    )
+                    && !checker.semantic.inside_optional()
                 {
                     flake8_pyi::rules::duplicate_union_member(checker, expr);
                 }
