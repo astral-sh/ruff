@@ -201,13 +201,6 @@ pub(crate) const fn is_future_required_preview_generics_enabled(settings: &Linte
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/20027
-pub(crate) const fn is_unnecessary_default_type_args_stubs_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/20343
 pub(crate) const fn is_sim910_expanded_key_support_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
