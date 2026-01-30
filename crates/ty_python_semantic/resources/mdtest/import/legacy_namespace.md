@@ -10,20 +10,20 @@ extra-paths = ["/airflow-core/src", "/providers/amazon/src/"]
 `/airflow-core/src/airflow/__init__.py`:
 
 ```py
-__import__('pkg_resources').declare_namespace(__name__)
+__import__("pkg_resources").declare_namespace(__name__)
 __version__ = "3.2.0"
 ```
 
 `/providers/amazon/src/airflow/__init__.py`:
 
 ```py
-__import__('pkg_resources').declare_namespace(__name__)
+__import__("pkg_resources").declare_namespace(__name__)
 ```
 
 `/providers/amazon/src/airflow/providers/__init__.py`:
 
 ```py
-__import__('pkg_resources').declare_namespace(__name__)
+__import__("pkg_resources").declare_namespace(__name__)
 ```
 
 `/providers/amazon/src/airflow/providers/amazon/__init__.py`:
@@ -272,20 +272,20 @@ extra-paths = ["/airflow-core/src", "/providers/amazon/src/"]
 `/airflow-core/src/airflow/__init__.py`:
 
 ```py
-__import__('not_pkg_resources').declare_namespace(__name__)
+__import__("not_pkg_resources").declare_namespace(__name__)
 __version__ = "3.2.0"
 ```
 
 `/providers/amazon/src/airflow/__init__.py`:
 
 ```py
-__import__('not_pkg_resources').declare_namespace(__name__)
+__import__("not_pkg_resources").declare_namespace(__name__)
 ```
 
 `/providers/amazon/src/airflow/providers/__init__.py`:
 
 ```py
-__import__('not_pkg_resources').declare_namespace(__name__)
+__import__("not_pkg_resources").declare_namespace(__name__)
 ```
 
 `/providers/amazon/src/airflow/providers/amazon/__init__.py`:
@@ -313,20 +313,20 @@ extra-paths = ["/airflow-core/src", "/providers/amazon/src/"]
 `/airflow-core/src/airflow/__init__.py`:
 
 ```py
-__import__('pkg_resources').declare_namespace("other_module")
+__import__("pkg_resources").declare_namespace("other_module")
 __version__ = "3.2.0"
 ```
 
 `/providers/amazon/src/airflow/__init__.py`:
 
 ```py
-__import__('pkg_resources').declare_namespace("other_module")
+__import__("pkg_resources").declare_namespace("other_module")
 ```
 
 `/providers/amazon/src/airflow/providers/__init__.py`:
 
 ```py
-__import__('pkg_resources').declare_namespace("other_module")
+__import__("pkg_resources").declare_namespace("other_module")
 ```
 
 `/providers/amazon/src/airflow/providers/amazon/__init__.py`:
