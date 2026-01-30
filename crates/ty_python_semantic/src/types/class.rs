@@ -3010,7 +3010,13 @@ impl<'db> StaticClassLiteral<'db> {
         );
 
         match result {
-            ClassMemberResult::Done(result) => result.finalize(db),
+            ClassMemberResult::Done(result) => {
+                // Bind `Self` to the instance type for class attribute access.
+                let self_type = Type::instance(db, self.unknown_specialization(db));
+                result
+                    .finalize(db)
+                    .map_type(|ty| ty.bind_self_typevars(db, self_type, None))
+            }
 
             ClassMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_class_literal(db)

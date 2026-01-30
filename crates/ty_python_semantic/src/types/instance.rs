@@ -232,6 +232,14 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
 }
 
 impl<'db> NominalInstanceType<'db> {
+    pub(super) fn can_contain_self(self) -> bool {
+        match self.0 {
+            NominalInstanceInner::Object => false,
+            NominalInstanceInner::ExactTuple(_) => true,
+            NominalInstanceInner::NonTuple(class) => class.is_generic(),
+        }
+    }
+
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
