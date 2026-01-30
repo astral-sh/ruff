@@ -243,8 +243,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
-    let suppressions =
-        Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
     let messages = check_path(
         path,
         path.parent()
@@ -312,7 +311,7 @@ pub(crate) fn test_contents<'a>(
             );
 
             let suppressions =
-                Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+                Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
             let fixed_messages = check_path(
                 path,
                 None,
