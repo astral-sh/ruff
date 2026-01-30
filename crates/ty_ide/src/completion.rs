@@ -1588,8 +1588,8 @@ pub(crate) fn unresolved_fixes(
 fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'db>) {
     let keyword_values = [
         ("None", Type::none(db)),
-        ("True", Type::BooleanLiteral(true)),
-        ("False", Type::BooleanLiteral(false)),
+        ("True", Type::bool_literal(db, true)),
+        ("False", Type::bool_literal(db, false)),
     ];
     for (name, ty) in keyword_values {
         completions.add(CompletionBuilder::keyword(name).ty(ty).builtin(true));
@@ -2467,14 +2467,8 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::BoundSuper(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => CompletionKind::Struct,
-            Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_) => CompletionKind::Value,
-            Type::EnumLiteral(_) => CompletionKind::Enum,
+            Type::LiteralValue(literal) if literal.is_enum(db) => CompletionKind::Enum,
+            Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_) => CompletionKind::Value,
             Type::ProtocolInstance(_) => CompletionKind::Interface,
             Type::TypeVar(_) => CompletionKind::TypeParameter,
             Type::Union(union) => union

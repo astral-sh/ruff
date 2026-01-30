@@ -1908,8 +1908,8 @@ mod tests {
         use TypeOrigin::Inferred;
 
         let db = setup_db();
-        let ty1 = Type::IntLiteral(1);
-        let ty2 = Type::IntLiteral(2);
+        let ty1 = Type::int_literal(&db, 1);
+        let ty2 = Type::int_literal(&db, 2);
 
         let unbound = || PlaceAndQualifiers::default();
 

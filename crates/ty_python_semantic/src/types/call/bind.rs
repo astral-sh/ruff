@@ -46,9 +46,10 @@ use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, GenericAlias, InternedConstraintSet, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members, todo_type,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
+    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -435,8 +436,10 @@ impl<'db> Bindings<'db> {
         dataclass_field_specifiers: &[Type<'db>],
     ) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
-            if let Some(Type::BooleanLiteral(value)) = ty {
-                *value
+            if let Some(ty) = ty
+                && let Some(LiteralValueTypeKind::Bool(value)) = ty.as_literal_value_kind(db)
+            {
+                value
             } else {
                 // TODO: emit a diagnostic if we receive `bool`
                 default
@@ -684,10 +687,11 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)) => {
-                        if let [Some(Type::StringLiteral(prefix)), None, None] =
-                            overload.parameter_types()
+                        if let [Some(first), None, None] = overload.parameter_types()
+                            && let Some(prefix) = first.as_string_literal(db)
                         {
-                            overload.set_return_type(Type::BooleanLiteral(
+                            overload.set_return_type(Type::bool_literal(
+                                db,
                                 literal.value(db).starts_with(prefix.value(db)),
                             ));
                         }
@@ -832,13 +836,13 @@ impl<'db> Bindings<'db> {
 
                         let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
                         {
-                            match kw_only {
+                            match kw_only.and_then(|ty| ty.as_literal_value_kind(db)) {
                                 // We are more conservative here when turning the type for `kw_only`
                                 // into a bool, because a field specifier in a stub might use
                                 // `kw_only: bool = ...` and the truthiness of `...` is always true.
                                 // This is different from `init` above because may need to fall back
                                 // to `kw_only_default`, whereas `init_default` does not exist.
-                                Some(Type::BooleanLiteral(yes)) => Some(yes),
+                                Some(LiteralValueTypeKind::Bool(yes)) => Some(yes),
                                 _ => None,
                             }
                         } else {
@@ -846,7 +850,7 @@ impl<'db> Bindings<'db> {
                         };
 
                         let alias = alias
-                            .and_then(Type::as_string_literal)
+                            .and_then(|ty| ty.as_string_literal(db))
                             .map(|literal| Box::from(literal.value(db)));
 
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
@@ -908,14 +912,17 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSingleton) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                                overload
+                                    .set_return_type(Type::bool_literal(db, ty.is_singleton(db)));
                             }
                         }
 
                         Some(KnownFunction::IsSingleValued) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload
-                                    .set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                                overload.set_return_type(Type::bool_literal(
+                                    db,
+                                    ty.is_single_valued(db),
+                                ));
                             }
                         }
 
@@ -1089,7 +1096,8 @@ impl<'db> Bindings<'db> {
                                 // would return `True` for the given type. Internally we consider `SupportsAbs[int]` to
                                 // be a "(specialised) protocol class", but `typing.is_protocol(SupportsAbs[int])` returns
                                 // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
-                                overload.set_return_type(Type::BooleanLiteral(
+                                overload.set_return_type(Type::bool_literal(
+                                    db,
                                     ty.as_class_literal()
                                         .is_some_and(|class| class.is_protocol(db)),
                                 ));
@@ -1122,7 +1130,7 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
 
-                            let Some(attr_name) = attr_name.as_string_literal() else {
+                            let Some(attr_name) = attr_name.as_string_literal(db) else {
                                 continue;
                             };
 
@@ -1318,7 +1326,7 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
 
-                            let Some(format_literal) = format.as_string_literal() else {
+                            let Some(format_literal) = format.as_string_literal(db) else {
                                 continue;
                             };
 
@@ -1350,8 +1358,10 @@ impl<'db> Bindings<'db> {
                                 let mut flags = dataclass_params.flags(db);
 
                                 for (param, flag) in DATACLASS_FLAGS {
-                                    if let Ok(Some(Type::BooleanLiteral(value))) =
+                                    if let Ok(Some(ty)) =
                                         overload.parameter_type_by_name(param, false)
+                                        && let Some(LiteralValueTypeKind::Bool(value)) =
+                                            ty.as_literal_value_kind(db)
                                     {
                                         flags.set(*flag, value);
                                     }
@@ -1540,7 +1550,7 @@ impl<'db> Bindings<'db> {
                         let result = tracked
                             .constraints(db)
                             .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
-                        overload.set_return_type(Type::BooleanLiteral(result));
+                        overload.set_return_type(Type::bool_literal(db, result));
                     }
 
                     Type::KnownBoundMethod(
@@ -1568,7 +1578,7 @@ impl<'db> Bindings<'db> {
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
-                            [None] => overload.set_return_type(Type::BooleanLiteral(false)),
+                            [None] => overload.set_return_type(Type::bool_literal(db, false)),
                             _ => {}
                         },
 
