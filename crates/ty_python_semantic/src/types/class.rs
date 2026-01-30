@@ -3129,7 +3129,14 @@ impl<'db> StaticClassLiteral<'db> {
         // class attributes; they are markers used by the dataclass decorator to
         // indicate that subsequent fields are keyword-only. Treat them as
         // undefined so the MRO falls through to parent classes.
-        if self.is_own_kw_only_sentinel(db, name) {
+        if member
+            .inner
+            .place
+            .unwidened_type()
+            .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
+            && CodeGeneratorKind::from_static_class(db, self, None)
+                .is_some_and(|policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)))
+        {
             return Member::unbound();
         }
 
@@ -4601,7 +4608,11 @@ impl<'db> StaticClassLiteral<'db> {
                     }
 
                     // `KW_ONLY` sentinels are markers, not real instance attributes.
-                    if self.is_own_kw_only_sentinel(db, name) {
+                    if declared_ty.is_instance_of(db, KnownClass::KwOnly)
+                        && CodeGeneratorKind::from_static_class(db, self, None).is_some_and(
+                            |policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)),
+                        )
+                    {
                         return Member::unbound();
                     }
 
@@ -4753,25 +4764,6 @@ impl<'db> StaticClassLiteral<'db> {
                 ..
             }
         )
-    }
-
-    /// Returns `true` if `name` is a `dataclasses.KW_ONLY` sentinel field on this class.
-    ///
-    /// `KW_ONLY` sentinels are not real attributes; they are markers that tell
-    /// the dataclass decorator to make subsequent fields keyword-only.
-    fn is_own_kw_only_sentinel(self, db: &'db dyn Db, name: &str) -> bool {
-        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
-            return false;
-        };
-        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
-            return false;
-        }
-
-        let fields = self.own_fields(db, None, field_policy);
-        let Some(field) = fields.get(name) else {
-            return false;
-        };
-        field.is_kw_only_sentinel(db)
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
