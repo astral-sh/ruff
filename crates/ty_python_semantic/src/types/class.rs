@@ -4623,7 +4623,7 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_qualifiers(qualifiers),
                                 }
                             }
-                        } else if self.dataclass_instance_field(db, name).is_some()
+                        } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty
                                 .class_member(db, "__get__".into())
                                 .place
@@ -4711,14 +4711,18 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    fn dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> Option<Field<'db>> {
-        let field_policy = CodeGeneratorKind::from_static_class(db, self, None)?;
+    fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+            return false;
+        };
         if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
-            return None;
+            return false;
         }
 
         let fields = self.own_fields(db, None, field_policy);
-        let field = fields.get(&Name::new(name))?;
+        let Some(field) = fields.get(name) else {
+            return false;
+        };
         matches!(
             field.kind,
             FieldKind::Dataclass {
@@ -4726,8 +4730,6 @@ impl<'db> StaticClassLiteral<'db> {
                 ..
             }
         )
-        .then_some(field.clone())
-        .filter(|field| !field.is_kw_only_sentinel(db))
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {

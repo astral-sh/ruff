@@ -28,9 +28,7 @@ bob = Member(name="Bob", tag="VIP")
 ```py
 from dataclasses import dataclass
 
-@dataclass
-class Configuration:
-    pass
+class Configuration: ...
 
 @dataclass(frozen=True)
 class SomeClass:
@@ -39,7 +37,6 @@ class SomeClass:
     def foo(self) -> int:
         raise NotImplementedError
 
-@dataclass
 class SpecificConfiguration(Configuration):
     x: int = 0
 
@@ -54,21 +51,37 @@ class SpecificClass(SomeClass):
 
 reveal_type(SpecificClass().config)  # revealed: SpecificConfiguration | None
 
-@dataclass
-class NonFrozenBase:
-    config: Configuration | None
-
-@dataclass
-class NonFrozenSpecificClass(NonFrozenBase):
-    config: SpecificConfiguration | None = None
-
-reveal_type(NonFrozenSpecificClass().config)  # revealed: SpecificConfiguration | None
-
 @dataclass(frozen=True)
 class NoDefaultSpecificClass(SomeClass):
     config: SpecificConfiguration | None
 
 reveal_type(NoDefaultSpecificClass(SpecificConfiguration()).config)  # revealed: SpecificConfiguration | None
+```
+
+## `KW_ONLY` sentinel with a default value
+
+A `KW_ONLY` sentinel is not a real instance field, even if it has a class body binding.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from dataclasses import dataclass, KW_ONLY
+
+@dataclass
+class Base:
+    x: int
+
+@dataclass
+class Child(Base):
+    _: KW_ONLY = KW_ONLY  # error: [invalid-assignment]
+    y: int = 0
+
+c = Child(x=1, y=2)
+reveal_type(c.x)  # revealed: int
+reveal_type(c.y)  # revealed: int
 ```
 
 ## Descriptor-typed fields with defaults
