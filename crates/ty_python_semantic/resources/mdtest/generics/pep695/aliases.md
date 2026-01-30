@@ -396,6 +396,51 @@ def _(values: list[int]) -> OptionalList[int]:
     return result
 ```
 
+Union type aliases also work correctly with TypedDict dict literal inference:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int
+
+type MaybePerson = Person | None
+
+def _(p: MaybePerson):
+    # Dict literal should be inferred as Person, not dict[str, str | int]
+    x: MaybePerson = {"name": "Alice", "age": 30}
+    reveal_type(x)  # revealed: Person
+```
+
+And with `dict()` calls in TypedDict context:
+
+```py
+from typing import TypedDict
+
+class Dog(TypedDict):
+    name: str
+    breed: str
+
+type MaybeDog = Dog | None
+
+def _():
+    # dict() call with keyword args should be inferred as Dog
+    animal: MaybeDog = dict(name="Buddy", breed="Labrador")
+    reveal_type(animal)  # revealed: Dog
+```
+
+And with set literal inference:
+
+```py
+type MaybeSet[T] = set[T] | T
+
+def _():
+    # Set literal should be inferred as set[int]
+    x: MaybeSet[int] = {1, 2, 3}
+    reveal_type(x)  # revealed: set[int]
+```
+
 ## Fully qualified type alias names in error messages
 
 When two type aliases have the same name but are in different scopes, they should be fully qualified

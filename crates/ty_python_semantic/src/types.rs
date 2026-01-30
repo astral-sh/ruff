@@ -1541,7 +1541,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If the type is a union, filters union elements based on the provided predicate.
+    /// If the type is a union (or a type alias that resolves to a union), filters union elements
+    /// based on the provided predicate.
     ///
     /// Otherwise, returns the type unchanged.
     pub(crate) fn filter_union(
@@ -1549,7 +1550,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
-        if let Type::Union(union) = self {
+        if let Type::Union(union) = self.resolve_type_alias(db) {
             union.filter(db, f)
         } else {
             self
