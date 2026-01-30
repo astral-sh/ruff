@@ -266,117 +266,87 @@ def bar(): ...
     fn format_code_blocks_ignore_blackendocs_off() {
         let code = r#"
 ```py
-def foo(): pass
-def bar(): pass
+print( 'hello' )
 ```
 
 <!-- blacken-docs:off -->
 ```py
-def foo(): pass
-def bar(): pass
+print( 'hello' )
 ```
 <!-- blacken-docs:on -->
 
 ```py
-def foo(): pass
-def bar(): pass
+print( 'hello' )
 ```
         "#;
         assert_snapshot!(format_code_blocks(
             code,
             None,
             &FormatterSettings::default()
-        ), @r"
+        ), @r#"
         ```py
-        def foo():
-            pass
-
-
-        def bar():
-            pass
+        print("hello")
         ```
 
         <!-- blacken-docs:off -->
         ```py
-        def foo(): pass
-        def bar(): pass
+        print( 'hello' )
         ```
         <!-- blacken-docs:on -->
 
         ```py
-        def foo():
-            pass
-
-
-        def bar():
-            pass
+        print("hello")
         ```
-        ");
+        "#);
     }
 
     #[test]
     fn format_code_blocks_ignore_ruff_off() {
         let code = r#"
 ```py
-def foo(): pass
-def bar(): pass
+print( 'hello' )
 ```
 
 <!-- ruff:off -->
 ```py
-def foo(): pass
-def bar(): pass
+print( 'hello' )
 ```
 <!-- ruff:on -->
 
 ```py
-def foo(): pass
-def bar(): pass
+print( 'hello' )
 ```
         "#;
         assert_snapshot!(format_code_blocks(
             code,
             None,
             &FormatterSettings::default()
-        ), @r"
+        ), @r#"
         ```py
-        def foo():
-            pass
-
-
-        def bar():
-            pass
+        print("hello")
         ```
 
         <!-- ruff:off -->
         ```py
-        def foo(): pass
-        def bar(): pass
+        print( 'hello' )
         ```
         <!-- ruff:on -->
 
         ```py
-        def foo():
-            pass
-
-
-        def bar():
-            pass
+        print("hello")
         ```
-        ");
+        "#);
     }
     #[test]
     fn format_code_blocks_ignore_to_end() {
         let code = r#"
 <!-- ruff:off -->
 ```py
-def foo(): pass
-def bar(): pass
+print( 'hello' )
 ```
 
 ```py
-def foo(): pass
-def bar(): pass
+print( 'hello' )
 ```
         "#;
         assert_snapshot!(format_code_blocks(
