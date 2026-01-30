@@ -5891,30 +5891,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 self.typevar_binding_context = previous_typevar_binding_context;
 
-                let legacy_typevars = |ty: Type<'db>| {
-                    let mut variables = FxOrderSet::default();
-                    ty.bind_and_find_all_legacy_typevars(
-                        self.db(),
-                        self.typevar_binding_context,
-                        &mut variables,
-                    );
-                    variables
-                };
                 // Convert eager union instances to lazy for assignments
                 // This enables lazy evaluation for recursive type aliases like `Foo = int | list["Foo"]`
-                let value_ty = if let Some(name) = target.as_name_expr()
-                && let Type::KnownInstance(KnownInstanceType::UnionType(instance)) = value_ty
-                && let Some(eager) = instance.as_eager(self.db())
-                // TODO: support generic recursive union type instances
-                && eager.union_type.as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
-                {
-                    Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::from_definition(
-                            self.db(),
-                            name.id().clone(),
-                            definition,
-                        ),
-                    ))
+                let value_ty = if let Some(instance) = value_ty.as_union_type_instance()
+                    && let Some(eager) = instance.as_eager(self.db())
+                    && let Some(lazy) = eager.try_into_lazy(
+                        self.db(),
+                        target,
+                        definition,
+                        self.typevar_binding_context,
+                    ) {
+                    lazy
                 } else {
                     value_ty
                 };
@@ -8058,26 +8045,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 inferred_ty
             };
 
-            let legacy_typevars = |ty: Type<'db>| {
-                let mut variables = FxOrderSet::default();
-                ty.bind_and_find_all_legacy_typevars(
-                    self.db(),
-                    self.typevar_binding_context,
-                    &mut variables,
-                );
-                variables
-            };
             // Convert eager union instances to lazy for assignments
             // This enables lazy evaluation for recursive type aliases like `Foo: TypeAlias = int | list["Foo"]`
-            let inferred_ty = if let Some(name) = target.as_name_expr()
-                && let Type::KnownInstance(KnownInstanceType::UnionType(instance)) = inferred_ty
+            let inferred_ty = if let Some(instance) = inferred_ty.as_union_type_instance()
                 && let Some(eager) = instance.as_eager(self.db())
-                // TODO: support generic recursive union type instances
-                && eager.union_type.as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+                && let Some(lazy) =
+                    eager.try_into_lazy(self.db(), target, definition, self.typevar_binding_context)
             {
-                Type::KnownInstance(KnownInstanceType::UnionType(
-                    UnionTypeInstance::from_definition(self.db(), name.id().clone(), definition),
-                ))
+                lazy
             } else {
                 inferred_ty
             };

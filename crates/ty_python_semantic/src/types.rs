@@ -1336,6 +1336,15 @@ impl<'db> Type<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
+    pub(crate) fn as_union_type_instance(self) -> Option<UnionTypeInstance<'db>> {
+        match self {
+            Type::KnownInstance(KnownInstanceType::UnionType(union_instance)) => {
+                Some(union_instance)
+            }
+            _ => None,
+        }
+    }
+
     /// Returns whether this is a "real" intersection type. (Negated types are represented by an
     /// intersection containing a single negative branch, which this method does _not_ consider a
     /// "real" intersection.)
@@ -9450,6 +9459,30 @@ impl<'db> EagerUnionTypeInstance<'db> {
             _value_expr_types: value_expr_types,
             union_type,
         })
+    }
+
+    fn try_into_lazy(
+        &self,
+        db: &'db dyn Db,
+        target: &ast::Expr,
+        definition: Definition<'db>,
+        typevar_binding_context: Option<Definition<'db>>,
+    ) -> Option<Type<'db>> {
+        let legacy_typevars = |ty: Type<'db>| {
+            let mut variables = FxOrderSet::default();
+            ty.bind_and_find_all_legacy_typevars(db, typevar_binding_context, &mut variables);
+            variables
+        };
+        if let Some(name) = target.as_name_expr()
+        // TODO: support generic recursive union type instances
+        && self.union_type.as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+        {
+            Some(Type::KnownInstance(KnownInstanceType::UnionType(
+                UnionTypeInstance::from_definition(db, name.id().clone(), definition),
+            )))
+        } else {
+            None
+        }
     }
 }
 
