@@ -637,6 +637,16 @@ impl Configuration {
                 Some(fallback.into())
             });
         }
+        // If the origin is UserSettings, we need more information
+        // to determine where to search for a fallback target version.
+        // - If Ruff is being invoked via the CLI, then we search in
+        // the cwd.
+        // - If Ruff is being invoked via the server, then we search
+        // in the editor's workspace root.
+        //
+        // This logic is implemented manually, at the time of this
+        // writing 2026-01-30, in `ruff::resolve::resolve` and
+        // `ruff_server::session::index::ruff_settings::RuffSettings::fallback`, respectively.
         self
     }
 }
