@@ -4235,17 +4235,6 @@ impl<'db> StaticClassLiteral<'db> {
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
-
-        // If this is a dataclass-like class, also consider the declared fields
-        // as implicitly defined attributes.
-        if target_method_decorator == MethodDecorator::None
-            && let Some(class_literal) = nearest_enclosing_class(db, index, class_body_scope)
-            && let Some(field) = class_literal.dataclass_instance_field(db, &name)
-        {
-            union_of_inferred_types = union_of_inferred_types.add(field.declared_ty);
-            is_attribute_bound = true;
-        }
-
         let is_valid_scope = |method_scope: &Scope| {
             let Some(method_def) = method_scope.node().as_function() else {
                 return true;
@@ -4634,6 +4623,24 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_qualifiers(qualifiers),
                                 }
                             }
+                        } else if self.dataclass_instance_field(db, name).is_some()
+                            && declared_ty
+                                .class_member(db, "__get__".into())
+                                .place
+                                .is_undefined()
+                        {
+                            // For dataclass-like classes, declared fields are assigned
+                            // by the synthesized `__init__`, so they are instance
+                            // attributes even without an explicit `self.x = ...`
+                            // assignment in a method body.
+                            //
+                            // However, if the declared type is a descriptor (has
+                            // `__get__`), we return unbound so that the descriptor
+                            // protocol in `member_lookup_with_policy` can resolve
+                            // the attribute type through `__get__`.
+                            Member {
+                                inner: declared.with_qualifiers(qualifiers),
+                            }
                         } else {
                             // The symbol is declared and bound in the class body,
                             // but we did not find any attribute assignments in
@@ -4705,9 +4712,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     fn dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> Option<Field<'db>> {
-        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
-            return None;
-        };
+        let field_policy = CodeGeneratorKind::from_static_class(db, self, None)?;
         if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
             return None;
         }

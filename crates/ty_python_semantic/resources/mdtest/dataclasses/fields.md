@@ -71,6 +71,44 @@ class NoDefaultSpecificClass(SomeClass):
 reveal_type(NoDefaultSpecificClass(SpecificConfiguration()).config)  # revealed: SpecificConfiguration | None
 ```
 
+## Descriptor-typed fields with defaults
+
+A dataclass field whose declared type is a descriptor should still resolve through the descriptor
+protocol on instance access, even when the field has a default value.
+
+`Desc2` has `__get__` but no `__set__`, making it a non-data descriptor.
+
+```py
+from dataclasses import dataclass
+from typing import Any, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Desc2(Generic[T]):
+    @overload
+    def __get__(self, instance: None, owner: Any) -> list[T]: ...
+    @overload
+    def __get__(self, instance: object, owner: Any) -> T: ...
+    def __get__(self, instance: object | None, owner: Any) -> list[T] | T:
+        raise NotImplementedError
+
+@dataclass
+class DC2:
+    x: Desc2[int]
+    y: Desc2[str]
+    z: Desc2[str] = Desc2()
+
+dc2 = DC2(Desc2(), Desc2(), Desc2())
+
+# On the class, __get__(None, owner) is called, returning list[T].
+reveal_type(DC2.z)  # revealed: list[str]
+
+# On instances, __get__(instance, owner) is called, returning T.
+# The default value should not cause the declared descriptor type
+# to leak into the instance attribute type.
+reveal_type(dc2.z)  # revealed: str
+```
+
 ## `default_factory`
 
 The `default_factory` argument can be used to specify a callable that provides a default value for a
