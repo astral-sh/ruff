@@ -363,6 +363,39 @@ def _(x: MyList[int]):
     reveal_type(head(x))  # revealed: int
 ```
 
+## Bidirectional type inference with union type aliases
+
+When a PEP 695 type alias expands to a union, bidirectional type inference should still work
+correctly. The type alias should be expanded to its value type when determining the expected type
+for specialization inference.
+
+```py
+type MaybeList[T] = list[T] | T
+
+def test[X: int](items: list[X]) -> list[X]:
+    # The annotation MaybeList[str | int] expands to `list[str | int] | str | int`.
+    # Bidirectional inference should infer list[str | int] from the list() call.
+    a: MaybeList[str | int] = list(items)
+    # The revealed type is list[str | int] because that's what list() returns.
+    reveal_type(a)  # revealed: list[str | int]
+    return items
+```
+
+This also works for more complex cases with multiple generic functions:
+
+```py
+type OptionalList[T] = list[T] | None
+
+def copy_list[T](items: list[T]) -> list[T]:
+    return list(items)
+
+def _(values: list[int]) -> OptionalList[int]:
+    result: OptionalList[int] = copy_list(values)
+    # The revealed type is list[int] because that's what copy_list returns.
+    reveal_type(result)  # revealed: list[int]
+    return result
+```
+
 ## Fully qualified type alias names in error messages
 
 When two type aliases have the same name but are in different scopes, they should be fully qualified
