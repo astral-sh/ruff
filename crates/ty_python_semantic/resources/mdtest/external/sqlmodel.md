@@ -22,9 +22,23 @@ user = User(id=1, name="John Doe")
 reveal_type(user.id)  # revealed: int
 reveal_type(user.name)  # revealed: str
 
-# TODO: this should not mention `__pydantic_self__`, and have proper parameters defined by the fields
-reveal_type(User.__init__)  # revealed: def __init__(__pydantic_self__, **data: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str) -> None
 
-# TODO: this should be an error
+# error: [missing-argument] "No arguments provided for required parameters `id`, `name`"
 User()
+```
+
+## Multi-level inheritance
+
+```py
+from sqlmodel import SQLModel
+
+class BaseUser(SQLModel):
+    id: int
+
+class User(BaseUser):
+    name: str
+
+reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str) -> None
+User(id=1, name="test")
 ```

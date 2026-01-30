@@ -177,9 +177,16 @@ impl<'db> CodeGeneratorKind<'db> {
             } else if let Some(transformer_params) =
                 class.iter_mro(db, specialization).skip(1).find_map(|base| {
                     base.into_class().and_then(|class| {
-                        class
-                            .static_class_literal(db)
-                            .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
+                        let (lit, _) = class.static_class_literal(db)?;
+                        // First: check if base class is directly decorated
+                        if let Some(params) = lit.dataclass_transformer_params(db) {
+                            return Some(params);
+                        }
+                        // Second: check if base class has a dataclass_transform metaclass
+                        if let Ok((_, Some(params))) = lit.try_metaclass(db) {
+                            return Some(params);
+                        }
+                        None
                     })
                 })
             {
