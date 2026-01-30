@@ -23,6 +23,17 @@ alice.role = "moderator"
 bob = Member(name="Bob", tag="VIP")
 ```
 
+## With `Literal` types
+
+```py
+from typing import Literal
+import dataclasses
+
+@dataclasses.dataclass
+class Foo:
+    x: Literal["f"] = dataclasses.field(init=False, default="f")
+```
+
 ## `default_factory`
 
 The `default_factory` argument can be used to specify a callable that provides a default value for a
