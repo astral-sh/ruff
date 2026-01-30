@@ -17,13 +17,11 @@ use smallvec::{SmallVec, smallvec};
 use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
-use crate::preview::is_range_suppressions_enabled;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
-use crate::settings::LinterSettings;
 use crate::{Locator, Violation};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -185,18 +183,9 @@ impl<'a> SuppressionDiagnostic<'a> {
 }
 
 impl Suppressions {
-    pub fn from_tokens(
-        settings: &LinterSettings,
-        source: &str,
-        tokens: &Tokens,
-        indexer: &Indexer,
-    ) -> Suppressions {
-        if is_range_suppressions_enabled(settings) {
-            let builder = SuppressionsBuilder::new(source);
-            builder.load_from_tokens(tokens, indexer)
-        } else {
-            Suppressions::default()
-        }
+    pub fn from_tokens(source: &str, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
+        let builder = SuppressionsBuilder::new(source);
+        builder.load_from_tokens(tokens, indexer)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -845,12 +834,9 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
     use similar::DiffableStr;
 
-    use crate::{
-        settings::LinterSettings,
-        suppression::{
-            InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
-            SuppressionParser, Suppressions,
-        },
+    use crate::suppression::{
+        InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
+        SuppressionParser, Suppressions,
     };
 
     #[test]
@@ -1804,12 +1790,7 @@ def bar():
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
             let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
             let indexer = Indexer::from_tokens(parsed.tokens(), source);
-            let suppressions = Suppressions::from_tokens(
-                &LinterSettings::default().with_preview_mode(),
-                source,
-                parsed.tokens(),
-                &indexer,
-            );
+            let suppressions = Suppressions::from_tokens(source, parsed.tokens(), &indexer);
             DebugSuppressions {
                 source,
                 suppressions,
