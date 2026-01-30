@@ -3125,6 +3125,21 @@ impl<'db> StaticClassLiteral<'db> {
             return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
         }
 
+        // For dataclass-like classes, `KW_ONLY` sentinel fields are not real
+        // class attributes; they are markers used by the dataclass decorator to
+        // indicate that subsequent fields are keyword-only. Treat them as
+        // undefined so the MRO falls through to parent classes.
+        if member
+            .inner
+            .place
+            .unwidened_type()
+            .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
+            && CodeGeneratorKind::from_static_class(db, self, None)
+                .is_some_and(|policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)))
+        {
+            return Member::unbound();
+        }
+
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
@@ -3956,6 +3971,9 @@ impl<'db> StaticClassLiteral<'db> {
             .into_iter()
             .rev()
             .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
+            // KW_ONLY sentinels are markers, not real fields. Exclude them so
+            // they cannot shadow an inherited field with the same name.
+            .filter(|(_, field)| !field.is_kw_only_sentinel(db))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
     }
@@ -4589,6 +4607,15 @@ impl<'db> StaticClassLiteral<'db> {
                         }
                     }
 
+                    // `KW_ONLY` sentinels are markers, not real instance attributes.
+                    if declared_ty.is_instance_of(db, KnownClass::KwOnly)
+                        && CodeGeneratorKind::from_static_class(db, self, None).is_some_and(
+                            |policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)),
+                        )
+                    {
+                        return Member::unbound();
+                    }
+
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
@@ -4622,6 +4649,24 @@ impl<'db> StaticClassLiteral<'db> {
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
+                            }
+                        } else if self.is_own_dataclass_instance_field(db, name)
+                            && declared_ty
+                                .class_member(db, "__get__".into())
+                                .place
+                                .is_undefined()
+                        {
+                            // For dataclass-like classes, declared fields are assigned
+                            // by the synthesized `__init__`, so they are instance
+                            // attributes even without an explicit `self.x = ...`
+                            // assignment in a method body.
+                            //
+                            // However, if the declared type is a descriptor (has
+                            // `__get__`), we return unbound so that the descriptor
+                            // protocol in `member_lookup_with_policy` can resolve
+                            // the attribute type through `__get__`.
+                            Member {
+                                inner: declared.with_qualifiers(qualifiers),
                             }
                         } else {
                             // The symbol is declared and bound in the class body,
@@ -4691,6 +4736,34 @@ impl<'db> StaticClassLiteral<'db> {
 
             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
         }
+    }
+
+    /// Returns `true` if `name` is a non-init-only field directly declared on this
+    /// dataclass (i.e., a field that corresponds to an instance attribute).
+    ///
+    /// This is used to decide whether a bare class-body annotation like `x: int`
+    /// should be treated as defining an instance attribute: dataclass fields are
+    /// implicitly assigned in `__init__`, so they behave as instance attributes
+    /// even though no explicit binding exists in the class body.
+    fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+            return false;
+        };
+        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+            return false;
+        }
+
+        let fields = self.own_fields(db, None, field_policy);
+        let Some(field) = fields.get(name) else {
+            return false;
+        };
+        matches!(
+            field.kind,
+            FieldKind::Dataclass {
+                init_only: false,
+                ..
+            }
+        )
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {

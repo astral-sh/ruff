@@ -1318,8 +1318,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let specialization = None;
 
                 let kw_only_sentinel_fields: Vec<_> = class
-                    .fields(self.db(), specialization, field_policy)
-                    .iter()
+                    .own_fields(self.db(), specialization, field_policy)
+                    .into_iter()
                     .filter_map(|(name, field)| {
                         field.is_kw_only_sentinel(self.db()).then_some(name)
                     })
