@@ -8776,17 +8776,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Avoid looking up attributes on a module if a module imports from itself
-        // (e.g. `from parent import submodule` inside the `parent` module).
-        let import_is_self_referential = module_ty
+        // at the module-global scope, where the import definition itself is one of the
+        // bindings for the symbol being looked up, which would cause a query cycle.
+        //
+        // In nested scopes (e.g. function bodies), the module's global-scope definitions
+        // are resolved independently, so there is no cycle risk and the lookup is safe.
+        let skip_self_referential_member_lookup = module_ty
             .as_module_literal()
-            .is_some_and(|module| Some(self.file()) == module.module(self.db()).file(self.db()));
+            .is_some_and(|module| Some(self.file()) == module.module(self.db()).file(self.db()))
+            && self.scope().file_scope_id(self.db()).is_global();
 
         // Although it isn't the runtime semantics, we go to some trouble to prioritize a submodule
         // over module `__getattr__`, because that's what other type checkers do.
         let mut from_module_getattr = None;
 
         // First try loading the requested attribute from the module.
-        if !import_is_self_referential {
+        if !skip_self_referential_member_lookup {
             if let PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
