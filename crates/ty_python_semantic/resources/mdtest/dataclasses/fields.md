@@ -23,6 +23,54 @@ alice.role = "moderator"
 bob = Member(name="Bob", tag="VIP")
 ```
 
+## Inheritance with defaults
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Configuration:
+    pass
+
+@dataclass(frozen=True)
+class SomeClass:
+    config: Configuration | None
+
+    def foo(self) -> int:
+        raise NotImplementedError
+
+@dataclass
+class SpecificConfiguration(Configuration):
+    x: int = 0
+
+@dataclass(frozen=True)
+class SpecificClass(SomeClass):
+    config: SpecificConfiguration | None = None
+
+    def foo(self) -> int:
+        if self.config is None:
+            return SpecificConfiguration().x
+        return self.config.x
+
+reveal_type(SpecificClass().config)  # revealed: SpecificConfiguration | None
+
+@dataclass
+class NonFrozenBase:
+    config: Configuration | None
+
+@dataclass
+class NonFrozenSpecificClass(NonFrozenBase):
+    config: SpecificConfiguration | None = None
+
+reveal_type(NonFrozenSpecificClass().config)  # revealed: SpecificConfiguration | None
+
+@dataclass(frozen=True)
+class NoDefaultSpecificClass(SomeClass):
+    config: SpecificConfiguration | None
+
+reveal_type(NoDefaultSpecificClass(SpecificConfiguration()).config)  # revealed: SpecificConfiguration | None
+```
+
 ## `default_factory`
 
 The `default_factory` argument can be used to specify a callable that provides a default value for a

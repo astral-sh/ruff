@@ -4235,6 +4235,17 @@ impl<'db> StaticClassLiteral<'db> {
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
+
+        // If this is a dataclass-like class, also consider the declared fields
+        // as implicitly defined attributes.
+        if target_method_decorator == MethodDecorator::None
+            && let Some(class_literal) = nearest_enclosing_class(db, index, class_body_scope)
+            && let Some(field) = class_literal.dataclass_instance_field(db, &name)
+        {
+            union_of_inferred_types = union_of_inferred_types.add(field.declared_ty);
+            is_attribute_bound = true;
+        }
+
         let is_valid_scope = |method_scope: &Scope| {
             let Some(method_def) = method_scope.node().as_function() else {
                 return true;
@@ -4691,6 +4702,27 @@ impl<'db> StaticClassLiteral<'db> {
 
             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
         }
+    }
+
+    fn dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> Option<Field<'db>> {
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+            return None;
+        };
+        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+            return None;
+        }
+
+        let fields = self.own_fields(db, None, field_policy);
+        let field = fields.get(&Name::new(name))?;
+        matches!(
+            field.kind,
+            FieldKind::Dataclass {
+                init_only: false,
+                ..
+            }
+        )
+        .then_some(field.clone())
+        .filter(|field| !field.is_kw_only_sentinel(db))
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
