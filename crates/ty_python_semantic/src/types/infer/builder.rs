@@ -11175,7 +11175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty
             });
 
-        // Validate that starred arguments are iterable
+        // Validate that starred arguments are iterable.
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
                 let iterable_type = self.expression_type(value);
@@ -11183,6 +11183,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
                 }
             }
+        }
+
+        // Validate that double-starred keyword arguments are mappings.
+        for keyword in arguments.keywords.iter().filter(|k| k.arg.is_none()) {
+            let mapping_type = self.expression_type(&keyword.value);
+
+            if mapping_type.as_paramspec_typevar(self.db()).is_some()
+                || mapping_type.unpack_keys_and_items(self.db()).is_some()
+            {
+                continue;
+            }
+
+            let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ARGUMENT_TYPE, &keyword.value)
+            else {
+                continue;
+            };
+
+            builder
+                .into_diagnostic("Argument expression after ** must be a mapping type")
+                .set_primary_message(format_args!("Found `{}`", mapping_type.display(self.db())));
         }
 
         if callable_type.is_notimplemented(self.db()) {
