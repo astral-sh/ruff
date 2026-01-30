@@ -3459,13 +3459,81 @@ impl<'db> Type<'db> {
                 )
                 .0;
 
-                self.invoke_descriptor_protocol(
+                let result = self.invoke_descriptor_protocol(
                     db,
                     name_str,
                     class_attr_fallback,
                     InstanceFallbackShadowsNonDataDescriptor::Yes,
                     policy,
-                )
+                );
+
+                // A class is an instance of its metaclass. If attribute lookup on the class
+                // fails, Python falls back to `type(cls).__getattr__` and
+                // `type(cls).__getattribute__` on the metaclass, analogous to how instance
+                // attribute access falls back to `__getattr__`/`__getattribute__` on the
+                // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
+                // lookup to hit the catch-all that only checks the meta-type (the metaclass).
+                let custom_getattr_result = || {
+                    if policy.no_getattr_lookup() {
+                        return Place::Undefined.into();
+                    }
+
+                    self.try_call_dunder(
+                        db,
+                        "__getattr__",
+                        CallArguments::positional([Type::string_literal(db, &name)]),
+                        TypeContext::default(),
+                    )
+                    .map(|outcome| Place::bound(outcome.return_type(db)))
+                    .unwrap_or_default()
+                    .into()
+                };
+
+                let custom_getattribute_result = || {
+                    if "__getattribute__" == name.as_str() {
+                        return Place::Undefined.into();
+                    }
+
+                    // Use `MRO_NO_OBJECT_FALLBACK` and `META_CLASS_NO_TYPE_FALLBACK` to
+                    // skip the default `type.__getattribute__` / `object.__getattribute__`,
+                    // so we only find custom `__getattribute__` on the metaclass itself.
+                    self.try_call_dunder_with_policy(
+                        db,
+                        "__getattribute__",
+                        &mut CallArguments::positional([Type::string_literal(db, &name)]),
+                        TypeContext::default(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .map(|outcome| Place::bound(outcome.return_type(db)))
+                    .unwrap_or_default()
+                    .into()
+                };
+
+                match result {
+                    member @ PlaceAndQualifiers {
+                        place:
+                            Place::Defined(DefinedPlace {
+                                definedness: Definedness::AlwaysDefined,
+                                ..
+                            }),
+                        qualifiers: _,
+                    } => member,
+                    member @ PlaceAndQualifiers {
+                        place:
+                            Place::Defined(DefinedPlace {
+                                definedness: Definedness::PossiblyUndefined,
+                                ..
+                            }),
+                        qualifiers: _,
+                    } => member
+                        .or_fall_back_to(db, custom_getattribute_result)
+                        .or_fall_back_to(db, custom_getattr_result),
+                    PlaceAndQualifiers {
+                        place: Place::Undefined,
+                        qualifiers: _,
+                    } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
+                }
             }
 
             // Unlike other objects, `super` has a unique member lookup behavior.
