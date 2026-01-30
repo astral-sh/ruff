@@ -442,3 +442,22 @@ def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
             # But we *can* narrow with inequality
             reveal_type(x)  # revealed: tuple[str, B]
 ```
+
+and it is also restricted to `match` patterns that solely consist of value patterns:
+
+```py
+class Config:
+    MODE: str = "default"
+
+def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
+    match u[0]:
+        case Config.MODE | "foo":
+            # Config.mode has type `str` (not a literal), which could match
+            # any string value at runtime. We cannot narrow based on "foo" alone
+            # because the actual match might have been against Config.mode.
+            reveal_type(u)  # revealed: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]
+        case "bar":
+            # Since the previous case could match any string, this case can
+            # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
+            reveal_type(u)  # revealed: tuple[Literal["bar"], str]
+```
