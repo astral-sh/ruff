@@ -33,16 +33,59 @@ static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
+static OFF_ON_DIRECTIVES: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?imx)
+            ^
+            \s*<!--\s*(?:blacken-docs|ruff)\s*:\s*(?<action>off|on)\s*-->
+        ",
+    )
+    .unwrap()
+});
+
 pub fn format_code_blocks(
     source: &str,
     path: Option<&Path>,
     settings: &FormatterSettings,
 ) -> MarkdownResult {
+    let mut ignore_ranges = Vec::new();
+    let mut last_off: Option<usize> = None;
+
+    // Find ruff:off directives and generate ranges to ignore formatting
+    for capture in OFF_ON_DIRECTIVES.captures_iter(source) {
+        let Some(action) = capture.name("action") else {
+            continue;
+        };
+
+        match action.as_str() {
+            "off" => last_off = last_off.or_else(|| Some(action.start())),
+            "on" => {
+                last_off = match last_off {
+                    Some(last_off) => {
+                        ignore_ranges.push(last_off..action.end());
+                        None
+                    }
+                    None => None,
+                };
+            }
+            _ => {}
+        }
+    }
+    // no matching ruff:on, ignore to end of file
+    if let Some(last_off) = last_off {
+        ignore_ranges.push(last_off..source.len());
+    }
+
     let mut changed = false;
     let mut formatted = String::with_capacity(source.len());
     let mut last_match = 0;
 
     for capture in MARKDOWN_CODE_BLOCK.captures_iter(source) {
+        let m = capture.get_match();
+        if ignore_ranges.iter().any(|ir| ir.contains(&m.start())) {
+            continue;
+        }
+
         let (_, [before, code_indent, language, code, after]) = capture.extract();
 
         // map code block to source type, accounting for configured extension mappings
@@ -65,7 +108,6 @@ pub fn format_code_blocks(
         if let Ok(formatted_code) = formatted_code {
             if formatted_code.len() != unformatted_code.len() || formatted_code != *unformatted_code
             {
-                let m = capture.get_match();
                 formatted.push_str(&source[last_match..m.start()]);
 
                 let indented_code = indent(&formatted_code, code_indent);
@@ -217,6 +259,130 @@ def bar(): ...
                 extension: mapping,
                 ..Default::default()
             }
+        ), @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_ignore_blackendocs_off() {
+        let code = r#"
+```py
+def foo(): pass
+def bar(): pass
+```
+
+<!-- blacken-docs:off -->
+```py
+def foo(): pass
+def bar(): pass
+```
+<!-- blacken-docs:on -->
+
+```py
+def foo(): pass
+def bar(): pass
+```
+        "#;
+        assert_snapshot!(format_code_blocks(
+            code,
+            None,
+            &FormatterSettings::default()
+        ), @r"
+        ```py
+        def foo():
+            pass
+
+
+        def bar():
+            pass
+        ```
+
+        <!-- blacken-docs:off -->
+        ```py
+        def foo(): pass
+        def bar(): pass
+        ```
+        <!-- blacken-docs:on -->
+
+        ```py
+        def foo():
+            pass
+
+
+        def bar():
+            pass
+        ```
+        ");
+    }
+
+    #[test]
+    fn format_code_blocks_ignore_ruff_off() {
+        let code = r#"
+```py
+def foo(): pass
+def bar(): pass
+```
+
+<!-- ruff:off -->
+```py
+def foo(): pass
+def bar(): pass
+```
+<!-- ruff:on -->
+
+```py
+def foo(): pass
+def bar(): pass
+```
+        "#;
+        assert_snapshot!(format_code_blocks(
+            code,
+            None,
+            &FormatterSettings::default()
+        ), @r"
+        ```py
+        def foo():
+            pass
+
+
+        def bar():
+            pass
+        ```
+
+        <!-- ruff:off -->
+        ```py
+        def foo(): pass
+        def bar(): pass
+        ```
+        <!-- ruff:on -->
+
+        ```py
+        def foo():
+            pass
+
+
+        def bar():
+            pass
+        ```
+        ");
+    }
+    #[test]
+    fn format_code_blocks_ignore_to_end() {
+        let code = r#"
+<!-- ruff:off -->
+```py
+def foo(): pass
+def bar(): pass
+```
+
+```py
+def foo(): pass
+def bar(): pass
+```
+        "#;
+        assert_snapshot!(format_code_blocks(
+            code,
+            None,
+            &FormatterSettings::default()
         ), @"Unchanged");
     }
 }
