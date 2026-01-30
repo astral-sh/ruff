@@ -10,6 +10,7 @@ python-version = "3.12"
 Many items that are callable can also be generic. Generic functions are the most obvious example:
 
 ```py
+from typing import Callable
 from ty_extensions import generic_context
 
 def identity[T](t: T) -> T:
@@ -17,6 +18,12 @@ def identity[T](t: T) -> T:
 
 # revealed: ty_extensions.GenericContext[T@identity]
 reveal_type(generic_context(identity))
+
+def identity2[**P, T](c: Callable[P, T]) -> Callable[P, T]:
+    return c
+
+# revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
+reveal_type(generic_context(identity2))
 ```
 
 Generic classes are another example, since you invoke the class to instantiate it:
@@ -38,6 +45,11 @@ from ty_extensions import into_callable
 reveal_type(into_callable(identity))
 # revealed: ty_extensions.GenericContext[T@identity]
 reveal_type(generic_context(into_callable(identity)))
+
+# revealed: [**P, T](c: (**P@identity2) -> T) -> (**P@identity2) -> T
+reveal_type(into_callable(identity2))
+# revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
+reveal_type(generic_context(into_callable(identity2)))
 
 # revealed: [T](t: T) -> C[T]
 reveal_type(into_callable(C))
@@ -70,6 +82,36 @@ reveal_type(generic_context(decorator_factory))
 # revealed: [T](T, /) -> T
 reveal_type(decorator_factory())
 # revealed: ty_extensions.GenericContext[T@decorator_factory]
+reveal_type(generic_context(decorator_factory()))
+```
+
+## Naming a generic `Callable` with paramspecs: type aliases
+
+The same pattern holds if the callable involves a paramspec.
+
+```py
+from typing import Callable
+from ty_extensions import generic_context
+
+type IdentityCallable[**P, T] = Callable[[Callable[P, T]], Callable[P, T]]
+
+def decorator_factory[**P, T]() -> IdentityCallable[P, T]:
+    def decorator[**P, T](fn: Callable[P, T]) -> Callable[P, T]:
+        return fn
+    # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
+    reveal_type(generic_context(decorator))
+
+    # TODO: no error
+    # error: [invalid-return-type]
+    return decorator
+
+# Note that `decorator_factory` returns a generic callable, but is not itself generic!
+# revealed: None
+reveal_type(generic_context(decorator_factory))
+
+# revealed: [**P, T]((**P@decorator_factory) -> T, /) -> (**P@decorator_factory) -> T
+reveal_type(decorator_factory())
+# revealed: ty_extensions.GenericContext[P@decorator_factory, T@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 ```
 
@@ -120,4 +162,51 @@ reveal_type(generic_context(outside_callable))
 reveal_type(outside_callable(1))
 # revealed: None
 reveal_type(generic_context(outside_callable(1)))
+```
+
+## Naming a generic `Callable` with paramspecs: function return values
+
+The same pattern holds if the callable involves a paramspec.
+
+```py
+from typing import Callable
+from ty_extensions import generic_context
+
+def decorator_factory[**P, T]() -> Callable[[Callable[P, T]], Callable[P, T]]:
+    def decorator[**P, T](fn: Callable[P, T]) -> Callable[P, T]:
+        return fn
+    # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
+    reveal_type(generic_context(decorator))
+
+    # TODO: no error
+    # error: [invalid-return-type]
+    return decorator
+
+# Note that `decorator_factory` returns a generic callable, but is not itself generic!
+# revealed: None
+reveal_type(generic_context(decorator_factory))
+
+# revealed: [**P, T]((**P@decorator_factory) -> T, /) -> (**P@decorator_factory) -> T
+reveal_type(decorator_factory())
+# revealed: ty_extensions.GenericContext[P@decorator_factory, T@decorator_factory]
+reveal_type(generic_context(decorator_factory()))
+```
+
+If the typevar also appears in a parameter, it is the function that is generic, and the returned
+`Callable` is not:
+
+```py
+def outside_callable[**P, T](func: Callable[P, T]) -> Callable[P, T]:
+    raise NotImplementedError
+
+# revealed: ty_extensions.GenericContext[P@outside_callable, T@outside_callable]
+reveal_type(generic_context(outside_callable))
+
+def identity(x: int) -> int:
+    return x
+
+# revealed: (x: int) -> int
+reveal_type(outside_callable(identity))
+# revealed: None
+reveal_type(generic_context(outside_callable(identity)))
 ```
