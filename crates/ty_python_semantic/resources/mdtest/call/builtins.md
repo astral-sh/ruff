@@ -175,6 +175,29 @@ isinstance("", t.Final)  # error: [invalid-argument-type]
 isinstance("", t.Any)  # error: [invalid-argument-type]
 ```
 
+## Calls to `dict()`
+
+`dict` has overloads that accept a `SupportsKeysAndGetItem` protocol. Types like `dict` itself
+satisfy this protocol structurally (not nominally), so TypeVar inference must handle structural
+protocol conformance.
+
+```py
+d_int: dict[str, int] = {"x": 1}
+d_mixed: dict[str, int | tuple[int, int, int]] = {"x": 1, "y": (2, 3, 4)}
+
+# Homogeneous kwargs (regression test)
+reveal_type(dict(d_int, z=2))  # revealed: dict[str, int]
+
+# Heterogeneous kwargs: _VT should be inferred as int | str
+reveal_type(dict(d_int, z="str"))  # revealed: dict[str, int | str]
+
+# Heterogeneous source dict
+reveal_type(dict(d_mixed, z=2))  # revealed: dict[str, int | tuple[int, int, int]]
+
+# Both source dict and kwargs are heterogeneous
+reveal_type(dict(d_mixed, z="x"))  # revealed: dict[str, int | tuple[int, int, int] | str]
+```
+
 ## The builtin `NotImplemented` constant is not callable
 
 <!-- snapshot-diagnostics -->

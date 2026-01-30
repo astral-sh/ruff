@@ -2005,10 +2005,10 @@ impl<'db> SpecializationBuilder<'db> {
                     Type::NominalInstance(formal_nominal) => {
                         formal_nominal.class(self.db).into_generic_alias()
                     }
-                    // TODO: This will only handle classes that explicit implement a generic protocol
-                    // by listing it as a base class. To handle classes that implicitly implement a
-                    // generic protocol, we will need to check the types of the protocol members to be
-                    // able to infer the specialization of the protocol that the class implements.
+                    // This will only handle classes that explicitly implement a generic protocol
+                    // by listing it as a base class. For classes that implicitly implement a
+                    // generic protocol (structural conformance), a fallback below uses
+                    // constraint-set assignability to infer the specialization.
                     Type::ProtocolInstance(ProtocolInstanceType {
                         inner: Protocol::FromClass(class),
                         ..
@@ -2042,6 +2042,16 @@ impl<'db> SpecializationBuilder<'db> {
                         }
                         return Ok(());
                     }
+                }
+
+                // Fallback for structural protocol conformance: if the formal type is a
+                // protocol instance and the MRO walk above didn't find a nominal match,
+                // use constraint-set assignability to infer type variable mappings from
+                // the protocol members.
+                if matches!(formal, Type::ProtocolInstance(_)) {
+                    let when = Type::NominalInstance(actual_nominal)
+                        .when_constraint_set_assignable_to(self.db, formal, self.inferable);
+                    self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                 }
             }
 
