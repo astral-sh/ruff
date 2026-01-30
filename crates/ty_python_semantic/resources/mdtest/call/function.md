@@ -130,11 +130,18 @@ T = TypeVar("T")
 def copy_type(f: T) -> Callable[[Any], T]:
     return lambda x: x
 
-# Naively iterating over the overloads without checking that the overloads come from the same file
-# as the definition would cause us to panic on this function,
-# because the overloads are defined in `stdlib/tkinter/__init__.pyi`.
+# Naively iterating over the overloads using `.iter_overloads_and_implementation()` and/or
+# using `.signature()` would cause us to panic on this function, because the overloads
+# of this function's public signature are defined in `stdlib/tkinter/__init__.pyi` due to
+# the decorator.
 @copy_type(tkinter.Text.__init__)
-def g3(self, *args: Any, **kwargs: Any) -> None: ...
+def g3(x, *args: Any, **kwargs: Any) -> None: ...
+def new_signature(): ...
+
+# The check is able to "see through" the decorators and examines the original function's
+# signature:
+@copy_type(new_signature)
+def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
 ```
 
 Parameters are also not understood as positional-only if they both start and end with `__`:

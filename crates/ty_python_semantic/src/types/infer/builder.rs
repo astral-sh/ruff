@@ -625,73 +625,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn check_legacy_positional_only_convention(&mut self) {
         let db = self.db();
 
-        // Without keeping track of nodes that we've already seen,
-        // we're liable to emit duplicate diagnostics on overloaded functions.
-        let mut seen_nodes = FxHashSet::default();
-
-        for (definition, ty_and_quals) in &self.declarations {
+        for (definition, _) in &self.declarations {
             if !definition.kind(db).is_function_def() {
                 continue;
             }
-            let Type::FunctionLiteral(function_type) = ty_and_quals.inner_type() else {
+
+            let Some(Type::FunctionLiteral(function_type)) =
+                infer_definition_types(db, *definition).undecorated_type()
+            else {
                 continue;
             };
-            if function_type.file(db) != self.file() {
+
+            let last_definition = function_type.literal(db).last_definition(db);
+            let node = last_definition.node(db, self.file(), self.module());
+
+            let ast_parameters = &node.parameters;
+            // If the function has any PEP-570 positional-only parameters,
+            // assume that `__`-prefixed parameters are not meant to be positional-only
+            if !ast_parameters.posonlyargs.is_empty() {
                 continue;
             }
-
-            for literal in function_type.iter_overloads_and_implementation(db) {
-                if literal.file(db) != self.file() {
+            let signature = last_definition.raw_signature(db);
+            let parsed_parameters = signature.parameters();
+            for (i, (param_node, param)) in ast_parameters.iter().zip(parsed_parameters).enumerate()
+            {
+                let AnyParameterRef::NonVariadic(param_node) = param_node else {
                     continue;
-                }
-                let node = literal.node(db, self.file(), self.module());
-                if !seen_nodes.insert(node.range()) {
-                    continue;
-                }
-                let ast_parameters = &node.parameters;
-                // If the function has any PEP-570 positional-only parameters,
-                // assume that `__`-prefixed parameters are not meant to be positional-only
-                if !ast_parameters.posonlyargs.is_empty() {
-                    continue;
-                }
-                let signature = literal.signature(db);
-                let parsed_parameters = signature.parameters();
-                for (i, (param_node, param)) in
-                    ast_parameters.iter().zip(parsed_parameters).enumerate()
+                };
+                if param_node.uses_pep_484_positional_only_convention()
+                    && !param.is_positional_only()
+                    && let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
                 {
-                    let AnyParameterRef::NonVariadic(param_node) = param_node else {
-                        continue;
-                    };
-                    if param_node.uses_pep_484_positional_only_convention()
-                        && !param.is_positional_only()
-                        && let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
-                    {
-                        let mut diagnostic = builder.into_diagnostic(
-                            "Invalid use of the legacy convention \
+                    let mut diagnostic = builder.into_diagnostic(
+                        "Invalid use of the legacy convention \
                             for positional-only parameters",
-                        );
-                        diagnostic.set_primary_message(
-                            "Parameter name begins with `__` \
+                    );
+                    diagnostic.set_primary_message(
+                        "Parameter name begins with `__` \
                             but will not be treated as positional-only",
-                        );
-                        diagnostic.info(
-                            "A parameter can only be positional-only \
+                    );
+                    diagnostic.info(
+                        "A parameter can only be positional-only \
                             if precedes all positional-or-keyword parameters",
+                    );
+                    if let Some((earlier_node, _)) = ast_parameters
+                        .iter()
+                        .zip(parsed_parameters)
+                        .take(i)
+                        .find(|(_, p)| !p.is_positional_only() && !p.is_variadic())
+                    {
+                        diagnostic.annotate(
+                            self.context
+                                .secondary(earlier_node.name())
+                                .message("Prior parameter here was positional-or-keyword"),
                         );
-                        if let Some((earlier_node, _)) = ast_parameters
-                            .iter()
-                            .zip(parsed_parameters)
-                            .take(i)
-                            .find(|(_, p)| !p.is_positional_only() && !p.is_variadic())
-                        {
-                            diagnostic.annotate(
-                                self.context
-                                    .secondary(earlier_node.name())
-                                    .message("Prior parameter here was positional-or-keyword"),
-                            );
-                        }
                     }
                 }
             }
