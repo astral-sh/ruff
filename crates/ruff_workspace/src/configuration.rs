@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, anyhow};
 use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
+use log::debug;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
@@ -53,6 +54,8 @@ use crate::options::{
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
     validate_required_version,
 };
+use crate::pyproject;
+use crate::resolver::ConfigurationOrigin;
 use crate::settings::{
     EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, INCLUDE_PREVIEW, LineEnding,
     Settings,
@@ -618,6 +621,33 @@ impl Configuration {
             format: self.format.combine(config.format),
             analyze: self.analyze.combine(config.analyze),
         }
+    }
+
+    #[must_use]
+    pub fn apply_fallbacks(
+        mut self,
+        origin: ConfigurationOrigin,
+        initial_config_path: &Path,
+    ) -> Self {
+        if matches!(origin, ConfigurationOrigin::Ancestor) {
+            self.target_version = self.target_version.or_else(|| {
+                let dir = initial_config_path.parent()?;
+                let fallback = pyproject::find_fallback_target_version(dir)?;
+                debug!("Derived `target-version` from `requires-python`: {fallback:?}");
+                Some(fallback.into())
+            });
+        }
+        // If the origin is UserSettings, we need more information
+        // to determine where to search for a fallback target version.
+        // - If Ruff is being invoked via the CLI, then we search in
+        // the cwd.
+        // - If Ruff is being invoked via the server, then we search
+        // in the editor's workspace root.
+        //
+        // This logic is implemented manually, at the time of this
+        // writing 2026-01-30, in `ruff::resolve::resolve` and
+        // `ruff_server::session::index::ruff_settings::RuffSettings::fallback`, respectively.
+        self
     }
 }
 
