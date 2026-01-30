@@ -64,9 +64,28 @@ pub(crate) fn bind_typevar<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It is always bound to the outermost method in the containing class.
+    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules.
+    // It is always bound to the outermost method in the nearest enclosing class.
+    //
+    // The ancestor walk looks for a (function, class) pair in the scope hierarchy. We stop
+    // at the first class boundary (when the inner scope is a class) to avoid traversing past
+    // a nested class into an outer class. For example, in:
+    //
+    // ```python
+    // class Outer:
+    //     def method(self) -> None:
+    //         class Inner:
+    //             def get(self) -> Self: ...
+    // ```
+    //
+    // When resolving `Self` in `get`'s return annotation, the containing scope is the `Inner`
+    // class body. Without the class-boundary break, the walk would skip `Inner` and find
+    // `(method, Outer)`, incorrectly binding Self to `Outer` instead of `Inner`.
     if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
         for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
+            if inner.kind().is_class() {
+                break;
+            }
             if outer.kind().is_class() {
                 if let NodeWithScopeKind::Function(function) = inner.node() {
                     let definition = index.expect_single_definition(function);
