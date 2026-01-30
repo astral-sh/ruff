@@ -7,9 +7,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::{
-    is_future_required_preview_generics_enabled, is_unnecessary_default_type_args_stubs_enabled,
-};
+use crate::preview::is_future_required_preview_generics_enabled;
 use crate::registry::Rule;
 use crate::rules::{
     airflow, flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
@@ -145,8 +143,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
 
             if checker.is_rule_enabled(Rule::UnnecessaryDefaultTypeArgs) {
                 if checker.target_version() >= PythonVersion::PY313
-                    || is_unnecessary_default_type_args_stubs_enabled(checker.settings())
-                        && checker.semantic().in_stub_file()
+                    || checker.semantic().in_stub_file()
                 {
                     pyupgrade::rules::unnecessary_default_type_args(checker, expr);
                 }
