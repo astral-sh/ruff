@@ -1949,6 +1949,21 @@ class Foo(metaclass=Meta):
 reveal_type(Foo.maybe)  # revealed: str | int
 ```
 
+### Inherited from a base metaclass
+
+`__getattr__` defined on a base metaclass is found via the metaclass MRO:
+
+```py
+class BaseMeta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Meta(BaseMeta): ...
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.whatever)  # revealed: int
+```
+
 ## Metaclasses with custom `__getattribute__` methods
 
 If a metaclass provides a custom `__getattribute__`, we use its return type for unknown attributes

@@ -3356,74 +3356,19 @@ impl<'db> Type<'db> {
                     policy,
                 );
 
-                let custom_getattr_result = || {
-                    if policy.no_getattr_lookup() {
-                        return Place::Undefined.into();
-                    }
-
-                    self.try_call_dunder(
-                        db,
-                        "__getattr__",
-                        CallArguments::positional([Type::string_literal(db, &name)]),
-                        TypeContext::default(),
-                    )
-                    .map(|outcome| Place::bound(outcome.return_type(db)))
-                    // TODO: Handle call errors here.
-                    .unwrap_or_default()
-                    .into()
-                };
-
-                let custom_getattribute_result = || {
-                    // Avoid cycles when looking up `__getattribute__`
-                    if "__getattribute__" == name.as_str() {
-                        return Place::Undefined.into();
-                    }
-
-                    // Typeshed has a `__getattribute__` method defined on `builtins.object` so we
-                    // explicitly hide it here using `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK`.
-                    self.try_call_dunder_with_policy(
-                        db,
-                        "__getattribute__",
-                        &mut CallArguments::positional([Type::string_literal(db, &name)]),
-                        TypeContext::default(),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                    )
-                    .map(|outcome| Place::bound(outcome.return_type(db)))
-                    // TODO: Handle call errors here.
-                    .unwrap_or_default()
-                    .into()
-                };
-
                 if result.is_class_var() && self.is_typed_dict() {
                     // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
                     // They can only be accessed on `SomeTypedDict` directly.
                     return Place::Undefined.into();
                 }
 
-                match result {
-                    member @ PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                definedness: Definedness::AlwaysDefined,
-                                ..
-                            }),
-                        qualifiers: _,
-                    } => member,
-                    member @ PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                definedness: Definedness::PossiblyUndefined,
-                                ..
-                            }),
-                        qualifiers: _,
-                    } => member
-                        .or_fall_back_to(db, custom_getattribute_result)
-                        .or_fall_back_to(db, custom_getattr_result),
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        qualifiers: _,
-                    } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
-                }
+                self.fallback_to_getattr(
+                    db,
+                    &name,
+                    result,
+                    policy,
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                )
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -3473,67 +3418,17 @@ impl<'db> Type<'db> {
                 // attribute access falls back to `__getattr__`/`__getattribute__` on the
                 // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                 // lookup to hit the catch-all that only checks the meta-type (the metaclass).
-                let custom_getattr_result = || {
-                    if policy.no_getattr_lookup() {
-                        return Place::Undefined.into();
-                    }
-
-                    self.try_call_dunder(
-                        db,
-                        "__getattr__",
-                        CallArguments::positional([Type::string_literal(db, &name)]),
-                        TypeContext::default(),
-                    )
-                    .map(|outcome| Place::bound(outcome.return_type(db)))
-                    .unwrap_or_default()
-                    .into()
-                };
-
-                let custom_getattribute_result = || {
-                    if "__getattribute__" == name.as_str() {
-                        return Place::Undefined.into();
-                    }
-
-                    // Use `MRO_NO_OBJECT_FALLBACK` and `META_CLASS_NO_TYPE_FALLBACK` to
-                    // skip the default `type.__getattribute__` / `object.__getattribute__`,
-                    // so we only find custom `__getattribute__` on the metaclass itself.
-                    self.try_call_dunder_with_policy(
-                        db,
-                        "__getattribute__",
-                        &mut CallArguments::positional([Type::string_literal(db, &name)]),
-                        TypeContext::default(),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .map(|outcome| Place::bound(outcome.return_type(db)))
-                    .unwrap_or_default()
-                    .into()
-                };
-
-                match result {
-                    member @ PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                definedness: Definedness::AlwaysDefined,
-                                ..
-                            }),
-                        qualifiers: _,
-                    } => member,
-                    member @ PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                definedness: Definedness::PossiblyUndefined,
-                                ..
-                            }),
-                        qualifiers: _,
-                    } => member
-                        .or_fall_back_to(db, custom_getattribute_result)
-                        .or_fall_back_to(db, custom_getattr_result),
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        qualifiers: _,
-                    } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
-                }
+                //
+                // Additionally skip `type.__getattribute__` via `META_CLASS_NO_TYPE_FALLBACK`
+                // so we only find custom definitions on the metaclass itself.
+                self.fallback_to_getattr(
+                    db,
+                    &name,
+                    result,
+                    policy,
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                )
             }
 
             // Unlike other objects, `super` has a unique member lookup behavior.
@@ -4816,6 +4711,84 @@ impl<'db> Type<'db> {
                 Ok(bindings)
             }
             Place::Undefined => Err(CallDunderError::MethodNotAvailable),
+        }
+    }
+
+    /// Apply `__getattr__` / `__getattribute__` fallback to an attribute-lookup result.
+    ///
+    /// If `result` is already always-defined, return it unchanged. Otherwise, fall back to calling
+    /// `__getattribute__` (and then `__getattr__`) on the meta-type of `self`.
+    ///
+    /// `getattribute_policy` controls which `__getattribute__` definitions are considered:
+    /// - For instances, pass `MRO_NO_OBJECT_FALLBACK` to skip `object.__getattribute__`.
+    /// - For classes, additionally pass `META_CLASS_NO_TYPE_FALLBACK` to also skip
+    ///   `type.__getattribute__`.
+    fn fallback_to_getattr(
+        self,
+        db: &'db dyn Db,
+        name: &Name,
+        result: PlaceAndQualifiers<'db>,
+        policy: MemberLookupPolicy,
+        getattribute_policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let custom_getattr_result = || {
+            if policy.no_getattr_lookup() {
+                return Place::Undefined.into();
+            }
+
+            self.try_call_dunder(
+                db,
+                "__getattr__",
+                CallArguments::positional([Type::string_literal(db, name)]),
+                TypeContext::default(),
+            )
+            .map(|outcome| Place::bound(outcome.return_type(db)))
+            // TODO: Handle call errors here.
+            .unwrap_or_default()
+            .into()
+        };
+
+        let custom_getattribute_result = || {
+            if "__getattribute__" == name.as_str() {
+                return Place::Undefined.into();
+            }
+
+            self.try_call_dunder_with_policy(
+                db,
+                "__getattribute__",
+                &mut CallArguments::positional([Type::string_literal(db, name)]),
+                TypeContext::default(),
+                getattribute_policy,
+            )
+            .map(|outcome| Place::bound(outcome.return_type(db)))
+            // TODO: Handle call errors here.
+            .unwrap_or_default()
+            .into()
+        };
+
+        match result {
+            member @ PlaceAndQualifiers {
+                place:
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }),
+                qualifiers: _,
+            } => member,
+            member @ PlaceAndQualifiers {
+                place:
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::PossiblyUndefined,
+                        ..
+                    }),
+                qualifiers: _,
+            } => member
+                .or_fall_back_to(db, custom_getattribute_result)
+                .or_fall_back_to(db, custom_getattr_result),
+            PlaceAndQualifiers {
+                place: Place::Undefined,
+                qualifiers: _,
+            } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
         }
     }
 
