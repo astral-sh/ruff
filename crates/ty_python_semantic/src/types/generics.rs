@@ -2043,44 +2043,44 @@ impl<'db> SpecializationBuilder<'db> {
                         }
                         return Ok(());
                     }
-                }
 
-                // Fallback for structural protocol conformance: if the formal type is a
-                // protocol instance and the MRO walk above didn't find a nominal match,
-                // use constraint-set assignability to infer type variable mappings from
-                // the protocol members.
-                //
-                // We only apply this when:
-                // 1. The actual type's specialization is fully static (no Unknown/Any
-                //    type parameters). When the actual type contains gradual types, the
-                //    structural matching produces constraints that include those gradual
-                //    types, which can change overload resolution behavior in unhelpful
-                //    ways.
-                // 2. The actual type has all protocol members defined. This is a cheap
-                //    pre-check (name lookup only, no type comparison) that avoids the
-                //    expensive constraint-set computation for types that clearly don't
-                //    satisfy the protocol.
-                if let Type::ProtocolInstance(protocol) = formal {
-                    let has_no_dynamic_specialization = !matches!(
-                        actual_nominal.class(self.db),
-                        ClassType::Generic(alias)
-                            if alias.specialization(self.db).types(self.db).iter().any(Type::is_dynamic)
-                    );
-                    let actual_ty = Type::NominalInstance(actual_nominal);
-                    let has_all_members = has_no_dynamic_specialization
-                        && protocol.interface(self.db).members(self.db).all(|member| {
-                            !actual_ty
-                                .member(self.db, member.name())
-                                .place
-                                .is_undefined()
-                        });
-                    if has_all_members {
-                        let when = actual_ty.when_constraint_set_assignable_to(
-                            self.db,
-                            formal,
-                            self.inferable,
+                    // Fallback for structural protocol conformance: the MRO walk
+                    // didn't find a nominal match for this generic protocol, so use
+                    // constraint-set assignability to infer type variable mappings
+                    // from the protocol members.
+                    //
+                    // We only apply this when:
+                    // 1. The actual type's specialization is fully static (no
+                    //    Unknown/Any type parameters). When the actual type contains
+                    //    gradual types, the structural matching produces constraints
+                    //    that include those gradual types, which can change overload
+                    //    resolution behavior in unhelpful ways.
+                    // 2. The actual type has all protocol members defined. This is a
+                    //    cheap pre-check (name lookup only, no type comparison) that
+                    //    avoids the expensive constraint-set computation for types
+                    //    that clearly don't satisfy the protocol.
+                    if let Type::ProtocolInstance(protocol) = formal {
+                        let has_no_dynamic_specialization = !matches!(
+                            actual_class,
+                            ClassType::Generic(alias)
+                                if alias.specialization(self.db).types(self.db).iter().any(Type::is_dynamic)
                         );
-                        self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                        let actual_ty = Type::NominalInstance(actual_nominal);
+                        let has_all_members = has_no_dynamic_specialization
+                            && protocol.interface(self.db).members(self.db).all(|member| {
+                                !actual_ty
+                                    .member(self.db, member.name())
+                                    .place
+                                    .is_undefined()
+                            });
+                        if has_all_members {
+                            let when = actual_ty.when_constraint_set_assignable_to(
+                                self.db,
+                                formal,
+                                self.inferable,
+                            );
+                            self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                        }
                     }
                 }
             }
