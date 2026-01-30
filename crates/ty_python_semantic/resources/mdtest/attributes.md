@@ -1874,6 +1874,143 @@ class ThisFails:
 ThisFails().x
 ```
 
+## Metaclasses with custom `__getattr__` methods
+
+A class is an instance of its metaclass. When attribute lookup on a class fails, Python falls back
+to `type(cls).__getattr__`, the metaclass's `__getattr__` method. This is analogous to how instance
+attribute access falls back to the class's `__getattr__`.
+
+### Basic
+
+```py
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.whatever)  # revealed: int
+```
+
+### Class attributes take precedence
+
+If the class defines the attribute directly, it takes precedence over the metaclass `__getattr__`:
+
+```py
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    x: str = "hello"
+
+reveal_type(Foo.x)  # revealed: str
+reveal_type(Foo.unknown)  # revealed: int
+```
+
+### Instance `__getattr__` is separate
+
+A `__getattr__` defined on the class itself applies to instance attribute access, not class
+attribute access. A `__getattr__` on the metaclass applies to class attribute access:
+
+```py
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    def __getattr__(self, name: str) -> str:
+        return "a"
+
+# Class access uses the metaclass __getattr__
+reveal_type(Foo.unknown)  # revealed: int
+
+# Instance access uses the class __getattr__
+reveal_type(Foo().unknown)  # revealed: str
+```
+
+### Possibly unbound class attributes
+
+If a class attribute is possibly unbound, the type is unioned with the metaclass `__getattr__`
+return type:
+
+```py
+def flag() -> bool:
+    return True
+
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    if flag():
+        maybe: str = "hello"
+
+reveal_type(Foo.maybe)  # revealed: str | int
+```
+
+### Inherited from a base metaclass
+
+`__getattr__` defined on a base metaclass is found via the metaclass MRO:
+
+```py
+class BaseMeta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Meta(BaseMeta): ...
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.whatever)  # revealed: int
+```
+
+## Metaclasses with custom `__getattribute__` methods
+
+If a metaclass provides a custom `__getattribute__`, we use its return type for unknown attributes
+on the class. Known class attributes still take precedence, matching the behavior of type checkers
+like mypy and pyright.
+
+### Basic
+
+```py
+class Meta(type):
+    def __getattribute__(cls, name: str, /) -> int:
+        return 1
+
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.whatever)  # revealed: int
+```
+
+### Class attributes take precedence
+
+```py
+class Meta(type):
+    def __getattribute__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    x: str = "hello"
+
+reveal_type(Foo.x)  # revealed: str
+reveal_type(Foo.unknown)  # revealed: int
+```
+
+### `__getattribute__` takes precedence over `__getattr__`
+
+```py
+class Meta(type):
+    def __getattribute__(cls, name: str) -> int:
+        return 1
+
+    def __getattr__(cls, name: str) -> str:
+        return "a"
+
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.x)  # revealed: int
+```
+
 ## Classes with custom `__setattr__` methods
 
 ### Basic

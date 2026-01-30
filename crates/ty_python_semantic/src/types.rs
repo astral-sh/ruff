@@ -3356,74 +3356,13 @@ impl<'db> Type<'db> {
                     policy,
                 );
 
-                let custom_getattr_result = || {
-                    if policy.no_getattr_lookup() {
-                        return Place::Undefined.into();
-                    }
-
-                    self.try_call_dunder(
-                        db,
-                        "__getattr__",
-                        CallArguments::positional([Type::string_literal(db, &name)]),
-                        TypeContext::default(),
-                    )
-                    .map(|outcome| Place::bound(outcome.return_type(db)))
-                    // TODO: Handle call errors here.
-                    .unwrap_or_default()
-                    .into()
-                };
-
-                let custom_getattribute_result = || {
-                    // Avoid cycles when looking up `__getattribute__`
-                    if "__getattribute__" == name.as_str() {
-                        return Place::Undefined.into();
-                    }
-
-                    // Typeshed has a `__getattribute__` method defined on `builtins.object` so we
-                    // explicitly hide it here using `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK`.
-                    self.try_call_dunder_with_policy(
-                        db,
-                        "__getattribute__",
-                        &mut CallArguments::positional([Type::string_literal(db, &name)]),
-                        TypeContext::default(),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                    )
-                    .map(|outcome| Place::bound(outcome.return_type(db)))
-                    // TODO: Handle call errors here.
-                    .unwrap_or_default()
-                    .into()
-                };
-
                 if result.is_class_var() && self.is_typed_dict() {
                     // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
                     // They can only be accessed on `SomeTypedDict` directly.
                     return Place::Undefined.into();
                 }
 
-                match result {
-                    member @ PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                definedness: Definedness::AlwaysDefined,
-                                ..
-                            }),
-                        qualifiers: _,
-                    } => member,
-                    member @ PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                definedness: Definedness::PossiblyUndefined,
-                                ..
-                            }),
-                        qualifiers: _,
-                    } => member
-                        .or_fall_back_to(db, custom_getattribute_result)
-                        .or_fall_back_to(db, custom_getattr_result),
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        qualifiers: _,
-                    } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
-                }
+                self.fallback_to_getattr(db, &name, result, policy)
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -3459,13 +3398,21 @@ impl<'db> Type<'db> {
                 )
                 .0;
 
-                self.invoke_descriptor_protocol(
+                let result = self.invoke_descriptor_protocol(
                     db,
                     name_str,
                     class_attr_fallback,
                     InstanceFallbackShadowsNonDataDescriptor::Yes,
                     policy,
-                )
+                );
+
+                // A class is an instance of its metaclass. If attribute lookup on the class
+                // fails, Python falls back to `type(cls).__getattr__` and
+                // `type(cls).__getattribute__` on the metaclass, analogous to how instance
+                // attribute access falls back to `__getattr__`/`__getattribute__` on the
+                // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
+                // lookup to hit the catch-all that only checks the meta-type (the metaclass).
+                self.fallback_to_getattr(db, &name, result, policy)
             }
 
             // Unlike other objects, `super` has a unique member lookup behavior.
@@ -4748,6 +4695,80 @@ impl<'db> Type<'db> {
                 Ok(bindings)
             }
             Place::Undefined => Err(CallDunderError::MethodNotAvailable),
+        }
+    }
+
+    /// Apply `__getattr__` / `__getattribute__` fallback to an attribute-lookup result.
+    ///
+    /// If `result` is already always-defined, return it unchanged. Otherwise, fall back to calling
+    /// `__getattribute__` (and then `__getattr__`) on the meta-type of `self`.
+    fn fallback_to_getattr(
+        self,
+        db: &'db dyn Db,
+        name: &Name,
+        result: PlaceAndQualifiers<'db>,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let custom_getattr_result = || {
+            if policy.no_getattr_lookup() {
+                return Place::Undefined.into();
+            }
+
+            self.try_call_dunder(
+                db,
+                "__getattr__",
+                CallArguments::positional([Type::string_literal(db, name)]),
+                TypeContext::default(),
+            )
+            .map(|outcome| Place::bound(outcome.return_type(db)))
+            // TODO: Handle call errors here.
+            .unwrap_or_default()
+            .into()
+        };
+
+        let custom_getattribute_result = || {
+            if "__getattribute__" == name.as_str() {
+                return Place::Undefined.into();
+            }
+
+            // Skip `object.__getattribute__`, which is the default mechanism we
+            // already model via the normal attribute-lookup path.
+            self.try_call_dunder_with_policy(
+                db,
+                "__getattribute__",
+                &mut CallArguments::positional([Type::string_literal(db, name)]),
+                TypeContext::default(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            )
+            .map(|outcome| Place::bound(outcome.return_type(db)))
+            // TODO: Handle call errors here.
+            .unwrap_or_default()
+            .into()
+        };
+
+        match result {
+            member @ PlaceAndQualifiers {
+                place:
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }),
+                qualifiers: _,
+            } => member,
+            member @ PlaceAndQualifiers {
+                place:
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::PossiblyUndefined,
+                        ..
+                    }),
+                qualifiers: _,
+            } => member
+                .or_fall_back_to(db, custom_getattribute_result)
+                .or_fall_back_to(db, custom_getattr_result),
+            PlaceAndQualifiers {
+                place: Place::Undefined,
+                qualifiers: _,
+            } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
         }
     }
 
