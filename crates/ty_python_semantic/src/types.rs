@@ -1200,6 +1200,15 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) fn has_typevar_or_typevar_instance(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, false, |ty| {
+            matches!(
+                ty,
+                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+            )
+        })
+    }
+
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
         match self {
             Type::SpecialForm(special_form) => Some(special_form),
@@ -8197,8 +8206,30 @@ impl<'db> TypeVarInstance<'db> {
             TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
                 Some(bound_or_constraints)
             }
-            TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self.lazy_bound(db),
-            TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self.lazy_constraints(db),
+            TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
+                .lazy_bound(db)
+                .map(TypeVarBoundOrConstraints::UpperBound),
+            TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
+                .lazy_constraints(db)
+                .map(TypeVarBoundOrConstraints::Constraints),
+        })
+    }
+
+    /// Similar to `bound_or_constraints`, but does not check that the bounds or constraints are non-generic.
+    pub(crate) fn bound_or_constraints_unchecked(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<TypeVarBoundOrConstraints<'db>> {
+        self._bound_or_constraints(db).and_then(|w| match w {
+            TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
+                Some(bound_or_constraints)
+            }
+            TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
+                .lazy_bound_unchecked(db)
+                .map(TypeVarBoundOrConstraints::UpperBound),
+            TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
+                .lazy_constraints_unchecked(db)
+                .map(TypeVarBoundOrConstraints::Constraints),
         })
     }
 
@@ -8228,12 +8259,20 @@ impl<'db> TypeVarInstance<'db> {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
                         Some(bound_or_constraints.normalized_impl(db, visitor).into())
                     }
-                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
-                        .lazy_bound(db)
-                        .map(|bound| bound.normalized_impl(db, visitor).into()),
-                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
-                        .lazy_constraints(db)
-                        .map(|constraints| constraints.normalized_impl(db, visitor).into()),
+                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => {
+                        self.lazy_bound(db).map(|bound| {
+                            TypeVarBoundOrConstraints::UpperBound(bound)
+                                .normalized_impl(db, visitor)
+                                .into()
+                        })
+                    }
+                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
+                        self.lazy_constraints(db).map(|constraints| {
+                            TypeVarBoundOrConstraints::Constraints(constraints)
+                                .normalized_impl(db, visitor)
+                                .into()
+                        })
+                    }
                 }),
             self.explicit_variance(db),
             self._default(db).and_then(|default| match default {
@@ -8263,14 +8302,14 @@ impl<'db> TypeVarInstance<'db> {
                     ),
                     TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => {
                         self.lazy_bound(db).map(|bound| {
-                            bound
+                            TypeVarBoundOrConstraints::UpperBound(bound)
                                 .materialize_impl(db, materialization_kind, visitor)
                                 .into()
                         })
                     }
                     TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
                         self.lazy_constraints(db).map(|constraints| {
-                            constraints
+                            TypeVarBoundOrConstraints::Constraints(constraints)
                                 .materialize_impl(db, materialization_kind, visitor)
                                 .into()
                         })
@@ -8323,12 +8362,14 @@ impl<'db> TypeVarInstance<'db> {
         })
     }
 
+    /// Returns the "unchecked" upper bound of a type variable instance.
+    /// `lazy_bound` checks if the upper bound type is generic (generic upper bound is not allowed).
     #[salsa::tracked(
-        cycle_fn=lazy_bound_or_constraints_cycle_recover,
-        cycle_initial=lazy_bound_or_constraints_cycle_initial,
+        cycle_fn=lazy_bound_cycle_recover,
+        cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_bound(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
+    fn lazy_bound_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
         let ty = match definition.kind(db) {
@@ -8346,19 +8387,27 @@ impl<'db> TypeVarInstance<'db> {
             _ => return None,
         };
 
-        if self.type_is_self_referential(db, ty) {
+        Some(ty)
+    }
+
+    fn lazy_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let bound = self.lazy_bound_unchecked(db)?;
+
+        if bound.has_typevar_or_typevar_instance(db) {
             return None;
         }
 
-        Some(TypeVarBoundOrConstraints::UpperBound(ty))
+        Some(bound)
     }
 
+    /// Returns the "unchecked" constraints of a type variable instance.
+    /// `lazy_constraints` checks if any of the constraint types are generic (generic constraints are not allowed).
     #[salsa::tracked(
-        cycle_fn=lazy_bound_or_constraints_cycle_recover,
-        cycle_initial=lazy_bound_or_constraints_cycle_initial,
+        cycle_fn=lazy_constraints_cycle_recover,
+        cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
+    fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
         let constraints = match definition.kind(db) {
@@ -8393,19 +8442,27 @@ impl<'db> TypeVarInstance<'db> {
             _ => return None,
         };
 
+        Some(constraints)
+    }
+
+    fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
+        let constraints = self.lazy_constraints_unchecked(db)?;
+
         if constraints
             .elements(db)
             .iter()
-            .any(|ty| self.type_is_self_referential(db, *ty))
+            .any(|ty| ty.has_typevar_or_typevar_instance(db))
         {
             return None;
         }
 
-        Some(TypeVarBoundOrConstraints::Constraints(constraints))
+        Some(constraints)
     }
 
+    /// Returns the "unchecked" default type of a type variable instance.
+    /// `lazy_default` checks if the default type is not self-referential.
     #[salsa::tracked(cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
-    fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
                 Type::NominalInstance(nominal_instance)
@@ -8478,11 +8535,20 @@ impl<'db> TypeVarInstance<'db> {
             _ => return None,
         };
 
-        if self.type_is_self_referential(db, ty) {
+        Some(ty)
+    }
+
+    fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let default = self.lazy_default_unchecked(db)?;
+
+        // Unlike bounds/constraints, default types are allowed to be generic (https://peps.python.org/pep-0696/#using-another-type-parameter-as-default).
+        // Here we simply check for non-self-referential.
+        // TODO: We should also check for non-forward references.
+        if self.type_is_self_referential(db, default) {
             return None;
         }
 
-        Some(ty)
+        Some(default)
     }
 
     pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
@@ -8504,25 +8570,34 @@ impl<'db> TypeVarInstance<'db> {
     }
 }
 
-fn lazy_bound_or_constraints_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: TypeVarInstance<'db>,
-) -> Option<TypeVarBoundOrConstraints<'db>> {
-    None
-}
-
 #[expect(clippy::ref_option)]
-fn lazy_bound_or_constraints_cycle_recover<'db>(
+fn lazy_bound_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
-    previous: &Option<TypeVarBoundOrConstraints<'db>>,
-    current: Option<TypeVarBoundOrConstraints<'db>>,
+    previous: &Option<Type<'db>>,
+    current: Option<Type<'db>>,
     _typevar: TypeVarInstance<'db>,
-) -> Option<TypeVarBoundOrConstraints<'db>> {
+) -> Option<Type<'db>> {
     // Normalize the bounds/constraints to ensure cycle convergence.
     match (previous, current) {
         (Some(prev), Some(current)) => Some(current.cycle_normalized(db, *prev, cycle)),
+        (None, Some(current)) => Some(current.recursive_type_normalized(db, cycle)),
+        (_, None) => None,
+    }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+#[expect(clippy::ref_option)]
+fn lazy_constraints_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &Option<TypeVarConstraints<'db>>,
+    current: Option<TypeVarConstraints<'db>>,
+    _typevar: TypeVarInstance<'db>,
+) -> Option<TypeVarConstraints<'db>> {
+    // Normalize the bounds/constraints to ensure cycle convergence.
+    match (previous, current) {
+        (Some(prev), Some(constraints)) => Some(constraints.cycle_normalized(db, *prev, cycle)),
         (None, Some(current)) => Some(current.recursive_type_normalized(db, cycle)),
         (_, None) => None,
     }
@@ -9107,6 +9182,30 @@ impl<'db> TypeVarConstraints<'db> {
             .collect::<Box<_>>();
         TypeVarConstraints::new(db, materialized)
     }
+
+    /// Normalize for cycle recovery by combining with the previous value and
+    /// removing divergent types introduced by the cycle.
+    ///
+    /// See [`Type::cycle_normalized`] for more details on how this works.
+    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+        let current_elements = self.elements(db);
+        let prev_elements = previous.elements(db);
+        TypeVarConstraints::new(
+            db,
+            current_elements
+                .iter()
+                .zip(prev_elements.iter())
+                .map(|(ty, prev_ty)| ty.cycle_normalized(db, *prev_ty, cycle))
+                .collect::<Box<_>>(),
+        )
+    }
+
+    /// Normalize recursive types for cycle recovery when there's no previous value.
+    ///
+    /// See [`Type::recursive_type_normalized`] for more details.
+    fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+        self.map(db, |ty| ty.recursive_type_normalized(db, cycle))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -9136,59 +9235,6 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 TypeVarBoundOrConstraints::Constraints(constraints.normalized_impl(db, visitor))
-            }
-        }
-    }
-
-    /// Normalize for cycle recovery by combining with the previous value and
-    /// removing divergent types introduced by the cycle.
-    ///
-    /// See [`Type::cycle_normalized`] for more details on how this works.
-    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
-        match (self, previous) {
-            (
-                TypeVarBoundOrConstraints::UpperBound(bound),
-                TypeVarBoundOrConstraints::UpperBound(prev_bound),
-            ) => {
-                TypeVarBoundOrConstraints::UpperBound(bound.cycle_normalized(db, prev_bound, cycle))
-            }
-            (
-                TypeVarBoundOrConstraints::Constraints(constraints),
-                TypeVarBoundOrConstraints::Constraints(prev_constraints),
-            ) => {
-                // Normalize each constraint with its corresponding previous constraint
-                let current_elements = constraints.elements(db);
-                let prev_elements = prev_constraints.elements(db);
-                TypeVarBoundOrConstraints::Constraints(TypeVarConstraints::new(
-                    db,
-                    current_elements
-                        .iter()
-                        .zip(prev_elements.iter())
-                        .map(|(ty, prev_ty)| ty.cycle_normalized(db, *prev_ty, cycle))
-                        .collect::<Box<_>>(),
-                ))
-            }
-            // The choice of whether it's an upper bound or constraints is purely syntactic and
-            // thus can never change in a cycle: `parsed_module` does not participate in cycles,
-            // the AST will never change from one iteration to the next.
-            _ => unreachable!(
-                "TypeVar switched from bound to constraints (or vice versa) in fixpoint iteration"
-            ),
-        }
-    }
-
-    /// Normalize recursive types for cycle recovery when there's no previous value.
-    ///
-    /// See [`Type::recursive_type_normalized`] for more details.
-    fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        match self {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                TypeVarBoundOrConstraints::UpperBound(bound.recursive_type_normalized(db, cycle))
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(
-                    constraints.map(db, |ty| ty.recursive_type_normalized(db, cycle)),
-                )
             }
         }
     }

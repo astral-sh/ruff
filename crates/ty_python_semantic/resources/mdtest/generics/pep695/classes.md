@@ -731,14 +731,23 @@ reveal_type(WithOverloadedMethod[int].method)
 
 ### No back-references
 
-Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars:
+Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars. Furthermore,
+bounds/constraints cannot refer to other type variables, i.e. they must be non-generic.
 
 ```py
-# TODO error
+# error: [invalid-type-variable-bound]
 class C[S: T, T]:
     pass
 
-class D[S: X]:
+# error: [invalid-type-variable-bound]
+class D[S, T: S]:
+    pass
+
+# error: [invalid-type-variable-constraints]
+class E[S: (int, T), T]:
+    pass
+
+class F[S: X]:
     pass
 
 X = int
