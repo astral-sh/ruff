@@ -1777,6 +1777,12 @@ impl<'db> SpecializationBuilder<'db> {
             upper: FxOrderSet<Type<'db>>,
         }
 
+        // If the constraint set is cyclic, we'll hit an infinite expansion when trying to add type
+        // mappings for it.
+        if constraints.is_cyclic(self.db) {
+            return;
+        }
+
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
