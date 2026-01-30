@@ -8,8 +8,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
+use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
@@ -27,9 +27,10 @@ use crate::types::{
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, NormalizedVisitor, Type, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionType, binding_type, declaration_type, walk_type_var_bounds,
+    UnionType, declaration_type, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
+use ruff_db::parsed::parsed_module;
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -162,14 +163,19 @@ pub(crate) fn typing_self<'db>(
     //
     // and the first match would be (method, Outer) -- wrong.
     let containing_scope = typevar_binding_context
-        .and_then(|def| binding_type(db, def).as_function_literal())
-        .map(|function| function.literal(db).last_definition(db).body_scope(db))
-        .unwrap_or(scope_id);
+        .and_then(|def| {
+            let DefinitionKind::Function(func_ref) = def.kind(db) else {
+                return None;
+            };
+            let module = parsed_module(db, file).load(db);
+            Some(index.node_scope(NodeWithScopeRef::Function(func_ref.node(&module))))
+        })
+        .unwrap_or_else(|| scope_id.file_scope_id(db));
 
     bind_typevar(
         db,
         index,
-        containing_scope.file_scope_id(db),
+        containing_scope,
         typevar_binding_context,
         typevar,
     )
