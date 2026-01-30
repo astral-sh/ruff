@@ -144,7 +144,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview", path.to_string_lossy());
