@@ -15,9 +15,9 @@ use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind,
-    UnionBuilder, UnionType, any_over_type, todo_type,
+    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
+    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -1190,7 +1190,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::GenericAlias(_) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::StringLiteral(_) => {
+            Type::LiteralValue(literal) if literal.is_string(self.db()) => {
                 self.infer_type_expression(slice);
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
@@ -1731,10 +1731,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .copied();
 
                     let probably_meant_literal = argument_elements.all(|ty| match ty {
-                        Type::StringLiteral(_)
-                        | Type::BytesLiteral(_)
-                        | Type::EnumLiteral(_)
-                        | Type::BooleanLiteral(_) => true,
+                        Type::LiteralValue(literal)
+                            if matches!(
+                                literal.kind(db),
+                                LiteralValueTypeKind::String(_)
+                                    | LiteralValueTypeKind::Bytes(_)
+                                    | LiteralValueTypeKind::Enum(_)
+                                    | LiteralValueTypeKind::Bool(_)
+                            ) =>
+                        {
+                            true
+                        }
                         Type::NominalInstance(instance) => {
                             instance.has_known_class(db, KnownClass::NoneType)
                         }
@@ -1848,7 +1855,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         return Ok(ty.inner(self.db()));
                     }
                     // `Literal[SomeEnum.Member]`
-                    Type::EnumLiteral(_) => {
+                    Type::LiteralValue(literal) if literal.is_enum(self.db()) => {
                         return Ok(subscript_ty);
                     }
                     // `Literal[SingletonEnum.Member]`, where `SingletonEnum.Member` simplifies to

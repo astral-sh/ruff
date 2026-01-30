@@ -32,9 +32,10 @@ use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BindingContext, BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MaterializationKind, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+    MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType, StringLiteralType,
+    SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType,
+    WrapperDescriptorKind, visitor,
 };
 
 /// A named item that can be either a class or a type alias.
@@ -503,8 +504,10 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
-            Type::EnumLiteral(literal) => {
-                self.record_class(db, literal.enum_class(db));
+            Type::LiteralValue(literal) => {
+                if let LiteralValueTypeKind::Enum(literal) = literal.kind(db) {
+                    self.record_class(db, literal.enum_class(db));
+                }
             }
             Type::GenericAlias(alias) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
@@ -583,12 +586,14 @@ impl<'db> DisplayType<'db> {
 impl<'db> FmtDetailed<'db> for DisplayType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let representation = self.ty.representation(self.db, self.settings.clone());
-        match self.ty {
-            Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_) => {
+        match self.ty.as_literal_value_kind(self.db) {
+            Some(
+                LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+                | LiteralValueTypeKind::Enum(_),
+            ) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::Literal))
                     .write_str("Literal")?;
                 f.write_char('[')?;
@@ -1051,7 +1056,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         KnownClass::Property,
                         "startswith",
                         "string",
-                        Type::StringLiteral(literal),
+                        Type::LiteralValue(LiteralValueType::promotable(
+                            self.db,
+                            LiteralValueTypeKind::String(literal),
+                        )),
                         Some(literal.value(self.db)),
                     ),
                     KnownBoundMethodType::ConstraintSetRange => {
@@ -1137,40 +1145,45 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::IntLiteral(n) => write!(f.with_type(self.ty), "{n}"),
-            Type::BooleanLiteral(boolean) => {
-                f.with_type(self.ty)
-                    .write_str(if boolean { "True" } else { "False" })
-            }
-            Type::StringLiteral(string) => {
-                write!(
-                    f.with_type(self.ty),
-                    "{}",
-                    string.display_with(self.db, self.settings.clone())
-                )
-            }
-            // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
-            // which would mean users would be able to jump to the definition of `LiteralString` from the
-            // inlay hint, but that seems less useful than the definition of `str` for a variable that is
-            // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
-            // at runtime)
-            Type::LiteralString => f.with_type(self.ty).write_str("LiteralString"),
-            Type::BytesLiteral(bytes) => {
-                let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
+            Type::LiteralValue(literal) => match literal.kind(self.db) {
+                LiteralValueTypeKind::Int(n) => write!(f.with_type(self.ty), "{n}"),
+                LiteralValueTypeKind::Bool(boolean) => {
+                    f.with_type(self.ty)
+                        .write_str(if boolean { "True" } else { "False" })
+                }
+                LiteralValueTypeKind::String(string) => {
+                    write!(
+                        f.with_type(self.ty),
+                        "{}",
+                        string.display_with(self.db, self.settings.clone())
+                    )
+                }
+                // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
+                // which would mean users would be able to jump to the definition of `LiteralString` from the
+                // inlay hint, but that seems less useful than the definition of `str` for a variable that is
+                // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
+                // at runtime)
+                LiteralValueTypeKind::LiteralString => {
+                    f.with_type(self.ty).write_str("LiteralString")
+                }
+                LiteralValueTypeKind::Bytes(bytes) => {
+                    let escape =
+                        AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
-                write!(
-                    f.with_type(self.ty),
-                    "{}",
-                    escape.bytes_repr(TripleQuotes::No)
-                )
-            }
-            Type::EnumLiteral(enum_literal) => {
-                enum_literal
-                    .enum_class(self.db)
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
-                write!(f, ".{}", enum_literal.name(self.db))
-            }
+                    write!(
+                        f.with_type(self.ty),
+                        "{}",
+                        escape.bytes_repr(TripleQuotes::No)
+                    )
+                }
+                LiteralValueTypeKind::Enum(enum_literal) => {
+                    enum_literal
+                        .enum_class(self.db)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    write!(f, ".{}", enum_literal.name(self.db))
+                }
+            },
             Type::TypeVar(bound_typevar) => {
                 f.set_invalid_type_annotation();
                 write!(
@@ -2193,11 +2206,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     f.write_str("=")?;
                 }
                 match default_type {
-                    Type::IntLiteral(_)
-                    | Type::BooleanLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::EnumLiteral(_)
-                    | Type::BytesLiteral(_) => {
+                    Type::LiteralValue(literal)
+                        if matches!(
+                            literal.kind(self.db),
+                            LiteralValueTypeKind::Int(_)
+                                | LiteralValueTypeKind::Bool(_)
+                                | LiteralValueTypeKind::String(_)
+                                | LiteralValueTypeKind::Enum(_)
+                                | LiteralValueTypeKind::Bytes(_)
+                        ) =>
+                    {
                         // For Literal types display the value without `Literal[..]` wrapping
                         let representation =
                             default_type.representation(self.db, self.settings.clone());
@@ -2311,14 +2329,16 @@ const UNION_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        fn is_condensable(ty: Type<'_>) -> bool {
+        fn is_condensable(db: &dyn Db, ty: Type<'_>) -> bool {
             matches!(
-                ty,
-                Type::IntLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::BytesLiteral(_)
-                    | Type::BooleanLiteral(_)
-                    | Type::EnumLiteral(_)
+                ty.as_literal_value_kind(db),
+                Some(
+                    LiteralValueTypeKind::Int(_)
+                        | LiteralValueTypeKind::String(_)
+                        | LiteralValueTypeKind::Bytes(_)
+                        | LiteralValueTypeKind::Bool(_)
+                        | LiteralValueTypeKind::Enum(_)
+                )
             )
         }
 
@@ -2327,7 +2347,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         let mut subclass_of_types = vec![];
 
         for element in elements.iter().copied() {
-            if is_condensable(element) {
+            if is_condensable(self.db, element) {
                 condensed_types.push(element);
             } else if let Type::SubclassOf(subclass_of) = element {
                 subclass_of_types.push(subclass_of);
@@ -2355,7 +2375,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 break;
             }
 
-            if is_condensable(*element) {
+            if is_condensable(self.db, *element) {
                 if let Some(condensed_types) = condensed_types.take() {
                     displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
@@ -2971,7 +2991,7 @@ mod tests {
         let mut items = TypedDictSchema::default();
         items.insert(
             Name::new("foo"),
-            TypedDictFieldBuilder::new(Type::IntLiteral(42))
+            TypedDictFieldBuilder::new(Type::int_literal(&db, 42))
                 .required(true)
                 .build(),
         );
@@ -3121,22 +3141,22 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("b")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db)),
                     Parameter::positional_only(Some(Name::new_static("c")))
-                        .with_default_type(Type::IntLiteral(1)),
+                        .with_default_type(Type::int_literal(&db, 1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(2)),
+                        .with_default_type(Type::int_literal(&db, 2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
-                        .with_default_type(Type::IntLiteral(3)),
+                        .with_default_type(Type::int_literal(&db, 3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(4)),
+                        .with_default_type(Type::int_literal(&db, 4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
-                        .with_default_type(Type::IntLiteral(5)),
+                        .with_default_type(Type::int_literal(&db, 5)),
                     Parameter::keyword_only(Name::new_static("h"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(6)),
+                        .with_default_type(Type::int_literal(&db, 6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],
@@ -3275,22 +3295,22 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("b")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db)),
                     Parameter::positional_only(Some(Name::new_static("c")))
-                        .with_default_type(Type::IntLiteral(1)),
+                        .with_default_type(Type::int_literal(&db, 1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(2)),
+                        .with_default_type(Type::int_literal(&db, 2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
-                        .with_default_type(Type::IntLiteral(3)),
+                        .with_default_type(Type::int_literal(&db, 3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(4)),
+                        .with_default_type(Type::int_literal(&db, 4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
-                        .with_default_type(Type::IntLiteral(5)),
+                        .with_default_type(Type::int_literal(&db, 5)),
                     Parameter::keyword_only(Name::new_static("h"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(6)),
+                        .with_default_type(Type::int_literal(&db, 6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],

@@ -371,8 +371,8 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
             if class.is_known(db, KnownClass::Bool) {
                 return Some(vec![
-                    Type::BooleanLiteral(true),
-                    Type::BooleanLiteral(false),
+                    Type::bool_literal(db, true),
+                    Type::bool_literal(db, false),
                 ]);
             }
 
@@ -468,7 +468,10 @@ mod tests {
         let db = setup_db();
         let bool_instance = KnownClass::Bool.to_instance(&db);
         let expanded = expand_type(&db, bool_instance).unwrap();
-        let expected_types = [Type::BooleanLiteral(true), Type::BooleanLiteral(false)];
+        let expected_types = [
+            Type::bool_literal(&db, true),
+            Type::bool_literal(&db, false),
+        ];
         assert_eq!(expanded.len(), expected_types.len());
         assert_eq!(expanded, expected_types);
     }
@@ -481,8 +484,8 @@ mod tests {
         let str_ty = KnownClass::Str.to_instance(&db);
         let bytes_ty = KnownClass::Bytes.to_instance(&db);
         let bool_ty = KnownClass::Bool.to_instance(&db);
-        let true_ty = Type::BooleanLiteral(true);
-        let false_ty = Type::BooleanLiteral(false);
+        let true_ty = Type::bool_literal(&db, true);
+        let false_ty = Type::bool_literal(&db, false);
 
         // Empty tuple
         let empty_tuple = Type::empty_tuple(&db);

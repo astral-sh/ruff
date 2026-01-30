@@ -159,7 +159,7 @@ impl<'db> ClassBase<'db> {
             }
 
             Type::PropertyInstance(_)
-            | Type::BooleanLiteral(_)
+            | Type::LiteralValue(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
             | Type::BoundMethod(_)
@@ -167,11 +167,6 @@ impl<'db> ClassBase<'db> {
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
-            | Type::BytesLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
             | Type::ModuleLiteral(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)

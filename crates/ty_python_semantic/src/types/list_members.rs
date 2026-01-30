@@ -313,12 +313,7 @@ impl<'db> AllMembers<'db> {
                 }
             }
 
-            Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::LiteralString
+            Type::LiteralValue(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)

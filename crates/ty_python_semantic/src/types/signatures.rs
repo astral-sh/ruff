@@ -2770,21 +2770,21 @@ mod tests {
                 Parameter::positional_only(Some(Name::new_static("b")))
                     .with_annotated_type(KnownClass::Int.to_instance(&db)),
                 Parameter::positional_only(Some(Name::new_static("c")))
-                    .with_default_type(Type::IntLiteral(1)),
+                    .with_default_type(Type::int_literal(&db, 1)),
                 Parameter::positional_only(Some(Name::new_static("d")))
                     .with_annotated_type(KnownClass::Int.to_instance(&db))
-                    .with_default_type(Type::IntLiteral(2)),
+                    .with_default_type(Type::int_literal(&db, 2)),
                 Parameter::positional_or_keyword(Name::new_static("e"))
-                    .with_default_type(Type::IntLiteral(3)),
+                    .with_default_type(Type::int_literal(&db, 3)),
                 Parameter::positional_or_keyword(Name::new_static("f"))
-                    .with_annotated_type(Type::IntLiteral(4))
-                    .with_default_type(Type::IntLiteral(4)),
+                    .with_annotated_type(Type::int_literal(&db, 4))
+                    .with_default_type(Type::int_literal(&db, 4)),
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_only(Name::new_static("g"))
-                    .with_default_type(Type::IntLiteral(5)),
+                    .with_default_type(Type::int_literal(&db, 5)),
                 Parameter::keyword_only(Name::new_static("h"))
-                    .with_annotated_type(Type::IntLiteral(6))
-                    .with_default_type(Type::IntLiteral(6)),
+                    .with_annotated_type(Type::int_literal(&db, 6))
+                    .with_default_type(Type::int_literal(&db, 6)),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(KnownClass::Str.to_instance(&db)),
             ],
