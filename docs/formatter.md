@@ -225,6 +225,70 @@ def f(x):
 [literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
 [`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
 
+## Markdown code formatting
+
+*Formatting for markdown code blocks is currently only available in [preview mode](preview.md#preview).*
+
+The Ruff formatter can also format any Markdown file with a `.md` filename
+extension. In these files, Ruff will format any CommonMark [fenced code blocks][]
+with the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`.
+Fenced code blocks without an info string are assumed to be Python code examples
+and will also be formatted.
+
+If a code example is recognized and treated as Python, the Ruff formatter will
+automatically skip it if the code does not parse as valid Python or if the
+reformatted code would produce an invalid Python program.
+
+Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
+the normal Python code formatting style, while any code blocks marked with
+`pyi` will be formatted with the alternate "Python stub" code style.
+
+While [formatting suppression](#format-suppression) comments will be handled as
+usual within code blocks, the formatter will also skip formatting any code block
+surrounded by appropriate HTML comments, such as:
+
+````markdown
+<!-- ruff:off -->
+```py
+print( 'hello' )
+```
+<!-- ruff:on -->
+````
+
+Any number of code blocks may be contained within a matching pair of `off` and
+`on` HTML comments, and any `off`  comment *without* a matching `on` comment
+will implicitly cover the remaining portion of the document.
+
+The Ruff formatter will also recognize HTML comments from [blacken-docs][],
+`<!-- blacken-docs:off -->` and `<!-- blacken-docs:on -->`, which are equivalent
+to `<!-- ruff:off -->` and `<!-- ruff:on -->` respectively.
+
+[blacken-docs]: https://github.com/adamchainz/blacken-docs/
+
+While in preview release, Ruff will not automatically find and format Markdown
+files in your project, but will format any Markdown files directly passed as
+an argument. To include Markdown files when running Ruff on your project,
+add them with [`extend-include`](settings.md#extend-include) in your
+project settings:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # Find and format code blocks in Markdown files
+    extend-include = ["*.md"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # Find and format code blocks in Markdown files
+    extend-include = ["*.md"]
+    ```
+
+Note that including Markdown files without also enabling [preview mode](preview.md#preview)
+will result in an error message and non-zero [exit code](#exit-codes).
+
 ## Format suppression
 
 Like Black, Ruff supports `# fmt: on`, `# fmt: off`, and `# fmt: skip` pragma comments, which can
