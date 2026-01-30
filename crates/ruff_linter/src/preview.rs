@@ -196,25 +196,8 @@ pub(crate) const fn is_allow_nested_roots_enabled(settings: &LinterSettings) -> 
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/18572
-pub(crate) const fn is_optional_as_none_in_union_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/20659
 pub(crate) const fn is_future_required_preview_generics_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/18683
-pub(crate) const fn is_safe_super_call_with_parameters_fix_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/19851
-pub(crate) const fn is_maxsplit_without_separator_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
