@@ -299,6 +299,11 @@ impl<'db> Mro<'db> {
                     } else {
                         Err(StaticMroErrorKind::UnresolvableMro {
                             bases_list: original_bases.iter().copied().collect(),
+                            generic_fix: check_generic_reorder_fixes_mro(
+                                db,
+                                resolved_bases.as_slice(),
+                                original_bases,
+                            ),
                         }
                         .into_mro_error(db, class))
                     }
@@ -623,7 +628,10 @@ pub(super) enum StaticMroErrorKind<'db> {
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
     ///
     /// See [`c3_merge`] for more details.
-    UnresolvableMro { bases_list: Box<[Type<'db>]> },
+    UnresolvableMro {
+        bases_list: Box<[Type<'db>]>,
+        generic_fix: Option<usize>,
+    },
 }
 
 impl<'db> StaticMroErrorKind<'db> {
@@ -690,6 +698,46 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
             }
         }
     }
+}
+
+fn check_generic_reorder_fixes_mro<'db>(
+    db: &'db dyn Db,
+    resolved_bases: &[ClassBase<'db>],
+    original_bases: &[Type<'db>],
+) -> Option<usize> {
+    let indices: Vec<usize> = original_bases
+        .iter()
+        .enumerate()
+        .filter_map(|(i, base)| {
+            matches!(
+                base,
+                Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+            )
+            .then_some(i)
+        })
+        .collect();
+    if indices.len() != 1 {
+        return None;
+    }
+    let resolved_index = resolved_bases
+        .iter()
+        .position(|base| matches!(base, ClassBase::Generic))?;
+    if resolved_index == resolved_bases.len() - 1 {
+        return None;
+    }
+    let mut reordered = resolved_bases.to_vec();
+    let generic = reordered.remove(resolved_index);
+    reordered.push(generic);
+    let mut seqs: Vec<VecDeque<ClassBase<'db>>> = Vec::with_capacity(reordered.len() + 1);
+    for base in &reordered {
+        if base.has_cyclic_mro(db) {
+            return None;
+        }
+        seqs.push(base.mro(db, None).collect());
+    }
+    seqs.push(reordered.iter().copied().collect());
+    c3_merge(seqs)?;
+    Some(indices[0])
 }
 
 /// Error for dynamic class MRO computation with fallback MRO.

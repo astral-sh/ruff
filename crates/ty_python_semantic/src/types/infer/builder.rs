@@ -3,6 +3,7 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
@@ -946,11 +947,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
                     }
-                    StaticMroErrorKind::UnresolvableMro { bases_list } => {
+                    StaticMroErrorKind::UnresolvableMro {
+                        bases_list,
+                        generic_fix,
+                    } => {
                         if let Some(builder) =
                             self.context.report_lint(&INCONSISTENT_MRO, class_node)
                         {
-                            builder.into_diagnostic(format_args!(
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Cannot create a consistent method resolution order (MRO) \
                                     for class `{}` with bases list `[{}]`",
                                 class.name(self.db()),
@@ -959,6 +963,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .map(|base| base.display(self.db()))
                                     .join(", ")
                             ));
+                            if let Some(index) = generic_fix {
+                                if let Some(arguments) = class_node.arguments.as_ref() {
+                                    let bases = &arguments.args;
+                                    let source =
+                                        source_text(self.context.db(), self.context.file());
+                                    let mut reordered_bases: Vec<String> = bases
+                                        .iter()
+                                        .enumerate()
+                                        .filter(|(i, _)| *i != *index)
+                                        .map(|(_, base)| source[base.range()].to_string())
+                                        .collect();
+                                    reordered_bases.push(source[bases[*index].range()].to_string());
+                                    let reordered_bases_t = reordered_bases.join(", ");
+                                    if let (Some(first), Some(last)) = (bases.first(), bases.last())
+                                    {
+                                        let fix = Fix::unsafe_edit(Edit::range_replacement(
+                                            reordered_bases_t,
+                                            TextRange::new(first.start(), last.end()),
+                                        ));
+                                        diagnostic.set_fix(fix);
+                                    }
+                                }
+                            }
                         }
                     }
                     StaticMroErrorKind::Pep695ClassWithGenericInheritance => {

@@ -1,0 +1,110 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: type.md - Calls to `type()` - MRO errors
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A: ...
+ 2 | 
+ 3 | # Duplicate bases are detected
+ 4 | # error: [duplicate-base] "Duplicate base class <class 'A'> in class `Dup`"
+ 5 | Dup = type("Dup", (A, A), {})
+ 6 | from unresolved_module import Bar, Baz  # error: [unresolved-import]
+ 7 | 
+ 8 | # No duplicate-base error here - Bar and Baz are Unknown, and we can't
+ 9 | # know if they're the same type.
+10 | X = type("X", (Bar, Baz), {})
+11 | class A: ...
+12 | class B(A): ...
+13 | class C(A): ...
+14 | 
+15 | # This creates an inconsistent MRO because D would need B before C (from first base)
+16 | # but also C before B (from second base inheritance through A)
+17 | class X(B, C): ...
+18 | class Y(C, B): ...
+19 | 
+20 | # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Conflict` with bases `[<class 'X'>, <class 'Y'>]`"
+21 | Conflict = type("Conflict", (X, Y), {})
+22 | from typing import Generic, TypeVar
+23 | 
+24 | K = TypeVar("K")
+25 | V = TypeVar("V")
+26 | 
+27 | class Foo(Generic[K, V], dict): ... # error: [inconsistent-mro]
+```
+
+# Diagnostics
+
+```
+error[duplicate-base]: Duplicate base class <class 'A'> in class `Dup`
+ --> src/mdtest_snippet.py:5:7
+  |
+3 | # Duplicate bases are detected
+4 | # error: [duplicate-base] "Duplicate base class <class 'A'> in class `Dup`"
+5 | Dup = type("Dup", (A, A), {})
+  |       ^^^^^^^^^^^^^^^^^^^^^^^
+6 | from unresolved_module import Bar, Baz  # error: [unresolved-import]
+  |
+info: rule `duplicate-base` is enabled by default
+
+```
+
+```
+error[unresolved-import]: Cannot resolve imported module `unresolved_module`
+ --> src/mdtest_snippet.py:6:6
+  |
+4 | # error: [duplicate-base] "Duplicate base class <class 'A'> in class `Dup`"
+5 | Dup = type("Dup", (A, A), {})
+6 | from unresolved_module import Bar, Baz  # error: [unresolved-import]
+  |      ^^^^^^^^^^^^^^^^^
+7 |
+8 | # No duplicate-base error here - Bar and Baz are Unknown, and we can't
+  |
+info: Searched in the following paths during module resolution:
+info:   1. /src (first-party code)
+info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+info: rule `unresolved-import` is enabled by default
+
+```
+
+```
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Conflict` with bases `[<class 'X'>, <class 'Y'>]`
+  --> src/mdtest_snippet.py:21:12
+   |
+20 | # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Conflict` with bases `[<class 'X'>, <…
+21 | Conflict = type("Conflict", (X, Y), {})
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 | from typing import Generic, TypeVar
+   |
+info: rule `inconsistent-mro` is enabled by default
+
+```
+
+```
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:27:1
+   |
+25 | V = TypeVar("V")
+26 |
+27 | class Foo(Generic[K, V], dict): ... # error: [inconsistent-mro]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: rule `inconsistent-mro` is enabled by default
+24 | K = TypeVar("K")
+25 | V = TypeVar("V")
+26 | 
+   - class Foo(Generic[K, V], dict): ... # error: [inconsistent-mro]
+27 + class Foo(dict, Generic[K, V]): ... # error: [inconsistent-mro]
+note: This is an unsafe fix and may change runtime behavior
+
+```
