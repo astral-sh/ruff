@@ -18,8 +18,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
   3 | class P(Protocol):
   4 |     # There'd be no unsoundness here if a subclass of this
   5 |     # class were to be instantiated without the method having been overridden:
-  6 |     # the function returns `None`, and the inferred return type of the function
-  7 |     # (`Unknown`) is assignable to `None`. Nonetheless, we consider this method
+  6 |     # the function returns `None`, and `None` is assignable to the inferred return
+  7 |     # type of the function (`Unknown`). Nonetheless, we consider this method
   8 |     # implicitly abstract anyway, since the distinction based on the return type
   9 |     # would probably be subtle and surprising to many users. This also matches the
  10 |     # behaviour of all other type checkers

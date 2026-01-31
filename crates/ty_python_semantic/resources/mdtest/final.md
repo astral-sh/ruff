@@ -730,8 +730,8 @@ from typing_extensions import Protocol, final, Never, overload
 class P(Protocol):
     # There'd be no unsoundness here if a subclass of this
     # class were to be instantiated without the method having been overridden:
-    # the function returns `None`, and the inferred return type of the function
-    # (`Unknown`) is assignable to `None`. Nonetheless, we consider this method
+    # the function returns `None`, and `None` is assignable to the inferred return
+    # type of the function (`Unknown`). Nonetheless, we consider this method
     # implicitly abstract anyway, since the distinction based on the return type
     # would probably be subtle and surprising to many users. This also matches the
     # behaviour of all other type checkers
