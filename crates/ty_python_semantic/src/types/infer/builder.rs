@@ -647,41 +647,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             let signature = last_definition.raw_signature(db);
             let parsed_parameters = signature.parameters();
-            for (i, (param_node, param)) in ast_parameters.iter().zip(parsed_parameters).enumerate()
-            {
+            let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
+
+            for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
                 let AnyParameterRef::NonVariadic(param_node) = param_node else {
                     continue;
                 };
-                if param_node.uses_pep_484_positional_only_convention()
-                    && !param.is_positional_only()
-                    && let Some(builder) = self
+                if param.is_positional_only() {
+                    continue;
+                }
+
+                if param_node.uses_pep_484_positional_only_convention() {
+                    if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
-                {
-                    let mut diagnostic = builder.into_diagnostic(
-                        "Invalid use of the legacy convention \
-                            for positional-only parameters",
-                    );
-                    diagnostic.set_primary_message(
-                        "Parameter name begins with `__` \
-                            but will not be treated as positional-only",
-                    );
-                    diagnostic.info(
-                        "A parameter can only be positional-only \
-                            if precedes all positional-or-keyword parameters",
-                    );
-                    if let Some((earlier_node, _)) = ast_parameters
-                        .iter()
-                        .zip(parsed_parameters)
-                        .take(i)
-                        .find(|(_, p)| !p.is_positional_only() && !p.is_variadic())
                     {
-                        diagnostic.annotate(
-                            self.context
-                                .secondary(earlier_node.name())
-                                .message("Prior parameter here was positional-or-keyword"),
+                        let mut diagnostic = builder.into_diagnostic(
+                            "Invalid use of the legacy convention \
+                            for positional-only parameters",
                         );
+                        diagnostic.set_primary_message(
+                            "Parameter name begins with `__` \
+                            but will not be treated as positional-only",
+                        );
+                        diagnostic.info(
+                            "A parameter can only be positional-only \
+                            if it precedes all positional-or-keyword parameters",
+                        );
+                        if let Some(earlier_node) = previous_non_positional_only {
+                            diagnostic.annotate(
+                                self.context
+                                    .secondary(earlier_node.name())
+                                    .message("Prior parameter here was positional-or-keyword"),
+                            );
+                        }
                     }
+                } else if previous_non_positional_only.is_none() {
+                    previous_non_positional_only = Some(param_node);
                 }
             }
         }

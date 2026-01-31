@@ -117,7 +117,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
 10 |
 11 | g(x=1, __y="foo")
    |
-info: A parameter can only be positional-only if precedes all positional-or-keyword parameters
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 info: rule `invalid-legacy-positional-parameter` is enabled by default
 
 ```
@@ -134,7 +134,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
 21 | @overload
 22 | def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
    |
-info: A parameter can only be positional-only if precedes all positional-or-keyword parameters
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 info: rule `invalid-legacy-positional-parameter` is enabled by default
 
 ```
@@ -151,7 +151,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
    |        Prior parameter here was positional-or-keyword
 23 | def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
    |
-info: A parameter can only be positional-only if precedes all positional-or-keyword parameters
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 info: rule `invalid-legacy-positional-parameter` is enabled by default
 
 ```
@@ -169,7 +169,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
 24 |
 25 | T = TypeVar("T")
    |
-info: A parameter can only be positional-only if precedes all positional-or-keyword parameters
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 info: rule `invalid-legacy-positional-parameter` is enabled by default
 
 ```
@@ -186,7 +186,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
    |        Prior parameter here was positional-or-keyword
 42 | def h(__x__: str): ...
    |
-info: A parameter can only be positional-only if precedes all positional-or-keyword parameters
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 info: rule `invalid-legacy-positional-parameter` is enabled by default
 
 ```
@@ -204,7 +204,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
 56 |     # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
 57 |     # parameter in a classmethod, and is always passed positionally at runtime,
    |
-info: A parameter can only be positional-only if precedes all positional-or-keyword parameters
+info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 info: rule `invalid-legacy-positional-parameter` is enabled by default
 
 ```
