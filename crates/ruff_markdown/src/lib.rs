@@ -233,4 +233,99 @@ fn (foo: &str) -> &str {
             format_code_blocks(code, None, &FormatterSettings::default()),
             @"Unchanged");
     }
+
+    #[test]
+    fn format_code_blocks_ignore_blackendocs_off() {
+        let code = r#"
+```py
+print( 'hello' )
+```
+
+<!-- blacken-docs:off -->
+```py
+print( 'hello' )
+```
+<!-- blacken-docs:on -->
+
+```py
+print( 'hello' )
+```
+        "#;
+        assert_snapshot!(format_code_blocks(
+            code,
+            None,
+            &FormatterSettings::default()
+        ), @r#"
+        ```py
+        print("hello")
+        ```
+
+        <!-- blacken-docs:off -->
+        ```py
+        print( 'hello' )
+        ```
+        <!-- blacken-docs:on -->
+
+        ```py
+        print("hello")
+        ```
+        "#);
+    }
+
+    #[test]
+    fn format_code_blocks_ignore_ruff_off() {
+        let code = r#"
+```py
+print( 'hello' )
+```
+
+<!-- ruff:off -->
+```py
+print( 'hello' )
+```
+<!-- ruff:on -->
+
+```py
+print( 'hello' )
+```
+        "#;
+        assert_snapshot!(format_code_blocks(
+            code,
+            None,
+            &FormatterSettings::default()
+        ), @r#"
+        ```py
+        print("hello")
+        ```
+
+        <!-- ruff:off -->
+        ```py
+        print( 'hello' )
+        ```
+        <!-- ruff:on -->
+
+        ```py
+        print("hello")
+        ```
+        "#);
+    }
+
+    #[test]
+    fn format_code_blocks_ignore_to_end() {
+        let code = r#"
+<!-- ruff:off -->
+```py
+print( 'hello' )
+```
+
+```py
+print( 'hello' )
+```
+        "#;
+        assert_snapshot!(format_code_blocks(
+            code,
+            None,
+            &FormatterSettings::default()
+        ), @"Unchanged");
+    }
 }
