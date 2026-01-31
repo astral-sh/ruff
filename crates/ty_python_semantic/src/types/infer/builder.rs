@@ -1621,6 +1621,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place_table = self.index.place_table(file_scope_id);
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            // Fast path: if the symbol has any bindings, it has a value and we can skip
+            // the expensive type inference for checking if it's `Final`.
+            if use_def.has_defined_bindings_at_end_of_scope(symbol_id) {
+                continue;
+            }
+
             let result = place_from_declarations(db, declarations);
             let first_declaration = result.first_declaration;
             let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
@@ -1633,14 +1639,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // import itself provides the value. Don't flag imported `Final` symbols,
             // even if a later `del` removes the binding at end-of-scope.
             if first_declaration.is_some_and(|decl| decl.kind(db).is_import()) {
-                continue;
-            }
-
-            // Check if the symbol has any bindings in the current scope.
-            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-            let binding_place = place_from_bindings(db, bindings);
-
-            if !binding_place.place.is_undefined() {
                 continue;
             }
 
@@ -1679,19 +1677,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            // Fast path: if the symbol has any bindings at class level, it has a value
+            // and we can skip the expensive type inference for checking if it's `Final`.
+            if use_def.has_defined_bindings_at_end_of_scope(symbol_id) {
+                continue;
+            }
+
             let result = place_from_declarations(db, declarations);
             let first_declaration = result.first_declaration;
             let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
 
             if !place_and_quals.qualifiers.contains(TypeQualifiers::FINAL) {
-                continue;
-            }
-
-            // Check if the symbol has any bindings at class level.
-            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-            let binding_place = place_from_bindings(db, bindings);
-
-            if !binding_place.place.is_undefined() {
                 continue;
             }
 

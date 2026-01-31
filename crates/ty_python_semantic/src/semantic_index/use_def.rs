@@ -443,6 +443,12 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
+    /// Returns `true` if the symbol has at least one defined (non-unbound) binding
+    /// at end-of-scope. This is a cheap check that doesn't require type inference.
+    pub(crate) fn has_defined_bindings_at_end_of_scope(&self, symbol: ScopedSymbolId) -> bool {
+        self.end_of_scope_symbols[symbol].has_defined_bindings()
+    }
+
     pub(crate) fn end_of_scope_member_bindings(
         &self,
         member: ScopedMemberId,

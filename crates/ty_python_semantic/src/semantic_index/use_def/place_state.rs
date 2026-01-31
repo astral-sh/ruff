@@ -308,6 +308,11 @@ impl Bindings {
         self.live_bindings.iter()
     }
 
+    /// Returns `true` if there is at least one defined (non-unbound) binding.
+    pub(super) fn has_defined_bindings(&self) -> bool {
+        self.live_bindings.iter().any(|b| !b.binding.is_unbound())
+    }
+
     pub(super) fn merge(
         &mut self,
         b: Self,
@@ -446,6 +451,11 @@ impl PlaceState {
 
     pub(super) fn declarations(&self) -> &Declarations {
         &self.declarations
+    }
+
+    /// Returns `true` if there is at least one defined (non-unbound) binding.
+    pub(super) fn has_defined_bindings(&self) -> bool {
+        self.bindings.has_defined_bindings()
     }
 
     pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
