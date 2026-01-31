@@ -235,6 +235,44 @@ fn (foo: &str) -> &str {
     }
 
     #[test]
+    fn format_code_blocks_tildas() {
+        let code = r#"
+~~~py
+print( 'hello' )
+~~~
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @r#"
+        ~~~py
+        print("hello")
+        ~~~
+        "#);
+    }
+
+    #[test]
+    fn format_code_blocks_long_fence() {
+        let code = r#"
+````py
+print( 'hello' )
+````
+~~~~~py
+print( 'hello' )
+~~~~~
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @r#"
+        ````py
+        print("hello")
+        ````
+        ~~~~~py
+        print("hello")
+        ~~~~~
+        "#);
+    }
+
+    #[test]
     fn format_code_blocks_ignore_blackendocs_off() {
         let code = r#"
 ```py
