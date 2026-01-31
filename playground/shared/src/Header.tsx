@@ -24,7 +24,7 @@ export default function Header({
   onChangeTheme: (theme: Theme) => void;
   onReset?(): void;
   onShare: () => Promise<void>;
-  onCopyMarkdown: () => Promise<void>;
+  onCopyMarkdown?: () => Promise<void>;
 }) {
   return (
     <div
@@ -56,10 +56,12 @@ export default function Header({
         </div>
         <div className="max-sm:hidden flex gap-2">
           <ShareButton key={edit} onShare={onShare} />
-          <CopyMarkdownButton
-            key={`md-${edit}`}
-            onCopyMarkdown={onCopyMarkdown}
-          />
+          {onCopyMarkdown != null && (
+            <CopyMarkdownButton
+              key={`md-${edit}`}
+              onCopyMarkdown={onCopyMarkdown}
+            />
+          )}
         </div>
         <Divider />
 
