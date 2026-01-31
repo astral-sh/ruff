@@ -9,8 +9,8 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
-    NodeIndex, PythonVersion,
+    self as ast, AnyNodeRef, AnyParameterRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext,
+    HasNodeIndex, NodeIndex, PythonVersion,
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -71,17 +71,17 @@ use crate::types::diagnostic::{
     DUPLICATE_BASE, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
-    INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
-    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED,
-    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
-    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
+    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
+    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
+    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
+    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
+    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
+    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -618,6 +618,76 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.check_static_class_definitions();
             self.check_overloaded_functions(node);
             self.check_type_guard_definitions();
+            self.check_legacy_positional_only_convention();
+        }
+    }
+
+    /// Iterate over all function definitions in this scope and check for invalid applications
+    /// of the pre-PEP-570 positional-only parameter convention.
+    fn check_legacy_positional_only_convention(&mut self) {
+        let db = self.db();
+
+        for (definition, _) in &self.declarations {
+            if !definition.kind(db).is_function_def() {
+                continue;
+            }
+
+            let Some(Type::FunctionLiteral(function_type)) =
+                infer_definition_types(db, *definition).undecorated_type()
+            else {
+                continue;
+            };
+
+            let last_definition = function_type.literal(db).last_definition(db);
+            let node = last_definition.node(db, self.file(), self.module());
+
+            let ast_parameters = &node.parameters;
+            // If the function has any PEP-570 positional-only parameters,
+            // assume that `__`-prefixed parameters are not meant to be positional-only
+            if !ast_parameters.posonlyargs.is_empty() {
+                continue;
+            }
+            let signature = last_definition.raw_signature(db);
+            let parsed_parameters = signature.parameters();
+            let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
+
+            for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
+                let AnyParameterRef::NonVariadic(param_node) = param_node else {
+                    continue;
+                };
+                if param.is_positional_only() {
+                    continue;
+                }
+
+                if param_node.uses_pep_484_positional_only_convention() {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
+                    {
+                        let mut diagnostic = builder.into_diagnostic(
+                            "Invalid use of the legacy convention \
+                            for positional-only parameters",
+                        );
+                        diagnostic.set_primary_message(
+                            "Parameter name begins with `__` \
+                            but will not be treated as positional-only",
+                        );
+                        diagnostic.info(
+                            "A parameter can only be positional-only \
+                            if it precedes all positional-or-keyword parameters",
+                        );
+                        if let Some(earlier_node) = previous_non_positional_only {
+                            diagnostic.annotate(
+                                self.context
+                                    .secondary(earlier_node.name())
+                                    .message("Prior parameter here was positional-or-keyword"),
+                            );
+                        }
+                    }
+                } else if previous_non_positional_only.is_none() {
+                    previous_non_positional_only = Some(param_node);
+                }
+            }
         }
     }
 
@@ -1790,7 +1860,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is
     /// assignable to the declared type of that parameter.
     fn check_type_guard_definitions(&mut self) {
-        for (definition, ty) in self.declarations.iter() {
+        for (definition, ty) in &self.declarations {
             // Only check actual function definitions, not imports.
             let DefinitionKind::Function(function_ref) = definition.kind(self.db()) else {
                 continue;
@@ -16062,12 +16132,7 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct VecMap<K, V>(Vec<(K, V)>);
 
-impl<K, V> VecMap<K, V>
-where
-    K: Eq,
-    K: std::fmt::Debug,
-    V: std::fmt::Debug,
-{
+impl<K, V> VecMap<K, V> {
     #[inline]
     fn len(&self) -> usize {
         self.0.len()
@@ -16078,21 +16143,10 @@ where
         self.0.is_empty()
     }
 
-    fn iter(&self) -> impl ExactSizeIterator<Item = (&K, &V)> {
-        self.0.iter().map(|(k, v)| (k, v))
-    }
-
-    fn insert(&mut self, key: K, value: V, multi_inference_state: MultiInferenceState) {
-        if matches!(multi_inference_state, MultiInferenceState::Ignore) {
-            return;
+    fn iter(&self) -> VecMapIterator<'_, K, V> {
+        VecMapIterator {
+            inner: self.0.iter(),
         }
-
-        debug_assert!(
-            !self.0.iter().any(|(existing, _)| existing == &key),
-            "An existing entry already exists for key {key:?}",
-        );
-
-        self.0.push((key, value));
     }
 
     fn into_boxed_slice(self) -> Box<[(K, V)]> {
@@ -16106,6 +16160,19 @@ where
     K: std::fmt::Debug,
     V: std::fmt::Debug,
 {
+    fn insert(&mut self, key: K, value: V, multi_inference_state: MultiInferenceState) {
+        if matches!(multi_inference_state, MultiInferenceState::Ignore) {
+            return;
+        }
+
+        debug_assert!(
+            !self.0.iter().any(|(existing, _)| existing == &key),
+            "An existing entry already exists for key {key:?}",
+        );
+
+        self.0.push((key, value));
+    }
+
     #[inline]
     fn extend<T: IntoIterator<Item = (K, V)>>(
         &mut self,
@@ -16125,6 +16192,35 @@ where
 impl<K, V> Default for VecMap<K, V> {
     fn default() -> Self {
         Self(Vec::default())
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a VecMap<K, V> {
+    type Item = (&'a K, &'a V);
+    type IntoIter = VecMapIterator<'a, K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+struct VecMapIterator<'a, K, V> {
+    inner: std::slice::Iter<'a, (K, V)>,
+}
+
+impl<'a, K, V> Iterator for VecMapIterator<'a, K, V> {
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|(k, v)| (k, v))
+    }
+}
+
+impl<K, V> std::iter::FusedIterator for VecMapIterator<'_, K, V> {}
+
+impl<K, V> ExactSizeIterator for VecMapIterator<'_, K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
     }
 }
 
