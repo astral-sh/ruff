@@ -5,7 +5,7 @@ use ruff_python_ast::PySourceType;
 use ruff_python_formatter::format_module_source;
 use ruff_python_trivia::textwrap::{dedent, indent};
 use ruff_source_file::{Line, UniversalNewlines};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
+use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -14,27 +14,7 @@ pub enum MarkdownResult {
     Unchanged,
 }
 
-// TODO: account for ~~~ and arbitrary length code fences
 // TODO: support code blocks nested inside block quotes, etc
-static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
-    // adapted from blacken-docs
-    // https://github.com/adamchainz/blacken-docs/blob/fb107c1dce25f9206e29297aaa1ed7afc2980a5a/src/blacken_docs/__init__.py#L17
-    Regex::new(
-        r"(?imsx)
-                    (?<before>
-                        ^(?<indent>\ *)```[^\S\r\n]*
-                        (?<lang>(?:python|py|python3|py3|pyi)?)
-                        (?:\ .*?)?\n
-                    )
-                    (?<code>.*?)
-                    (?<after>
-                        ^\ *```[^\S\r\n]*$
-                    )
-                    ",
-    )
-    .unwrap()
-});
-
 static MARKDOWN_CODE_FENCE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?ix)
