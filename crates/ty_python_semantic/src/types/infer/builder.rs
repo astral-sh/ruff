@@ -16093,12 +16093,7 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct VecMap<K, V>(Vec<(K, V)>);
 
-impl<K, V> VecMap<K, V>
-where
-    K: Eq,
-    K: std::fmt::Debug,
-    V: std::fmt::Debug,
-{
+impl<K, V> VecMap<K, V> {
     #[inline]
     fn len(&self) -> usize {
         self.0.len()
@@ -16115,6 +16110,17 @@ where
         }
     }
 
+    fn into_boxed_slice(self) -> Box<[(K, V)]> {
+        self.0.into_boxed_slice()
+    }
+}
+
+impl<K, V> VecMap<K, V>
+where
+    K: Eq,
+    K: std::fmt::Debug,
+    V: std::fmt::Debug,
+{
     fn insert(&mut self, key: K, value: V, multi_inference_state: MultiInferenceState) {
         if matches!(multi_inference_state, MultiInferenceState::Ignore) {
             return;
@@ -16128,17 +16134,6 @@ where
         self.0.push((key, value));
     }
 
-    fn into_boxed_slice(self) -> Box<[(K, V)]> {
-        self.0.into_boxed_slice()
-    }
-}
-
-impl<K, V> VecMap<K, V>
-where
-    K: Eq,
-    K: std::fmt::Debug,
-    V: std::fmt::Debug,
-{
     #[inline]
     fn extend<T: IntoIterator<Item = (K, V)>>(
         &mut self,
@@ -16161,12 +16156,7 @@ impl<K, V> Default for VecMap<K, V> {
     }
 }
 
-impl<'a, K, V> IntoIterator for &'a VecMap<K, V>
-where
-    K: Eq,
-    K: std::fmt::Debug,
-    V: std::fmt::Debug,
-{
+impl<'a, K, V> IntoIterator for &'a VecMap<K, V> {
     type Item = (&'a K, &'a V);
     type IntoIter = VecMapIterator<'a, K, V>;
 
