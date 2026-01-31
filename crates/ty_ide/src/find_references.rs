@@ -1124,6 +1124,243 @@ def process_model():
     }
 
     #[test]
+    fn multi_file_parameter_references_include_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "example_rename_2.py",
+                "
+class ExampleClass:
+    def __init__(self, <CURSOR>old_name: str) -> None:
+        self.old_name = old_name
+",
+            )
+            .source(
+                "example_rename.py",
+                r#"
+from example_rename_2 import ExampleClass
+
+instance = ExampleClass(old_name="test")
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> example_rename.py:4:25
+          |
+        2 | from example_rename_2 import ExampleClass
+        3 |
+        4 | instance = ExampleClass(old_name="test")
+          |                         --------
+          |
+         ::: example_rename_2.py:3:24
+          |
+        2 | class ExampleClass:
+        3 |     def __init__(self, old_name: str) -> None:
+          |                        --------
+        4 |         self.old_name = old_name
+          |                         --------
+          |
+        "#);
+    }
+
+    #[test]
+    fn multi_file_function_parameter_references_include_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+def func(<CURSOR>value: int):
+    return value * 2
+",
+            )
+            .source(
+                "main.py",
+                "
+from utils import func
+
+result = func(value=42)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> main.py:4:15
+          |
+        2 | from utils import func
+        3 |
+        4 | result = func(value=42)
+          |               -----
+          |
+         ::: utils.py:2:10
+          |
+        2 | def func(value: int):
+          |          -----
+        3 |     return value * 2
+          |            -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn multi_file_async_function_parameter_references_include_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+async def func(<CURSOR>value: int) -> int:
+    return value * 2
+",
+            )
+            .source(
+                "main.py",
+                "
+from utils import func
+
+async def main():
+    return await func(value=42)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> main.py:5:23
+          |
+        4 | async def main():
+        5 |     return await func(value=42)
+          |                       -----
+          |
+         ::: utils.py:2:16
+          |
+        2 | async def func(value: int) -> int:
+          |                -----
+        3 |     return value * 2
+          |            -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn multi_file_attribute_references_do_not_include_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "example_rename_2.py",
+                "
+class ExampleClass:
+    def __init__(self, old_name: str) -> None:
+        self.<CURSOR>old_name = old_name
+",
+            )
+            .source(
+                "example_rename.py",
+                r#"
+from example_rename_2 import ExampleClass
+
+instance = ExampleClass(old_name="test")
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 1 references
+         --> example_rename_2.py:4:14
+          |
+        2 | class ExampleClass:
+        3 |     def __init__(self, old_name: str) -> None:
+        4 |         self.old_name = old_name
+          |              --------
+          |
+        "#);
+    }
+
+    #[test]
+    fn multi_file_nested_function_parameter_references_do_not_include_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "outer.py",
+                "
+def outer():
+    def inner(<CURSOR>value: int):
+        return value * 2
+    return inner
+",
+            )
+            .source(
+                "caller.py",
+                "
+from outer import outer
+
+func = outer()
+result = func(value=10)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 2 references
+         --> outer.py:3:15
+          |
+        2 | def outer():
+        3 |     def inner(value: int):
+          |               -----
+        4 |         return value * 2
+          |                -----
+        5 |     return inner
+          |
+        "#);
+    }
+
+    #[test]
+    fn multi_file_parameter_references_do_not_include_other_parameter_same_name() {
+        let test = CursorTest::builder()
+            .source(
+                "example_rename_2.py",
+                "
+class ExampleClass:
+    def __init__(self, <CURSOR>old_name: str) -> None:
+        self.old_name = old_name
+
+    def method(self, old_name: str) -> str:
+        return f\"Hello {old_name}\"
+",
+            )
+            .source(
+                "example_rename.py",
+                r#"
+from example_rename_2 import ExampleClass
+
+instance = ExampleClass(old_name="test")
+result = instance.method(old_name="world")
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> example_rename.py:4:25
+          |
+        2 | from example_rename_2 import ExampleClass
+        3 |
+        4 | instance = ExampleClass(old_name="test")
+          |                         --------
+        5 | result = instance.method(old_name="world")
+          |
+         ::: example_rename_2.py:3:24
+          |
+        2 | class ExampleClass:
+        3 |     def __init__(self, old_name: str) -> None:
+          |                        --------
+        4 |         self.old_name = old_name
+          |                         --------
+        5 |
+        6 |     def method(self, old_name: str) -> str:
+          |
+        "#);
+    }
+
+    #[test]
     fn import_alias_references_should_not_resolve_to_original() {
         let test = CursorTest::builder()
             .source(

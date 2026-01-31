@@ -342,6 +342,47 @@ class DataProcessor:
     }
 
     #[test]
+    fn multi_file_parameter_rename_updates_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "example_rename_2.py",
+                "
+class ExampleClass:
+    def __init__(self, <CURSOR>old_name: str) -> None:
+        self.old_name = old_name
+",
+            )
+            .source(
+                "example_rename.py",
+                r#"
+from example_rename_2 import ExampleClass
+
+instance = ExampleClass(old_name="test")
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("new_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> example_rename_2.py:3:24
+          |
+        2 | class ExampleClass:
+        3 |     def __init__(self, old_name: str) -> None:
+          |                        ^^^^^^^^
+        4 |         self.old_name = old_name
+          |                         --------
+          |
+         ::: example_rename.py:4:25
+          |
+        2 | from example_rename_2 import ExampleClass
+        3 |
+        4 | instance = ExampleClass(old_name="test")
+          |                         --------
+          |
+        "#);
+    }
+
+    #[test]
     fn rename_string_annotation1() {
         let test = cursor_test(
             r#"
