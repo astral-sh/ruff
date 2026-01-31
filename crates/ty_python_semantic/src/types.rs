@@ -1220,6 +1220,16 @@ impl<'db> Type<'db> {
         ty
     }
 
+    /// Returns `Some(UnionType)` if this type behaves like a union. Apart from explicit unions,
+    /// this returns `Some` for `TypeAlias`es of unions and `NewType`s of `float` and `complex`.
+    pub(crate) fn as_union_like(self, db: &'db dyn Db) -> Option<UnionType<'db>> {
+        match self.resolve_type_alias(db) {
+            Type::Union(union) => Some(union),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).as_union_like(db),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
@@ -3264,7 +3274,7 @@ impl<'db> Type<'db> {
             // `float` and not `int | float`). However, all other `NewType` cases need to fall
             // through, because we generally do want e.g. methods that return `Self` to return the
             // `NewType`.
-            Type::NewTypeInstance(new_type_instance) if new_type_instance.base_is_union(db) => {
+            Type::NewTypeInstance(new_type_instance) if self.as_union_like(db).is_some() => {
                 new_type_instance
                     .concrete_base_type(db)
                     .member_lookup_with_policy(db, name, policy)
