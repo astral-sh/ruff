@@ -133,7 +133,8 @@ def _(x: ProtoInt[int]):
 class LegacyDict(TypedDict[T]):
     x: T
 
-type LegacyDictInt = LegacyDict[int]
+# TODO: false positive (LegacyDict is generic over T, but TypedDict[T] is not yet supported)
+type LegacyDictInt = LegacyDict[int]  # error: [not-subscriptable] "Cannot subscript non-generic type"
 
 # error: [not-subscriptable] "Cannot subscript non-generic type alias"
 def _(x: LegacyDictInt[int]):
