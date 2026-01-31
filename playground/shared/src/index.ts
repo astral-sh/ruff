@@ -1,4 +1,5 @@
 export { default as AstralButton } from "./AstralButton";
+export { default as CopyMarkdownButton } from "./CopyMarkdownButton";
 export { ErrorMessage } from "./ErrorMessage";
 export { default as Header } from "./Header";
 export { default as RepoButton } from "./RepoButton";
