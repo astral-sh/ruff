@@ -6,12 +6,12 @@ function getLanguageTag(filename: string): string {
   switch (extension) {
     case "py":
       return "python";
+    case "pyi":
+      return "python";
     case "json":
       return "json";
     case "toml":
       return "toml";
-    case "md":
-      return "markdown";
     default:
       return "python"; // Default to python for ty playground
   }
