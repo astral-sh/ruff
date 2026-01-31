@@ -20,20 +20,22 @@ export default function CopyMarkdownButton({
   return status === "copied" ? (
     <AstralButton
       type="button"
-      className="relative flex-none leading-6 py-1.5 px-3 cursor-auto dark:shadow-copied text-xs"
+      className="relative flex-none py-1.5 px-3 cursor-auto dark:shadow-copied text-xs leading-tight"
     >
       <span
-        className="absolute inset-0 flex items-center justify-center invisible"
+        className="absolute inset-0 flex items-center justify-center invisible leading-tight"
         aria-hidden="true"
       >
         Copy Markdown
       </span>
-      <span aria-hidden="false">Copied!</span>
+      <span aria-hidden="false" className="leading-tight">
+        Copied!
+      </span>
     </AstralButton>
   ) : (
     <AstralButton
       type="button"
-      className="relative flex-none leading-6 py-1.5 px-3 shadow-xs disabled:opacity-50 text-xs"
+      className="relative flex-none py-1.5 px-3 shadow-xs disabled:opacity-50 text-xs leading-tight"
       disabled={status === "copying"}
       onClick={async () => {
         setStatus("copying");
@@ -48,12 +50,12 @@ export default function CopyMarkdownButton({
       }}
     >
       <span
-        className="absolute inset-0 flex items-center justify-center"
+        className="absolute inset-0 flex items-center justify-center leading-tight"
         aria-hidden="false"
       >
         Copy Markdown
       </span>
-      <span className="invisible" aria-hidden="true">
+      <span className="invisible leading-tight" aria-hidden="true">
         Copied!
       </span>
     </AstralButton>
