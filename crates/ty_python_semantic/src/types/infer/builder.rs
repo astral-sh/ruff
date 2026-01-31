@@ -7941,22 +7941,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            if let Some(value) = value {
+            let value_ty = value.as_ref().map(|value| {
                 self.infer_maybe_standalone_expression(
                     value,
                     TypeContext::new(Some(annotated.inner_type())),
-                );
-            }
+                )
+            });
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target, TypeContext::default());
 
             // But here we explicitly overwrite the type for the overall `self.attr` node with
-            // the annotated type. We do no use `store_expression_type` here, because it checks
+            // the annotated type. We do not use `store_expression_type` here, because it checks
             // that no type has been stored for the expression before.
-            self.expressions
-                .insert((&**target).into(), annotated.inner_type());
+            //
+            // For bare qualifier annotations like `Final` without a type argument, the annotated
+            // inner type is `Unknown`. In that case, use the inferred type from the right-hand
+            // side value if available (mirroring the behavior for name-target definitions).
+            let target_ty = if annotated.inner_type().is_unknown()
+                && !annotated.qualifiers.is_empty()
+                && let Some(inferred_ty) = value_ty
+            {
+                inferred_ty
+            } else {
+                annotated.inner_type()
+            };
+            self.expressions.insert((&**target).into(), target_ty);
         }
     }
 
