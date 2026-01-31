@@ -1,5 +1,7 @@
 use itertools::{Either, EitherOrBoth, Itertools};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
@@ -57,7 +59,7 @@ use crate::semantic_index::{
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
+    AbstractMethod, ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
     MetaclassErrorKind, MethodDecorator, NamedTupleField, NamedTupleSpec,
 };
@@ -100,8 +102,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
-    FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
-    is_implicit_classmethod,
+    FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
+    OverloadLiteral, function_body_kind, is_implicit_classmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
@@ -1437,13 +1439,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
+        // Exclude `Protocol` classes. It is possible to subtype a `Protocol` class
+        // without subclassing it, so an `@final` `Protocol` class with unimplemented abstract
+        // methods is not inherently broken in the same way as a non-`Protocol` final class
+        // with unimplemented abstract methods.
+        if class.is_protocol(db) {
+            return;
+        }
+
         let class_type = class.identity_specialization(db);
         let abstract_methods = class_type.abstract_methods(db);
 
         // If there are no abstract methods, we're done.
-        let Some((first_method_name, (defining_class, definition))) =
-            abstract_methods.iter().next()
-        else {
+        let Some((first_method_name, abstract_method)) = abstract_methods.iter().next() else {
             return;
         };
 
@@ -1464,13 +1472,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         ));
 
+        let AbstractMethod {
+            defining_class,
+            definition,
+            kind,
+        } = abstract_method;
+
         let module = parsed_module(db, definition.file(db)).load(db);
         let span = Span::from(definition.focus_range(db, &module));
+        let defining_class_name = defining_class.name(db);
         let secondary_annotation = Annotation::secondary(span).message(format_args!(
-            "`{first_method_name}` defined as abstract on superclass `{defining_class}`",
-            defining_class = defining_class.name(db)
+            "`{first_method_name}` defined as abstract on superclass `{defining_class_name}`",
         ));
         diagnostic.annotate(secondary_annotation);
+        if !kind.is_explicit() {
+            let mut sub = SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format_args!(
+                    "`{defining_class_name}.{first_method_name}` is implicitly abstract \
+                    because `{defining_class_name}` is a `Protocol` class \
+                    and `{first_method_name}` lacks an implementation",
+                ),
+            );
+            sub.annotate(
+                Annotation::primary(defining_class.definition_span(db))
+                    .message(format_args!("`{defining_class_name}` declared here")),
+            );
+            diagnostic.sub(sub);
+
+            // If the implicitly abstract method is defined in first-party code
+            // and the return type is assignable to `None`, they may not have intended
+            // for it to be implicitly abstract; add a clarificatory note:
+            if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
+                let function_type_as_callable = infer_definition_types(db, *definition)
+                    .binding_type(*definition)
+                    .try_upcast_to_callable(db);
+
+                if let Some(callables) = function_type_as_callable
+                    && Type::function_like_callable(
+                        db,
+                        Signature::new(Parameters::gradual_form(), Type::none(db)),
+                    )
+                    .is_assignable_to(db, callables.into_type(db))
+                {
+                    diagnostic.help(format_args!(
+                        "Change the body of `{first_method_name}` to `return` \
+                        or `return None` if it was not intended to be abstract"
+                    ));
+                }
+            }
+        }
     }
 
     /// Check the overloaded functions in this scope.
@@ -2527,28 +2578,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_body(&function.body);
 
         if let Some(returns) = function.returns.as_deref() {
-            fn is_stub_suite(suite: &[ast::Stmt]) -> bool {
-                match suite {
-                    [
-                        ast::Stmt::Expr(ast::StmtExpr { value: first, .. }),
-                        ast::Stmt::Expr(ast::StmtExpr { value: second, .. }),
-                        ..,
-                    ] => first.is_string_literal_expr() && second.is_ellipsis_literal_expr(),
-                    [
-                        ast::Stmt::Expr(ast::StmtExpr { value, .. }),
-                        ast::Stmt::Pass(_),
-                        ..,
-                    ] => value.is_string_literal_expr(),
-                    [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ..] => {
-                        value.is_ellipsis_literal_expr() || value.is_string_literal_expr()
-                    }
-                    [ast::Stmt::Pass(_)] => true,
-                    _ => false,
-                }
-            }
-
-            let has_empty_body =
-                self.return_types_and_ranges.is_empty() && is_stub_suite(&function.body);
+            let has_empty_body = self.return_types_and_ranges.is_empty()
+                && function_body_kind(self.db(), function, |expr| self.expression_type(expr))
+                    == FunctionBodyKind::Stub;
 
             let mut enclosing_class_context = None;
 

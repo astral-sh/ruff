@@ -27,7 +27,7 @@ use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, KnownFunction,
+    AbstractMethodKind, DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
     is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
@@ -1022,31 +1022,31 @@ impl<'db> ClassType<'db> {
     /// Returns a map of methods on this class that were defined as abstract on a superclass
     /// and have not been overridden with a concrete implementation anywhere in the MRO
     ///
-    /// The value of the map is a tuple of the class that defined the abstract method
-    /// and the [`Definition`] of the abstract method.
+    /// The value of the map is a struct containing information about the abstract method.
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn abstract_methods(
-        self,
-        db: &'db dyn Db,
-    ) -> FxIndexMap<Name, (ClassType<'db>, Definition<'db>)> {
-        fn is_abstract(db: &dyn Db, ty: Type) -> bool {
+    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, AbstractMethod<'db>> {
+        fn type_as_abstract_method<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            defining_class: ClassType<'db>,
+        ) -> Option<AbstractMethodKind> {
             match ty {
-                Type::FunctionLiteral(function) => {
-                    function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
+                Type::BoundMethod(method) => {
+                    method.function(db).as_abstract_method(db, defining_class)
                 }
-                Type::BoundMethod(method) => method
-                    .function(db)
-                    .has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD),
                 Type::PropertyInstance(property) => {
                     // A property is abstract if either its getter or setter is abstract.
                     property
                         .getter(db)
-                        .is_some_and(|getter| is_abstract(db, getter))
-                        || property
-                            .setter(db)
-                            .is_some_and(|setter| is_abstract(db, setter))
+                        .and_then(|getter| type_as_abstract_method(db, getter, defining_class))
+                        .or_else(|| {
+                            property.setter(db).and_then(|setter| {
+                                type_as_abstract_method(db, setter, defining_class)
+                            })
+                        })
                 }
-                _ => false,
+                _ => None,
             }
         }
 
@@ -1078,8 +1078,13 @@ impl<'db> ClassType<'db> {
                 let Some(definition) = place_and_definition.first_definition else {
                     continue;
                 };
-                if is_abstract(db, ty) {
-                    abstract_methods.insert(name.clone(), (class, definition));
+                if let Some(kind) = type_as_abstract_method(db, ty, class) {
+                    let abstract_method = AbstractMethod {
+                        defining_class: class,
+                        definition,
+                        kind,
+                    };
+                    abstract_methods.insert(name.clone(), abstract_method);
                 } else {
                     // If this method is concrete, remove it from the map of abstract methods.
                     abstract_methods.shift_remove(name);
@@ -2015,6 +2020,13 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
             Self::Generic(generic) => generic.variance_of(db, typevar),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+pub(super) struct AbstractMethod<'db> {
+    pub(super) defining_class: ClassType<'db>,
+    pub(super) definition: Definition<'db>,
+    pub(super) kind: AbstractMethodKind,
 }
 
 /// A filter that describes which methods are considered when looking for implicit attribute assignments
@@ -6392,6 +6404,7 @@ pub enum KnownClass {
     Staticmethod,
     Classmethod,
     Super,
+    NotImplementedError,
     // enum
     Enum,
     EnumType,
@@ -6520,6 +6533,7 @@ impl KnownClass {
 
             Self::BaseException
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Object
             | Self::OrderedDict
@@ -6603,6 +6617,7 @@ impl KnownClass {
             | KnownClass::Slice
             | KnownClass::Property
             | KnownClass::BaseException
+            | KnownClass::NotImplementedError
             | KnownClass::Exception
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -6692,6 +6707,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -6780,6 +6796,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -6886,6 +6903,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -6971,6 +6989,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -7058,6 +7077,7 @@ impl KnownClass {
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::Exception => "Exception",
+            Self::NotImplementedError => "NotImplementedError",
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
@@ -7419,6 +7439,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7548,6 +7569,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7657,6 +7679,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7727,6 +7750,7 @@ impl KnownClass {
             "BaseException" => &[Self::BaseException],
             "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
             "Exception" => &[Self::Exception],
+            "NotImplementedError" => &[Self::NotImplementedError],
             "ExceptionGroup" => &[Self::ExceptionGroup],
             "staticmethod" => &[Self::Staticmethod],
             "classmethod" => &[Self::Classmethod],
@@ -7844,6 +7868,7 @@ impl KnownClass {
             | Self::VersionInfo
             | Self::BaseException
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::EllipsisType
             | Self::BaseExceptionGroup

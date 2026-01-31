@@ -90,7 +90,8 @@ use crate::types::{
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, binding_type, definition_expression_type, infer_definition_types, walk_signature,
+    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_definition_types,
+    walk_signature,
 };
 use crate::{Db, FxOrderSet};
 
@@ -789,6 +790,72 @@ impl<'db> FunctionLiteral<'db> {
     fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.last_definition(db).raw_signature(db)
     }
+
+    /// Return `Some()` if this function is an abstract method.
+    ///
+    /// A method can be abstract if it is explicitly decorated with `@abstractmethod`,
+    /// or if it is an overloaded `Protocol` method without an implementation,
+    /// or if it is a `Protocol` method with a body that solely consists of `pass`/`...`
+    /// statements, or if it is a `Protocol` method that only has a docstring,
+    /// or if it is a `Protocol` method whose body only consists of a single
+    /// `raise NotImplementedError` statement.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn as_abstract_method(
+        self,
+        db: &'db dyn Db,
+        enclosing_class: ClassType<'db>,
+    ) -> Option<AbstractMethodKind> {
+        if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
+            return Some(AbstractMethodKind::Explicit);
+        }
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        if file.is_stub(db) {
+            return None;
+        }
+        if !enclosing_class.is_protocol(db) {
+            return None;
+        }
+        let (_, implementation) = self.overloads_and_implementation(db);
+        let Some(implementation) = implementation else {
+            return Some(AbstractMethodKind::ImplicitDueToStubBody);
+        };
+        let module = parsed_module(db, file).load(db);
+        let node = implementation.node(db, file, &module);
+        let body_kind = function_body_kind(db, node, |expr| {
+            definition_expression_type(db, definition, expr)
+        });
+        match body_kind {
+            FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
+            FunctionBodyKind::AlwaysRaisesNotImplementedError => {
+                Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
+            }
+            FunctionBodyKind::Regular => None,
+        }
+    }
+}
+
+/// Indicates whether a method is explicitly or implicitly abstract.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(super) enum AbstractMethodKind {
+    /// The method is explicitly marked as abstract using `@abstractmethod`.
+    Explicit,
+    /// The method is implicitly abstract due to being in a `Protocol` class without an
+    /// implementation.
+    ImplicitDueToStubBody,
+    /// The method is implicitly abstract due to being in a `Protocol` class with a body that
+    /// solely consists of `raise NotImplementedError` statements.
+    ImplicitDueToAlwaysRaising,
+}
+
+impl AbstractMethodKind {
+    pub(super) const fn is_explicit(self) -> bool {
+        matches!(self, AbstractMethodKind::Explicit)
+    }
+
+    pub(super) const fn is_implicit_due_to_stub_body(self) -> bool {
+        matches!(self, AbstractMethodKind::ImplicitDueToStubBody)
+    }
 }
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
@@ -1199,6 +1266,14 @@ impl<'db> FunctionType<'db> {
             updated_last_definition_signature,
         ))
     }
+
+    pub(super) fn as_abstract_method(
+        self,
+        db: &'db dyn Db,
+        enclosing_class: ClassType<'db>,
+    ) -> Option<AbstractMethodKind> {
+        self.literal(db).as_abstract_method(db, enclosing_class)
+    }
 }
 
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
@@ -1313,6 +1388,73 @@ fn last_definition_signature_cycle_initial<'db>(
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
     Signature::bottom()
+}
+
+/// Classify the body of this function:
+/// - [`FunctionBodyKind::Stub`] if it is a stub function (i.e., only contains `pass` or `...`
+/// - [`FunctionBodyKind::AlwaysRaisesNotImplementedError`] if it consists of a single
+///   `raise NotImplementedError` statement
+/// - [`FunctionBodyKind::Regular`] otherwise
+///
+/// In all cases, we allow a docstring as the first statement in the function body;
+/// the analysis is only done on the remaining statements if the first is a docstring.
+pub(super) fn function_body_kind<'db>(
+    db: &'db dyn Db,
+    node: &ast::StmtFunctionDef,
+    infer_type: impl Fn(&ast::Expr) -> Type<'db>,
+) -> FunctionBodyKind {
+    // Allow docstrings, but only as the first statement.
+    let suite = if let Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) = node.body.first()
+        && value.is_string_literal_expr()
+    {
+        &node.body[1..]
+    } else {
+        &node.body[..]
+    };
+
+    if suite.iter().all(|stmt| match stmt {
+        ast::Stmt::Pass(_) => true,
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+        _ => false,
+    }) {
+        return FunctionBodyKind::Stub;
+    }
+
+    if let [ast::Stmt::Raise(raise)] = suite
+        && let ast::StmtRaise {
+            exc: Some(exc),
+            cause: None,
+            node_index: _,
+            range: _,
+        } = raise
+        && infer_type(exc).is_subtype_of(
+            db,
+            UnionType::from_elements(
+                db,
+                [
+                    KnownClass::NotImplementedError.to_class_literal(db),
+                    KnownClass::NotImplementedError.to_instance(db),
+                ],
+            ),
+        )
+    {
+        return FunctionBodyKind::AlwaysRaisesNotImplementedError;
+    }
+
+    FunctionBodyKind::Regular
+}
+
+/// Classification of function body kinds.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum FunctionBodyKind {
+    /// The function body only consists of `...`, `pass`, and/or a docstring.
+    Stub,
+    /// The function body consists of a single `raise NotImplementedError` statement,
+    /// possibly preceded by a docstring.
+    AlwaysRaisesNotImplementedError,
+    /// Any function body that is not a stub and does not consist of a single
+    /// `raise NotImplementedError` statement.
+    Regular,
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
