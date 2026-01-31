@@ -273,6 +273,20 @@ print( 'hello' )
     }
 
     #[test]
+    fn format_code_blocks_nested() {
+        let code = r#"
+````markdown
+```py
+print( 'hello' )
+```
+````
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &FormatterSettings::default()),
+            @"Unchanged");
+    }
+
+    #[test]
     fn format_code_blocks_ignore_blackendocs_off() {
         let code = r#"
 ```py
