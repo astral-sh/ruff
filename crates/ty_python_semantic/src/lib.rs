@@ -25,12 +25,12 @@ pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
     SitePackagesPaths, SysPrefixPathOrigin,
 };
-pub use types::DisplaySettings;
 pub use types::ide_support::{
     ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,
     definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
     map_stub_definition,
 };
+pub use types::{DisplaySettings, TypeQualifiers};
 
 pub mod ast_node_ref;
 mod db;

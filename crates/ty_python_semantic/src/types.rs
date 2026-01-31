@@ -7507,7 +7507,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
-    pub(crate) struct TypeQualifiers: u8 {
+    pub struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -7538,7 +7538,7 @@ impl TypeQualifiers {
     ///
     /// Note that this function can only be called on sets with a single member.
     /// Panics if more than a single bit is set.
-    fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::CLASS_VAR => "ClassVar",
             Self::FINAL => "Final",
@@ -7552,6 +7552,23 @@ impl TypeQualifiers {
                 )
             }
         }
+    }
+
+    /// Iterate over the individual user-visible qualifier flags that are set.
+    ///
+    /// Internal-only qualifiers like `IMPLICIT_INSTANCE_ATTRIBUTE` and
+    /// `FROM_MODULE_GETATTR` are excluded.
+    pub fn user_visible(self) -> impl Iterator<Item = TypeQualifiers> {
+        [
+            Self::CLASS_VAR,
+            Self::FINAL,
+            Self::INIT_VAR,
+            Self::REQUIRED,
+            Self::NOT_REQUIRED,
+            Self::READ_ONLY,
+        ]
+        .into_iter()
+        .filter(move |flag| self.contains(*flag))
     }
 }
 

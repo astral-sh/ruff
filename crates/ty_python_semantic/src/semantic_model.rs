@@ -16,7 +16,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::list_members::{Member, all_members, all_reachable_members};
-use crate::types::{Type, binding_type, infer_complete_scope_types};
+use crate::types::{Type, TypeQualifiers, binding_type, infer_complete_scope_types};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -385,6 +385,42 @@ impl<'db> SemanticModel<'db> {
             )),
         };
         Some((ast, model))
+    }
+
+    /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for a given expression,
+    /// if the expression refers to a name or attribute with declared qualifiers.
+    pub fn type_qualifiers(&self, expr: ExprRef<'_>) -> TypeQualifiers {
+        match expr {
+            ExprRef::Name(name) => {
+                let index = semantic_index(self.db, self.file);
+                let Some(file_scope) = index.try_expression_scope_id(&self.expr_ref_in_ast(expr))
+                else {
+                    return TypeQualifiers::empty();
+                };
+                let scope = file_scope.to_scope_id(self.db, self.file);
+                let symbol = crate::semantic_index::symbol::Symbol::new(name.id.clone());
+                crate::place::place(
+                    self.db,
+                    scope,
+                    (&symbol).into(),
+                    crate::place::ConsideredDefinitions::AllReachable,
+                )
+                .qualifiers
+            }
+            ExprRef::Attribute(attr) => {
+                let Some(value_ty) = attr.value.inferred_type(self) else {
+                    return TypeQualifiers::empty();
+                };
+                value_ty
+                    .member_lookup_with_policy(
+                        self.db,
+                        attr.attr.id.clone(),
+                        crate::types::MemberLookupPolicy::default(),
+                    )
+                    .qualifiers
+            }
+            _ => TypeQualifiers::empty(),
+        }
     }
 }
 
