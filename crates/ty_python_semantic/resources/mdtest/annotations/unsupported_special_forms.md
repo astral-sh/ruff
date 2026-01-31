@@ -84,12 +84,13 @@ def allowed(
     tuple_variadic: tuple[int, Unpack[tuple[str, ...]], bytes],
     callable_typevartuple: Callable[[int, Unpack[Ts]], None],
     callable_tuple: Callable[[Unpack[tuple[int, str]]], None],
-    variadic: Variadic[Unpack[tuple[int, str]]],
-    prefix: Prefix[int, Unpack[tuple[str, bytes]]],
-    suffix: Suffix[Unpack[tuple[int, str]], bytes],
+    # TODO: false positives (generic classes using `TypeVarTuple` are not fully supported yet)
+    variadic: Variadic[Unpack[tuple[int, str]]],  # error: [not-subscriptable]
+    prefix: Prefix[int, Unpack[tuple[str, bytes]]],  # error: [not-subscriptable]
+    suffix: Suffix[Unpack[tuple[int, str]], bytes],  # error: [not-subscriptable]
     pair: Pair[Unpack[tuple[int, str]]],
     quoted_pair_argument: Pair["Unpack[tuple[int, str]]"],
-    triple: Triple[int, Unpack[tuple[str, bytes]]],
+    triple: Triple[int, Unpack[tuple[str, bytes]]],  # error: [not-subscriptable]
     quoted_tuple: "tuple[int, Unpack[tuple[str, bytes]]]",
     quoted_pair: "Pair[Unpack[tuple[int, str]]]",
 ) -> None:
