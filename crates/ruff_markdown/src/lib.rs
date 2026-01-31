@@ -4,6 +4,8 @@ use regex::Regex;
 use ruff_python_ast::PySourceType;
 use ruff_python_formatter::format_module_source;
 use ruff_python_trivia::textwrap::{dedent, indent};
+use ruff_source_file::{Line, UniversalNewlines};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use ruff_workspace::FormatterSettings;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -33,46 +35,110 @@ static MARKDOWN_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
+static MARKDOWN_CODE_FENCE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?ix)
+            ^
+            (?<indent>\s*)
+            (?<fence>(?:```+|~~~+))\s*
+            (?<language>(?:\w+)?)\s*
+            (?<info>(?:.*))\s*
+            $
+        ",
+    )
+    .unwrap()
+});
+
+static OFF_ON_DIRECTIVES: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?imx)
+            ^
+            \s*<!--\s*(?:blacken-docs|ruff)\s*:\s*(?<action>off|on)\s*-->
+        ",
+    )
+    .unwrap()
+});
+
+#[derive(Debug, Default, PartialEq, Eq)]
+enum MarkdownState {
+    #[default]
+    On,
+    Off,
+}
+
 pub fn format_code_blocks(
     source: &str,
     path: Option<&Path>,
     settings: &FormatterSettings,
 ) -> MarkdownResult {
+    let mut state = MarkdownState::On;
     let mut changed = false;
     let mut formatted = String::with_capacity(source.len());
-    let mut last_match = 0;
+    let mut last_match = TextSize::new(0);
 
-    for capture in MARKDOWN_CODE_BLOCK.captures_iter(source) {
-        let (_, [before, code_indent, language, code, after]) = capture.extract();
+    let mut lines = source.universal_newlines().peekable();
+    while let Some(line) = lines.next() {
+        // Toggle code block formatting off/on
+        if let Some(capture) = OFF_ON_DIRECTIVES.captures(&line) {
+            let (_, [action]) = capture.extract();
+            state = match action {
+                "off" => MarkdownState::Off,
+                "on" => MarkdownState::On,
+                _ => state,
+            };
+        // Process code blocks
+        } else if let Some(opening_capture) = MARKDOWN_CODE_FENCE.captures(&line) {
+            let (_, [code_indent, opening_fence, language, _info]) = opening_capture.extract();
+            let start = lines.peek().map(Line::start).unwrap_or_default();
 
-        let py_source_type = PySourceType::from_extension(language);
-        let unformatted_code = dedent(code);
-        let options = settings.to_format_options(py_source_type, &unformatted_code, path);
+            // Consume lines until reaching the matching/ending code fence
+            for code_line in lines.by_ref() {
+                if let Some(closing_capture) = MARKDOWN_CODE_FENCE.captures(&code_line) {
+                    let (_, [_, closing_fence, _, _]) = closing_capture.extract();
+                    // Found the end of the code block
+                    if closing_fence == opening_fence {
+                        let language = language.to_ascii_lowercase();
+                        if state == MarkdownState::On
+                            && matches!(
+                                language.as_str(),
+                                "python" | "py" | "python3" | "py3" | "pyi" | ""
+                            )
+                        {
+                            // Maybe python, try formatting it
+                            let end = code_line.start();
+                            let unformatted_code = dedent(&source[TextRange::new(start, end)]);
 
-        // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
-        #[expect(clippy::redundant_closure_for_method_calls)]
-        let formatted_code =
-            format_module_source(&unformatted_code, options).map(|formatted| formatted.into_code());
+                            let py_source_type = PySourceType::from_extension(&language);
+                            let options =
+                                settings.to_format_options(py_source_type, &unformatted_code, path);
 
-        if let Ok(formatted_code) = formatted_code {
-            if formatted_code.len() != unformatted_code.len() || formatted_code != *unformatted_code
-            {
-                let m = capture.get_match();
-                formatted.push_str(&source[last_match..m.start()]);
+                            // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
+                            // dependency, and I suspect that Rust can optimize the closure away regardless.
+                            #[expect(clippy::redundant_closure_for_method_calls)]
+                            let formatted_code = format_module_source(&unformatted_code, options)
+                                .map(|formatted| formatted.into_code());
 
-                let indented_code = indent(&formatted_code, code_indent);
-                // otherwise I need to deal with a result from write!
-                #[expect(clippy::format_push_string)]
-                formatted.push_str(&format!("{before}{indented_code}{after}"));
-
-                last_match = m.end();
-                changed = true;
+                            // Formatting produced changes
+                            if let Ok(formatted_code) = formatted_code
+                                && (formatted_code.len() != unformatted_code.len()
+                                    || formatted_code != *unformatted_code)
+                            {
+                                formatted.push_str(&source[TextRange::new(last_match, start)]);
+                                let formatted_code = indent(&formatted_code, code_indent);
+                                formatted.push_str(&formatted_code);
+                                last_match = end;
+                                changed = true;
+                            }
+                        }
+                        break;
+                    }
+                }
             }
         }
     }
 
     if changed {
-        formatted.push_str(&source[last_match..]);
+        formatted.push_str(&source[last_match.to_usize()..]);
         MarkdownResult::Formatted(formatted)
     } else {
         MarkdownResult::Unchanged
