@@ -13266,6 +13266,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     fallback()
                 }
                 LookupError::PossiblyUndefined(type_when_bound) => {
+                    // `PossiblyUndefined` is ambiguous here. It could be because an attribute is
+                    // conditionally defined, for example:
+                    // ```
+                    // class Foo:
+                    //     if flag:
+                    //         x = 42
+                    // ```
+                    // That is indeed a "possibly missing attribute", and it's a warning by default, because
+                    // there's a high false positive rate.
+                    //
+                    // On the other hand, we could be looking at a union where some elements have
+                    // the attribute but others definitely don't. That's a very different case, and
+                    // we want it to be an error. Use `as_union_like` here to handle type aliases
+                    // of unions and `NewType`s of float/complex in addition to explicit unions.
+                    if let Some(union) = value_type.as_union_like(db) {
+                        let elements_missing_the_attribute: Vec<_> = union
+                            .elements(db)
+                            .iter()
+                            .filter(|element| element.member(db, attr_name).place.is_undefined())
+                            .collect();
+                        if !elements_missing_the_attribute.is_empty() {
+                            if let Some(builder) =
+                                self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                            {
+                                let missing_types = elements_missing_the_attribute
+                                    .iter()
+                                    .map(|ty| format!("`{}`", ty.display(db)))
+                                    .collect::<Vec<_>>()
+                                    .join(", ");
+
+                                builder.into_diagnostic(format_args!(
+                                    "Attribute `{attr_name}` is not defined on {} in union `{value_type}`",
+                                    missing_types,
+                                    value_type = value_type.display(db),
+                                ));
+                            }
+                            return type_when_bound;
+                        }
+                    }
+
                     report_possibly_missing_attribute(
                         &self.context,
                         attribute,

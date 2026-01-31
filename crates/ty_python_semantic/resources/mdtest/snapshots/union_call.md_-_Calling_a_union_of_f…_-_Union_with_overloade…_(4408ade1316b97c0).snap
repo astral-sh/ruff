@@ -15,22 +15,22 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 ```
 1 | def _(x: bytes | str | int):
 2 |     # error: [invalid-argument-type]
-3 |     # error: [possibly-missing-attribute]
+3 |     # error: [unresolved-attribute]
 4 |     x.split(" ")
 ```
 
 # Diagnostics
 
 ```
-warning[possibly-missing-attribute]: Attribute `split` may be missing on object of type `bytes | str | int`
+error[unresolved-attribute]: Attribute `split` is not defined on `int` in union `bytes | str | int`
  --> src/mdtest_snippet.py:4:5
   |
 2 |     # error: [invalid-argument-type]
-3 |     # error: [possibly-missing-attribute]
+3 |     # error: [unresolved-attribute]
 4 |     x.split(" ")
   |     ^^^^^^^
   |
-info: rule `possibly-missing-attribute` is enabled by default
+info: rule `unresolved-attribute` is enabled by default
 
 ```
 
@@ -39,7 +39,7 @@ error[invalid-argument-type]: Argument to bound method `split` is incorrect
  --> src/mdtest_snippet.py:4:13
   |
 2 |     # error: [invalid-argument-type]
-3 |     # error: [possibly-missing-attribute]
+3 |     # error: [unresolved-attribute]
 4 |     x.split(" ")
   |             ^^^ Expected `Buffer | None`, found `Literal[" "]`
   |

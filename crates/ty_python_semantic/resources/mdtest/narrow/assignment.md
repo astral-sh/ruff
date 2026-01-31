@@ -135,9 +135,9 @@ a.b = B()
 reveal_type(a.b)  # revealed: B
 reveal_type(a.b.c1)  # revealed: C | None
 reveal_type(a.b.c2)  # revealed: C | None
-# error: [possibly-missing-attribute]
+# error: [unresolved-attribute]
 reveal_type(a.b.c1.d)  # revealed: D | None
-# error: [possibly-missing-attribute]
+# error: [unresolved-attribute]
 reveal_type(a.b.c2.d)  # revealed: D | None
 ```
 
@@ -294,9 +294,9 @@ class C:
     reveal_type(b.a.x[0])  # revealed: Literal[0]
 
 def _():
-    # error: [possibly-missing-attribute]
+    # error: [unresolved-attribute]
     reveal_type(b.a.x[0])  # revealed: int | None
-    # error: [possibly-missing-attribute]
+    # error: [unresolved-attribute]
     reveal_type(b.a.x)  # revealed: list[int | None]
     reveal_type(b.a)  # revealed: A | None
 
