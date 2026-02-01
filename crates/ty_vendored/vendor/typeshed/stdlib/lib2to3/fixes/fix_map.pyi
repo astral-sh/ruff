@@ -15,6 +15,7 @@ map(F, X, Y, ...) to go on until the longest argument is exhausted,
 substituting None for missing values -- like zip(), it now stops as
 soon as the shortest argument is exhausted.
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

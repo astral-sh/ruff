@@ -8,6 +8,7 @@ list of standard commands.  Also, this is a good place to put common
 configure-like tasks: "try to compile this C code", or "figure out where
 this header file lives".
 """
+
 from _typeshed import StrOrBytesPath
 from collections.abc import Sequence
 from re import Pattern
@@ -46,6 +47,7 @@ class config(Command):
         preprocessor succeeded, false if there were any errors.
         ('body' probably isn't of much use, but what the heck.)
         """
+
     def search_cpp(
         self,
         pattern: Pattern[str] | str,
@@ -61,12 +63,14 @@ class config(Command):
         preprocesses an empty file -- which can be useful to determine the
         symbols the preprocessor and compiler set by default.
         """
+
     def try_compile(
         self, body: str, headers: Sequence[str] | None = None, include_dirs: Sequence[str] | None = None, lang: str = "c"
     ) -> bool:
         """Try to compile a source file built from 'body' and 'headers'.
         Return true on success, false otherwise.
         """
+
     def try_link(
         self,
         body: str,
@@ -80,6 +84,7 @@ class config(Command):
         'headers', to executable form.  Return true on success, false
         otherwise.
         """
+
     def try_run(
         self,
         body: str,
@@ -93,6 +98,7 @@ class config(Command):
         built from 'body' and 'headers'.  Return true on success, false
         otherwise.
         """
+
     def check_func(
         self,
         func: str,
@@ -116,6 +122,7 @@ class config(Command):
         calls it.  'libraries' and 'library_dirs' are used when
         linking.
         """
+
     def check_lib(
         self,
         library: str,
@@ -132,6 +139,7 @@ class config(Command):
         'other_libraries' will be included in the link, in case 'library'
         has symbols that depend on other libraries.
         """
+
     def check_header(
         self, header: str, include_dirs: Sequence[str] | None = None, library_dirs: Sequence[str] | None = None, lang: str = "c"
     ) -> bool:

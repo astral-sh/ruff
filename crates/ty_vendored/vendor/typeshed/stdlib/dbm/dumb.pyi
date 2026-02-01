@@ -20,6 +20,7 @@ is read when the database is opened, and some updates rewrite the whole index)
 - support opening for read-only (flag = 'm')
 
 """
+
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Iterator, MutableMapping
@@ -56,30 +57,30 @@ if sys.version_info >= (3, 11):
     def open(file: StrOrBytesPath, flag: str = "c", mode: int = 0o666) -> _Database:
         """Open the database file, filename, and return corresponding object.
 
-The flag argument, used to control how the database is opened in the
-other DBM implementations, supports only the semantics of 'c' and 'n'
-values.  Other values will default to the semantics of 'c' value:
-the database will always opened for update and will be created if it
-does not exist.
+        The flag argument, used to control how the database is opened in the
+        other DBM implementations, supports only the semantics of 'c' and 'n'
+        values.  Other values will default to the semantics of 'c' value:
+        the database will always opened for update and will be created if it
+        does not exist.
 
-The optional mode argument is the UNIX mode of the file, used only when
-the database has to be created.  It defaults to octal code 0o666 (and
-will be modified by the prevailing umask).
+        The optional mode argument is the UNIX mode of the file, used only when
+        the database has to be created.  It defaults to octal code 0o666 (and
+        will be modified by the prevailing umask).
 
-"""
+        """
 
 else:
     def open(file: str, flag: str = "c", mode: int = 0o666) -> _Database:
         """Open the database file, filename, and return corresponding object.
 
-    The flag argument, used to control how the database is opened in the
-    other DBM implementations, supports only the semantics of 'c' and 'n'
-    values.  Other values will default to the semantics of 'c' value:
-    the database will always opened for update and will be created if it
-    does not exist.
+        The flag argument, used to control how the database is opened in the
+        other DBM implementations, supports only the semantics of 'c' and 'n'
+        values.  Other values will default to the semantics of 'c' value:
+        the database will always opened for update and will be created if it
+        does not exist.
 
-    The optional mode argument is the UNIX mode of the file, used only when
-    the database has to be created.  It defaults to octal code 0o666 (and
-    will be modified by the prevailing umask).
+        The optional mode argument is the UNIX mode of the file, used only when
+        the database has to be created.  It defaults to octal code 0o666 (and
+        will be modified by the prevailing umask).
 
-    """
+        """

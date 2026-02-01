@@ -2,6 +2,7 @@
 
 This fixer will also convert g(f.xreadlines) into g(f.__iter__).
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

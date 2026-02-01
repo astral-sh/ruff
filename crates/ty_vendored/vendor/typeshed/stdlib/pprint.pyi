@@ -23,6 +23,7 @@ saferepr()
     data structures.
 
 """
+
 import sys
 from _typeshed import SupportsWrite
 from collections import deque
@@ -111,8 +112,10 @@ else:
 
 def isreadable(object: object) -> bool:
     """Determine if saferepr(object) is readable by eval()."""
+
 def isrecursive(object: object) -> bool:
     """Determine if object requires a recursive representation."""
+
 def saferepr(object: object) -> str:
     """Version of repr() which can handle recursive data structures."""
 
@@ -130,31 +133,31 @@ class PrettyPrinter:
             underscore_numbers: bool = False,
         ) -> None:
             """Handle pretty printing operations onto a stream using a set of
-configured parameters.
+            configured parameters.
 
-indent
-    Number of spaces to indent for each level of nesting.
+            indent
+                Number of spaces to indent for each level of nesting.
 
-width
-    Attempted maximum number of columns in the output.
+            width
+                Attempted maximum number of columns in the output.
 
-depth
-    The maximum depth to print out nested structures.
+            depth
+                The maximum depth to print out nested structures.
 
-stream
-    The desired output stream.  If omitted (or false), the standard
-    output stream available at construction will be used.
+            stream
+                The desired output stream.  If omitted (or false), the standard
+                output stream available at construction will be used.
 
-compact
-    If true, several items will be combined in one line.
+            compact
+                If true, several items will be combined in one line.
 
-sort_dicts
-    If true, dict keys are sorted.
+            sort_dicts
+                If true, dict keys are sorted.
 
-underscore_numbers
-    If true, digit groups are separated with underscores.
+            underscore_numbers
+                If true, digit groups are separated with underscores.
 
-"""
+            """
     else:
         def __init__(
             self,
@@ -167,28 +170,28 @@ underscore_numbers
             sort_dicts: bool = True,
         ) -> None:
             """Handle pretty printing operations onto a stream using a set of
-        configured parameters.
+            configured parameters.
 
-        indent
-            Number of spaces to indent for each level of nesting.
+            indent
+                Number of spaces to indent for each level of nesting.
 
-        width
-            Attempted maximum number of columns in the output.
+            width
+                Attempted maximum number of columns in the output.
 
-        depth
-            The maximum depth to print out nested structures.
+            depth
+                The maximum depth to print out nested structures.
 
-        stream
-            The desired output stream.  If omitted (or false), the standard
-            output stream available at construction will be used.
+            stream
+                The desired output stream.  If omitted (or false), the standard
+                output stream available at construction will be used.
 
-        compact
-            If true, several items will be combined in one line.
+            compact
+                If true, several items will be combined in one line.
 
-        sort_dicts
-            If true, dict keys are sorted.
+            sort_dicts
+                If true, dict keys are sorted.
 
-        """
+            """
 
     def pformat(self, object: object) -> str: ...
     def pprint(self, object: object) -> None: ...
@@ -196,9 +199,10 @@ underscore_numbers
     def isrecursive(self, object: object) -> bool: ...
     def format(self, object: object, context: dict[int, int], maxlevels: int, level: int) -> tuple[str, bool, bool]:
         """Format object for a specific context, returning a string
-and flags indicating whether the representation is 'readable'
-and whether the object represents a recursive construct.
-"""
+        and flags indicating whether the representation is 'readable'
+        and whether the object represents a recursive construct.
+        """
+
     def _format(
         self, object: object, stream: SupportsWrite[str], indent: int, allowance: int, context: dict[int, int], level: int
     ) -> None: ...
