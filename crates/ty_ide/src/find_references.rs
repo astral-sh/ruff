@@ -1748,15 +1748,20 @@ func<CURSOR>_alias()
             )
             .build();
 
-        // TODO: this should also highlight the RHS subpkg in the import
         assert_snapshot!(test.references(), @"
-        info[references]: Found 1 references
-         --> mypackage/__init__.py:4:5
+        info[references]: Found 3 references
+         --> mypackage/__init__.py:2:21
           |
         2 | from .subpkg import subpkg
+          |                     ------
         3 |
         4 | x = subpkg
           |     ------
+          |
+         ::: mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
           |
         ");
     }

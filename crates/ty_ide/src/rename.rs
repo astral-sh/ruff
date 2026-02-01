@@ -1529,20 +1529,20 @@ result = func(10, y=20)
             )
             .build();
 
-        // TODO(submodule-imports): this is incorrect, we should rename the `subpkg` int
-        // and the RHS of the import statement (but *not* rename the LHS).
-        //
-        // However us being cautious here *would* be good as the rename will actually
-        // result in a `subpkg` variable still existing in this code, as the import's LHS
-        // `DefinitionKind::ImportFromSubmodule` would stop being overwritten by the RHS!
         assert_snapshot!(test.rename("mypkg"), @"
-        info[rename]: Rename symbol (found 1 locations)
-         --> mypackage/__init__.py:4:5
+        info[rename]: Rename symbol (found 3 locations)
+         --> mypackage/__init__.py:2:21
           |
         2 | from .subpkg import subpkg
+          |                     ^^^^^^
         3 |
         4 | x = subpkg
-          |     ^^^^^^
+          |     ------
+          |
+         ::: mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
           |
         ");
     }
@@ -1679,7 +1679,7 @@ result = func(10, y=20)
             .build();
 
         assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 3 locations)
+       info[rename]: Rename symbol (found 6 locations)
          --> main.py:2:17
           |
         2 | from lib import test
@@ -1695,6 +1695,14 @@ result = func(10, y=20)
           |     ----
         6 | @overload
         7 | def test(a: str) -> str: ...
+          |     ----
+        8 | @overload
+        9 | def test(a: int) -> int: ...
+          |     ----
+       10 |
+       11 | def test(a: Any) -> Any:
+          |     ----
+       12 |     return a
           |
         "#);
     }
