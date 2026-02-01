@@ -16,7 +16,7 @@ use itertools::{EitherOrBoth, Itertools};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, semantic_index};
+use super::{DynamicType, Type, TypeVarVariance, semantic_index};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
@@ -1998,7 +1998,12 @@ impl<'db> Parameters<'db> {
 
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|default| {
-                definition_expression_type(db, definition, default).replace_parameter_defaults(db)
+                // Use the same approach as function_signature_expression_type to avoid cycles.
+                // Defaults are always deferred (see infer_function_definition), so we can go
+                // directly to infer_deferred_types without first checking infer_definition_types.
+                infer_deferred_types(db, definition)
+                    .expression_type(default)
+                    .replace_parameter_defaults(db)
             })
         };
 

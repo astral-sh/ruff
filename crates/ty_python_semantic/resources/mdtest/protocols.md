@@ -2292,6 +2292,40 @@ static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))  # error: [
 static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
 ```
 
+## Subtyping of protocols with decorated method members
+
+Protocol methods can be decorated with other decorators like `@contextmanager`. When matching
+protocol methods to implementations, decorators should be applied consistently:
+
+```py
+from typing import Protocol
+from collections.abc import Generator
+from contextlib import contextmanager
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+
+class ContextManagerProtocol(Protocol):
+    @contextmanager
+    def method(self, y: bool = False) -> Generator[None, None, None]: ...
+
+class CorrectImpl:
+    @contextmanager
+    def method(self, y: bool = False) -> Generator[None, None, None]:
+        yield
+
+class AlsoCorrect:
+    @contextmanager
+    def method(self, y: bool = True) -> Generator[None, None, None]:
+        yield
+
+class MissingDecorator:
+    def method(self, y: bool = False) -> Generator[None, None, None]:
+        yield
+
+static_assert(is_assignable_to(CorrectImpl, ContextManagerProtocol))
+static_assert(is_assignable_to(AlsoCorrect, ContextManagerProtocol))
+static_assert(not is_assignable_to(MissingDecorator, ContextManagerProtocol))
+```
+
 ## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
