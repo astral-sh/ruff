@@ -1,5 +1,3 @@
-"""Python Character Mapping Codec cp273 generated from 'python-mappings/CP273.TXT' with gencodec.py."""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
