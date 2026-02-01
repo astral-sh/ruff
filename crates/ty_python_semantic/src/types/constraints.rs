@@ -159,6 +159,31 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
     }
 }
 
+pub(crate) trait ResultConstraintsExtension<T> {
+    /// Returns [`always`][ConstraintSet::always] if the result is `Err(_)`; otherwise
+    /// applies a function to determine under what constraints the value inside of it holds.
+    fn when_err_or<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c>;
+}
+
+impl<T, E> ResultConstraintsExtension<T> for Result<T, E> {
+    fn when_err_or<'db, 'c>(
+        self,
+        _db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        match self {
+            Ok(value) => f(value),
+            Err(_) => ConstraintSet::always(builder),
+        }
+    }
+}
+
 /// An extension trait for building constraint sets from an [`Iterator`].
 pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
