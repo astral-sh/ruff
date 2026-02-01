@@ -1497,7 +1497,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .negate_if(self.db, !is_positive)
             }
             dynamic @ Type::Dynamic(_) => dynamic,
-            Type::SpecialForm(SpecialFormType::Any) => Type::any(),
             _ => return None,
         };
 
