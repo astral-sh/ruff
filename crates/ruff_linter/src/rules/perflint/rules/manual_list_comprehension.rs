@@ -174,19 +174,6 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     };
 
-    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
-    // `manual-list-copy` doesn't cover.
-    if !for_stmt.is_async {
-        if if_test.is_none() {
-            if arg
-                .as_name_expr()
-                .is_some_and(|arg| arg.id == *for_stmt_target_id)
-            {
-                return;
-            }
-        }
-    }
-
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
     if any_over_expr(arg, &|expr| {
         expr.as_name_expr()
@@ -334,6 +321,24 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ComprehensionType::Extend
     };
 
+    if !for_stmt.is_async {
+        let is_identity = arg
+            .as_name_expr()
+            .is_some_and(|arg| arg.id == *for_stmt_target_id);
+        match comprehension_type {
+            ComprehensionType::Extend => {
+                if !is_identity || if_test.is_some() {
+                    return;
+                }
+            }
+            ComprehensionType::ListComprehension => {
+                if is_identity && if_test.is_none() {
+                    return;
+                }
+            }
+        }
+    }
+
     let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
             is_async: for_stmt.is_async,
@@ -440,6 +445,15 @@ fn convert_to_list_extend(
             let generator_str = if for_stmt.is_async {
                 // generators do not implement __iter__, so `async for` requires the generator to be a list
                 format!("[{generator_str}]")
+            } else if if_test.is_none()
+                && to_append.as_name_expr().is_some_and(|name| {
+                    for_stmt
+                        .target
+                        .as_name_expr()
+                        .is_some_and(|target| target.id == name.id)
+                })
+            {
+                for_iter_str
             } else {
                 generator_str
             };
