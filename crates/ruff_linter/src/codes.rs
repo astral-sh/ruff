@@ -986,6 +986,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Numpy, "003") => rules::numpy::rules::NumpyDeprecatedFunction,
         (Numpy, "201") => rules::numpy::rules::Numpy2Deprecation,
 
+        // numpydoc
+        (Numpydoc, "007") => rules::numpydoc::rules::WrongSectionOrder,
+
         // fastapi
         (FastApi, "001") => rules::fastapi::rules::FastApiRedundantResponseModel,
         (FastApi, "002") => rules::fastapi::rules::FastApiNonAnnotatedDependency,

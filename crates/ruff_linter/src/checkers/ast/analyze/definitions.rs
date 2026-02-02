@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
-use crate::rules::{flake8_annotations, flake8_pyi, pydoclint, pydocstyle, pylint};
+use crate::rules::{flake8_annotations, flake8_pyi, numpydoc, pydoclint, pydocstyle, pylint};
 use crate::{docstrings, warn_user};
 
 /// Run lint rules over all [`Definition`] nodes in the [`SemanticModel`].
@@ -89,6 +89,9 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::DocstringMissingException,
         Rule::DocstringExtraneousException,
     ]);
+    let enforce_numpydoc = checker.any_rule_enabled(&[
+        Rule::WrongSectionOrder,
+    ]);
 
     if !enforce_annotations
         && !enforce_docstrings
@@ -96,6 +99,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         && !enforce_stubs_and_runtime
         && !enforce_dunder_method
         && !enforce_pydoclint
+        && !enforce_numpydoc
     {
         return;
     }
@@ -161,8 +165,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
         }
 
-        // pydocstyle, pydoclint
-        if enforce_docstrings || enforce_pydoclint {
+        // pydocstyle, pydoclint, numpydoc
+        if enforce_docstrings || enforce_pydoclint || enforce_numpydoc {
             if pydocstyle::helpers::should_ignore_definition(
                 definition,
                 &checker.settings().pydocstyle,
@@ -287,7 +291,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::OverindentedSectionUnderline,
                 Rule::UndocumentedParam,
             ]);
-            if enforce_sections || enforce_pydoclint {
+            if enforce_sections || enforce_pydoclint || enforce_numpydoc {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(
                     &docstring,
                     checker.settings().pydocstyle.convention(),
@@ -310,6 +314,10 @@ pub(crate) fn definitions(checker: &mut Checker) {
                         &section_contexts,
                         checker.settings().pydocstyle.convention(),
                     );
+                }
+
+                if enforce_numpydoc {
+                    numpydoc::rules::wrong_section_order(checker, &docstring, &section_contexts);
                 }
             }
         }
