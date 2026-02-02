@@ -4264,7 +4264,7 @@ pub(crate) enum BindingError<'db> {
     InvalidDataclassApplication(InvalidDataclassTarget),
 }
 
-impl<'db> BindingError<'db> {
+impl BindingError<'_> {
     pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
@@ -4279,12 +4279,10 @@ impl<'db> BindingError<'db> {
             }
 
             BindingError::TooManyPositionalArguments {
-                first_excess_argument_index,
+                first_excess_argument_index: Some(i),
                 ..
             } => {
-                if let Some(i) = first_excess_argument_index {
-                    *i += offset;
-                }
+                *i += offset;
             }
 
             _ => {}
