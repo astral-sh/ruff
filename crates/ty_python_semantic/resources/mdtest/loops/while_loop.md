@@ -375,3 +375,18 @@ definitely_bound
 # error: [possibly-unresolved-reference]
 definitely_unbound
 ```
+
+linked list example
+
+```py
+class Node:
+    def __init__(self, next: "Node | None" = None):
+        self.next: "Node | None" = next
+
+node = Node(Node(Node()))
+reveal_type(node)  # revealed: Node
+while node.next is not None:
+    reveal_type(node)  # revealed: Node
+    node = node.next
+    reveal_type(node)  # revealed: Node
+```
