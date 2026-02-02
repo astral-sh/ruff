@@ -105,6 +105,15 @@ impl<'db> Bindings<'db> {
         }
     }
 
+    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+        if offset == 0 {
+            return;
+        }
+        for binding in &mut self.elements {
+            binding.apply_argument_index_offset(offset);
+        }
+    }
+
     pub(crate) fn with_constructor_instance_type(
         mut self,
         constructor_instance_type: Type<'db>,
@@ -1654,6 +1663,17 @@ impl<'db> CallableBinding<'db> {
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
+        }
+    }
+
+    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+        if offset == 0 {
+            return;
+        }
+        for overload in &mut self.overloads {
+            for error in &mut overload.errors {
+                error.apply_argument_index_offset(offset);
+            }
         }
     }
 
@@ -3499,13 +3519,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
-        let bindings = match Bindings::from(callable_binding)
+        let mut bindings = match Bindings::from(callable_binding)
             .match_parameters(self.db, &sub_arguments)
             .check_types(self.db, &sub_arguments, self.call_expression_tcx, &[])
         {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => *bindings,
         };
+        let offset = argument_index.unwrap_or(0);
+        bindings.apply_argument_index_offset(offset);
 
         // SAFETY: `bindings` was created from a single `CallableBinding` above.
         let callable_binding = bindings
@@ -4240,6 +4262,35 @@ pub(crate) enum BindingError<'db> {
     CalledTopCallable(Type<'db>),
     /// The `@dataclass` decorator was applied to an invalid target.
     InvalidDataclassApplication(InvalidDataclassTarget),
+}
+
+impl<'db> BindingError<'db> {
+    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+        match self {
+            BindingError::InvalidArgumentType { argument_index, .. }
+            | BindingError::InvalidKeyType { argument_index, .. }
+            | BindingError::KeywordsNotAMapping { argument_index, .. }
+            | BindingError::UnknownArgument { argument_index, .. }
+            | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
+            | BindingError::ParameterAlreadyAssigned { argument_index, .. }
+            | BindingError::SpecializationError { argument_index, .. } => {
+                if let Some(i) = argument_index {
+                    *i += offset;
+                }
+            }
+
+            BindingError::TooManyPositionalArguments {
+                first_excess_argument_index,
+                ..
+            } => {
+                if let Some(i) = first_excess_argument_index {
+                    *i += offset;
+                }
+            }
+
+            _ => {}
+        }
+    }
 }
 
 /// The target of an invalid `@dataclass` application.
