@@ -291,7 +291,7 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
           enable-cache: "true"
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
@@ -350,7 +350,7 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
           enable-cache: "true"
       - name: "Run tests"
         run: cargo nextest run --cargo-profile profiling --all-features
@@ -384,7 +384,7 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
           enable-cache: "true"
       - name: "Run tests"
         run: |
@@ -491,7 +491,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           shared-key: ruff-linux-debug
@@ -528,7 +528,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -572,7 +572,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
-          version: "0.9.26"
+          version: "0.9.28"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -678,7 +678,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -739,7 +739,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -792,7 +792,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 24
@@ -830,7 +830,7 @@ jobs:
         with:
           python-version: 3.13
           activate-environment: true
-          version: "0.9.26"
+          version: "0.9.28"
       - name: "Install dependencies"
         run: uv pip install -r docs/requirements.txt
       - name: "Update README File"
@@ -981,7 +981,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1062,7 +1062,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
 
       - name: "Install codspeed"
         uses: taiki-e/install-action@542cebaaed782771e619bd5609d97659d109c492 # v2.66.7
@@ -1113,7 +1113,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1157,7 +1157,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
-          version: "0.9.26"
+          version: "0.9.28"
 
       - name: "Install codspeed"
         uses: taiki-e/install-action@542cebaaed782771e619bd5609d97659d109c492 # v2.66.7
