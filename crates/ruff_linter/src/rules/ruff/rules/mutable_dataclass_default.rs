@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation};
+use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_dataclass_field};
 
 /// ## What it does
 /// Checks for mutable default values in dataclass attributes.
@@ -21,6 +21,10 @@ use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation};
 ///
 /// If the default value is intended to be mutable, it must be annotated with
 /// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
+///
+/// This rule also detects mutable defaults passed via the `default` keyword
+/// argument in `field()` (for stdlib dataclasses), `attrs.field()`, `attr.ib()`,
+/// and `attr.attrib()` calls.
 ///
 /// ## Example
 /// ```python
@@ -69,9 +73,9 @@ impl Violation for MutableDataclassDefault {
 pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    if dataclass_kind(class_def, semantic).is_none() {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
-    }
+    };
 
     for statement in &class_def.body {
         let Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -83,11 +87,28 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             continue;
         };
 
-        if is_mutable_expr(value, checker.semantic())
+        let value_to_check = if let Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = value.as_ref()
+        {
+            if is_dataclass_field(func, checker.semantic(), dataclass_kind) {
+                arguments.find_keyword("default").map(|kw| &kw.value)
+            } else {
+                Some(value.as_ref())
+            }
+        } else {
+            Some(value.as_ref())
+        };
+
+        let Some(value_to_check) = value_to_check else {
+            continue;
+        };
+
+        if is_mutable_expr(value_to_check, checker.semantic())
             && !is_class_var_annotation(annotation, checker.semantic())
             && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {
-            checker.report_diagnostic(MutableDataclassDefault, value.range());
+            checker.report_diagnostic(MutableDataclassDefault, value_to_check.range());
         }
     }
 }
