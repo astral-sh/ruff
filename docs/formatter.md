@@ -227,9 +227,9 @@ def f(x):
 
 ## Markdown code formatting
 
-*Formatting for Markdown code blocks is currently only available in [preview mode](preview.md#preview).*
+*This feature is currently only available in [preview mode](preview.md#preview).*
 
-The Ruff formatter can also format Markdown files with a `.md` extension.
+The Ruff formatter can also format Python code blocks in Markdown files.
 In these files, Ruff will format any CommonMark [fenced code blocks][]
 with the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`.
 Fenced code blocks without an info string are assumed to be Python code examples
@@ -265,11 +265,23 @@ to `<!-- ruff:off -->` and `<!-- ruff:on -->` respectively.
 
 [blacken-docs]: https://github.com/adamchainz/blacken-docs/
 
-While in preview release, Ruff will not automatically find and format Markdown
-files in your project, but will format any Markdown files directly passed as
-an argument. To include Markdown files when running Ruff on your project,
-add them with [`extend-include`](settings.md#extend-include) in your
-project settings:
+Ruff will not automatically discover or format Markdown files in your project,
+but will format any Markdown files explicitly passed with a `.md` extension:
+
+```shell-session
+$ ruff format --preview --check docs/
+warning: No Python files found under the given path(s)
+
+$ ruff format --preview --check docs/*.md
+13 files already formatted
+```
+
+This is likely to change in a future release when the feature is stabilized.
+Including Markdown files without also enabling [preview mode](preview.md#preview)
+will result in an error message and non-zero [exit code](#exit-codes).
+
+To include Markdown files by default when running Ruff on your project, add them
+with [`extend-include`](settings.md#extend-include) in your project settings:
 
 === "pyproject.toml"
 
@@ -277,6 +289,8 @@ project settings:
     [tool.ruff]
     # Find and format code blocks in Markdown files
     extend-include = ["*.md"]
+    # OR
+    extend-include = ["docs/*.md"]
     ```
 
 === "ruff.toml"
@@ -284,10 +298,10 @@ project settings:
     ```toml
     # Find and format code blocks in Markdown files
     extend-include = ["*.md"]
+    # OR
+    extend-include = ["docs/*.md"]
     ```
 
-Note that including Markdown files without also enabling [preview mode](preview.md#preview)
-will result in an error message and non-zero [exit code](#exit-codes).
 
 ## Format suppression
 
