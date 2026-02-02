@@ -722,17 +722,11 @@ if __name__ == "__main__":
 
 #[test]
 fn check_silent_mode_no_output() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let file_path = tempdir.path().join("main.py");
     // Write code that requires formatting,
     // but there should be no "reformat" output in silent mode
-    fs::write(&file_path, "def     foo():\n                pass\n")?;
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
 
-    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
-    cmd.current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--check", "--silent"])
-        .arg(file_path);
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--silent"]), @r"
     success: false
     exit_code: 1
     ----- stdout -----
