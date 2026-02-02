@@ -52,7 +52,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as it will remove `print` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.57")]
+#[violation_metadata(stable_since = "v0.0.57", safety = "unsafe")]
 pub(crate) struct Print;
 
 impl Violation for Print {
@@ -102,7 +102,7 @@ impl Violation for Print {
 /// This rule's fix is marked as unsafe, as it will remove `pprint` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.57")]
+#[violation_metadata(stable_since = "v0.0.57", safety = "unsafe")]
 pub(crate) struct PPrint;
 
 impl Violation for PPrint {

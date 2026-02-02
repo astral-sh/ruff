@@ -36,7 +36,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", safety = "display-only")]
 pub(crate) struct LambdaAssignment {
     name: String,
 }

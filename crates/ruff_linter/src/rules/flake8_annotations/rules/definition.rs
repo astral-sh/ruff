@@ -241,7 +241,7 @@ impl Violation for MissingTypeCls {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
     annotation: Option<String>,
@@ -295,7 +295,7 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,
     annotation: Option<String>,
@@ -356,7 +356,7 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///
 /// - `lint.flake8-annotations.mypy-init-return`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypeSpecialMethod {
     name: String,
     annotation: Option<String>,
@@ -408,7 +408,7 @@ impl Violation for MissingReturnTypeSpecialMethod {
 ///
 /// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypeStaticMethod {
     name: String,
     annotation: Option<String>,
@@ -460,7 +460,7 @@ impl Violation for MissingReturnTypeStaticMethod {
 ///
 /// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypeClassMethod {
     name: String,
     annotation: Option<String>,

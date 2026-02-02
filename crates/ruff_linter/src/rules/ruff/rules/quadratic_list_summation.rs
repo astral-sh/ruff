@@ -60,7 +60,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [microbenchmarks]: https://github.com/astral-sh/ruff/issues/5073#issuecomment-1591836349
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", safety = "unsafe")]
 pub(crate) struct QuadraticListSummation;
 
 impl AlwaysFixableViolation for QuadraticListSummation {

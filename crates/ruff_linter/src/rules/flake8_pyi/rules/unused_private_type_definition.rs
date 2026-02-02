@@ -30,7 +30,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// The fix is always marked as unsafe, as it would break your code if the type
 /// variable is imported by another module.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", safety = "unsafe")]
 pub(crate) struct UnusedPrivateTypeVar {
     type_var_like_name: String,
     type_var_like_kind: String,

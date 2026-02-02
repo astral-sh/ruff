@@ -50,7 +50,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", safety = "unsafe")]
 pub(crate) struct ConvertNamedTupleFunctionalToClass {
     name: String,
 }

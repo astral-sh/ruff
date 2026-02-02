@@ -49,7 +49,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.30")]
+#[violation_metadata(stable_since = "v0.0.30", safety = "unsafe")]
 pub(crate) struct MultiValueRepeatedKeyLiteral {
     name: SourceCodeSnippet,
     existing: SourceCodeSnippet,
@@ -122,7 +122,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.30")]
+#[violation_metadata(stable_since = "v0.0.30", safety = "unsafe")]
 pub(crate) struct MultiValueRepeatedKeyVariable {
     name: SourceCodeSnippet,
 }

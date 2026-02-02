@@ -39,7 +39,7 @@ use crate::rules::flynt::helpers;
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.266")]
+#[violation_metadata(stable_since = "v0.0.266", safety = "unsafe")]
 pub(crate) struct StaticJoinToFString {
     expression: SourceCodeSnippet,
 }

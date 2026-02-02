@@ -57,7 +57,7 @@ use crate::{Edit, Fix};
 /// ## References
 /// - [Python documentation: The `pass` statement](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", safety = "unsafe")]
 pub(crate) struct UnnecessaryPlaceholder {
     kind: Placeholder,
 }

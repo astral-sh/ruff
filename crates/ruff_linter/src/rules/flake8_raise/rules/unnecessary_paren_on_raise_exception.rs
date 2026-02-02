@@ -43,7 +43,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.239")]
+#[violation_metadata(stable_since = "v0.0.239", safety = "unsafe")]
 pub(crate) struct UnnecessaryParenOnRaiseException;
 
 impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {

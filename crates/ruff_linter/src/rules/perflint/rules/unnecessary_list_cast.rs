@@ -51,7 +51,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     print(i)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", safety = "unsafe")]
 pub(crate) struct UnnecessaryListCast;
 
 impl AlwaysFixableViolation for UnnecessaryListCast {

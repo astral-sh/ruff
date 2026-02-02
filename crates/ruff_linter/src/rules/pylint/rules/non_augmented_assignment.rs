@@ -69,7 +69,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// assert (foo, bar) == ([1, 2], [1, 2])
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.7")]
+#[violation_metadata(preview_since = "v0.3.7", safety = "unsafe")]
 pub(crate) struct NonAugmentedAssignment {
     operator: AugmentedOperator,
 }
