@@ -3365,6 +3365,7 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
+            fix_title: kind.fix_title(),
             diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
             rule: T::rule(),
         }
@@ -3384,6 +3385,7 @@ impl<'a> LintContext<'a> {
         if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
+                fix_title: kind.fix_title(),
                 diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
                 rule,
             })
@@ -3447,6 +3449,11 @@ pub(crate) struct DiagnosticGuard<'a, 'b> {
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
     diagnostic: Option<Diagnostic>,
+    /// The optional help message to display.
+    ///
+    /// This is stored here so that it can be added to the `Diagnostic` in the `Drop` impl and
+    /// render just above the diff, even if other sub-diagnostics have been added.
+    fix_title: Option<String>,
     rule: Rule,
 }
 
@@ -3592,7 +3599,10 @@ impl Drop for DiagnosticGuard<'_, '_> {
             return;
         }
 
-        if let Some(diagnostic) = self.diagnostic.take() {
+        if let Some(mut diagnostic) = self.diagnostic.take() {
+            if let Some(fix_title) = self.fix_title.take() {
+                diagnostic.help(fix_title);
+            }
             self.context.diagnostics.borrow_mut().push(diagnostic);
         }
     }

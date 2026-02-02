@@ -71,7 +71,6 @@ pub trait Violation: ViolationMetadata + Sized {
     fn into_diagnostic(self, range: TextRange, file: &SourceFile) -> Diagnostic {
         create_lint_diagnostic(
             self.message(),
-            self.fix_title(),
             range,
             None,
             None,

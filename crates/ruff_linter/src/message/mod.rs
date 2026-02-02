@@ -75,10 +75,8 @@ pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagn
     diagnostic
 }
 
-#[expect(clippy::too_many_arguments)]
-pub fn create_lint_diagnostic<B, S>(
+pub fn create_lint_diagnostic<B>(
     body: B,
-    suggestion: Option<S>,
     range: TextRange,
     fix: Option<Fix>,
     parent: Option<TextSize>,
@@ -88,7 +86,6 @@ pub fn create_lint_diagnostic<B, S>(
 ) -> Diagnostic
 where
     B: Display,
-    S: Display,
 {
     let mut diagnostic = Diagnostic::new(
         DiagnosticId::Lint(LintName::of(rule.into())),
@@ -107,10 +104,6 @@ where
         annotation.hide_snippet(true);
     }
     diagnostic.annotate(annotation);
-
-    if let Some(suggestion) = suggestion {
-        diagnostic.help(suggestion);
-    }
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
@@ -278,9 +271,8 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_import_start = TextSize::from(7);
-        let unused_import = create_lint_diagnostic(
+        let mut unused_import = create_lint_diagnostic(
             "`os` imported but unused",
-            Some("Remove unused import: `os`"),
             TextRange::new(unused_import_start, TextSize::from(9)),
             Some(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(0),
@@ -291,11 +283,11 @@ def fibonacci(n):
             Some(unused_import_start),
             Rule::UnusedImport,
         );
+        unused_import.help("Remove unused import: `os`");
 
         let unused_variable_start = TextSize::from(94);
-        let unused_variable = create_lint_diagnostic(
+        let mut unused_variable = create_lint_diagnostic(
             "Local variable `x` is assigned to but never used",
-            Some("Remove assignment to unused variable `x`"),
             TextRange::new(unused_variable_start, TextSize::from(95)),
             Some(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
@@ -306,13 +298,13 @@ def fibonacci(n):
             Some(unused_variable_start),
             Rule::UnusedVariable,
         );
+        unused_variable.help("Remove assignment to unused variable `x`");
 
         let file_2 = r"if a == 1: pass";
 
         let undefined_name_start = TextSize::from(3);
         let undefined_name = create_lint_diagnostic(
             "Undefined name `a`",
-            Option::<&'static str>::None,
             TextRange::new(undefined_name_start, TextSize::from(4)),
             None,
             None,
