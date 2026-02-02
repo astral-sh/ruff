@@ -4983,9 +4983,21 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
                 })
             });
 
-        attribute_variances
+        let inferred_variance: TypeVarVariance = attribute_variances
             .chain(explicit_bases_variances)
-            .collect()
+            .collect();
+
+        // If the inferred variance is bivariant (meaning the typevar doesn't appear
+        // in any position that would give it variance), but the typevar has explicit
+        // variance declared, use the explicit variance. This is important for classes
+        // with unused type parameters that still have declared variance.
+        if inferred_variance == TypeVarVariance::Bivariant {
+            if let Some(explicit_variance) = typevar.typevar(db).explicit_variance(db) {
+                return explicit_variance;
+            }
+        }
+
+        inferred_variance
     }
 }
 

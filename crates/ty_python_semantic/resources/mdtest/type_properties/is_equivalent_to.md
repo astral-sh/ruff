@@ -636,5 +636,65 @@ reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>
 static_assert(not is_equivalent_to(TypeOf[imported], TypeOf[other_imported]))
 ```
 
+## Explicit variance on unused type parameters
+
+When a type parameter has explicit variance (covariant or contravariant) but doesn't appear
+in any method signatures (making it appear "unused"), the explicit variance should still be
+respected for equivalence and subtyping checks.
+
+```py
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
+from typing import Generic, TypeVar
+
+class A: ...
+class B: ...
+class C(A): ...
+
+# A class with an unused covariant type parameter - should still be covariant
+T_unused = TypeVar("T_unused", covariant=True)
+
+class UnusedCovariant(Generic[T_unused]):
+    pass
+
+# With explicit covariant variance, UnusedCovariant[C] should be a subtype of UnusedCovariant[A]
+static_assert(is_subtype_of(UnusedCovariant[C], UnusedCovariant[A]))
+static_assert(not is_subtype_of(UnusedCovariant[A], UnusedCovariant[C]))
+static_assert(not is_equivalent_to(UnusedCovariant[A], UnusedCovariant[C]))
+
+# A class with an unused contravariant type parameter - should still be contravariant
+U_unused = TypeVar("U_unused", contravariant=True)
+
+class UnusedContravariant(Generic[U_unused]):
+    pass
+
+# With explicit contravariant variance, UnusedContravariant[A] should be a subtype of UnusedContravariant[C]
+static_assert(is_subtype_of(UnusedContravariant[A], UnusedContravariant[C]))
+static_assert(not is_subtype_of(UnusedContravariant[C], UnusedContravariant[A]))
+static_assert(not is_equivalent_to(UnusedContravariant[A], UnusedContravariant[C]))
+```
+
+## Generator return type parameter
+
+The return type parameter of `typing.Generator` should always affect type equivalence,
+even on Python versions before 3.13 where the parameter doesn't appear in the protocol
+interface (it only appears in `close()` starting in Python 3.13).
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
+from typing import Generator
+
+class A: ...
+class B: ...
+
+static_assert(not is_equivalent_to(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, B], Generator[None, None, A]))
+```
+
 [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
 [the equivalence relation]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent

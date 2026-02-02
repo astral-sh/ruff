@@ -149,6 +149,29 @@ impl<'db> Type<'db> {
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
+            // For class-based protocols from the same origin, also compare specializations
+            // using variance-aware comparison. This ensures that type parameters like
+            // Generator's return type are properly compared even if they don't appear
+            // in the protocol interface on older Python versions.
+            if let (Protocol::FromClass(self_class), Protocol::FromClass(other_class)) =
+                (self_protocol.inner, protocol.inner)
+            {
+                if let (ClassType::Generic(self_alias), ClassType::Generic(other_alias)) =
+                    (*self_class, *other_class)
+                {
+                    if self_alias.origin(db) == other_alias.origin(db) {
+                        return self_alias.specialization(db).has_relation_to_impl(
+                            db,
+                            other_alias.specialization(db),
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        );
+                    }
+                }
+            }
+
             self_protocol.interface(db).has_relation_to_impl(
                 db,
                 protocol.interface(db),
@@ -770,12 +793,33 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsEquivalentVisitor<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
         }
+
+        // For class-based protocols from the same origin, compare their specializations
+        // using variance-aware comparison. This ensures that type parameters like
+        // Generator's return type are properly compared even if they don't appear
+        // in the protocol interface on older Python versions.
+        if let (Protocol::FromClass(self_class), Protocol::FromClass(other_class)) =
+            (self.inner, other.inner)
+        {
+            if let (
+                ClassType::Generic(self_alias),
+                ClassType::Generic(other_alias),
+            ) = (*self_class, *other_class)
+            {
+                if self_alias.origin(db) == other_alias.origin(db) {
+                    return self_alias
+                        .specialization(db)
+                        .is_equivalent_to_impl(db, other_alias.specialization(db), inferable, visitor);
+                }
+            }
+        }
+
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
             return ConstraintSet::from(true);
