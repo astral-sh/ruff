@@ -8,8 +8,9 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::node_key::NodeKey;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
@@ -30,7 +31,6 @@ use crate::types::{
     UnionType, declaration_type, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
-use ruff_db::parsed::parsed_module;
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -167,8 +167,11 @@ pub(crate) fn typing_self<'db>(
             let DefinitionKind::Function(func_ref) = def.kind(db) else {
                 return None;
             };
-            let module = parsed_module(db, file).load(db);
-            Some(index.node_scope(NodeWithScopeRef::Function(func_ref.node(&module))))
+            Some(
+                index.node_scope_by_key(NodeWithScopeKey::Function(NodeKey::from_node_ref(
+                    func_ref,
+                ))),
+            )
         })
         .unwrap_or_else(|| scope_id.file_scope_id(db));
 
