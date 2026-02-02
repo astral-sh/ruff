@@ -683,6 +683,47 @@ class IntChild(Base[int]):
         pass
 ```
 
+## Overriding `MutableMapping.update` (issue #2693)
+
+`MutableMapping.update` has an overload with `self: MutableMapping[str, _VT]` that accepts
+`SupportsKeysAndGetItem[str, _VT]`. A child class that inherits from `MutableMapping[str, str]` must
+be compatible with that overload, but a child that inherits from `MutableMapping[int, str]` should
+not be checked against it.
+
+```py
+from collections.abc import MutableMapping
+
+class MyStrDict(MutableMapping[str, str]):
+    def __getitem__(self, key: str) -> str:
+        return ""
+
+    def __setitem__(self, key: str, value: str) -> None:
+        pass
+
+    def __delitem__(self, key: str) -> None:
+        pass
+
+    def __iter__(self):
+        return iter([])
+
+    def __len__(self) -> int:
+        return 0
+```
+
+## Overriding `str.__iter__` (issue #2612)
+
+`str.__iter__` has an overload with `self: LiteralString` that returns `Iterator[LiteralString]`.
+Subclasses of `str` are not `LiteralString`, so they should not need to be compatible with that
+overload.
+
+```py
+from typing import Iterator
+
+class MyStr(str):
+    def __iter__(self) -> Iterator[str]:
+        return iter(super().__iter__())
+```
+
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
