@@ -1,0 +1,31 @@
+[package]
+name = "ruff_python_importer"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_diagnostics = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_codegen = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true, features = ["serde"] }
+ruff_text_size = { workspace = true }
+
+anyhow = { workspace = true }
+
+[dev-dependencies]
+ruff_python_parser = { workspace = true }
+
+insta = { workspace = true }
+
+[features]
+
+[lints]
+workspace = true

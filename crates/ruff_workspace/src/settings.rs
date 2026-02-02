@@ -3,11 +3,11 @@ use ruff_cache::cache_dir;
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_graph::AnalyzeSettings;
 use ruff_linter::display_settings;
+use ruff_linter::settings::LinterSettings;
 use ruff_linter::settings::types::{
     CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
     UnsafeFixes,
 };
-use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_formatter::{
@@ -19,7 +19,6 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, CacheKey)]
-#[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     #[cache_key(ignore)]
     pub cache_dir: PathBuf,
@@ -142,6 +141,13 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
 pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("*.py"),
     FilePattern::Builtin("*.pyi"),
+    FilePattern::Builtin("*.ipynb"),
+    FilePattern::Builtin("**/pyproject.toml"),
+];
+pub(crate) static INCLUDE_PREVIEW: &[FilePattern] = &[
+    FilePattern::Builtin("*.py"),
+    FilePattern::Builtin("*.pyi"),
+    FilePattern::Builtin("*.pyw"),
     FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
 ];

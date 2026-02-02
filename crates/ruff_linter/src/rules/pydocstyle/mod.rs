@@ -14,7 +14,7 @@ mod tests {
 
     use super::settings::{Convention, Settings};
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::MissingBlankLineAfterLastSection, Path::new("sections.py"))]
     #[test_case(Rule::NoBlankLineAfterSection, Path::new("sections.py"))]
@@ -109,7 +109,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -119,7 +119,7 @@ mod tests {
             Path::new("pydocstyle/bom.py"),
             &settings::LinterSettings::for_rule(Rule::TripleSingleQuotes),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -134,7 +134,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -147,7 +147,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -164,7 +164,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -181,7 +181,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -198,7 +198,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -211,7 +211,7 @@ mod tests {
                 Rule::MissingTrailingPeriod,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -230,7 +230,7 @@ mod tests {
                 Rule::UndocumentedPublicInit,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

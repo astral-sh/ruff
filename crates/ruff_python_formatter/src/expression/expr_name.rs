@@ -14,6 +14,7 @@ impl FormatNodeRule<ExprName> for FormatExprName {
             id: _,
             range,
             ctx: _,
+            node_index: _,
         } = item;
         write!(f, [source_text_slice(*range)])
     }

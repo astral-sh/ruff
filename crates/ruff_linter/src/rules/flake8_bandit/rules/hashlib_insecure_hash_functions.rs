@@ -1,13 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_ast::{self as ast, Arguments};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::string_literal;
+use crate::rules::flake8_bandit::helpers::string_literal;
 
 /// ## What it does
 /// Checks for uses of weak or broken cryptographic hash functions in
@@ -22,6 +22,17 @@ use super::super::helpers::string_literal;
 ///
 /// Avoid using weak or broken cryptographic hash functions in security
 /// contexts. Instead, use a known secure hash function such as SHA256.
+///
+/// Note: This rule targets the following weak algorithm names in `hashlib`:
+/// `md4`, `md5`, `sha`, and `sha1`. It also flags uses of `crypt.crypt` and
+/// `crypt.mksalt` when configured with `METHOD_CRYPT`, `METHOD_MD5`, or
+/// `METHOD_BLOWFISH`.
+///
+/// It does not attempt to lint OpenSSL- or platform-specific aliases and OIDs
+/// (for example: `"sha-1"`, `"ssl3-sha1"`, `"ssl3-md5"`, or
+/// `"1.3.14.3.2.26"`), nor variations with trailing spaces, as the set of
+/// accepted aliases depends on the underlying OpenSSL version and varies across
+/// platforms and Python builds.
 ///
 /// ## Example
 /// ```python
@@ -63,6 +74,7 @@ use super::super::helpers::string_literal;
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.212")]
 pub(crate) struct HashlibInsecureHashFunction {
     library: String,
     string: String,
@@ -141,23 +153,23 @@ fn detect_insecure_hashlib_calls(
                 hash_func_name.to_ascii_lowercase().as_str(),
                 "md4" | "md5" | "sha" | "sha1"
             ) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     HashlibInsecureHashFunction {
                         library: "hashlib".to_string(),
                         string: hash_func_name.to_string(),
                     },
                     name_arg.range(),
-                ));
+                );
             }
         }
         HashlibCall::WeakHash(func_name) => {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 HashlibInsecureHashFunction {
                     library: "hashlib".to_string(),
                     string: (*func_name).to_string(),
                 },
                 call.func.range(),
-            ));
+            );
         }
     }
 }
@@ -186,13 +198,13 @@ fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
         qualified_name.segments(),
         ["crypt", "METHOD_CRYPT" | "METHOD_MD5" | "METHOD_BLOWFISH"]
     ) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             HashlibInsecureHashFunction {
                 library: "crypt".to_string(),
                 string: qualified_name.to_string(),
             },
             method.range(),
-        ));
+        );
     }
 }
 

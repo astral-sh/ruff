@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -9,6 +8,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `TypedDict` declarations that use functional syntax.
@@ -61,6 +61,7 @@ use crate::checkers::ast::Checker;
 /// [Python keywords]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 /// [Dunder names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct ConvertTypedDictFunctionalToClass {
     name: String,
 }
@@ -97,7 +98,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
         },
@@ -115,7 +116,6 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             checker.comment_ranges(),
         ));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
@@ -132,6 +132,7 @@ fn match_typed_dict_assign<'a>(
         func,
         arguments,
         range: _,
+        node_index: _,
     }) = value
     else {
         return None;
@@ -150,6 +151,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
                 id: field.into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
         ),
@@ -157,6 +159,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
         value: None,
         simple: true,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
@@ -177,11 +180,13 @@ fn create_class_def_stmt(
                 None => Box::from([]),
             },
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         body,
         type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
@@ -190,6 +195,7 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
     if items.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         Some(vec![node])
     } else {
@@ -223,6 +229,7 @@ fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Vec<Stmt>>
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         Some(vec![node])
     } else {
@@ -235,6 +242,7 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         return Some(vec![node]);
     }
@@ -257,13 +265,16 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
         ([_typename, fields], [..]) => {
             let total = arguments.find_keyword("total");
             match fields {
-                Expr::Dict(ast::ExprDict { items, range: _ }) => {
-                    Some((fields_from_dict_literal(items)?, total))
-                }
+                Expr::Dict(ast::ExprDict {
+                    items,
+                    range: _,
+                    node_index: _,
+                }) => Some((fields_from_dict_literal(items)?, total)),
                 Expr::Call(ast::ExprCall {
                     func,
                     arguments: Arguments { keywords, .. },
                     range: _,
+                    node_index: _,
                 }) => Some((fields_from_dict_call(func, keywords)?, total)),
                 _ => None,
             }
@@ -272,6 +283,7 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
         ([_typename], []) => {
             let node = Stmt::Pass(ast::StmtPass {
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             Some((vec![node], None))
         }

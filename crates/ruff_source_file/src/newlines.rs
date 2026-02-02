@@ -322,7 +322,7 @@ impl LineEnding {
         }
     }
 
-    #[allow(clippy::len_without_is_empty)]
+    #[expect(clippy::len_without_is_empty)]
     pub const fn len(&self) -> usize {
         match self {
             LineEnding::Lf | LineEnding::Cr => 1,

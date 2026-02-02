@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Check for shallow `os.environ` copies.
@@ -43,6 +43,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [BPO 15373]: https://bugs.python.org/issue15373
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct ShallowCopyEnviron;
 
 impl AlwaysFixableViolation for ShallowCopyEnviron {
@@ -88,10 +89,9 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(ShallowCopyEnviron, call.range());
+    let mut diagnostic = checker.report_diagnostic(ShallowCopyEnviron, call.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("{}.copy()", checker.locator().slice(arg)),
         call.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

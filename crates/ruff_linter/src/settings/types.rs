@@ -5,19 +5,20 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use log::debug;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
+use ruff_db::diagnostic::DiagnosticFormat;
 use rustc_hash::FxHashMap;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
 use ruff_python_ast::{self as ast, PySourceType};
 
+use crate::Applicability;
 use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 use crate::{display_settings, fs};
@@ -35,6 +36,7 @@ pub enum PythonVersion {
     Py312,
     Py313,
     Py314,
+    Py315,
 }
 
 impl Default for PythonVersion {
@@ -57,6 +59,7 @@ impl TryFrom<ast::PythonVersion> for PythonVersion {
             ast::PythonVersion::PY312 => Ok(Self::Py312),
             ast::PythonVersion::PY313 => Ok(Self::Py313),
             ast::PythonVersion::PY314 => Ok(Self::Py314),
+            ast::PythonVersion::PY315 => Ok(Self::Py315),
             _ => Err(format!("unrecognized python version {value}")),
         }
     }
@@ -87,6 +90,7 @@ impl PythonVersion {
             Self::Py312 => (3, 12),
             Self::Py313 => (3, 13),
             Self::Py314 => (3, 14),
+            Self::Py315 => (3, 15),
         }
     }
 }
@@ -249,12 +253,12 @@ pub struct FilePatternSet {
     cache_key: u64,
     // This field is only for displaying the internals
     // of `set`.
-    #[allow(clippy::used_underscore_binding)]
+    #[expect(clippy::used_underscore_binding)]
     _set_internals: Vec<FilePattern>,
 }
 
 impl FilePatternSet {
-    #[allow(clippy::used_underscore_binding)]
+    #[expect(clippy::used_underscore_binding)]
     pub fn try_from_iter<I>(patterns: I) -> Result<Self, anyhow::Error>
     where
         I: IntoIterator<Item = FilePattern>,
@@ -534,6 +538,20 @@ pub enum OutputFormat {
     Sarif,
 }
 
+impl OutputFormat {
+    /// Returns `true` if this format is intended for users to read directly, in contrast to
+    /// machine-readable or structured formats.
+    ///
+    /// This can be used to check whether information beyond the diagnostics, such as a header or
+    /// `Found N diagnostics` footer, should be included.
+    pub const fn is_human_readable(&self) -> bool {
+        matches!(
+            self,
+            OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
+        )
+    }
+}
+
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -553,6 +571,34 @@ impl Display for OutputFormat {
     }
 }
 
+/// The subset of output formats only implemented in Ruff, not in `ruff_db` via `DisplayDiagnostics`.
+pub enum RuffOutputFormat {
+    Github,
+    Grouped,
+    Sarif,
+}
+
+impl TryFrom<OutputFormat> for DiagnosticFormat {
+    type Error = RuffOutputFormat;
+
+    fn try_from(format: OutputFormat) -> std::result::Result<Self, Self::Error> {
+        match format {
+            OutputFormat::Concise => Ok(DiagnosticFormat::Concise),
+            OutputFormat::Full => Ok(DiagnosticFormat::Full),
+            OutputFormat::Json => Ok(DiagnosticFormat::Json),
+            OutputFormat::JsonLines => Ok(DiagnosticFormat::JsonLines),
+            OutputFormat::Junit => Ok(DiagnosticFormat::Junit),
+            OutputFormat::Gitlab => Ok(DiagnosticFormat::Gitlab),
+            OutputFormat::Pylint => Ok(DiagnosticFormat::Pylint),
+            OutputFormat::Rdjson => Ok(DiagnosticFormat::Rdjson),
+            OutputFormat::Azure => Ok(DiagnosticFormat::Azure),
+            OutputFormat::Github => Err(RuffOutputFormat::Github),
+            OutputFormat::Grouped => Err(RuffOutputFormat::Grouped),
+            OutputFormat::Sarif => Err(RuffOutputFormat::Sarif),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
 pub struct RequiredVersion(VersionSpecifiers);
@@ -561,25 +607,33 @@ impl TryFrom<String> for RequiredVersion {
     type Error = pep440_rs::VersionSpecifiersParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl FromStr for RequiredVersion {
+    type Err = pep440_rs::VersionSpecifiersParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
-        if let Ok(version) = pep440_rs::Version::from_str(&value) {
+        if let Ok(version) = pep440_rs::Version::from_str(value) {
             Ok(Self(VersionSpecifiers::from(
                 VersionSpecifier::equals_version(version),
             )))
         } else {
-            Ok(Self(VersionSpecifiers::from_str(&value)?))
+            Ok(Self(VersionSpecifiers::from_str(value)?))
         }
     }
 }
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for RequiredVersion {
-    fn schema_name() -> String {
-        "RequiredVersion".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("RequiredVersion")
     }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        gen.subschema_for::<String>()
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        <String as schemars::JsonSchema>::json_schema(generator)
     }
 }
 

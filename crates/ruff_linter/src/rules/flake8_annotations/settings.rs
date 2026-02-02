@@ -5,7 +5,7 @@ use ruff_macros::CacheKey;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Default, CacheKey)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub mypy_init_return: bool,
     pub suppress_dummy_args: bool,

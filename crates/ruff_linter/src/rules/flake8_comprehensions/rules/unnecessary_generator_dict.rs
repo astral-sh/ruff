@@ -1,13 +1,13 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as dict
@@ -32,6 +32,7 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.61")]
 pub(crate) struct UnnecessaryGeneratorDict;
 
 impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
@@ -70,8 +71,7 @@ pub(crate) fn unnecessary_generator_dict(
     if tuple.iter().any(Expr::is_starred_expr) {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryGeneratorDict, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::unsafe_edit));
-    checker.report_diagnostic(diagnostic);
 }

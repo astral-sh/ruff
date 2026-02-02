@@ -1,16 +1,14 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::sync::Arc;
 use zip::CompressionMethod;
 
-use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-use red_knot_python_semantic::{
-    default_lint_registry, Db, Program, ProgramSettings, PythonPlatform, SearchPathSettings,
-};
-use ruff_db::files::{File, Files};
+use ruff_db::Db as SourceDb;
+use ruff_db::files::Files;
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
-use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
+use ty_module_resolver::{SearchPathSettings, SearchPaths};
+use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
     let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
@@ -19,12 +17,13 @@ static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::Lazy
 });
 
 #[salsa::db]
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
     system: OsSystem,
-    rule_selection: Arc<RuleSelection>,
+    search_paths: Arc<SearchPaths>,
+    python_version: PythonVersion,
 }
 
 impl ModuleDb {
@@ -32,29 +31,35 @@ impl ModuleDb {
     pub fn from_src_roots(
         src_roots: Vec<SystemPathBuf>,
         python_version: PythonVersion,
+        venv_path: Option<SystemPathBuf>,
     ) -> Result<Self> {
-        let search_paths = SearchPathSettings::new(src_roots);
+        let system = OsSystem::default();
+        let mut search_path_settings = SearchPathSettings::new(src_roots);
+        // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
+        if let Some(venv_path) = venv_path {
+            let environment =
+                PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, &system)?;
+            search_path_settings.site_packages_paths = environment
+                .site_packages_paths(&system)
+                .context("Failed to discover the site-packages directory")?
+                .into_vec();
+        }
+        let search_paths = search_path_settings
+            .to_search_paths(&system, &EMPTY_VENDORED)
+            .context("Invalid search path settings")?;
 
-        let db = Self::default();
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version,
-                python_platform: PythonPlatform::default(),
-                search_paths,
-            },
-        )?;
+        let db = Self {
+            storage: salsa::Storage::new(None),
+            files: Files::default(),
+            system,
+            search_paths: Arc::new(search_paths),
+            python_version,
+        };
+
+        // Register the static roots for salsa durability
+        db.search_paths.try_register_static_roots(&db);
 
         Ok(db)
-    }
-}
-
-impl Upcast<dyn SourceDb> for ModuleDb {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
     }
 }
 
@@ -73,26 +78,16 @@ impl SourceDb for ModuleDb {
     }
 
     fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
+        self.python_version
     }
 }
 
 #[salsa::db]
-impl Db for ModuleDb {
-    fn is_file_open(&self, file: File) -> bool {
-        !file.path(self).is_vendored_path()
-    }
-
-    fn rule_selection(&self) -> Arc<RuleSelection> {
-        self.rule_selection.clone()
-    }
-
-    fn lint_registry(&self) -> &LintRegistry {
-        default_lint_registry()
+impl ty_module_resolver::Db for ModuleDb {
+    fn search_paths(&self) -> &SearchPaths {
+        &self.search_paths
     }
 }
 
 #[salsa::db]
-impl salsa::Database for ModuleDb {
-    fn salsa_event(&self, _event: &dyn Fn() -> salsa::Event) {}
-}
+impl salsa::Database for ModuleDb {}

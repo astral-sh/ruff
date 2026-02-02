@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: fstring_single_quote_escape_eol(MAC_EOL)
-snapshot_kind: text
 ---
 ## Tokens
 ```
@@ -14,7 +13,7 @@ snapshot_kind: text
         ),
     ),
     (
-        FStringMiddle(
+        InterpolatedStringMiddle(
             "text \\\r more text",
         ),
         2..19,

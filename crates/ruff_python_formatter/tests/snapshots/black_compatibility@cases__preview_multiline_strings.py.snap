@@ -1,7 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_multiline_strings.py
-snapshot_kind: text
 ---
 ## Input
 
@@ -164,30 +162,79 @@ Please use `--build-option` instead,
 `--global-option` is reserved to flags like `--verbose` or `--quiet`.
 """
 
-this_will_become_one_line = (
-    "a"
-    "b"
-    "c"
-)
-
-this_will_stay_on_three_lines = (
-    "a"  # comment
-    "b"
-    "c"
-)
-
-this_will_also_become_one_line = (  # comment
-    "a"
-    "b"
-    "c"
-)
-
 assert some_var == expected_result, """
 test
 """
 assert some_var == expected_result, f"""
 expected: {expected_result}
 actual: {some_var}"""
+
+
+def foo():
+    a = {
+        xxxx_xxxxxxx.xxxxxx_xxxxxxxxxxxx_xxxxxx_xx_xxx_xxxxxx: {
+            "xxxxx": """Sxxxxx xxxxxxxxxxxx xxx xxxxx (xxxxxx xxx xxxxxxx)""",
+            "xxxxxxxx": (
+                """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+                xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+            ),
+            "xxxxxxxx": """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+                xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+        },
+    }
+
+
+xxxx_xxxxxxx.xxxxxx_xxxxxxxxxxxx_xxxxxx_xx_xxx_xxxxxx = {
+    "xxxxx": """Sxxxxx xxxxxxxxxxxx xxx xxxxx (xxxxxx xxx xxxxxxx)""",
+    "xxxxxxxx": (
+        """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+    xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+    ),
+    "xxxxx_xxxxxxxxxx_xxxxxxxxx_xx": (
+        """
+a
+a
+a
+a
+a"""
+    ),
+    "xx_xxxxx_xxxxxxxxxx_xxxxxxxxx_xx": """
+a
+a
+a
+a
+a""",
+}
+
+a = """
+""" if """
+""" == """
+""" else """
+"""
+
+a = """
+""" if b else """
+"""
+
+a = """
+""" if """
+""" == """
+""" else b
+
+a = b if """
+""" == """
+""" else """
+"""
+
+a = """
+""" if b else c
+
+a = c if b else """
+"""
+
+a = b if """
+""" == """
+""" else c
 ```
 
 ## Black Differences
@@ -309,7 +356,7 @@ actual: {some_var}"""
  # Another use case
  data = yaml.load("""\
  a: 1
-@@ -77,19 +106,23 @@
+@@ -77,10 +106,12 @@
  b: 2
  """,
  )
@@ -324,19 +371,7 @@ actual: {some_var}"""
  
  MULTILINE = """
  foo
- """.replace("\n", "")
--generated_readme = lambda project_name: """
-+generated_readme = (
-+    lambda project_name: """
- {}
- 
- <Add content here!>
- """.strip().format(project_name)
-+)
- parser.usage += """
- Custom extra help summary.
- 
-@@ -156,16 +189,24 @@
+@@ -156,16 +187,24 @@
               10 LOAD_CONST               0 (None)
               12 RETURN_VALUE
  """ % (_C.__init__.__code__.co_firstlineno + 1,)
@@ -367,17 +402,36 @@ actual: {some_var}"""
  [
      """cow
  moos""",
-@@ -206,7 +247,9 @@
-     "c"
- )
+@@ -214,10 +253,8 @@
+                 """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+                 xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+             ),
+-            "xxxxxxxx": (
+-                """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+-                xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+-            ),
++            "xxxxxxxx": """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
++                xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx""",
+         },
+     }
  
--this_will_also_become_one_line = "abc"  # comment
-+this_will_also_become_one_line = (  # comment
-+    "abc"
-+)
+@@ -236,14 +273,12 @@
+ a
+ a"""
+     ),
+-    "xx_xxxxx_xxxxxxxxxx_xxxxxxxxx_xx": (
+-        """
++    "xx_xxxxx_xxxxxxxxxx_xxxxxxxxx_xx": """
+ a
+ a
+ a
+ a
+-a"""
+-    ),
++a""",
+ }
  
- assert some_var == expected_result, """
- test
+ a = (
 ```
 
 ## Ruff Output
@@ -501,13 +555,11 @@ data = yaml.load(
 MULTILINE = """
 foo
 """.replace("\n", "")
-generated_readme = (
-    lambda project_name: """
+generated_readme = lambda project_name: """
 {}
 
 <Add content here!>
 """.strip().format(project_name)
-)
 parser.usage += """
 Custom extra help summary.
 
@@ -624,24 +676,111 @@ Please use `--build-option` instead,
 `--global-option` is reserved to flags like `--verbose` or `--quiet`.
 """
 
-this_will_become_one_line = "abc"
-
-this_will_stay_on_three_lines = (
-    "a"  # comment
-    "b"
-    "c"
-)
-
-this_will_also_become_one_line = (  # comment
-    "abc"
-)
-
 assert some_var == expected_result, """
 test
 """
 assert some_var == expected_result, f"""
 expected: {expected_result}
 actual: {some_var}"""
+
+
+def foo():
+    a = {
+        xxxx_xxxxxxx.xxxxxx_xxxxxxxxxxxx_xxxxxx_xx_xxx_xxxxxx: {
+            "xxxxx": """Sxxxxx xxxxxxxxxxxx xxx xxxxx (xxxxxx xxx xxxxxxx)""",
+            "xxxxxxxx": (
+                """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+                xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+            ),
+            "xxxxxxxx": """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+                xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx""",
+        },
+    }
+
+
+xxxx_xxxxxxx.xxxxxx_xxxxxxxxxxxx_xxxxxx_xx_xxx_xxxxxx = {
+    "xxxxx": """Sxxxxx xxxxxxxxxxxx xxx xxxxx (xxxxxx xxx xxxxxxx)""",
+    "xxxxxxxx": (
+        """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+    xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+    ),
+    "xxxxx_xxxxxxxxxx_xxxxxxxxx_xx": (
+        """
+a
+a
+a
+a
+a"""
+    ),
+    "xx_xxxxx_xxxxxxxxxx_xxxxxxxxx_xx": """
+a
+a
+a
+a
+a""",
+}
+
+a = (
+    """
+"""
+    if """
+"""
+    == """
+"""
+    else """
+"""
+)
+
+a = (
+    """
+"""
+    if b
+    else """
+"""
+)
+
+a = (
+    """
+"""
+    if """
+"""
+    == """
+"""
+    else b
+)
+
+a = (
+    b
+    if """
+"""
+    == """
+"""
+    else """
+"""
+)
+
+a = (
+    """
+"""
+    if b
+    else c
+)
+
+a = (
+    c
+    if b
+    else """
+"""
+)
+
+a = (
+    b
+    if """
+"""
+    == """
+"""
+    else c
+)
 ```
 
 ## Black Output
@@ -847,20 +986,113 @@ Please use `--build-option` instead,
 `--global-option` is reserved to flags like `--verbose` or `--quiet`.
 """
 
-this_will_become_one_line = "abc"
-
-this_will_stay_on_three_lines = (
-    "a"  # comment
-    "b"
-    "c"
-)
-
-this_will_also_become_one_line = "abc"  # comment
-
 assert some_var == expected_result, """
 test
 """
 assert some_var == expected_result, f"""
 expected: {expected_result}
 actual: {some_var}"""
+
+
+def foo():
+    a = {
+        xxxx_xxxxxxx.xxxxxx_xxxxxxxxxxxx_xxxxxx_xx_xxx_xxxxxx: {
+            "xxxxx": """Sxxxxx xxxxxxxxxxxx xxx xxxxx (xxxxxx xxx xxxxxxx)""",
+            "xxxxxxxx": (
+                """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+                xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+            ),
+            "xxxxxxxx": (
+                """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+                xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+            ),
+        },
+    }
+
+
+xxxx_xxxxxxx.xxxxxx_xxxxxxxxxxxx_xxxxxx_xx_xxx_xxxxxx = {
+    "xxxxx": """Sxxxxx xxxxxxxxxxxx xxx xxxxx (xxxxxx xxx xxxxxxx)""",
+    "xxxxxxxx": (
+        """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
+    xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
+    ),
+    "xxxxx_xxxxxxxxxx_xxxxxxxxx_xx": (
+        """
+a
+a
+a
+a
+a"""
+    ),
+    "xx_xxxxx_xxxxxxxxxx_xxxxxxxxx_xx": (
+        """
+a
+a
+a
+a
+a"""
+    ),
+}
+
+a = (
+    """
+"""
+    if """
+"""
+    == """
+"""
+    else """
+"""
+)
+
+a = (
+    """
+"""
+    if b
+    else """
+"""
+)
+
+a = (
+    """
+"""
+    if """
+"""
+    == """
+"""
+    else b
+)
+
+a = (
+    b
+    if """
+"""
+    == """
+"""
+    else """
+"""
+)
+
+a = (
+    """
+"""
+    if b
+    else c
+)
+
+a = (
+    c
+    if b
+    else """
+"""
+)
+
+a = (
+    b
+    if """
+"""
+    == """
+"""
+    else c
+)
 ```

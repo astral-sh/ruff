@@ -1,6 +1,6 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{visitor, Arguments, Expr, Stmt};
+use ruff_python_ast::{Arguments, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::TextRange;

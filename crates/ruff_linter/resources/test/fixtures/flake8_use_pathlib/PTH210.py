@@ -54,6 +54,13 @@ windows_path.with_suffix(r"s")
 windows_path.with_suffix(u'' "json")
 windows_path.with_suffix(suffix="js")
 
+Path().with_suffix(".")
+Path().with_suffix("py")
+PosixPath().with_suffix("py")
+PurePath().with_suffix("py")
+PurePosixPath().with_suffix("py")
+PureWindowsPath().with_suffix("py")
+WindowsPath().with_suffix("py")
 
 ### No errors
 path.with_suffix()

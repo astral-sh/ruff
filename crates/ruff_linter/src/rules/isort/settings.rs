@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::display_settings;
-use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
+use crate::rules::isort::categorize::KnownModules;
 use ruff_macros::CacheKey;
 use ruff_python_semantic::{Alias, MemberNameImport, ModuleNameImport, NameImport};
 
@@ -20,19 +20,15 @@ use super::categorize::ImportSection;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
     /// "further" imports (more `.` characters, least local).
     ClosestToFurthest,
     /// Place "further" imports (more `.` characters, least local) imports
     /// before "closer" imports (fewer `.` characters, most local).
+    #[default]
     FurthestToClosest,
-}
-
-impl Default for RelativeImportsOrder {
-    fn default() -> Self {
-        Self::FurthestToClosest
-    }
 }
 
 impl Display for RelativeImportsOrder {
@@ -45,7 +41,7 @@ impl Display for RelativeImportsOrder {
 }
 
 #[derive(Debug, Clone, CacheKey)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub required_imports: BTreeSet<NameImport>,
     pub combine_as_imports: bool,

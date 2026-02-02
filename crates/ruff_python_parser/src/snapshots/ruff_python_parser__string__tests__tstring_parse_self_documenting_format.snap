@@ -1,0 +1,70 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: NodeIndex(None),
+            range: 0..14,
+            value: TString(
+                ExprTString {
+                    node_index: NodeIndex(None),
+                    range: 0..14,
+                    value: TStringValue {
+                        inner: Single(
+                            TString {
+                                range: 0..14,
+                                node_index: NodeIndex(None),
+                                elements: [
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 2..13,
+                                            node_index: NodeIndex(None),
+                                            expression: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 3..7,
+                                                    id: Name("user"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            debug_text: Some(
+                                                DebugText {
+                                                    leading: "",
+                                                    trailing: "=",
+                                                },
+                                            ),
+                                            conversion: None,
+                                            format_spec: Some(
+                                                InterpolatedStringFormatSpec {
+                                                    range: 9..12,
+                                                    node_index: NodeIndex(None),
+                                                    elements: [
+                                                        Literal(
+                                                            InterpolatedStringLiteralElement {
+                                                                range: 9..12,
+                                                                node_index: NodeIndex(None),
+                                                                value: ">10",
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                flags: TStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                    unclosed: false,
+                                },
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

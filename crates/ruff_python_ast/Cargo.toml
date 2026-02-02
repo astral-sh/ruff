@@ -10,6 +10,10 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
+
 [lib]
 
 [dependencies]
@@ -22,16 +26,18 @@ ruff_text_size = { workspace = true }
 aho-corasick = { workspace = true }
 bitflags = { workspace = true }
 compact_str = { workspace = true }
+get-size2 = { workspace = true, optional = true }
 is-macro = { workspace = true }
-itertools = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+thiserror = { workspace = true }
 
 [features]
-schemars = ["dep:schemars"]
+schemars = ["dep:schemars", "dep:serde_json"]
 cache = ["dep:ruff_cache", "dep:ruff_macros"]
 serde = [
     "dep:serde",
@@ -39,10 +45,7 @@ serde = [
     "dep:ruff_cache",
     "compact_str/serde",
 ]
+get-size = ["dep:get-size2", "ruff_text_size/get-size"]
 
 [lints]
 workspace = true
-
-[package.metadata.cargo-shear]
-# Used via `CacheKey` macro expansion.
-ignored = ["ruff_cache"]

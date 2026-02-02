@@ -317,6 +317,91 @@ impl IsMetaclass {
     }
 }
 
+/// Check if a class has a metaclass-like `__new__` method signature.
+///
+/// A metaclass-like `__new__` method signature has:
+/// 1. Exactly 5 parameters (including cls)
+/// 2. Second parameter annotated with `str`
+/// 3. Third parameter annotated with a `tuple` type
+/// 4. Fourth parameter annotated with a `dict` type
+/// 5. Fifth parameter is keyword-variadic (`**kwargs`)
+///
+/// For example:
+///
+/// ```python
+/// class MyMetaclass(django.db.models.base.ModelBase):
+///     def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MyMetaclass:
+///         ...
+/// ```
+fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    // Look for a __new__ method in the class body
+    for stmt in &class_def.body {
+        let ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+            name, parameters, ..
+        }) = stmt
+        else {
+            continue;
+        };
+
+        if name != "__new__" {
+            continue;
+        }
+
+        // Check if we have exactly 5 parameters (cls + 4 others)
+        if parameters.len() != 5 {
+            continue;
+        }
+
+        // Check that there is no variadic parameter
+        if parameters.vararg.is_some() {
+            continue;
+        }
+
+        // Check that the last parameter is keyword-variadic (**kwargs)
+        if parameters.kwarg.is_none() {
+            continue;
+        }
+
+        // Check parameter annotations, skipping the first parameter (cls)
+        let mut param_iter = parameters.iter().skip(1);
+
+        // Check second parameter (name: str)
+        let Some(second_param) = param_iter.next() else {
+            continue;
+        };
+        if !second_param
+            .annotation()
+            .is_some_and(|annotation| semantic.match_builtin_expr(map_subscript(annotation), "str"))
+        {
+            continue;
+        }
+
+        // Check third parameter (bases: tuple[...])
+        let Some(third_param) = param_iter.next() else {
+            continue;
+        };
+        if !third_param.annotation().is_some_and(|annotation| {
+            semantic.match_builtin_expr(map_subscript(annotation), "tuple")
+        }) {
+            continue;
+        }
+
+        // Check fourth parameter (attrs: dict[...])
+        let Some(fourth_param) = param_iter.next() else {
+            continue;
+        };
+        if !fourth_param.annotation().is_some_and(|annotation| {
+            semantic.match_builtin_expr(map_subscript(annotation), "dict")
+        }) {
+            continue;
+        }
+
+        return true;
+    }
+
+    false
+}
+
 /// Returns `IsMetaclass::Yes` if the given class is definitely a metaclass,
 /// `IsMetaclass::No` if it's definitely *not* a metaclass, and
 /// `IsMetaclass::Maybe` otherwise.
@@ -349,7 +434,17 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
     match (is_base_class, maybe) {
         (true, true) => IsMetaclass::Maybe,
         (true, false) => IsMetaclass::Yes,
-        (false, _) => IsMetaclass::No,
+        (false, _) => {
+            // If it has >1 base class and a metaclass-like signature for `__new__`,
+            // then it might be a metaclass.
+            if class_def.bases().is_empty() {
+                IsMetaclass::No
+            } else if has_metaclass_new_signature(class_def, semantic) {
+                IsMetaclass::Maybe
+            } else {
+                IsMetaclass::No
+            }
+        }
     }
 }
 

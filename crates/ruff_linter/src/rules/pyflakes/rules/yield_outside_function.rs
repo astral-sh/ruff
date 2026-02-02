@@ -1,8 +1,9 @@
 use std::fmt;
 
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::semantic_errors::YieldOutsideFunctionKind;
+
+use crate::Violation;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum DeferralKeyword {
@@ -53,6 +54,7 @@ impl From<YieldOutsideFunctionKind> for DeferralKeyword {
 ///
 /// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.22")]
 pub(crate) struct YieldOutsideFunction {
     keyword: DeferralKeyword,
 }

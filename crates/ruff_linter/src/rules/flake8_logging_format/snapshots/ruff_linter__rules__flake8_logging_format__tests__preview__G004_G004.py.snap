@@ -1,0 +1,277 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+---
+G004 [*] Logging statement uses f-string
+ --> G004.py:4:14
+  |
+3 | name = "world"
+4 | logging.info(f"Hello {name}")
+  |              ^^^^^^^^^^^^^^^
+5 | logging.log(logging.INFO, f"Hello {name}")
+  |
+help: Convert to lazy `%` formatting
+1 | import logging
+2 | 
+3 | name = "world"
+  - logging.info(f"Hello {name}")
+4 + logging.info("Hello %s", name)
+5 | logging.log(logging.INFO, f"Hello {name}")
+6 | 
+7 | _LOGGER = logging.getLogger()
+
+G004 [*] Logging statement uses f-string
+ --> G004.py:5:27
+  |
+3 | name = "world"
+4 | logging.info(f"Hello {name}")
+5 | logging.log(logging.INFO, f"Hello {name}")
+  |                           ^^^^^^^^^^^^^^^
+6 |
+7 | _LOGGER = logging.getLogger()
+  |
+help: Convert to lazy `%` formatting
+2 | 
+3 | name = "world"
+4 | logging.info(f"Hello {name}")
+  - logging.log(logging.INFO, f"Hello {name}")
+5 + logging.log(logging.INFO, "Hello %s", name)
+6 | 
+7 | _LOGGER = logging.getLogger()
+8 | _LOGGER.info(f"{__name__}")
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:8:14
+   |
+ 7 | _LOGGER = logging.getLogger()
+ 8 | _LOGGER.info(f"{__name__}")
+   |              ^^^^^^^^^^^^^
+ 9 |
+10 | logging.getLogger().info(f"{name}")
+   |
+help: Convert to lazy `%` formatting
+5  | logging.log(logging.INFO, f"Hello {name}")
+6  | 
+7  | _LOGGER = logging.getLogger()
+   - _LOGGER.info(f"{__name__}")
+8  + _LOGGER.info("%s", __name__)
+9  | 
+10 | logging.getLogger().info(f"{name}")
+11 | 
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:10:26
+   |
+ 8 | _LOGGER.info(f"{__name__}")
+ 9 |
+10 | logging.getLogger().info(f"{name}")
+   |                          ^^^^^^^^^
+11 |
+12 | from logging import info
+   |
+help: Convert to lazy `%` formatting
+7  | _LOGGER = logging.getLogger()
+8  | _LOGGER.info(f"{__name__}")
+9  | 
+   - logging.getLogger().info(f"{name}")
+10 + logging.getLogger().info("%s", name)
+11 | 
+12 | from logging import info
+13 | 
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:14:6
+   |
+12 | from logging import info
+13 |
+14 | info(f"{name}")
+   |      ^^^^^^^^^
+15 | info(f"{__name__}")
+   |
+help: Convert to lazy `%` formatting
+11 | 
+12 | from logging import info
+13 | 
+   - info(f"{name}")
+14 + info("%s", name)
+15 | info(f"{__name__}")
+16 | 
+17 | # Don't trigger for t-strings
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:15:6
+   |
+14 | info(f"{name}")
+15 | info(f"{__name__}")
+   |      ^^^^^^^^^^^^^
+16 |
+17 | # Don't trigger for t-strings
+   |
+help: Convert to lazy `%` formatting
+12 | from logging import info
+13 | 
+14 | info(f"{name}")
+   - info(f"{__name__}")
+15 + info("%s", __name__)
+16 | 
+17 | # Don't trigger for t-strings
+18 | info(t"{name}")
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:24:14
+   |
+22 | total = 9
+23 | directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
+24 | logging.info(f"{count} out of {total} files in {directory_path} checked")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to lazy `%` formatting
+21 | count = 5
+22 | total = 9
+23 | directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
+   - logging.info(f"{count} out of {total} files in {directory_path} checked")
+24 + logging.info("%s out of %s files in %s checked", count, total, directory_path)
+25 | 
+26 | 
+27 | 
+
+G004 Logging statement uses f-string
+  --> G004.py:30:13
+   |
+28 | x = 99
+29 | fmt = "08d"
+30 | logger.info(f"{x:{'08d'}}")
+   |             ^^^^^^^^^^^^^^
+31 | logger.info(f"{x:>10} {x:{fmt}}")
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:31:13
+   |
+29 | fmt = "08d"
+30 | logger.info(f"{x:{'08d'}}")
+31 | logger.info(f"{x:>10} {x:{fmt}}")
+   |             ^^^^^^^^^^^^^^^^^^^^
+32 |
+33 | logging.info(f"")
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:33:14
+   |
+31 | logger.info(f"{x:>10} {x:{fmt}}")
+32 |
+33 | logging.info(f"")
+   |              ^^^
+34 | logging.info(f"This message doesn't have any variables.")
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:34:14
+   |
+33 | logging.info(f"")
+34 | logging.info(f"This message doesn't have any variables.")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 |
+36 | obj = {"key": "value"}
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:37:14
+   |
+36 | obj = {"key": "value"}
+37 | logging.info(f"Object: {obj!r}")
+   |              ^^^^^^^^^^^^^^^^^^
+38 |
+39 | items_count = 3
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:40:17
+   |
+39 | items_count = 3
+40 | logging.warning(f"Items: {items_count:d}")
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+41 |
+42 | data = {"status": "active"}
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:43:14
+   |
+42 | data = {"status": "active"}
+43 | logging.info(f"Processing {len(data)} items")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 | logging.info(f"Status: {data.get('status', 'unknown').upper()}")
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:44:14
+   |
+42 | data = {"status": "active"}
+43 | logging.info(f"Processing {len(data)} items")
+44 | logging.info(f"Status: {data.get('status', 'unknown').upper()}")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:48:14
+   |
+47 | result = 123
+48 | logging.info(f"Calculated result: {result + 100}")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+49 |
+50 | temperature = 123
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:51:14
+   |
+50 | temperature = 123
+51 | logging.info(f"Temperature: {temperature:.1f}°C")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+52 |
+53 | class FilePath:
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:57:14
+   |
+55 |         self.name = name
+56 |
+57 | logging.info(f"No changes made to {file_path.name}.")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+58 |
+59 | user = "tron"
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:61:15
+   |
+59 | user = "tron"
+60 | balance = 123.45
+61 | logging.error(f"Error {404}: User {user} has insufficient balance ${balance:.2f}")
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+62 |
+63 | import logging
+   |
+help: Convert to lazy `%` formatting
+
+G004 Logging statement uses f-string
+  --> G004.py:66:15
+   |
+65 | x = 1
+66 | logging.error(f"{x} -> %s", x)
+   |               ^^^^^^^^^^^^
+   |
+help: Convert to lazy `%` formatting

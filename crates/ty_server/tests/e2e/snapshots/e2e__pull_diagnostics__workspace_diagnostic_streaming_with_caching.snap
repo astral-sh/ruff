@@ -1,0 +1,301 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: all_items
+---
+[
+    Full(
+        WorkspaceFullDocumentDiagnosticReport {
+            uri: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "<temp_dir>/src/error_0.py",
+                query: None,
+                fragment: None,
+            },
+            version: Some(
+                2,
+            ),
+            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                result_id: Some(
+                    "[RESULT_ID]",
+                ),
+                items: [
+                    Diagnostic {
+                        range: Range {
+                            start: Position {
+                                line: 1,
+                                character: 11,
+                            },
+                            end: Position {
+                                line: 1,
+                                character: 15,
+                            },
+                        },
+                        severity: Some(
+                            Error,
+                        ),
+                        code: Some(
+                            String(
+                                "unresolved-reference",
+                            ),
+                        ),
+                        code_description: Some(
+                            CodeDescription {
+                                href: Url {
+                                    scheme: "https",
+                                    cannot_be_a_base: false,
+                                    username: "",
+                                    password: None,
+                                    host: Some(
+                                        Domain(
+                                            "ty.dev",
+                                        ),
+                                    ),
+                                    port: None,
+                                    path: "/rules",
+                                    query: None,
+                                    fragment: Some(
+                                        "unresolved-reference",
+                                    ),
+                                },
+                            },
+                        ),
+                        source: Some(
+                            "ty",
+                        ),
+                        message: "Name `true` used when not defined",
+                        related_information: None,
+                        tags: None,
+                        data: None,
+                    },
+                ],
+            },
+        },
+    ),
+    Full(
+        WorkspaceFullDocumentDiagnosticReport {
+            uri: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "<temp_dir>/src/error_1.py",
+                query: None,
+                fragment: None,
+            },
+            version: Some(
+                2,
+            ),
+            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                result_id: Some(
+                    "[RESULT_ID]",
+                ),
+                items: [
+                    Diagnostic {
+                        range: Range {
+                            start: Position {
+                                line: 1,
+                                character: 11,
+                            },
+                            end: Position {
+                                line: 1,
+                                character: 15,
+                            },
+                        },
+                        severity: Some(
+                            Error,
+                        ),
+                        code: Some(
+                            String(
+                                "unresolved-reference",
+                            ),
+                        ),
+                        code_description: Some(
+                            CodeDescription {
+                                href: Url {
+                                    scheme: "https",
+                                    cannot_be_a_base: false,
+                                    username: "",
+                                    password: None,
+                                    host: Some(
+                                        Domain(
+                                            "ty.dev",
+                                        ),
+                                    ),
+                                    port: None,
+                                    path: "/rules",
+                                    query: None,
+                                    fragment: Some(
+                                        "unresolved-reference",
+                                    ),
+                                },
+                            },
+                        ),
+                        source: Some(
+                            "ty",
+                        ),
+                        message: "Name `true` used when not defined",
+                        related_information: None,
+                        tags: None,
+                        data: None,
+                    },
+                ],
+            },
+        },
+    ),
+    Full(
+        WorkspaceFullDocumentDiagnosticReport {
+            uri: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "<temp_dir>/src/error_2.py",
+                query: None,
+                fragment: None,
+            },
+            version: Some(
+                2,
+            ),
+            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                result_id: Some(
+                    "[RESULT_ID]",
+                ),
+                items: [
+                    Diagnostic {
+                        range: Range {
+                            start: Position {
+                                line: 1,
+                                character: 11,
+                            },
+                            end: Position {
+                                line: 1,
+                                character: 15,
+                            },
+                        },
+                        severity: Some(
+                            Error,
+                        ),
+                        code: Some(
+                            String(
+                                "unresolved-reference",
+                            ),
+                        ),
+                        code_description: Some(
+                            CodeDescription {
+                                href: Url {
+                                    scheme: "https",
+                                    cannot_be_a_base: false,
+                                    username: "",
+                                    password: None,
+                                    host: Some(
+                                        Domain(
+                                            "ty.dev",
+                                        ),
+                                    ),
+                                    port: None,
+                                    path: "/rules",
+                                    query: None,
+                                    fragment: Some(
+                                        "unresolved-reference",
+                                    ),
+                                },
+                            },
+                        ),
+                        source: Some(
+                            "ty",
+                        ),
+                        message: "Name `true` used when not defined",
+                        related_information: None,
+                        tags: None,
+                        data: None,
+                    },
+                ],
+            },
+        },
+    ),
+    Unchanged(
+        WorkspaceUnchangedDocumentDiagnosticReport {
+            uri: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "<temp_dir>/src/error_3.py",
+                query: None,
+                fragment: None,
+            },
+            version: None,
+            unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                result_id: "[RESULT_ID]",
+            },
+        },
+    ),
+    Unchanged(
+        WorkspaceUnchangedDocumentDiagnosticReport {
+            uri: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "<temp_dir>/src/error_4.py",
+                query: None,
+                fragment: None,
+            },
+            version: None,
+            unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                result_id: "[RESULT_ID]",
+            },
+        },
+    ),
+    Unchanged(
+        WorkspaceUnchangedDocumentDiagnosticReport {
+            uri: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "<temp_dir>/src/error_5.py",
+                query: None,
+                fragment: None,
+            },
+            version: None,
+            unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                result_id: "[RESULT_ID]",
+            },
+        },
+    ),
+    Unchanged(
+        WorkspaceUnchangedDocumentDiagnosticReport {
+            uri: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "<temp_dir>/src/error_6.py",
+                query: None,
+                fragment: None,
+            },
+            version: None,
+            unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                result_id: "[RESULT_ID]",
+            },
+        },
+    ),
+]

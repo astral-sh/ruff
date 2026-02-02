@@ -1,16 +1,16 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
+use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
     rules::perflint::helpers::statement_deletion_range,
 };
-use anyhow::{anyhow, Result};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use anyhow::{Result, anyhow};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::{analyze::typing::is_list, Binding};
+use ruff_python_semantic::{Binding, analyze::typing::is_list};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 /// ## What it does
@@ -48,12 +48,8 @@ use ruff_text_size::{Ranged, TextRange};
 /// original = list(range(10000))
 /// filtered.extend(x for x in original if x % 2)
 /// ```
-///
-/// Take care that if the original for-loop uses an assignment expression
-/// as a conditional, such as `if match:=re.match("\d+","123")`, then
-/// the corresponding comprehension must wrap the assignment
-/// expression in parentheses to avoid a syntax error.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
     comprehension_type: Option<ComprehensionType>,
@@ -113,12 +109,14 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         //     if z:
         //         filtered.append(x)
         // ```
-        [ast::Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            test,
-            ..
-        })] => {
+        [
+            ast::Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                test,
+                ..
+            }),
+        ] => {
             if !elif_else_clauses.is_empty() {
                 return;
             }
@@ -146,8 +144,10 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range,
+        node_index: _,
     }) = value.as_ref()
     else {
         return;
@@ -250,6 +250,11 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         .iter()
         .find(|binding| for_stmt.target.range() == binding.range)
         .unwrap();
+    // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
+    // then it is intended to be used elsewhere outside the for loop.
+    if target_binding.is_global() || target_binding.is_nonlocal() {
+        return;
+    }
     // If any references to the loop target variable are after the loop,
     // then converting it into a comprehension would cause a NameError
     if target_binding
@@ -329,7 +334,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ComprehensionType::Extend
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
             is_async: for_stmt.is_async,
             comprehension_type: Some(comprehension_type),
@@ -338,7 +343,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable
-    if is_fix_manual_list_comprehension_enabled(checker.settings) {
+    if is_fix_manual_list_comprehension_enabled(checker.settings()) {
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,
@@ -350,15 +355,13 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             )
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn convert_to_list_extend(
     fix_type: ComprehensionType,
     binding: &Binding,
     for_stmt: &ast::StmtFor,
-    if_test: Option<&ast::Expr>,
+    if_test: Option<&Expr>,
     to_append: &Expr,
     checker: &Checker,
 ) -> Result<Fix> {
@@ -374,10 +377,11 @@ fn convert_to_list_extend(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            if test.is_named_expr() {
-                format!(" if ({})", locator.slice(test.range()))
-            } else {
-                format!(" if {}", locator.slice(test.range()))
+            match test {
+                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+                    format!(" if ({})", locator.slice(test.range()))
+                }
+                _ => format!(" if {}", locator.slice(test.range())),
             }
         }
         None => String::new(),
@@ -408,7 +412,14 @@ fn convert_to_list_extend(
     };
     let target_str = locator.slice(for_stmt.target.range());
     let elt_str = locator.slice(to_append);
-    let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
+    let generator_str = if to_append
+        .as_generator_expr()
+        .is_some_and(|generator| !generator.parenthesized)
+    {
+        format!("({elt_str}) {for_type} {target_str} in {for_iter_str}{if_str}")
+    } else {
+        format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}")
+    };
 
     let variable_name = locator.slice(binding);
     let for_loop_inline_comments = comment_strings_in_range(

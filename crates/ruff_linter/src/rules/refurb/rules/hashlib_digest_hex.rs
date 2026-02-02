@@ -1,10 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the use of `.digest().hex()` on a hashlib hash, like `sha512`.
@@ -28,9 +29,13 @@ use crate::checkers::ast::Checker;
 /// hashed = sha512(b"some data").hexdigest()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `hashlib`](https://docs.python.org/3/library/hashlib.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct HashlibDigestHex;
 
 impl Violation for HashlibDigestHex {
@@ -109,13 +114,20 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
             )
         })
     {
-        let mut diagnostic = Diagnostic::new(HashlibDigestHex, call.range());
+        let mut diagnostic = checker.report_diagnostic(HashlibDigestHex, call.range());
         if arguments.is_empty() {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                ".hexdigest".to_string(),
-                TextRange::new(value.end(), call.func.end()),
-            )));
+            let replacement_range = TextRange::new(value.end(), call.func.end());
+
+            let applicability = if checker.comment_ranges().intersects(replacement_range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(".hexdigest".to_string(), replacement_range),
+                applicability,
+            ));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

@@ -6,7 +6,8 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
+use ruff_linter::codes::RuleGroup;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
@@ -19,9 +20,12 @@ struct Explanation<'a> {
     summary: &'a str,
     message_formats: &'a [&'a str],
     fix: String,
-    #[allow(clippy::struct_field_names)]
+    fix_availability: FixAvailability,
+    #[expect(clippy::struct_field_names)]
     explanation: Option<&'a str>,
     preview: bool,
+    status: RuleGroup,
+    source_location: SourceLocation,
 }
 
 impl<'a> Explanation<'a> {
@@ -30,21 +34,27 @@ impl<'a> Explanation<'a> {
         let (linter, _) = Linter::parse_code(&code).unwrap();
         let fix = rule.fixable().to_string();
         Self {
-            name: rule.as_ref(),
+            name: rule.name().as_str(),
             code,
             linter: linter.name(),
             summary: rule.message_formats()[0],
             message_formats: rule.message_formats(),
             fix,
+            fix_availability: rule.fixable(),
             explanation: rule.explanation(),
             preview: rule.is_preview(),
+            status: rule.group(),
+            source_location: SourceLocation {
+                file: rule.file(),
+                line: rule.line(),
+            },
         }
     }
 }
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    let _ = write!(&mut output, "# {} ({})", rule.as_ref(), rule.noqa_code());
+    let _ = write!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
     output.push('\n');
     output.push('\n');
 
@@ -121,4 +131,15 @@ pub(crate) fn rules(format: HelpFormat) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// The location of the rule's implementation in the Ruff source tree, relative to the repository
+/// root.
+///
+/// For most rules this will point to the `#[derive(ViolationMetadata)]` line above the rule's
+/// struct.
+#[derive(Serialize)]
+struct SourceLocation {
+    file: &'static str,
+    line: u32,
 }

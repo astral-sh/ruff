@@ -1,0 +1,32 @@
+[package]
+name = "ty_vendored"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_db = { workspace = true }
+static_assertions = { workspace = true }
+zip = { workspace = true }
+
+[build-dependencies]
+path-slash = { workspace = true }
+walkdir = { workspace = true }
+zip = { workspace = true, features = ["zstd", "deflate"] }
+
+[dev-dependencies]
+walkdir = { workspace = true }
+
+[features]
+zstd = ["zip/zstd"]
+deflate = ["zip/deflate"]
+
+[lints]
+workspace = true
+

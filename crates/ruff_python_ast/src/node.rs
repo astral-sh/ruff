@@ -13,6 +13,7 @@ impl ast::ElifElseClause {
     {
         let ast::ElifElseClause {
             range: _,
+            node_index: _,
             test,
             body,
         } = self;
@@ -28,7 +29,11 @@ impl ast::ExprDict {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprDict { items, range: _ } = self;
+        let ast::ExprDict {
+            items,
+            range: _,
+            node_index: _,
+        } = self;
 
         for ast::DictItem { key, value } in items {
             if let Some(key) = key {
@@ -48,6 +53,7 @@ impl ast::ExprBoolOp {
             op,
             values,
             range: _,
+            node_index: _,
         } = self;
         match values.as_slice() {
             [left, rest @ ..] => {
@@ -74,6 +80,7 @@ impl ast::ExprCompare {
             ops,
             comparators,
             range: _,
+            node_index: _,
         } = self;
 
         visitor.visit_expr(left);
@@ -85,23 +92,23 @@ impl ast::ExprCompare {
     }
 }
 
-impl ast::FStringFormatSpec {
+impl ast::InterpolatedStringFormatSpec {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         for element in &self.elements {
-            visitor.visit_f_string_element(element);
+            visitor.visit_interpolated_string_element(element);
         }
     }
 }
 
-impl ast::FStringExpressionElement {
+impl ast::InterpolatedElement {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FStringExpressionElement {
+        let ast::InterpolatedElement {
             expression,
             format_spec,
             ..
@@ -110,18 +117,22 @@ impl ast::FStringExpressionElement {
 
         if let Some(format_spec) = format_spec {
             for spec_part in &format_spec.elements {
-                visitor.visit_f_string_element(spec_part);
+                visitor.visit_interpolated_string_element(spec_part);
             }
         }
     }
 }
 
-impl ast::FStringLiteralElement {
+impl ast::InterpolatedStringLiteralElement {
     pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FStringLiteralElement { range: _, value: _ } = self;
+        let ast::InterpolatedStringLiteralElement {
+            range: _,
+            node_index: _,
+            value: _,
+        } = self;
     }
 }
 
@@ -130,7 +141,11 @@ impl ast::ExprFString {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprFString { value, range: _ } = self;
+        let ast::ExprFString {
+            value,
+            range: _,
+            node_index: _,
+        } = self;
 
         for f_string_part in value {
             match f_string_part {
@@ -145,12 +160,33 @@ impl ast::ExprFString {
     }
 }
 
+impl ast::ExprTString {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprTString {
+            value,
+            range: _,
+            node_index: _,
+        } = self;
+
+        for t_string in value {
+            visitor.visit_t_string(t_string);
+        }
+    }
+}
+
 impl ast::ExprStringLiteral {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprStringLiteral { value, range: _ } = self;
+        let ast::ExprStringLiteral {
+            value,
+            range: _,
+            node_index: _,
+        } = self;
 
         for string_literal in value {
             visitor.visit_string_literal(string_literal);
@@ -163,7 +199,11 @@ impl ast::ExprBytesLiteral {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprBytesLiteral { value, range: _ } = self;
+        let ast::ExprBytesLiteral {
+            value,
+            range: _,
+            node_index: _,
+        } = self;
 
         for bytes_literal in value {
             visitor.visit_bytes_literal(bytes_literal);
@@ -178,6 +218,7 @@ impl ast::ExceptHandlerExceptHandler {
     {
         let ast::ExceptHandlerExceptHandler {
             range: _,
+            node_index: _,
             type_,
             name,
             body,
@@ -194,38 +235,6 @@ impl ast::ExceptHandlerExceptHandler {
     }
 }
 
-impl ast::PatternMatchValue {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchValue { value, range: _ } = self;
-        visitor.visit_expr(value);
-    }
-}
-
-impl ast::PatternMatchSingleton {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchSingleton { value, range: _ } = self;
-        visitor.visit_singleton(value);
-    }
-}
-
-impl ast::PatternMatchSequence {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchSequence { patterns, range: _ } = self;
-        for pattern in patterns {
-            visitor.visit_pattern(pattern);
-        }
-    }
-}
-
 impl ast::PatternMatchMapping {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
@@ -236,6 +245,7 @@ impl ast::PatternMatchMapping {
             patterns,
             rest,
             range: _,
+            node_index: _,
         } = self;
 
         let mut rest = rest.as_ref();
@@ -257,66 +267,6 @@ impl ast::PatternMatchMapping {
     }
 }
 
-impl ast::PatternMatchClass {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchClass {
-            cls,
-            arguments: parameters,
-            range: _,
-        } = self;
-        visitor.visit_expr(cls);
-        visitor.visit_pattern_arguments(parameters);
-    }
-}
-
-impl ast::PatternMatchStar {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchStar { range: _, name } = self;
-
-        if let Some(name) = name {
-            visitor.visit_identifier(name);
-        }
-    }
-}
-
-impl ast::PatternMatchAs {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchAs {
-            pattern,
-            range: _,
-            name,
-        } = self;
-        if let Some(pattern) = pattern {
-            visitor.visit_pattern(pattern);
-        }
-
-        if let Some(name) = name {
-            visitor.visit_identifier(name);
-        }
-    }
-}
-
-impl ast::PatternMatchOr {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchOr { patterns, range: _ } = self;
-        for pattern in patterns {
-            visitor.visit_pattern(pattern);
-        }
-    }
-}
-
 impl ast::PatternArguments {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
@@ -324,6 +274,7 @@ impl ast::PatternArguments {
     {
         let PatternArguments {
             range: _,
+            node_index: _,
             patterns,
             keywords,
         } = self;
@@ -345,6 +296,7 @@ impl ast::PatternKeyword {
     {
         let PatternKeyword {
             range: _,
+            node_index: _,
             attr,
             pattern,
         } = self;
@@ -361,6 +313,7 @@ impl ast::Comprehension {
     {
         let ast::Comprehension {
             range: _,
+            node_index: _,
             target,
             iter,
             ifs,
@@ -412,6 +365,7 @@ impl ast::Parameter {
     {
         let ast::Parameter {
             range: _,
+            node_index: _,
             name,
             annotation,
         } = self;
@@ -430,6 +384,7 @@ impl ast::ParameterWithDefault {
     {
         let ast::ParameterWithDefault {
             range: _,
+            node_index: _,
             parameter,
             default,
         } = self;
@@ -447,6 +402,7 @@ impl ast::Keyword {
     {
         let ast::Keyword {
             range: _,
+            node_index: _,
             arg,
             value,
         } = self;
@@ -465,6 +421,7 @@ impl Alias {
     {
         let ast::Alias {
             range: _,
+            node_index: _,
             name,
             asname,
         } = self;
@@ -483,6 +440,7 @@ impl ast::WithItem {
     {
         let ast::WithItem {
             range: _,
+            node_index: _,
             context_expr,
             optional_vars,
         } = self;
@@ -502,6 +460,7 @@ impl ast::MatchCase {
     {
         let ast::MatchCase {
             range: _,
+            node_index: _,
             pattern,
             guard,
             body,
@@ -522,6 +481,7 @@ impl ast::Decorator {
     {
         let ast::Decorator {
             range: _,
+            node_index: _,
             expression,
         } = self;
 
@@ -536,69 +496,12 @@ impl ast::TypeParams {
     {
         let ast::TypeParams {
             range: _,
+            node_index: _,
             type_params,
         } = self;
 
         for type_param in type_params {
             visitor.visit_type_param(type_param);
-        }
-    }
-}
-
-impl ast::TypeParamTypeVar {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamTypeVar {
-            bound,
-            default,
-            name,
-            range: _,
-        } = self;
-
-        visitor.visit_identifier(name);
-        if let Some(expr) = bound {
-            visitor.visit_expr(expr);
-        }
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
-        }
-    }
-}
-
-impl ast::TypeParamTypeVarTuple {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamTypeVarTuple {
-            range: _,
-            name,
-            default,
-        } = self;
-        visitor.visit_identifier(name);
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
-        }
-    }
-}
-
-impl ast::TypeParamParamSpec {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamParamSpec {
-            range: _,
-            name,
-            default,
-        } = self;
-        visitor.visit_identifier(name);
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
         }
     }
 }
@@ -611,11 +514,30 @@ impl ast::FString {
         let ast::FString {
             elements,
             range: _,
+            node_index: _,
             flags: _,
         } = self;
 
         for fstring_element in elements {
-            visitor.visit_f_string_element(fstring_element);
+            visitor.visit_interpolated_string_element(fstring_element);
+        }
+    }
+}
+
+impl ast::TString {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ast::TString {
+            elements,
+            range: _,
+            node_index: _,
+            flags: _,
+        } = self;
+
+        for tstring_element in elements {
+            visitor.visit_interpolated_string_element(tstring_element);
         }
     }
 }
@@ -628,6 +550,7 @@ impl ast::StringLiteral {
     {
         let ast::StringLiteral {
             range: _,
+            node_index: _,
             value: _,
             flags: _,
         } = self;
@@ -642,6 +565,7 @@ impl ast::BytesLiteral {
     {
         let ast::BytesLiteral {
             range: _,
+            node_index: _,
             value: _,
             flags: _,
         } = self;
@@ -654,7 +578,11 @@ impl ast::Identifier {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::Identifier { range: _, id: _ } = self;
+        let ast::Identifier {
+            range: _,
+            node_index: _,
+            id: _,
+        } = self;
     }
 }
 
@@ -676,60 +604,57 @@ impl<'a> AnyNodeRef<'a> {
 
     /// The last child of the last branch, if the node has multiple branches.
     pub fn last_child_in_body(&self) -> Option<AnyNodeRef<'a>> {
-        let body = match self {
-            AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
-            | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
-            | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
-            | AnyNodeRef::MatchCase(MatchCase { body, .. })
-            | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
-                body,
-                ..
-            })
-            | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
-            AnyNodeRef::StmtIf(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
+        let body =
+            match self {
+                AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
+                | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
+                | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
+                | AnyNodeRef::MatchCase(MatchCase { body, .. })
+                | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
+                    body,
+                    ..
+                })
+                | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
+                AnyNodeRef::StmtIf(ast::StmtIf {
+                    body,
+                    elif_else_clauses,
+                    ..
+                }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
 
-            AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
-            | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
-                if orelse.is_empty() {
-                    body
-                } else {
-                    orelse
+                AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
+                | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
+                    if orelse.is_empty() { body } else { orelse }
                 }
-            }
 
-            AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
-                return cases.last().map(AnyNodeRef::from);
-            }
+                AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
+                    return cases.last().map(AnyNodeRef::from);
+                }
 
-            AnyNodeRef::StmtTry(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                if finalbody.is_empty() {
-                    if orelse.is_empty() {
-                        if handlers.is_empty() {
-                            body
+                AnyNodeRef::StmtTry(ast::StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                }) => {
+                    if finalbody.is_empty() {
+                        if orelse.is_empty() {
+                            if handlers.is_empty() {
+                                body
+                            } else {
+                                return handlers.last().map(AnyNodeRef::from);
+                            }
                         } else {
-                            return handlers.last().map(AnyNodeRef::from);
+                            orelse
                         }
                     } else {
-                        orelse
+                        finalbody
                     }
-                } else {
-                    finalbody
                 }
-            }
 
-            // Not a node that contains an indented child node.
-            _ => return None,
-        };
+                // Not a node that contains an indented child node.
+                _ => return None,
+            };
 
         body.last().map(AnyNodeRef::from)
     }

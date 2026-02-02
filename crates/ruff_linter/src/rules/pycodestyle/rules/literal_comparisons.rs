@@ -1,8 +1,7 @@
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{self, generate_comparison};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
@@ -10,6 +9,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {
@@ -58,6 +58,7 @@ impl EqCmpOp {
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct NoneComparison(EqCmpOp);
 
 impl AlwaysFixableViolation for NoneComparison {
@@ -120,6 +121,7 @@ impl AlwaysFixableViolation for NoneComparison {
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct TrueFalseComparison {
     value: bool,
     op: EqCmpOp,
@@ -136,22 +138,18 @@ impl AlwaysFixableViolation for TrueFalseComparison {
         let cond = cond.truncated_display();
         match (value, op) {
             (true, EqCmpOp::Eq) => {
-                format!("Avoid equality comparisons to `True`; use `if {cond}:` for truth checks")
+                format!("Avoid equality comparisons to `True`; use `{cond}:` for truth checks")
             }
             (true, EqCmpOp::NotEq) => {
                 format!(
-                    "Avoid inequality comparisons to `True`; use `if not {cond}:` for false checks"
+                    "Avoid inequality comparisons to `True`; use `not {cond}:` for false checks"
                 )
             }
             (false, EqCmpOp::Eq) => {
-                format!(
-                    "Avoid equality comparisons to `False`; use `if not {cond}:` for false checks"
-                )
+                format!("Avoid equality comparisons to `False`; use `not {cond}:` for false checks")
             }
             (false, EqCmpOp::NotEq) => {
-                format!(
-                    "Avoid inequality comparisons to `False`; use `if {cond}:` for truth checks"
-                )
+                format!("Avoid inequality comparisons to `False`; use `{cond}:` for truth checks")
             }
         }
     }
@@ -181,15 +179,14 @@ fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> Option<bool>
 
 fn generate_redundant_comparison(
     compare: &ast::ExprCompare,
-    comment_ranges: &ruff_python_trivia::CommentRanges,
+    tokens: &Tokens,
     source: &str,
     comparator: &Expr,
     kind: bool,
     needs_wrap: bool,
 ) -> String {
-    let comparator_range =
-        parenthesized_range(comparator.into(), compare.into(), comment_ranges, source)
-            .unwrap_or(comparator.range());
+    let comparator_range = parenthesized_range(comparator.into(), compare.into(), tokens)
+        .unwrap_or(comparator.range());
 
     let comparator_str = &source[comparator_range];
 
@@ -213,7 +210,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     // then replace the entire expression at the end with one "real" fix, to
     // avoid conflicts.
     let mut bad_ops: FxHashMap<usize, CmpOp> = FxHashMap::default();
-    let mut diagnostics: Vec<Diagnostic> = vec![];
+    let mut diagnostics = vec![];
 
     // Check `left`.
     let mut comparator = compare.left.as_ref();
@@ -226,22 +223,24 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
 
     if !helpers::is_constant_non_singleton(next) {
         if let Some(op) = EqCmpOp::try_from(*op) {
-            if checker.enabled(Rule::NoneComparison) && comparator.is_none_literal_expr() {
+            if checker.is_rule_enabled(Rule::NoneComparison) && comparator.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
+                        let diagnostic =
+                            checker.report_diagnostic(NoneComparison(op), comparator.range());
                         bad_ops.insert(0, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
+                        let diagnostic =
+                            checker.report_diagnostic(NoneComparison(op), comparator.range());
                         bad_ops.insert(0, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
                     }
                 }
             }
 
-            if checker.enabled(Rule::TrueFalseComparison) {
+            if checker.is_rule_enabled(Rule::TrueFalseComparison) {
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
                     match op {
                         EqCmpOp::Eq => {
@@ -250,7 +249,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                             } else {
                                 None
                             };
-                            let diagnostic = Diagnostic::new(
+                            let diagnostic = checker.report_diagnostic(
                                 TrueFalseComparison {
                                     value: *value,
                                     op,
@@ -267,7 +266,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                             } else {
                                 None
                             };
-                            let diagnostic = Diagnostic::new(
+                            let diagnostic = checker.report_diagnostic(
                                 TrueFalseComparison {
                                     value: *value,
                                     op,
@@ -292,22 +291,24 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
         }
 
         if let Some(op) = EqCmpOp::try_from(*op) {
-            if checker.enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
+            if checker.is_rule_enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                        let diagnostic =
+                            checker.report_diagnostic(NoneComparison(op), next.range());
                         bad_ops.insert(index, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                        let diagnostic =
+                            checker.report_diagnostic(NoneComparison(op), next.range());
                         bad_ops.insert(index, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
                     }
                 }
             }
 
-            if checker.enabled(Rule::TrueFalseComparison) {
+            if checker.is_rule_enabled(Rule::TrueFalseComparison) {
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
                     match op {
                         EqCmpOp::Eq => {
@@ -328,7 +329,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                             } else {
                                 None
                             };
-                            let diagnostic = Diagnostic::new(
+                            let diagnostic = checker.report_diagnostic(
                                 TrueFalseComparison {
                                     value: *value,
                                     op,
@@ -347,7 +348,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                             } else {
                                 None
                             };
-                            let diagnostic = Diagnostic::new(
+                            let diagnostic = checker.report_diagnostic(
                                 TrueFalseComparison {
                                     value: *value,
                                     op,
@@ -377,7 +378,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
             .copied()
             .collect::<Vec<_>>();
 
-        let comment_ranges = checker.comment_ranges();
+        let tokens = checker.tokens();
         let source = checker.source();
 
         let content = match (&*compare.ops, &*compare.comparators) {
@@ -385,18 +386,13 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 if let Some(kind) = is_redundant_boolean_comparison(*op, &compare.left) {
                     let needs_wrap = compare.left.range().start() != compare.range().start();
                     generate_redundant_comparison(
-                        compare,
-                        comment_ranges,
-                        source,
-                        comparator,
-                        kind,
-                        needs_wrap,
+                        compare, tokens, source, comparator, kind, needs_wrap,
                     )
                 } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
                     let needs_wrap = comparator.range().end() != compare.range().end();
                     generate_redundant_comparison(
                         compare,
-                        comment_ranges,
+                        tokens,
                         source,
                         &compare.left,
                         kind,
@@ -408,7 +404,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         &ops,
                         &compare.comparators,
                         compare.into(),
-                        comment_ranges,
+                        tokens,
                         source,
                     )
                 }
@@ -418,18 +414,16 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 &ops,
                 &compare.comparators,
                 compare.into(),
-                comment_ranges,
+                tokens,
                 source,
             ),
         };
 
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                content.to_string(),
+                content.clone(),
                 compare.range(),
             )));
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }

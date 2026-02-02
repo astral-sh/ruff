@@ -11,7 +11,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::AirflowVariableNameTaskIdMismatch, Path::new("AIR001.py"))]
     #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR002.py"))]
@@ -46,16 +46,20 @@ mod tests {
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_sqlite.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_zendesk.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_standard.py"))]
+    #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_try.py"))]
+    #[test_case(Rule::Airflow3IncompatibleFunctionSignature, Path::new("AIR303.py"))]
     #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_args.py"))]
     #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_names.py"))]
+    #[test_case(Rule::Airflow3SuggestedUpdate, Path::new("AIR311_try.py"))]
     #[test_case(Rule::Airflow3SuggestedToMoveToProvider, Path::new("AIR312.py"))]
+    #[test_case(Rule::Airflow3SuggestedToMoveToProvider, Path::new("AIR312_try.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("airflow").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

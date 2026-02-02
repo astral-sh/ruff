@@ -3,7 +3,7 @@ use ruff_python_ast::{Pattern, PatternArguments};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
+use crate::expression::parentheses::{Parentheses, empty_parenthesized, parenthesized};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -72,8 +72,9 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
     }
 }
 
-/// Returns `true` if the pattern (which is the only argument to a [`PatternMatchClass`]) is
-/// parenthesized. Used to avoid falsely assuming that `x` is parenthesized in cases like:
+/// Returns `true` if the pattern (which is the only argument to a
+/// [`PatternMatchClass`](ruff_python_ast::PatternMatchClass)) is parenthesized.
+/// Used to avoid falsely assuming that `x` is parenthesized in cases like:
 /// ```python
 /// case Point2D(x): ...
 /// ```

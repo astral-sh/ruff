@@ -265,26 +265,29 @@ Instead, apply the `# fmt: off` comment to the entire statement:
 Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
 comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
 
-`# fmt: skip` comments suppress formatting for a preceding statement, case header, decorator,
-function definition, or class definition:
+`# fmt: skip` comments suppress formatting for a case header, decorator,
+function definition, class definition, or the preceding statements
+on the same logical line. The formatter leaves the following unchanged:
 
 ```python
 if True:
     pass
-elif False: # fmt: skip
+elif     False: # fmt: skip
     pass
 
 @Test
-@Test2 # fmt: skip
+@Test2(a,b) # fmt: skip
 def test(): ...
 
-a = [1, 2, 3, 4, 5] # fmt: skip
+a = [1,2,3,4,5] # fmt: skip
 
-def test(a, b, c, d, e, f) -> int: # fmt: skip
+def test(a,b,c,d,e,f) -> int: # fmt: skip
     pass
+
+x=1;x=2;x=3 # fmt: skip
 ```
 
-As such, adding an `# fmt: skip` comment at the end of an expression will have no effect. In
+Adding a `# fmt: skip` comment at the end of an expression will have no effect. In
 the following example, the list entry `'1'` will be formatted, despite the `# fmt: skip`:
 
 ```python
@@ -361,6 +364,7 @@ When an incompatible lint rule or setting is enabled, `ruff format` will emit a 
 `ruff format` exits with the following status codes:
 
 - `0` if Ruff terminates successfully, regardless of whether any files were formatted.
+- `1` if Ruff terminates successfully, one or more files were formatted, and `--exit-non-zero-on-format` was specified.
 - `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an
     internal error.
 
@@ -500,6 +504,48 @@ If you want Ruff to split an f-string across multiple lines, ensure there's a li
 
 [self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
 [configured quote style]: settings.md/#format_quote-style
+
+### Fluent layout for method chains
+
+At times, when developers write long chains of methods on an object, such as
+
+```python
+x = df.filter(cond).agg(func).merge(other)
+```
+
+the intent is to perform a sequence of transformations or operations
+on a fixed object of interest - in this example, the object `df`.
+Assuming the assigned expression exceeds the `line-length`, this preview
+style will format the above as:
+
+```python
+x = (
+    df
+    .filter(cond)
+    .agg(func)
+    .merge(other)
+)
+```
+
+This deviates from the stable formatting, and also from Black, both
+of which would produce:
+
+
+```python
+x = (
+    df.filter(cond)
+    .agg(func)
+    .merge(other)
+)
+```
+
+Both the stable and preview formatting are variants of something
+called a **fluent layout**.
+
+In general, this preview style differs from the stable style
+only at the first attribute that precedes
+a call or subscript. The preview formatting breaks _before_ this attribute,
+while the stable formatting breaks _after_ the call or subscript.
 
 ## Sorting imports
 

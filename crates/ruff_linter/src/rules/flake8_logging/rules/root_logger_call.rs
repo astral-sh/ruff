@@ -1,9 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_logging::helpers::is_logger_method_name;
 
 /// ## What it does
 /// Checks for usages of the following `logging` top-level functions:
@@ -28,6 +29,7 @@ use crate::checkers::ast::Checker;
 /// logger.info("Foobar")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct RootLoggerCall {
     attr: String,
 }
@@ -63,15 +65,5 @@ pub(crate) fn root_logger_call(checker: &Checker, call: &ExprCall) {
     let kind = RootLoggerCall {
         attr: (*attr).to_string(),
     };
-    let diagnostic = Diagnostic::new(kind, call.range);
-
-    checker.report_diagnostic(diagnostic);
-}
-
-#[inline]
-fn is_logger_method_name(attr: &str) -> bool {
-    matches!(
-        attr,
-        "debug" | "info" | "warn" | "warning" | "error" | "critical" | "log" | "exception"
-    )
+    checker.report_diagnostic(kind, call.range);
 }

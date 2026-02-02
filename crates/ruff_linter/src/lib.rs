@@ -9,10 +9,13 @@ pub use locator::Locator;
 pub use noqa::generate_noqa_edits;
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
+pub use rule_selector::RuleSelector;
 #[cfg(feature = "clap")]
 pub use rule_selector::clap_completion::RuleSelectorParser;
-pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
+
+pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix};
+pub use violation::{AlwaysFixableViolation, FixAvailability, Violation, ViolationMetadata};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -43,8 +46,10 @@ pub mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+pub mod suppression;
 mod text_helpers;
 pub mod upstream_categories;
+mod violation;
 
 #[cfg(any(test, fuzzing))]
 pub mod test;
@@ -55,7 +60,7 @@ pub const RUFF_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 mod tests {
     use std::path::Path;
 
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, SourceType};
 
     use crate::codes::Rule;
     use crate::settings::LinterSettings;
@@ -72,7 +77,7 @@ mod tests {
             Returns:
             """
 "#;
-        let source_type = PySourceType::Python;
+        let source_type = SourceType::Python(PySourceType::Python);
         let rule = Rule::OverIndentation;
 
         let source_kind = SourceKind::from_source_code(code.to_string(), source_type)

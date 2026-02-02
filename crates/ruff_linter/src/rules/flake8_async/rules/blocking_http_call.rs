@@ -1,10 +1,10 @@
 use ruff_python_ast::ExprCall;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -20,18 +20,25 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// import urllib
+///
+///
 /// async def fetch():
 ///     urllib.request.urlopen("https://example.com/foo/bar").read()
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import aiohttp
+///
+///
 /// async def fetch():
 ///     async with aiohttp.ClientSession() as session:
 ///         async with session.get("https://example.com/foo/bar") as resp:
 ///             ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct BlockingHttpCallInAsyncFunction;
 
 impl Violation for BlockingHttpCallInAsyncFunction {
@@ -70,10 +77,7 @@ pub(crate) fn blocking_http_call(checker: &Checker, call: &ExprCall) {
             .as_ref()
             .is_some_and(is_blocking_http_call)
         {
-            checker.report_diagnostic(Diagnostic::new(
-                BlockingHttpCallInAsyncFunction,
-                call.func.range(),
-            ));
+            checker.report_diagnostic(BlockingHttpCallInAsyncFunction, call.func.range());
         }
     }
 }

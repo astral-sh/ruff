@@ -1,0 +1,156 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbrace_in_format_spec.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..73,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 44..56,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 44..56,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 44..56,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 46..52,
+                                                    node_index: NodeIndex(None),
+                                                    value: "hello ",
+                                                },
+                                            ),
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 52..55,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 53..54,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: Some(
+                                                        InterpolatedStringFormatSpec {
+                                                            range: 55..55,
+                                                            node_index: NodeIndex(None),
+                                                            elements: [],
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 57..72,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 57..72,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 57..72,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 59..65,
+                                                    node_index: NodeIndex(None),
+                                                    value: "hello ",
+                                                },
+                                            ),
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 65..71,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 66..67,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: Some(
+                                                        InterpolatedStringFormatSpec {
+                                                            range: 68..71,
+                                                            node_index: NodeIndex(None),
+                                                            elements: [
+                                                                Literal(
+                                                                    InterpolatedStringLiteralElement {
+                                                                        range: 68..71,
+                                                                        node_index: NodeIndex(None),
+                                                                        value: ".3f",
+                                                                    },
+                                                                ),
+                                                            ],
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"hello {x:"
+  |            ^ Syntax Error: t-string: expecting `}`
+3 | t"hello {x:.3f"
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"hello {x:"
+3 | t"hello {x:.3f"
+  |               ^ Syntax Error: t-string: expecting `}`
+  |

@@ -1,0 +1,306 @@
+# No matching overload diagnostics
+
+<!-- snapshot-diagnostics -->
+
+## Calls to overloaded functions
+
+```py
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+def f(x: int | str) -> int | str:
+    return x
+
+f(b"foo")  # error: [no-matching-overload]
+```
+
+## Call to function with many unmatched overloads
+
+Note that it would be fine to use `pow` here as an example of a routine with many overloads, but at
+time of writing (2025-05-14), ty doesn't support some of the type signatures of those overloads.
+Which in turn makes snapshotting a bit annoying, since the output can depend on how ty is compiled
+(because of how `Todo` types are dealt with when `debug_assertions` is enabled versus disabled).
+
+```py
+from typing import overload
+
+class Foo: ...
+
+@overload
+def foo(a: int, b: int, c: int): ...
+@overload
+def foo(a: str, b: int, c: int): ...
+@overload
+def foo(a: int, b: str, c: int): ...
+@overload
+def foo(a: int, b: int, c: str): ...
+@overload
+def foo(a: str, b: str, c: int): ...
+@overload
+def foo(a: int, b: str, c: str): ...
+@overload
+def foo(a: str, b: str, c: str): ...
+@overload
+def foo(a: int, b: int, c: int): ...
+@overload
+def foo(a: float, b: int, c: int): ...
+@overload
+def foo(a: int, b: float, c: int): ...
+@overload
+def foo(a: int, b: int, c: float): ...
+@overload
+def foo(a: float, b: float, c: int): ...
+@overload
+def foo(a: int, b: float, c: float): ...
+@overload
+def foo(a: float, b: float, c: float): ...
+@overload
+def foo(a: str, b: str, c: str): ...
+@overload
+def foo(a: float, b: str, c: str): ...
+@overload
+def foo(a: str, b: float, c: str): ...
+@overload
+def foo(a: str, b: str, c: float): ...
+@overload
+def foo(a: float, b: float, c: str): ...
+@overload
+def foo(a: str, b: float, c: float): ...
+@overload
+def foo(a: float, b: float, c: float): ...
+def foo(a, b, c): ...
+
+foo(Foo(), Foo())  # error: [no-matching-overload]
+```
+
+## Call to function with too many unmatched overloads
+
+This is like the above example, but has an excessive number of overloads to the point that ty will
+cut off the list in the diagnostic and emit a message stating the number of omitted overloads.
+
+```py
+from typing import overload
+
+class Foo: ...
+
+@overload
+def foo(a: int, b: int, c: int): ...
+@overload
+def foo(a: str, b: int, c: int): ...
+@overload
+def foo(a: int, b: str, c: int): ...
+@overload
+def foo(a: int, b: int, c: str): ...
+@overload
+def foo(a: str, b: str, c: int): ...
+@overload
+def foo(a: int, b: str, c: str): ...
+@overload
+def foo(a: str, b: str, c: str): ...
+@overload
+def foo(a: int, b: int, c: int): ...
+@overload
+def foo(a: float, b: int, c: int): ...
+@overload
+def foo(a: int, b: float, c: int): ...
+@overload
+def foo(a: int, b: int, c: float): ...
+@overload
+def foo(a: float, b: float, c: int): ...
+@overload
+def foo(a: int, b: float, c: float): ...
+@overload
+def foo(a: float, b: float, c: float): ...
+@overload
+def foo(a: str, b: str, c: str): ...
+@overload
+def foo(a: float, b: str, c: str): ...
+@overload
+def foo(a: str, b: float, c: str): ...
+@overload
+def foo(a: str, b: str, c: float): ...
+@overload
+def foo(a: float, b: float, c: str): ...
+@overload
+def foo(a: str, b: float, c: float): ...
+@overload
+def foo(a: float, b: float, c: float): ...
+@overload
+def foo(a: list[int], b: list[int], c: list[int]): ...
+@overload
+def foo(a: list[str], b: list[int], c: list[int]): ...
+@overload
+def foo(a: list[int], b: list[str], c: list[int]): ...
+@overload
+def foo(a: list[int], b: list[int], c: list[str]): ...
+@overload
+def foo(a: list[str], b: list[str], c: list[int]): ...
+@overload
+def foo(a: list[int], b: list[str], c: list[str]): ...
+@overload
+def foo(a: list[str], b: list[str], c: list[str]): ...
+@overload
+def foo(a: list[int], b: list[int], c: list[int]): ...
+@overload
+def foo(a: list[float], b: list[int], c: list[int]): ...
+@overload
+def foo(a: list[int], b: list[float], c: list[int]): ...
+@overload
+def foo(a: list[int], b: list[int], c: list[float]): ...
+@overload
+def foo(a: list[float], b: list[float], c: list[int]): ...
+@overload
+def foo(a: list[int], b: list[float], c: list[float]): ...
+@overload
+def foo(a: list[float], b: list[float], c: list[float]): ...
+@overload
+def foo(a: list[str], b: list[str], c: list[str]): ...
+@overload
+def foo(a: list[float], b: list[str], c: list[str]): ...
+@overload
+def foo(a: list[str], b: list[float], c: list[str]): ...
+@overload
+def foo(a: list[str], b: list[str], c: list[float]): ...
+@overload
+def foo(a: list[float], b: list[float], c: list[str]): ...
+@overload
+def foo(a: list[str], b: list[float], c: list[float]): ...
+@overload
+def foo(a: list[float], b: list[float], c: list[float]): ...
+@overload
+def foo(a: bool, b: bool, c: bool): ...
+@overload
+def foo(a: str, b: bool, c: bool): ...
+@overload
+def foo(a: bool, b: str, c: bool): ...
+@overload
+def foo(a: bool, b: bool, c: str): ...
+@overload
+def foo(a: str, b: str, c: bool): ...
+@overload
+def foo(a: bool, b: str, c: str): ...
+@overload
+def foo(a: str, b: str, c: str): ...
+@overload
+def foo(a: int, b: int, c: int): ...
+@overload
+def foo(a: bool, b: int, c: int): ...
+@overload
+def foo(a: int, b: bool, c: int): ...
+@overload
+def foo(a: int, b: int, c: bool): ...
+@overload
+def foo(a: bool, b: bool, c: int): ...
+@overload
+def foo(a: int, b: bool, c: bool): ...
+@overload
+def foo(a: str, b: str, c: str): ...
+@overload
+def foo(a: float, b: bool, c: bool): ...
+@overload
+def foo(a: bool, b: float, c: bool): ...
+@overload
+def foo(a: bool, b: bool, c: float): ...
+@overload
+def foo(a: float, b: float, c: bool): ...
+@overload
+def foo(a: bool, b: float, c: float): ...
+def foo(a, b, c): ...
+
+foo(Foo(), Foo())  # error: [no-matching-overload]
+```
+
+## Calls to overloaded functions with lots of parameters
+
+```py
+from typing import overload
+
+@overload
+def f(
+    lion: int,
+    turtle: int,
+    tortoise: int,
+    goat: int,
+    capybara: int,
+    chicken: int,
+    ostrich: int,
+    gorilla: int,
+    giraffe: int,
+    condor: int,
+    kangaroo: int,
+    anaconda: int,
+    tarantula: int,
+    millipede: int,
+    leopard: int,
+    hyena: int,
+) -> int: ...
+@overload
+def f(
+    lion: str,
+    turtle: str,
+    tortoise: str,
+    goat: str,
+    capybara: str,
+    chicken: str,
+    ostrich: str,
+    gorilla: str,
+    giraffe: str,
+    condor: str,
+    kangaroo: str,
+    anaconda: str,
+    tarantula: str,
+    millipede: str,
+    leopard: str,
+    hyena: str,
+) -> str: ...
+def f(
+    lion: int | str,
+    turtle: int | str,
+    tortoise: int | str,
+    goat: int | str,
+    capybara: int | str,
+    chicken: int | str,
+    ostrict: int | str,
+    gorilla: int | str,
+    giraffe: int | str,
+    condor: int | str,
+    kangaroo: int | str,
+    anaconda: int | str,
+    tarantula: int | str,
+    millipede: int | str,
+    leopard: int | str,
+    hyena: int | str,
+) -> int | str:
+    return 0
+
+f(b"foo")  # error: [no-matching-overload]
+```
+
+## A method call with unmatched overloads
+
+```py
+from typing import overload
+
+class Foo:
+    @overload
+    def bar(self, x: int) -> int: ...
+    @overload
+    def bar(self, x: str) -> str: ...
+    def bar(self, x: int | str) -> int | str:
+        return x
+
+foo = Foo()
+foo.bar(b"wat")  # error: [no-matching-overload]
+```
+
+## A class constructor with unmatched overloads
+
+TODO: At time of writing (2025-05-15), this has non-ideal diagnostics that doesn't show the
+unmatched overloads.
+
+```py
+type()  # error: [no-matching-overload]
+```

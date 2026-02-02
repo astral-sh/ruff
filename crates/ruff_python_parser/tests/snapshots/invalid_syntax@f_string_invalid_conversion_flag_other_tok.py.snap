@@ -1,32 +1,37 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_conversion_flag_other_tok.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: NodeIndex(None),
         range: 0..22,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 0..10,
                     value: FString(
                         ExprFString {
+                            node_index: NodeIndex(None),
                             range: 0..10,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..10,
+                                            node_index: NodeIndex(None),
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 2..9,
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 3..4,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -42,6 +47,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -53,21 +59,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 11..21,
                     value: FString(
                         ExprFString {
+                            node_index: NodeIndex(None),
                             range: 11..21,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 11..21,
+                                            node_index: NodeIndex(None),
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 13..20,
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 14..15,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -83,6 +94,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),

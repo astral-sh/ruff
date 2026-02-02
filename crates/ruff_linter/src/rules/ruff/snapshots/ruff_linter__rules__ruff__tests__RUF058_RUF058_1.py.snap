@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF058 `itertools.starmap` called on `zip` iterable
+  --> RUF058_1.py:10:10
+   |
+ 9 | map = {}
+10 | for _ in starmap(print, zip("A", "12")):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |     pass
+   |
+help: Use `map` instead

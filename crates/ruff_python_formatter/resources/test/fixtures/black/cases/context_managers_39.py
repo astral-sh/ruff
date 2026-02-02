@@ -82,3 +82,9 @@ async def func():
         argument1, argument2, argument3="some_value"
     ):
         pass
+
+
+
+# don't remove the brackets here, it changes the meaning of the code.
+with (x, y) as z:
+    pass

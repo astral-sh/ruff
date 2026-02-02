@@ -12,6 +12,7 @@ use {
 ///
 /// It is a logic error for `start` to be greater than `end`.
 #[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TextRange {
     // Invariant: start <= end
     start: TextSize,
@@ -421,6 +422,22 @@ impl TextRange {
     #[must_use]
     pub fn add_end(&self, amount: TextSize) -> TextRange {
         TextRange::new(self.start(), self.end() + amount)
+    }
+}
+
+/// Conversion methods.
+impl TextRange {
+    /// A convenience routine for converting this range to a
+    /// standard library range that satisfies the `RangeBounds`
+    /// trait.
+    ///
+    /// This is also available as a `From` trait implementation,
+    /// but this method avoids the need to specify types to help
+    /// inference.
+    #[inline]
+    #[must_use]
+    pub fn to_std_range(&self) -> Range<usize> {
+        (*self).into()
     }
 }
 

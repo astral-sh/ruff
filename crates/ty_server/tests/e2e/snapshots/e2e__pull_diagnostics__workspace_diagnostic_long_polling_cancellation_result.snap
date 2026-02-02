@@ -1,0 +1,13 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: result
+---
+Err(
+    RequestFailed(
+        ResponseError {
+            code: -32800,
+            message: "request was cancelled by client",
+            data: None,
+        },
+    ),
+)

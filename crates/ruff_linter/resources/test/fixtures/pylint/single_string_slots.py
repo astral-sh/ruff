@@ -33,3 +33,11 @@ class Foo:
 
     def __init__(self, bar):
         self.bar = bar
+
+# This is a type error, out of scope for the rule
+class Foo:
+    __slots__ = t"bar{baz}"
+
+    def __init__(self, bar):
+        self.bar = bar
+

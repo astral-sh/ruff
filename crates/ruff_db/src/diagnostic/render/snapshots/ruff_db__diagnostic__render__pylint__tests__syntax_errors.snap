@@ -1,0 +1,6 @@
+---
+source: crates/ruff_db/src/diagnostic/render/pylint.rs
+expression: env.render_diagnostics(&diagnostics)
+---
+syntax_errors.py:1: [invalid-syntax] Expected one or more symbol names after import
+syntax_errors.py:3: [invalid-syntax] Expected ')', found newline

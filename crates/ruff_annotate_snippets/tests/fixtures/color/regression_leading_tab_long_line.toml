@@ -1,0 +1,20 @@
+[message]
+level = "Error"
+id = "E0308"
+title = "mismatched types"
+
+[[message.snippets]]
+source = """
+					s_data['d_dails'] = bb['contacted'][hostip]['ansible_facts']['ansible_devices']['vda']['vendor'] + " " + bb['contacted'][hostip]['an
+"""
+line_start = 4
+origin = "$DIR/non-whitespace-trimming.rs"
+
+[[message.snippets.annotations]]
+label = ""
+level = "Error"
+range = [5, 11]
+
+[renderer]
+# anonymized_line_numbers = true
+color = true

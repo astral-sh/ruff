@@ -1,0 +1,136 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        TStringStart,
+        0..4,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "\nhello\n    world\n",
+        ),
+        4..21,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        21..24,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringStart,
+        25..29,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "\n    world\nhello\n",
+        ),
+        29..46,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        46..49,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringStart,
+        50..52,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "some ",
+        ),
+        52..57,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        57..58,
+    ),
+    (
+        TStringStart,
+        58..62,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "multiline\nallowed ",
+        ),
+        62..80,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        80..81,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        81..82,
+    ),
+    (
+        Rbrace,
+        82..83,
+    ),
+    (
+        TStringEnd,
+        83..86,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Rbrace,
+        86..87,
+    ),
+    (
+        InterpolatedStringMiddle(
+            " string",
+        ),
+        87..94,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        94..95,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        95..95,
+    ),
+]
+```

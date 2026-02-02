@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use ruff_python_trivia::{is_pragma_comment, CommentRanges};
+use ruff_python_trivia::{CommentRanges, is_pragma_comment};
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
 

@@ -1,0 +1,169 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/template_strings_py313.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..89,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 44..52,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 44..52,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 44..52,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 46..51,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 47..50,
+                                                            id: Name("hey"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 53..63,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 53..63,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 53..63,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 55..62,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 56..61,
+                                                            id: Name("there"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 64..88,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 64..88,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 64..88,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 68..85,
+                                                    node_index: NodeIndex(None),
+                                                    value: "what's\nhappening?",
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: true,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.13"}
+2 | t"{hey}"
+  | ^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+3 | t'{there}'
+4 | t"""what's
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.13"}
+2 | t"{hey}"
+3 | t'{there}'
+  | ^^^^^^^^^^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+4 | t"""what's
+5 | happening?"""
+  |
+
+
+  |
+2 |   t"{hey}"
+3 |   t'{there}'
+4 | / t"""what's
+5 | | happening?"""
+  | |_____________^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
+  |

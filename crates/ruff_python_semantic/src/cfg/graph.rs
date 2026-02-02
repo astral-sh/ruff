@@ -1,7 +1,7 @@
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::Stmt;
 use ruff_text_size::{Ranged, TextRange};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 /// Returns the control flow graph associated to an array of statements
 pub fn build_cfg(stmts: &[Stmt]) -> ControlFlowGraph<'_> {

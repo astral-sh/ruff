@@ -1,15 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    self as ast, comparable::ComparableExpr, helpers::any_over_expr, Expr, Stmt,
+    self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
 };
-use ruff_python_semantic::{analyze::typing::is_dict, Binding};
+use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
 use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a dictionary comprehension.
@@ -46,6 +46,7 @@ use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deleti
 /// result.update({x: y for x, y in pairs if y % 2})
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct ManualDictComprehension {
     fix_type: DictComprehensionType,
     is_async: bool,
@@ -91,12 +92,14 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         //     if idx % 2 == 0:
         //         result[name] = idx
         // ```
-        [Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            test,
-            ..
-        })] => {
+        [
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                test,
+                ..
+            }),
+        ] => {
             // TODO(charlie): If there's an `else` clause, verify that the `else` has the
             // same structure.
             if !elif_else_clauses.is_empty() {
@@ -119,43 +122,29 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         targets,
         value,
         range,
+        node_index: _,
     }) = stmt
     else {
         return;
     };
 
-    let [Expr::Subscript(ast::ExprSubscript {
-        value: subscript_value,
-        slice: key,
-        ..
-    })] = targets.as_slice()
+    let [
+        Expr::Subscript(ast::ExprSubscript {
+            value: subscript_value,
+            slice: key,
+            ..
+        }),
+    ] = targets.as_slice()
     else {
         return;
     };
 
     // If any references to a target variable are after the loop,
-    // then removing the loop would cause a NameError
-    let any_references_after_for_loop = |target: &Expr| {
-        let target_binding = checker
-            .semantic()
-            .bindings
-            .iter()
-            .find(|binding| target.range() == binding.range);
-        debug_assert!(
-            target_binding.is_some(),
-            "for-loop target binding must exist"
-        );
-
-        let Some(target_binding) = target_binding else {
-            // All uses of this function will early-return if this returns true, so this must early-return the rule
-            return true;
-        };
-
-        target_binding
-            .references()
-            .map(|reference| checker.semantic().reference(reference))
-            .any(|other_reference| other_reference.start() > for_stmt.end())
-    };
+    // then removing the loop would cause a NameError. Make sure none
+    // of the variables are used outside the for loop.
+    if has_post_loop_references(checker, target, for_stmt.end()) {
+        return;
+    }
 
     match target {
         Expr::Tuple(tuple) => {
@@ -171,22 +160,12 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             {
                 return;
             }
-            // Make sure none of the variables are used outside the for loop
-            if tuple.iter().any(any_references_after_for_loop) {
-                return;
-            }
         }
         Expr::Name(_) => {
             if ComparableExpr::from(key) != ComparableExpr::from(target) {
                 return;
             }
             if ComparableExpr::from(value) != ComparableExpr::from(target) {
-                return;
-            }
-
-            // We know that `target` contains an ExprName, but closures can't take `&impl Ranged`,
-            // so we pass `target` itself instead of the inner ExprName
-            if any_references_after_for_loop(target) {
                 return;
             }
         }
@@ -230,7 +209,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
-    if is_fix_manual_dict_comprehension_enabled(checker.settings) {
+    if is_fix_manual_dict_comprehension_enabled(checker.settings()) {
         let binding_stmt = binding.statement(checker.semantic());
         let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
             ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
@@ -292,7 +271,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             DictComprehensionType::Update
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ManualDictComprehension {
                 fix_type,
                 is_async: for_stmt.is_async,
@@ -310,16 +289,14 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 checker,
             ))
         });
-
-        checker.report_diagnostic(diagnostic);
     } else {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             ManualDictComprehension {
                 fix_type: DictComprehensionType::Comprehension,
                 is_async: for_stmt.is_async,
             },
             *range,
-        ));
+        );
     }
 }
 
@@ -344,10 +321,11 @@ fn convert_to_dict_comprehension(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            if test.is_named_expr() {
-                format!(" if ({})", locator.slice(test.range()))
-            } else {
-                format!(" if {}", locator.slice(test.range()))
+            match test {
+                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+                    format!(" if ({})", locator.slice(test.range()))
+                }
+                _ => format!(" if {}", locator.slice(test.range())),
             }
         }
         None => String::new(),
@@ -376,13 +354,38 @@ fn convert_to_dict_comprehension(
     } else {
         "for"
     };
-    let elt_str = format!(
-        "{}: {}",
-        locator.slice(key.range()),
-        locator.slice(value.range())
-    );
+    // Handles the case where `key` has a trailing comma, e.g, `dict[x,] = y`
+    let key_str = if let Expr::Tuple(ast::ExprTuple {
+        elts,
+        parenthesized,
+        ..
+    }) = key
+    {
+        if elts.len() != 1 {
+            return None;
+        }
+        if *parenthesized {
+            locator.slice(key).to_string()
+        } else {
+            format!("({})", locator.slice(key))
+        }
+    } else {
+        locator.slice(key).to_string()
+    };
 
-    let comprehension_str = format!("{{{elt_str} {for_type} {target_str} in {iter_str}{if_str}}}");
+    // If the value is a tuple without parentheses, add them
+    let value_str = if let Expr::Tuple(ast::ExprTuple {
+        parenthesized: false,
+        ..
+    }) = value
+    {
+        format!("({})", locator.slice(value))
+    } else {
+        locator.slice(value).to_string()
+    };
+
+    let comprehension_str =
+        format!("{{{key_str}: {value_str} {for_type} {target_str} in {iter_str}{if_str}}}");
 
     let for_loop_inline_comments = comment_strings_in_range(
         checker,
@@ -468,4 +471,30 @@ fn convert_to_dict_comprehension(
 enum DictComprehensionType {
     Update,
     Comprehension,
+}
+
+fn has_post_loop_references(checker: &Checker, expr: &Expr, loop_end: TextSize) -> bool {
+    any_over_expr(expr, &|expr| match expr {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .any(|expr| has_post_loop_references(checker, expr, loop_end)),
+        Expr::Name(name) => {
+            let Some(target_binding) = checker
+                .semantic()
+                .bindings
+                .iter()
+                .find(|binding| name.range() == binding.range)
+            else {
+                // no binding in for statement => err on the safe side and make the checker skip
+                // e.g., `for foo[0] in bar:` or `for foo.bar in baz:`
+                return true;
+            };
+
+            target_binding
+                .references()
+                .map(|reference| checker.semantic().reference(reference))
+                .any(|other_reference| other_reference.start() > loop_end)
+        }
+        _ => false,
+    })
 }

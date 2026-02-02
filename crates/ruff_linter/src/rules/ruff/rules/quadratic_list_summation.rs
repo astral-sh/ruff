@@ -1,15 +1,15 @@
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of `sum()` to flatten lists of lists, which has
@@ -60,6 +60,7 @@ use crate::importer::ImportRequest;
 ///
 /// [microbenchmarks]: https://github.com/astral-sh/ruff/issues/5073#issuecomment-1591836349
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.285")]
 pub(crate) struct QuadraticListSummation;
 
 impl AlwaysFixableViolation for QuadraticListSummation {
@@ -79,6 +80,7 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
         func,
         arguments,
         range,
+        node_index: _,
     } = call;
 
     let Some(iterable) = arguments.args.first() else {
@@ -95,9 +97,8 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
+    let mut diagnostic = checker.report_diagnostic(QuadraticListSummation, *range);
     diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.
@@ -115,13 +116,8 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
     )?;
 
     let iterable = checker.locator().slice(
-        parenthesized_range(
-            iterable.into(),
-            (&call.arguments).into(),
-            checker.comment_ranges(),
-            checker.locator().contents(),
-        )
-        .unwrap_or(iterable.range()),
+        parenthesized_range(iterable.into(), (&call.arguments).into(), checker.tokens())
+            .unwrap_or(iterable.range()),
     );
 
     Ok(Fix::unsafe_edits(

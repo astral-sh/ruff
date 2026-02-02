@@ -1,6 +1,7 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::SourceRow;
+
+use crate::Violation;
 
 /// ## What it does
 /// Checks for uses of names that are declared as `global` prior to the
@@ -36,6 +37,7 @@ use ruff_source_file::SourceRow;
 /// ## References
 /// - [Python documentation: The `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.174")]
 pub(crate) struct LoadBeforeGlobalDeclaration {
     pub(crate) name: String,
     pub(crate) row: SourceRow,

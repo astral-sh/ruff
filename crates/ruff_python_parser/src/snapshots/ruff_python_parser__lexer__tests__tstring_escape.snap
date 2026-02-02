@@ -1,0 +1,86 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        TStringStart,
+        0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "\\",
+        ),
+        2..3,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        3..4,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        4..5,
+    ),
+    (
+        Colon,
+        5..6,
+    ),
+    (
+        InterpolatedStringMiddle(
+            "\\\"\\",
+        ),
+        6..9,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        9..10,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        10..11,
+    ),
+    (
+        Rbrace,
+        11..12,
+    ),
+    (
+        Rbrace,
+        12..13,
+    ),
+    (
+        InterpolatedStringMiddle(
+            " \\\"\\\"\\\n end",
+        ),
+        13..24,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        24..25,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        25..25,
+    ),
+]
+```

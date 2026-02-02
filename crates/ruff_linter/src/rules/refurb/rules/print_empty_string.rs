@@ -1,12 +1,13 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::contains_effect;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::{contains_effect, is_empty_f_string};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `print` calls with unnecessary empty strings as positional
@@ -30,9 +31,15 @@ use crate::checkers::ast::Checker;
 /// print()
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked as unsafe if it removes comments or an unused `sep` keyword argument
+/// that may have side effects. Removing such arguments may change the program's
+/// behavior by skipping the execution of those side effects.
+///
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct PrintEmptyString {
     reason: Reason,
 }
@@ -84,7 +91,8 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 Reason::EmptyArgument
             };
 
-            let mut diagnostic = Diagnostic::new(PrintEmptyString { reason }, call.range());
+            let mut diagnostic =
+                checker.report_diagnostic(PrintEmptyString { reason }, call.range());
 
             diagnostic.set_fix(
                 EmptyStringFix::from_call(
@@ -92,11 +100,10 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                     Separator::Remove,
                     checker.semantic(),
                     checker.generator(),
+                    checker.comment_ranges(),
                 )
                 .into_fix(),
             );
-
-            checker.report_diagnostic(diagnostic);
         }
 
         [arg] if arg.is_starred_expr() => {
@@ -107,7 +114,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
         [] | [_] => {
             // If there's a `sep` argument, remove it, regardless of what it is.
             if call.arguments.find_keyword("sep").is_some() {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     PrintEmptyString {
                         reason: Reason::UselessSeparator,
                     },
@@ -120,11 +127,10 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                         Separator::Remove,
                         checker.semantic(),
                         checker.generator(),
+                        checker.comment_ranges(),
                     )
                     .into_fix(),
                 );
-
-                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -170,7 +176,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 Separator::Remove
             };
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 PrintEmptyString {
                     reason: if separator == Separator::Retain {
                         Reason::EmptyArgument
@@ -182,24 +188,26 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
             );
 
             diagnostic.set_fix(
-                EmptyStringFix::from_call(call, separator, checker.semantic(), checker.generator())
-                    .into_fix(),
+                EmptyStringFix::from_call(
+                    call,
+                    separator,
+                    checker.semantic(),
+                    checker.generator(),
+                    checker.comment_ranges(),
+                )
+                .into_fix(),
             );
-
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
 
 /// Check if an expression is a constant empty string.
 fn is_empty_string(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::StringLiteral(ast::ExprStringLiteral {
-            value,
-            ..
-        }) if value.is_empty()
-    )
+    match expr {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+        Expr::FString(f_string) => is_empty_f_string(f_string),
+        _ => false,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -219,10 +227,15 @@ impl EmptyStringFix {
         separator: Separator,
         semantic: &SemanticModel,
         generator: Generator,
+        comment_ranges: &CommentRanges,
     ) -> Self {
         let range = call.range();
         let mut call = call.clone();
         let mut applicability = Applicability::Safe;
+
+        if comment_ranges.intersects(range) {
+            applicability = Applicability::Unsafe;
+        }
 
         // Remove all empty string positional arguments.
         call.arguments.args = call

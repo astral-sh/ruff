@@ -91,6 +91,47 @@ impl fmt::Display for FStringPrefix {
     }
 }
 
+/// Enumeration of the valid prefixes a t-string literal can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum TStringPrefix {
+    /// Just a regular t-string with no other prefixes, e.g. t"{bar}"
+    Regular,
+
+    /// A "raw" template string, that has an `r` or `R` prefix,
+    /// e.g. `rt"{bar}"` or `Rt"{bar}"`
+    Raw { uppercase_r: bool },
+}
+
+impl TStringPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Regular => "t",
+            Self::Raw { uppercase_r: true } => "Rt",
+            Self::Raw { uppercase_r: false } => "rt",
+        }
+    }
+
+    pub const fn text_len(self) -> TextSize {
+        match self {
+            Self::Regular => TextSize::new(1),
+            Self::Raw { .. } => TextSize::new(2),
+        }
+    }
+
+    /// Return true if this prefix indicates a "raw t-string",
+    /// e.g. `rt"{bar}"` or `Rt"{bar}"`
+    pub const fn is_raw(self) -> bool {
+        matches!(self, Self::Raw { .. })
+    }
+}
+
+impl fmt::Display for TStringPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Enumeration of the valid prefixes a bytestring literal can have.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ByteStringPrefix {
@@ -151,6 +192,9 @@ pub enum AnyStringPrefix {
     /// Prefixes that indicate the string is an f-string
     Format(FStringPrefix),
 
+    /// Prefixes that indicate the string is a t-string
+    Template(TStringPrefix),
+
     /// All other prefixes
     Regular(StringLiteralPrefix),
 }
@@ -161,6 +205,7 @@ impl AnyStringPrefix {
             Self::Regular(regular_prefix) => regular_prefix.as_str(),
             Self::Bytes(bytestring_prefix) => bytestring_prefix.as_str(),
             Self::Format(fstring_prefix) => fstring_prefix.as_str(),
+            Self::Template(tstring_prefix) => tstring_prefix.as_str(),
         }
     }
 
@@ -169,6 +214,7 @@ impl AnyStringPrefix {
             Self::Regular(regular_prefix) => regular_prefix.text_len(),
             Self::Bytes(bytestring_prefix) => bytestring_prefix.text_len(),
             Self::Format(fstring_prefix) => fstring_prefix.text_len(),
+            Self::Template(tstring_prefix) => tstring_prefix.text_len(),
         }
     }
 
@@ -177,6 +223,7 @@ impl AnyStringPrefix {
             Self::Regular(regular_prefix) => regular_prefix.is_raw(),
             Self::Bytes(bytestring_prefix) => bytestring_prefix.is_raw(),
             Self::Format(fstring_prefix) => fstring_prefix.is_raw(),
+            Self::Template(tstring_prefix) => tstring_prefix.is_raw(),
         }
     }
 }

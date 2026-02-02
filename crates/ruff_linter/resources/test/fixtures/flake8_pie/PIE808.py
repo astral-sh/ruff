@@ -14,3 +14,6 @@ range(0, 10, 1)
 range(0, 10, step=1)
 range(start=0, stop=10)
 range(0, stop=10)
+
+# regression test for https://github.com/astral-sh/ruff/pull/18805
+range((0), 42)

@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC202_google.py:14:5: DOC202 Docstring should not have a returns section because the function doesn't return anything
+DOC202 Docstring should not have a returns section because the function doesn't return anything
+  --> DOC202_google.py:14:5
    |
 12 |   # DOC202
 13 |   def foo(num: int) -> str:
@@ -14,12 +15,13 @@ DOC202_google.py:14:5: DOC202 Docstring should not have a returns section becaus
 20 | |     Returns:
 21 | |         str: A string
 22 | |     """
-   | |_______^ DOC202
+   | |_______^
 23 |       print('test')
    |
-   = help: Remove the "Returns" section
+help: Remove the "Returns" section
 
-DOC202_google.py:30:9: DOC202 Docstring should not have a returns section because the function doesn't return anything
+DOC202 Docstring should not have a returns section because the function doesn't return anything
+  --> DOC202_google.py:30:9
    |
 28 |       # DOC202
 29 |       def foo(self) -> str:
@@ -32,12 +34,13 @@ DOC202_google.py:30:9: DOC202 Docstring should not have a returns section becaus
 36 | |         Returns:
 37 | |             str: A string
 38 | |         """
-   | |___________^ DOC202
+   | |___________^
 39 |           print('test')
    |
-   = help: Remove the "Returns" section
+help: Remove the "Returns" section
 
-DOC202_google.py:80:5: DOC202 Docstring should not have a returns section because the function doesn't return anything
+DOC202 Docstring should not have a returns section because the function doesn't return anything
+  --> DOC202_google.py:80:5
    |
 78 |   # DOC202 -- never explicitly returns anything, just short-circuits
 79 |   def foo(s: str, condition: bool):
@@ -46,8 +49,8 @@ DOC202_google.py:80:5: DOC202 Docstring should not have a returns section becaus
 82 | |     Returns:
 83 | |         None
 84 | |     """
-   | |_______^ DOC202
+   | |_______^
 85 |       if not condition:
 86 |           return
    |
-   = help: Remove the "Returns" section
+help: Remove the "Returns" section

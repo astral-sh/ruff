@@ -1,11 +1,12 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
+use crate::rules::refurb::helpers::IterLocation;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
-use super::helpers::parenthesize_loop_iter_if_necessary;
+use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 
 /// ## What it does
 /// Checks for code that updates a set with the contents of an iterable by
@@ -43,6 +44,7 @@ use super::helpers::parenthesize_loop_iter_if_necessary;
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.5")]
 pub(crate) struct ForLoopSetMutations {
     method_name: &'static str,
     batch_method_name: &'static str,
@@ -106,7 +108,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
             format!(
                 "{}.{batch_method_name}({})",
                 set.id,
-                parenthesize_loop_iter_if_necessary(for_stmt, checker),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call),
             )
         }
         (for_target, arg) => format!(
@@ -114,7 +116,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
             set.id,
             locator.slice(arg),
             locator.slice(for_target),
-            parenthesize_loop_iter_if_necessary(for_stmt, checker),
+            parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
         ),
     };
 
@@ -128,13 +130,13 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
         applicability,
     );
 
-    let diagnostic = Diagnostic::new(
-        ForLoopSetMutations {
-            method_name,
-            batch_method_name,
-        },
-        for_stmt.range,
-    );
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(
+            ForLoopSetMutations {
+                method_name,
+                batch_method_name,
+            },
+            for_stmt.range,
+        )
+        .set_fix(fix);
 }

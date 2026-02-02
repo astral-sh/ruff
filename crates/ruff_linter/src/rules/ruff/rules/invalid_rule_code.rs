@@ -1,11 +1,28 @@
-use crate::noqa::{Code, Directive};
-use crate::registry::Rule;
-use crate::Locator;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::noqa::{Code, Directive};
 use crate::noqa::{Codes, NoqaDirectives};
+use crate::registry::Rule;
+use crate::rule_redirects::get_redirect_target;
+use crate::{AlwaysFixableViolation, Edit, Fix};
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum InvalidRuleCodeKind {
+    Noqa,
+    Suppression,
+}
+
+impl InvalidRuleCodeKind {
+    fn as_str(&self) -> &str {
+        match self {
+            InvalidRuleCodeKind::Noqa => "`# noqa`",
+            InvalidRuleCodeKind::Suppression => "suppression",
+        }
+    }
+}
 
 /// ## What it does
 /// Checks for `noqa` codes that are invalid.
@@ -31,24 +48,35 @@ use crate::noqa::{Codes, NoqaDirectives};
 /// ## Options
 /// - `lint.external`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.11.4")]
 pub(crate) struct InvalidRuleCode {
     pub(crate) rule_code: String,
+    pub(crate) kind: InvalidRuleCodeKind,
+    pub(crate) whole_comment: bool,
 }
 
 impl AlwaysFixableViolation for InvalidRuleCode {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid rule code in `# noqa`: {}", self.rule_code)
+        format!(
+            "Invalid rule code in {}: {}",
+            self.kind.as_str(),
+            self.rule_code
+        )
     }
 
     fn fix_title(&self) -> String {
-        "Remove the rule code".to_string()
+        if self.whole_comment {
+            format!("Remove the {} comment", self.kind.as_str())
+        } else {
+            format!("Remove the rule code `{}`", self.rule_code)
+        }
     }
 }
 
 /// RUF102 for invalid noqa codes
 pub(crate) fn invalid_noqa_code(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     external: &[String],
@@ -58,7 +86,9 @@ pub(crate) fn invalid_noqa_code(
             continue;
         };
 
-        let all_valid = directive.iter().all(|code| code_is_valid(code, external));
+        let all_valid = directive
+            .iter()
+            .all(|code| code_is_valid(code.as_str(), external));
 
         if all_valid {
             continue;
@@ -66,56 +96,64 @@ pub(crate) fn invalid_noqa_code(
 
         let (valid_codes, invalid_codes): (Vec<_>, Vec<_>) = directive
             .iter()
-            .partition(|&code| code_is_valid(code, external));
+            .partition(|&code| code_is_valid(code.as_str(), external));
 
         if valid_codes.is_empty() {
-            diagnostics.push(all_codes_invalid_diagnostic(directive, invalid_codes));
+            all_codes_invalid_diagnostic(directive, invalid_codes, context);
         } else {
-            diagnostics.extend(invalid_codes.into_iter().map(|invalid_code| {
-                some_codes_are_invalid_diagnostic(directive, invalid_code, locator)
-            }));
+            for invalid_code in invalid_codes {
+                some_codes_are_invalid_diagnostic(directive, invalid_code, locator, context);
+            }
         }
     }
 }
 
-fn code_is_valid(code: &Code, external: &[String]) -> bool {
-    let code_str = code.as_str();
-    Rule::from_code(code_str).is_ok() || external.iter().any(|ext| code_str.starts_with(ext))
+pub(crate) fn code_is_valid(code: &str, external: &[String]) -> bool {
+    Rule::from_code(get_redirect_target(code).unwrap_or(code)).is_ok()
+        || external.iter().any(|ext| code.starts_with(ext))
 }
 
 fn all_codes_invalid_diagnostic(
     directive: &Codes<'_>,
     invalid_codes: Vec<&Code<'_>>,
-) -> Diagnostic {
-    Diagnostic::new(
-        InvalidRuleCode {
-            rule_code: invalid_codes
-                .into_iter()
-                .map(Code::as_str)
-                .collect::<Vec<_>>()
-                .join(", "),
-        },
-        directive.range(),
-    )
-    .with_fix(Fix::safe_edit(Edit::range_deletion(directive.range())))
+    context: &LintContext,
+) {
+    context
+        .report_diagnostic(
+            InvalidRuleCode {
+                rule_code: invalid_codes
+                    .into_iter()
+                    .map(Code::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                kind: InvalidRuleCodeKind::Noqa,
+                whole_comment: true,
+            },
+            directive.range(),
+        )
+        .set_fix(Fix::safe_edit(Edit::range_deletion(directive.range())));
 }
 
 fn some_codes_are_invalid_diagnostic(
     codes: &Codes,
     invalid_code: &Code,
     locator: &Locator,
-) -> Diagnostic {
-    let diagnostic = Diagnostic::new(
-        InvalidRuleCode {
-            rule_code: invalid_code.to_string(),
-        },
-        invalid_code.range(),
-    );
-    diagnostic.with_fix(Fix::safe_edit(remove_invalid_noqa(
-        codes,
-        invalid_code,
-        locator,
-    )))
+    context: &LintContext,
+) {
+    context
+        .report_diagnostic(
+            InvalidRuleCode {
+                rule_code: invalid_code.to_string(),
+                kind: InvalidRuleCodeKind::Noqa,
+                whole_comment: false,
+            },
+            invalid_code.range(),
+        )
+        .set_fix(Fix::safe_edit(remove_invalid_noqa(
+            codes,
+            invalid_code,
+            locator,
+        )));
 }
 
 fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) -> Edit {

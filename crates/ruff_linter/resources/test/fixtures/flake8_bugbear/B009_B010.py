@@ -67,3 +67,22 @@ getattr(self.
 
 import builtins
 builtins.getattr(foo, "bar")
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/18353
+setattr(foo, "__debug__", 0)
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/21126
+# Non-NFKC attribute names should be marked as unsafe. Python normalizes identifiers in
+# attribute access (obj.attr) using NFKC, but does not normalize string
+# arguments passed to getattr/setattr. Rewriting `getattr(ns, "ſ")` to
+# `ns.ſ` would be interpreted as `ns.s` at runtime, changing behavior.
+# Example: the long s character "ſ" normalizes to "s" under NFKC.
+getattr(foo, "ſ")
+setattr(foo, "ſ", 1)
+
+
+getattr(
+    obj,
+    # text
+    "foo",
+)

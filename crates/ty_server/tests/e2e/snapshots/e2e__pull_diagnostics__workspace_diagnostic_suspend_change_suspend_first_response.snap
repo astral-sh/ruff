@@ -1,0 +1,83 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: first_response
+---
+Report(
+    WorkspaceDiagnosticReport {
+        items: [
+            Full(
+                WorkspaceFullDocumentDiagnosticReport {
+                    uri: Url {
+                        scheme: "file",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: None,
+                        port: None,
+                        path: "<temp_dir>/src/test.py",
+                        query: None,
+                        fragment: None,
+                    },
+                    version: Some(
+                        2,
+                    ),
+                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                        result_id: Some(
+                            "[RESULT_ID]",
+                        ),
+                        items: [
+                            Diagnostic {
+                                range: Range {
+                                    start: Position {
+                                        line: 1,
+                                        character: 11,
+                                    },
+                                    end: Position {
+                                        line: 1,
+                                        character: 13,
+                                    },
+                                },
+                                severity: Some(
+                                    Error,
+                                ),
+                                code: Some(
+                                    String(
+                                        "invalid-return-type",
+                                    ),
+                                ),
+                                code_description: Some(
+                                    CodeDescription {
+                                        href: Url {
+                                            scheme: "https",
+                                            cannot_be_a_base: false,
+                                            username: "",
+                                            password: None,
+                                            host: Some(
+                                                Domain(
+                                                    "ty.dev",
+                                                ),
+                                            ),
+                                            port: None,
+                                            path: "/rules",
+                                            query: None,
+                                            fragment: Some(
+                                                "invalid-return-type",
+                                            ),
+                                        },
+                                    },
+                                ),
+                                source: Some(
+                                    "ty",
+                                ),
+                                message: "Return type does not match returned value: expected `str`, found `Literal[42]`",
+                                related_information: None,
+                                tags: None,
+                                data: None,
+                            },
+                        ],
+                    },
+                },
+            ),
+        ],
+    },
+)

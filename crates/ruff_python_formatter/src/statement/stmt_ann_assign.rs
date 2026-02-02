@@ -1,14 +1,13 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtAnnAssign;
 
-use crate::comments::SourceComment;
 use crate::expression::is_splittable_expression;
 use crate::expression::parentheses::Parentheses;
+use crate::prelude::*;
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
 };
 use crate::statement::trailing_semicolon;
-use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtAnnAssign;
@@ -17,6 +16,7 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
     fn fmt_fields(&self, item: &StmtAnnAssign, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAnnAssign {
             range: _,
+            node_index: _,
             target,
             annotation,
             value,
@@ -82,13 +82,5 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
         }
 
         Ok(())
-    }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
     }
 }

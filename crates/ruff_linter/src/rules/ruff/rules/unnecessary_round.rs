@@ -1,13 +1,14 @@
-use crate::checkers::ast::Checker;
-use crate::Locator;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
-use ruff_python_semantic::SemanticModel;
 use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
+
+use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `round()` calls that have no effect on the input.
@@ -32,8 +33,8 @@ use ruff_text_size::Ranged;
 ///
 /// The fix is marked unsafe if it is not possible to guarantee that the first argument of
 /// `round()` is of type `int`, or if the fix deletes comments.
-///
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct UnnecessaryRound;
 
 impl AlwaysFixableViolation for UnnecessaryRound {
@@ -100,9 +101,9 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
     let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
     let fix = Fix::applicable_edit(edit, applicability);
 
-    let diagnostic = Diagnostic::new(UnnecessaryRound, call.range());
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(UnnecessaryRound, call.range())
+        .set_fix(fix);
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -139,6 +140,15 @@ pub(super) fn rounded_and_ndigits<'a>(
     semantic: &'a SemanticModel,
 ) -> Option<(&'a Expr, RoundedValue, NdigitsValue)> {
     if arguments.len() > 2 {
+        return None;
+    }
+
+    // *args
+    if arguments.args.iter().any(Expr::is_starred_expr) {
+        return None;
+    }
+    // **kwargs
+    if arguments.keywords.iter().any(|kw| kw.arg.is_none()) {
         return None;
     }
 

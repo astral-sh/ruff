@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for classes that inherit from both `str` and `enum.Enum`.
@@ -72,12 +72,16 @@ use crate::importer::ImportRequest;
 /// As such, migrating to `enum.StrEnum` will introduce a behavior change for
 /// code that relies on the Python 3.11 behavior.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// ## References
 /// - [enum.StrEnum](https://docs.python.org/3/library/enum.html#enum.StrEnum)
 ///
 /// [breaking change]: https://blog.pecar.me/python-enum
-
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.6")]
 pub(crate) struct ReplaceStrEnum {
     name: String,
 }
@@ -126,7 +130,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ReplaceStrEnum {
             name: class_def.name.to_string(),
         },
@@ -153,6 +157,4 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
             ))
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }

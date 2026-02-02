@@ -10,6 +10,10 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via macro expansion.
+ignored = ["colored"]
+
 [lib]
 
 [dependencies]
@@ -18,6 +22,7 @@ ruff_formatter = { workspace = true }
 ruff_graph = { workspace = true, features = ["serde", "schemars"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
+ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true, features = ["serde"] }
 ruff_python_semantic = { workspace = true, features = ["serde"] }
@@ -26,14 +31,14 @@ ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
+glob = { workspace = true }
+globset = { workspace = true }
 ignore = { workspace = true }
 indexmap = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 matchit = { workspace = true }
-glob = { workspace = true }
-globset = { workspace = true }
 path-absolutize = { workspace = true }
 path-slash = { workspace = true }
 pep440_rs = { workspace = true }
@@ -41,9 +46,11 @@ regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
+serde_json = { workspace = true, optional = true }
 shellexpand = { workspace = true }
 strum = { workspace = true }
 toml = { workspace = true }
+unicode-normalization = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 etcetera = { workspace = true }
@@ -53,15 +60,13 @@ etcetera = { workspace = true }
 ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
 tempfile = { workspace = true }
 
-[package.metadata.cargo-shear]
-# Used via macro expansion.
-ignored = ["colored"]
-
 [features]
 default = []
 schemars = [
     "dep:schemars",
+    "dep:serde_json",
     "ruff_formatter/schemars",
+    "ruff_linter/schemars",
     "ruff_python_formatter/schemars",
     "ruff_python_semantic/schemars",
 ]

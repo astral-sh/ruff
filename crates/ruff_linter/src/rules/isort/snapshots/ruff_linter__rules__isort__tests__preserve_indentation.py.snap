@@ -1,40 +1,38 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-preserve_indentation.py:2:5: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> preserve_indentation.py:2:5
   |
 1 |   if True:
 2 | /     import sys
 3 | |     import os
-  | |_____________^ I001
+  | |_____________^
 4 |   else:
 5 |       import sys
   |
-  = help: Organize imports
+help: Organize imports
+1 | if True:
+2 +     import os
+3 |     import sys
+  -     import os
+4 | else:
+5 |     import sys
+6 |     import os
 
-ℹ Safe fix
-1 1 | if True:
-  2 |+    import os
-2 3 |     import sys
-3   |-    import os
-4 4 | else:
-5 5 |     import sys
-6 6 |     import os
-
-preserve_indentation.py:5:5: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> preserve_indentation.py:5:5
   |
 3 |       import os
 4 |   else:
 5 | /     import sys
 6 | |     import os
-  | |_____________^ I001
+  | |_____________^
   |
-  = help: Organize imports
-
-ℹ Safe fix
-2 2 |     import sys
-3 3 |     import os
-4 4 | else:
-  5 |+    import os
-5 6 |     import sys
-6   |-    import os
+help: Organize imports
+2 |     import sys
+3 |     import os
+4 | else:
+5 +     import os
+6 |     import sys
+  -     import os

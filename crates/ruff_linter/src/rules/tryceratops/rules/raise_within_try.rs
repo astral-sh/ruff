@@ -1,14 +1,14 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     comparable::ComparableExpr,
     helpers::{self, map_callable},
-    statement_visitor::{walk_stmt, StatementVisitor},
+    statement_visitor::{StatementVisitor, walk_stmt},
 };
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -50,6 +50,7 @@ use crate::checkers::ast::Checker;
 ///         raise
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.233")]
 pub(crate) struct RaiseWithinTry;
 
 impl Violation for RaiseWithinTry {
@@ -115,7 +116,7 @@ pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[Exc
                     .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {
-            checker.report_diagnostic(Diagnostic::new(RaiseWithinTry, stmt.range()));
+            checker.report_diagnostic(RaiseWithinTry, stmt.range());
         }
     }
 }

@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// This is not a regular diagnostic; instead, it's raised when a file cannot be read
@@ -24,6 +25,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// - [UNIX Permissions introduction](https://mason.gmu.edu/~montecin/UNIXpermiss.htm)
 /// - [Command Line Basics: Symbolic Links](https://www.digitalocean.com/community/tutorials/workflow-symbolic-links)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub struct IOError {
     pub message: String,
 }
@@ -64,9 +66,10 @@ impl Violation for IOError {
 /// - [Python documentation: Syntax Errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
 #[derive(ViolationMetadata)]
 #[deprecated(note = "E999 has been removed")]
+#[violation_metadata(removed_since = "0.8.0")]
 pub(crate) struct SyntaxError;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for SyntaxError {
     fn message(&self) -> String {
         unreachable!("E999 has been removed")

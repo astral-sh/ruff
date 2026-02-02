@@ -1,15 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-import_from_after_import.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> import_from_after_import.py:1:1
   |
 1 | / from collections import Collection
 2 | | import os
-  | |_________^ I001
+  | |_________^
   |
-  = help: Organize imports
-
-ℹ Safe fix
-  1 |+import os
-1 2 | from collections import Collection
-2   |-import os
+help: Organize imports
+1 + import os
+2 | from collections import Collection
+  - import os

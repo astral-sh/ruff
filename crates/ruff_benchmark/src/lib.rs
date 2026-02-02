@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
+#[cfg(any(feature = "ty_instrumented", feature = "ruff_instrumented"))]
 pub mod criterion;
+pub mod real_world_projects;
 
 pub static NUMPY_GLOBALS: TestFile = TestFile::new(
     "numpy/globals.py",

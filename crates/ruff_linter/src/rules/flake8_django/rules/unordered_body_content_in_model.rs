@@ -1,15 +1,15 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_django::helpers;
 
 /// ## What it does
 /// Checks for the order of Model's inner classes, methods, and fields as per
@@ -63,6 +63,7 @@ use super::helpers;
 ///
 /// [Django Style Guide]: https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/#model-style
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct DjangoUnorderedBodyContentInModel {
     element_type: ContentType,
     prev_element_type: ContentType,
@@ -75,7 +76,9 @@ impl Violation for DjangoUnorderedBodyContentInModel {
             element_type,
             prev_element_type,
         } = self;
-        format!("Order of model's inner classes, methods, and fields does not follow the Django Style Guide: {element_type} should come before {prev_element_type}")
+        format!(
+            "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: {element_type} should come before {prev_element_type}"
+        )
     }
 }
 
@@ -110,14 +113,13 @@ pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: &ast
             .iter()
             .find(|&&prev_element_type| prev_element_type > element_type)
         {
-            let diagnostic = Diagnostic::new(
+            checker.report_diagnostic(
                 DjangoUnorderedBodyContentInModel {
                     element_type,
                     prev_element_type,
                 },
                 element.range(),
             );
-            checker.report_diagnostic(diagnostic);
         } else {
             element_types.push(element_type);
         }

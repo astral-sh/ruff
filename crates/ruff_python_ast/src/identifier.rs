@@ -13,7 +13,7 @@
 use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use ruff_python_trivia::{is_python_whitespace, Cursor};
+use ruff_python_trivia::{Cursor, is_python_whitespace};
 
 pub trait Identifier {
     /// Return the [`TextRange`] of the identifier in the given AST node.

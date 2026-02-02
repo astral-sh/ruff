@@ -1,8 +1,9 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast as ast;
+
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast as ast;
 
 /// ## What it does
 /// Checks for non-raw literal string arguments passed to the `match` parameter
@@ -26,7 +27,8 @@ use ruff_python_ast as ast;
 ///     do_thing_that_raises()
 /// ```
 ///
-/// Use instead:
+/// If the pattern is intended to be a regular expression, use a raw string to signal this
+/// intention:
 ///
 /// ```python
 /// import pytest
@@ -36,7 +38,7 @@ use ruff_python_ast as ast;
 ///     do_thing_that_raises()
 /// ```
 ///
-/// Alternatively:
+/// Alternatively, escape any regex metacharacters with `re.escape`:
 ///
 /// ```python
 /// import pytest
@@ -47,7 +49,7 @@ use ruff_python_ast as ast;
 ///     do_thing_that_raises()
 /// ```
 ///
-/// or:
+/// or directly with backslashes:
 ///
 /// ```python
 /// import pytest
@@ -62,6 +64,7 @@ use ruff_python_ast as ast;
 /// - [Python documentation: `re.escape`](https://docs.python.org/3/library/re.html#re.escape)
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct PytestRaisesAmbiguousPattern;
 
 impl Violation for PytestRaisesAmbiguousPattern {
@@ -98,9 +101,7 @@ pub(crate) fn pytest_raises_ambiguous_pattern(checker: &Checker, call: &ast::Exp
         return;
     }
 
-    let diagnostic = Diagnostic::new(PytestRaisesAmbiguousPattern, string.range);
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(PytestRaisesAmbiguousPattern, string.range);
 }
 
 fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool {

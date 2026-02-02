@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::{AlwaysFixableViolation, Fix};
 use crate::{checkers::ast::Checker, fix::edits::add_argument};
 
 /// ## What it does
@@ -18,13 +18,20 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// It's recommended to use a `stacklevel` of 2 or higher, to give the caller
 /// more context about the warning.
 ///
+/// In Python 3.12 and higher, one may also use `skip_file_prefixes` to specify
+/// which file prefixes are ignored when counting the stack level. This implicitly overrides the `stacklevel` to be
+/// at least 2, according to the [Python documentation].
 /// ## Example
 /// ```python
+/// import warnings
+///
 /// warnings.warn("This is a warning")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import warnings
+///
 /// warnings.warn("This is a warning", stacklevel=2)
 /// ```
 ///
@@ -35,8 +42,11 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// higher stacklevel to address the diagnostic.
 ///
 /// ## References
-/// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
+/// - [Python documentation: `warnings.warn`][Python documentation]
+///
+///[Python documentation]: https://docs.python.org/3/library/warnings.html#warnings.warn
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct NoExplicitStacklevel;
 
 impl AlwaysFixableViolation for NoExplicitStacklevel {
@@ -60,10 +70,18 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
+    // When prefixes are supplied, stacklevel is implicitly overridden to be `max(2, stacklevel)`.
+    //
+    // Signature as of Python 3.13 (https://docs.python.org/3/library/warnings.html#warnings.warn)
+    // ```text
+    //                  0       1               2            3                  4
+    // warnings.warn(message, category=None, stacklevel=1, source=None, *, skip_file_prefixes=())
+    // ```
     if call
         .arguments
         .find_argument_value("stacklevel", 2)
         .is_some()
+        || is_skip_file_prefixes_param_set(&call.arguments)
         || call
             .arguments
             .args
@@ -77,16 +95,20 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
     {
         return;
     }
-    let mut diagnostic = Diagnostic::new(NoExplicitStacklevel, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(NoExplicitStacklevel, call.func.range());
 
-    let edit = add_argument(
-        "stacklevel=2",
-        &call.arguments,
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    );
+    let edit = add_argument("stacklevel=2", &call.arguments, checker.tokens());
 
     diagnostic.set_fix(Fix::unsafe_edit(edit));
+}
 
-    checker.report_diagnostic(diagnostic);
+/// Returns `true` if `skip_file_prefixes` is set to its non-default value.
+/// The default value of `skip_file_prefixes` is an empty tuple.
+fn is_skip_file_prefixes_param_set(arguments: &ast::Arguments) -> bool {
+    arguments
+        .find_keyword("skip_file_prefixes")
+        .is_some_and(|keyword| match &keyword.value {
+            Expr::Tuple(tuple) => !tuple.elts.is_empty(),
+            _ => true,
+        })
 }

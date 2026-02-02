@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for deprecated NumPy type aliases.
@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// int
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.247")]
 pub(crate) struct NumpyDeprecatedTypeAlias {
     type_name: String,
 }
@@ -74,12 +75,13 @@ pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
                 }
             })
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             NumpyDeprecatedTypeAlias {
                 type_name: type_name.to_string(),
             },
             expr.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         let type_name = match type_name {
             "unicode" => "str",
             _ => type_name,
@@ -93,6 +95,5 @@ pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
             let binding_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(binding_edit, import_edit))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

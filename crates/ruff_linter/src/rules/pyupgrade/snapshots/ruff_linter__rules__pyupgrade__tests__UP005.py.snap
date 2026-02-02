@@ -1,79 +1,74 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+ --> UP005.py:6:9
   |
 4 | class Suite(unittest.TestCase):
 5 |     def test(self) -> None:
 6 |         self.assertEquals (1, 2)
-  |         ^^^^^^^^^^^^^^^^^ UP005
+  |         ^^^^^^^^^^^^^^^^^
 7 |         self.assertEquals(1, 2)
 8 |         self.assertEqual(3, 4)
   |
-  = help: Replace `assertEqual` with `assertEquals`
+help: Replace `assertEqual` with `assertEquals`
+3 | 
+4 | class Suite(unittest.TestCase):
+5 |     def test(self) -> None:
+  -         self.assertEquals (1, 2)
+6 +         self.assertEqual (1, 2)
+7 |         self.assertEquals(1, 2)
+8 |         self.assertEqual(3, 4)
+9 |         self.failUnlessAlmostEqual(1, 1.1)
 
-ℹ Safe fix
-3 3 | 
-4 4 | class Suite(unittest.TestCase):
-5 5 |     def test(self) -> None:
-6   |-        self.assertEquals (1, 2)
-  6 |+        self.assertEqual (1, 2)
-7 7 |         self.assertEquals(1, 2)
-8 8 |         self.assertEqual(3, 4)
-9 9 |         self.failUnlessAlmostEqual(1, 1.1)
-
-UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+ --> UP005.py:7:9
   |
 5 |     def test(self) -> None:
 6 |         self.assertEquals (1, 2)
 7 |         self.assertEquals(1, 2)
-  |         ^^^^^^^^^^^^^^^^^ UP005
+  |         ^^^^^^^^^^^^^^^^^
 8 |         self.assertEqual(3, 4)
 9 |         self.failUnlessAlmostEqual(1, 1.1)
   |
-  = help: Replace `assertEqual` with `assertEquals`
+help: Replace `assertEqual` with `assertEquals`
+4  | class Suite(unittest.TestCase):
+5  |     def test(self) -> None:
+6  |         self.assertEquals (1, 2)
+   -         self.assertEquals(1, 2)
+7  +         self.assertEqual(1, 2)
+8  |         self.assertEqual(3, 4)
+9  |         self.failUnlessAlmostEqual(1, 1.1)
+10 |         self.assertNotRegexpMatches("a", "b")
 
-ℹ Safe fix
-4 4 | class Suite(unittest.TestCase):
-5 5 |     def test(self) -> None:
-6 6 |         self.assertEquals (1, 2)
-7   |-        self.assertEquals(1, 2)
-  7 |+        self.assertEqual(1, 2)
-8 8 |         self.assertEqual(3, 4)
-9 9 |         self.failUnlessAlmostEqual(1, 1.1)
-10 10 |         self.assertNotRegexpMatches("a", "b")
-
-UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
+UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
+  --> UP005.py:9:9
    |
  7 |         self.assertEquals(1, 2)
  8 |         self.assertEqual(3, 4)
  9 |         self.failUnlessAlmostEqual(1, 1.1)
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP005
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 10 |         self.assertNotRegexpMatches("a", "b")
    |
-   = help: Replace `assertAlmostEqual` with `failUnlessAlmostEqual`
+help: Replace `assertAlmostEqual` with `failUnlessAlmostEqual`
+6  |         self.assertEquals (1, 2)
+7  |         self.assertEquals(1, 2)
+8  |         self.assertEqual(3, 4)
+   -         self.failUnlessAlmostEqual(1, 1.1)
+9  +         self.assertAlmostEqual(1, 1.1)
+10 |         self.assertNotRegexpMatches("a", "b")
 
-ℹ Safe fix
-6  6  |         self.assertEquals (1, 2)
-7  7  |         self.assertEquals(1, 2)
-8  8  |         self.assertEqual(3, 4)
-9     |-        self.failUnlessAlmostEqual(1, 1.1)
-   9  |+        self.assertAlmostEqual(1, 1.1)
-10 10 |         self.assertNotRegexpMatches("a", "b")
-
-UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
+UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
+  --> UP005.py:10:9
    |
  8 |         self.assertEqual(3, 4)
  9 |         self.failUnlessAlmostEqual(1, 1.1)
 10 |         self.assertNotRegexpMatches("a", "b")
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP005
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace `assertNotRegex` with `assertNotRegexpMatches`
-
-ℹ Safe fix
-7  7  |         self.assertEquals(1, 2)
-8  8  |         self.assertEqual(3, 4)
-9  9  |         self.failUnlessAlmostEqual(1, 1.1)
-10    |-        self.assertNotRegexpMatches("a", "b")
-   10 |+        self.assertNotRegex("a", "b")
+help: Replace `assertNotRegex` with `assertNotRegexpMatches`
+7  |         self.assertEquals(1, 2)
+8  |         self.assertEqual(3, 4)
+9  |         self.failUnlessAlmostEqual(1, 1.1)
+   -         self.assertNotRegexpMatches("a", "b")
+10 +         self.assertNotRegex("a", "b")

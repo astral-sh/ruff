@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -44,6 +44,7 @@ use crate::checkers::ast::Checker;
 ///         raise CantBeNegative(x)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct RaiseVanillaArgs;
 
 impl Violation for RaiseVanillaArgs {
@@ -78,7 +79,7 @@ pub(crate) fn raise_vanilla_args(checker: &Checker, expr: &Expr) {
     }
 
     if contains_message(arg) {
-        checker.report_diagnostic(Diagnostic::new(RaiseVanillaArgs, expr.range()));
+        checker.report_diagnostic(RaiseVanillaArgs, expr.range());
     }
 }
 

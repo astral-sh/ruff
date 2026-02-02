@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `list()` calls that take unnecessary list or tuple literals as
@@ -35,6 +35,7 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.66")]
 pub(crate) struct UnnecessaryLiteralWithinListCall {
     kind: LiteralKind,
 }
@@ -82,7 +83,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast
         return;
     }
 
-    let diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralWithinListCall {
             kind: argument_kind,
         },
@@ -119,7 +120,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast
         }
     };
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    diagnostic.set_fix(fix);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -14,31 +14,31 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
             let Stmt::For(stmt_for) = checker.semantic.current_statement() else {
                 unreachable!("Expected Stmt::For");
             };
-            if checker.enabled(Rule::UnusedLoopControlVariable) {
+            if checker.is_rule_enabled(Rule::UnusedLoopControlVariable) {
                 flake8_bugbear::rules::unused_loop_control_variable(checker, stmt_for);
             }
-            if checker.enabled(Rule::IncorrectDictIterator) {
+            if checker.is_rule_enabled(Rule::IncorrectDictIterator) {
                 perflint::rules::incorrect_dict_iterator(checker, stmt_for);
             }
-            if checker.enabled(Rule::YieldInForLoop) {
+            if checker.is_rule_enabled(Rule::YieldInForLoop) {
                 pyupgrade::rules::yield_in_for_loop(checker, stmt_for);
             }
-            if checker.enabled(Rule::UnnecessaryEnumerate) {
+            if checker.is_rule_enabled(Rule::UnnecessaryEnumerate) {
                 refurb::rules::unnecessary_enumerate(checker, stmt_for);
             }
-            if checker.enabled(Rule::EnumerateForLoop) {
+            if checker.is_rule_enabled(Rule::EnumerateForLoop) {
                 flake8_simplify::rules::enumerate_for_loop(checker, stmt_for);
             }
-            if checker.enabled(Rule::LoopIteratorMutation) {
+            if checker.is_rule_enabled(Rule::LoopIteratorMutation) {
                 flake8_bugbear::rules::loop_iterator_mutation(checker, stmt_for);
             }
-            if checker.enabled(Rule::DictIndexMissingItems) {
+            if checker.is_rule_enabled(Rule::DictIndexMissingItems) {
                 pylint::rules::dict_index_missing_items(checker, stmt_for);
             }
-            if checker.enabled(Rule::ManualDictComprehension) {
+            if checker.is_rule_enabled(Rule::ManualDictComprehension) {
                 perflint::rules::manual_dict_comprehension(checker, stmt_for);
             }
-            if checker.enabled(Rule::ManualListComprehension) {
+            if checker.is_rule_enabled(Rule::ManualListComprehension) {
                 perflint::rules::manual_list_comprehension(checker, stmt_for);
             }
         }

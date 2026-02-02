@@ -90,3 +90,14 @@ def func():
 
 def func():
     {(a, b): a + b for (a, b) in [(1, 2), (3, 4)]}  # OK
+
+# https://github.com/astral-sh/ruff/issues/18764
+{ # 1
+a # 2
+: # 3
+None # 4
+for # 5
+a # 6
+in # 7
+iterable # 8
+} # 9

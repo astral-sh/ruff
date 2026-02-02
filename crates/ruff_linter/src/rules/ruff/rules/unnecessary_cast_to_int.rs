@@ -1,18 +1,18 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::{Arguments, Expr, ExprCall};
-use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{lines_after_ignoring_trivia, CommentRanges};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
+use ruff_python_trivia::{CommentRanges, lines_after_ignoring_trivia};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::unnecessary_round::{
-    rounded_and_ndigits, InferredType, NdigitsValue, RoundedValue,
+    InferredType, NdigitsValue, RoundedValue, rounded_and_ndigits,
 };
-use crate::Locator;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -45,6 +45,7 @@ use crate::Locator;
 /// overriding the `__round__`, `__ceil__`, `__floor__`, or `__trunc__` dunder methods
 /// such that they don't return an integer.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryCastToInt;
 
 impl AlwaysFixableViolation for UnnecessaryCastToInt {
@@ -85,36 +86,36 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
         applicability,
         checker.semantic(),
         checker.locator(),
+        checker.tokens(),
         checker.comment_ranges(),
         checker.source(),
     );
-    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range());
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(UnnecessaryCastToInt, call.range())
+        .set_fix(fix);
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.
+#[allow(clippy::too_many_arguments)]
 fn unwrap_int_expression(
     call: &ExprCall,
     argument: &Expr,
     applicability: Applicability,
     semantic: &SemanticModel,
     locator: &Locator,
+    tokens: &Tokens,
     comment_ranges: &CommentRanges,
     source: &str,
 ) -> Fix {
-    let content = if let Some(range) = parenthesized_range(
-        argument.into(),
-        (&call.arguments).into(),
-        comment_ranges,
-        source,
-    ) {
+    let content = if let Some(range) =
+        parenthesized_range(argument.into(), (&call.arguments).into(), tokens)
+    {
         locator.slice(range).to_string()
     } else {
         let parenthesize = semantic.current_expression_parent().is_some()
             || argument.is_named_expr()
             || locator.count_lines(argument.range()) > 0;
-        if parenthesize && !has_own_parentheses(argument, comment_ranges, source) {
+        if parenthesize && !has_own_parentheses(argument, tokens, source) {
             format!("({})", locator.slice(argument.range()))
         } else {
             locator.slice(argument.range()).to_string()
@@ -158,9 +159,10 @@ fn call_applicability(checker: &Checker, inner_call: &ExprCall) -> Option<Applic
     match qualified_name.segments() {
         // Always returns a strict instance of `int`
         ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
-        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => {
-            Some(Applicability::Safe)
-        }
+        | [
+            "math",
+            "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm",
+        ] => Some(Applicability::Safe),
 
         // Depends on `ndigits` and `number.__round__`
         ["" | "builtins", "round"] => round_applicability(arguments, checker.semantic()),
@@ -253,7 +255,7 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
 }
 
 /// Returns `true` if the given [`Expr`] has its own parentheses (e.g., `()`, `[]`, `{}`).
-fn has_own_parentheses(expr: &Expr, comment_ranges: &CommentRanges, source: &str) -> bool {
+fn has_own_parentheses(expr: &Expr, tokens: &Tokens, source: &str) -> bool {
     match expr {
         Expr::ListComp(_)
         | Expr::SetComp(_)
@@ -274,14 +276,10 @@ fn has_own_parentheses(expr: &Expr, comment_ranges: &CommentRanges, source: &str
             // f
             // (10)
             // ```
-            let func_end = parenthesized_range(
-                call_expr.func.as_ref().into(),
-                call_expr.into(),
-                comment_ranges,
-                source,
-            )
-            .unwrap_or(call_expr.func.range())
-            .end();
+            let func_end =
+                parenthesized_range(call_expr.func.as_ref().into(), call_expr.into(), tokens)
+                    .unwrap_or(call_expr.func.range())
+                    .end();
             lines_after_ignoring_trivia(func_end, source) == 0
         }
         Expr::Subscript(subscript_expr) => {
@@ -289,8 +287,7 @@ fn has_own_parentheses(expr: &Expr, comment_ranges: &CommentRanges, source: &str
             let subscript_end = parenthesized_range(
                 subscript_expr.value.as_ref().into(),
                 subscript_expr.into(),
-                comment_ranges,
-                source,
+                tokens,
             )
             .unwrap_or(subscript_expr.value.range())
             .end();

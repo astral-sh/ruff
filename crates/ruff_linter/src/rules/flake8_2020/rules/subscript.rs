@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_2020::helpers::is_sys;
@@ -38,6 +38,7 @@ use crate::rules::flake8_2020::helpers::is_sys;
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionSlice3;
 
 impl Violation for SysVersionSlice3 {
@@ -78,6 +79,7 @@ impl Violation for SysVersionSlice3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersion2;
 
 impl Violation for SysVersion2 {
@@ -118,6 +120,7 @@ impl Violation for SysVersion2 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersion0;
 
 impl Violation for SysVersion0 {
@@ -158,6 +161,7 @@ impl Violation for SysVersion0 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.113")]
 pub(crate) struct SysVersionSlice1;
 
 impl Violation for SysVersionSlice1 {
@@ -176,16 +180,17 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
                 upper: Some(upper),
                 step: None,
                 range: _,
+                node_index: _,
             }) => {
                 if let Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(i),
                     ..
                 }) = upper.as_ref()
                 {
-                    if *i == 1 && checker.enabled(Rule::SysVersionSlice1) {
-                        checker.report_diagnostic(Diagnostic::new(SysVersionSlice1, value.range()));
-                    } else if *i == 3 && checker.enabled(Rule::SysVersionSlice3) {
-                        checker.report_diagnostic(Diagnostic::new(SysVersionSlice3, value.range()));
+                    if *i == 1 && checker.is_rule_enabled(Rule::SysVersionSlice1) {
+                        checker.report_diagnostic(SysVersionSlice1, value.range());
+                    } else if *i == 3 && checker.is_rule_enabled(Rule::SysVersionSlice3) {
+                        checker.report_diagnostic(SysVersionSlice3, value.range());
                     }
                 }
             }
@@ -194,10 +199,10 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
                 value: ast::Number::Int(i),
                 ..
             }) => {
-                if *i == 2 && checker.enabled(Rule::SysVersion2) {
-                    checker.report_diagnostic(Diagnostic::new(SysVersion2, value.range()));
-                } else if *i == 0 && checker.enabled(Rule::SysVersion0) {
-                    checker.report_diagnostic(Diagnostic::new(SysVersion0, value.range()));
+                if *i == 2 && checker.is_rule_enabled(Rule::SysVersion2) {
+                    checker.report_diagnostic(SysVersion2, value.range());
+                } else if *i == 0 && checker.is_rule_enabled(Rule::SysVersion0) {
+                    checker.report_diagnostic(SysVersion0, value.range());
                 }
             }
 

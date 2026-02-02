@@ -11,7 +11,7 @@ use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{
-    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
+    PyprojectConfig, ResolvedFile, match_exclusion, python_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -21,6 +21,7 @@ pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     config_arguments: &ConfigArguments,
+    reason: Option<&str>,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
@@ -68,7 +69,7 @@ pub(crate) fn add_noqa(
             {
                 return None;
             }
-            let source_kind = match SourceKind::from_path(path, source_type) {
+            let source_kind = match SourceKind::from_path(path, SourceType::Python(source_type)) {
                 Ok(Some(source_kind)) => source_kind,
                 Ok(None) => return None,
                 Err(e) => {
@@ -76,7 +77,14 @@ pub(crate) fn add_noqa(
                     return None;
                 }
             };
-            match add_noqa_to_path(path, package, &source_kind, source_type, &settings.linter) {
+            match add_noqa_to_path(
+                path,
+                package,
+                &source_kind,
+                source_type,
+                &settings.linter,
+                reason,
+            ) {
                 Ok(count) => Some(count),
                 Err(e) => {
                     error!("Failed to add noqa to {}: {e}", path.display());

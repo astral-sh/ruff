@@ -1,6 +1,6 @@
-use anyhow::{bail, Result};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use anyhow::{Result, bail};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for generator expressions, list and set comprehensions that can
@@ -40,12 +41,16 @@ use crate::importer::ImportRequest;
 /// all(starmap(predicate, some_iterable))
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `itertools.starmap`](https://docs.python.org/3/library/itertools.html#itertools.starmap)
 ///
 /// [PEP 709]: https://peps.python.org/pep-0709/
 /// [#7771]: https://github.com/astral-sh/ruff/issues/7771
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.291")]
 pub(crate) struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {
@@ -133,7 +138,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         }
     }
 
-    let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
+    let mut diagnostic = checker.report_diagnostic(ReimplementedStarmap, target.range());
     diagnostic.try_set_fix(|| {
         // Import `starmap` from `itertools`.
         let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
@@ -154,9 +159,19 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             )?,
             target.range(),
         );
-        Ok(Fix::safe_edits(import_edit, [main_edit]))
+
+        let applicability = if checker.comment_ranges().intersects(target.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(Fix::applicable_edits(
+            import_edit,
+            [main_edit],
+            applicability,
+        ))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.
@@ -299,6 +314,7 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
         id: starmap_binding,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     ast::ExprCall {
         func: Box::new(starmap.into()),
@@ -306,8 +322,10 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
             args: Box::from([func.clone(), iter.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
 }
 
@@ -317,6 +335,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
         id: func_name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     ast::ExprCall {
         func: Box::new(name.into()),
@@ -324,8 +343,10 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
             args: Box::from([call.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
 }
 
@@ -338,7 +359,9 @@ enum ComprehensionTarget<'a> {
 }
 
 /// Extract the target from the comprehension (e.g., `(x, y, z)` in `(x, y, z, ...) in iter`).
-fn match_comprehension_target(comprehension: &ast::Comprehension) -> Option<ComprehensionTarget> {
+fn match_comprehension_target(
+    comprehension: &ast::Comprehension,
+) -> Option<ComprehensionTarget<'_>> {
     if comprehension.is_async || !comprehension.ifs.is_empty() {
         return None;
     }

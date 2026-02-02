@@ -26,3 +26,9 @@ def hello():
 
 f"foo"u"bar"  # OK
 f"foo" u"bar"  # OK
+
+# https://github.com/astral-sh/ruff/issues/18895
+""u""
+""u"hi"
+""""""""""""""""""""u"hi"
+""U"helloooo"

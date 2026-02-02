@@ -208,7 +208,7 @@ impl<'stmt> MermaidGraph<'stmt> for CFGWithSource<'stmt> {
                 return MermaidNode {
                     content: "EXIT".to_string(),
                     shape: MermaidNodeShape::DoubleCircle,
-                }
+                };
             }
         };
 

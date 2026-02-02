@@ -1,9 +1,9 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::WithItem;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
+    Parentheses, Parenthesize, is_expression_parenthesized, parenthesized,
 };
 use crate::prelude::*;
 
@@ -94,6 +94,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
     fn fmt_fields(&self, item: &WithItem, f: &mut PyFormatter) -> FormatResult<()> {
         let WithItem {
             range: _,
+            node_index: _,
             context_expr,
             optional_vars,
         } = item;

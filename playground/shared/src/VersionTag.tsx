@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 export default function VersionTag({ children }: { children: ReactNode }) {
   return (
     <div
+      title="Version"
       className={classNames(
         "text-gray-500",
         "text-xs",

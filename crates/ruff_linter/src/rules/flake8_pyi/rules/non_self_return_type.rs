@@ -1,10 +1,10 @@
 use crate::checkers::ast::{Checker, TypingImporter};
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::PythonVersion;
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
@@ -50,6 +50,29 @@ use ruff_text_size::Ranged;
 /// 1. `__aiter__` methods that return `AsyncIterator`, despite the class
 ///    inheriting directly from `AsyncIterator`.
 ///
+/// The rule attempts to avoid flagging methods on metaclasses, since
+/// [PEP 673] specifies that `Self` is disallowed in metaclasses. Ruff can
+/// detect a class as being a metaclass if it inherits from a stdlib
+/// metaclass such as `builtins.type` or `abc.ABCMeta`, and additionally
+/// infers that a class may be a metaclass if it has a `__new__` method
+/// with a similar signature to `type.__new__`. The heuristic used to
+/// identify a metaclass-like `__new__` method signature is that it:
+///
+/// 1. Has exactly 5 parameters (including `cls`)
+/// 1. Has a second parameter annotated with `str`
+/// 1. Has a third parameter annotated with a `tuple` type
+/// 1. Has a fourth parameter annotated with a `dict` type
+/// 1. Has a fifth parameter is keyword-variadic (`**kwargs`)
+///
+/// For example, the following class would be detected as a metaclass, disabling
+/// the rule:
+///
+/// ```python
+/// class MyMetaclass(django.db.models.base.ModelBase):
+///     def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MyMetaclass:
+///         ...
+/// ```
+///
 /// ## Example
 ///
 /// ```pyi
@@ -87,7 +110,10 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
+///
+/// [PEP 673]: https://peps.python.org/pep-0673/#valid-locations-for-self
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct NonSelfReturnType {
     class_name: String,
     method_name: String,
@@ -106,7 +132,9 @@ impl Violation for NonSelfReturnType {
         if matches!(class_name.as_str(), "__new__") {
             "`__new__` methods usually return `self` at runtime".to_string()
         } else {
-            format!("`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime")
+            format!(
+                "`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime"
+            )
         }
     }
 
@@ -140,7 +168,10 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if analyze::class::is_metaclass(class_def, semantic).is_yes() {
+    if !matches!(
+        analyze::class::is_metaclass(class_def, semantic),
+        analyze::class::IsMetaclass::No
+    ) {
         return;
     }
 
@@ -151,7 +182,7 @@ pub(crate) fn non_self_return_type(
 
     if is_async {
         if name == "__aenter__"
-            && is_name(returns, &class_def.name)
+            && is_name_or_stringized_name(returns, &class_def.name, checker)
             && !is_final(&class_def.decorator_list, semantic)
         {
             add_diagnostic(checker, stmt, returns, class_def, name);
@@ -167,7 +198,7 @@ pub(crate) fn non_self_return_type(
         return;
     }
 
-    if is_name(returns, &class_def.name) {
+    if is_name_or_stringized_name(returns, &class_def.name, checker) {
         if matches!(name, "__enter__" | "__new__") && !is_final(&class_def.decorator_list, semantic)
         {
             add_diagnostic(checker, stmt, returns, class_def, name);
@@ -206,7 +237,7 @@ fn add_diagnostic(
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NonSelfReturnType {
             class_name: class_def.name.to_string(),
             method_name: method_name.to_string(),
@@ -217,8 +248,6 @@ fn add_diagnostic(
     diagnostic.try_set_fix(|| {
         replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn replace_with_self_fix(
@@ -296,6 +325,11 @@ fn is_name(expr: &ast::Expr, name: &str) -> bool {
         return false;
     };
     id.as_str() == name
+}
+
+/// Return `true` if the given expression resolves to the given name,
+fn is_name_or_stringized_name(expr: &ast::Expr, name: &str, checker: &Checker) -> bool {
+    checker.match_maybe_stringized_annotation(expr, |expr| is_name(expr, name))
 }
 
 /// Return `true` if the given expression resolves to `typing.Self`.

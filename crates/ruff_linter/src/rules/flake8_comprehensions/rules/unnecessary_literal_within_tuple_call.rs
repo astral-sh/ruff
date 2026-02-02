@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -8,8 +7,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::preview::is_check_comprehensions_in_tuple_call_enabled;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
@@ -48,6 +48,7 @@ use super::helpers;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.66")]
 pub(crate) struct UnnecessaryLiteralWithinTupleCall {
     literal_kind: TupleLiteralKind,
 }
@@ -101,7 +102,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     let argument_kind = match argument {
         Expr::Tuple(_) => TupleLiteralKind::Tuple,
         Expr::List(_) => TupleLiteralKind::List,
-        Expr::ListComp(_) if is_check_comprehensions_in_tuple_call_enabled(checker.settings) => {
+        Expr::ListComp(_) if is_check_comprehensions_in_tuple_call_enabled(checker.settings()) => {
             TupleLiteralKind::ListComp
         }
         _ => return,
@@ -110,7 +111,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralWithinTupleCall {
             literal_kind: argument_kind,
         },
@@ -124,7 +125,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
                 let needs_trailing_comma = if let [item] = elts.as_slice() {
                     SimpleTokenizer::new(
                         checker.locator().contents(),
-                        TextRange::new(item.end(), call.end()),
+                        TextRange::new(item.end(), argument.end()),
                     )
                     .all(|token| token.kind != SimpleTokenKind::Comma)
                 } else {
@@ -165,10 +166,8 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
             });
         }
 
-        _ => return,
+        _ => (),
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, PartialEq, Eq)]

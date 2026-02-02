@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{analyze, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 ///         contents = await f.read()
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct BlockingOpenCallInAsyncFunction;
 
 impl Violation for BlockingOpenCallInAsyncFunction {
@@ -52,10 +53,7 @@ pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
     if is_open_call(&call.func, checker.semantic())
         || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
     {
-        checker.report_diagnostic(Diagnostic::new(
-            BlockingOpenCallInAsyncFunction,
-            call.func.range(),
-        ));
+        checker.report_diagnostic(BlockingOpenCallInAsyncFunction, call.func.range());
     }
 }
 
@@ -72,7 +70,7 @@ fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Returns `true` if an expression resolves to a call to `pathlib.Path.open`.
-fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
         return false;
     };

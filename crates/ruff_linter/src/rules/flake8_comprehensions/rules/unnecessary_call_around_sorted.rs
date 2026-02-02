@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
@@ -32,13 +32,17 @@ use crate::rules::flake8_comprehensions::fixes;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as `reversed()` and `reverse=True` will
-/// yield different results in the event of custom sort keys or equality
-/// functions. Specifically, `reversed()` will reverse the order of the
-/// collection, while `sorted()` with `reverse=True` will perform a stable
+/// This rule's fix is marked as unsafe for `reversed()` cases, as `reversed()`
+/// and `reverse=True` will yield different results in the event of custom sort
+/// keys or equality functions. Specifically, `reversed()` will reverse the order
+/// of the collection, while `sorted()` with `reverse=True` will perform a stable
 /// reverse sort, which will preserve the order of elements that compare as
 /// equal.
+///
+/// The fix is marked as safe for `list()` cases, as removing `list()` around
+/// `sorted()` does not change the behavior.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UnnecessaryCallAroundSorted {
     func: UnnecessaryFunction,
 }
@@ -79,7 +83,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     if !semantic.match_builtin_expr(inner_func, "sorted") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryCallAroundSorted {
             func: unnecessary_function,
         },
@@ -94,7 +98,6 @@ pub(crate) fn unnecessary_call_around_sorted(
         };
         Ok(Fix::applicable_edit(edit, applicability))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -1,0 +1,72 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: tuples.md - Comparison: Tuples - Equality with elements that incorrectly implement `__bool__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class NotBoolable:
+ 2 |     __bool__: None = None
+ 3 | 
+ 4 | class A:
+ 5 |     # error: [invalid-method-override]
+ 6 |     def __eq__(self, other) -> NotBoolable:
+ 7 |         return NotBoolable()
+ 8 | 
+ 9 | # error: [unsupported-bool-conversion]
+10 | (A(),) == (A(),)
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `__eq__`
+   --> src/mdtest_snippet.py:6:9
+    |
+  4 | class A:
+  5 |     # error: [invalid-method-override]
+  6 |     def __eq__(self, other) -> NotBoolable:
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
+  7 |         return NotBoolable()
+    |
+   ::: stdlib/builtins.pyi:142:9
+    |
+140 |     def __setattr__(self, name: str, value: Any, /) -> None: ...
+141 |     def __delattr__(self, name: str, /) -> None: ...
+142 |     def __eq__(self, value: object, /) -> bool: ...
+    |         -------------------------------------- `object.__eq__` defined here
+143 |     def __ne__(self, value: object, /) -> bool: ...
+144 |     def __str__(self) -> str: ...  # noqa: Y029
+    |
+info: This violates the Liskov Substitution Principle
+help: It is recommended for `__eq__` to work with arbitrary objects, for example:
+help
+help:     def __eq__(self, other: object) -> bool:
+help:         if not isinstance(other, A):
+help:             return False
+help:         return <logic to compare two `A` instances>
+help
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+  --> src/mdtest_snippet.py:10:1
+   |
+ 9 | # error: [unsupported-bool-conversion]
+10 | (A(),) == (A(),)
+   | ^^^^^^^^^^^^^^^^
+   |
+info: `__bool__` on `NotBoolable` must be callable
+info: rule `unsupported-bool-conversion` is enabled by default
+
+```

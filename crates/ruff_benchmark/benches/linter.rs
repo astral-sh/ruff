@@ -1,18 +1,18 @@
 use ruff_benchmark::criterion;
 
 use criterion::{
-    criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
+    BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
 use ruff_benchmark::{
-    TestCase, LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
-use ruff_linter::linter::{lint_only, ParseSource};
+use ruff_linter::linter::{ParseSource, lint_only};
 use ruff_linter::rule_selector::PreviewOptions;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::PreviewMode;
-use ruff_linter::settings::{flags, LinterSettings};
+use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::SourceKind;
-use ruff_linter::{registry::Rule, RuleSelector};
+use ruff_linter::{RuleSelector, registry::Rule};
 use ruff_python_ast::PySourceType;
 use ruff_python_parser::parse_module;
 
@@ -26,7 +26,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
 #[global_allocator]
@@ -42,12 +43,13 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
-#[allow(non_upper_case_globals)]
-#[export_name = "_rjem_malloc_conf"]
-#[allow(unsafe_code)]
+#[unsafe(export_name = "_rjem_malloc_conf")]
+#[expect(non_upper_case_globals)]
+#[expect(unsafe_code)]
 pub static _rjem_malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
 
 fn create_test_cases() -> Vec<TestCase> {
@@ -77,19 +79,23 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                 b.iter_batched(
                     || parsed.clone(),
                     |parsed| {
+                        // Assert that file contains no parse errors
+                        assert!(parsed.has_valid_syntax());
+
                         let path = case.path();
-                        let result = lint_only(
+                        let py_source_type = PySourceType::from(path.as_path());
+                        lint_only(
                             &path,
                             None,
                             settings,
                             flags::Noqa::Enabled,
-                            &SourceKind::Python(case.code().to_string()),
-                            PySourceType::from(path.as_path()),
+                            &SourceKind::Python {
+                                code: case.code().to_string(),
+                                is_stub: py_source_type.is_stub(),
+                            },
+                            py_source_type,
                             ParseSource::Precomputed(parsed),
-                        );
-
-                        // Assert that file contains no parse errors
-                        assert!(!result.has_syntax_errors());
+                        )
                     },
                     criterion::BatchSize::SmallInput,
                 );

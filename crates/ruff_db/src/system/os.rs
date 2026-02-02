@@ -1,19 +1,21 @@
-use filetime::FileTime;
-use ruff_notebook::{Notebook, NotebookError};
-use rustc_hash::FxHashSet;
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
-use std::{any::Any, path::PathBuf};
-
-use crate::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
-};
+#![allow(clippy::disallowed_methods)]
 
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
 };
+use crate::max_parallelism;
+use crate::system::{
+    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+};
+use filetime::FileTime;
+use ruff_notebook::{Notebook, NotebookError};
+use rustc_hash::FxHashSet;
+use std::num::NonZeroUsize;
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+use std::{any::Any, path::PathBuf};
 
 /// A system implementation that uses the OS file system.
 #[derive(Debug, Clone)]
@@ -50,7 +52,6 @@ impl OsSystem {
 
         Self {
             // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
-            #[allow(clippy::needless_update)]
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
                 case_sensitivity,
@@ -161,12 +162,50 @@ impl System for OsSystem {
         None
     }
 
+    /// Returns an absolute cache directory on the system.
+    ///
+    /// On Linux and macOS, uses `$XDG_CACHE_HOME/ty` or `.cache/ty`.
+    /// On Windows, uses `C:\Users\User\AppData\Local\ty\cache`.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        use etcetera::BaseStrategy as _;
+
+        let cache_dir = etcetera::base_strategy::choose_base_strategy()
+            .ok()
+            .map(|dirs| dirs.cache_dir().join("ty"))
+            .map(|cache_dir| {
+                if cfg!(windows) {
+                    // On Windows, we append `cache` to the LocalAppData directory, i.e., prefer
+                    // `C:\Users\User\AppData\Local\ty\cache` over `C:\Users\User\AppData\Local\ty`.
+                    cache_dir.join("cache")
+                } else {
+                    cache_dir
+                }
+            })
+            .and_then(|path| SystemPathBuf::from_path_buf(path).ok())
+            .unwrap_or_else(|| SystemPathBuf::from(".ty_cache"));
+
+        Some(cache_dir)
+    }
+
+    // TODO: Remove this feature gating once `ruff_wasm` no longer indirectly depends on `ruff_db` with the
+    //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
+    #[cfg(target_arch = "wasm32")]
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     /// Creates a builder to recursively walk `path`.
     ///
     /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        WalkDirectoryBuilder::new(path, OsDirectoryWalker {})
+        WalkDirectoryBuilder::new(
+            path,
+            OsDirectoryWalker {
+                cwd: self.current_directory().to_path_buf(),
+            },
+        )
     }
 
     fn glob(
@@ -193,6 +232,10 @@ impl System for OsSystem {
         })
     }
 
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -215,6 +258,14 @@ impl System for OsSystem {
             })
         })))
     }
+
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        std::env::var(name)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
 }
 
 impl OsSystem {
@@ -224,16 +275,16 @@ impl OsSystem {
     /// instead of at least one system call for each component between `path` and `prefix`.
     ///
     /// However, using `canonicalize` to resolve the path's casing doesn't work in two cases:
-    /// * if `path` is a symlink because `canonicalize` then returns the symlink's target and not the symlink's source path.
-    /// * on Windows: If `path` is a mapped network drive because `canonicalize` then returns the UNC path
-    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` then returns `\\?\UNC\server\share`).
+    /// * if `path` is a symlink, `canonicalize` returns the symlink's target and not the symlink's source path.
+    /// * on Windows: If `path` is a mapped network drive, `canonicalize` returns the UNC path
+    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` returns `\\?\UNC\server\share`).
     ///
     /// Symlinks and mapped network drives should be rare enough that this fast path is worth trying first,
     /// even if it comes at a cost for those rare use cases.
     fn path_exists_case_sensitive_fast(&self, path: &SystemPath) -> Option<bool> {
         // This is a more forgiving version of `dunce::simplified` that removes all `\\?\` prefixes on Windows.
         // We use this more forgiving version because we don't intend on using either path for anything other than comparison
-        // and the prefix is only relevant when passing the path to other programs and its longer than 200 something
+        // and the prefix is only relevant when passing the path to other programs and it's longer than 200 something
         // characters.
         fn simplify_ignore_verbatim(path: &SystemPath) -> &SystemPath {
             if cfg!(windows) {
@@ -247,9 +298,7 @@ impl OsSystem {
             }
         }
 
-        let simplified = simplify_ignore_verbatim(path);
-
-        let Ok(canonicalized) = simplified.as_std_path().canonicalize() else {
+        let Ok(canonicalized) = path.as_std_path().canonicalize() else {
             // The path doesn't exist or can't be accessed. The path doesn't exist.
             return Some(false);
         };
@@ -257,17 +306,22 @@ impl OsSystem {
         let Ok(canonicalized) = SystemPathBuf::from_path_buf(canonicalized) else {
             // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
             // that a symlink is involved. Fall back to the slow path.
-            tracing::debug!("Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8");
+            tracing::debug!(
+                "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{path}` is not valid UTF-8"
+            );
             return None;
         };
 
         let simplified_canonicalized = simplify_ignore_verbatim(&canonicalized);
+        let simplified = simplify_ignore_verbatim(path);
 
         // Test if the paths differ by anything other than casing. If so, that suggests that
         // `path` pointed to a symlink (or some other none reversible path normalization happened).
         // In this case, fall back to the slow path.
         if simplified_canonicalized.as_str().to_lowercase() != simplified.as_str().to_lowercase() {
-            tracing::debug!("Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing");
+            tracing::debug!(
+                "Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing"
+            );
             return None;
         }
 
@@ -303,12 +357,20 @@ impl OsSystem {
 }
 
 impl WritableSystem for OsSystem {
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        std::fs::File::create_new(path).map(drop)
+    }
+
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }
 
@@ -400,7 +462,9 @@ struct ListedDirectory {
 }
 
 #[derive(Debug)]
-struct OsDirectoryWalker;
+struct OsDirectoryWalker {
+    cwd: SystemPathBuf,
+}
 
 impl DirectoryWalker for OsDirectoryWalker {
     fn walk(
@@ -419,6 +483,7 @@ impl DirectoryWalker for OsDirectoryWalker {
         };
 
         let mut builder = ignore::WalkBuilder::new(first.as_std_path());
+        builder.current_dir(self.cwd.as_std_path());
 
         builder.standard_filters(standard_filters);
         builder.hidden(hidden);
@@ -427,11 +492,7 @@ impl DirectoryWalker for OsDirectoryWalker {
             builder.add(additional_path.as_std_path());
         }
 
-        builder.threads(
-            std::thread::available_parallelism()
-                .map_or(1, std::num::NonZeroUsize::get)
-                .min(12),
-        );
+        builder.threads(max_parallelism().min(NonZeroUsize::new(12).unwrap()).get());
 
         builder.build_parallel().run(|| {
             let mut visitor = visitor_builder.build();
@@ -667,8 +728,8 @@ fn detect_case_sensitivity(path: &SystemPath) -> CaseSensitivity {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::DirectoryEntry;
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
 
     use super::*;
 

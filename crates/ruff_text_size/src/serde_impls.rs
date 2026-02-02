@@ -1,6 +1,6 @@
 use {
     crate::{TextRange, TextSize},
-    serde::{de, Deserialize, Deserializer, Serialize, Serializer},
+    serde::{Deserialize, Deserializer, Serialize, Serializer, de},
 };
 
 impl Serialize for TextSize {
@@ -31,7 +31,7 @@ impl Serialize for TextRange {
 }
 
 impl<'de> Deserialize<'de> for TextRange {
-    #[allow(clippy::nonminimal_bool)]
+    #[expect(clippy::nonminimal_bool)]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,

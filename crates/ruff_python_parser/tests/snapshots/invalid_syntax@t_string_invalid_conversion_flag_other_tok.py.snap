@@ -1,0 +1,122 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_conversion_flag_other_tok.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..66,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 44..54,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 44..54,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 44..54,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 46..53,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 47..48,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 55..65,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 55..65,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 55..65,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 57..64,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 58..59,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"{x!123}"
+  |      ^^^ Syntax Error: t-string: invalid conversion character
+3 | t"{x!'a'}"
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"{x!123}"
+3 | t"{x!'a'}"
+  |      ^^^ Syntax Error: t-string: invalid conversion character
+  |

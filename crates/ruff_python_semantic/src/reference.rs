@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use bitflags::bitflags;
 
-use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_index::{IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::ExprContext;
 use ruff_text_size::{Ranged, TextRange};
 

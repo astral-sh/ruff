@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
+F401 [*] `multiprocessing.process` imported but unused
+  --> F401_0.py:10:8
+   |
+ 8 | )
+ 9 | import multiprocessing.pool
+10 | import multiprocessing.process
+   |        ^^^^^^^^^^^^^^^^^^^^^^^
+11 | import logging.config
+12 | import logging.handlers
+   |
+help: Remove unused import: `multiprocessing.process`
+7  |     namedtuple,
+8  | )
+9  | import multiprocessing.pool
+   - import multiprocessing.process
+10 | import logging.config
+11 | import logging.handlers
+12 | from typing import (
+
+
+F401 [*] `logging.config` imported but unused
+  --> F401_0.py:11:8
+   |
+ 9 | import multiprocessing.pool
+10 | import multiprocessing.process
+11 | import logging.config
+   |        ^^^^^^^^^^^^^^
+12 | import logging.handlers
+13 | from typing import (
+   |
+help: Remove unused import: `logging.config`
+8  | )
+9  | import multiprocessing.pool
+10 | import multiprocessing.process
+   - import logging.config
+11 | import logging.handlers
+12 | from typing import (
+13 |     TYPE_CHECKING,

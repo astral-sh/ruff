@@ -38,6 +38,10 @@ class NonEmptyWithInit:
     def __init__():
         pass
 
+class NonEmptyChildWithInlineComment:
+    value: int
+    ... # preserve me
+
 # Not violations
 
 class EmptyClass: ...

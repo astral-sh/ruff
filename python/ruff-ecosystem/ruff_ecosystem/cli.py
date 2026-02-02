@@ -87,7 +87,8 @@ def entrypoint():
     )
 
     with cache_context as cache:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         main_task = asyncio.ensure_future(
             main(
                 command=RuffCommand(args.ruff_command),

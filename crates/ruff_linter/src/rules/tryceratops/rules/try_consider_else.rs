@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -29,6 +29,7 @@ use crate::checkers::ast::Checker;
 ///         return rec
 ///     except ZeroDivisionError:
 ///         logging.exception("Exception occurred")
+///         raise
 /// ```
 ///
 /// Use instead:
@@ -41,6 +42,7 @@ use crate::checkers::ast::Checker;
 ///         rec = 1 / n
 ///     except ZeroDivisionError:
 ///         logging.exception("Exception occurred")
+///         raise
 ///     else:
 ///         print(f"reciprocal of {n} is {rec}")
 ///         return rec
@@ -49,6 +51,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Errors and Exceptions](https://docs.python.org/3/tutorial/errors.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct TryConsiderElse;
 
 impl Violation for TryConsiderElse {
@@ -67,13 +70,18 @@ pub(crate) fn try_consider_else(
 ) {
     if body.len() > 1 && orelse.is_empty() && !handler.is_empty() {
         if let Some(stmt) = body.last() {
-            if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
+            if let Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }) = stmt
+            {
                 if let Some(value) = value {
                     if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
                         return;
                     }
                 }
-                checker.report_diagnostic(Diagnostic::new(TryConsiderElse, stmt.range()));
+                checker.report_diagnostic(TryConsiderElse, stmt.range());
             }
         }
     }

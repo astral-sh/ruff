@@ -1,0 +1,133 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        TStringStart,
+        0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        2..3,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        3..4,
+    ),
+    (
+        Exclamation,
+        4..5,
+    ),
+    (
+        Name(
+            Name("s"),
+        ),
+        5..6,
+    ),
+    (
+        Rbrace,
+        6..7,
+    ),
+    (
+        InterpolatedStringMiddle(
+            " ",
+        ),
+        7..8,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        8..9,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        9..10,
+    ),
+    (
+        Equal,
+        10..11,
+    ),
+    (
+        Exclamation,
+        11..12,
+    ),
+    (
+        Name(
+            Name("r"),
+        ),
+        12..13,
+    ),
+    (
+        Rbrace,
+        13..14,
+    ),
+    (
+        InterpolatedStringMiddle(
+            " ",
+        ),
+        14..15,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        15..16,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        16..17,
+    ),
+    (
+        Colon,
+        17..18,
+    ),
+    (
+        InterpolatedStringMiddle(
+            ".3f!r",
+        ),
+        18..23,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Rbrace,
+        23..24,
+    ),
+    (
+        InterpolatedStringMiddle(
+            " {x!r}",
+        ),
+        24..32,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        32..33,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        33..33,
+    ),
+]
+```

@@ -1,0 +1,270 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF057 [*] Value being rounded is already an integer
+ --> RUF057.py:6:1
+  |
+6 | round(42)                                         # Error (safe)
+  | ^^^^^^^^^
+7 | round(42, None)                                   # Error (safe)
+8 | round(42, 2)                                      # Error (safe)
+  |
+help: Remove unnecessary `round` call
+3 | 
+4 | 
+5 | 
+  - round(42)                                         # Error (safe)
+6 + 42                                         # Error (safe)
+7 | round(42, None)                                   # Error (safe)
+8 | round(42, 2)                                      # Error (safe)
+9 | round(42, -2)                                     # No error
+
+RUF057 [*] Value being rounded is already an integer
+ --> RUF057.py:7:1
+  |
+6 | round(42)                                         # Error (safe)
+7 | round(42, None)                                   # Error (safe)
+  | ^^^^^^^^^^^^^^^
+8 | round(42, 2)                                      # Error (safe)
+9 | round(42, -2)                                     # No error
+  |
+help: Remove unnecessary `round` call
+4  | 
+5  | 
+6  | round(42)                                         # Error (safe)
+   - round(42, None)                                   # Error (safe)
+7  + 42                                   # Error (safe)
+8  | round(42, 2)                                      # Error (safe)
+9  | round(42, -2)                                     # No error
+10 | round(42, inferred_int)                           # No error
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:8:1
+   |
+ 6 | round(42)                                         # Error (safe)
+ 7 | round(42, None)                                   # Error (safe)
+ 8 | round(42, 2)                                      # Error (safe)
+   | ^^^^^^^^^^^^
+ 9 | round(42, -2)                                     # No error
+10 | round(42, inferred_int)                           # No error
+   |
+help: Remove unnecessary `round` call
+5  | 
+6  | round(42)                                         # Error (safe)
+7  | round(42, None)                                   # Error (safe)
+   - round(42, 2)                                      # Error (safe)
+8  + 42                                      # Error (safe)
+9  | round(42, -2)                                     # No error
+10 | round(42, inferred_int)                           # No error
+11 | round(42, 3 + 4)                                  # No error
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:24:1
+   |
+24 | round(4 + 2)                                      # Error (safe)
+   | ^^^^^^^^^^^^
+25 | round(4 + 2, None)                                # Error (safe)
+26 | round(4 + 2, 2)                                   # Error (safe)
+   |
+help: Remove unnecessary `round` call
+21 | round(42., foo)                                   # No error
+22 | 
+23 | 
+   - round(4 + 2)                                      # Error (safe)
+24 + 4 + 2                                      # Error (safe)
+25 | round(4 + 2, None)                                # Error (safe)
+26 | round(4 + 2, 2)                                   # Error (safe)
+27 | round(4 + 2, -2)                                  # No error
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:25:1
+   |
+24 | round(4 + 2)                                      # Error (safe)
+25 | round(4 + 2, None)                                # Error (safe)
+   | ^^^^^^^^^^^^^^^^^^
+26 | round(4 + 2, 2)                                   # Error (safe)
+27 | round(4 + 2, -2)                                  # No error
+   |
+help: Remove unnecessary `round` call
+22 | 
+23 | 
+24 | round(4 + 2)                                      # Error (safe)
+   - round(4 + 2, None)                                # Error (safe)
+25 + 4 + 2                                # Error (safe)
+26 | round(4 + 2, 2)                                   # Error (safe)
+27 | round(4 + 2, -2)                                  # No error
+28 | round(4 + 2, inferred_int)                        # No error
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:26:1
+   |
+24 | round(4 + 2)                                      # Error (safe)
+25 | round(4 + 2, None)                                # Error (safe)
+26 | round(4 + 2, 2)                                   # Error (safe)
+   | ^^^^^^^^^^^^^^^
+27 | round(4 + 2, -2)                                  # No error
+28 | round(4 + 2, inferred_int)                        # No error
+   |
+help: Remove unnecessary `round` call
+23 | 
+24 | round(4 + 2)                                      # Error (safe)
+25 | round(4 + 2, None)                                # Error (safe)
+   - round(4 + 2, 2)                                   # Error (safe)
+26 + 4 + 2                                   # Error (safe)
+27 | round(4 + 2, -2)                                  # No error
+28 | round(4 + 2, inferred_int)                        # No error
+29 | round(4 + 2, 3 + 4)                               # No error
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:42:1
+   |
+42 | round(inferred_int)                               # Error (unsafe)
+   | ^^^^^^^^^^^^^^^^^^^
+43 | round(inferred_int, None)                         # Error (unsafe)
+44 | round(inferred_int, 2)                            # Error (unsafe)
+   |
+help: Remove unnecessary `round` call
+39 | round(4. + 2., foo)                               # No error
+40 | 
+41 | 
+   - round(inferred_int)                               # Error (unsafe)
+42 + inferred_int                               # Error (unsafe)
+43 | round(inferred_int, None)                         # Error (unsafe)
+44 | round(inferred_int, 2)                            # Error (unsafe)
+45 | round(inferred_int, -2)                           # No error
+note: This is an unsafe fix and may change runtime behavior
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:43:1
+   |
+42 | round(inferred_int)                               # Error (unsafe)
+43 | round(inferred_int, None)                         # Error (unsafe)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+44 | round(inferred_int, 2)                            # Error (unsafe)
+45 | round(inferred_int, -2)                           # No error
+   |
+help: Remove unnecessary `round` call
+40 | 
+41 | 
+42 | round(inferred_int)                               # Error (unsafe)
+   - round(inferred_int, None)                         # Error (unsafe)
+43 + inferred_int                         # Error (unsafe)
+44 | round(inferred_int, 2)                            # Error (unsafe)
+45 | round(inferred_int, -2)                           # No error
+46 | round(inferred_int, inferred_int)                 # No error
+note: This is an unsafe fix and may change runtime behavior
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:44:1
+   |
+42 | round(inferred_int)                               # Error (unsafe)
+43 | round(inferred_int, None)                         # Error (unsafe)
+44 | round(inferred_int, 2)                            # Error (unsafe)
+   | ^^^^^^^^^^^^^^^^^^^^^^
+45 | round(inferred_int, -2)                           # No error
+46 | round(inferred_int, inferred_int)                 # No error
+   |
+help: Remove unnecessary `round` call
+41 | 
+42 | round(inferred_int)                               # Error (unsafe)
+43 | round(inferred_int, None)                         # Error (unsafe)
+   - round(inferred_int, 2)                            # Error (unsafe)
+44 + inferred_int                            # Error (unsafe)
+45 | round(inferred_int, -2)                           # No error
+46 | round(inferred_int, inferred_int)                 # No error
+47 | round(inferred_int, 3 + 4)                        # No error
+note: This is an unsafe fix and may change runtime behavior
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:71:1
+   |
+69 |   # contains newline.
+70 |   # See https://github.com/astral-sh/ruff/issues/15598
+71 | / round(-
+72 | | 1)
+   | |__^
+73 |   round(1
+74 |   *1
+   |
+help: Remove unnecessary `round` call
+68 | # Fixes should preserve parentheses when argument
+69 | # contains newline.
+70 | # See https://github.com/astral-sh/ruff/issues/15598
+   - round(-
+71 + (-
+72 | 1)
+73 | round(1
+74 | *1
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:73:1
+   |
+71 |   round(-
+72 |   1)
+73 | / round(1
+74 | | *1
+75 | | )
+   | |_^
+76 |
+77 |   # fix should be unsafe if comment is in call range
+   |
+help: Remove unnecessary `round` call
+70 | # See https://github.com/astral-sh/ruff/issues/15598
+71 | round(-
+72 | 1)
+   - round(1
+   - *1
+   - )
+73 + (1
+74 + *1)
+75 | 
+76 | # fix should be unsafe if comment is in call range
+77 | round(# a comment
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:78:1
+   |
+77 |   # fix should be unsafe if comment is in call range
+78 | / round(# a comment
+79 | | 17
+80 | | )
+   | |_^
+81 |   round(
+82 |       17 # a comment
+   |
+help: Remove unnecessary `round` call
+75 | )
+76 | 
+77 | # fix should be unsafe if comment is in call range
+   - round(# a comment
+78 | 17
+   - )
+79 | round(
+80 |     17 # a comment
+81 | )
+note: This is an unsafe fix and may change runtime behavior
+
+RUF057 [*] Value being rounded is already an integer
+  --> RUF057.py:81:1
+   |
+79 |   17
+80 |   )
+81 | / round(
+82 | |     17 # a comment
+83 | | )
+   | |_^
+84 |
+85 |   # See: https://github.com/astral-sh/ruff/issues/21209
+   |
+help: Remove unnecessary `round` call
+78 | round(# a comment
+79 | 17
+80 | )
+   - round(
+   -     17 # a comment
+   - )
+81 + 17
+82 | 
+83 | # See: https://github.com/astral-sh/ruff/issues/21209
+84 | print(round(125, **{"ndigits": -2}))
+note: This is an unsafe fix and may change runtime behavior

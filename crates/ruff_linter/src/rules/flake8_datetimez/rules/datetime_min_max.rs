@@ -1,11 +1,11 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -18,21 +18,31 @@ use crate::checkers::ast::Checker;
 /// unexpectedly, as in:
 ///
 /// ```python
+/// import datetime
+///
 /// # Timezone: UTC-14
-/// datetime.min.timestamp()  # ValueError: year 0 is out of range
-/// datetime.max.timestamp()  # ValueError: year 10000 is out of range
+/// datetime.datetime.min.timestamp()  # ValueError: year 0 is out of range
+/// datetime.datetime.max.timestamp()  # ValueError: year 10000 is out of range
 /// ```
 ///
 /// ## Example
 /// ```python
-/// datetime.max
+/// import datetime
+///
+/// datetime.datetime.max
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// datetime.max.replace(tzinfo=datetime.UTC)
+/// import datetime
+///
+/// datetime.datetime.max.replace(tzinfo=datetime.UTC)
 /// ```
+///
+/// ## References
+/// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct DatetimeMinMax {
     min_max: MinMax,
 }
@@ -74,7 +84,7 @@ pub(crate) fn datetime_min_max(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(DatetimeMinMax { min_max }, expr.range()));
+    checker.report_diagnostic(DatetimeMinMax { min_max }, expr.range());
 }
 
 /// Check if the current expression has the pattern `foo.replace(tzinfo=bar)` or `foo.time()`.

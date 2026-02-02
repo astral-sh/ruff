@@ -1,5 +1,5 @@
-use super::notebook;
 use super::PositionEncoding;
+use super::notebook;
 use lsp_types as types;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::LineIndex;
@@ -13,7 +13,7 @@ pub(crate) struct NotebookRange {
 
 pub(crate) trait RangeExt {
     fn to_text_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding)
-        -> TextRange;
+    -> TextRange;
 }
 
 pub(crate) trait ToRangeExt {

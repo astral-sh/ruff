@@ -293,6 +293,155 @@ aaaaa[aaaaaaaaaaa] = (
 )
 
 
+#############################################################
+# T-Strings
+#############################################################
+
+# Flatten and join the t-string
+aaaaaaaaaaa = t"test{
+expression}flat" t"cean beeeeeeee {joined} eeeeeeeeeeeeeeeee" # inline
+
+# Parenthesize the value and join it, inline the comment
+aaaaaaaaaaa = t"test{
+expression}flat" t"cean beeeeeeee {joined} eeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
+# Parenthesize the t-string and keep it multiline because it doesn't fit on a single line including the comment
+aaaaaaaaaaa = t"test{
+expression
+}flat" t"cean beeeeeeee {
+joined
+} eeeeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
+
+# The target splits because of a magic trailing comma
+# The string is joined and not parenthesized because it just fits into the line length (including comment).
+a[
+    aaaaaaa,
+    b,
+] = t"ccccc{
+expression}ccccccccccc" t"cccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+
+# Same but starting with a joined string. They should both result in the same formatting.
+[
+    aaaaaaa,
+    b,
+] = t"ccccc{
+expression}ccccccccccccccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+# The target splits because of the magic trailing comma
+# The string is **not** joined because it with the inlined comment exceeds the line length limit.
+a[
+    aaaaaaa,
+    b,
+] = t"ccccc{
+expression}cccccccccccccccccccc" t"cccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+
+# The target should be flat
+# The string should be joined because it fits into the line length
+a[
+    aaaaaaa,
+    b
+] = (
+    t"ccccc{
+    expression}ccccccccccc" t"cccccccccccccccccccccccc"  # comment
+)
+
+# Same but starting with a joined string. They should both result in the same formatting.
+a[
+    aaaaaaa,
+    b
+] = t"ccccc{
+expression}ccccccccccccccccccccccccccccccccccc"  # comment
+
+# The target should be flat
+# The string gets parenthesized because it, with the inlined comment, exceeds the line length limit.
+a[
+    aaaaaaa,
+    b
+] = t"ccccc{
+expression}ccccccccccc" t"ccccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+
+# Split an overlong target, but join the string if it fits
+a[
+    aaaaaaa,
+    b
+].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
+    t"ccccc{
+    expression}ccccccccccc" t"cccccccccccccccccccccccccccccc"  # comment
+)
+
+# Split both if necessary and keep multiline
+a[
+    aaaaaaa,
+    b
+].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
+    t"ccccc{
+    expression}cccccccccccccccccccccccccccccccc" t"ccccccccccccccccccccccccccccccc"  # comment
+)
+
+# Don't inline t-strings that contain expressions that are guaranteed to split, e.b. because of a magic trailing comma
+aaaaaaaaaaaaaaaaaa = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}" t"moreeeeeeeeeeeeeeeeeeee" t"test" # comment
+
+aaaaaaaaaaaaaaaaaa = (
+    t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}" t"moreeeeeeeeeeeeeeeeeeee" t"test" # comment
+)
+
+aaaaa[aaaaaaaaaaa] = t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}" t"moreeeeeeeeeeeeeeeeeeee" t"test" # comment
+
+aaaaa[aaaaaaaaaaa] = (t"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}" t"moreeeeeeeeeeeeeeeeeeee" t"test" # comment
+)
+
+# Don't inline t-strings that contain commented expressions
+aaaaaaaaaaaaaaaaaa = (
+    t"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    t"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# Don't inline t-strings with multiline debug expressions:
+aaaaaaaaaaaaaaaaaa = (
+    t"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    t"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+    b=}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    t"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    t"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    t"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}" t"moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+
 # Trailing last-part comments
 
 a = (
@@ -350,7 +499,7 @@ a = (
 )
 
 logger.error(
-    f"Failed to run task {task} for job"  
+    f"Failed to run task {task} for job"
     f"with id {str(job.id)}" # type: ignore[union-attr]
 )
 

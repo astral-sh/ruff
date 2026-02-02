@@ -1,0 +1,10 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+ParseError {
+    error: OtherError(
+        "cannot mix t-string literals with string or bytes literals",
+    ),
+    location: 0..18,
+}

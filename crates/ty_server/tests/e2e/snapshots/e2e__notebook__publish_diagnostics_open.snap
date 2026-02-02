@@ -1,0 +1,96 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
+---
+[
+  {
+    "uri": "vscode-notebook-cell://test.ipynb#1",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 49
+          },
+          "end": {
+            "line": 0,
+            "character": 52
+          }
+        },
+        "severity": 1,
+        "code": "invalid-return-type",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#invalid-return-type"
+        },
+        "source": "ty",
+        "message": "Function can implicitly return `None`, which is not assignable to return type `str`",
+        "relatedInformation": []
+      }
+    ],
+    "version": 0
+  },
+  {
+    "uri": "vscode-notebook-cell://test.ipynb#2",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 66
+          },
+          "end": {
+            "line": 0,
+            "character": 78
+          }
+        },
+        "severity": 1,
+        "code": "invalid-argument-type",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#invalid-argument-type"
+        },
+        "source": "ty",
+        "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/"underlined/"]`",
+        "relatedInformation": [
+          {
+            "location": {
+              "uri": "vscode-notebook-cell://test.ipynb#1",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 4
+                },
+                "end": {
+                  "line": 0,
+                  "character": 14
+                }
+              }
+            },
+            "message": "Function defined here"
+          },
+          {
+            "location": {
+              "uri": "vscode-notebook-cell://test.ipynb#1",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 32
+                },
+                "end": {
+                  "line": 0,
+                  "character": 44
+                }
+              }
+            },
+            "message": "Parameter declared here"
+          }
+        ]
+      }
+    ],
+    "version": 0
+  },
+  {
+    "uri": "vscode-notebook-cell://test.ipynb#0",
+    "diagnostics": [],
+    "version": 0
+  }
+]

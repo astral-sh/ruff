@@ -1,8 +1,8 @@
 #![allow(clippy::print_stdout)]
 
+use std::ffi::OsString;
 use std::fs::File;
-use std::io::{self, stdout, BufWriter, Write};
-use std::num::NonZeroUsize;
+use std::io::{self, BufWriter, Write, stdout};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -10,18 +10,18 @@ use std::sync::mpsc::channel;
 use anyhow::Result;
 use clap::CommandFactory;
 use colored::Colorize;
-use log::warn;
-use notify::{recommended_watcher, RecursiveMode, Watcher};
+use log::error;
+use notify::{RecursiveMode, Watcher, recommended_watcher};
 
 use args::{GlobalConfigArgs, ServerCommand};
-use ruff_linter::logging::{set_up_logging, LogLevel};
+use ruff_db::diagnostic::{Diagnostic, Severity};
+use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
-use ruff_linter::settings::types::OutputFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
 use crate::args::{
-    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand,
+    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand, TerminalColor,
 };
 use crate::printer::{Flags as PrinterFlags, Printer};
 
@@ -131,10 +131,18 @@ pub fn run(
         global_options,
     }: Args,
 ) -> Result<ExitStatus> {
+    // Set color before so all outputs are properly colored
+    if let Some(color_override) =
+        colored_override(global_options.color, std::env::var_os("FORCE_COLOR"))
     {
+        colored::control::set_override(color_override);
+    }
+
+    {
+        ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            #[allow(clippy::print_stderr)]
+            #[expect(clippy::print_stderr)]
             {
                 eprintln!(
                     r#"
@@ -204,12 +212,18 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let cli_output_format_set = args.output_format.is_some();
     let (cli, config_arguments) = args.partition(global_options)?;
-
+    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    if cli_output_format_set && !pyproject_config.settings.formatter.preview.is_enabled() {
+        warn_user_once!(
+            "The --output-format flag for the formatter is unstable and requires preview mode to use."
+        );
+    }
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &config_arguments)
+        commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
     } else {
-        commands::format::format(cli, &config_arguments)
+        commands::format::format(cli, &config_arguments, &pyproject_config)
     }
 }
 
@@ -223,13 +237,7 @@ fn analyze_graph(
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {
-    let four = NonZeroUsize::new(4).unwrap();
-
-    // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
-    let worker_threads = std::thread::available_parallelism()
-        .unwrap_or(four)
-        .min(four);
-    commands::server::run_server(worker_threads, args.resolve_preview())
+    commands::server::run_server(args.resolve_preview())
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
@@ -318,15 +326,23 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         warn_user!("Detected debug build without --no-cache.");
     }
 
-    if cli.add_noqa {
+    if let Some(reason) = &cli.add_noqa {
         if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
+        if reason.contains(['\n', '\r']) {
+            return Err(anyhow::anyhow!(
+                "--add-noqa <reason> cannot contain newline characters"
+            ));
+        }
+
+        let reason_opt = (!reason.is_empty()).then_some(reason.as_str());
+
         let modifications =
-            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments)?;
+            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments, reason_opt)?;
         if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
-            #[allow(clippy::print_stderr)]
+            #[expect(clippy::print_stderr)]
             {
                 eprintln!("Added {modifications} noqa directive{s}.");
             }
@@ -349,13 +365,6 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let preview = pyproject_config.settings.linter.preview.is_enabled();
 
     if cli.watch {
-        if output_format != OutputFormat::default() {
-            warn_user!(
-                "`--output-format {}` is always used in watch mode.",
-                OutputFormat::default()
-            );
-        }
-
         // Configure the file watcher.
         let (tx, rx) = channel();
         let mut watcher = recommended_watcher(tx)?;
@@ -370,7 +379,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::check::check(
+        let diagnostics = commands::check::check(
             &files,
             &pyproject_config,
             &config_arguments,
@@ -379,7 +388,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &messages, preview)?;
+        printer.write_continuously(&mut writer, &diagnostics, preview)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -399,7 +408,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
 
-                    let messages = commands::check::check(
+                    let diagnostics = commands::check::check(
                         &files,
                         &pyproject_config,
                         &config_arguments,
@@ -408,7 +417,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                         fix_mode,
                         unsafe_fixes,
                     )?;
-                    printer.write_continuously(&mut writer, &messages, preview)?;
+                    printer.write_continuously(&mut writer, &diagnostics, preview)?;
                 }
                 Err(err) => return Err(err.into()),
             }
@@ -446,10 +455,31 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         if cli.statistics {
             printer.write_statistics(&diagnostics, &mut summary_writer)?;
         } else {
-            printer.write_once(&diagnostics, &mut summary_writer)?;
+            printer.write_once(&diagnostics, &mut summary_writer, preview)?;
         }
 
         if !cli.exit_zero {
+            let max_severity = diagnostics
+                .inner
+                .iter()
+                .map(Diagnostic::severity)
+                .max()
+                .unwrap_or(Severity::Info);
+            if max_severity.is_fatal() {
+                // When a panic/fatal error is reported, prompt the user to open an issue on github.
+                // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
+                // message here instead of attaching it to the diagnostic ensures that we only print
+                // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
+                // the message from being captured by tools parsing the normal output.
+                let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
+
+https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
+
+...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
+";
+                error!("{message}");
+                return Ok(ExitStatus::Error);
+            }
             if cli.diff {
                 // If we're printing a diff, we always want to exit non-zero if there are
                 // any fixable violations (since we've printed the diff, but not applied the
@@ -470,11 +500,11 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                 // there are any violations, unless we're explicitly asked to exit zero on
                 // fix.
                 if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.messages.is_empty() {
+                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
                         return Ok(ExitStatus::Failure);
                     }
                 } else {
-                    if !diagnostics.messages.is_empty() {
+                    if !diagnostics.inner.is_empty() {
                         return Ok(ExitStatus::Failure);
                     }
                 }
@@ -484,11 +514,27 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     Ok(ExitStatus::Success)
 }
 
+fn colored_override(
+    color: Option<TerminalColor>,
+    env_force_color: Option<OsString>,
+) -> Option<bool> {
+    match color {
+        // Cli arguments should take precedence over env vars.
+        Some(TerminalColor::Always) => Some(true),
+        Some(TerminalColor::Never) => Some(false),
+        // Default to no override, but respect FORCE_COLOR.
+        Some(TerminalColor::Auto) | None => {
+            // support FORCE_COLOR env var
+            env_force_color.map(|force_color: OsString| !force_color.is_empty())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test_file_change_detector {
     use std::path::PathBuf;
 
-    use crate::{change_detected, ChangeKind};
+    use crate::{ChangeKind, change_detected};
 
     #[test]
     fn detect_correct_file_change() {
@@ -601,6 +647,29 @@ mod test_file_change_detector {
                 ],
                 attrs: notify::event::EventAttributes::default(),
             }),
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_set_colored_override {
+    use crate::{args::TerminalColor, colored_override};
+
+    #[test]
+    fn force_color_env_is_respected() {
+        assert_eq!(colored_override(None, Some("1".into())), Some(true));
+    }
+
+    #[test]
+    fn cli_args_takes_precedences_over_force_color_env() {
+        assert_eq!(
+            colored_override(Some(TerminalColor::Never), Some("1".into())),
+            Some(false)
+        );
+
+        assert_eq!(
+            colored_override(Some(TerminalColor::Always), None),
+            Some(true)
         );
     }
 }

@@ -1,14 +1,14 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::helpers::is_empty_or_null_string;
+use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
@@ -51,6 +51,7 @@ use super::helpers::is_empty_or_null_string;
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestRaisesWithMultipleStatements;
 
 impl Violation for PytestRaisesWithMultipleStatements {
@@ -61,13 +62,14 @@ impl Violation for PytestRaisesWithMultipleStatements {
 }
 
 /// ## What it does
-/// Checks for `pytest.raises` calls without a `match` parameter.
+/// Checks for `pytest.raises` calls without a `match` or `check` parameter.
 ///
 /// ## Why is this bad?
 /// `pytest.raises(Error)` will catch any `Error` and may catch errors that are
 /// unrelated to the code under test. To avoid this, `pytest.raises` should be
-/// called with a `match` parameter. The exception names that require a `match`
-/// parameter can be configured via the
+/// called with a `match` parameter (to constrain the exception message) or a
+/// `check` parameter (to constrain the exception itself). The exception names
+/// that require a `match` or `check` parameter can be configured via the
 /// [`lint.flake8-pytest-style.raises-require-match-for`] and
 /// [`lint.flake8-pytest-style.raises-extend-require-match-for`] settings.
 ///
@@ -95,6 +97,16 @@ impl Violation for PytestRaisesWithMultipleStatements {
 ///         ...
 /// ```
 ///
+/// Or, for pytest 8.4.0 and later:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(OSError, check=lambda e: e.errno == 42):
+///         ...
+/// ```
+///
 /// ## Options
 /// - `lint.flake8-pytest-style.raises-require-match-for`
 /// - `lint.flake8-pytest-style.raises-extend-require-match-for`
@@ -102,6 +114,7 @@ impl Violation for PytestRaisesWithMultipleStatements {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestRaisesTooBroad {
     exception: String,
 }
@@ -123,6 +136,9 @@ impl Violation for PytestRaisesTooBroad {
 /// ## Why is this bad?
 /// `pytest.raises` expects to receive an expected exception as its first
 /// argument. If omitted, the `pytest.raises` call will fail at runtime.
+/// The rule will also accept calls without an expected exception but with
+/// `match` and/or `check` keyword arguments, which are also valid after
+/// pytest version 8.4.0.
 ///
 /// ## Example
 /// ```python
@@ -147,6 +163,7 @@ impl Violation for PytestRaisesTooBroad {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestRaisesWithoutException;
 
 impl Violation for PytestRaisesWithoutException {
@@ -170,22 +187,22 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
+/// PT010
 pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
-        if checker.enabled(Rule::PytestRaisesWithoutException) {
+        if checker.is_rule_enabled(Rule::PytestRaisesWithoutException) {
             if call
                 .arguments
                 .find_argument("expected_exception", 0)
                 .is_none()
+                && call.arguments.find_keyword("match").is_none()
+                && call.arguments.find_keyword("check").is_none()
             {
-                checker.report_diagnostic(Diagnostic::new(
-                    PytestRaisesWithoutException,
-                    call.func.range(),
-                ));
+                checker.report_diagnostic(PytestRaisesWithoutException, call.func.range());
             }
         }
 
-        if checker.enabled(Rule::PytestRaisesTooBroad) {
+        if checker.is_rule_enabled(Rule::PytestRaisesTooBroad) {
             // Pytest.raises has two overloads
             // ```py
             // with raises(expected_exception: type[E] | tuple[type[E], ...], *, match: str | Pattern[str] | None = ...) → RaisesContext[E] as excinfo
@@ -195,11 +212,15 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
             if call.arguments.find_argument("func", 1).is_none() {
                 if let Some(exception) = call.arguments.find_argument_value("expected_exception", 0)
                 {
-                    if call
+                    let match_is_empty_or_absent = call
                         .arguments
                         .find_keyword("match")
-                        .is_none_or(|k| is_empty_or_null_string(&k.value))
-                    {
+                        .is_none_or(|k| is_empty_or_null_string(&k.value));
+                    let check_is_absent_or_none = call
+                        .arguments
+                        .find_keyword("check")
+                        .is_none_or(|k| k.value.is_none_literal_expr());
+                    if match_is_empty_or_absent && check_is_absent_or_none {
                         exception_needs_match(checker, exception);
                     }
                 }
@@ -208,6 +229,7 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     }
 }
 
+/// PT012
 pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
     let raises_called = items.iter().any(|item| match &item.context_expr {
         Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
@@ -234,10 +256,7 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
         };
 
         if is_too_complex {
-            checker.report_diagnostic(Diagnostic::new(
-                PytestRaisesWithMultipleStatements,
-                stmt.range(),
-            ));
+            checker.report_diagnostic(PytestRaisesWithMultipleStatements, stmt.range());
         }
     }
 }
@@ -250,13 +269,13 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
         .and_then(|qualified_name| {
             let qualified_name = qualified_name.to_string();
             checker
-                .settings
+                .settings()
                 .flake8_pytest_style
                 .raises_require_match_for
                 .iter()
                 .chain(
                     &checker
-                        .settings
+                        .settings()
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )
@@ -264,11 +283,11 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
                 .then_some(qualified_name)
         })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             PytestRaisesTooBroad {
                 exception: qualified_name,
             },
             exception.range(),
-        ));
+        );
     }
 }

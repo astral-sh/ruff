@@ -1,11 +1,6 @@
-export default function RepoButton() {
+export default function RepoButton({ href }: { href: string }) {
   return (
-    <a
-      className="rounded-full"
-      href="https://github.com/astral-sh/ruff"
-      target="_blank"
-      rel="noreferrer"
-    >
+    <a className="rounded-full" href={href} target="_blank" rel="noreferrer">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         width="24"

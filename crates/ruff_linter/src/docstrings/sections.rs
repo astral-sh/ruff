@@ -36,6 +36,7 @@ pub(crate) enum SectionKind {
     OtherParameters,
     Parameters,
     Raises,
+    Receives,
     References,
     Return,
     Returns,
@@ -76,6 +77,7 @@ impl SectionKind {
             "other parameters" => Some(Self::OtherParameters),
             "parameters" => Some(Self::Parameters),
             "raises" => Some(Self::Raises),
+            "receives" => Some(Self::Receives),
             "references" => Some(Self::References),
             "return" => Some(Self::Return),
             "returns" => Some(Self::Returns),
@@ -117,6 +119,7 @@ impl SectionKind {
             Self::OtherParameters => "Other Parameters",
             Self::Parameters => "Parameters",
             Self::Raises => "Raises",
+            Self::Receives => "Receives",
             Self::References => "References",
             Self::Return => "Return",
             Self::Returns => "Returns",
@@ -208,7 +211,7 @@ impl<'a> SectionContexts<'a> {
         self.contexts.len()
     }
 
-    pub(crate) fn iter(&self) -> SectionContextsIter {
+    pub(crate) fn iter(&self) -> SectionContextsIter<'_> {
         SectionContextsIter {
             docstring_body: self.docstring.body(),
             inner: self.contexts.iter(),
@@ -418,7 +421,7 @@ fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> 
 }
 
 /// Check if the suspected context is really a section header.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn is_docstring_section(
     line: &Line,
     indent_size: TextSize,
@@ -444,8 +447,7 @@ fn is_docstring_section(
         if next_line.is_empty() {
             false
         } else {
-            let next_line_is_underline = next_line.chars().all(|char| matches!(char, '-' | '='));
-            next_line_is_underline
+            next_line.chars().all(|char| matches!(char, '-' | '='))
         }
     });
     if next_line_is_underline {

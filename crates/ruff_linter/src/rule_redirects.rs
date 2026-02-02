@@ -150,7 +150,7 @@ mod tests {
         for rule in Rule::iter() {
             let (code, group) = (rule.noqa_code(), rule.group());
 
-            if matches!(group, RuleGroup::Removed) {
+            if matches!(group, RuleGroup::Removed { .. }) {
                 continue;
             }
 

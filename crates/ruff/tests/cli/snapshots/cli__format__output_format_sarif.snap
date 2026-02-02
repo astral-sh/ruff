@@ -1,0 +1,81 @@
+---
+source: crates/ruff/tests/cli/format.rs
+info:
+  program: ruff
+  args:
+    - format
+    - "--no-cache"
+    - "--output-format"
+    - sarif
+    - "--preview"
+    - "--check"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "[TMP]/input.py"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 1,
+                        "endLine": 2,
+                        "startColumn": 1,
+                        "startLine": 1
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": null
+              }
+            }
+          ],
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[TMP]/input.py"
+                },
+                "region": {
+                  "endColumn": 1,
+                  "endLine": 2,
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "File would be reformatted"
+          },
+          "ruleId": "unformatted"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/astral-sh/ruff",
+          "name": "ruff",
+          "rules": [],
+          "version": "[VERSION]"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
+----- stderr -----

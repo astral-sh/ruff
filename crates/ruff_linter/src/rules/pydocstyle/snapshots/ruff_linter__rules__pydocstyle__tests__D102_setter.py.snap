@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
-setter.py:16:9: D102 Missing docstring in public method
+D102 Missing docstring in public method
+  --> setter.py:16:9
    |
 15 |     @foo
 16 |     def foo(self, value: str) -> None:
-   |         ^^^ D102
+   |         ^^^
 17 |         pass
    |

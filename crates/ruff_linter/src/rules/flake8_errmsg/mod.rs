@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test]
     fn defaults() -> Result<()> {
@@ -22,7 +22,7 @@ mod tests {
                 Rule::DotFormatInException,
             ]),
         )?;
-        assert_messages!("defaults", diagnostics);
+        assert_diagnostics!("defaults", diagnostics);
         Ok(())
     }
 
@@ -41,7 +41,19 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!("custom", diagnostics);
+        assert_diagnostics!("custom", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn string_exception() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_errmsg/EM101_byte_string.py"),
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rule(Rule::RawStringInException)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

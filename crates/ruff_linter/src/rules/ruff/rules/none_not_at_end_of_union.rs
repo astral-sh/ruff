@@ -1,17 +1,17 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 use smallvec::SmallVec;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for type annotations where `None` is not at the end of an union.
 ///
 /// ## Why is this bad?
-/// Type annotation unions are associative, meaning that the order of the elements
+/// Type annotation unions are commutative, meaning that the order of the elements
 /// does not matter. The `None` literal represents the absence of a value. For
 /// readability, it's preferred to write the more informative type expressions first.
 ///
@@ -30,6 +30,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `typing.Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.7.4")]
 pub(crate) struct NoneNotAtEndOfUnion;
 
 impl Violation for NoneNotAtEndOfUnion {
@@ -70,6 +71,6 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     }
 
     for none_expr in none_exprs {
-        checker.report_diagnostic(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
+        checker.report_diagnostic(NoneNotAtEndOfUnion, none_expr.range());
     }
 }

@@ -1,12 +1,14 @@
 use ast::ExprName;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad_start;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary dict comprehension when creating a dictionary from
@@ -31,9 +33,23 @@ use crate::checkers::ast::Checker;
 /// dict.fromkeys(iterable, 1)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments inside the dict comprehension,
+/// as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// {  # comment 1
+///     a:  # comment 2
+///     None  # comment 3
+///     for a in iterable  # comment 4
+/// }
+/// ```
+///
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
 }
@@ -81,6 +97,12 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
+    // Don't suggest `dict.fromkeys` if the target contains side-effecting expressions
+    // (attributes, subscripts, or slices).
+    if contains_side_effecting_sub_expression(&generator.target) {
+        return;
+    }
+
     // Don't suggest `dict.fromkeys` if the value is not a constant or constant-like.
     if !is_constant_like(dict_comp.value.as_ref()) {
         return;
@@ -113,7 +135,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryDictComprehensionForIterable {
             is_value_none_literal: dict_comp.value.is_none_literal_expr(),
         },
@@ -121,18 +143,28 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     );
 
     if checker.semantic().has_builtin_binding("dict") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            checker
-                .generator()
-                .expr(&fix_unnecessary_dict_comprehension(
-                    dict_comp.value.as_ref(),
-                    generator,
-                )),
+        let edit = Edit::range_replacement(
+            pad_start(
+                checker
+                    .generator()
+                    .expr(&fix_unnecessary_dict_comprehension(
+                        dict_comp.value.as_ref(),
+                        generator,
+                    )),
+                dict_comp.start(),
+                checker.locator(),
+            ),
             dict_comp.range(),
-        )));
+        );
+        diagnostic.set_fix(Fix::applicable_edit(
+            edit,
+            if checker.comment_ranges().intersects(dict_comp.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the expression can be shared across multiple values.
@@ -178,14 +210,26 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         },
         keywords: Box::from([]),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     Expr::Call(ExprCall {
         func: Box::new(Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         arguments: args,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+    })
+}
+
+fn contains_side_effecting_sub_expression(target: &Expr) -> bool {
+    any_over_expr(target, &|expr| {
+        matches!(
+            expr,
+            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_)
+        )
     })
 }

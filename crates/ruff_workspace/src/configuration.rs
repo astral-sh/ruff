@@ -5,12 +5,11 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::env::VarError;
-use std::num::{NonZeroU16, NonZeroU8};
+use std::num::{NonZeroU8, NonZeroU16};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Result};
-use glob::{glob, GlobError, Paths, PatternError};
+use anyhow::{Context, Result, anyhow};
+use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -20,10 +19,9 @@ use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
-use ruff_graph::{AnalyzeSettings, Direction};
+use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::registry::RuleNamespace;
-use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
+use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
@@ -33,10 +31,11 @@ use ruff_linter::settings::types::{
     FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
     RequiredVersion, UnsafeFixes,
 };
-use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
+use ruff_linter::settings::{
+    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
+};
 use ruff_linter::{
-    fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
-    RUFF_PKG_VERSION,
+    RuleSelector, fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message,
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
@@ -52,9 +51,11 @@ use crate::options::{
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    validate_required_version,
 };
 use crate::settings::{
-    FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
+    EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, INCLUDE_PREVIEW, LineEnding,
+    Settings,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -153,17 +154,10 @@ pub struct Configuration {
 impl Configuration {
     pub fn into_settings(self, project_root: &Path) -> Result<Settings> {
         if let Some(required_version) = &self.required_version {
-            let ruff_pkg_version = pep440_rs::Version::from_str(RUFF_PKG_VERSION)
-                .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
-            if !required_version.contains(&ruff_pkg_version) {
-                return Err(anyhow!(
-                    "Required version `{}` does not match the running version `{}`",
-                    required_version,
-                    RUFF_PKG_VERSION
-                ));
-            }
+            validate_required_version(required_version)?;
         }
 
+        let linter_target_version = TargetVersion(self.target_version);
         let target_version = self.target_version.unwrap_or_default();
         let global_preview = self.preview.unwrap_or_default();
 
@@ -220,12 +214,20 @@ impl Configuration {
             preview: analyze_preview,
             target_version,
             extension: self.extension.clone().unwrap_or_default(),
-            detect_string_imports: analyze
-                .detect_string_imports
-                .unwrap_or(analyze_defaults.detect_string_imports),
+            string_imports: StringImports {
+                enabled: analyze
+                    .detect_string_imports
+                    .unwrap_or(analyze_defaults.string_imports.enabled),
+                min_dots: analyze
+                    .string_imports_min_dots
+                    .unwrap_or(analyze_defaults.string_imports.min_dots),
+            },
             include_dependencies: analyze
                 .include_dependencies
                 .unwrap_or(analyze_defaults.include_dependencies),
+            type_checking_imports: analyze
+                .type_checking_imports
+                .unwrap_or(analyze_defaults.type_checking_imports),
         };
 
         let lint = self.lint;
@@ -243,10 +245,13 @@ impl Configuration {
             .unwrap_or_default();
         let flake8_import_conventions = lint
             .flake8_import_conventions
-            .map(Flake8ImportConventionsOptions::into_settings)
+            .map(Flake8ImportConventionsOptions::try_into_settings)
+            .transpose()?
             .unwrap_or_default();
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
+
+        let future_annotations = lint.future_annotations.unwrap_or_default();
 
         Ok(Settings {
             cache_dir: self
@@ -266,20 +271,24 @@ impl Configuration {
                 extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
                 extend_include: FilePatternSet::try_from_iter(self.extend_include)?,
                 force_exclude: self.force_exclude.unwrap_or(false),
-                include: FilePatternSet::try_from_iter(
-                    self.include.unwrap_or_else(|| INCLUDE.to_vec()),
-                )?,
+                include: match global_preview {
+                    PreviewMode::Disabled => FilePatternSet::try_from_iter(
+                        self.include.unwrap_or_else(|| INCLUDE.to_vec()),
+                    )?,
+                    PreviewMode::Enabled => FilePatternSet::try_from_iter(
+                        self.include.unwrap_or_else(|| INCLUDE_PREVIEW.to_vec()),
+                    )?,
+                },
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
             },
 
-            #[allow(deprecated)]
             linter: LinterSettings {
                 rules,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
-                unresolved_target_version: target_version,
+                unresolved_target_version: linter_target_version,
                 per_file_target_version,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
@@ -431,6 +440,7 @@ impl Configuration {
                     .map(RuffOptions::into_settings)
                     .unwrap_or_default(),
                 typing_extensions: lint.typing_extensions.unwrap_or(true),
+                future_annotations,
             },
 
             formatter,
@@ -635,6 +645,7 @@ pub struct LintConfiguration {
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
     pub typing_extensions: Option<bool>,
+    pub future_annotations: Option<bool>,
 
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -668,7 +679,7 @@ pub struct LintConfiguration {
 
 impl LintConfiguration {
     fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let ignore = options
             .common
             .ignore
@@ -676,7 +687,7 @@ impl LintConfiguration {
             .flatten()
             .chain(options.common.extend_ignore.into_iter().flatten())
             .collect();
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let unfixable = options
             .common
             .unfixable
@@ -685,10 +696,12 @@ impl LintConfiguration {
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
 
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let ignore_init_module_imports = {
             if options.common.ignore_init_module_imports.is_some() {
-                warn_user_once!("The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged.");
+                warn_user_once!(
+                    "The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged."
+                );
             }
             options.common.ignore_init_module_imports
         };
@@ -749,6 +762,7 @@ impl LintConfiguration {
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
             typing_extensions: options.typing_extensions,
+            future_annotations: options.future_annotations,
 
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
@@ -1044,7 +1058,9 @@ impl LintConfiguration {
                 [] => (),
                 [selection] => {
                     let (prefix, code) = selection.prefix_and_code();
-                    return Err(anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview is enabled."));
+                    return Err(anyhow!(
+                        "Selection of deprecated rule `{prefix}{code}` is not allowed when preview is enabled."
+                    ));
                 }
                 [..] => {
                     let mut message = "Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:".to_string();
@@ -1092,7 +1108,7 @@ impl LintConfiguration {
         // approach to give each pair it's own `warn_user_once`.
         for (preferred, expendable, message) in INCOMPATIBLE_CODES {
             if rules.enabled(*preferred) && rules.enabled(*expendable) {
-                warn_user_once_by_id!(expendable.as_ref(), "{}", message);
+                warn_user_once_by_id!(expendable.name().as_str(), "{}", message);
                 rules.disable(*expendable);
             }
         }
@@ -1173,7 +1189,8 @@ impl LintConfiguration {
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
             ruff: self.ruff.combine(config.ruff),
-            typing_extensions: self.typing_extensions,
+            typing_extensions: self.typing_extensions.or(config.typing_extensions),
+            future_annotations: self.future_annotations.or(config.future_annotations),
         }
     }
 }
@@ -1193,7 +1210,6 @@ pub struct FormatConfiguration {
 }
 
 impl FormatConfiguration {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: FormatOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             // `--extension` is a hidden command-line argument that isn't supported in configuration
@@ -1231,7 +1247,6 @@ impl FormatConfiguration {
     }
 
     #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
@@ -1256,11 +1271,12 @@ pub struct AnalyzeConfiguration {
 
     pub direction: Option<Direction>,
     pub detect_string_imports: Option<bool>,
+    pub string_imports_min_dots: Option<usize>,
     pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
+    pub type_checking_imports: Option<bool>,
 }
 
 impl AnalyzeConfiguration {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             exclude: options.exclude.map(|paths| {
@@ -1275,6 +1291,7 @@ impl AnalyzeConfiguration {
             preview: options.preview.map(PreviewMode::from),
             direction: options.direction,
             detect_string_imports: options.detect_string_imports,
+            string_imports_min_dots: options.string_imports_min_dots,
             include_dependencies: options.include_dependencies.map(|dependencies| {
                 dependencies
                     .into_iter()
@@ -1283,18 +1300,22 @@ impl AnalyzeConfiguration {
                     })
                     .collect::<BTreeMap<_, _>>()
             }),
+            type_checking_imports: options.type_checking_imports,
         })
     }
 
     #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
             direction: self.direction.or(config.direction),
             detect_string_imports: self.detect_string_imports.or(config.detect_string_imports),
+            string_imports_min_dots: self
+                .string_imports_min_dots
+                .or(config.string_imports_min_dots),
             include_dependencies: self.include_dependencies.or(config.include_dependencies),
+            type_checking_imports: self.type_checking_imports.or(config.type_checking_imports),
         }
     }
 }
@@ -1339,7 +1360,7 @@ fn warn_about_deprecated_top_level_lint_options(
     top_level_options: &LintCommonOptions,
     path: Option<&Path>,
 ) {
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     let LintCommonOptions {
         allowed_confusables,
         dummy_variable_rgx,
@@ -1634,11 +1655,11 @@ mod tests {
 
     use anyhow::Result;
 
+    use ruff_linter::RuleSelector;
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
-    use ruff_linter::RuleSelector;
 
     use crate::configuration::{LintConfiguration, RuleSelection};
     use crate::options::PydocstyleOptions;
@@ -1659,7 +1680,6 @@ mod tests {
         Rule::BlankLinesBeforeNestedDefinition,
     ];
 
-    #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(
         selections: impl IntoIterator<Item = RuleSelection>,
         preview: Option<PreviewOptions>,

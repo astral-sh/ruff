@@ -39,3 +39,27 @@ f'\'normal\' {f'nested'} normal'  # Q003
 f'\'normal\' {f'nested'} "double quotes"'
 f'\'normal\' {f'\'nested\' {'other'} normal'} "double quotes"'  # Q003
 f'\'normal\' {f'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
+
+
+
+# Same as above, but with t-strings
+t'This is a \'string\''  # Q003
+t'This is \\ a \\\'string\''  # Q003
+t'"This" is a \'string\''
+f"This is a 'string'"
+f"\"This\" is a 'string'"
+fr'This is a \'string\''
+fR'This is a \'string\''
+foo = (
+    t'This is a'
+    t'\'string\''  # Q003
+)
+t'\'foo\' {'nested'}'  # Q003
+t'\'foo\' {t'nested'}'  # Q003
+t'\'foo\' {t'\'nested\''} \'\''  # Q003
+
+t'normal {t'nested'} normal'
+t'\'normal\' {t'nested'} normal'  # Q003
+t'\'normal\' {t'nested'} "double quotes"'
+t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l

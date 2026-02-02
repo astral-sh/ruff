@@ -10,11 +10,11 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test_case(Rule::Assert, Path::new("S101.py"))]
     #[test_case(Rule::BadFilePermissions, Path::new("S103.py"))]
@@ -94,7 +94,7 @@ mod tests {
             Path::new("flake8_bandit").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -104,21 +104,27 @@ mod tests {
     #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
     #[test_case(Rule::SuspiciousNonCryptographicRandomUsage, Path::new("S311.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
-    #[test_case(Rule::SubprocessWithoutShellEqualsTrue, Path::new("S603.py"))]
+    #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
+    #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
             rule_code.noqa_code(),
             path.to_string_lossy()
         );
-        let diagnostics = test_path(
+
+        assert_diagnostics_diff!(
+            snapshot,
             Path::new("flake8_bandit").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
             &LinterSettings {
                 preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
+            }
+        );
         Ok(())
     }
 
@@ -140,7 +146,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -161,7 +167,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -182,7 +188,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::HardcodedTempFile)
             },
         )?;
-        assert_messages!("S108_extend", diagnostics);
+        assert_diagnostics!("S108_extend", diagnostics);
         Ok(())
     }
 
@@ -198,7 +204,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TryExceptPass)
             },
         )?;
-        assert_messages!("S110_typed", diagnostics);
+        assert_diagnostics!("S110_typed", diagnostics);
         Ok(())
     }
 }

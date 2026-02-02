@@ -1,0 +1,37 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: shadowing.md - Shadowing - Implicit function shadowing
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/shadowing.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def f(): ...
+2 | 
+3 | f = 1  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `def f() -> Unknown`
+ --> src/mdtest_snippet.py:3:1
+  |
+1 | def f(): ...
+2 |
+3 | f = 1  # error: [invalid-assignment]
+  | -   ^ Incompatible value of type `Literal[1]`
+  | |
+  | Declared type `def f() -> Unknown`
+  |
+info: Implicit shadowing of function `f`, add an annotation to make it explicit if this is intentional
+info: rule `invalid-assignment` is enabled by default
+
+```

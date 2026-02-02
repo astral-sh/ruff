@@ -1,11 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` expressions that can be replaced with `min()` or `max()`
@@ -19,18 +20,26 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Example
 /// ```python
+/// score1, score2 = 4, 5
+///
 /// highest_score = score1 if score1 > score2 else score2
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// score1, score2 = 4, 5
+///
 /// highest_score = max(score2, score1)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3.11/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3.11/library/functions.html#max)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct IfExprMinMax {
     min_max: MinMax,
     expression: SourceCodeSnippet,
@@ -130,7 +139,7 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
         checker.generator().expr(arg2),
     );
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfExprMinMax {
             min_max,
             expression: SourceCodeSnippet::from_str(checker.locator().slice(if_exp)),
@@ -140,13 +149,17 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
     );
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement,
-            if_exp.range(),
-        )));
-    }
+        let applicability = if checker.comment_ranges().intersects(if_exp.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
-    checker.report_diagnostic(diagnostic);
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(replacement, if_exp.range()),
+            applicability,
+        ));
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

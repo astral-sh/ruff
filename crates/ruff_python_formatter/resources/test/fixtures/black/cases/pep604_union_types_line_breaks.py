@@ -19,7 +19,7 @@ z: (Short
 z: (int) = 2.3
 z: ((int)) = foo()
 
-# In case I go for not enforcing parentheses, this might get improved at the same time
+# In case I go for not enforcing parantheses, this might get improved at the same time
 x = (
     z
     == 9999999999999999999999999999999999999999

@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF063 Use `typing_extensions.get_annotations` instead of `__dict__` access
+ --> RUF063.py:4:1
+  |
+2 | # Cases that should trigger the violation
+3 |
+4 | foo.__dict__.get("__annotations__")  # RUF063
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | foo.__dict__.get("__annotations__", None)  # RUF063
+6 | foo.__dict__.get("__annotations__", {})  # RUF063
+  |
+
+RUF063 Use `typing_extensions.get_annotations` instead of `__dict__` access
+ --> RUF063.py:5:1
+  |
+4 | foo.__dict__.get("__annotations__")  # RUF063
+5 | foo.__dict__.get("__annotations__", None)  # RUF063
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | foo.__dict__.get("__annotations__", {})  # RUF063
+7 | foo.__dict__["__annotations__"]  # RUF063
+  |
+
+RUF063 Use `typing_extensions.get_annotations` instead of `__dict__` access
+ --> RUF063.py:6:1
+  |
+4 | foo.__dict__.get("__annotations__")  # RUF063
+5 | foo.__dict__.get("__annotations__", None)  # RUF063
+6 | foo.__dict__.get("__annotations__", {})  # RUF063
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 | foo.__dict__["__annotations__"]  # RUF063
+  |
+
+RUF063 Use `typing_extensions.get_annotations` instead of `__dict__` access
+ --> RUF063.py:7:1
+  |
+5 | foo.__dict__.get("__annotations__", None)  # RUF063
+6 | foo.__dict__.get("__annotations__", {})  # RUF063
+7 | foo.__dict__["__annotations__"]  # RUF063
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |
+9 | # Cases that should NOT trigger the violation
+  |

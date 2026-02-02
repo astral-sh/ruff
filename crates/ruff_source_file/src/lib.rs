@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
 use std::sync::{Arc, OnceLock};
 
 #[cfg(feature = "serde")]
@@ -10,8 +11,8 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use crate::line_index::{LineIndex, OneIndexed, PositionEncoding};
 pub use crate::line_ranges::LineRanges;
 pub use crate::newlines::{
-    find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
-    UniversalNewlines,
+    Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator, UniversalNewlines,
+    find_newline,
 };
 
 mod line_index;
@@ -162,7 +163,8 @@ impl SourceFileBuilder {
 /// A source file that is identified by its name. Optionally stores the source code and [`LineIndex`].
 ///
 /// Cloning a [`SourceFile`] is cheap, because it only requires bumping a reference count.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct SourceFile {
     inner: Arc<SourceFileInner>,
 }
@@ -188,14 +190,14 @@ impl SourceFile {
         &self.source_text()[range]
     }
 
-    pub fn to_source_code(&self) -> SourceCode {
+    pub fn to_source_code(&self) -> SourceCode<'_, '_> {
         SourceCode {
             text: self.source_text(),
             index: self.index(),
         }
     }
 
-    fn index(&self) -> &LineIndex {
+    pub fn index(&self) -> &LineIndex {
         self.inner
             .line_index
             .get_or_init(|| LineIndex::from_source_text(self.source_text()))
@@ -225,6 +227,7 @@ impl Ord for SourceFile {
     }
 }
 
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 struct SourceFileInner {
     name: Box<str>,
     code: Box<str>,
@@ -238,6 +241,13 @@ impl PartialEq for SourceFileInner {
 }
 
 impl Eq for SourceFileInner {}
+
+impl Hash for SourceFileInner {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.code.hash(state);
+    }
+}
 
 /// The line and column of an offset in a source file.
 ///

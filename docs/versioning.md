@@ -20,6 +20,7 @@ Ruff uses a custom versioning scheme that uses the **minor** version number for 
     - Stable rules are added to the default set
     - Stable rules are removed from the default set
     - A safe fix for a rule is promoted to stable
+    - A rule is deprecated
 - Formatter:
      - The stable style changed
 - Language server:

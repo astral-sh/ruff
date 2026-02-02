@@ -1,8 +1,8 @@
 use insta::assert_debug_snapshot;
 
-use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
-use ruff_python_trivia::{lines_after, lines_before, CommentRanges, SimpleToken, SimpleTokenizer};
+use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind};
+use ruff_python_trivia::{CommentRanges, SimpleToken, SimpleTokenizer, lines_after, lines_before};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 struct TokenizationTestCase {
@@ -167,6 +167,22 @@ fn string_with_byte_kind() {
     assert_debug_snapshot!(test_case.tokens());
 
     // note: not reversible: [other, bogus] vs [bogus, other]
+}
+
+#[test]
+fn fstring() {
+    let source = "f'foo'";
+
+    let test_case = tokenize(source);
+    assert_debug_snapshot!(test_case.tokens());
+}
+
+#[test]
+fn tstring() {
+    let source = "t'foo'";
+
+    let test_case = tokenize(source);
+    assert_debug_snapshot!(test_case.tokens());
 }
 
 #[test]

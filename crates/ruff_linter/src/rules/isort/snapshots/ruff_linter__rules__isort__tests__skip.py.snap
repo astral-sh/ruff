@@ -1,61 +1,58 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-skip.py:20:5: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+  --> skip.py:20:5
    |
 18 |       import sys
 19 |       import os  # isort: skip
 20 | /     import collections
 21 | |     import abc
-   | |______________^ I001
+   | |______________^
    |
-   = help: Organize imports
+help: Organize imports
+17 | def f():
+18 |     import sys
+19 |     import os  # isort: skip
+20 +     import abc
+21 |     import collections
+   -     import abc
+22 | 
+23 | 
+24 | def f():
 
-ℹ Safe fix
-17 17 | def f():
-18 18 |     import sys
-19 19 |     import os  # isort: skip
-   20 |+    import abc
-20 21 |     import collections
-21    |-    import abc
-22 22 | 
-23 23 | 
-24 24 | def f():
-
-skip.py:27:5: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+  --> skip.py:27:5
    |
 25 |       import sys
 26 |       import os  # isort:skip
 27 | /     import collections
 28 | |     import abc
-   | |______________^ I001
+   | |______________^
    |
-   = help: Organize imports
+help: Organize imports
+24 | def f():
+25 |     import sys
+26 |     import os  # isort:skip
+27 +     import abc
+28 |     import collections
+   -     import abc
+29 | 
+30 | 
+31 | def f():
 
-ℹ Safe fix
-24 24 | def f():
-25 25 |     import sys
-26 26 |     import os  # isort:skip
-   27 |+    import abc
-27 28 |     import collections
-28    |-    import abc
-29 29 | 
-30 30 | 
-31 31 | def f():
-
-skip.py:34:5: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+  --> skip.py:34:5
    |
 32 |     import sys; import os  # isort:skip
 33 |     import sys; import os  # isort:skip  # isort:skip
 34 |     import sys; import os
-   |     ^^^^^^^^^^^^^^^^^^^^^ I001
+   |     ^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Organize imports
-
-ℹ Safe fix
-31 31 | def f():
-32 32 |     import sys; import os  # isort:skip
-33 33 |     import sys; import os  # isort:skip  # isort:skip
-34    |-    import sys; import os
-   34 |+    import os
-   35 |+    import sys
+help: Organize imports
+31 | def f():
+32 |     import sys; import os  # isort:skip
+33 |     import sys; import os  # isort:skip  # isort:skip
+   -     import sys; import os
+34 +     import os
+35 +     import sys

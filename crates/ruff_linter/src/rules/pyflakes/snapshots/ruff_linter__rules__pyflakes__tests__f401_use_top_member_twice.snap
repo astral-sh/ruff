@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `a.b` imported but unused
+ --> f401_preview_submodule.py:3:8
+  |
+2 | import a
+3 | import a.b
+  |        ^^^
+4 | a.foo()
+5 | a.bar()
+  |
+help: Remove unused import: `a.b`
+1 | 
+2 | import a
+  - import a.b
+3 | a.foo()
+4 | a.bar()

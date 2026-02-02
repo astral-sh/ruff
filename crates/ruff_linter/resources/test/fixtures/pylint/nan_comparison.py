@@ -92,3 +92,8 @@ if y == np.inf:
 # OK
 if x == "nan":
     pass
+
+# PLW0117
+# https://github.com/astral-sh/ruff/issues/18596
+assert x == float("-NaN ")
+assert x == float(" \n+nan   \t")

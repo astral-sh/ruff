@@ -2,21 +2,42 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
+> [!NOTE]
+>
+> This guide is for Ruff. If you're looking to contribute to ty, please see [the ty contributing
+> guide](https://github.com/astral-sh/ruff/blob/main/crates/ty/CONTRIBUTING.md).
+
+## Finding ways to help
+
+We label issues that would be good for a first time contributor as
+[`good first issue`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+These usually do not require significant experience with Rust or the Ruff code base.
+
+We label issues that we think are a good opportunity for subsequent contributions as
+[`help wanted`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
+These require varying levels of experience with Rust and Ruff. Often, we want to accomplish these
+tasks but do not have the resources to do so ourselves.
+
+You don't need our permission to start on an issue we have labeled as appropriate for community
+contribution as described above. However, it's a good idea to indicate that you are going to work on
+an issue to avoid concurrent attempts to solve the same problem.
+
+Please check in with us before starting work on an issue that has not been labeled as appropriate
+for community contribution. We're happy to receive contributions for other issues, but it's
+important to make sure we have consensus on the solution to the problem first.
+
+Outside of issues with the labels above, issues labeled as
+[`bug`](https://github.com/astral-sh/ruff/issues?q=is%3Aopen+is%3Aissue+label%3A%22bug%22) are the
+best candidates for contribution. In contrast, issues labeled with `needs-decision` or
+`needs-design` are _not_ good candidates for contribution. Please do not open pull requests for
+issues with these labels.
+
+Please do not open pull requests for new features without prior discussion. While we appreciate
+exploration of new features, we will often close these pull requests immediately. Adding a
+new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
+team before it is appropriate to begin work on an implementation.
+
 ## The Basics
-
-Ruff welcomes contributions in the form of pull requests.
-
-For small changes (e.g., bug fixes), feel free to submit a PR.
-
-For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
-creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
-You can also join us on [Discord](https://discord.com/invite/astral-sh) to discuss your idea with the
-community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
-and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
-that are ready for contributions.
-
-If you have suggestions on how we might improve the contributing documentation, [let us know](https://github.com/astral-sh/ruff/discussions/5693)!
 
 ### Prerequisites
 
@@ -32,12 +53,12 @@ cargo install cargo-insta
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
-You can optionally install pre-commit hooks to automatically run the validation checks
+You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install pre-commit
-pre-commit install
+uv tool install prek
+prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
@@ -64,7 +85,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-uvx pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -139,7 +160,10 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-    `#[derive(ViolationMetadata)]` to see examples.
+    `#[derive(ViolationMetadata)]` to see examples. You also need to add a
+    `#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]` attribute on your
+    `ViolationMetadata` struct. This adds the rule in preview, and the version will be filled in
+    automatically in the next release.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
@@ -153,8 +177,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). New rules
-    should be added in `RuleGroup::Preview`.
+1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -165,8 +188,9 @@ to call your new function at the appropriate time and with the appropriate input
 defined therein is a Python AST visitor, which iterates over the AST, building up a semantic model,
 and calling out to lint rule analyzer functions as it goes.
 
-If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
-for the `Diagnostic::new` invocations to understand how other, similar rules are implemented.
+If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file or use the AST
+panel in the [playground](https://play.ruff.rs/?secondary=AST). Grep for the
+`Checker::report_diagnostic` invocations to understand how other, similar rules are implemented.
 
 Once you're satisfied with your code, add tests for your rule
 (see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
@@ -259,6 +283,55 @@ Note that plugin-specific configuration options are defined in their own modules
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
+### Opening a PR
+
+After you finish your changes, the next step is to open a PR. By default, two
+sections will be filled into the PR body: the summary and the test plan.
+
+#### The summary
+
+The summary is intended to give us as maintainers information about your PR.
+This should typically include a link to the relevant issue(s) you're addressing
+in your PR, as well as a summary of the issue and your approach to fixing it. If
+you have any questions about your approach or design, or if you considered
+alternative approaches, that can also be helpful to include.
+
+AI can be helpful in generating both the code and summary of your PR, but a
+successful contribution should still be carefully reviewed by you and the
+summary editorialized before submitting a PR. A great summary is thorough but
+also succinct and gives us the context we need to review your PR.
+
+You can find examples of excellent issues and PRs by searching for the
+[`great writeup`](https://github.com/astral-sh/ruff/issues?q=label%3A%22great%20writeup%22)
+label.
+
+#### The test plan
+
+The test plan is likely to be shorter than the summary and can be as simple as
+"Added new snapshot tests for `RUF123`," at least for rule bugs. For LSP or some
+types of CLI changes, in particular, it can also be helpful to include
+screenshots or recordings of your change in action.
+
+#### Ecosystem report
+
+After opening the PR, an ecosystem report will be run as part of CI. This shows
+a diff of linter and formatter behavior before and after the changes in your PR.
+Going through these changes and reporting your findings in the PR summary or an
+additional comment help us to review your PR more efficiently. It's also a great
+way to find new test cases to incorporate into your PR if you identify any
+issues.
+
+#### PR status
+
+To help us know when your PR is ready for review again, please either move your
+PR back to a draft while working on it (marking it ready for review afterwards
+will ping the previous reviewers) or explicitly re-request a review. This helps
+us to avoid re-reviewing a PR while you're still working on it and also to
+prioritize PRs that are definitely ready for review.
+
+You can also thumbs-up or mark as resolved any comments we leave to let us know
+you addressed them.
+
 ## MkDocs
 
 To preview any changes to the documentation locally:
@@ -274,11 +347,7 @@ To preview any changes to the documentation locally:
 1. Run the development server with:
 
     ```shell
-    # For contributors.
-    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.public.yml
-
-    # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-    uvx --with-requirements docs/requirements-insiders.txt -- mkdocs serve -f mkdocs.insiders.yml
+    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.yml
     ```
 
 The documentation should then be available locally at
@@ -293,9 +362,15 @@ them to [PyPI](https://pypi.org/project/ruff/).
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
 
-### Creating a new release
+### Installing tools
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+1. Install `npm`: `brew install npm` or similar
+
+### Creating a new release
+
+Commit each step of this process separately for easier review.
 
 1. Run `./scripts/release.sh`; this command will:
 
@@ -309,6 +384,18 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
+    - Square brackets (eg, `[ruff]` project name) will be automatically escaped by `prek`
+
+    Additionally, for minor releases:
+
+    - Move the existing contents of `CHANGELOG.md` to `changelogs/0.MINOR.x.md`,
+        where `MINOR` is the previous minor release (e.g. `11` when preparing
+        the 0.12.0 release)
+    - Reverse the entries to put the oldest version first (`0.MINOR.0` instead
+        of `0.MINOR.LATEST` as in the main changelog)
+        - Use the
+            [`reverse-changelog.py`](https://github.com/astral-sh/uv/blob/main/scripts/reverse-changelog.py)
+            script from the uv repo to do this automatically
 
 1. Highlight any breaking changes in `BREAKING_CHANGES.md`
 
@@ -337,13 +424,13 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 1. Verify the GitHub release:
 
-    1. The Changelog should match the content of `CHANGELOG.md`
-    1. Append the contributors from the `scripts/release.sh` script
+    1. The changelog should match the content of `CHANGELOG.md`
 
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
+    1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
 1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
@@ -365,6 +452,15 @@ uvx --from ./python/ruff-ecosystem ruff-ecosystem format ruff "./target/debug/ru
 ```
 
 See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
+
+## Upgrading Rust
+
+1. Change the `channel` in `./rust-toolchain.toml` to the new Rust version (`<latest>`)
+1. Change the `rust-version` in the `./Cargo.toml` to `<latest> - 2` (e.g. 1.84 if the latest is 1.86)
+1. Run `cargo clippy --fix --allow-dirty --allow-staged` to fix new clippy warnings
+1. Create and merge the PR
+1. Bump the Rust version in Ruff's conda forge recipe. See [this PR](https://github.com/conda-forge/ruff-feedstock/pull/266) for an example.
+1. Enjoy the new Rust version!
 
 ## Benchmarking and Profiling
 
@@ -397,7 +493,7 @@ cargo install hyperfine
 To benchmark the release build:
 
 ```shell
-cargo build --release && hyperfine --warmup 10 \
+cargo build --release --bin ruff && hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ -e"
 
@@ -596,8 +692,7 @@ Then convert the recorded profile
 perf script -F +pid > /tmp/test.perf
 ```
 
-You can now view the converted file with [firefox profiler](https://profiler.firefox.com/), with a
-more in-depth guide [here](https://profiler.firefox.com/docs/#/./guide-perf-profiling)
+You can now view the converted file with [firefox profiler](https://profiler.firefox.com/). To learn more about Firefox profiler, read the [Firefox profiler profiling-guide](https://profiler.firefox.com/docs/#/./guide-perf-profiling).
 
 An alternative is to convert the perf data to `flamegraph.svg` using
 [flamegraph](https://github.com/flamegraph-rs/flamegraph) (`cargo install flamegraph`):

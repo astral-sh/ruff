@@ -1,9 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_extended_snmp_api_path_detection_enabled;
 
 /// ## What it does
 /// Checks for uses of the SNMPv3 protocol without encryption.
@@ -29,6 +30,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct SnmpWeakCryptography;
 
 impl Violation for SnmpWeakCryptography {
@@ -46,13 +48,20 @@ pub(crate) fn snmp_weak_cryptography(checker: &Checker, call: &ast::ExprCall) {
             .semantic()
             .resolve_qualified_name(&call.func)
             .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["pysnmp", "hlapi", "UsmUserData"]
-                )
+                if is_extended_snmp_api_path_detection_enabled(checker.settings()) {
+                    matches!(
+                        qualified_name.segments(),
+                        ["pysnmp", "hlapi", .., "UsmUserData"]
+                    )
+                } else {
+                    matches!(
+                        qualified_name.segments(),
+                        ["pysnmp", "hlapi", "UsmUserData"]
+                    )
+                }
             })
         {
-            checker.report_diagnostic(Diagnostic::new(SnmpWeakCryptography, call.func.range()));
+            checker.report_diagnostic(SnmpWeakCryptography, call.func.range());
         }
     }
 }

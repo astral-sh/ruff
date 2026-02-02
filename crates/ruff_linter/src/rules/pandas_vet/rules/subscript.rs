@@ -1,14 +1,13 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::Violation;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
+use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
 /// ## What it does
 /// Checks for uses of `.ix` on Pandas objects.
@@ -41,6 +40,7 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// - [Pandas documentation: `loc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html)
 /// - [Pandas documentation: `iloc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iloc.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotIx;
 
 impl Violation for PandasUseOfDotIx {
@@ -83,6 +83,7 @@ impl Violation for PandasUseOfDotIx {
 /// - [Pandas documentation: `loc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html)
 /// - [Pandas documentation: `at`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.at.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotAt;
 
 impl Violation for PandasUseOfDotAt {
@@ -134,6 +135,7 @@ impl Violation for PandasUseOfDotAt {
 /// - [Pandas documentation: `iloc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iloc.html)
 /// - [Pandas documentation: `iat`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iat.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotIat;
 
 impl Violation for PandasUseOfDotIat {
@@ -152,15 +154,6 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
         return;
     };
 
-    let violation: DiagnosticKind = match attr.as_str() {
-        "ix" if checker.settings.rules.enabled(Rule::PandasUseOfDotIx) => PandasUseOfDotIx.into(),
-        "at" if checker.settings.rules.enabled(Rule::PandasUseOfDotAt) => PandasUseOfDotAt.into(),
-        "iat" if checker.settings.rules.enabled(Rule::PandasUseOfDotIat) => {
-            PandasUseOfDotIat.into()
-        }
-        _ => return,
-    };
-
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.at[0]`), and on irrelevant bindings
     // (like imports).
     if !matches!(
@@ -170,5 +163,22 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(violation, expr.range()));
+    let range = expr.range();
+
+    match attr.as_str() {
+        // PD007
+        "ix" if checker.is_rule_enabled(Rule::PandasUseOfDotIx) => {
+            let mut diagnostic = checker.report_diagnostic(PandasUseOfDotIx, range);
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+        }
+        // PD008
+        "at" if checker.is_rule_enabled(Rule::PandasUseOfDotAt) => {
+            checker.report_diagnostic(PandasUseOfDotAt, range);
+        }
+        // PD009
+        "iat" if checker.is_rule_enabled(Rule::PandasUseOfDotIat) => {
+            checker.report_diagnostic(PandasUseOfDotIat, range);
+        }
+        _ => (),
+    }
 }

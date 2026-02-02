@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for literals that are similar to constants in `math` module.
@@ -28,6 +28,7 @@ use crate::importer::ImportRequest;
 /// ## References
 /// - [Python documentation: `math` constants](https://docs.python.org/3/library/math.html#constants)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.6")]
 pub(crate) struct MathConstant {
     literal: String,
     constant: &'static str,
@@ -55,7 +56,7 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
     };
 
     if let Some(constant) = Constant::from_value(value) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MathConstant {
                 literal: checker.locator().slice(literal).into(),
                 constant: constant.name(),
@@ -63,7 +64,6 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
             literal.range(),
         );
         diagnostic.try_set_fix(|| convert_to_constant(literal, constant.name(), checker));
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -105,7 +105,7 @@ enum Constant {
 }
 
 impl Constant {
-    #[allow(clippy::approx_constant)]
+    #[expect(clippy::approx_constant)]
     fn from_value(value: f64) -> Option<Self> {
         if (3.14..3.15).contains(&value) {
             matches_constant(std::f64::consts::PI, value).then_some(Self::Pi)

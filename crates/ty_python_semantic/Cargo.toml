@@ -1,0 +1,82 @@
+[package]
+name = "ty_python_semantic"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_db = { workspace = true }
+ruff_diagnostics = { workspace = true }
+ruff_index = { workspace = true, features = ["salsa"] }
+ruff_macros = { workspace = true }
+ruff_memory_usage = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["salsa"] }
+ruff_python_literal = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ty_combine = { workspace = true }
+ty_module_resolver = { workspace = true }
+ty_site_packages = { workspace = true }
+
+anyhow = { workspace = true }
+bitflags = { workspace = true }
+bitvec = { workspace = true }
+compact_str = { workspace = true }
+drop_bomb = { workspace = true }
+get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
+hashbrown = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+memchr = { workspace = true }
+ordermap = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true, features = ["compact_str", "ordermap"] }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+smallvec = { workspace = true }
+static_assertions = { workspace = true }
+strsim = "0.11.1"
+strum = { workspace = true }
+strum_macros = { workspace = true }
+test-case = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+ruff_db = { workspace = true, features = ["testing", "os"] }
+ruff_python_parser = { workspace = true }
+ty_static = { workspace = true }
+ty_test = { workspace = true }
+ty_vendored = { workspace = true }
+
+anyhow = { workspace = true }
+camino = { workspace = true }
+datatest-stable = { workspace = true }
+glob = { workspace = true }
+indoc = { workspace = true }
+insta = { workspace = true }
+pretty_assertions = { workspace = true }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
+
+[features]
+schemars = ["dep:schemars", "dep:serde_json"]
+serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
+testing = []
+
+[[test]]
+name = "mdtest"
+harness = false
+
+[lints]
+workspace = true

@@ -70,3 +70,12 @@ list(map(lambda: 1, "xyz"))
 list(map(lambda x, y: x, [(1, 2), (3, 4)]))
 list(map(lambda: 1, "xyz"))
 list(map(lambda x, y: x, [(1, 2), (3, 4)]))
+
+# When inside t-string, then the fix should be surrounded by whitespace
+_ = t"{set(map(lambda x: x % 2 == 0, nums))}"
+_ = t"{dict(map(lambda v: (v, v**2), nums))}"
+
+
+# See https://github.com/astral-sh/ruff/issues/20198
+# No error: lambda contains `yield`, so map() should not be rewritten
+map(lambda x: (yield x), [1, 2, 3])

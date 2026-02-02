@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: NodeIndex(None),
             range: 0..16,
             value: StringLiteral(
                 ExprStringLiteral {
+                    node_index: NodeIndex(None),
                     range: 0..16,
                     value: StringLiteralValue {
                         inner: Concatenated(
@@ -16,20 +17,24 @@ snapshot_kind: text
                                 strings: [
                                     StringLiteral {
                                         range: 0..8,
+                                        node_index: NodeIndex(None),
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
                                             prefix: Empty,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                     StringLiteral {
                                         range: 9..16,
+                                        node_index: NodeIndex(None),
                                         value: "world",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
                                             prefix: Empty,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ],

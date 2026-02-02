@@ -1,0 +1,9 @@
+#:schema ../ty.schema.json
+# Configuration overrides for the mypy primer run
+
+# Enable off-by-default rules.
+[rules]
+possibly-unresolved-reference = "warn"
+possibly-missing-import = "warn"
+division-by-zero = "warn"
+unsupported-dynamic-base = "warn"

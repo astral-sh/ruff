@@ -1,11 +1,11 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, BindingKind};
 use ruff_text_size::Ranged;
 
-use crate::Locator;
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for the use of non-ASCII characters in variable names.
@@ -26,6 +26,7 @@ use crate::Locator;
 ///
 /// [PEP 672]: https://peps.python.org/pep-0672/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct NonAsciiName {
     name: String,
     kind: Kind,
@@ -44,10 +45,11 @@ impl Violation for NonAsciiName {
 }
 
 /// PLC2401
-pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Diagnostic> {
+pub(crate) fn non_ascii_name(checker: &Checker, binding: &Binding) {
+    let locator = checker.locator();
     let name = binding.name(locator.contents());
     if name.is_ascii() {
-        return None;
+        return;
     }
 
     let kind = match binding.kind {
@@ -72,18 +74,19 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
         | BindingKind::SubmoduleImport(_)
         | BindingKind::Deletion
         | BindingKind::ConditionalDeletion(_)
-        | BindingKind::UnboundException(_) => {
-            return None;
+        | BindingKind::UnboundException(_)
+        | BindingKind::DunderClassCell => {
+            return;
         }
     };
 
-    Some(Diagnostic::new(
+    checker.report_diagnostic(
         NonAsciiName {
             name: name.to_string(),
             kind,
         },
         binding.range(),
-    ))
+    );
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

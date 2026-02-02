@@ -9,3 +9,7 @@ extensions_dir = "./extensions"
 glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
 list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
 search("*.png")
+
+# if `dir_fd` is set, suppress the diagnostic
+glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"), dir_fd=1)
+list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"), dir_fd=1))

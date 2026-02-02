@@ -88,3 +88,25 @@ def f_multi_line_string2():
             example="example"
         )
     )
+
+
+def raise_typing_cast_exception():
+    import typing
+    raise typing.cast("Exception", None)
+
+
+def f_typing_cast_excluded():
+    from typing import cast
+    raise cast(RuntimeError, "This should not trigger EM101")
+
+
+def f_typing_cast_excluded_import():
+    import typing
+    raise typing.cast(RuntimeError, "This should not trigger EM101")
+
+
+def f_typing_cast_excluded_aliased():
+    from typing import cast as my_cast
+    raise my_cast(RuntimeError, "This should not trigger EM101")
+
+

@@ -1,0 +1,6 @@
+---
+source: crates/ruff_db/src/diagnostic/render/azure.rs
+expression: env.render_diagnostics(&diagnostics)
+---
+##vso[task.logissue type=error;sourcepath=/syntax_errors.py;linenumber=1;columnnumber=15;code=invalid-syntax;]Expected one or more symbol names after import
+##vso[task.logissue type=error;sourcepath=/syntax_errors.py;linenumber=3;columnnumber=12;code=invalid-syntax;]Expected ')', found newline

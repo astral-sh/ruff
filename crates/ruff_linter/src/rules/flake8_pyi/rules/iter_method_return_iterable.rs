@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_text_size::Ranged;
 
 use ruff_python_semantic::{Definition, Member, MemberKind};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -69,6 +69,7 @@ use crate::checkers::ast::Checker;
 ///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct IterMethodReturnIterable {
     is_async: bool,
 }
@@ -125,9 +126,6 @@ pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Defini
             }
         })
     {
-        checker.report_diagnostic(Diagnostic::new(
-            IterMethodReturnIterable { is_async },
-            returns.range(),
-        ));
+        checker.report_diagnostic(IterMethodReturnIterable { is_async }, returns.range());
     }
 }

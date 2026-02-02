@@ -78,3 +78,11 @@ b: None | Literal[None] | None
 c: (None | Literal[None]) | None
 d: None | (Literal[None] | None)
 e: None | ((None | Literal[None]) | None) | None
+
+# Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
+print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
+print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
+print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__

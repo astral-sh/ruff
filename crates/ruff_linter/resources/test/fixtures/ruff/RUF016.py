@@ -113,3 +113,18 @@ var = bytearray(b"abc")["x"]
 x = "x"
 var = [1, 2, 3][0:x]
 var = [1, 2, 3][x:1]
+
+# https://github.com/astral-sh/ruff/issues/20204
+
+# Should not emit for boolean index and slice bounds
+var = [1, 2, 3][False]
+var = [1, 2, 3][False:True:True]
+
+# Should emit for invalid access using t-string
+var = [1, 2][t"x"]
+
+# Should emit for invalid access using lambda
+var = [1, 2, 3][lambda: 0]
+
+# Should emit for invalid access using generator
+var = [1, 2, 3][(x for x in ())]

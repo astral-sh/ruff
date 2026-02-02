@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `raise` statements that raise `NotImplemented`.
@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `NotImplemented`](https://docs.python.org/3/library/constants.html#NotImplemented)
 /// - [Python documentation: `NotImplementedError`](https://docs.python.org/3/library/exceptions.html#NotImplementedError)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct RaiseNotImplemented;
 
 impl Violation for RaiseNotImplemented {
@@ -74,7 +75,7 @@ pub(crate) fn raise_not_implemented(checker: &Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
+    let mut diagnostic = checker.report_diagnostic(RaiseNotImplemented, expr.range());
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
             "NotImplementedError",
@@ -86,5 +87,4 @@ pub(crate) fn raise_not_implemented(checker: &Checker, expr: &Expr) {
             import_edit,
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }

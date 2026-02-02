@@ -1,8 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Line;
 
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
 
@@ -69,6 +70,7 @@ use crate::settings::LinterSettings;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct LineTooLong(usize, usize);
 
 impl Violation for LineTooLong {
@@ -84,10 +86,11 @@ pub(crate) fn line_too_long(
     line: &Line,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-) -> Option<Diagnostic> {
+    context: &LintContext,
+) {
     let limit = settings.pycodestyle.max_line_length;
 
-    Overlong::try_from_line(
+    if let Some(overlong) = Overlong::try_from_line(
         line,
         comment_ranges,
         limit,
@@ -97,11 +100,10 @@ pub(crate) fn line_too_long(
             &[]
         },
         settings.tab_size,
-    )
-    .map(|overlong| {
-        Diagnostic::new(
+    ) {
+        context.report_diagnostic(
             LineTooLong(overlong.width(), limit.value() as usize),
             overlong.range(),
-        )
-    })
+        );
+    }
 }

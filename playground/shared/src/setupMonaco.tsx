@@ -287,12 +287,12 @@ function defineAyuThemes(monaco: Monaco) {
         token: "comment",
       },
       {
-        foreground: ROCK,
-        token: "string",
+        foreground: COSMIC,
+        token: "keyword",
       },
       {
-        foreground: SUN,
-        token: "keyword",
+        foreground: COSMIC,
+        token: "builtinConstant",
       },
       {
         foreground: CONSTELLATION,
@@ -301,6 +301,22 @@ function defineAyuThemes(monaco: Monaco) {
       {
         token: "tag",
         foreground: ROCK,
+      },
+      {
+        foreground: ROCK,
+        token: "string",
+      },
+      {
+        token: "method",
+        foreground: SUN,
+      },
+      {
+        token: "function",
+        foreground: SUN,
+      },
+      {
+        token: "decorator",
+        foreground: SUN,
       },
     ],
     encodedTokensColors: [],
@@ -548,11 +564,11 @@ function defineAyuThemes(monaco: Monaco) {
         token: "comment",
       },
       {
-        foreground: RADIATE,
+        foreground: ELECTRON,
         token: "string",
       },
       {
-        foreground: ELECTRON,
+        foreground: CONSTELLATION,
         token: "number",
       },
       {
@@ -560,8 +576,12 @@ function defineAyuThemes(monaco: Monaco) {
         token: "identifier",
       },
       {
-        foreground: SUN,
+        foreground: RADIATE,
         token: "keyword",
+      },
+      {
+        foreground: RADIATE,
+        token: "builtinConstant",
       },
       {
         foreground: PROTON,
@@ -570,6 +590,30 @@ function defineAyuThemes(monaco: Monaco) {
       {
         foreground: ASTEROID,
         token: "delimiter",
+      },
+      {
+        token: "class",
+        foreground: SUPERNOVA,
+      },
+      {
+        foreground: STARLIGHT,
+        token: "variable",
+      },
+      {
+        foreground: STARLIGHT,
+        token: "parameter",
+      },
+      {
+        token: "method",
+        foreground: SUN,
+      },
+      {
+        token: "function",
+        foreground: SUN,
+      },
+      {
+        token: "decorator",
+        foreground: SUN,
       },
     ],
     encodedTokensColors: [],

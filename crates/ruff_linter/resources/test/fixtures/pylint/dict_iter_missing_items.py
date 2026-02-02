@@ -30,3 +30,23 @@ for a, b in d_tuple:
     pass
 for a, b in d_tuple_annotated: 
     pass
+
+# Empty dict cases
+empty_dict = {}
+empty_dict["x"] = 1
+for k, v in empty_dict:
+    pass
+
+empty_dict_annotated_tuple_keys: dict[tuple[int, str], bool] = {}
+for k, v in empty_dict_annotated_tuple_keys:
+    pass
+
+empty_dict_unannotated = {}
+empty_dict_unannotated[("x", "y")] = True
+for k, v in empty_dict_unannotated:
+    pass
+
+empty_dict_annotated_str_keys: dict[str, int] = {}
+empty_dict_annotated_str_keys["x"] = 1
+for k, v in empty_dict_annotated_str_keys:
+    pass

@@ -3,20 +3,20 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::rules::flake8_type_checking::helpers::{
-    filter_contained, is_typing_reference, quote_annotation,
+    TypingReference, filter_contained, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
-use crate::rules::isort::{categorize, ImportSection, ImportType};
+use crate::rules::isort::{ImportSection, ImportType, categorize};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for first-party imports that are only used for type annotations, but
@@ -38,11 +38,18 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
 ///
-/// import local_module
+/// from . import local_module
 ///
 ///
 /// def func(sized: local_module.Container) -> int:
@@ -56,7 +63,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///     import local_module
+///     from . import local_module
 ///
 ///
 /// def func(sized: local_module.Container) -> int:
@@ -69,10 +76,12 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
+/// - `lint.future-annotations`
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct TypingOnlyFirstPartyImport {
     qualified_name: String,
 }
@@ -113,6 +122,12 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -144,10 +159,12 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
+/// - `lint.future-annotations`
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct TypingOnlyThirdPartyImport {
     qualified_name: String,
 }
@@ -188,6 +205,12 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -219,10 +242,12 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
+/// - `lint.future-annotations`
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct TypingOnlyStandardLibraryImport {
     qualified_name: String,
 }
@@ -258,9 +283,10 @@ pub(crate) fn typing_only_runtime_import(
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        // If we're in un-strict mode, don't flag typing-only imports that are
-        // implicitly loaded by way of a valid runtime import.
-        if !checker.settings.flake8_type_checking.strict
+        // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
+        // imports that are implicitly loaded by way of a valid runtime import.
+        if !checker.settings().future_annotations
+            && !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
                 .any(|import| is_implicit_import(binding, import))
@@ -276,85 +302,94 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         };
 
-        if binding.context.is_runtime()
-            && binding
-                .references()
-                .map(|reference_id| checker.semantic().reference(reference_id))
-                .all(|reference| {
-                    is_typing_reference(reference, &checker.settings.flake8_type_checking)
-                })
+        if !binding.context.is_runtime() {
+            continue;
+        }
+
+        let typing_reference =
+            TypingReference::from_references(binding, checker.semantic(), checker.settings());
+
+        let needs_future_import = match typing_reference {
+            TypingReference::Runtime => continue,
+            // We can only get the `Future` variant if `future_annotations` is
+            // enabled, so we can unconditionally set this here.
+            TypingReference::Future => true,
+            TypingReference::TypingOnly | TypingReference::Quote => false,
+        };
+
+        let qualified_name = import.qualified_name();
+
+        if is_exempt(
+            &qualified_name.to_string(),
+            &checker
+                .settings()
+                .flake8_type_checking
+                .exempt_modules
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        ) {
+            continue;
+        }
+
+        let source_name = import.source_name().join(".");
+
+        // Categorize the import, using coarse-grained categorization.
+        let import_type = match categorize(
+            &source_name,
+            qualified_name.is_unresolved_import(),
+            &checker.settings().src,
+            checker.package(),
+            checker.settings().isort.detect_same_package,
+            &checker.settings().isort.known_modules,
+            checker.target_version(),
+            checker.settings().isort.no_sections,
+            &checker.settings().isort.section_order,
+            &checker.settings().isort.default_section,
+        ) {
+            ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
+                ImportType::FirstParty
+            }
+            ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
+                ImportType::ThirdParty
+            }
+            ImportSection::Known(ImportType::StandardLibrary) => ImportType::StandardLibrary,
+            ImportSection::Known(ImportType::Future) => {
+                continue;
+            }
+        };
+
+        if !checker.is_rule_enabled(rule_for(import_type)) {
+            continue;
+        }
+
+        let Some(node_id) = binding.source else {
+            continue;
+        };
+
+        let import = ImportBinding {
+            import,
+            reference_id,
+            binding,
+            range: binding.range(),
+            parent_range: binding.parent_range(checker.semantic()),
+            needs_future_import,
+        };
+
+        if checker.rule_is_ignored(rule_for(import_type), import.start())
+            || import.parent_range.is_some_and(|parent_range| {
+                checker.rule_is_ignored(rule_for(import_type), parent_range.start())
+            })
         {
-            let qualified_name = import.qualified_name();
-
-            if is_exempt(
-                &qualified_name.to_string(),
-                &checker
-                    .settings
-                    .flake8_type_checking
-                    .exempt_modules
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>(),
-            ) {
-                continue;
-            }
-
-            // Categorize the import, using coarse-grained categorization.
-            let import_type = match categorize(
-                &qualified_name.to_string(),
-                qualified_name.is_unresolved_import(),
-                &checker.settings.src,
-                checker.package(),
-                checker.settings.isort.detect_same_package,
-                &checker.settings.isort.known_modules,
-                checker.target_version(),
-                checker.settings.isort.no_sections,
-                &checker.settings.isort.section_order,
-                &checker.settings.isort.default_section,
-            ) {
-                ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
-                    ImportType::FirstParty
-                }
-                ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
-                    ImportType::ThirdParty
-                }
-                ImportSection::Known(ImportType::StandardLibrary) => ImportType::StandardLibrary,
-                ImportSection::Known(ImportType::Future) => {
-                    continue;
-                }
-            };
-
-            if !checker.enabled(rule_for(import_type)) {
-                continue;
-            }
-
-            let Some(node_id) = binding.source else {
-                continue;
-            };
-
-            let import = ImportBinding {
-                import,
-                reference_id,
-                binding,
-                range: binding.range(),
-                parent_range: binding.parent_range(checker.semantic()),
-            };
-
-            if checker.rule_is_ignored(rule_for(import_type), import.start())
-                || import.parent_range.is_some_and(|parent_range| {
-                    checker.rule_is_ignored(rule_for(import_type), parent_range.start())
-                })
-            {
-                ignores_by_statement
-                    .entry((node_id, import_type))
-                    .or_default()
-                    .push(import);
-            } else {
-                errors_by_statement
-                    .entry((node_id, import_type))
-                    .or_default()
-                    .push(import);
-            }
+            ignores_by_statement
+                .entry((node_id, import_type))
+                .or_default()
+                .push(import);
+        } else {
+            errors_by_statement
+                .entry((node_id, import_type))
+                .or_default()
+                .push(import);
         }
     }
 
@@ -370,8 +405,10 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic = Diagnostic::new(
-                diagnostic_for(import_type, import.qualified_name().to_string()),
+            let mut diagnostic = diagnostic_for(
+                checker,
+                import_type,
+                import.qualified_name().to_string(),
                 range,
             );
             if let Some(range) = parent_range {
@@ -380,7 +417,6 @@ pub(crate) fn typing_only_runtime_import(
             if let Some(fix) = fix.as_ref() {
                 diagnostic.set_fix(fix.clone());
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -394,14 +430,15 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic = Diagnostic::new(
-                diagnostic_for(import_type, import.qualified_name().to_string()),
+            let mut diagnostic = diagnostic_for(
+                checker,
+                import_type,
+                import.qualified_name().to_string(),
                 range,
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -417,11 +454,22 @@ fn rule_for(import_type: ImportType) -> Rule {
 }
 
 /// Return the [`Diagnostic`] for the given import type.
-fn diagnostic_for(import_type: ImportType, qualified_name: String) -> DiagnosticKind {
+fn diagnostic_for<'a, 'b>(
+    checker: &'a Checker<'b>,
+    import_type: ImportType,
+    qualified_name: String,
+    range: TextRange,
+) -> DiagnosticGuard<'a, 'b> {
     match import_type {
-        ImportType::StandardLibrary => TypingOnlyStandardLibraryImport { qualified_name }.into(),
-        ImportType::ThirdParty => TypingOnlyThirdPartyImport { qualified_name }.into(),
-        ImportType::FirstParty => TypingOnlyFirstPartyImport { qualified_name }.into(),
+        ImportType::StandardLibrary => {
+            checker.report_diagnostic(TypingOnlyStandardLibraryImport { qualified_name }, range)
+        }
+        ImportType::ThirdParty => {
+            checker.report_diagnostic(TypingOnlyThirdPartyImport { qualified_name }, range)
+        }
+        ImportType::FirstParty => {
+            checker.report_diagnostic(TypingOnlyFirstPartyImport { qualified_name }, range)
+        }
         _ => unreachable!("Unexpected import type"),
     }
 }
@@ -473,6 +521,8 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         .min()
         .expect("Expected at least one import");
 
+    let add_future_import = imports.iter().any(|binding| binding.needs_future_import);
+
     // Step 1) Remove the import.
     let remove_import_edit = fix::edits::remove_unused_imports(
         member_names.iter().map(AsRef::as_ref),
@@ -496,37 +546,52 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         )?
         .into_edits();
 
-    // Step 3) Quote any runtime usages of the referenced symbol.
-    let quote_reference_edits = filter_contained(
-        imports
-            .iter()
-            .flat_map(|ImportBinding { binding, .. }| {
-                binding.references.iter().filter_map(|reference_id| {
-                    let reference = checker.semantic().reference(*reference_id);
-                    if reference.in_runtime_context() {
-                        Some(quote_annotation(
-                            reference.expression_id()?,
-                            checker.semantic(),
-                            checker.stylist(),
-                            checker.locator(),
-                            checker.default_string_flags(),
-                        ))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect::<Vec<_>>(),
-    );
+    // Step 3) Either add a `__future__` import or quote any runtime usages of the referenced
+    // symbol.
+    let fix = if add_future_import {
+        let future_import = checker.importer().add_future_import();
 
-    Ok(Fix::unsafe_edits(
-        type_checking_edit,
-        add_import_edit
-            .into_iter()
-            .chain(std::iter::once(remove_import_edit))
-            .chain(quote_reference_edits),
-    )
-    .isolate(Checker::isolation(
+        // The order here is very important. We first need to add the `__future__` import, if
+        // needed, since it's a syntax error to come later. Then `type_checking_edit` imports
+        // `TYPE_CHECKING`, if available. Then we can add and/or remove existing imports.
+        Fix::unsafe_edits(
+            future_import,
+            std::iter::once(type_checking_edit)
+                .chain(add_import_edit)
+                .chain(std::iter::once(remove_import_edit)),
+        )
+    } else {
+        let quote_reference_edits = filter_contained(
+            imports
+                .iter()
+                .flat_map(|ImportBinding { binding, .. }| {
+                    binding.references.iter().filter_map(|reference_id| {
+                        let reference = checker.semantic().reference(*reference_id);
+                        if reference.in_runtime_context() {
+                            Some(quote_annotation(
+                                reference.expression_id()?,
+                                checker.semantic(),
+                                checker.stylist(),
+                                checker.locator(),
+                                checker.default_string_flags(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect::<Vec<_>>(),
+        );
+        Fix::unsafe_edits(
+            type_checking_edit,
+            add_import_edit
+                .into_iter()
+                .chain(std::iter::once(remove_import_edit))
+                .chain(quote_reference_edits),
+        )
+    };
+
+    Ok(fix.isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
     )))
 }

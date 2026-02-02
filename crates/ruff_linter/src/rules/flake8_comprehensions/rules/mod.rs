@@ -18,7 +18,6 @@ pub(crate) use unnecessary_literal_within_tuple_call::*;
 pub(crate) use unnecessary_map::*;
 pub(crate) use unnecessary_subscript_reversal::*;
 
-mod helpers;
 mod unnecessary_call_around_sorted;
 mod unnecessary_collection_call;
 mod unnecessary_comprehension;

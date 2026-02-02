@@ -1,0 +1,196 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: "lex_invalid(source, Mode::Module)"
+---
+## Tokens
+```
+[
+    (
+        NonLogicalNewline,
+        0..1,
+    ),
+    (
+        TStringStart,
+        1..3,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "__",
+        ),
+        3..5,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        5..6,
+    ),
+    (
+        NonLogicalNewline,
+        6..7,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        11..12,
+    ),
+    (
+        Colon,
+        12..13,
+    ),
+    (
+        InterpolatedStringMiddle(
+            "d",
+        ),
+        13..14,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        14..15,
+    ),
+    (
+        Rbrace,
+        15..16,
+    ),
+    (
+        Name(
+            Name("__"),
+        ),
+        16..18,
+    ),
+    (
+        String(
+            "",
+        ),
+        18..19,
+        TokenFlags(
+            UNCLOSED_STRING,
+        ),
+    ),
+    (
+        Newline,
+        19..20,
+    ),
+    (
+        TStringStart,
+        20..22,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "__",
+        ),
+        22..24,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        24..25,
+    ),
+    (
+        NonLogicalNewline,
+        25..26,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        30..31,
+    ),
+    (
+        Colon,
+        31..32,
+    ),
+    (
+        InterpolatedStringMiddle(
+            "a",
+        ),
+        32..33,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        33..34,
+    ),
+    (
+        Indent,
+        34..42,
+    ),
+    (
+        Name(
+            Name("b"),
+        ),
+        42..43,
+    ),
+    (
+        Newline,
+        43..44,
+    ),
+    (
+        Dedent,
+        44..44,
+    ),
+    (
+        Rbrace,
+        44..45,
+    ),
+    (
+        Name(
+            Name("__"),
+        ),
+        45..47,
+    ),
+    (
+        String(
+            "",
+        ),
+        47..48,
+        TokenFlags(
+            UNCLOSED_STRING,
+        ),
+    ),
+    (
+        Newline,
+        48..49,
+    ),
+]
+```
+## Errors
+```
+[
+    LexicalError {
+        error: TStringError(
+            NewlineInFormatSpec,
+        ),
+        location: 13..14,
+    },
+    LexicalError {
+        error: UnclosedStringError,
+        location: 18..19,
+    },
+    LexicalError {
+        error: TStringError(
+            NewlineInFormatSpec,
+        ),
+        location: 32..33,
+    },
+    LexicalError {
+        error: UnclosedStringError,
+        location: 47..48,
+    },
+]
+```

@@ -1,0 +1,83 @@
+# This workflow is a cron job that generates a report describing
+# all diagnostics ty emits across the whole ecosystem. The report
+# is uploaded to https://ty-ecosystem-ext.pages.dev/ on a weekly basis.
+
+name: ty ecosystem-report
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every Wednesday at 5:00 UTC:
+    - cron: 0 5 * * 3
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+
+jobs:
+  ty-ecosystem-report:
+    name: Create ecosystem report
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
+        with:
+          enable-cache: true
+          version: "0.9.28"
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          workspaces: "ruff"
+          lookup-only: false
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Create report
+        shell: bash
+        run: |
+          cd ruff
+
+          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+          mkdir -p ~/.config/ty
+          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+
+          cd ..
+
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@2e1816eac09c90140b1ba51d19afc5f59da460f5"
+
+          ecosystem-analyzer \
+            --verbose \
+            --repository ruff \
+            analyze \
+            --profile=profiling \
+            --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
+            --output ecosystem-diagnostics.json
+
+          mkdir dist
+
+          ecosystem-analyzer \
+            generate-report \
+            --max-diagnostics-per-project=1000 \
+            ecosystem-diagnostics.json \
+            --output dist/index.html
+
+      # NOTE: astral-sh-bot uses this artifact to publish the ecosystem report.
+      # Make sure to update the bot if you rename the artifact.
+      - name: "Upload ecosystem report"
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: full-report
+          path: dist/

@@ -9,6 +9,7 @@ pub use os::OsSystem;
 
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
@@ -16,12 +17,11 @@ use std::{fmt, io};
 pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
-use crate::file_revision::FileRevision;
-
 pub use self::path::{
-    deduplicate_nested_paths, DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf,
-    SystemVirtualPath, SystemVirtualPathBuf,
+    DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemVirtualPathBuf, deduplicate_nested_paths,
 };
+use crate::file_revision::FileRevision;
 
 mod memory_fs;
 #[cfg(feature = "os")]
@@ -46,7 +46,7 @@ pub type Result<T> = std::io::Result<T>;
 ///    * File watching isn't supported.
 ///
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
-pub trait System: Debug {
+pub trait System: Debug + Sync + Send {
     /// Reads the metadata of the file or directory at `path`.
     ///
     /// This function will traverse symbolic links to query information about the destination file.
@@ -65,6 +65,35 @@ pub trait System: Debug {
     /// Unlike `std::fs::canonicalize`, this function does remove UNC prefixes if possible.
     /// See [dunce::canonicalize] for more information.
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
+
+    /// Returns the source type for `path` if known or `None`.
+    ///
+    /// The default is to always return `None`, assuming the system
+    /// has no additional information and that the caller should
+    /// rely on the file extension instead.
+    ///
+    /// This is primarily used for the LSP integration to respect
+    /// the chosen language (or the fact that it is a notebook) in
+    /// the editor.
+    fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
+        let _ = path;
+        None
+    }
+
+    /// Returns the source type for `path` if known or `None`.
+    ///
+    /// The default is to always return `None`, assuming the system
+    /// has no additional information and that the caller should
+    /// rely on the file extension instead.
+    ///
+    /// This is primarily used for the LSP integration to respect
+    /// the chosen language (or the fact that it is a notebook) in
+    /// the editor.
+    fn virtual_path_source_type(&self, path: &SystemVirtualPath) -> Option<PySourceType> {
+        let _ = path;
+
+        None
+    }
 
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
@@ -124,6 +153,11 @@ pub trait System: Debug {
     /// Returns `None` if no such convention exists for the system.
     fn user_config_directory(&self) -> Option<SystemPathBuf>;
 
+    /// Returns the directory path where cached files are stored.
+    ///
+    /// Returns `None` if no such convention exists for the system.
+    fn cache_dir(&self) -> Option<SystemPathBuf>;
+
     /// Iterate over the contents of the directory at `path`.
     ///
     /// The returned iterator must have the following properties:
@@ -167,13 +201,33 @@ pub trait System: Debug {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     >;
+
+    /// Fetches the environment variable `key` from the current process.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::env::VarError::NotPresent`] if:
+    /// - The variable is not set.
+    /// - The variable's name contains an equal sign or NUL (`'='` or `'\0'`).
+    ///
+    /// Returns [`std::env::VarError::NotUnicode`] if the variable's value is not valid
+    /// Unicode.
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        let _ = name;
+        Err(std::env::VarError::NotPresent)
+    }
+
+    /// Returns a handle to a [`WritableSystem`] if this system is writeable.
+    fn as_writable(&self) -> Option<&dyn WritableSystem>;
 
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
+    fn dyn_clone(&self) -> Box<dyn System>;
 }
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
@@ -211,11 +265,59 @@ impl fmt::Display for CaseSensitivity {
 
 /// System trait for non-readonly systems.
 pub trait WritableSystem: System {
+    /// Creates a file at the given path.
+    ///
+    /// Returns an error if the file already exists.
+    fn create_new_file(&self, path: &SystemPath) -> Result<()>;
+
     /// Writes the given content to the file at the given path.
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()>;
+    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+        self.write_file_bytes(path, content.as_bytes())
+    }
+
+    /// Writes the given content to the file at the given path.
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()>;
 
     /// Creates a directory at `path` as well as any intermediate directories.
     fn create_directory_all(&self, path: &SystemPath) -> Result<()>;
+
+    /// Reads the provided file from the system cache, or creates the file if necessary.
+    ///
+    /// Returns `Ok(None)` if the system does not expose a suitable cache directory.
+    fn get_or_cache(
+        &self,
+        path: &SystemPath,
+        read_contents: &dyn Fn() -> Result<String>,
+    ) -> Result<Option<SystemPathBuf>> {
+        let Some(cache_dir) = self.cache_dir() else {
+            return Ok(None);
+        };
+
+        let cache_path = cache_dir.join(path);
+
+        // The file has already been cached.
+        if self.is_file(&cache_path) {
+            return Ok(Some(cache_path));
+        }
+
+        // Read the file contents.
+        let contents = read_contents()?;
+
+        // Create the parent directory.
+        self.create_directory_all(cache_path.parent().unwrap())?;
+
+        // Create and write to the file on the system.
+        //
+        // Note that `create_new_file` will fail if the file has already been created. This
+        // ensures that only one thread/process ever attempts to write to it to avoid corrupting
+        // the cache.
+        self.create_new_file(&cache_path)?;
+        self.write_file(&cache_path, &contents)?;
+
+        Ok(Some(cache_path))
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

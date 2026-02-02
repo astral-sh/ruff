@@ -1,17 +1,16 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::Expr;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::Expr;
-use ruff_python_trivia::CommentRanges;
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for ternary `if` expressions that can be replaced with the `or`
@@ -23,22 +22,27 @@ use crate::Locator;
 ///
 /// ## Example
 /// ```python
+/// x, y = 1, 2
+///
 /// z = x if x else y
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// x, y = 1, 2
+///
 /// z = x or y
 /// ```
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe in the event that the body of the
-/// `if` expression contains side effects.
+/// `if` expression contains side effects or comments.
 ///
 /// For example, `foo` will be called twice in `foo() if foo() else bar()`
 /// (assuming `foo()` returns a truthy value), but only once in
 /// `foo() or bar()`.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.6")]
 pub(crate) struct IfExpInsteadOfOrOperator;
 
 impl Violation for IfExpInsteadOfOrOperator {
@@ -61,32 +65,33 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
         body,
         orelse,
         range,
+        node_index: _,
     } = if_expr;
 
     if ComparableExpr::from(test) != ComparableExpr::from(body) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IfExpInsteadOfOrOperator, *range);
+    let mut diagnostic = checker.report_diagnostic(IfExpInsteadOfOrOperator, *range);
+
+    let has_comments = checker.comment_ranges().intersects(*range);
 
     // Replace with `{test} or {orelse}`.
     diagnostic.set_fix(Fix::applicable_edit(
         Edit::range_replacement(
             format!(
                 "{} or {}",
-                parenthesize_test(test, if_expr, checker.comment_ranges(), checker.locator()),
-                parenthesize_test(orelse, if_expr, checker.comment_ranges(), checker.locator()),
+                parenthesize_test(test, if_expr, checker.tokens(), checker.locator()),
+                parenthesize_test(orelse, if_expr, checker.tokens(), checker.locator()),
             ),
             if_expr.range(),
         ),
-        if contains_effect(body, |id| checker.semantic().has_builtin_binding(id)) {
+        if contains_effect(body, |id| checker.semantic().has_builtin_binding(id)) || has_comments {
             Applicability::Unsafe
         } else {
             Applicability::Safe
         },
     ));
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Parenthesize an expression for use in an `or` operator (e.g., parenthesize `x` in `x or y`),
@@ -99,15 +104,10 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
 fn parenthesize_test<'a>(
     expr: &Expr,
     if_expr: &ast::ExprIf,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
     locator: &Locator<'a>,
 ) -> Cow<'a, str> {
-    if let Some(range) = parenthesized_range(
-        expr.into(),
-        if_expr.into(),
-        comment_ranges,
-        locator.contents(),
-    ) {
+    if let Some(range) = parenthesized_range(expr.into(), if_expr.into(), tokens) {
         Cow::Borrowed(locator.slice(range))
     } else if matches!(expr, Expr::If(_) | Expr::Lambda(_) | Expr::Named(_)) {
         Cow::Owned(format!("({})", locator.slice(expr.range())))

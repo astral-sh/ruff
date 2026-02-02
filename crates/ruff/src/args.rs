@@ -7,8 +7,10 @@ use std::sync::Arc;
 
 use crate::commands::completions::config::{OptionString, OptionStringParser};
 use anyhow::bail;
+use clap::builder::Styles;
+use clap::builder::styling::{AnsiColor, Effects};
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
@@ -22,12 +24,12 @@ use ruff_linter::settings::types::{
     PythonVersion, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_python_ast as ast;
 use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
-use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;
@@ -65,6 +67,15 @@ pub struct GlobalConfigArgs {
     // we emit an error later on, after the initial parsing by clap.
     #[arg(long, help_heading = "Global options", global = true)]
     pub isolated: bool,
+
+    /// Control when colored output is used.
+    #[arg(
+        long,
+        value_name = "WHEN",
+        help_heading = "Global options",
+        global = true
+    )]
+    pub(crate) color: Option<TerminalColor>,
 }
 
 impl GlobalConfigArgs {
@@ -78,6 +89,27 @@ impl GlobalConfigArgs {
     }
 }
 
+/// Control when colored output is used.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub(crate) enum TerminalColor {
+    /// Display colors if the output goes to an interactive terminal.
+    #[default]
+    Auto,
+
+    /// Always display colors.
+    Always,
+
+    /// Never display colors.
+    Never,
+}
+
+// Configures Clap v3-style help menu colors
+const STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default());
+
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -86,6 +118,7 @@ impl GlobalConfigArgs {
     after_help = "For help with a specific command, see: `ruff help <command>`."
 )]
 #[command(version)]
+#[command(styles = STYLES)]
 pub struct Args {
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -93,7 +126,7 @@ pub struct Args {
     pub(crate) global_options: GlobalConfigArgs,
 }
 
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     /// Run Ruff on the given files or directories.
@@ -157,6 +190,7 @@ pub enum AnalyzeCommand {
 }
 
 #[derive(Clone, Debug, clap::Parser)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct AnalyzeGraphCommand {
     /// List of files or directories to include.
     #[clap(help = "List of files or directories to include [default: .]")]
@@ -169,6 +203,9 @@ pub struct AnalyzeGraphCommand {
     /// Attempt to detect imports from string literals.
     #[clap(long)]
     detect_string_imports: bool,
+    /// The minimum number of dots in a string import to consider it a valid import.
+    #[clap(long)]
+    min_dots: Option<usize>,
     /// Enable preview mode. Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
     preview: bool,
@@ -177,14 +214,23 @@ pub struct AnalyzeGraphCommand {
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     target_version: Option<PythonVersion>,
+    /// Path to a virtual environment to use for resolving additional dependencies
+    #[arg(long)]
+    python: Option<PathBuf>,
+    /// Include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).
+    /// Use `--no-type-checking-imports` to exclude imports that are only used for type checking.
+    #[arg(long, overrides_with("no_type_checking_imports"))]
+    type_checking_imports: bool,
+    #[arg(long, overrides_with("type_checking_imports"), hide = true)]
+    no_type_checking_imports: bool,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
-    #[clap(help = "List of files or directories to check [default: .]")]
+    #[clap(help = "List of files or directories to check, or `-` to read from stdin [default: .]")]
     pub files: Vec<PathBuf>,
     /// Apply fixes to resolve lint violations.
     /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
@@ -399,8 +445,13 @@ pub struct CheckCommand {
     )]
     pub statistics: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
+    /// Optionally provide a reason to append after the codes.
     #[arg(
         long,
+        value_name = "REASON",
+        default_missing_value = "",
+        num_args = 0..=1,
+        require_equals = true,
         // conflicts_with = "add_noqa",
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
@@ -410,8 +461,9 @@ pub struct CheckCommand {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
         conflicts_with = "fix",
+        conflicts_with = "diff",
     )]
-    pub add_noqa: bool,
+    pub add_noqa: Option<String>,
     /// See the files Ruff will be run against with the current settings.
     #[arg(
         long,
@@ -443,10 +495,12 @@ pub struct CheckCommand {
 }
 
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FormatCommand {
     /// List of files or directories to format.
-    #[clap(help = "List of files or directories to format [default: .]")]
+    #[clap(
+        help = "List of files or directories to format, or `-` to read from stdin [default: .]"
+    )]
     pub files: Vec<PathBuf>,
     /// Avoid writing any formatted files back; instead, exit with a non-zero status code if any
     /// files would have been modified, and zero otherwise.
@@ -531,6 +585,14 @@ pub struct FormatCommand {
     /// Exit with a non-zero status code if any files were modified via format, even if all files were formatted successfully.
     #[arg(long, help_heading = "Miscellaneous", alias = "exit-non-zero-on-fix")]
     pub exit_non_zero_on_format: bool,
+
+    /// Output serialization format for violations, when used with `--check`.
+    /// The default serialization format is "full".
+    ///
+    /// Note that this option is currently only respected in preview mode. A warning will be emitted
+    /// if this flag is used on stable.
+    #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
+    pub output_format: Option<OutputFormat>,
 }
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
@@ -557,7 +619,7 @@ pub enum HelpFormat {
     Json,
 }
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct LogLevelArgs {
     /// Enable verbose logging.
@@ -778,6 +840,7 @@ impl FormatCommand {
             target_version: self.target_version.map(ast::PythonVersion::from),
             cache_dir: self.cache_dir,
             extension: self.extension,
+            output_format: self.output_format,
             ..ExplicitConfigOverrides::default()
         };
 
@@ -796,6 +859,7 @@ impl AnalyzeGraphCommand {
         let format_arguments = AnalyzeGraphArgs {
             files: self.files,
             direction: self.direction,
+            python: self.python,
         };
 
         let cli_overrides = ExplicitConfigOverrides {
@@ -804,8 +868,13 @@ impl AnalyzeGraphCommand {
             } else {
                 None
             },
+            string_imports_min_dots: self.min_dots,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             target_version: self.target_version.map(ast::PythonVersion::from),
+            type_checking_imports: resolve_bool_arg(
+                self.type_checking_imports,
+                self.no_type_checking_imports,
+            ),
             ..ExplicitConfigOverrides::default()
         };
 
@@ -1027,9 +1096,9 @@ Possible choices:
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
-    pub add_noqa: bool,
+    pub add_noqa: Option<String>,
     pub diff: bool,
     pub exit_non_zero_on_fix: bool,
     pub exit_zero: bool,
@@ -1046,7 +1115,7 @@ pub struct CheckArguments {
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
     pub no_cache: bool,
@@ -1122,10 +1191,10 @@ impl std::fmt::Display for FormatRangeParseError {
                 write!(
                     f,
                     "the start position '{start_invalid}' is greater than the end position '{end_invalid}'.\n  {tip} Try switching start and end: '{end}-{start}'",
-                    start_invalid=start.to_string().bold().yellow(),
-                    end_invalid=end.to_string().bold().yellow(),
-                    start=start.to_string().green().bold(),
-                    end=end.to_string().green().bold()
+                    start_invalid = start.to_string().bold().yellow(),
+                    end_invalid = end.to_string().bold().yellow(),
+                    start = start.to_string().green().bold(),
+                    end = end.to_string().green().bold()
                 )
             }
             FormatRangeParseError::InvalidStart(inner) => inner.write(f, true),
@@ -1226,30 +1295,36 @@ impl LineColumnParseError {
 
         match self {
             LineColumnParseError::ColumnParseError(inner) => {
-                write!(f, "the {range}s column is not a valid number ({inner})'\n  {tip} The format is 'line:column'.")
+                write!(
+                    f,
+                    "the {range}s column is not a valid number ({inner})'\n  {tip} The format is 'line:column'."
+                )
             }
             LineColumnParseError::LineParseError(inner) => {
-                write!(f, "the {range} line is not a valid number ({inner})\n  {tip} The format is 'line:column'.")
+                write!(
+                    f,
+                    "the {range} line is not a valid number ({inner})\n  {tip} The format is 'line:column'."
+                )
             }
             LineColumnParseError::ZeroColumnIndex { line } => {
                 write!(
                     f,
                     "the {range} column is 0, but it should be 1 or greater.\n  {tip} The column numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion=format!("{line}:1").green().bold()
+                    suggestion = format!("{line}:1").green().bold()
                 )
             }
             LineColumnParseError::ZeroLineIndex { column } => {
                 write!(
                     f,
                     "the {range} line is 0, but it should be 1 or greater.\n  {tip} The line numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion=format!("1:{column}").green().bold()
+                    suggestion = format!("1:{column}").green().bold()
                 )
             }
             LineColumnParseError::ZeroLineAndColumnIndex => {
                 write!(
                     f,
                     "the {range} line and column are both 0, but they should be 1 or greater.\n  {tip} The line and column numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion="1:1".to_string().green().bold()
+                    suggestion = "1:1".to_string().green().bold()
                 )
             }
         }
@@ -1261,12 +1336,12 @@ impl LineColumnParseError {
 pub struct AnalyzeGraphArgs {
     pub files: Vec<PathBuf>,
     pub direction: Direction,
+    pub python: Option<PathBuf>,
 }
 
 /// Configuration overrides provided via dedicated CLI flags:
 /// `--line-length`, `--respect-gitignore`, etc.
 #[derive(Clone, Default)]
-#[allow(clippy::struct_excessive_bools)]
 struct ExplicitConfigOverrides {
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,
@@ -1295,6 +1370,8 @@ struct ExplicitConfigOverrides {
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
     detect_string_imports: Option<bool>,
+    string_imports_min_dots: Option<usize>,
+    type_checking_imports: Option<bool>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1381,6 +1458,12 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(detect_string_imports) = &self.detect_string_imports {
             config.analyze.detect_string_imports = Some(*detect_string_imports);
+        }
+        if let Some(string_imports_min_dots) = &self.string_imports_min_dots {
+            config.analyze.string_imports_min_dots = Some(*string_imports_min_dots);
+        }
+        if let Some(type_checking_imports) = &self.type_checking_imports {
+            config.analyze.type_checking_imports = Some(*type_checking_imports);
         }
 
         config

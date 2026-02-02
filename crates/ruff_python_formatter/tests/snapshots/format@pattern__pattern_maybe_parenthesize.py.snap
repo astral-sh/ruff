@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/pattern/pattern_maybe_parenthesize.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -295,7 +294,15 @@ match x:
     ]:
         pass
 
-
+match a, b:
+    case [], []:
+        ...
+    case [], _:
+        ...
+    case _, []:
+        ...
+    case _, _:
+        ...
 
 ```
 
@@ -592,4 +599,14 @@ match x:
         ccccccccccccccccccccccccccccccccc,
     ]:
         pass
+
+match a, b:
+    case [], []:
+        ...
+    case [], _:
+        ...
+    case _, []:
+        ...
+    case _, _:
+        ...
 ```

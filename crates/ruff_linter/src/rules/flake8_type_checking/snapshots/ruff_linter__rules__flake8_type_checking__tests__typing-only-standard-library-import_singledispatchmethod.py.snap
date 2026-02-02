@@ -1,28 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
-singledispatchmethod.py:4:21: TC003 [*] Move standard library import `pathlib.Path` into a type-checking block
+TC003 [*] Move standard library import `pathlib.Path` into a type-checking block
+ --> singledispatchmethod.py:4:21
   |
 3 | from collections.abc import MutableMapping, Mapping
 4 | from pathlib import Path
-  |                     ^^^^ TC003
+  |                     ^^^^
 5 | from functools import singledispatchmethod
 6 | from typing import Union
   |
-  = help: Move into type-checking block
-
-ℹ Unsafe fix
-1 1 | from __future__ import annotations
-2 2 | 
-3 3 | from collections.abc import MutableMapping, Mapping
-4   |-from pathlib import Path
-5 4 | from functools import singledispatchmethod
-6   |-from typing import Union
-  5 |+from typing import Union, TYPE_CHECKING
-  6 |+
-  7 |+if TYPE_CHECKING:
-  8 |+    from pathlib import Path
-7 9 | 
-8 10 | 
-9 11 | class Foo:
+help: Move into type-checking block
+1  | from __future__ import annotations
+2  | 
+3  | from collections.abc import MutableMapping, Mapping
+   - from pathlib import Path
+4  | from functools import singledispatchmethod
+   - from typing import Union
+5  + from typing import Union, TYPE_CHECKING
+6  + 
+7  + if TYPE_CHECKING:
+8  +     from pathlib import Path
+9  | 
+10 | 
+11 | class Foo:
+note: This is an unsafe fix and may change runtime behavior

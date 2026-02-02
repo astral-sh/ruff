@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/type.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: NodeIndex(None),
         range: 0..1828,
         body: [
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 0..12,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 5..6,
                             id: Name("X"),
                             ctx: Store,
@@ -23,6 +25,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 9..12,
                             id: Name("int"),
                             ctx: Load,
@@ -32,9 +35,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 13..31,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 18..19,
                             id: Name("X"),
                             ctx: Store,
@@ -43,9 +48,11 @@ Module(
                     type_params: None,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 22..31,
                             left: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 22..25,
                                     id: Name("int"),
                                     ctx: Load,
@@ -54,6 +61,7 @@ Module(
                             op: BitOr,
                             right: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 28..31,
                                     id: Name("str"),
                                     ctx: Load,
@@ -65,9 +73,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 32..60,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 37..38,
                             id: Name("X"),
                             ctx: Store,
@@ -76,9 +86,11 @@ Module(
                     type_params: None,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 41..60,
                             left: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 41..44,
                                     id: Name("int"),
                                     ctx: Load,
@@ -87,16 +99,19 @@ Module(
                             op: BitOr,
                             right: StringLiteral(
                                 ExprStringLiteral {
+                                    node_index: NodeIndex(None),
                                     range: 47..60,
                                     value: StringLiteralValue {
                                         inner: Single(
                                             StringLiteral {
                                                 range: 47..60,
+                                                node_index: NodeIndex(None),
                                                 value: "ForwardRefY",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
@@ -109,9 +124,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 61..87,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 66..67,
                             id: Name("X"),
                             ctx: Store,
@@ -120,13 +137,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 67..70,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 68..69,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 68..69,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -137,9 +157,11 @@ Module(
                     ),
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 73..87,
                             left: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 73..74,
                                     id: Name("T"),
                                     ctx: Load,
@@ -148,9 +170,11 @@ Module(
                             op: BitOr,
                             right: Subscript(
                                 ExprSubscript {
+                                    node_index: NodeIndex(None),
                                     range: 77..87,
                                     value: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 77..81,
                                             id: Name("list"),
                                             ctx: Load,
@@ -158,9 +182,11 @@ Module(
                                     ),
                                     slice: Subscript(
                                         ExprSubscript {
+                                            node_index: NodeIndex(None),
                                             range: 82..86,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 82..83,
                                                     id: Name("X"),
                                                     ctx: Load,
@@ -168,6 +194,7 @@ Module(
                                             ),
                                             slice: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 84..85,
                                                     id: Name("T"),
                                                     ctx: Load,
@@ -185,9 +212,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 101..116,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 106..107,
                             id: Name("X"),
                             ctx: Store,
@@ -196,13 +225,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 107..110,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 108..109,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 108..109,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -213,6 +245,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 113..116,
                             id: Name("int"),
                             ctx: Load,
@@ -222,9 +255,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 117..145,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 122..123,
                             id: Name("X"),
                             ctx: Store,
@@ -233,13 +268,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 123..126,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 124..125,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 124..125,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -250,12 +288,15 @@ Module(
                     ),
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 129..145,
                             left: Subscript(
                                 ExprSubscript {
+                                    node_index: NodeIndex(None),
                                     range: 129..136,
                                     value: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 129..133,
                                             id: Name("list"),
                                             ctx: Load,
@@ -263,6 +304,7 @@ Module(
                                     ),
                                     slice: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 134..135,
                                             id: Name("T"),
                                             ctx: Load,
@@ -274,9 +316,11 @@ Module(
                             op: BitOr,
                             right: Subscript(
                                 ExprSubscript {
+                                    node_index: NodeIndex(None),
                                     range: 139..145,
                                     value: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 139..142,
                                             id: Name("set"),
                                             ctx: Load,
@@ -284,6 +328,7 @@ Module(
                                     ),
                                     slice: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 143..144,
                                             id: Name("T"),
                                             ctx: Load,
@@ -298,9 +343,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 146..178,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 151..152,
                             id: Name("X"),
                             ctx: Store,
@@ -309,13 +356,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 152..165,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 153..154,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 153..154,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -323,20 +373,24 @@ Module(
                                 ),
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
+                                        node_index: NodeIndex(None),
                                         range: 156..159,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 157..159,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: None,
                                     },
                                 ),
                                 ParamSpec(
                                     TypeParamParamSpec {
+                                        node_index: NodeIndex(None),
                                         range: 161..164,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 163..164,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: None,
                                     },
@@ -346,10 +400,12 @@ Module(
                     ),
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 168..178,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 169..170,
                                         id: Name("T"),
                                         ctx: Load,
@@ -357,6 +413,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 172..174,
                                         id: Name("Ts"),
                                         ctx: Load,
@@ -364,6 +421,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 176..177,
                                         id: Name("P"),
                                         ctx: Load,
@@ -378,9 +436,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 179..216,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 184..185,
                             id: Name("X"),
                             ctx: Store,
@@ -389,17 +449,21 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 185..203,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 186..192,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 186..187,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 189..192,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -411,20 +475,24 @@ Module(
                                 ),
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
+                                        node_index: NodeIndex(None),
                                         range: 194..197,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 195..197,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: None,
                                     },
                                 ),
                                 ParamSpec(
                                     TypeParamParamSpec {
+                                        node_index: NodeIndex(None),
                                         range: 199..202,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 201..202,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: None,
                                     },
@@ -434,10 +502,12 @@ Module(
                     ),
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 206..216,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 207..208,
                                         id: Name("T"),
                                         ctx: Load,
@@ -445,6 +515,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 210..212,
                                         id: Name("Ts"),
                                         ctx: Load,
@@ -452,6 +523,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 214..215,
                                         id: Name("P"),
                                         ctx: Load,
@@ -466,9 +538,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 217..261,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 222..223,
                             id: Name("X"),
                             ctx: Store,
@@ -477,21 +551,26 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 223..248,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 224..237,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 224..225,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: Some(
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: NodeIndex(None),
                                                     range: 227..237,
                                                     elts: [
                                                         Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 228..231,
                                                                 id: Name("int"),
                                                                 ctx: Load,
@@ -499,6 +578,7 @@ Module(
                                                         ),
                                                         Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 233..236,
                                                                 id: Name("str"),
                                                                 ctx: Load,
@@ -515,20 +595,24 @@ Module(
                                 ),
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
+                                        node_index: NodeIndex(None),
                                         range: 239..242,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 240..242,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: None,
                                     },
                                 ),
                                 ParamSpec(
                                     TypeParamParamSpec {
+                                        node_index: NodeIndex(None),
                                         range: 244..247,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 246..247,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: None,
                                     },
@@ -538,10 +622,12 @@ Module(
                     ),
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 251..261,
                             elts: [
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 252..253,
                                         id: Name("T"),
                                         ctx: Load,
@@ -549,6 +635,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 255..257,
                                         id: Name("Ts"),
                                         ctx: Load,
@@ -556,6 +643,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 259..260,
                                         id: Name("P"),
                                         ctx: Load,
@@ -570,9 +658,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 262..287,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 267..268,
                             id: Name("X"),
                             ctx: Store,
@@ -581,18 +671,22 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 268..277,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 269..276,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 269..270,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 273..276,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -606,9 +700,11 @@ Module(
                     ),
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 280..287,
                             left: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 280..281,
                                     id: Name("T"),
                                     ctx: Load,
@@ -617,6 +713,7 @@ Module(
                             op: BitOr,
                             right: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 284..287,
                                     id: Name("str"),
                                     ctx: Load,
@@ -628,9 +725,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 288..330,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 293..294,
                             id: Name("X"),
                             ctx: Store,
@@ -639,20 +738,25 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 294..314,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 295..313,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 295..296,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: Some(
                                             BinOp(
                                                 ExprBinOp {
+                                                    node_index: NodeIndex(None),
                                                     range: 298..307,
                                                     left: Name(
                                                         ExprName {
+                                                            node_index: NodeIndex(None),
                                                             range: 298..301,
                                                             id: Name("int"),
                                                             ctx: Load,
@@ -661,6 +765,7 @@ Module(
                                                     op: BitOr,
                                                     right: Name(
                                                         ExprName {
+                                                            node_index: NodeIndex(None),
                                                             range: 304..307,
                                                             id: Name("str"),
                                                             ctx: Load,
@@ -672,6 +777,7 @@ Module(
                                         default: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 310..313,
                                                     id: Name("int"),
                                                     ctx: Load,
@@ -685,12 +791,15 @@ Module(
                     ),
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 317..330,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: NodeIndex(None),
                                     range: 317..324,
                                     left: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 317..318,
                                             id: Name("T"),
                                             ctx: Load,
@@ -699,6 +808,7 @@ Module(
                                     op: BitOr,
                                     right: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 321..324,
                                             id: Name("int"),
                                             ctx: Load,
@@ -709,6 +819,7 @@ Module(
                             op: BitOr,
                             right: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 327..330,
                                     id: Name("str"),
                                     ctx: Load,
@@ -720,9 +831,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 331..384,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 336..337,
                             id: Name("X"),
                             ctx: Store,
@@ -731,23 +844,29 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 337..361,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
+                                        node_index: NodeIndex(None),
                                         range: 338..360,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 339..341,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: Some(
                                             Starred(
                                                 ExprStarred {
+                                                    node_index: NodeIndex(None),
                                                     range: 344..360,
                                                     value: Subscript(
                                                         ExprSubscript {
+                                                            node_index: NodeIndex(None),
                                                             range: 345..360,
                                                             value: Name(
                                                                 ExprName {
+                                                                    node_index: NodeIndex(None),
                                                                     range: 345..350,
                                                                     id: Name("tuple"),
                                                                     ctx: Load,
@@ -755,10 +874,12 @@ Module(
                                                             ),
                                                             slice: Tuple(
                                                                 ExprTuple {
+                                                                    node_index: NodeIndex(None),
                                                                     range: 351..359,
                                                                     elts: [
                                                                         Name(
                                                                             ExprName {
+                                                                                node_index: NodeIndex(None),
                                                                                 range: 351..354,
                                                                                 id: Name("int"),
                                                                                 ctx: Load,
@@ -766,6 +887,7 @@ Module(
                                                                         ),
                                                                         Name(
                                                                             ExprName {
+                                                                                node_index: NodeIndex(None),
                                                                                 range: 356..359,
                                                                                 id: Name("str"),
                                                                                 ctx: Load,
@@ -790,9 +912,11 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 364..384,
                             value: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 364..369,
                                     id: Name("tuple"),
                                     ctx: Load,
@@ -800,10 +924,12 @@ Module(
                             ),
                             slice: Tuple(
                                 ExprTuple {
+                                    node_index: NodeIndex(None),
                                     range: 370..383,
                                     elts: [
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 370..373,
                                                 id: Name("int"),
                                                 ctx: Load,
@@ -811,9 +937,11 @@ Module(
                                         ),
                                         Starred(
                                             ExprStarred {
+                                                node_index: NodeIndex(None),
                                                 range: 375..378,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 376..378,
                                                         id: Name("Ts"),
                                                         ctx: Load,
@@ -824,6 +952,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 380..383,
                                                 id: Name("str"),
                                                 ctx: Load,
@@ -841,9 +970,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 385..428,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 390..391,
                             id: Name("X"),
                             ctx: Store,
@@ -852,21 +983,26 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 391..409,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
+                                        node_index: NodeIndex(None),
                                         range: 392..408,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 394..395,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: Some(
                                             List(
                                                 ExprList {
+                                                    node_index: NodeIndex(None),
                                                     range: 398..408,
                                                     elts: [
                                                         Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 399..402,
                                                                 id: Name("int"),
                                                                 ctx: Load,
@@ -874,6 +1010,7 @@ Module(
                                                         ),
                                                         Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 404..407,
                                                                 id: Name("str"),
                                                                 ctx: Load,
@@ -891,9 +1028,11 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 412..428,
                             value: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 412..420,
                                     id: Name("Callable"),
                                     ctx: Load,
@@ -901,10 +1040,12 @@ Module(
                             ),
                             slice: Tuple(
                                 ExprTuple {
+                                    node_index: NodeIndex(None),
                                     range: 421..427,
                                     elts: [
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 421..422,
                                                 id: Name("P"),
                                                 ctx: Load,
@@ -912,6 +1053,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 424..427,
                                                 id: Name("str"),
                                                 ctx: Load,
@@ -929,9 +1071,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 459..474,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 464..468,
                             id: Name("type"),
                             ctx: Store,
@@ -940,6 +1084,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 471..474,
                             id: Name("int"),
                             ctx: Load,
@@ -949,9 +1094,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 475..491,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 480..485,
                             id: Name("match"),
                             ctx: Store,
@@ -960,6 +1107,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 488..491,
                             id: Name("int"),
                             ctx: Load,
@@ -969,9 +1117,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 492..507,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 497..501,
                             id: Name("case"),
                             ctx: Store,
@@ -980,6 +1130,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 504..507,
                             id: Name("int"),
                             ctx: Load,
@@ -989,9 +1140,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 533..548,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 538..541,
                             id: Name("foo"),
                             ctx: Store,
@@ -1000,6 +1153,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 544..548,
                             id: Name("type"),
                             ctx: Load,
@@ -1009,9 +1163,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 549..565,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 554..557,
                             id: Name("foo"),
                             ctx: Store,
@@ -1020,6 +1176,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 560..565,
                             id: Name("match"),
                             ctx: Load,
@@ -1029,9 +1186,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 566..581,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 571..574,
                             id: Name("foo"),
                             ctx: Store,
@@ -1040,6 +1199,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 577..581,
                             id: Name("case"),
                             ctx: Load,
@@ -1049,9 +1209,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 605..620,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 613..614,
                             id: Name("X"),
                             ctx: Store,
@@ -1060,6 +1222,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 617..620,
                             id: Name("int"),
                             ctx: Load,
@@ -1069,9 +1232,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 621..636,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 626..627,
                             id: Name("X"),
                             ctx: Store,
@@ -1080,6 +1245,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 633..636,
                             id: Name("int"),
                             ctx: Load,
@@ -1089,9 +1255,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 637..652,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 642..643,
                             id: Name("X"),
                             ctx: Store,
@@ -1100,6 +1268,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 649..652,
                             id: Name("int"),
                             ctx: Load,
@@ -1109,9 +1278,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 653..673,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 658..659,
                             id: Name("X"),
                             ctx: Store,
@@ -1120,6 +1291,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 668..671,
                             id: Name("int"),
                             ctx: Load,
@@ -1129,9 +1301,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 674..693,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 685..686,
                             id: Name("X"),
                             ctx: Store,
@@ -1140,13 +1314,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 686..689,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 687..688,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 687..688,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -1157,6 +1334,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 692..693,
                             id: Name("T"),
                             ctx: Load,
@@ -1166,9 +1344,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 694..714,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 699..700,
                             id: Name("X"),
                             ctx: Store,
@@ -1177,13 +1357,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 707..710,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 708..709,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 708..709,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -1194,6 +1377,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 713..714,
                             id: Name("T"),
                             ctx: Load,
@@ -1203,9 +1387,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 715..734,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 720..721,
                             id: Name("X"),
                             ctx: Store,
@@ -1214,13 +1400,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 721..724,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 722..723,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 722..723,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -1231,6 +1420,7 @@ Module(
                     ),
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 733..734,
                             id: Name("T"),
                             ctx: Load,
@@ -1240,9 +1430,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 756..768,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 761..762,
                             id: Name("X"),
                             ctx: Store,
@@ -1251,6 +1443,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 765..768,
                             id: Name("int"),
                             ctx: Load,
@@ -1260,9 +1453,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 770..782,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 775..776,
                             id: Name("X"),
                             ctx: Store,
@@ -1271,6 +1466,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 779..782,
                             id: Name("str"),
                             ctx: Load,
@@ -1280,9 +1476,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 784..797,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 789..790,
                             id: Name("X"),
                             ctx: Store,
@@ -1291,6 +1489,7 @@ Module(
                     type_params: None,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 793..797,
                             id: Name("type"),
                             ctx: Load,
@@ -1300,20 +1499,24 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
+                    node_index: NodeIndex(None),
                     range: 798..819,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("X"),
                         range: 804..805,
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         TypeAlias(
                             StmtTypeAlias {
+                                node_index: NodeIndex(None),
                                 range: 807..819,
                                 name: Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 812..813,
                                         id: Name("X"),
                                         ctx: Store,
@@ -1322,6 +1525,7 @@ Module(
                                 type_params: None,
                                 value: Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 816..819,
                                         id: Name("int"),
                                         ctx: Load,
@@ -1334,9 +1538,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 821..853,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 826..831,
                             id: Name("Point"),
                             ctx: Store,
@@ -1345,9 +1551,11 @@ Module(
                     type_params: None,
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 834..853,
                             value: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 834..839,
                                     id: Name("tuple"),
                                     ctx: Load,
@@ -1355,10 +1563,12 @@ Module(
                             ),
                             slice: Tuple(
                                 ExprTuple {
+                                    node_index: NodeIndex(None),
                                     range: 840..852,
                                     elts: [
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 840..845,
                                                 id: Name("float"),
                                                 ctx: Load,
@@ -1366,6 +1576,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 847..852,
                                                 id: Name("float"),
                                                 ctx: Load,
@@ -1383,9 +1594,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 854..881,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 859..864,
                             id: Name("Point"),
                             ctx: Store,
@@ -1394,13 +1607,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 864..867,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 865..866,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 865..866,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -1411,9 +1627,11 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 870..881,
                             value: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 870..875,
                                     id: Name("tuple"),
                                     ctx: Load,
@@ -1421,10 +1639,12 @@ Module(
                             ),
                             slice: Tuple(
                                 ExprTuple {
+                                    node_index: NodeIndex(None),
                                     range: 876..880,
                                     elts: [
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 876..877,
                                                 id: Name("T"),
                                                 ctx: Load,
@@ -1432,6 +1652,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 879..880,
                                                 id: Name("T"),
                                                 ctx: Load,
@@ -1449,9 +1670,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 882..918,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 887..894,
                             id: Name("IntFunc"),
                             ctx: Store,
@@ -1460,13 +1683,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 894..899,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
+                                        node_index: NodeIndex(None),
                                         range: 895..898,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 897..898,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: None,
                                     },
@@ -1476,9 +1702,11 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 902..918,
                             value: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 902..910,
                                     id: Name("Callable"),
                                     ctx: Load,
@@ -1486,10 +1714,12 @@ Module(
                             ),
                             slice: Tuple(
                                 ExprTuple {
+                                    node_index: NodeIndex(None),
                                     range: 911..917,
                                     elts: [
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 911..912,
                                                 id: Name("P"),
                                                 ctx: Load,
@@ -1497,6 +1727,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 914..917,
                                                 id: Name("int"),
                                                 ctx: Load,
@@ -1514,9 +1745,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 932..972,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 937..949,
                             id: Name("LabeledTuple"),
                             ctx: Store,
@@ -1525,13 +1758,16 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 949..954,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
+                                        node_index: NodeIndex(None),
                                         range: 950..953,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 951..953,
+                                            node_index: NodeIndex(None),
                                         },
                                         default: None,
                                     },
@@ -1541,9 +1777,11 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 957..972,
                             value: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 957..962,
                                     id: Name("tuple"),
                                     ctx: Load,
@@ -1551,10 +1789,12 @@ Module(
                             ),
                             slice: Tuple(
                                 ExprTuple {
+                                    node_index: NodeIndex(None),
                                     range: 963..971,
                                     elts: [
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 963..966,
                                                 id: Name("str"),
                                                 ctx: Load,
@@ -1562,9 +1802,11 @@ Module(
                                         ),
                                         Starred(
                                             ExprStarred {
+                                                node_index: NodeIndex(None),
                                                 range: 968..971,
                                                 value: Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 969..971,
                                                         id: Name("Ts"),
                                                         ctx: Load,
@@ -1585,9 +1827,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 989..1037,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 994..1010,
                             id: Name("HashableSequence"),
                             ctx: Store,
@@ -1596,17 +1840,21 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 1010..1023,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 1011..1022,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1011..1012,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 1014..1022,
                                                     id: Name("Hashable"),
                                                     ctx: Load,
@@ -1621,9 +1869,11 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 1026..1037,
                             value: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1026..1034,
                                     id: Name("Sequence"),
                                     ctx: Load,
@@ -1631,6 +1881,7 @@ Module(
                             ),
                             slice: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1035..1036,
                                     id: Name("T"),
                                     ctx: Load,
@@ -1643,9 +1894,11 @@ Module(
             ),
             TypeAlias(
                 StmtTypeAlias {
+                    node_index: NodeIndex(None),
                     range: 1060..1110,
                     name: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 1065..1081,
                             id: Name("IntOrStrSequence"),
                             ctx: Store,
@@ -1654,21 +1907,26 @@ Module(
                     type_params: Some(
                         TypeParams {
                             range: 1081..1096,
+                            node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
                                         range: 1082..1095,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1082..1083,
+                                            node_index: NodeIndex(None),
                                         },
                                         bound: Some(
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: NodeIndex(None),
                                                     range: 1085..1095,
                                                     elts: [
                                                         Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 1086..1089,
                                                                 id: Name("int"),
                                                                 ctx: Load,
@@ -1676,6 +1934,7 @@ Module(
                                                         ),
                                                         Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 1091..1094,
                                                                 id: Name("str"),
                                                                 ctx: Load,
@@ -1695,9 +1954,11 @@ Module(
                     ),
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 1099..1110,
                             value: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1099..1107,
                                     id: Name("Sequence"),
                                     ctx: Load,
@@ -1705,6 +1966,7 @@ Module(
                             ),
                             slice: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1108..1109,
                                     id: Name("T"),
                                     ctx: Load,
@@ -1717,19 +1979,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1164..1178,
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 1164..1178,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
+                                        node_index: NodeIndex(None),
                                         range: 1164..1175,
                                         left: BinOp(
                                             ExprBinOp {
+                                                node_index: NodeIndex(None),
                                                 range: 1164..1171,
                                                 left: Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 1164..1168,
                                                         id: Name("type"),
                                                         ctx: Load,
@@ -1738,6 +2005,7 @@ Module(
                                                 op: Mult,
                                                 right: Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 1170..1171,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -1748,6 +2016,7 @@ Module(
                                         op: Add,
                                         right: Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 1174..1175,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -1757,6 +2026,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 1177..1178,
                                         id: Name("c"),
                                         ctx: Load,
@@ -1771,16 +2041,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1203..1219,
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 1203..1219,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
+                                        node_index: NodeIndex(None),
                                         range: 1203..1216,
                                         left: Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 1203..1207,
                                                 id: Name("type"),
                                                 ctx: Load,
@@ -1789,9 +2063,11 @@ Module(
                                         op: Mult,
                                         right: BinOp(
                                             ExprBinOp {
+                                                node_index: NodeIndex(None),
                                                 range: 1210..1215,
                                                 left: Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 1210..1211,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -1800,6 +2076,7 @@ Module(
                                                 op: Add,
                                                 right: Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 1214..1215,
                                                         id: Name("b"),
                                                         ctx: Load,
@@ -1811,6 +2088,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 1218..1219,
                                         id: Name("c"),
                                         ctx: Load,
@@ -1825,12 +2103,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1244..1260,
                     value: Call(
                         ExprCall {
+                            node_index: NodeIndex(None),
                             range: 1244..1260,
                             func: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1244..1248,
                                     id: Name("type"),
                                     ctx: Load,
@@ -1838,15 +2119,19 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 1249..1260,
+                                node_index: NodeIndex(None),
                                 args: [
                                     Starred(
                                         ExprStarred {
+                                            node_index: NodeIndex(None),
                                             range: 1250..1256,
                                             value: BinOp(
                                                 ExprBinOp {
+                                                    node_index: NodeIndex(None),
                                                     range: 1251..1256,
                                                     left: Name(
                                                         ExprName {
+                                                            node_index: NodeIndex(None),
                                                             range: 1251..1252,
                                                             id: Name("a"),
                                                             ctx: Load,
@@ -1855,6 +2140,7 @@ Module(
                                                     op: Add,
                                                     right: Name(
                                                         ExprName {
+                                                            node_index: NodeIndex(None),
                                                             range: 1255..1256,
                                                             id: Name("b"),
                                                             ctx: Load,
@@ -1867,6 +2153,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1258..1259,
                                             id: Name("c"),
                                             ctx: Load,
@@ -1881,15 +2168,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1286..1301,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 1286..1301,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: NodeIndex(None),
                                     range: 1286..1297,
                                     left: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1286..1290,
                                             id: Name("type"),
                                             ctx: Load,
@@ -1898,9 +2189,11 @@ Module(
                                     op: Sub,
                                     right: BinOp(
                                         ExprBinOp {
+                                            node_index: NodeIndex(None),
                                             range: 1292..1297,
                                             left: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 1292..1293,
                                                     id: Name("a"),
                                                     ctx: Load,
@@ -1909,6 +2202,7 @@ Module(
                                             op: Mult,
                                             right: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 1296..1297,
                                                     id: Name("b"),
                                                     ctx: Load,
@@ -1921,6 +2215,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1300..1301,
                                     id: Name("c"),
                                     ctx: Load,
@@ -1932,15 +2227,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1327..1344,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 1327..1344,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: NodeIndex(None),
                                     range: 1327..1340,
                                     left: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1327..1331,
                                             id: Name("type"),
                                             ctx: Load,
@@ -1949,9 +2248,11 @@ Module(
                                     op: Sub,
                                     right: BinOp(
                                         ExprBinOp {
+                                            node_index: NodeIndex(None),
                                             range: 1334..1339,
                                             left: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 1334..1335,
                                                     id: Name("a"),
                                                     ctx: Load,
@@ -1960,6 +2261,7 @@ Module(
                                             op: Mult,
                                             right: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 1338..1339,
                                                     id: Name("b"),
                                                     ctx: Load,
@@ -1972,6 +2274,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1343..1344,
                                     id: Name("c"),
                                     ctx: Load,
@@ -1983,18 +2286,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1370..1387,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: NodeIndex(None),
                             range: 1370..1387,
                             left: BinOp(
                                 ExprBinOp {
+                                    node_index: NodeIndex(None),
                                     range: 1370..1383,
                                     left: Call(
                                         ExprCall {
+                                            node_index: NodeIndex(None),
                                             range: 1370..1379,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 1370..1374,
                                                     id: Name("type"),
                                                     ctx: Load,
@@ -2002,13 +2310,16 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 1375..1379,
+                                                node_index: NodeIndex(None),
                                                 args: [
                                                     UnaryOp(
                                                         ExprUnaryOp {
+                                                            node_index: NodeIndex(None),
                                                             range: 1376..1378,
                                                             op: USub,
                                                             operand: Name(
                                                                 ExprName {
+                                                                    node_index: NodeIndex(None),
                                                                     range: 1377..1378,
                                                                     id: Name("a"),
                                                                     ctx: Load,
@@ -2024,6 +2335,7 @@ Module(
                                     op: Mult,
                                     right: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1382..1383,
                                             id: Name("b"),
                                             ctx: Load,
@@ -2034,6 +2346,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1386..1387,
                                     id: Name("c"),
                                     ctx: Load,
@@ -2045,15 +2358,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1414..1423,
                     value: Attribute(
                         ExprAttribute {
+                            node_index: NodeIndex(None),
                             range: 1414..1423,
                             value: Call(
                                 ExprCall {
+                                    node_index: NodeIndex(None),
                                     range: 1414..1421,
                                     func: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1414..1418,
                                             id: Name("type"),
                                             ctx: Load,
@@ -2061,6 +2378,7 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 1419..1421,
+                                        node_index: NodeIndex(None),
                                         args: [],
                                         keywords: [],
                                     },
@@ -2069,6 +2387,7 @@ Module(
                             attr: Identifier {
                                 id: Name("a"),
                                 range: 1422..1423,
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },
@@ -2077,15 +2396,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1439..1450,
                     value: Attribute(
                         ExprAttribute {
+                            node_index: NodeIndex(None),
                             range: 1439..1450,
                             value: Call(
                                 ExprCall {
+                                    node_index: NodeIndex(None),
                                     range: 1439..1448,
                                     func: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1439..1443,
                                             id: Name("type"),
                                             ctx: Load,
@@ -2093,9 +2416,11 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 1444..1448,
+                                        node_index: NodeIndex(None),
                                         args: [
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: NodeIndex(None),
                                                     range: 1445..1447,
                                                     elts: [],
                                                     ctx: Load,
@@ -2110,6 +2435,7 @@ Module(
                             attr: Identifier {
                                 id: Name("a"),
                                 range: 1449..1450,
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },
@@ -2118,15 +2444,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1468..1480,
                     value: Attribute(
                         ExprAttribute {
+                            node_index: NodeIndex(None),
                             range: 1468..1480,
                             value: Call(
                                 ExprCall {
+                                    node_index: NodeIndex(None),
                                     range: 1468..1478,
                                     func: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1468..1472,
                                             id: Name("type"),
                                             ctx: Load,
@@ -2134,9 +2464,11 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 1473..1478,
+                                        node_index: NodeIndex(None),
                                         args: [
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: NodeIndex(None),
                                                     range: 1474..1476,
                                                     elts: [],
                                                     ctx: Load,
@@ -2151,6 +2483,7 @@ Module(
                             attr: Identifier {
                                 id: Name("a"),
                                 range: 1479..1480,
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },
@@ -2159,15 +2492,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1498..1508,
                     value: Attribute(
                         ExprAttribute {
+                            node_index: NodeIndex(None),
                             range: 1498..1508,
                             value: Subscript(
                                 ExprSubscript {
+                                    node_index: NodeIndex(None),
                                     range: 1498..1506,
                                     value: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1498..1502,
                                             id: Name("type"),
                                             ctx: Load,
@@ -2175,6 +2512,7 @@ Module(
                                     ),
                                     slice: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1504..1505,
                                             id: Name("a"),
                                             ctx: Load,
@@ -2186,6 +2524,7 @@ Module(
                             attr: Identifier {
                                 id: Name("b"),
                                 range: 1507..1508,
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },
@@ -2194,15 +2533,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1525..1536,
                     value: Attribute(
                         ExprAttribute {
+                            node_index: NodeIndex(None),
                             range: 1525..1536,
                             value: Subscript(
                                 ExprSubscript {
+                                    node_index: NodeIndex(None),
                                     range: 1525..1534,
                                     value: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1525..1529,
                                             id: Name("type"),
                                             ctx: Load,
@@ -2210,10 +2553,12 @@ Module(
                                     ),
                                     slice: Tuple(
                                         ExprTuple {
+                                            node_index: NodeIndex(None),
                                             range: 1531..1533,
                                             elts: [
                                                 Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 1531..1532,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -2230,6 +2575,7 @@ Module(
                             attr: Identifier {
                                 id: Name("b"),
                                 range: 1535..1536,
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },
@@ -2238,15 +2584,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1575..1588,
                     value: Attribute(
                         ExprAttribute {
+                            node_index: NodeIndex(None),
                             range: 1575..1588,
                             value: Subscript(
                                 ExprSubscript {
+                                    node_index: NodeIndex(None),
                                     range: 1575..1586,
                                     value: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1575..1579,
                                             id: Name("type"),
                                             ctx: Load,
@@ -2254,10 +2604,12 @@ Module(
                                     ),
                                     slice: Tuple(
                                         ExprTuple {
+                                            node_index: NodeIndex(None),
                                             range: 1581..1585,
                                             elts: [
                                                 Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 1582..1583,
                                                         id: Name("a"),
                                                         ctx: Load,
@@ -2274,6 +2626,7 @@ Module(
                             attr: Identifier {
                                 id: Name("b"),
                                 range: 1587..1588,
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },
@@ -2282,15 +2635,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1608..1624,
                     value: Subscript(
                         ExprSubscript {
+                            node_index: NodeIndex(None),
                             range: 1608..1624,
                             value: Call(
                                 ExprCall {
+                                    node_index: NodeIndex(None),
                                     range: 1608..1614,
                                     func: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1608..1612,
                                             id: Name("type"),
                                             ctx: Load,
@@ -2298,6 +2655,7 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 1612..1614,
+                                        node_index: NodeIndex(None),
                                         args: [],
                                         keywords: [],
                                     },
@@ -2305,10 +2663,12 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
+                                    node_index: NodeIndex(None),
                                     range: 1615..1623,
                                     lower: Some(
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 1615..1616,
                                                 id: Name("a"),
                                                 ctx: Load,
@@ -2318,6 +2678,7 @@ Module(
                                     upper: Some(
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 1622..1623,
                                                 id: Name("b"),
                                                 ctx: Load,
@@ -2334,12 +2695,15 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: NodeIndex(None),
                     range: 1643..1661,
                     test: Named(
                         ExprNamed {
+                            node_index: NodeIndex(None),
                             range: 1646..1655,
                             target: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1646..1650,
                                     id: Name("type"),
                                     ctx: Store,
@@ -2347,6 +2711,7 @@ Module(
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
                                     range: 1654..1655,
                                     value: Int(
                                         1,
@@ -2358,6 +2723,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: NodeIndex(None),
                                 range: 1657..1661,
                             },
                         ),
@@ -2367,10 +2733,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 1662..1697,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 1662..1666,
                                 id: Name("type"),
                                 ctx: Store,
@@ -2379,19 +2747,24 @@ Module(
                     ],
                     value: Lambda(
                         ExprLambda {
+                            node_index: NodeIndex(None),
                             range: 1669..1697,
                             parameters: Some(
                                 Parameters {
                                     range: 1676..1681,
+                                    node_index: NodeIndex(None),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 1676..1681,
+                                            node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 1676..1681,
+                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("query"),
                                                     range: 1676..1681,
+                                                    node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -2405,9 +2778,11 @@ Module(
                             ),
                             body: Compare(
                                 ExprCompare {
+                                    node_index: NodeIndex(None),
                                     range: 1683..1697,
                                     left: Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1683..1688,
                                             id: Name("query"),
                                             ctx: Load,
@@ -2419,6 +2794,7 @@ Module(
                                     comparators: [
                                         Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 1692..1697,
                                                 id: Name("event"),
                                                 ctx: Load,
@@ -2433,12 +2809,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1698..1713,
                     value: Call(
                         ExprCall {
+                            node_index: NodeIndex(None),
                             range: 1698..1713,
                             func: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1698..1703,
                                     id: Name("print"),
                                     ctx: Load,
@@ -2446,12 +2825,15 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 1703..1713,
+                                node_index: NodeIndex(None),
                                 args: [
                                     Call(
                                         ExprCall {
+                                            node_index: NodeIndex(None),
                                             range: 1704..1712,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 1704..1708,
                                                     id: Name("type"),
                                                     ctx: Load,
@@ -2459,9 +2841,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 1708..1712,
+                                                node_index: NodeIndex(None),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
                                                             range: 1709..1711,
                                                             value: Int(
                                                                 12,
@@ -2482,12 +2866,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1714..1724,
                     value: Call(
                         ExprCall {
+                            node_index: NodeIndex(None),
                             range: 1714..1724,
                             func: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1714..1718,
                                     id: Name("type"),
                                     ctx: Load,
@@ -2495,9 +2882,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 1718..1724,
+                                node_index: NodeIndex(None),
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1719..1723,
                                             id: Name("type"),
                                             ctx: Load,
@@ -2512,10 +2901,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 1725..1743,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 1725..1726,
                                 id: Name("a"),
                                 ctx: Store,
@@ -2524,9 +2915,11 @@ Module(
                     ],
                     value: Compare(
                         ExprCompare {
+                            node_index: NodeIndex(None),
                             range: 1732..1741,
                             left: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1732..1736,
                                     id: Name("type"),
                                     ctx: Load,
@@ -2538,6 +2931,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 1740..1741,
                                         id: Name("C"),
                                         ctx: Load,
@@ -2550,10 +2944,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 1744..1760,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 1744..1745,
                                 id: Name("a"),
                                 ctx: Store,
@@ -2562,9 +2958,11 @@ Module(
                     ],
                     value: Call(
                         ExprCall {
+                            node_index: NodeIndex(None),
                             range: 1751..1758,
                             func: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1751..1755,
                                     id: Name("type"),
                                     ctx: Load,
@@ -2572,9 +2970,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 1755..1758,
+                                node_index: NodeIndex(None),
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 1756..1757,
                                             id: Name("b"),
                                             ctx: Load,
@@ -2589,12 +2989,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1761..1778,
                     value: Call(
                         ExprCall {
+                            node_index: NodeIndex(None),
                             range: 1761..1778,
                             func: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1761..1765,
                                     id: Name("type"),
                                     ctx: Load,
@@ -2602,18 +3005,22 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 1766..1778,
+                                node_index: NodeIndex(None),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 1769..1776,
+                                        node_index: NodeIndex(None),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("X"),
                                                 range: 1769..1770,
+                                                node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: Name(
                                             ExprName {
+                                                node_index: NodeIndex(None),
                                                 range: 1773..1776,
                                                 id: Name("int"),
                                                 ctx: Load,
@@ -2628,10 +3035,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 1779..1787,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 1779..1783,
                                 id: Name("type"),
                                 ctx: Store,
@@ -2640,6 +3049,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: NodeIndex(None),
                             range: 1786..1787,
                             value: Int(
                                 1,
@@ -2650,10 +3060,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 1788..1800,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 1788..1792,
                                 id: Name("type"),
                                 ctx: Store,
@@ -2661,6 +3073,7 @@ Module(
                         ),
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 1795..1796,
                                 id: Name("x"),
                                 ctx: Store,
@@ -2669,6 +3082,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: NodeIndex(None),
                             range: 1799..1800,
                             value: Int(
                                 1,
@@ -2679,10 +3093,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 1801..1813,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 1801..1802,
                                 id: Name("x"),
                                 ctx: Store,
@@ -2690,6 +3106,7 @@ Module(
                         ),
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 1805..1809,
                                 id: Name("type"),
                                 ctx: Store,
@@ -2698,6 +3115,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: NodeIndex(None),
                             range: 1812..1813,
                             value: Int(
                                 1,
@@ -2708,22 +3126,28 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 1814..1828,
                     value: Lambda(
                         ExprLambda {
+                            node_index: NodeIndex(None),
                             range: 1814..1828,
                             parameters: Some(
                                 Parameters {
                                     range: 1821..1822,
+                                    node_index: NodeIndex(None),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 1821..1822,
+                                            node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 1821..1822,
+                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 1821..1822,
+                                                    node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -2737,6 +3161,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 1824..1828,
                                     id: Name("type"),
                                     ctx: Load,

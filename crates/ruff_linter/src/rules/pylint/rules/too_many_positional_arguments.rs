@@ -1,8 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, identifier::Identifier};
+use ruff_python_semantic::analyze::function_type::is_subject_to_liskov_substitution_principle;
 use ruff_python_semantic::analyze::{function_type, visibility};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -20,6 +21,16 @@ use crate::checkers::ast::Checker;
 /// Consider refactoring functions with many arguments into smaller functions
 /// with fewer arguments, using objects to group related arguments, or migrating to
 /// [keyword-only arguments](https://docs.python.org/3/tutorial/controlflow.html#special-parameters).
+///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Changing the signature of a subclass method may cause type checkers to
+/// complain about a violation of the Liskov Substitution Principle if it
+/// means that the method now incompatibly overrides a method defined on a
+/// superclass. Explicitly decorating an overriding method with `@override`
+/// signals to Ruff that the method is intended to override a superclass
+/// method and that a type checker will enforce that it does so; Ruff
+/// therefore knows that it should not enforce rules about methods having
+/// too many arguments.
 ///
 /// ## Example
 ///
@@ -41,7 +52,10 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-positional-args`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.7")]
 pub(crate) struct TooManyPositionalArguments {
     c_pos: usize,
     max_pos: usize,
@@ -72,10 +86,10 @@ pub(crate) fn too_many_positional_arguments(
         .posonlyargs
         .iter()
         .chain(&function_def.parameters.args)
-        .filter(|param| !checker.settings.dummy_variable_rgx.is_match(param.name()))
+        .filter(|param| !checker.settings().dummy_variable_rgx.is_match(param.name()))
         .count();
 
-    if num_positional_args <= checker.settings.pylint.max_positional_args {
+    if num_positional_args <= checker.settings().pylint.max_positional_args {
         return;
     }
 
@@ -94,8 +108,8 @@ pub(crate) fn too_many_positional_arguments(
             &function_def.decorator_list,
             semantic.current_scope(),
             semantic,
-            &checker.settings.pep8_naming.classmethod_decorators,
-            &checker.settings.pep8_naming.staticmethod_decorators,
+            &checker.settings().pep8_naming.classmethod_decorators,
+            &checker.settings().pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::Method
             | function_type::FunctionType::ClassMethod
@@ -108,15 +122,28 @@ pub(crate) fn too_many_positional_arguments(
         num_positional_args
     };
 
-    if num_positional_args <= checker.settings.pylint.max_positional_args {
+    if num_positional_args <= checker.settings().pylint.max_positional_args {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         TooManyPositionalArguments {
             c_pos: num_positional_args,
-            max_pos: checker.settings.pylint.max_positional_args,
+            max_pos: checker.settings().pylint.max_positional_args,
         },
         function_def.identifier(),
-    ));
+    );
+    if is_subject_to_liskov_substitution_principle(
+        &function_def.name,
+        &function_def.decorator_list,
+        semantic.current_scope(),
+        semantic,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
+    ) {
+        diagnostic.help(
+            "Consider adding `@typing.override` if changing the function signature \
+            would violate the Liskov Substitution Principle",
+        );
+    }
 }

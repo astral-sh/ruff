@@ -47,7 +47,7 @@ fn struct_ignored_fields() {
     struct NamedFieldsStruct {
         a: String,
         #[cache_key(ignore)]
-        #[allow(unused)]
+        #[expect(unused)]
         b: String,
     }
 

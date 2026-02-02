@@ -1,5 +1,5 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_list;
@@ -7,6 +7,7 @@ use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::refurb::helpers::generate_method_call;
 
@@ -34,9 +35,13 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// b = a.copy()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the slice expression contains comments.
+///
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#mutable-sequence-types)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.290")]
 pub(crate) struct SliceCopy;
 
 impl Violation for SliceCopy {
@@ -61,14 +66,19 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
     let Some(name) = match_list_full_slice(subscript, checker.semantic()) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(SliceCopy, subscript.range());
+    let mut diagnostic = checker.report_diagnostic(SliceCopy, subscript.range());
     let replacement = generate_method_call(name.clone(), "copy", checker.generator());
-    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-        replacement,
-        subscript.start(),
-        subscript.end(),
-    )));
-    checker.report_diagnostic(diagnostic);
+
+    let applicability = if checker.comment_ranges().intersects(subscript.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::replacement(replacement, subscript.start(), subscript.end()),
+        applicability,
+    ));
 }
 
 /// Matches `obj[:]` where `obj` is a list.
@@ -84,6 +94,7 @@ fn match_list_full_slice<'a>(
             upper: None,
             step: None,
             range: _,
+            node_index: _,
         })
     ) {
         return None;

@@ -49,3 +49,13 @@ class Baz:
     def prop4(self) -> None:
         print("I've run out of things to say")
         return None
+
+
+# https://github.com/astral-sh/ruff/issues/18774
+class _:
+    def foo(bar):
+        if not bar:
+            return
+        return (
+            None # comment
+        )

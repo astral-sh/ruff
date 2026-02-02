@@ -1,12 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use std::borrow::Cow;
+
+use itertools::Itertools;
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
-use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
-
+use crate::linter::float::as_non_finite_float_string_literal;
+use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## What it does
 /// Checks for unnecessary string literal or float casts in `Decimal`
 /// constructors.
@@ -23,21 +26,32 @@ use crate::checkers::ast::Checker;
 /// Prefer the more concise form of argument passing for `Decimal`
 /// constructors, as it's more readable and idiomatic.
 ///
+/// Note that this rule does not flag quoted float literals such as `Decimal("0.1")`, which will
+/// produce a more precise `Decimal` value than the unquoted `Decimal(0.1)`.
+///
 /// ## Example
 /// ```python
+/// from decimal import Decimal
+///
 /// Decimal("0")
 /// Decimal(float("Infinity"))
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from decimal import Decimal
+///
 /// Decimal(0)
 /// Decimal("Infinity")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct VerboseDecimalConstructor {
     replacement: String,
 }
@@ -71,7 +85,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
         return;
     };
 
-    let diagnostic = match value {
+    match value {
         Expr::StringLiteral(ast::ExprStringLiteral {
             value: str_literal, ..
         }) => {
@@ -81,18 +95,25 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             // using this regex:
             // https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
             // _after_ trimming whitespace from the string and removing all occurrences of "_".
-            let mut trimmed = Cow::from(str_literal.to_str().trim_whitespace());
-            if memchr::memchr(b'_', trimmed.as_bytes()).is_some() {
-                trimmed = Cow::from(trimmed.replace('_', ""));
-            }
+            let original_str = str_literal.to_str().trim_whitespace();
+            // Strip leading underscores before extracting the sign, as Python's Decimal parser
+            // removes underscores before parsing the sign.
+            let sign_check_str = original_str.trim_start_matches('_');
             // Extract the unary sign, if any.
-            let (unary, rest) = if let Some(trimmed) = trimmed.strip_prefix('+') {
-                ("+", Cow::from(trimmed))
-            } else if let Some(trimmed) = trimmed.strip_prefix('-') {
-                ("-", Cow::from(trimmed))
+            let (unary, sign_check_str) = if let Some(trimmed) = sign_check_str.strip_prefix('+') {
+                ("+", trimmed)
+            } else if let Some(trimmed) = sign_check_str.strip_prefix('-') {
+                ("-", trimmed)
             } else {
-                ("", trimmed)
+                ("", sign_check_str)
             };
+            // Save the string after the sign for normalization (before removing underscores)
+            let str_after_sign_for_normalization = sign_check_str;
+            let mut rest = Cow::from(sign_check_str);
+            let has_digit_separators = memchr::memchr(b'_', original_str.as_bytes()).is_some();
+            if has_digit_separators {
+                rest = Cow::from(rest.replace('_', ""));
+            }
 
             // Early return if we now have an empty string
             // or a very long string:
@@ -108,6 +129,13 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 return;
             }
 
+            // If the original string had digit separators, normalize them
+            let rest = if has_digit_separators {
+                Cow::from(normalize_digit_separators(str_after_sign_for_normalization))
+            } else {
+                Cow::from(rest)
+            };
+
             // If all the characters are zeros, then the value is zero.
             let rest = match (unary, rest.is_empty()) {
                 // `Decimal("-0")` is not the same as `Decimal("0")`
@@ -116,23 +144,28 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                     return;
                 }
                 (_, true) => "0",
-                _ => rest,
+                _ => &rest,
             };
 
             let replacement = format!("{unary}{rest}");
-            let mut diagnostic = Diagnostic::new(
+
+            let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
                 },
                 value.range(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                replacement,
-                value.range(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(value.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
 
-            diagnostic
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(replacement, value.range()),
+                applicability,
+            ));
         }
         Expr::Call(ast::ExprCall {
             func, arguments, ..
@@ -149,61 +182,55 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             let [float] = arguments.args.as_ref() else {
                 return;
             };
-            let Some(float) = float.as_string_literal_expr() else {
+            let Some(float_str) = as_non_finite_float_string_literal(float) else {
                 return;
             };
 
-            let trimmed = float.value.to_str().trim();
-            let mut matches_non_finite_keyword = false;
-            for non_finite_keyword in [
-                "inf",
-                "+inf",
-                "-inf",
-                "infinity",
-                "+infinity",
-                "-infinity",
-                "nan",
-                "+nan",
-                "-nan",
-            ] {
-                if trimmed.eq_ignore_ascii_case(non_finite_keyword) {
-                    matches_non_finite_keyword = true;
-                    break;
-                }
-            }
-            if !matches_non_finite_keyword {
-                return;
-            }
-
             let mut replacement = checker.locator().slice(float).to_string();
             // `Decimal(float("-nan")) == Decimal("nan")`
-            if trimmed.eq_ignore_ascii_case("-nan") {
+            if float_str == "-nan" {
                 // Here we do not attempt to remove just the '-' character.
                 // It may have been encoded (e.g. as '\N{hyphen-minus}')
                 // in the original source slice, and the added complexity
                 // does not make sense for this edge case.
                 replacement = "\"nan\"".to_string();
             }
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
                 },
                 value.range(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                replacement,
-                value.range(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(value.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
 
-            diagnostic
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(replacement, value.range()),
+                applicability,
+            ));
         }
-        _ => {
-            return;
-        }
-    };
+        _ => {}
+    }
+}
 
-    checker.report_diagnostic(diagnostic);
+/// Normalizes digit separators in a numeric string by:
+/// - Stripping leading and trailing underscores
+/// - Collapsing medial underscore sequences to single underscores
+fn normalize_digit_separators(original_str: &str) -> String {
+    // Strip leading and trailing underscores
+    let trimmed = original_str
+        .trim_start_matches(['_', '0'])
+        .trim_end_matches('_');
+
+    // Collapse medial underscore sequences to single underscores
+    trimmed
+        .chars()
+        .dedup_by(|a, b| *a == '_' && a == b)
+        .collect()
 }
 
 // ```console

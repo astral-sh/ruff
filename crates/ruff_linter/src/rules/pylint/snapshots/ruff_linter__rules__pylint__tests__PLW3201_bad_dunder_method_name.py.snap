@@ -1,67 +1,74 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-bad_dunder_method_name.py:5:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
+PLW3201 Dunder method `_init_` has no special meaning in Python 3
+ --> bad_dunder_method_name.py:5:9
   |
 4 | class Apples:
 5 |     def _init_(self):  # [bad-dunder-name]
-  |         ^^^^^^ PLW3201
+  |         ^^^^^^
 6 |         pass
   |
 
-bad_dunder_method_name.py:8:9: PLW3201 Dunder method `__hello__` has no special meaning in Python 3
+PLW3201 Dunder method `__hello__` has no special meaning in Python 3
+ --> bad_dunder_method_name.py:8:9
   |
 6 |         pass
 7 |
 8 |     def __hello__(self):  # [bad-dunder-name]
-  |         ^^^^^^^^^ PLW3201
+  |         ^^^^^^^^^
 9 |         print("hello")
   |
 
-bad_dunder_method_name.py:11:9: PLW3201 Dunder method `__init_` has no special meaning in Python 3
+PLW3201 Dunder method `__init_` has no special meaning in Python 3
+  --> bad_dunder_method_name.py:11:9
    |
  9 |         print("hello")
 10 |
 11 |     def __init_(self):  # [bad-dunder-name]
-   |         ^^^^^^^ PLW3201
+   |         ^^^^^^^
 12 |         # author likely unintentionally misspelled the correct init dunder.
 13 |         pass
    |
 
-bad_dunder_method_name.py:15:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
+PLW3201 Dunder method `_init_` has no special meaning in Python 3
+  --> bad_dunder_method_name.py:15:9
    |
 13 |         pass
 14 |
 15 |     def _init_(self):  # [bad-dunder-name]
-   |         ^^^^^^ PLW3201
+   |         ^^^^^^
 16 |         # author likely unintentionally misspelled the correct init dunder.
 17 |         pass
    |
 
-bad_dunder_method_name.py:19:9: PLW3201 Dunder method `___neg__` has no special meaning in Python 3
+PLW3201 Dunder method `___neg__` has no special meaning in Python 3
+  --> bad_dunder_method_name.py:19:9
    |
 17 |         pass
 18 |
 19 |     def ___neg__(self):  # [bad-dunder-name]
-   |         ^^^^^^^^ PLW3201
+   |         ^^^^^^^^
 20 |         # author likely accidentally added an additional `_`
 21 |         pass
    |
 
-bad_dunder_method_name.py:23:9: PLW3201 Dunder method `__inv__` has no special meaning in Python 3
+PLW3201 Dunder method `__inv__` has no special meaning in Python 3
+  --> bad_dunder_method_name.py:23:9
    |
 21 |         pass
 22 |
 23 |     def __inv__(self):  # [bad-dunder-name]
-   |         ^^^^^^^ PLW3201
+   |         ^^^^^^^
 24 |         # author likely meant to call the invert dunder method
 25 |         pass
    |
 
-bad_dunder_method_name.py:98:9: PLW3201 Dunder method `__unicode__` has no special meaning in Python 3
+PLW3201 Dunder method `__unicode__` has no special meaning in Python 3
+  --> bad_dunder_method_name.py:98:9
    |
 97 |     # Removed with Python 3
 98 |     def __unicode__(self):
-   |         ^^^^^^^^^^^ PLW3201
+   |         ^^^^^^^^^^^
 99 |         pass
    |

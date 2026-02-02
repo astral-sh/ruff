@@ -113,10 +113,10 @@ IGNORE_LIST = [
 # Specs for which to override the formatter options
 OPTIONS_OVERRIDES = {
     "context_managers_38.py": {
-        "target_version": "py38"
+        "target_version": "3.8"
     },
     "context_managers_autodetect_38.py" : {
-        "target_version": "py38"
+        "target_version": "3.8"
     }
 }
 

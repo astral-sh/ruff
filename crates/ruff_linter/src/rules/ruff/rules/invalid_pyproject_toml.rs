@@ -1,5 +1,6 @@
-use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for any pyproject.toml that does not conform to the schema from the relevant PEPs.
@@ -30,6 +31,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// - [Specification of `[build-system]` in pyproject.toml](https://peps.python.org/pep-0518/)
 /// - [Draft but implemented license declaration extensions](https://peps.python.org/pep-0639)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct InvalidPyprojectToml {
     pub message: String,
 }

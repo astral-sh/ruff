@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
+ --> PTH202_2.py:3:1
+  |
+1 | import os
+2 |
+3 | os.path.getsize(filename="filename")
+  | ^^^^^^^^^^^^^^^
+4 | os.path.getsize(filename=b"filename")
+5 | os.path.getsize(filename=__file__)
+  |
+help: Replace with `Path(...).stat().st_size`
+1 | import os
+2 + import pathlib
+3 | 
+  - os.path.getsize(filename="filename")
+4 + pathlib.Path("filename").stat().st_size
+5 | os.path.getsize(filename=b"filename")
+6 | os.path.getsize(filename=__file__)
+
+PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
+ --> PTH202_2.py:4:1
+  |
+3 | os.path.getsize(filename="filename")
+4 | os.path.getsize(filename=b"filename")
+  | ^^^^^^^^^^^^^^^
+5 | os.path.getsize(filename=__file__)
+  |
+help: Replace with `Path(...).stat().st_size`
+1 | import os
+2 + import pathlib
+3 | 
+4 | os.path.getsize(filename="filename")
+  - os.path.getsize(filename=b"filename")
+5 + pathlib.Path(b"filename").stat().st_size
+6 | os.path.getsize(filename=__file__)
+
+PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
+ --> PTH202_2.py:5:1
+  |
+3 | os.path.getsize(filename="filename")
+4 | os.path.getsize(filename=b"filename")
+5 | os.path.getsize(filename=__file__)
+  | ^^^^^^^^^^^^^^^
+  |
+help: Replace with `Path(...).stat().st_size`
+1 | import os
+2 + import pathlib
+3 | 
+4 | os.path.getsize(filename="filename")
+5 | os.path.getsize(filename=b"filename")
+  - os.path.getsize(filename=__file__)
+6 + pathlib.Path(__file__).stat().st_size

@@ -9,9 +9,9 @@ use serde::Deserialize;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
+    Layer,
     fmt::{format::FmtSpan, time::ChronoLocal, writer::BoxMakeWriter},
     layer::SubscriberExt,
-    Layer,
 };
 
 pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
@@ -34,7 +34,7 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
                 .append(true)
                 .open(&path)
                 .map_err(|err| {
-                    #[allow(clippy::print_stderr)]
+                    #[expect(clippy::print_stderr)]
                     {
                         eprintln!(
                             "Failed to open file at {} for logging: {err}",

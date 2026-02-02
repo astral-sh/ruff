@@ -2,11 +2,11 @@ use std::fmt;
 
 use ruff_python_ast::{self as ast};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `re.subn`](https://docs.python.org/3/library/re.html#re.subn)
 /// - [Python documentation: `re.split`](https://docs.python.org/3/library/re.html#re.split)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.278")]
 pub(crate) struct ReSubPositionalArgs {
     method: Method,
 }
@@ -75,10 +76,7 @@ pub(crate) fn re_sub_positional_args(checker: &Checker, call: &ast::ExprCall) {
     };
 
     if call.arguments.args.len() > method.num_args() {
-        checker.report_diagnostic(Diagnostic::new(
-            ReSubPositionalArgs { method },
-            call.range(),
-        ));
+        checker.report_diagnostic(ReSubPositionalArgs { method }, call.range());
     }
 }
 

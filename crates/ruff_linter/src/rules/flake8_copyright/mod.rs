@@ -7,7 +7,7 @@ pub mod settings;
 mod tests {
     use crate::registry::Rule;
     use crate::test::test_snippet;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test]
     fn notice() {
@@ -20,7 +20,7 @@ import os
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -34,7 +34,7 @@ import os
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -48,7 +48,7 @@ import os
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -62,7 +62,7 @@ import os
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -76,7 +76,7 @@ import os
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -90,7 +90,7 @@ import os
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -110,7 +110,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -130,7 +130,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -150,7 +150,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -170,7 +170,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -190,7 +190,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -210,7 +210,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -230,7 +230,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -250,7 +250,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -268,7 +268,7 @@ import os
                 ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
             },
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -331,7 +331,7 @@ import os
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 
     #[test]
@@ -342,6 +342,6 @@ import os
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
     }
 }

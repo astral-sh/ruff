@@ -1,5 +1,94 @@
 # Breaking Changes
 
+## 0.14.0
+
+- **Default to Python 3.10**
+
+    Ruff now defaults to Python 3.10 instead of 3.9 if no explicit Python
+    version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version)
+    or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires)
+    ([#20725](https://github.com/astral-sh/ruff/pull/20725))
+
+- **Default to Python 3.14 for syntax errors**
+
+    Ruff will default to the _latest_ supported Python version (3.14) when
+    checking for syntax errors without a Python version configured. The default
+    in all other cases, like applying lint rules, remains at the minimum
+    supported Python version (3.10).
+
+## 0.13.0
+
+- **Several rules can now add `from __future__ import annotations` automatically**
+
+    `TC001`, `TC002`, `TC003`, `RUF013`, and `UP037` now add `from __future__ import annotations` as part of their fixes when the
+    `lint.future-annotations` setting is enabled. This allows the rules to move
+    more imports into `TYPE_CHECKING` blocks (`TC001`, `TC002`, and `TC003`),
+    use PEP 604 union syntax on Python versions before 3.10 (`RUF013`), and
+    unquote more annotations (`UP037`).
+
+- **Full module paths are now used to verify first-party modules**
+
+    Ruff now checks that the full path to a module exists on disk before
+    categorizing it as a first-party import. This change makes first-party
+    import detection more accurate, helping to avoid false positives on local
+    directories with the same name as a third-party dependency, for example. See
+    the [FAQ
+    section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) on import categorization for more details.
+
+- **Deprecated rules must now be selected by exact rule code**
+
+    Ruff will no longer activate deprecated rules selected by their group name
+    or prefix. As noted below, the two remaining deprecated rules were also
+    removed in this release, so this won't affect any current rules, but it will
+    still affect any deprecations in the future.
+
+- **The deprecated macOS configuration directory fallback has been removed**
+
+    Ruff will no longer look for a user-level configuration file at
+    `~/Library/Application Support/ruff/ruff.toml` on macOS. This feature was
+    deprecated in v0.5 in favor of using the [XDG
+    specification](https://specifications.freedesktop.org/basedir-spec/latest/)
+    (usually resolving to `~/.config/ruff/ruff.toml`), like on Linux. The
+    fallback and accompanying deprecation warning have now been removed.
+
+- **[`pandas-df-variable-name`](https://docs.astral.sh/ruff/rules/pandas-df-variable-name) (`PD901`) has been removed**
+
+- **[`non-pep604-isinstance`](https://docs.astral.sh/ruff/rules/non-pep604-isinstance) (`UP038`) has been removed**
+
+## 0.12.0
+
+- **Detection of more syntax errors**
+
+    Ruff now detects version-related syntax errors, such as the use of the `match`
+    statement on Python versions before 3.10, and syntax errors emitted by
+    CPython's compiler, such as irrefutable `match` patterns before the final
+    `case` arm.
+
+- **New default Python version handling for syntax errors**
+
+    Ruff will default to the _latest_ supported Python version (3.13) when
+    checking for the version-related syntax errors mentioned above to prevent
+    false positives in projects without a Python version configured. The default
+    in all other cases, like applying lint rules, is unchanged and remains at the
+    minimum supported Python version (3.9).
+
+- **Updated f-string formatting**
+
+    Ruff now formats multi-line f-strings with format specifiers to avoid adding a
+    line break after the format specifier. This addresses a change to the Python
+    grammar in version 3.13.4 that made such a line break a syntax error.
+
+- **`rust-toolchain.toml` is no longer included in source distributions**
+
+    The `rust-toolchain.toml` is used to specify a higher Rust version than Ruff's
+    minimum supported Rust version (MSRV) for development and building release
+    artifacts. However, when present in source distributions, it would also cause
+    downstream package maintainers to pull in the same Rust toolchain, even if
+    their available toolchain was MSRV-compatible.
+
+- **[`suspicious-xmle-tree-usage`](https://docs.astral.sh/ruff/rules/suspicious-xmle-tree-usage/)
+    (`S320`) has been removed**
+
 ## 0.11.0
 
 This is a follow-up to release 0.10.0. Because of a mistake in the release process, the `requires-python` inference changes were not included in that release. Ruff 0.11.0 now includes this change as well as the stabilization of the preview behavior for `PGH004`.

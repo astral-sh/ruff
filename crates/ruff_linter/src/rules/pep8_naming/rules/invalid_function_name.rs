@@ -1,12 +1,11 @@
-use ruff_python_ast::{Decorator, Stmt};
-
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::identifier::Identifier;
-use ruff_python_semantic::analyze::visibility;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{Decorator, Stmt, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::{class::any_base_class, visibility};
 use ruff_python_stdlib::str;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -25,6 +24,11 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// to ignore all functions starting with `test_` from this rule, set the
 /// [`lint.pep8-naming.extend-ignore-names`] option to `["test_*"]`.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Explicitly decorating a method with `@override` signals to Ruff that the method is intended
+/// to override a superclass method, and that a type checker will enforce that it does so. Ruff
+/// therefore knows that it should not enforce naming conventions on such methods.
+///
 /// ## Example
 /// ```python
 /// def myFunction():
@@ -42,7 +46,9 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.77")]
 pub(crate) struct InvalidFunctionName {
     name: String,
 }
@@ -57,15 +63,16 @@ impl Violation for InvalidFunctionName {
 
 /// N802
 pub(crate) fn invalid_function_name(
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],
     ignore_names: &IgnoreNames,
     semantic: &SemanticModel,
-) -> Option<Diagnostic> {
+) {
     // Ignore any function names that are already lowercase.
     if str::is_lowercase(name) {
-        return None;
+        return;
     }
 
     // Ignore any functions that are explicitly `@override` or `@overload`.
@@ -74,18 +81,65 @@ pub(crate) fn invalid_function_name(
     if visibility::is_override(decorator_list, semantic)
         || visibility::is_overload(decorator_list, semantic)
     {
-        return None;
+        return;
     }
 
     // Ignore any explicitly-allowed names.
     if ignore_names.matches(name) {
-        return None;
+        return;
     }
 
-    Some(Diagnostic::new(
+    let parent_class = semantic
+        .current_statement_parent()
+        .and_then(|parent| parent.as_class_def_stmt());
+
+    // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
+    if name.starts_with("visit_")
+        && parent_class.is_some_and(|class| {
+            any_base_class(class, semantic, &mut |superclass| {
+                let qualified = semantic.resolve_qualified_name(superclass);
+                qualified.is_some_and(|name| {
+                    matches!(name.segments(), ["ast", "NodeVisitor" | "NodeTransformer"])
+                })
+            })
+        })
+    {
+        return;
+    }
+
+    // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class and its subclasses
+    if name.starts_with("do_")
+        && parent_class.is_some_and(|class| {
+            any_base_class(class, semantic, &mut |superclass| {
+                let qualified = semantic.resolve_qualified_name(superclass);
+                qualified.is_some_and(|name| {
+                    matches!(
+                        name.segments(),
+                        [
+                            "http",
+                            "server",
+                            "BaseHTTPRequestHandler"
+                                | "CGIHTTPRequestHandler"
+                                | "SimpleHTTPRequestHandler"
+                        ]
+                    )
+                })
+            })
+        })
+    {
+        return;
+    }
+
+    let mut diagnostic = checker.report_diagnostic(
         InvalidFunctionName {
             name: name.to_string(),
         },
         stmt.identifier(),
-    ))
+    );
+    if parent_class.is_some() {
+        diagnostic.help(
+            "Consider adding `@typing.override` if this method \
+            overrides a method from a superclass",
+        );
+    }
 }

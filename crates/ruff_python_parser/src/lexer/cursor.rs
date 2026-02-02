@@ -62,7 +62,7 @@ impl<'src> Cursor<'src> {
     ///
     /// Use [`Cursor::rest`] to get the remaining text.
     // SAFETY: The `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     pub(super) fn text_len(&self) -> TextSize {
         TextSize::new(self.chars.as_str().len() as u32)
     }

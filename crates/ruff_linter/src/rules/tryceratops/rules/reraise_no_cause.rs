@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## Removed
 /// This rule is identical to [B904] which should be used instead.
@@ -36,6 +37,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 ///
 /// [B904]: https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "v0.2.0")]
 pub(crate) struct ReraiseNoCause;
 
 /// TRY200

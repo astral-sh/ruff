@@ -1,16 +1,16 @@
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::Rule;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for dictionary literals that associate multiple values with the
@@ -49,6 +49,7 @@ use crate::registry::Rule;
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.30")]
 pub(crate) struct MultiValueRepeatedKeyLiteral {
     name: SourceCodeSnippet,
     existing: SourceCodeSnippet,
@@ -121,6 +122,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.30")]
 pub(crate) struct MultiValueRepeatedKeyVariable {
     name: SourceCodeSnippet,
 }
@@ -176,8 +178,8 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                     | Expr::EllipsisLiteral(_)
                     | Expr::Tuple(_)
                     | Expr::FString(_) => {
-                        if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
-                            let mut diagnostic = Diagnostic::new(
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) {
+                            let mut diagnostic = checker.report_diagnostic(
                                 MultiValueRepeatedKeyLiteral {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                     existing: SourceCodeSnippet::from_str(
@@ -191,27 +193,24 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     parenthesized_range(
                                         dict.value(i - 1).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i - 1).range())
                                     .end(),
                                     parenthesized_range(
                                         dict.value(i).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i).range())
                                     .end(),
                                 )));
                             }
-                            checker.report_diagnostic(diagnostic);
                         }
                     }
                     Expr::Name(_) => {
-                        if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
-                            let mut diagnostic = Diagnostic::new(
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) {
+                            let mut diagnostic = checker.report_diagnostic(
                                 MultiValueRepeatedKeyVariable {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                 },
@@ -223,22 +222,19 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     parenthesized_range(
                                         dict.value(i - 1).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i - 1).range())
                                     .end(),
                                     parenthesized_range(
                                         dict.value(i).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i).range())
                                     .end(),
                                 )));
                             }
-                            checker.report_diagnostic(diagnostic);
                         }
                     }
                     _ => {}

@@ -105,3 +105,8 @@ if future.exception():
 future = executor.submit(float, "a")
 if future.exception():
     raise future.Exception()
+
+
+raise TypeError(
+    # comment
+)

@@ -4,7 +4,7 @@ use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
 use ruff_text_size::Ranged;
 
-use crate::{parse_expression, parse_string_annotation, ParseError, Parsed};
+use crate::{ParseError, Parsed, parse_expression, parse_string_annotation};
 
 type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
 

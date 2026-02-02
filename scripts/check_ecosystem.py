@@ -22,10 +22,11 @@ import re
 import tempfile
 import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
-from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -46,7 +47,7 @@ class Repository(NamedTuple):
     show_fixes: bool = False
 
     @asynccontextmanager
-    async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
+    async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[str]:
         """Shallow clone this repository to a temporary directory."""
         if checkout_dir.exists():
             logger.debug(f"Reusing {self.org}:{self.repo}")
@@ -342,7 +343,7 @@ DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Awaitable[Any])
 
 
 async def main(
@@ -528,7 +529,8 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     if args.checkouts:
         args.checkouts.mkdir(exist_ok=True, parents=True)
     main_task = asyncio.ensure_future(

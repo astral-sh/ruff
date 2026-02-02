@@ -1,12 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::{
-    analyze::{function_type, visibility},
     Scope, ScopeId, ScopeKind,
+    analyze::{function_type, visibility},
 };
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_variable;
 
@@ -16,6 +16,16 @@ use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_v
 /// ## Why is this bad?
 /// Unused `self` parameters are usually a sign of a method that could be
 /// replaced by a function, class method, or static method.
+///
+/// This rule exempts methods decorated with [`@typing.override`][override].
+/// Converting an instance method into a static method or class method may
+/// cause type checkers to complain about a violation of the Liskov
+/// Substitution Principle if it means that the method now incompatibly
+/// overrides a method defined on a superclass. Explicitly decorating an
+/// overriding method with `@override` signals to Ruff that the method is
+/// intended to override a superclass method and that a type checker will
+/// enforce that it does so; Ruff therefore knows that it should not enforce
+/// rules about unused `self` parameters on such methods.
 ///
 /// ## Example
 /// ```python
@@ -38,7 +48,17 @@ use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_v
 ///     def greeting():
 ///         print("Greetings friend!")
 /// ```
+///
+/// ## Options
+///
+/// The rule will not trigger on methods that are already marked as static or class methods.
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.286")]
 pub(crate) struct NoSelfUse {
     method_name: String,
 }
@@ -76,15 +96,15 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
             decorator_list,
             parent,
             semantic,
-            &checker.settings.pep8_naming.classmethod_decorators,
-            &checker.settings.pep8_naming.staticmethod_decorators,
+            &checker.settings().pep8_naming.classmethod_decorators,
+            &checker.settings().pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::Method
     ) {
         return;
     }
 
-    let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+    let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
 
     if function_type::is_stub(func, semantic)
         || visibility::is_magic(name)
@@ -126,11 +146,15 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
         .map(|binding_id| semantic.binding(binding_id))
         .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
-        checker.report_diagnostic(Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             NoSelfUse {
                 method_name: name.to_string(),
             },
             func.identifier(),
-        ));
+        );
+        diagnostic.help(
+            "Consider adding `@typing.override` if this method overrides \
+            a method from a superclass",
+        );
     }
 }

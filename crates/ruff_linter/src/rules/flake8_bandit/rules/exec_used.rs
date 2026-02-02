@@ -1,9 +1,9 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -22,6 +22,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `exec`](https://docs.python.org/3/library/functions.html#exec)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.116")]
 pub(crate) struct ExecBuiltin;
 
 impl Violation for ExecBuiltin {
@@ -34,6 +35,6 @@ impl Violation for ExecBuiltin {
 /// S102
 pub(crate) fn exec_used(checker: &Checker, func: &Expr) {
     if checker.semantic().match_builtin_expr(func, "exec") {
-        checker.report_diagnostic(Diagnostic::new(ExecBuiltin, func.range()));
+        checker.report_diagnostic(ExecBuiltin, func.range());
     }
 }

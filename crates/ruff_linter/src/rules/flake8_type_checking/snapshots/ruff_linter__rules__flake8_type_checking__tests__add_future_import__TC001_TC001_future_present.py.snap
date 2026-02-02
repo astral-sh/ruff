@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC001 [*] Move application import `.first_party` into a type-checking block
+ --> TC001_future_present.py:3:15
+  |
+1 | from __future__ import annotations
+2 |
+3 | from . import first_party
+  |               ^^^^^^^^^^^
+  |
+help: Move into type-checking block
+1 | from __future__ import annotations
+2 | 
+  - from . import first_party
+3 + from typing import TYPE_CHECKING
+4 + 
+5 + if TYPE_CHECKING:
+6 +     from . import first_party
+7 | 
+8 | 
+9 | def f(x: first_party.foo): ...
+note: This is an unsafe fix and may change runtime behavior

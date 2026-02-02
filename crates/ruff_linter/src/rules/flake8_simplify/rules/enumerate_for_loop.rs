@@ -1,15 +1,20 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use crate::preview::is_enumerate_for_loop_int_index_enabled;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `for` loops with explicit loop-index variables that can be replaced
 /// with `enumerate()`.
+///
+/// In [preview], this rule checks for index variables initialized with any integer rather than only
+/// a literal zero.
 ///
 /// ## Why is this bad?
 /// When iterating over a sequence, it's often desirable to keep track of the
@@ -20,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// fruits = ["apple", "banana", "cherry"]
+/// i = 0
 /// for fruit in fruits:
 ///     print(f"{i + 1}. {fruit}")
 ///     i += 1
@@ -34,7 +40,10 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct EnumerateForLoop {
     index: String,
 }
@@ -80,17 +89,21 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 continue;
             }
 
-            // Ensure that the index variable was initialized to 0.
+            // Ensure that the index variable was initialized to 0 (or instance of `int` if preview is enabled).
             let Some(value) = typing::find_binding_value(binding, checker.semantic()) else {
                 continue;
             };
-            if !matches!(
+            if !(matches!(
                 value,
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Int(Int::ZERO),
                     ..
                 })
-            ) {
+            ) || matches!(
+                ResolvedPythonType::from(value),
+                ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+            ) && is_enumerate_for_loop_int_index_enabled(checker.settings()))
+            {
                 continue;
             }
 
@@ -139,13 +152,12 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 continue;
             }
 
-            let diagnostic = Diagnostic::new(
+            checker.report_diagnostic(
                 EnumerateForLoop {
                     index: index.id.to_string(),
                 },
                 stmt.range(),
             );
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

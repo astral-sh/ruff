@@ -1,12 +1,12 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSubscript};
 
+use crate::expression::CallChainLayout;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized, parenthesized,
 };
-use crate::expression::CallChainLayout;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -27,6 +27,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
     fn fmt_fields(&self, item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprSubscript {
             range: _,
+            node_index: _,
             value,
             slice,
             ctx: _,
@@ -50,7 +51,10 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
                 value.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match value.as_ref() {
-                    Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Attribute(expr) => expr
+                        .format()
+                        .with_options(call_chain_layout.decrement_call_like_count())
+                        .fmt(f),
                     Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     _ => value.format().with_options(Parentheses::Never).fmt(f),
@@ -70,8 +74,8 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
                 .fmt(f)
         });
 
-        let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
-            && call_chain_layout == CallChainLayout::Fluent;
+        let is_call_chain_root =
+            self.call_chain_layout == CallChainLayout::Default && call_chain_layout.is_fluent();
         if is_call_chain_root {
             write!(f, [group(&format_inner)])
         } else {
@@ -91,7 +95,8 @@ impl NeedsParentheses for ExprSubscript {
                 self.into(),
                 context.comments().ranges(),
                 context.source(),
-            ) == CallChainLayout::Fluent
+            )
+            .is_fluent()
             {
                 OptionalParentheses::Multiline
             } else if is_expression_parenthesized(

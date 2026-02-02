@@ -1,14 +1,15 @@
-use ruff_python_ast::{self as ast, Stmt};
+use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{
-    dataclass_kind, has_default_copy_semantics, is_class_var_annotation, is_final_annotation,
-    is_special_attribute,
+use crate::rules::ruff::helpers::{
+    dataclass_kind, has_default_copy_semantics, is_class_var_annotation,
+    is_ctypes_structure_fields, is_final_annotation, is_special_attribute,
 };
 
 /// ## What it does
@@ -84,6 +85,7 @@ use crate::rules::ruff::rules::helpers::{
 ///
 /// [ClassVar]: https://docs.python.org/3/library/typing.html#typing.ClassVar
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct MutableClassDefault;
 
 impl Violation for MutableClassDefault {
@@ -95,6 +97,9 @@ impl Violation for MutableClassDefault {
 
 /// RUF012
 pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+    // Collect any `ClassVar`s we find in case they get reassigned later.
+    let mut class_var_targets = FxHashSet::default();
+
     for statement in &class_def.body {
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -103,6 +108,12 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                 value: Some(value),
                 ..
             }) => {
+                if let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                    if is_class_var_annotation(annotation, checker.semantic()) {
+                        class_var_targets.insert(id);
+                    }
+                }
+
                 if !is_special_attribute(target)
                     && is_mutable_expr(value, checker.semantic())
                     && !is_class_var_annotation(annotation, checker.semantic())
@@ -118,19 +129,31 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                         return;
                     }
 
-                    checker.report_diagnostic(Diagnostic::new(MutableClassDefault, value.range()));
+                    checker.report_diagnostic(MutableClassDefault, value.range());
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                if !targets.iter().all(is_special_attribute)
-                    && is_mutable_expr(value, checker.semantic())
+                if !targets.iter().all(|target| {
+                    is_special_attribute(target)
+                        || target
+                            .as_name_expr()
+                            .is_some_and(|name| class_var_targets.contains(&name.id))
+                }) && is_mutable_expr(value, checker.semantic())
                 {
+                    // The `_fields_` property of a `ctypes.Structure` base class has its
+                    // immutability enforced  by the base class itself which will throw an error if
+                    // it's set a second time
+                    // See: https://docs.python.org/3/library/ctypes.html#ctypes.Structure._fields_
+                    if is_ctypes_structure_fields(class_def, checker.semantic(), targets) {
+                        return;
+                    }
+
                     // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
                     if has_default_copy_semantics(class_def, checker.semantic()) {
                         return;
                     }
 
-                    checker.report_diagnostic(Diagnostic::new(MutableClassDefault, value.range()));
+                    checker.report_diagnostic(MutableClassDefault, value.range());
                 }
             }
             _ => (),

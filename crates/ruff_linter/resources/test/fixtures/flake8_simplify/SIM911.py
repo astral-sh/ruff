@@ -23,3 +23,28 @@ for k, v in zip(d2.keys(), d2.values()):  # SIM911
 items = zip(x.keys(), x.values())  # OK
 
 items.bar = zip(x.keys(), x.values())  # OK
+
+# https://github.com/astral-sh/ruff/issues/18777
+def foo():
+    dict = {}
+    for country, stars in zip(dict.keys(), dict.values()):
+        ...
+
+
+# https://github.com/astral-sh/ruff/issues/18776
+flag_stars = {}
+for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
+
+# Regression test for https://github.com/astral-sh/ruff/issues/18778
+d = {}
+for country, stars in zip(d.keys(*x), d.values("hello")):...
+
+
+flag_stars = {"USA": 50, "Slovenia": 3, "Panama": 2, "Australia": 6}
+
+for country, stars in zip(
+        flag_stars.keys(),
+        # text
+        flag_stars.values(),
+):
+    print(f"{country}'s flag has {stars} stars.")

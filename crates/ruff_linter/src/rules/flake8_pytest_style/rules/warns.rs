@@ -1,14 +1,14 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::helpers::is_empty_or_null_string;
+use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 
 /// ## What it does
 /// Checks for `pytest.warns` context managers with multiple statements.
@@ -50,6 +50,7 @@ use super::helpers::is_empty_or_null_string;
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct PytestWarnsWithMultipleStatements;
 
 impl Violation for PytestWarnsWithMultipleStatements {
@@ -76,11 +77,11 @@ impl Violation for PytestWarnsWithMultipleStatements {
 ///
 ///
 /// def test_foo():
-///     with pytest.warns(RuntimeWarning):
+///     with pytest.warns(Warning):
 ///         ...
 ///
 ///     # empty string is also an error
-///     with pytest.warns(RuntimeWarning, match=""):
+///     with pytest.warns(Warning, match=""):
 ///         ...
 /// ```
 ///
@@ -90,7 +91,7 @@ impl Violation for PytestWarnsWithMultipleStatements {
 ///
 ///
 /// def test_foo():
-///     with pytest.warns(RuntimeWarning, match="expected message"):
+///     with pytest.warns(Warning, match="expected message"):
 ///         ...
 /// ```
 ///
@@ -101,6 +102,7 @@ impl Violation for PytestWarnsWithMultipleStatements {
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct PytestWarnsTooBroad {
     warning: String,
 }
@@ -146,6 +148,7 @@ impl Violation for PytestWarnsTooBroad {
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.2")]
 pub(crate) struct PytestWarnsWithoutWarning;
 
 impl Violation for PytestWarnsWithoutWarning {
@@ -172,16 +175,13 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 /// PT029, PT030
 pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_warns(&call.func, checker.semantic()) {
-        if checker.enabled(Rule::PytestWarnsWithoutWarning) {
+        if checker.is_rule_enabled(Rule::PytestWarnsWithoutWarning) {
             if call.arguments.is_empty() {
-                checker.report_diagnostic(Diagnostic::new(
-                    PytestWarnsWithoutWarning,
-                    call.func.range(),
-                ));
+                checker.report_diagnostic(PytestWarnsWithoutWarning, call.func.range());
             }
         }
 
-        if checker.enabled(Rule::PytestWarnsTooBroad) {
+        if checker.is_rule_enabled(Rule::PytestWarnsTooBroad) {
             if let Some(warning) = call.arguments.find_argument_value("expected_warning", 0) {
                 if call
                     .arguments
@@ -222,10 +222,7 @@ pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], 
         };
 
         if is_too_complex {
-            checker.report_diagnostic(Diagnostic::new(
-                PytestWarnsWithMultipleStatements,
-                stmt.range(),
-            ));
+            checker.report_diagnostic(PytestWarnsWithMultipleStatements, stmt.range());
         }
     }
 }
@@ -239,13 +236,13 @@ fn warning_needs_match(checker: &Checker, warning: &Expr) {
             .and_then(|qualified_name| {
                 let qualified_name = qualified_name.to_string();
                 checker
-                    .settings
+                    .settings()
                     .flake8_pytest_style
                     .warns_require_match_for
                     .iter()
                     .chain(
                         &checker
-                            .settings
+                            .settings()
                             .flake8_pytest_style
                             .warns_extend_require_match_for,
                     )
@@ -253,11 +250,11 @@ fn warning_needs_match(checker: &Checker, warning: &Expr) {
                     .then_some(qualified_name)
             })
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             PytestWarnsTooBroad {
                 warning: qualified_name,
             },
             warning.range(),
-        ));
+        );
     }
 }

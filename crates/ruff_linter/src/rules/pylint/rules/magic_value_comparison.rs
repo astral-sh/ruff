@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
 
@@ -46,6 +46,7 @@ use crate::rules::pylint::settings::ConstantType;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.221")]
 pub(crate) struct MagicValueComparison {
     value: String,
 }
@@ -89,7 +90,7 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
             !matches!(value.to_str(), "" | "__main__")
         }
         LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
-            #[allow(clippy::float_cmp)]
+            #[expect(clippy::float_cmp)]
             ast::Number::Float(value) => !(*value == 0.0 || *value == 1.0),
             ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
             ast::Number::Complex { .. } => true,
@@ -110,13 +111,13 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
 
     for comparison_expr in std::iter::once(left).chain(comparators) {
         if let Some(value) = as_literal(comparison_expr) {
-            if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
-                checker.report_diagnostic(Diagnostic::new(
+            if is_magic_value(value, &checker.settings().pylint.allow_magic_value_types) {
+                checker.report_diagnostic(
                     MagicValueComparison {
                         value: checker.locator().slice(comparison_expr).to_string(),
                     },
                     comparison_expr.range(),
-                ));
+                );
             }
         }
     }

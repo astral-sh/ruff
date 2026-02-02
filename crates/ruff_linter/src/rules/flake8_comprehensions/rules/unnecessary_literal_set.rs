@@ -1,12 +1,12 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `set()` calls that take unnecessary list or tuple literals
@@ -34,6 +34,7 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.61")]
 pub(crate) struct UnnecessaryLiteralSet {
     kind: UnnecessaryLiteral,
 }
@@ -67,7 +68,7 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryLiteralSet { kind }, call.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryLiteralSet { kind }, call.range());
 
     // Convert `set((1, 2))` to `{1, 2}`.
     diagnostic.set_fix({
@@ -124,8 +125,6 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
             }
         }
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

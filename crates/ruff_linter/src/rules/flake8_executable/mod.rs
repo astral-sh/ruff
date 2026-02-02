@@ -12,7 +12,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Path::new("EXE001_1.py"))]
     #[test_case(Path::new("EXE001_2.py"))]
@@ -22,6 +22,8 @@ mod tests {
     #[test_case(Path::new("EXE002_3.py"))]
     #[test_case(Path::new("EXE003.py"))]
     #[test_case(Path::new("EXE003_uv.py"))]
+    #[test_case(Path::new("EXE003_uv_tool.py"))]
+    #[test_case(Path::new("EXE003_uvx.py"))]
     #[test_case(Path::new("EXE004_1.py"))]
     #[test_case(Path::new("EXE004_2.py"))]
     #[test_case(Path::new("EXE004_3.py"))]
@@ -30,6 +32,12 @@ mod tests {
     #[test_case(Path::new("EXE005_2.py"))]
     #[test_case(Path::new("EXE005_3.py"))]
     fn rules(path: &Path) -> Result<()> {
+        if is_wsl::is_wsl() {
+            // these rules are always ignored on WSL, so skip testing them in a WSL environment
+            // see https://github.com/astral-sh/ruff/pull/21724 for latest discussion
+            return Ok(());
+        }
+
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_executable").join(path).as_path(),
@@ -41,7 +49,7 @@ mod tests {
                 Rule::ShebangMissingPython,
             ]),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -1,72 +1,72 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-runtime_evaluated_decorators_1.py:12:12: TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+  --> runtime_evaluated_decorators_1.py:12:12
    |
 11 | if TYPE_CHECKING:
 12 |     import datetime  # TC004
-   |            ^^^^^^^^ TC004
+   |            ^^^^^^^^
 13 |     from array import array  # TC004
    |
-   = help: Move out of type-checking block
+help: Move out of type-checking block
+7  | from attrs import frozen
+8  | 
+9  | import numpy
+10 + import datetime
+11 | 
+12 | if TYPE_CHECKING:
+   -     import datetime  # TC004
+13 |     from array import array  # TC004
+14 | 
+15 |     import pandas  # TC004
+note: This is an unsafe fix and may change runtime behavior
 
-ℹ Unsafe fix
-7  7  | from attrs import frozen
-8  8  | 
-9  9  | import numpy
-   10 |+import datetime
-10 11 | 
-11 12 | if TYPE_CHECKING:
-12    |-    import datetime  # TC004
-13 13 |     from array import array  # TC004
-14 14 | 
-15 15 |     import pandas  # TC004
-
-runtime_evaluated_decorators_1.py:13:23: TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+  --> runtime_evaluated_decorators_1.py:13:23
    |
 11 | if TYPE_CHECKING:
 12 |     import datetime  # TC004
 13 |     from array import array  # TC004
-   |                       ^^^^^ TC004
+   |                       ^^^^^
 14 |
 15 |     import pandas  # TC004
    |
-   = help: Move out of type-checking block
+help: Move out of type-checking block
+7  | from attrs import frozen
+8  | 
+9  | import numpy
+10 + from array import array
+11 | 
+12 | if TYPE_CHECKING:
+13 |     import datetime  # TC004
+   -     from array import array  # TC004
+14 | 
+15 |     import pandas  # TC004
+16 |     import pyproj
+note: This is an unsafe fix and may change runtime behavior
 
-ℹ Unsafe fix
-7  7  | from attrs import frozen
-8  8  | 
-9  9  | import numpy
-   10 |+from array import array
-10 11 | 
-11 12 | if TYPE_CHECKING:
-12 13 |     import datetime  # TC004
-13    |-    from array import array  # TC004
-14 14 | 
-15 15 |     import pandas  # TC004
-16 16 |     import pyproj
-
-runtime_evaluated_decorators_1.py:15:12: TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
+TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
+  --> runtime_evaluated_decorators_1.py:15:12
    |
 13 |     from array import array  # TC004
 14 |
 15 |     import pandas  # TC004
-   |            ^^^^^^ TC004
+   |            ^^^^^^
 16 |     import pyproj
    |
-   = help: Move out of type-checking block
-
-ℹ Unsafe fix
-7  7  | from attrs import frozen
-8  8  | 
-9  9  | import numpy
-   10 |+import pandas
-10 11 | 
-11 12 | if TYPE_CHECKING:
-12 13 |     import datetime  # TC004
-13 14 |     from array import array  # TC004
-14 15 | 
-15    |-    import pandas  # TC004
-16 16 |     import pyproj
-17 17 | 
-18 18 |
+help: Move out of type-checking block
+7  | from attrs import frozen
+8  | 
+9  | import numpy
+10 + import pandas
+11 | 
+12 | if TYPE_CHECKING:
+13 |     import datetime  # TC004
+14 |     from array import array  # TC004
+15 | 
+   -     import pandas  # TC004
+16 |     import pyproj
+17 | 
+18 | 
+note: This is an unsafe fix and may change runtime behavior

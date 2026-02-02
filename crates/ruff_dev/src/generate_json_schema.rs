@@ -1,14 +1,12 @@
-#![allow(clippy::print_stdout, clippy::print_stderr)]
-
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use pretty_assertions::StrComparison;
-use schemars::schema_for;
+use schemars::generate::SchemaSettings;
 
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use ruff_workspace::options::Options;
 
 #[derive(clap::Args)]
@@ -19,7 +17,9 @@ pub(crate) struct Args {
 }
 
 pub(crate) fn main(args: &Args) -> Result<()> {
-    let schema = schema_for!(Options);
+    let settings = SchemaSettings::draft07();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<Options>();
     let schema_string = serde_json::to_string_pretty(&schema).unwrap();
     let filename = "ruff.schema.json";
     let schema_path = PathBuf::from(ROOT_DIR).join(filename);
@@ -58,7 +58,7 @@ mod tests {
 
     use crate::generate_all::Mode;
 
-    use super::{main, Args};
+    use super::{Args, main};
 
     #[test]
     fn test_generate_json_schema() -> Result<()> {

@@ -1,7 +1,7 @@
-use crate::files::{system_path_to_file, vendored_path_to_file, File};
+use crate::Db;
+use crate::files::{File, system_path_to_file, vendored_path_to_file};
 use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
-use crate::Db;
 use std::fmt::{Display, Formatter};
 
 /// Path to a file.
@@ -11,7 +11,7 @@ use std::fmt::{Display, Formatter};
 /// * a file stored on the [host system](crate::system::System).
 /// * a virtual file stored on the [host system](crate::system::System).
 /// * a vendored file stored in the [vendored file system](crate::vendored::VendoredFileSystem).
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum FilePath {
     /// Path to a file on the [host system](crate::system::System).
     System(SystemPathBuf),

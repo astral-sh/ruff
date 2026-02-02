@@ -1,0 +1,72 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: NodeIndex(None),
+            range: 0..13,
+            value: TString(
+                ExprTString {
+                    node_index: NodeIndex(None),
+                    range: 0..13,
+                    value: TStringValue {
+                        inner: Single(
+                            TString {
+                                range: 0..13,
+                                node_index: NodeIndex(None),
+                                elements: [
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 2..12,
+                                            node_index: NodeIndex(None),
+                                            expression: Compare(
+                                                ExprCompare {
+                                                    node_index: NodeIndex(None),
+                                                    range: 3..11,
+                                                    left: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 3..5,
+                                                            value: Int(
+                                                                42,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    ops: [
+                                                        Eq,
+                                                    ],
+                                                    comparators: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 9..11,
+                                                                value: Int(
+                                                                    42,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            debug_text: None,
+                                            conversion: None,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                ],
+                                flags: TStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                    unclosed: false,
+                                },
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

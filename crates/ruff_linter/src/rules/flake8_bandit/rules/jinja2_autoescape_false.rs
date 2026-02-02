@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// - [Jinja documentation: API](https://jinja.palletsprojects.com/en/latest/api/#autoescaping)
 /// - [Common Weakness Enumeration: CWE-94](https://cwe.mitre.org/data/definitions/94.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.220")]
 pub(crate) struct Jinja2AutoescapeFalse {
     value: bool,
 }
@@ -70,23 +71,20 @@ pub(crate) fn jinja2_autoescape_false(checker: &Checker, call: &ast::ExprCall) {
                 Expr::Call(ast::ExprCall { func, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                         if id != "select_autoescape" {
-                            checker.report_diagnostic(Diagnostic::new(
+                            checker.report_diagnostic(
                                 Jinja2AutoescapeFalse { value: true },
                                 keyword.range(),
-                            ));
+                            );
                         }
                     }
                 }
-                _ => checker.report_diagnostic(Diagnostic::new(
-                    Jinja2AutoescapeFalse { value: true },
-                    keyword.range(),
-                )),
+                _ => {
+                    checker
+                        .report_diagnostic(Jinja2AutoescapeFalse { value: true }, keyword.range());
+                }
             }
         } else {
-            checker.report_diagnostic(Diagnostic::new(
-                Jinja2AutoescapeFalse { value: false },
-                call.func.range(),
-            ));
+            checker.report_diagnostic(Jinja2AutoescapeFalse { value: false }, call.func.range());
         }
     }
 }

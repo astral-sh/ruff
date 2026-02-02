@@ -13,7 +13,7 @@ mod tests {
     use crate::rules::pep8_naming;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.pyi"))]
@@ -73,8 +73,9 @@ mod tests {
     #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.pyi"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.py"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.pyi"))]
-    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.py"))]
-    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.pyi"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.pyi"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_2.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
     #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.py"))]
@@ -133,7 +134,7 @@ mod tests {
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -152,7 +153,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -165,15 +166,16 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY38,
+                unresolved_target_version: PythonVersion::PY38.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
-    #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
+    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
+    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -187,7 +189,20 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("PYI021_1.pyi"))]
+    fn pyi021_pie790_isolation_check(path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::LinterSettings::for_rules([
+                Rule::DocstringInStub,
+                Rule::UnnecessaryPlaceholder,
+            ]),
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

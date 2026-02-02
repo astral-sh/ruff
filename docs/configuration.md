@@ -51,7 +51,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py39"
 
     [tool.ruff.lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -133,7 +133,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py39"
 
     [lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -270,7 +270,7 @@ There are a few exceptions to these rules:
 1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
     a default configuration. If a user-specific configuration file exists
     at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
+    configuration, with `${config_dir}` being determined via [`etcetera`'s base strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
     and all relative paths being again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
@@ -345,12 +345,14 @@ formatting `.pyi` files, but would continue to include them in linting:
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
 `.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](settings.md#respect-gitignore)).
 
-Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria.
-For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
+Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria, 
+unless [`force-exclude`](settings.md#force-exclude) is also enabled (via CLI or settings file).
+For example, without `force-exclude` enabled, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
 By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.ipynb`, or `pyproject.toml`.
+In [preview](preview.md) mode, Ruff will also discover `*.pyw` by default.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
 You can also change the default selection using the [`include`](settings.md#include) setting.
@@ -538,7 +540,7 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help     Print help
+  -h, --help     Print help (see more with '--help')
   -V, --version  Print version
 
 Log levels:
@@ -557,6 +559,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -573,7 +578,8 @@ Run Ruff on the given files or directories
 Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to check [default: .]
+  [FILES]...  List of files or directories to check, or `-` to read from stdin
+              [default: .]
 
 Options:
       --fix
@@ -608,7 +614,7 @@ Options:
           RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313, py314]
+          py37, py38, py39, py310, py311, py312, py313, py314, py315]
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
@@ -618,14 +624,15 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --statistics
           Show counts for every rule with at least one violation
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
+      --add-noqa[=<REASON>]
+          Enable automatic additions of `noqa` directives to failing lines.
+          Optionally provide a reason to append after the codes
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help
+          Print help (see more with '--help')
 
 Rule selection:
       --select <RULE_CODE>
@@ -693,6 +700,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 ```
 
 <!-- End auto-generated check help. -->
@@ -707,7 +717,8 @@ Run the Ruff formatter on the given files or directories
 Usage: ruff format [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to format [default: .]
+  [FILES]...  List of files or directories to format, or `-` to read from stdin
+              [default: .]
 
 Options:
       --check
@@ -723,10 +734,15 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313, py314]
+          py37, py38, py39, py310, py311, py312, py313, py314, py315]
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
+      --output-format <OUTPUT_FORMAT>
+          Output serialization format for violations, when used with `--check`.
+          The default serialization format is "full" [env: RUFF_OUTPUT_FORMAT=]
+          [possible values: concise, full, json, json-lines, junit, grouped,
+          github, gitlab, pylint, rdjson, azure, sarif]
   -h, --help
           Print help (see more with '--help')
 
@@ -778,6 +794,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 ```
 
 <!-- End auto-generated format help. -->
