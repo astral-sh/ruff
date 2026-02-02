@@ -13,7 +13,7 @@ RUF064 [*] Non-octal mode
   |
 help: Replace with octal literal
 info: Current value of mode 444 (0o674) sets permissions: u=rw-, g=rwx, o=r--
-info: Suggested value of 292 sets permissions: u=r--, g=r--, o=r--
+info: Suggested value of 0o444 sets permissions: u=r--, g=r--, o=r--
 3 | import os
 4 | from pathlib import Path
 5 | 
@@ -72,7 +72,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 777 (0o1411) sets permissions: u=r--, g=--x, o=--x
-info: Suggested value of 511 sets permissions: u=rwx, g=rwx, o=rwx
+info: Suggested value of 0o777 sets permissions: u=rwx, g=rwx, o=rwx
 9  | os.chmod("foo", 10000)  # Error
 10 | os.chmod("foo", 99999)  # Error
 11 | 
@@ -94,7 +94,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 400 (0o620) sets permissions: u=rw-, g=-w-, o=---
-info: Suggested value of 256 sets permissions: u=r--, g=---, o=---
+info: Suggested value of 0o400 sets permissions: u=r--, g=---, o=---
 12 | os.umask(777)  # Error
 13 | os.umask(0o777)  # OK
 14 | 
@@ -116,7 +116,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 755 (0o1363) sets permissions: u=-wx, g=rw-, o=-wx
-info: Suggested value of 493 sets permissions: u=rwx, g=r-x, o=r-x
+info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
 15 | os.fchmod(0, 400)  # Error
 16 | os.fchmod(0, 0o400)  # OK
 17 | 
@@ -138,7 +138,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 600 (0o1130) sets permissions: u=--x, g=-wx, o=---
-info: Suggested value of 384 sets permissions: u=rw-, g=---, o=---
+info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
 18 | os.lchmod("foo", 755)  # Error
 19 | os.lchmod("foo", 0o755)  # OK
 20 | 
@@ -160,7 +160,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 644 (0o1204) sets permissions: u=-w-, g=---, o=r--
-info: Suggested value of 420 sets permissions: u=rw-, g=r--, o=r--
+info: Suggested value of 0o644 sets permissions: u=rw-, g=r--, o=r--
 21 | os.mkdir("foo", 600)  # Error
 22 | os.mkdir("foo", 0o600)  # OK
 23 | 
@@ -182,7 +182,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 640 (0o1200) sets permissions: u=-w-, g=---, o=---
-info: Suggested value of 416 sets permissions: u=rw-, g=r--, o=---
+info: Suggested value of 0o640 sets permissions: u=rw-, g=r--, o=---
 24 | os.makedirs("foo", 644)  # Error
 25 | os.makedirs("foo", 0o644)  # OK
 26 | 
@@ -204,7 +204,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 660 (0o1224) sets permissions: u=-w-, g=-w-, o=r--
-info: Suggested value of 432 sets permissions: u=rw-, g=rw-, o=---
+info: Suggested value of 0o660 sets permissions: u=rw-, g=rw-, o=---
 27 | os.mkfifo("foo", 640)  # Error
 28 | os.mkfifo("foo", 0o640)  # OK
 29 | 
@@ -226,7 +226,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 644 (0o1204) sets permissions: u=-w-, g=---, o=r--
-info: Suggested value of 420 sets permissions: u=rw-, g=r--, o=r--
+info: Suggested value of 0o644 sets permissions: u=rw-, g=r--, o=r--
 30 | os.mknod("foo", 660)  # Error
 31 | os.mknod("foo", 0o660)  # OK
 32 | 
@@ -248,7 +248,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 755 (0o1363) sets permissions: u=-wx, g=rw-, o=-wx
-info: Suggested value of 493 sets permissions: u=rwx, g=r-x, o=r-x
+info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
 33 | os.open("foo", os.O_CREAT, 644)  # Error
 34 | os.open("foo", os.O_CREAT, 0o644)  # OK
 35 | 
@@ -269,7 +269,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 755 (0o1363) sets permissions: u=-wx, g=rw-, o=-wx
-info: Suggested value of 493 sets permissions: u=rwx, g=r-x, o=r-x
+info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
 37 | Path("bar").chmod(0o755)  # OK
 38 | 
 39 | path = Path("bar")
@@ -291,7 +291,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 600 (0o1130) sets permissions: u=--x, g=-wx, o=---
-info: Suggested value of 384 sets permissions: u=rw-, g=---, o=---
+info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
 40 | path.chmod(755)  # Error
 41 | path.chmod(0o755)  # OK
 42 | 
@@ -313,7 +313,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 600 (0o1130) sets permissions: u=--x, g=-wx, o=---
-info: Suggested value of 384 sets permissions: u=rw-, g=---, o=---
+info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
 43 | dbm.open("db", "r", 600)  # Error
 44 | dbm.open("db", "r", 0o600)  # OK
 45 | 
@@ -335,7 +335,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 600 (0o1130) sets permissions: u=--x, g=-wx, o=---
-info: Suggested value of 384 sets permissions: u=rw-, g=---, o=---
+info: Suggested value of 0o600 sets permissions: u=rw-, g=---, o=---
 46 | dbm.gnu.open("db", "r", 600)  # Error
 47 | dbm.gnu.open("db", "r", 0o600)  # OK
 48 | 
@@ -357,7 +357,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 256 (0o400) sets permissions: u=r--, g=---, o=---
-info: Suggested value of 256 sets permissions: u=r--, g=---, o=---
+info: Suggested value of 0o400 sets permissions: u=r--, g=---, o=---
 49 | dbm.ndbm.open("db", "r", 600)  # Error
 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
 51 | 
@@ -379,7 +379,7 @@ RUF064 [*] Non-octal mode
    |
 help: Replace with octal literal
 info: Current value of mode 493 (0o755) sets permissions: u=rwx, g=r-x, o=r-x
-info: Suggested value of 493 sets permissions: u=rwx, g=r-x, o=r-x
+info: Suggested value of 0o755 sets permissions: u=rwx, g=r-x, o=r-x
 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
 51 | 
 52 | os.fchmod(0, 256)  # 0o400
