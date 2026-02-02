@@ -745,63 +745,26 @@ items = {(123)}
 
 ### Long lambda expressions
 
-In [preview](../preview.md), Ruff will keep lambda parameters on a single line,
-just like Black:
+Both Ruff and Black will keep lambda parameters on a single
+line. However, if the body expression exceeds the configured line length,
+Ruff will additionally add parentheses around the lambda body and break
+it over multiple lines:
+
 
 ```python
-# Input
+# Ruff
 def a():
     return b(
         c,
         d,
         e,
-        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ),
-    )
-
-# Ruff Stable
-def a():
-    return b(
-        c,
-        d,
-        e,
-        f=lambda self,
-        *args,
-        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
-    )
-
-# Black and Ruff Preview
-def a():
-    return b(
-        c,
-        d,
-        e,
-        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ),
-    )
-```
-
-However, if the body expression exceeds the configured line length, Ruff will
-additionally add parentheses around the lambda body and break it over multiple
-lines:
-
-```python
-# Input
-def a():
-    return b(
-        c,
-        d,
-        e,
-        # Additional `b` character pushes this over the line length
-        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
+        f=lambda self, *args, **kwargs: (
+            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
         ),
         # More complex expressions also trigger wrapping
-        g=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ) + 1,
+        g=lambda self, *args, **kwargs: (
+            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+        ),
     )
 
 # Black
@@ -810,8 +773,7 @@ def a():
         c,
         d,
         e,
-        # Additional `b` character pushes this over the line length
-        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
             *args, **kwargs
         ),
         # More complex expressions also trigger wrapping
