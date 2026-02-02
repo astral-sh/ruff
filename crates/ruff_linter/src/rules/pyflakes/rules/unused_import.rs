@@ -167,7 +167,7 @@ impl Violation for UnusedImport {
                     "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
                 )
             }
-            UnusedImportContext::DunderInitFirstParty { .. } => {
+            UnusedImportContext::DunderInitSamePackage { .. } => {
                 format!(
                     "`{name}` imported but unused; consider removing, adding to `__all__`, or using a redundant alias"
                 )
@@ -187,11 +187,11 @@ impl Violation for UnusedImport {
         } = self;
         if *ignore_init_module_imports {
             match context {
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::Zero,
                     submodule_import: false,
                 } => return Some(format!("Use an explicit re-export: `{module} as {module}`")),
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::Zero,
                     submodule_import: true,
                 } => {
@@ -203,11 +203,11 @@ impl Violation for UnusedImport {
                             .expect("Expected all submodule imports to contain a '.'")
                     ));
                 }
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::One,
                     submodule_import: false,
                 } => return Some(format!("Add unused import `{binding}` to __all__")),
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::One,
                     submodule_import: true,
                 } => {
@@ -219,7 +219,7 @@ impl Violation for UnusedImport {
                             .expect("Expected all submodule imports to contain a '.'")
                     ));
                 }
-                UnusedImportContext::DunderInitFirstParty {
+                UnusedImportContext::DunderInitSamePackage {
                     dunder_all_count: DunderAllCount::Many,
                     submodule_import: _,
                 }
@@ -259,7 +259,7 @@ enum UnusedImportContext {
     /// The unused import occurs inside an except handler
     ExceptHandler,
     /// The unused import is a first-party import in an `__init__.py` file
-    DunderInitFirstParty {
+    DunderInitSamePackage {
         dunder_all_count: DunderAllCount,
         submodule_import: bool,
     },
@@ -422,8 +422,12 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     // So we look up the name `a` and see if it has
                     // a reference in `__all__`.
                     && (!is_refined_submodule_import_match_enabled(checker.settings())||!symbol_used_in_dunder_all(checker.semantic(), &binding))
+                    && isort::categorize::same_package(
+                        checker.package(),
+                        &binding.import.source_name()[0],
+                    )
                 {
-                    UnusedImportContext::DunderInitFirstParty {
+                    UnusedImportContext::DunderInitSamePackage {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
                         submodule_import: binding.import.is_submodule_import(),
                     }
@@ -432,7 +436,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                 };
                 (binding, context)
             })
-            .partition(|(_, context)| context.is_dunder_init_first_party() && preview_mode);
+            .partition(|(_, context)| context.is_dunder_init_same_package() && preview_mode);
 
         // generate fixes that are shared across bindings in the statement
         let (fix_remove, fix_reexport) =
