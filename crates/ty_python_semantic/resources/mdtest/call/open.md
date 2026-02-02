@@ -8,9 +8,9 @@ type aliases. However, we also do not emit false-positive diagnostics on common 
 ```py
 import pickle
 
-reveal_type(open(""))  # revealed: TextIOWrapper[_WrappedBuffer]
-reveal_type(open("", "r"))  # revealed: TextIOWrapper[_WrappedBuffer]
-reveal_type(open("", "rb"))  # revealed: BufferedReader[_BufferedReaderStream]
+reveal_type(open(""))  # revealed: TextIOWrapper[_WrappedBuffer & Unknown]
+reveal_type(open("", "r"))  # revealed: TextIOWrapper[_WrappedBuffer & Unknown]
+reveal_type(open("", "rb"))  # revealed: BufferedReader[_BufferedReaderStream & Unknown]
 
 with open("foo.pickle", "rb") as f:
     x = pickle.load(f)  # fine
@@ -27,9 +27,9 @@ The same is true for `os.fdopen()`:
 import pickle
 import os
 
-reveal_type(os.fdopen(0))  # revealed: TextIOWrapper[_WrappedBuffer]
-reveal_type(os.fdopen(0, "r"))  # revealed: TextIOWrapper[_WrappedBuffer]
-reveal_type(os.fdopen(0, "rb"))  # revealed: BufferedReader[_BufferedReaderStream]
+reveal_type(os.fdopen(0))  # revealed: TextIOWrapper[_WrappedBuffer & Unknown]
+reveal_type(os.fdopen(0, "r"))  # revealed: TextIOWrapper[_WrappedBuffer & Unknown]
+reveal_type(os.fdopen(0, "rb"))  # revealed: BufferedReader[_BufferedReaderStream & Unknown]
 
 with os.fdopen(0, "rb") as f:
     x = pickle.load(f)  # fine
@@ -43,9 +43,9 @@ And similarly for `Path.open()`:
 from pathlib import Path
 import pickle
 
-reveal_type(Path("").open())  # revealed: TextIOWrapper[_WrappedBuffer]
-reveal_type(Path("").open("r"))  # revealed: TextIOWrapper[_WrappedBuffer]
-reveal_type(Path("").open("rb"))  # revealed: BufferedReader[_BufferedReaderStream]
+reveal_type(Path("").open())  # revealed: TextIOWrapper[_WrappedBuffer & Unknown]
+reveal_type(Path("").open("r"))  # revealed: TextIOWrapper[_WrappedBuffer & Unknown]
+reveal_type(Path("").open("rb"))  # revealed: BufferedReader[_BufferedReaderStream & Unknown]
 
 with Path("foo.pickle").open("rb") as f:
     x = pickle.load(f)  # fine
