@@ -9392,15 +9392,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let propagatable_kind = decorated_ty
-            .try_upcast_to_callable(self.db())
-            .and_then(CallableTypes::exactly_one)
-            .and_then(|callable| match callable.kind(self.db()) {
-                kind @ (CallableTypeKind::FunctionLike
-                | CallableTypeKind::StaticMethodLike
-                | CallableTypeKind::ClassMethodLike) => Some(kind),
-                _ => None,
-            });
+        // For FunctionLiteral, get the kind directly without computing the full signature.
+        // This avoids a query cycle when the function has default parameter values, since
+        // computing the signature requires evaluating those defaults which may trigger
+        // deferred inference.
+        let propagatable_kind = match decorated_ty {
+            Type::FunctionLiteral(func) => {
+                let db = self.db();
+                if func.is_classmethod(db) {
+                    Some(CallableTypeKind::ClassMethodLike)
+                } else if func.is_staticmethod(db) {
+                    Some(CallableTypeKind::StaticMethodLike)
+                } else {
+                    Some(CallableTypeKind::FunctionLike)
+                }
+            }
+            _ => decorated_ty
+                .try_upcast_to_callable(self.db())
+                .and_then(CallableTypes::exactly_one)
+                .and_then(|callable| match callable.kind(self.db()) {
+                    kind @ (CallableTypeKind::FunctionLike
+                    | CallableTypeKind::StaticMethodLike
+                    | CallableTypeKind::ClassMethodLike) => Some(kind),
+                    _ => None,
+                }),
+        };
 
         // Check if this is a class-like type that should use constructor call handling.
         let class = match decorator_ty {
