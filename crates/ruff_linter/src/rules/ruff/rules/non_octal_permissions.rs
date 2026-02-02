@@ -111,12 +111,11 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
         return;
     }
 
+    let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
+
     let Some(mode) = int.as_u16() else {
-        checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
         return;
     };
-
-    let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
 
     diagnostic.info(format!(
         "Current value of mode {mode_literal} ({:#o}) sets permissions: {})",
