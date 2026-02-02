@@ -90,10 +90,15 @@ pub(crate) fn implicit_string_concatenation_in_collection_literal(
             continue;
         }
 
-        let mut diagnostic = checker.report_diagnostic(
+        let (mut diagnostic, fix_title) = checker.report_custom_diagnostic(
             ImplicitStringConcatenationInCollectionLiteral,
             string_like.range(),
         );
+        diagnostic.before_drop(move |diag| {
+            if let Some(fix_title) = &fix_title {
+                diag.help(fix_title);
+            }
+        });
         diagnostic.help("Did you forget a comma?");
         diagnostic.set_fix(Fix::unsafe_edits(
             Edit::insertion("(".to_string(), string_like.range().start()),

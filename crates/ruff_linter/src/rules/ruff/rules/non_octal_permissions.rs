@@ -111,7 +111,13 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
+    let (mut diagnostic, fix_title) =
+        checker.report_custom_diagnostic(NonOctalPermissions, mode_arg.range());
+    diagnostic.before_drop(move |diag| {
+        if let Some(fix_title) = &fix_title {
+            diag.help(fix_title);
+        }
+    });
 
     let Some(mode) = int.as_u16() else {
         return;
