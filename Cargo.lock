@@ -666,16 +666,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
 name = "colored"
-version = "3.0.0"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
+checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1727,7 +1727,7 @@ checksum = "e04d7f318608d35d4b61ddd75cbdaee86b023ebe2bd5a66ee0915f0bf93095a9"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2942,7 +2942,7 @@ dependencies = [
  "clap",
  "clap_complete_command",
  "clearscreen",
- "colored 3.0.0",
+ "colored 3.1.1",
  "dunce",
  "filetime",
  "globwalk",
@@ -3198,7 +3198,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.10.0",
  "clap",
- "colored 3.0.0",
+ "colored 3.1.1",
  "compact_str",
  "fern",
  "glob",
@@ -3592,7 +3592,7 @@ name = "ruff_workspace"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "colored 3.0.0",
+ "colored 3.1.1",
  "etcetera",
  "glob",
  "globset",
@@ -4411,7 +4411,7 @@ dependencies = [
  "clap",
  "clap_complete_command",
  "clearscreen",
- "colored 3.0.0",
+ "colored 3.1.1",
  "crossbeam",
  "ctrlc",
  "dunce",
@@ -4547,7 +4547,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
- "colored 3.0.0",
+ "colored 3.1.1",
  "crossbeam",
  "get-size2",
  "globset",
@@ -4682,7 +4682,7 @@ name = "ty_site_packages"
 version = "0.0.0"
 dependencies = [
  "camino",
- "colored 3.0.0",
+ "colored 3.1.1",
  "get-size2",
  "indexmap",
  "ruff_annotate_snippets",
@@ -4710,7 +4710,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
- "colored 3.0.0",
+ "colored 3.1.1",
  "dunce",
  "insta",
  "memchr",
