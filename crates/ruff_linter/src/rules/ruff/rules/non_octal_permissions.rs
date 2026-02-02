@@ -118,7 +118,7 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     };
 
     diagnostic.info(format!(
-        "Current value of mode {mode_literal} ({:#o}) sets permissions: {})",
+        "Current value of mode {mode_literal} ({:#o}) sets permissions: {}",
         mode & 0o7777,
         get_permissions(mode)
     ));
