@@ -637,8 +637,17 @@ class BadChild(Base):
 
 When a base class has overloads with constrained `self` types (e.g., `self: Base[str]`), the child
 class's override only needs to be compatible with overloads whose self-type constraint is satisfied
-by the child class. For a generic child class `Child(Base[T])`, the overload with `self: Base[str]`
-only applies when `T=str`.
+by the child class.
+
+For concrete child classes like `Child(Base[int])`, overloads with incompatible self-type
+constraints (like `self: Base[str]`) are filtered out - the child doesn't need to satisfy those
+overloads.
+
+TODO: For generic child classes like `Child(Base[T])`, we currently filter out constrained overloads
+entirely (since `Child[T]` is not assignable to `Base[str]` when T is unbound). This matches mypy's
+behavior but is technically unsound: when `T=str`, the child becomes `Child[str]` which IS a
+`Base[str]`, so the constrained overload should apply. A proper fix would require specializing the
+child's method signature and comparing against each applicable overload.
 
 ```toml
 [environment]
