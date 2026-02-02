@@ -147,7 +147,7 @@ assumed to be Python code examples and also formatted.
 * reStructuredText [literal blocks]. While literal blocks may contain things
 other than Python, this is meant to reflect a long-standing convention in the
 Python ecosystem where literal blocks often contain Python code.
-* reStructuredText [`code-block` and `sourcecode` directives]. As with
+* reStructuredText [`code-block` and `sourcecode` directives][directives]. As with
 Markdown, the language names recognized for Python are `python`, `py`,
 `python3`, or `py3`.
 
@@ -223,7 +223,7 @@ def f(x):
 [doctest]: https://docs.python.org/3/library/doctest.html
 [fenced code blocks]: https://spec.commonmark.org/0.30/#fenced-code-blocks
 [literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
-[`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+[directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
 
 ## Format suppression
 
