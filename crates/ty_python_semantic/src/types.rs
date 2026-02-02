@@ -33,7 +33,7 @@ pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     TypeContext, infer_complete_scope_types, infer_deferred_types, infer_definition_types,
-    infer_expression_type, infer_expression_types, infer_scope_types, static_expression_truthiness,
+    infer_expression_type, infer_expression_types, infer_scope_types,
 };
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::{CallableSignature, Signature};
@@ -1221,6 +1221,16 @@ impl<'db> Type<'db> {
         ty
     }
 
+    /// Returns `Some(UnionType)` if this type behaves like a union. Apart from explicit unions,
+    /// this returns `Some` for `TypeAlias`es of unions and `NewType`s of `float` and `complex`.
+    pub(crate) fn as_union_like(self, db: &'db dyn Db) -> Option<UnionType<'db>> {
+        match self.resolve_type_alias(db) {
+            Type::Union(union) => Some(union),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).as_union_like(db),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
@@ -1542,7 +1552,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If the type is a union, filters union elements based on the provided predicate.
+    /// If the type is a union (or a type alias that resolves to a union), filters union elements
+    /// based on the provided predicate.
     ///
     /// Otherwise, returns the type unchanged.
     pub(crate) fn filter_union(
@@ -1550,7 +1561,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
-        if let Type::Union(union) = self {
+        if let Type::Union(union) = self.resolve_type_alias(db) {
             union.filter(db, f)
         } else {
             self
@@ -3265,7 +3276,7 @@ impl<'db> Type<'db> {
             // `float` and not `int | float`). However, all other `NewType` cases need to fall
             // through, because we generally do want e.g. methods that return `Self` to return the
             // `NewType`.
-            Type::NewTypeInstance(new_type_instance) if new_type_instance.base_is_union(db) => {
+            Type::NewTypeInstance(new_type_instance) if self.as_union_like(db).is_some() => {
                 new_type_instance
                     .concrete_base_type(db)
                     .member_lookup_with_policy(db, name, policy)

@@ -2708,8 +2708,9 @@ class Toggle:
         if check(self.y):
             self.y = True
 
-reveal_type(Toggle().x)  # revealed: Literal[True]
-reveal_type(Toggle().y)  # revealed:  Unknown | Literal[True]
+# Literal[True] or undefined
+reveal_type(Toggle().x)  # revealed: Literal[True] | Unknown
+reveal_type(Toggle().y)  # revealed: Unknown | Literal[True]
 ```
 
 Make sure that the growing union of literals `Literal[0, 1, 2, ...]` collapses to `int` during

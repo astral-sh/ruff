@@ -1497,7 +1497,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .negate_if(self.db, !is_positive)
             }
             dynamic @ Type::Dynamic(_) => dynamic,
-            Type::SpecialForm(SpecialFormType::Any) => Type::any(),
             _ => return None,
         };
 
@@ -1528,7 +1527,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
             .map(|ty| {
                 NarrowingConstraints::from_iter([(place, NarrowingConstraint::intersection(ty))])
-            })?;
+            })
+            .unwrap_or_default();
 
         // Narrow tagged unions of `TypedDict`s with `Literal` keys, for example:
         //

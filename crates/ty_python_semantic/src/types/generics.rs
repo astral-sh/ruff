@@ -8,8 +8,9 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
+use crate::node_key::NodeKey;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
@@ -18,16 +19,16 @@ use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
-use crate::types::signatures::Parameters;
+use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeAliasType, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionType, declaration_type, walk_callable_type,
+    CallableType, CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeAliasType,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
+    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_callable_type,
     walk_manual_pep_695_type_alias, walk_pep_695_type_alias, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
@@ -65,13 +66,25 @@ pub(crate) fn bind_typevar<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It is always bound to the outermost method in the containing class.
+    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It
+    // is always bound to the outermost method in the nearest enclosing class. The walk looks for a
+    // (function, class) pair in the scope hierarchy. The caller (`typing_self`) is responsible for
+    // ensuring that `containing_scope` starts from the function body scope rather than the scope
+    // where the function is defined, so that the function itself appears in the ancestor chain.
+    //
+    // We also match `FunctionTypeParameters` as a valid inner scope because for generic methods
+    // (e.g., `def foo[T](self) -> Self`), the type-params scope sits between the function body
+    // and the class body in the ancestor chain.
     if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
         for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
             if outer.kind().is_class() {
-                if let NodeWithScopeKind::Function(function) = inner.node() {
-                    let definition = index.expect_single_definition(function);
-                    return Some(typevar.with_binding_context(db, definition));
+                match inner.node() {
+                    NodeWithScopeKind::Function(function)
+                    | NodeWithScopeKind::FunctionTypeParameters(function) => {
+                        let definition = index.expect_single_definition(function);
+                        return Some(typevar.with_binding_context(db, definition));
+                    }
+                    _ => {}
                 }
             }
         }
@@ -88,11 +101,12 @@ pub(crate) fn bind_typevar<'db>(
 /// Create a `typing.Self` type variable for a given class.
 pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
-    function_scope_id: ScopeId,
+    scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    let index = semantic_index(db, function_scope_id.file(db));
+    let file = scope_id.file(db);
+    let index = semantic_index(db, file);
 
     let identity = TypeVarIdentity::new(
         db,
@@ -122,10 +136,50 @@ pub(crate) fn typing_self<'db>(
         None,
     );
 
+    // The `bind_typevar` Self loop walks ancestor scopes looking for a (function, class) pair.
+    // For this to work correctly, the walk must start from the function's own body scope, not the
+    // scope where the function is defined (e.g., the class body), so that the function itself
+    // appears in the ancestor chain. When `typevar_binding_context` is a function definition, we
+    // use the function's body scope; otherwise we fall back to the passed-in scope.
+    //
+    // For example, given:
+    //
+    // ```python
+    // class Outer:
+    //     def method(self) -> None:
+    //         class Inner:
+    //             def get(self) -> Self: ...
+    // ```
+    //
+    // Starting from `get`'s body scope, the ancestor chain is:
+    //
+    //   get body -> Inner class body -> method body -> Outer class body -> module
+    //
+    // The first (function, class) pair found is (get, Inner) -- correct.
+    //
+    // If we instead started from the scope where `get` is defined (i.e., the Inner class body),
+    // the chain would be:
+    //
+    //   Inner class body -> method body -> Outer class body -> module
+    //
+    // and the first match would be (method, Outer) -- wrong.
+    let containing_scope = typevar_binding_context
+        .and_then(|def| {
+            let DefinitionKind::Function(func_ref) = def.kind(db) else {
+                return None;
+            };
+            Some(
+                index.node_scope_by_key(NodeWithScopeKey::Function(NodeKey::from_node_ref(
+                    func_ref,
+                ))),
+            )
+        })
+        .unwrap_or_else(|| scope_id.file_scope_id(db));
+
     bind_typevar(
         db,
         index,
-        function_scope_id.file_scope_id(db),
+        containing_scope,
         typevar_binding_context,
         typevar,
     )
@@ -1841,6 +1895,35 @@ impl<'db> SpecializationBuilder<'db> {
         }
     }
 
+    /// Infer type mappings by comparing formal callable signatures against actual callables.
+    fn infer_from_callable_signature(
+        &mut self,
+        formal: Type<'db>,
+        formal_signature: &CallableSignature<'db>,
+        actual_callables: &CallableTypes<'db>,
+        f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+    ) {
+        let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
+
+        for actual_callable in actual_callables.as_slice() {
+            if formal_is_single_paramspec {
+                let when = actual_callable
+                    .signatures(self.db)
+                    .when_constraint_set_assignable_to(self.db, formal_signature, self.inferable);
+                self.add_type_mappings_from_constraint_set(formal, when, &mut *f);
+            } else {
+                for actual_signature in &actual_callable.signatures(self.db).overloads {
+                    let when = actual_signature.when_constraint_set_assignable_to_signatures(
+                        self.db,
+                        formal_signature,
+                        self.inferable,
+                    );
+                    self.add_type_mappings_from_constraint_set(formal, when, &mut *f);
+                }
+            }
+        }
+    }
+
     /// Infer type mappings for the specialization based on a given type and its declared type.
     pub(crate) fn infer(
         &mut self,
@@ -2209,36 +2292,29 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
+            // When the formal type is a protocol with a `__call__` method, infer the specialization
+            // from matching the actual type's callable signature against the protocol's `__call__`
+            // method signature.
+            (Type::ProtocolInstance(formal_protocol), _) => {
+                let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
+                else {
+                    return Ok(());
+                };
+                let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
+                    return Ok(());
+                };
+                // The `__call__` method is bound to `self`, so we need to bind it to get the
+                // callable signature that the actual type needs to match.
+                let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
+                self.infer_from_callable_signature(formal, formal_signature, &actual_callables, f);
+            }
+
             (Type::Callable(formal_callable), _) => {
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     return Ok(());
                 };
-
-                let formal_callable = formal_callable.signatures(self.db);
-                let formal_is_single_paramspec = formal_callable.is_single_paramspec().is_some();
-
-                for actual_callable in actual_callables.as_slice() {
-                    if formal_is_single_paramspec {
-                        let when = actual_callable
-                            .signatures(self.db)
-                            .when_constraint_set_assignable_to(
-                                self.db,
-                                formal_callable,
-                                self.inferable,
-                            );
-                        self.add_type_mappings_from_constraint_set(formal, when, &mut f);
-                    } else {
-                        for actual_signature in &actual_callable.signatures(self.db).overloads {
-                            let when = actual_signature
-                                .when_constraint_set_assignable_to_signatures(
-                                    self.db,
-                                    formal_callable,
-                                    self.inferable,
-                                );
-                            self.add_type_mappings_from_constraint_set(formal, when, &mut f);
-                        }
-                    }
-                }
+                let formal_signature = formal_callable.signatures(self.db);
+                self.infer_from_callable_signature(formal, formal_signature, &actual_callables, f);
             }
 
             // Expand type aliases in the actual type.

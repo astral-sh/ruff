@@ -3144,12 +3144,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // type parameters from generic classes.
         let preferred_type_mappings = return_with_tcx
             .and_then(|(return_ty, tcx)| {
-                // Expand type aliases to their value types so that union members can be
-                // correctly filtered. This is necessary for PEP 695 type aliases like
-                // `type MaybeList[T] = list[T] | T` where the expanded union contains
-                // class instances that we want to use for specialization inference.
-                let tcx = tcx.resolve_type_alias(self.db);
-
                 tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                     .class_specialization(self.db)?;
 
