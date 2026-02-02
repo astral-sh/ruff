@@ -362,6 +362,24 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
         return;
     }
 
+    // This must come before the context variable check since value is not the context itself
+    if is_get_call_on_context_key(checker, call_expr, "inlet_events") {
+        if let Some(Expr::StringLiteral(ExprStringLiteral { range, .. })) =
+            call_expr.arguments.find_positional(0)
+        {
+            checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: "inlet_events[\"<uri>\"]".to_string(),
+                    replacement: Replacement::Message(
+                        "Accessing `inlet_events` via a string key (URI) is deprecated; use `inlet_events[Asset(\"<uri>\")]` instead.",
+                    ),
+                },
+                *range,
+            );
+            return;
+        }
+    }
+
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
         return;
     };
@@ -418,6 +436,20 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
         return;
     }
 
+    // This must come before the context variable check since value is not the context itself
+    if is_string_subscript_on_context_key(checker, subscript, "inlet_events") {
+        checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: "inlet_events[\"<uri>\"]".to_string(),
+                replacement: Replacement::Message(
+                    "Accessing `inlet_events` via a string key (URI) is deprecated; use `inlet_events[Asset(\"<uri>\")]` instead.",
+                ),
+            },
+            subscript.slice.range(),
+        );
+        return;
+    }
+
     let ExprSubscript { value, slice, .. } = subscript;
 
     let Some(ExprStringLiteral { value: key, .. }) = slice.as_string_literal_expr() else {
@@ -470,9 +502,6 @@ fn check_removed_attribute_access_on_context_key(checker: &Checker, attr_expr: &
             Replacement::Message(
                 "`external_trigger` is removed; it cannot be accessed from `context[\"dag_run\"]`",
             )
-        }
-        "uri" if is_removed_context_key_attribute(checker, attr_expr, "inlet_events", attr) => {
-            Replacement::AttrName("asset.uri")
         }
         _ => return,
     };
@@ -1322,6 +1351,24 @@ fn is_context_key_access(checker: &Checker, expr: &Expr, key: &str) -> bool {
     false
 }
 
+/// Check if an expression is or resolves to an access of a specific context key.
+///
+/// Returns `true` if `expr` is:
+/// - Direct access: `context["key"]` or `context.get("key")`
+/// - Variable bound to context key: `x = context["key"]; x`
+fn is_value_from_context_key(checker: &Checker, expr: &Expr, context_key: &str) -> bool {
+    if is_context_key_access(checker, expr, context_key) {
+        return true;
+    }
+
+    let semantic = checker.semantic();
+    expr.as_name_expr()
+        .and_then(|name| semantic.only_binding(name))
+        .map(|id| semantic.binding(id))
+        .and_then(|binding| typing::find_binding_value(binding, semantic))
+        .is_some_and(|bound_value| is_context_key_access(checker, bound_value, context_key))
+}
+
 /// Check for removed attributes on context key values.
 ///
 /// Returns `true` if `attr_expr` accesses a removed attribute on a context key value,
@@ -1345,18 +1392,39 @@ fn is_removed_context_key_attribute(
         return false;
     }
 
-    let semantic = checker.semantic();
+    is_value_from_context_key(checker, value, context_key)
+}
 
-    // Direct access: context["key"].attr or context.get("key").attr
-    if is_context_key_access(checker, value, context_key) {
-        return true;
+/// Check for string-based subscript access on a context key value.
+fn is_string_subscript_on_context_key(
+    checker: &Checker,
+    subscript_expr: &ExprSubscript,
+    context_key: &str,
+) -> bool {
+    let ExprSubscript { value, slice, .. } = subscript_expr;
+
+    // Must be a string literal (not Dataset(...) or other expression)
+    if !slice.is_string_literal_expr() {
+        return false;
     }
 
-    // Variable bound to context key: x = context["key"]; x.attr
-    value
-        .as_name_expr()
-        .and_then(|name| semantic.only_binding(name))
-        .map(|id| semantic.binding(id))
-        .and_then(|binding| typing::find_binding_value(binding, semantic))
-        .is_some_and(|bound_value| is_context_key_access(checker, bound_value, context_key))
+    is_value_from_context_key(checker, value, context_key)
+}
+
+/// Check for string-based `.get()` call on a context key value.
+fn is_get_call_on_context_key(checker: &Checker, call_expr: &ExprCall, context_key: &str) -> bool {
+    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
+        return false;
+    };
+
+    if attr.as_str() != "get" {
+        return false;
+    }
+
+    // The first argument must be a string literal
+    let Some(Expr::StringLiteral(_)) = call_expr.arguments.find_positional(0) else {
+        return false;
+    };
+
+    is_value_from_context_key(checker, value, context_key)
 }

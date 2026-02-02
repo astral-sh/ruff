@@ -182,22 +182,26 @@ def test_dag_run_external_trigger_get_current_context():
     dag_run = context["dag_run"]
     print(dag_run.external_trigger)
 
-
-# inlet_events.uri
+# inlet_events should be accessed through Asset/Dataset object
 @task
-def test_inlet_events_uri_via_variable(**context):
+def test_inlet_events_string_subscript(**context):
+    print(context["inlet_events"]["this://is-url"])
+    print(context.get("inlet_events")["this://is-url"])
+    print(context["inlet_events"].get("this://is-url"))
+    print(context.get("inlet_events").get("this://is-url"))
+
+
+@task
+def test_inlet_events_string_subscript_via_variable(**context):
     inlet_events = context["inlet_events"]
-    print(inlet_events.uri)
+    print(inlet_events["this://is-url"])
+    print(inlet_events.get("this://is-url"))
+
 
 @task
-def test_inlet_events_uri_direct_subscript(**context):
-    print(context["inlet_events"].uri)
+def test_inlet_events_dataset_subscript_ok(**context):
+    from airflow.datasets import Dataset
+    from airflow.sdk import Asset
 
-@task
-def test_inlet_events_uri_direct_get(**context):
-    print(context.get("inlet_events").uri)
-
-@task
-def test_inlet_events_uri_get_current_context():
-    context = get_current_context()
-    print(context["inlet_events"].uri)
+    print(context["inlet_events"][Dataset("this://is-url")])
+    print(context["inlet_events"][Asset("this://is-url")])
