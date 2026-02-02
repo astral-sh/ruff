@@ -21,8 +21,8 @@ use crate::{
         use_def_map,
     },
     types::{
-        CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type,
+        CallableSignature, CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters,
+        Signature, StaticClassLiteral, Type,
         class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
@@ -309,11 +309,65 @@ fn check_class_declaration<'db>(
             continue;
         }
 
-        let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db) else {
-            continue;
-        };
+        // Check if we need to filter overloads based on self-type constraints.
+        // For example, if the superclass has an overload `def method(self: Base[str], ...) -> None`,
+        // and the child class is `Child(Base[int])`, then this overload doesn't apply to the child.
+        //
+        // We only use the special filtering path for instance methods that have explicit
+        // self-type constraints. For all other cases (classmethods, staticmethods, or methods
+        // without constrained self types), we use the original code path.
+        let superclass_type_as_type = {
+            // Try to get the unbound function and filter its overloads
+            let filtered_callable = (|| {
+                let superclass_member = superclass.own_class_member(db, None, &member.name);
+                let Some(Type::FunctionLiteral(function)) =
+                    superclass_member.ignore_possibly_undefined()
+                else {
+                    return None;
+                };
 
-        let superclass_type_as_type = superclass_type_as_callable.into_type(db);
+                // Only filter for instance methods (not staticmethods or classmethods)
+                if function.is_staticmethod(db) || function.is_classmethod(db) {
+                    return None;
+                }
+
+                // Check if there are any overloads with explicit self-type constraints
+                let signature = function.signature(db);
+                let has_constrained_self = signature.iter().any(|sig| {
+                    sig.parameters()
+                        .as_slice()
+                        .first()
+                        .is_some_and(Parameter::should_annotation_be_displayed)
+                });
+
+                if !has_constrained_self {
+                    return None;
+                }
+
+                // Filter the overloads based on self-type constraints
+                let filtered =
+                    filter_applicable_overloads_for_function(db, function, instance_of_class)?;
+
+                // Bind self and create the callable
+                let bound_signature = filtered.bind_self(db, Some(instance_of_class));
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    bound_signature,
+                    crate::types::CallableTypeKind::FunctionLike,
+                )))
+            })();
+
+            if let Some(callable) = filtered_callable {
+                callable
+            } else {
+                // Fall back to the original code path
+                let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
+                else {
+                    continue;
+                };
+                superclass_type_as_callable.into_type(db)
+            }
+        };
 
         if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
             continue;
@@ -530,6 +584,64 @@ fn extract_underlying_functions<'db>(
         }
         _ => None,
     }
+}
+
+/// Filters overloads of a function type based on constrained self-type annotations.
+///
+/// When a base class has overloads with constrained `self` types (e.g., `self: Base[str]`),
+/// the child class's override only needs to be compatible with overloads whose self-type
+/// constraint is satisfied by the child class.
+///
+/// This function filters the UNBOUND signature (before self is bound) to check the first
+/// parameter's explicit type annotation. Only overloads whose self-type constraint is
+/// satisfied by `child_instance_type` are kept.
+///
+/// Returns `None` if no applicable overloads remain after filtering.
+fn filter_applicable_overloads_for_function<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    child_instance_type: Type<'db>,
+) -> Option<CallableSignature<'db>> {
+    let signature = function.signature(db);
+    let overloads: Vec<_> = signature
+        .iter()
+        .filter(|sig| {
+            // Get the first parameter (self) of this overload from the UNBOUND signature
+            let Some(first_param) = sig.parameters().as_slice().first() else {
+                // No parameters means no self constraint, keep this overload
+                return true;
+            };
+
+            // Only consider explicit self-type annotations.
+            // If the annotation is inferred (the normal case for `self`), keep the overload.
+            if !first_param.should_annotation_be_displayed() {
+                return true;
+            }
+
+            // Get the annotated type of the first parameter
+            let self_annotation = first_param.annotated_type();
+
+            // If the self parameter has no meaningful annotation (Unknown/Any/object),
+            // the overload applies to all instances
+            if self_annotation.is_unknown()
+                || self_annotation.is_object()
+                || self_annotation.is_dynamic()
+            {
+                return true;
+            }
+
+            // Check if the child instance type is assignable to the self annotation.
+            // If it is, this overload applies to the child class.
+            child_instance_type.is_assignable_to(db, self_annotation)
+        })
+        .cloned()
+        .collect();
+
+    if overloads.is_empty() {
+        return None;
+    }
+
+    Some(CallableSignature::from_overloads(overloads))
 }
 
 fn check_post_init_signature<'db>(

@@ -633,6 +633,56 @@ class BadChild(Base):
     def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
 ```
 
+## Overloaded methods with constrained self types
+
+When a base class has overloads with constrained `self` types (e.g., `self: Base[str]`), the child
+class's override only needs to be compatible with overloads whose self-type constraint is satisfied
+by the child class. For a generic child class `Child(Base[T])`, the overload with `self: Base[str]`
+only applies when `T=str`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    @overload
+    def method(self, arg: T) -> None: ...
+    @overload
+    def method(self: "Base[str]", arg: str, extra: str) -> None: ...
+    def method(self, arg: Any, extra: str = "") -> None:
+        pass
+
+class Child(Base[T]):
+    # This should be valid: when T=str, the str-constrained overload applies
+    # and this signature is compatible. When T!=str, only the first overload
+    # applies, and this is also compatible.
+    def method(self, arg: T, extra: str = "") -> None:
+        pass
+
+# Concrete child class that specializes to str - the constrained overload applies
+class StrChild(Base[str]):
+    # Valid: must be compatible with both overloads since T=str
+    def method(self, arg: str, extra: str = "") -> None:
+        pass
+
+class BadStrChild(Base[str]):
+    # error: [invalid-method-override]
+    def method(self, arg: str) -> None:
+        pass
+
+# Concrete child class that specializes to int - the constrained overload doesn't apply
+class IntChild(Base[int]):
+    # Valid: only needs to be compatible with the first overload (T=int)
+    def method(self, arg: int) -> None:
+        pass
+```
+
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
