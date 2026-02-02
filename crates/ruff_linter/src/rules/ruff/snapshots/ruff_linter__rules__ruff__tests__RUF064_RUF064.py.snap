@@ -399,7 +399,7 @@ RUF064 [*] Non-octal mode
 57 | os.chmod("foo", 0000)  # Error
    |
 help: Replace with octal literal
-info: Current value of 000 (0o0) sets permissions: u=---, g=---, o=---
+info: Current value of 000 (0o000) sets permissions: u=---, g=---, o=---
 53 | os.fchmod(0, 493)  # 0o755
 54 | 
 55 | # https://github.com/astral-sh/ruff/issues/19010
@@ -420,7 +420,7 @@ RUF064 [*] Non-octal mode
 59 | os.chmod("foo", 0b0)  # Error
    |
 help: Replace with octal literal
-info: Current value of 0000 (0o0) sets permissions: u=---, g=---, o=---
+info: Current value of 0000 (0o000) sets permissions: u=---, g=---, o=---
 54 | 
 55 | # https://github.com/astral-sh/ruff/issues/19010
 56 | os.chmod("foo", 000)  # Error
@@ -441,7 +441,7 @@ RUF064 Non-octal mode
 61 | os.chmod("foo", 0)  # Ok
    |
 help: Replace with octal literal
-info: Current value of 0b0 (0o0) sets permissions: u=---, g=---, o=---
+info: Current value of 0b0 (0o000) sets permissions: u=---, g=---, o=---
 
 RUF064 Non-octal mode
   --> RUF064.py:60:17
@@ -452,4 +452,4 @@ RUF064 Non-octal mode
 61 | os.chmod("foo", 0)  # Ok
    |
 help: Replace with octal literal
-info: Current value of 0x0 (0o0) sets permissions: u=---, g=---, o=---
+info: Current value of 0x0 (0o000) sets permissions: u=---, g=---, o=---

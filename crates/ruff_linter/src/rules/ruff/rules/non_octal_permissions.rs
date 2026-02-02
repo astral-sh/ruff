@@ -118,7 +118,7 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     };
 
     diagnostic.info(format!(
-        "Current value of {mode_literal} ({:#o}) sets permissions: {}",
+        "Current value of {mode_literal} ({:#05o}) sets permissions: {}",
         mode & 0o7777,
         get_permissions(mode)
     ));
@@ -139,7 +139,7 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     };
     let suggested_permissions = get_permissions(suggested);
     diagnostic.info(format!(
-        "Suggested value of {suggested:#o} sets permissions: {suggested_permissions}"
+        "Suggested value of {suggested:#05o} sets permissions: {suggested_permissions}"
     ));
     let edit = Edit::range_replacement(format!("{suggested:#o}"), mode_arg.range());
     diagnostic.set_fix(Fix::unsafe_edit(edit));
