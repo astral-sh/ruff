@@ -920,6 +920,7 @@ declare_lint! {
     ///
     /// Functions with empty bodies are permitted in certain contexts where they serve as
     /// declarations rather than implementations:
+    ///
     /// - Functions in stub files (`.pyi`)
     /// - Methods in Protocol classes
     /// - Abstract methods decorated with `@abstractmethod`
