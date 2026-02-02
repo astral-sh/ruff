@@ -209,7 +209,7 @@ use crate::semantic_index::predicate::{
 };
 use crate::types::{
     CallableTypes, IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
-    infer_expression_type, static_expression_truthiness,
+    infer_expression_type,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -329,7 +329,15 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
     match kind {
         PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
         PatternPredicateKind::Value(value) => {
-            infer_expression_type(db, *value, TypeContext::default())
+            let ty = infer_expression_type(db, *value, TypeContext::default());
+            // Only return the type if it's single-valued. For non-single-valued types
+            // (like `str`), we can't definitively exclude any specific type from
+            // subsequent patterns because the pattern could match any value of that type.
+            if ty.is_single_valued(db) {
+                ty
+            } else {
+                Type::Never
+            }
         }
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
@@ -856,7 +864,9 @@ impl ReachabilityConstraints {
 
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
-                static_expression_truthiness(db, test_expr).negate_if(!predicate.is_positive)
+                infer_expression_type(db, test_expr, TypeContext::default())
+                    .bool(db)
+                    .negate_if(!predicate.is_positive)
             }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,

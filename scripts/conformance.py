@@ -462,6 +462,7 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--ignore=assert-type-unspellable-subtype",
+            "--error=invalid-legacy-positional-parameter",
             "--exit-zero",
             *map(str, test_files),
         ],

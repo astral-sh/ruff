@@ -526,6 +526,15 @@ impl<'db> SemanticIndex<'db> {
         self.scopes_by_node.get(&node.node_key()).copied()
     }
 
+    /// Returns the id of the scope that the node identified by `key` creates.
+    ///
+    /// This is useful when you have a [`NodeWithScopeKey`] constructed from an
+    /// [`AstNodeRef`](crate::ast_node_ref::AstNodeRef) and want to avoid loading
+    /// the parsed module just to look up the scope.
+    pub(crate) fn node_scope_by_key(&self, key: NodeWithScopeKey) -> FileScopeId {
+        self.scopes_by_node[&key]
+    }
+
     /// Checks if there is an import of `__future__.annotations` in the global scope, which affects
     /// the logic for type inference.
     pub(super) fn has_future_annotations(&self) -> bool {
