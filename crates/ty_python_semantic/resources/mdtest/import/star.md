@@ -158,7 +158,7 @@ from collections import OrderedDict
 from collections import OrderedDict as Foo
 
 A, B = 1, (C := 2)
-D: (E := 4) = (F := 5)  # error: [invalid-type-form]
+D: (E := 4) = (F := 5)  # error: [invalid-type-form]  # fmt:skip
 
 for G in [1]:
     ...
