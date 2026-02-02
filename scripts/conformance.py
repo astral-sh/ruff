@@ -454,7 +454,11 @@ def collect_ty_diagnostics(
     source: Source,
     test_files: Sequence[Path],
     python_version: str = "3.12",
+    extra_search_paths: Sequence[Path] = (),
 ) -> list[Diagnostic]:
+    extra_search_path_args = [
+        f"--extra-search-path={path}" for path in extra_search_paths
+    ]
     process = subprocess.run(
         [
             *ty_path,
@@ -464,6 +468,7 @@ def collect_ty_diagnostics(
             "--ignore=assert-type-unspellable-subtype",
             "--error=invalid-legacy-positional-parameter",
             "--exit-zero",
+            *extra_search_path_args,
             *map(str, test_files),
         ],
         capture_output=True,
@@ -819,11 +824,14 @@ def main():
 
     expected = collect_expected_diagnostics(test_files)
 
+    extra_search_paths = [tests_dir / "tests"]
+
     old = collect_ty_diagnostics(
         ty_path=args.old_ty,
         test_files=test_files,
         source=Source.OLD,
         python_version=args.python_version,
+        extra_search_paths=extra_search_paths,
     )
 
     new = collect_ty_diagnostics(
@@ -831,6 +839,7 @@ def main():
         test_files=test_files,
         source=Source.NEW,
         python_version=args.python_version,
+        extra_search_paths=extra_search_paths,
     )
 
     grouped = group_diagnostics_by_key(
