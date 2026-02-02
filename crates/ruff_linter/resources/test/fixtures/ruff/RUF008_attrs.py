@@ -2,6 +2,7 @@ import typing
 from typing import ClassVar, Sequence
 
 import attr
+import attrs
 from attr import s
 from attrs import define, frozen
 
@@ -45,3 +46,33 @@ class D:
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
     class_variable: ClassVar[list[int]] = []
+
+
+# Mutable defaults wrapped in field() calls
+@define
+class E:
+    mutable_default: list[int] = attrs.field(default=[])
+    mutable_default2: dict[str, int] = attrs.field(default={})
+    mutable_default3: set[int] = attrs.field(default=set())
+    mutable_default4: dict[str, int] = attrs.field(default=dict())
+    correct_factory: list[int] = attrs.field(factory=list)
+    immutable_default: tuple[int, ...] = attrs.field(default=())
+    immutable_default2: str = attrs.field(default="hello")
+    immutable_default3: int = attrs.field(default=1)
+    non_mutable_var: list[int] = attrs.field(default=KNOWINGLY_MUTABLE_DEFAULT)
+    class_variable: ClassVar[list[int]] = attrs.field(default=[])
+
+
+@attr.s
+class F:
+    mutable_default: list[int] = attr.ib(default=[])
+    mutable_default2: dict[str, int] = attr.ib(default={})
+    correct_factory: list[int] = attr.ib(factory=list)
+    immutable_default: tuple[int, ...] = attr.ib(default=())
+
+
+@attr.s
+class G:
+    mutable_default: list[int] = attr.attrib(default=[])
+    mutable_default2: set[int] = attr.attrib(default=set())
+    correct_factory: list[int] = attr.attrib(factory=list)
