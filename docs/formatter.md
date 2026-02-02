@@ -227,10 +227,10 @@ def f(x):
 
 ## Markdown code formatting
 
-*Formatting for markdown code blocks is currently only available in [preview mode](preview.md#preview).*
+*Formatting for Markdown code blocks is currently only available in [preview mode](preview.md#preview).*
 
-The Ruff formatter can also format any Markdown file with a `.md` filename
-extension. In these files, Ruff will format any CommonMark [fenced code blocks][]
+The Ruff formatter can also format Markdown files with a `.md` extension.
+In these files, Ruff will format any CommonMark [fenced code blocks][]
 with the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`.
 Fenced code blocks without an info string are assumed to be Python code examples
 and will also be formatted.
@@ -241,7 +241,7 @@ reformatted code would produce an invalid Python program.
 
 Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
 the normal Python code formatting style, while any code blocks marked with
-`pyi` will be formatted with the alternate "Python stub" code style.
+`pyi` will be formatted like Python type stub files.
 
 While [formatting suppression](#format-suppression) comments will be handled as
 usual within code blocks, the formatter will also skip formatting any code block
