@@ -125,7 +125,7 @@ But not at the end of the f-string:
 ```py
 a = f"""
 {
-  10 / 0  # error: [division-by-zero]
+    10 / 0  # error: [division-by-zero]
 }
 """  # error: [unused-type-ignore-comment]  # type: ignore
 ```

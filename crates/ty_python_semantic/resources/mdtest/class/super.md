@@ -639,8 +639,10 @@ def coinflip() -> bool:
 def f():
     if coinflip():
         class A: ...
+
     else:
         class A: ...
+
     super(A, A())  # error: [invalid-super-argument]
 ```
 

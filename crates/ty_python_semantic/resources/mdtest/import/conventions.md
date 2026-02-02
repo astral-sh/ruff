@@ -212,7 +212,7 @@ reveal_type(Foo)  # revealed: <class 'Foo'>
 ```pyi
 from b import Foo
 
-__all__ = ['Foo']
+__all__ = ["Foo"]
 ```
 
 `b.pyi`:
