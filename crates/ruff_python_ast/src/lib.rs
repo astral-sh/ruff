@@ -43,6 +43,8 @@ pub enum SourceType {
     Python(PySourceType),
     /// The file contains TOML.
     Toml(TomlSourceType),
+    /// The file contains Markdown.
+    Markdown,
 }
 
 impl Default for SourceType {
@@ -59,6 +61,7 @@ impl<P: AsRef<Path>> From<P> for SourceType {
             Some(filename) if filename == "poetry.lock" => Self::Toml(TomlSourceType::Poetry),
             _ => match path.as_ref().extension() {
                 Some(ext) if ext == "toml" => Self::Toml(TomlSourceType::Unrecognized),
+                Some(ext) if ext == "md" => Self::Markdown,
                 _ => Self::Python(PySourceType::from(path)),
             },
         }

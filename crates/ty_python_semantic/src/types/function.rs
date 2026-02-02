@@ -68,10 +68,12 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
-    report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
-    report_invalid_total_ordering_call,
+    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
+    report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
+    report_issubclass_check_against_protocol_with_non_method_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
+    report_runtime_check_against_typed_dict,
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
@@ -88,7 +90,8 @@ use crate::types::{
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, binding_type, definition_expression_type, infer_definition_types, walk_signature,
+    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_definition_types,
+    walk_signature,
 };
 use crate::{Db, FxOrderSet};
 
@@ -432,7 +435,7 @@ impl<'db> OverloadLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+    pub(super) fn raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
         /// - No parameters in the method use PEP-570 syntax AND
@@ -461,7 +464,7 @@ impl<'db> OverloadLiteral<'db> {
                 return false;
             }
 
-            if literal.is_staticmethod(db) {
+            if literal.is_staticmethod(db) && literal.name(db) != "__new__" {
                 return false;
             }
 
@@ -786,6 +789,72 @@ impl<'db> FunctionLiteral<'db> {
     /// over-invalidation.
     fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.last_definition(db).raw_signature(db)
+    }
+
+    /// Return `Some()` if this function is an abstract method.
+    ///
+    /// A method can be abstract if it is explicitly decorated with `@abstractmethod`,
+    /// or if it is an overloaded `Protocol` method without an implementation,
+    /// or if it is a `Protocol` method with a body that solely consists of `pass`/`...`
+    /// statements, or if it is a `Protocol` method that only has a docstring,
+    /// or if it is a `Protocol` method whose body only consists of a single
+    /// `raise NotImplementedError` statement.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn as_abstract_method(
+        self,
+        db: &'db dyn Db,
+        enclosing_class: ClassType<'db>,
+    ) -> Option<AbstractMethodKind> {
+        if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
+            return Some(AbstractMethodKind::Explicit);
+        }
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        if file.is_stub(db) {
+            return None;
+        }
+        if !enclosing_class.is_protocol(db) {
+            return None;
+        }
+        let (_, implementation) = self.overloads_and_implementation(db);
+        let Some(implementation) = implementation else {
+            return Some(AbstractMethodKind::ImplicitDueToStubBody);
+        };
+        let module = parsed_module(db, file).load(db);
+        let node = implementation.node(db, file, &module);
+        let body_kind = function_body_kind(db, node, |expr| {
+            definition_expression_type(db, definition, expr)
+        });
+        match body_kind {
+            FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
+            FunctionBodyKind::AlwaysRaisesNotImplementedError => {
+                Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
+            }
+            FunctionBodyKind::Regular => None,
+        }
+    }
+}
+
+/// Indicates whether a method is explicitly or implicitly abstract.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(super) enum AbstractMethodKind {
+    /// The method is explicitly marked as abstract using `@abstractmethod`.
+    Explicit,
+    /// The method is implicitly abstract due to being in a `Protocol` class without an
+    /// implementation.
+    ImplicitDueToStubBody,
+    /// The method is implicitly abstract due to being in a `Protocol` class with a body that
+    /// solely consists of `raise NotImplementedError` statements.
+    ImplicitDueToAlwaysRaising,
+}
+
+impl AbstractMethodKind {
+    pub(super) const fn is_explicit(self) -> bool {
+        matches!(self, AbstractMethodKind::Explicit)
+    }
+
+    pub(super) const fn is_implicit_due_to_stub_body(self) -> bool {
+        matches!(self, AbstractMethodKind::ImplicitDueToStubBody)
     }
 }
 
@@ -1197,6 +1266,14 @@ impl<'db> FunctionType<'db> {
             updated_last_definition_signature,
         ))
     }
+
+    pub(super) fn as_abstract_method(
+        self,
+        db: &'db dyn Db,
+        enclosing_class: ClassType<'db>,
+    ) -> Option<AbstractMethodKind> {
+        self.literal(db).as_abstract_method(db, enclosing_class)
+    }
 }
 
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
@@ -1311,6 +1388,73 @@ fn last_definition_signature_cycle_initial<'db>(
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
     Signature::bottom()
+}
+
+/// Classify the body of this function:
+/// - [`FunctionBodyKind::Stub`] if it is a stub function (i.e., only contains `pass` or `...`
+/// - [`FunctionBodyKind::AlwaysRaisesNotImplementedError`] if it consists of a single
+///   `raise NotImplementedError` statement
+/// - [`FunctionBodyKind::Regular`] otherwise
+///
+/// In all cases, we allow a docstring as the first statement in the function body;
+/// the analysis is only done on the remaining statements if the first is a docstring.
+pub(super) fn function_body_kind<'db>(
+    db: &'db dyn Db,
+    node: &ast::StmtFunctionDef,
+    infer_type: impl Fn(&ast::Expr) -> Type<'db>,
+) -> FunctionBodyKind {
+    // Allow docstrings, but only as the first statement.
+    let suite = if let Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) = node.body.first()
+        && value.is_string_literal_expr()
+    {
+        &node.body[1..]
+    } else {
+        &node.body[..]
+    };
+
+    if suite.iter().all(|stmt| match stmt {
+        ast::Stmt::Pass(_) => true,
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+        _ => false,
+    }) {
+        return FunctionBodyKind::Stub;
+    }
+
+    if let [ast::Stmt::Raise(raise)] = suite
+        && let ast::StmtRaise {
+            exc: Some(exc),
+            cause: None,
+            node_index: _,
+            range: _,
+        } = raise
+        && infer_type(exc).is_subtype_of(
+            db,
+            UnionType::from_elements(
+                db,
+                [
+                    KnownClass::NotImplementedError.to_class_literal(db),
+                    KnownClass::NotImplementedError.to_instance(db),
+                ],
+            ),
+        )
+    {
+        return FunctionBodyKind::AlwaysRaisesNotImplementedError;
+    }
+
+    FunctionBodyKind::Regular
+}
+
+/// Classification of function body kinds.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum FunctionBodyKind {
+    /// The function body only consists of `...`, `pass`, and/or a docstring.
+    Stub,
+    /// The function body consists of a single `raise NotImplementedError` statement,
+    /// possibly preceded by a docstring.
+    AlwaysRaisesNotImplementedError,
+    /// Any function body that is not a stub and does not consist of a single
+    /// `raise NotImplementedError` statement.
+    Regular,
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
@@ -1557,8 +1701,13 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
                     return;
                 }
-                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                {
+                let diagnostic =
+                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(db, *asserted_ty) {
+                        &TYPE_ASSERTION_FAILURE
+                    } else {
+                        &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
+                    };
+                if let Some(builder) = context.report_lint(diagnostic, call_expression) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
                         asserted_ty.display(db),
@@ -1840,15 +1989,33 @@ impl KnownFunction {
 
                 match second_argument {
                     Type::ClassLiteral(class) => {
-                        if let Some(protocol_class) = class.into_protocol_class(db)
-                            && !protocol_class.is_runtime_checkable(db)
-                        {
-                            report_runtime_check_against_non_runtime_checkable_protocol(
+                        if class.is_typed_dict(db) {
+                            report_runtime_check_against_typed_dict(
                                 context,
                                 call_expression,
-                                protocol_class,
+                                *class,
                                 self,
                             );
+                        } else if let Some(protocol_class) = class.into_protocol_class(db) {
+                            if !protocol_class.is_runtime_checkable(db) {
+                                report_runtime_check_against_non_runtime_checkable_protocol(
+                                    context,
+                                    call_expression,
+                                    protocol_class,
+                                    self,
+                                );
+                            } else if self == KnownFunction::IsSubclass {
+                                let non_method_members =
+                                    protocol_class.interface(db).non_method_members(db);
+                                if !non_method_members.is_empty() {
+                                    report_issubclass_check_against_protocol_with_non_method_members(
+                                        context,
+                                        call_expression,
+                                        protocol_class,
+                                        &non_method_members,
+                                    );
+                                }
+                            }
                         }
 
                         if self == KnownFunction::IsInstance {
@@ -2017,6 +2184,10 @@ impl KnownFunction {
             _ => {}
         }
     }
+
+    pub(crate) fn name(self) -> &'static str {
+        self.into()
+    }
 }
 
 #[cfg(test)]
@@ -2032,7 +2203,7 @@ pub(crate) mod tests {
         let db = setup_db();
 
         for function in KnownFunction::iter() {
-            let function_name: &'static str = function.into();
+            let function_name = function.name();
 
             let module = match function {
                 KnownFunction::Len

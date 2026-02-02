@@ -13,6 +13,7 @@ use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    YieldOutsideFunctionKind,
 };
 use ruff_text_size::TextRange;
 use ty_module_resolver::{ModuleName, resolve_module};
@@ -24,11 +25,13 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
-    DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
@@ -753,6 +756,59 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.try_node_context_stack_manager = try_node_stack_manager;
 
         (definition, num_definitions)
+    }
+
+    // Creates a definition for each key-value assignment in the dictionary.
+    //
+    // If there are multiple targets, a given key-value definition will be created multiple
+    // times for each target.
+    fn add_dict_key_assignment_definitions(
+        &mut self,
+        targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for target in targets {
+            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+                self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
+            }
+        }
+    }
+
+    fn add_dict_key_assignment_definitions_impl(
+        &mut self,
+        target: &MemberExprBuilder,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for item in &dict.items {
+            let Some(key) = item.key.as_ref() else {
+                continue;
+            };
+
+            let Some(member_expr) = MemberExprBuilder::visit_subscript_expr(target.clone(), key)
+            else {
+                continue;
+            };
+
+            // Recurse into nested dictionaries.
+            if let ast::Expr::Dict(dict_value) = &item.value {
+                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
+            }
+
+            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
+                let place_id = self.add_place(place_expr);
+
+                self.add_definition(
+                    place_id,
+                    DictKeyAssignmentNodeRef {
+                        key,
+                        assignment,
+                        value: &item.value,
+                    },
+                );
+            }
+        }
     }
 
     fn record_expression_narrowing_constraint(
@@ -2480,7 +2536,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_definition {
                         match self.current_assignment() {
                             Some(CurrentAssignment::Assign { node, unpack }) => {
-                                self.add_definition(
+                                let assignment = self.add_definition(
                                     place_id,
                                     AssignmentDefinitionNodeRef {
                                         unpack,
@@ -2488,10 +2544,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         target: expr,
                                     },
                                 );
+
+                                if let ast::Expr::Dict(dict) = &*node.value {
+                                    self.add_dict_key_assignment_definitions(
+                                        &node.targets,
+                                        dict,
+                                        assignment,
+                                    );
+                                }
                             }
                             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                                 self.add_standalone_type_expression(&ann_assign.annotation);
-                                self.add_definition(
+                                let assignment = self.add_definition(
                                     place_id,
                                     AnnotatedAssignmentDefinitionNodeRef {
                                         node: ann_assign,
@@ -2500,6 +2564,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         target: expr,
                                     },
                                 );
+
+                                if let Some(ast::Expr::Dict(dict)) = ann_assign.value.as_deref() {
+                                    self.add_dict_key_assignment_definitions(
+                                        [&*ann_assign.target],
+                                        dict,
+                                        assignment,
+                                    );
+                                }
                             }
                             Some(CurrentAssignment::AugAssign(aug_assign)) => {
                                 self.add_definition(place_id, aug_assign);
@@ -2916,6 +2988,17 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        // TODO(brent) The long-term fix for this is for `YieldOutsideFunction` not to apply to
+        // `await` at all and only to emit the more specific `AwaitOutsideAsyncFunction` instead.
+        // However, to preserve backwards compatibility with the corresponding Ruff rules, we
+        // temporarily filter out the diagnostic for ty instead.
+        if matches!(
+            error.kind,
+            SemanticSyntaxErrorKind::YieldOutsideFunction(YieldOutsideFunctionKind::Await)
+        ) {
+            return;
+        }
+
         if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }

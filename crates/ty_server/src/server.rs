@@ -131,21 +131,6 @@ impl Server {
                 )
             })?;
 
-        let workspace_urls = if workspace_urls.len() > 1 {
-            let first_workspace = workspace_urls.into_iter().next().unwrap();
-            tracing::warn!(
-                "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace
-            );
-            client.show_warning_message(format_args!(
-                "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace,
-            ));
-            vec![first_workspace]
-        } else {
-            workspace_urls
-        };
-
         Ok(Self {
             connection,
             worker_threads,

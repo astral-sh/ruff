@@ -163,6 +163,9 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notifications::DidChangeWatchedFiles::METHOD => {
             sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
         }
+        notifications::DidChangeWorkspaceFoldersHandler::METHOD => {
+            sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif)
+        }
         lsp_types::notification::Cancel::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }

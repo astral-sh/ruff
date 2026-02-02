@@ -254,9 +254,30 @@ methods that are compatible with the return type, so the `return` expression is 
 
 ```py
 def same_constrained_types[T: (int, str)](t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
+
+def chained_constrained_types[T: (int, float)](t1: T, t2: T, t3: T) -> T:
+    return (t1 + t2) * t3
+
+def typevar_times_literal[T: (int, float)](t: T) -> T:
+    return t * 2
+
+def literal_times_typevar[T: (int, float)](t: T) -> T:
+    return 2 * t
+
+def negate_typevar[T: (int, float)](t: T) -> T:
+    return -t
+
+def positive_typevar[T: (int, float)](t: T) -> T:
+    return +t
+```
+
+Unary operations that are not supported by all constraints should error:
+
+```py
+def invert_typevar[T: (int, float)](t: T) -> int:
+    # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `T@invert_typevar`"
+    return ~t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two

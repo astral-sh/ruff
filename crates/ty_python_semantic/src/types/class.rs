@@ -3,15 +3,15 @@ use std::cell::RefCell;
 use std::fmt::Write;
 use std::sync::{LazyLock, Mutex};
 
-use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, Mro, MroIterator, SpecialFormType, StaticMroError,
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
+use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, TypeOrigin};
 use crate::semantic_index::definition::{Definition, DefinitionState};
-use crate::semantic_index::scope::{NodeWithScopeKind, Scope, ScopeKind};
+use crate::semantic_index::scope::{NodeWithScopeKind, Scope};
 use crate::semantic_index::symbol::Symbol;
 use crate::semantic_index::{
     DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
@@ -27,14 +27,13 @@ use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, KnownFunction,
+    AbstractMethodKind, DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
     is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
-use crate::types::list_members::all_end_of_scope_members;
 use crate::types::member::{Member, class_member};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::relation::{
@@ -1020,105 +1019,78 @@ impl<'db> ClassType<'db> {
         self.class_literal(db).is_final(db)
     }
 
-    /// Returns a map of abstract method names to the class that originally defines them.
+    /// Returns a map of methods on this class that were defined as abstract on a superclass
+    /// and have not been overridden with a concrete implementation anywhere in the MRO
     ///
-    /// Only returns methods that are still abstract on `self` (i.e., have not been overridden
-    /// with a concrete implementation anywhere in the MRO).
+    /// The value of the map is a struct containing information about the abstract method.
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, ClassType<'db>> {
-        fn is_abstract(db: &dyn Db, ty: Type) -> bool {
+    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, AbstractMethod<'db>> {
+        fn type_as_abstract_method<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            defining_class: ClassType<'db>,
+        ) -> Option<AbstractMethodKind> {
             match ty {
-                Type::FunctionLiteral(function) => {
-                    function.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
+                Type::BoundMethod(method) => {
+                    method.function(db).as_abstract_method(db, defining_class)
                 }
-                Type::BoundMethod(method) => method
-                    .function(db)
-                    .has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD),
                 Type::PropertyInstance(property) => {
                     // A property is abstract if either its getter or setter is abstract.
                     property
                         .getter(db)
-                        .is_some_and(|getter| is_abstract(db, getter))
-                        || property
-                            .setter(db)
-                            .is_some_and(|setter| is_abstract(db, setter))
+                        .and_then(|getter| type_as_abstract_method(db, getter, defining_class))
+                        .or_else(|| {
+                            property.setter(db).and_then(|setter| {
+                                type_as_abstract_method(db, setter, defining_class)
+                            })
+                        })
                 }
-                _ => false,
+                _ => None,
             }
         }
 
-        fn is_method_like(ty: Type) -> bool {
-            matches!(
-                ty,
-                Type::FunctionLiteral(_)
-                    | Type::BoundMethod(_)
-                    | Type::PropertyInstance(_)
-                    | Type::KnownBoundMethod(_)
-                    | Type::WrapperDescriptor(_)
-                    | Type::Callable(_)
-                    | Type::DataclassDecorator(_)
-                    | Type::DataclassTransformer(_)
-            )
-        }
+        let mut abstract_methods: FxIndexMap<Name, _> = FxIndexMap::default();
 
-        let mut abstract_methods = FxIndexMap::<Name, ClassType<'db>>::default();
-
-        // Collect all abstract methods defined anywhere in the MRO.
-        for class_base in self.iter_mro(db) {
-            let class = match class_base {
-                ClassBase::Class(class) => class,
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => continue,
-                ClassBase::Dynamic(_) => continue,
-            };
-
-            // Skip dynamic classes; they can't define abstract methods.
-            let Some((class_literal, _)) = class.static_class_literal(db) else {
+        // Iterate through the MRO in reverse order,
+        // skipping `object` (we know it doesn't define any abstract methods)
+        for supercls in self.iter_mro(db).rev().skip(1) {
+            let ClassBase::Class(class) = supercls else {
                 continue;
             };
-
-            let class_scope = class_literal.body_scope(db);
-
-            for member in all_end_of_scope_members(db, class_scope) {
-                if is_abstract(db, member.member.ty) {
-                    abstract_methods.entry(member.member.name).or_insert(class);
+            // Currently we do not recognize dynamic classes as being able to define abstract methods,
+            // but we do recognise them as being able to override abstract methods defined in static classes.
+            let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
+                abstract_methods
+                    .retain(|name, _| class.own_class_member(db, None, name).is_undefined());
+                continue;
+            };
+            let scope = class_literal.body_scope(db);
+            let place_table = place_table(db, scope);
+            for (symbol_id, bindings_iterator) in
+                use_def_map(db, class_literal.body_scope(db)).all_end_of_scope_symbol_bindings()
+            {
+                let name = place_table.symbol(symbol_id).name();
+                let place_and_definition = place_from_bindings(db, bindings_iterator);
+                let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
+                    continue;
+                };
+                let Some(definition) = place_and_definition.first_definition else {
+                    continue;
+                };
+                if let Some(kind) = type_as_abstract_method(db, ty, class) {
+                    let abstract_method = AbstractMethod {
+                        defining_class: class,
+                        definition,
+                        kind,
+                    };
+                    abstract_methods.insert(name.clone(), abstract_method);
+                } else {
+                    // If this method is concrete, remove it from the map of abstract methods.
+                    abstract_methods.shift_remove(name);
                 }
             }
         }
-
-        // Get `self`'s body scope for checking non-callable bindings.
-        let self_body_scope = self
-            .static_class_literal(db)
-            .map(|(class_literal, _)| class_literal.body_scope(db));
-
-        // Filter out methods that have been overridden with concrete implementations.
-        abstract_methods.retain(|method_name, _| {
-            let member = self.class_member(db, method_name, MemberLookupPolicy::default());
-            match member.place {
-                Place::Defined(defined) => {
-                    if is_method_like(defined.ty) {
-                        // For method-like types, check if it's still abstract.
-                        is_abstract(db, defined.ty)
-                    } else {
-                        // For non-callable types, check if there's a binding in `self`'s
-                        // scope. A binding (like `f = 42` or `f: int = 42`) overrides
-                        // the abstract method, but a declaration-only (like `f: int`) does not.
-                        let Some(body_scope) = self_body_scope else {
-                            return true;
-                        };
-                        let table = place_table(db, body_scope);
-                        let has_binding = table.symbol_id(method_name).is_some_and(|symbol_id| {
-                            let use_def = use_def_map(db, body_scope);
-                            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                            !place_from_bindings(db, bindings).place.is_undefined()
-                        });
-                        // If there's a binding, the method is implemented (not abstract).
-                        // If there's no binding, the method is still abstract.
-                        !has_binding
-                    }
-                }
-                Place::Undefined => true,
-            }
-        });
 
         abstract_methods
     }
@@ -2048,6 +2020,13 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
             Self::Generic(generic) => generic.variance_of(db, typevar),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+pub(super) struct AbstractMethod<'db> {
+    pub(super) defining_class: ClassType<'db>,
+    pub(super) definition: Definition<'db>,
+    pub(super) kind: AbstractMethodKind,
 }
 
 /// A filter that describes which methods are considered when looking for implicit attribute assignments
@@ -3158,6 +3137,21 @@ impl<'db> StaticClassLiteral<'db> {
             return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
         }
 
+        // For dataclass-like classes, `KW_ONLY` sentinel fields are not real
+        // class attributes; they are markers used by the dataclass decorator to
+        // indicate that subsequent fields are keyword-only. Treat them as
+        // undefined so the MRO falls through to parent classes.
+        if member
+            .inner
+            .place
+            .unwidened_type()
+            .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
+            && CodeGeneratorKind::from_static_class(db, self, None)
+                .is_some_and(|policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)))
+        {
+            return Member::unbound();
+        }
+
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
@@ -3989,6 +3983,9 @@ impl<'db> StaticClassLiteral<'db> {
             .into_iter()
             .rev()
             .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
+            // KW_ONLY sentinels are markers, not real fields. Exclude them so
+            // they cannot shadow an inherited field with the same name.
+            .filter(|(_, field)| !field.is_kw_only_sentinel(db))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
     }
@@ -4622,6 +4619,15 @@ impl<'db> StaticClassLiteral<'db> {
                         }
                     }
 
+                    // `KW_ONLY` sentinels are markers, not real instance attributes.
+                    if declared_ty.is_instance_of(db, KnownClass::KwOnly)
+                        && CodeGeneratorKind::from_static_class(db, self, None).is_some_and(
+                            |policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)),
+                        )
+                    {
+                        return Member::unbound();
+                    }
+
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
@@ -4655,6 +4661,24 @@ impl<'db> StaticClassLiteral<'db> {
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
+                            }
+                        } else if self.is_own_dataclass_instance_field(db, name)
+                            && declared_ty
+                                .class_member(db, "__get__".into())
+                                .place
+                                .is_undefined()
+                        {
+                            // For dataclass-like classes, declared fields are assigned
+                            // by the synthesized `__init__`, so they are instance
+                            // attributes even without an explicit `self.x = ...`
+                            // assignment in a method body.
+                            //
+                            // However, if the declared type is a descriptor (has
+                            // `__get__`), we return unbound so that the descriptor
+                            // protocol in `member_lookup_with_policy` can resolve
+                            // the attribute type through `__get__`.
+                            Member {
+                                inner: declared.with_qualifiers(qualifiers),
                             }
                         } else {
                             // The symbol is declared and bound in the class body,
@@ -4724,6 +4748,34 @@ impl<'db> StaticClassLiteral<'db> {
 
             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
         }
+    }
+
+    /// Returns `true` if `name` is a non-init-only field directly declared on this
+    /// dataclass (i.e., a field that corresponds to an instance attribute).
+    ///
+    /// This is used to decide whether a bare class-body annotation like `x: int`
+    /// should be treated as defining an instance attribute: dataclass fields are
+    /// implicitly assigned in `__init__`, so they behave as instance attributes
+    /// even though no explicit binding exists in the class body.
+    fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+            return false;
+        };
+        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+            return false;
+        }
+
+        let fields = self.own_fields(db, None, field_policy);
+        let Some(field) = fields.get(name) else {
+            return false;
+        };
+        matches!(
+            field.kind,
+            FieldKind::Dataclass {
+                init_only: false,
+                ..
+            }
+        )
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
@@ -6221,39 +6273,7 @@ impl<'db> QualifiedClassName<'db> {
             }
         };
 
-        let module_ast = parsed_module(self.db, file).load(self.db);
-        let index = semantic_index(self.db, file);
-
-        let mut name_parts = vec![];
-
-        for (_, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(skip_count) {
-            let node = ancestor_scope.node();
-
-            match ancestor_scope.kind() {
-                ScopeKind::Class => {
-                    if let Some(class_def) = node.as_class() {
-                        name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
-                    }
-                }
-                ScopeKind::Function => {
-                    if let Some(function_def) = node.as_function() {
-                        name_parts.push(format!(
-                            "<locals of function '{}'>",
-                            function_def.node(&module_ast).name.as_str()
-                        ));
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        if let Some(module) = file_to_module(self.db, file) {
-            let module_name = module.name(self.db);
-            name_parts.push(module_name.as_str().to_string());
-        }
-
-        name_parts.reverse();
-        name_parts
+        display::qualified_name_components_from_scope(self.db, file, file_scope_id, skip_count)
     }
 }
 
@@ -6384,6 +6404,7 @@ pub enum KnownClass {
     Staticmethod,
     Classmethod,
     Super,
+    NotImplementedError,
     // enum
     Enum,
     EnumType,
@@ -6512,6 +6533,7 @@ impl KnownClass {
 
             Self::BaseException
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Object
             | Self::OrderedDict
@@ -6595,6 +6617,7 @@ impl KnownClass {
             | KnownClass::Slice
             | KnownClass::Property
             | KnownClass::BaseException
+            | KnownClass::NotImplementedError
             | KnownClass::Exception
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -6684,6 +6707,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -6772,6 +6796,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -6878,6 +6903,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -6963,6 +6989,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -7050,6 +7077,7 @@ impl KnownClass {
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::Exception => "Exception",
+            Self::NotImplementedError => "NotImplementedError",
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
@@ -7411,6 +7439,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7540,6 +7569,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7649,6 +7679,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
@@ -7719,6 +7750,7 @@ impl KnownClass {
             "BaseException" => &[Self::BaseException],
             "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
             "Exception" => &[Self::Exception],
+            "NotImplementedError" => &[Self::NotImplementedError],
             "ExceptionGroup" => &[Self::ExceptionGroup],
             "staticmethod" => &[Self::Staticmethod],
             "classmethod" => &[Self::Classmethod],
@@ -7836,6 +7868,7 @@ impl KnownClass {
             | Self::VersionInfo
             | Self::BaseException
             | Self::Exception
+            | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::EllipsisType
             | Self::BaseExceptionGroup

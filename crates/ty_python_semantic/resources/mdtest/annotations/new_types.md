@@ -263,6 +263,20 @@ static_assert(is_assignable_to(Bar, int | float | complex | None))
 static_assert(is_assignable_to(Bar, Bar | None))
 ```
 
+`NewType`s can be arbitrarily deeply nested. Check the same properties on a doubly nested example:
+
+```py
+FooFoo = NewType("FooFoo", Foo)
+reveal_type(FooFoo(Foo(3.14)).__class__)  # revealed: type[int | float]
+reveal_type(FooFoo(Foo(42)).__class__)  # revealed: type[int | float]
+static_assert(is_assignable_to(FooFoo, float))
+static_assert(is_assignable_to(FooFoo, Foo))
+static_assert(is_assignable_to(FooFoo, int | float))
+static_assert(is_assignable_to(FooFoo, int | float | None))
+static_assert(is_assignable_to(FooFoo, FooFoo | None))
+static_assert(is_assignable_to(FooFoo, Foo | None))
+```
+
 We don't currently try to distinguish between an implicit union (e.g. `float`) and the equivalent
 explicit union (e.g. `int | float`), so these two explicit unions are also allowed. But again, most
 unions are not allowed:
@@ -299,6 +313,10 @@ reveal_type(Foo(3.14) < Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) == Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) + Foo(42))  # revealed: int | float
 reveal_type(Foo(3.14) / Foo(42))  # revealed: int | float
+reveal_type(FooFoo(Foo(3.14)) < FooFoo(Foo(42)))  # revealed: bool
+reveal_type(FooFoo(Foo(3.14)) == FooFoo(Foo(42)))  # revealed: bool
+reveal_type(FooFoo(Foo(3.14)) + FooFoo(Foo(42)))  # revealed: int | float
+reveal_type(FooFoo(Foo(3.14)) / FooFoo(Foo(42)))  # revealed: int | float
 ```
 
 But again as above, we can't _always_ lower `Foo` to `int | float`, because there are also binary
@@ -345,6 +363,10 @@ reveal_type(-Bar(1 + 2j))  # revealed: int | float | complex
 reveal_type(+Bar(1 + 2j))  # revealed: int | float | complex
 ~Bar(1 + 2j)  # error: [unsupported-operator]
 reveal_type(not Bar(1 + 2j))  # revealed: bool
+reveal_type(-FooFoo(Foo(3.14)))  # revealed: int | float
+reveal_type(+FooFoo(Foo(3.14)))  # revealed: int | float
+~FooFoo(Foo(3.14))  # error: [unsupported-operator]
+reveal_type(not FooFoo(Foo(3.14)))  # revealed: bool
 
 class Unary:
     # __pos__ is deliberately left out, giving an error below.
@@ -588,7 +610,7 @@ Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
 ## A `NewType` cannot be generic
 
 ```py
-from typing import Any, NewType, TypeVar
+from typing import Any, NewType, TypeVar, Generic
 
 # All of these are allowed.
 A = NewType("A", list)
@@ -601,6 +623,9 @@ C = NewType("C", list[T])  # error: [invalid-newtype]
 
 D = dict[str, T]
 E = NewType("E", D[T])  # error: [invalid-newtype]
+
+class Foo(Generic[T]):
+    N = NewType("N", list[T])  # error: [invalid-newtype]
 
 # this is fine: omitting the type argument means that this is equivalent
 # to `F = NewType("F", dict[str, Any])

@@ -165,6 +165,77 @@ FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINA
 FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
 ```
 
+### Reassignment after conditional assignment
+
+If a `Final` symbol is conditionally assigned, a subsequent unconditional assignment is still a
+reassignment error, because the symbol may have already been bound:
+
+```py
+from typing import Final
+
+def cond() -> bool:
+    return True
+
+ABC: Final[int]
+
+if cond():
+    ABC = 1
+
+ABC = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `ABC` is not allowed"
+```
+
+Assigning in both branches of an `if/else` is fine — each branch is a first assignment:
+
+```py
+from typing import Final
+
+def cond() -> bool:
+    return True
+
+X: Final[int]
+
+if cond():
+    X = 1
+else:
+    X = 2
+```
+
+But assigning in both branches and then again unconditionally is an error:
+
+```py
+from typing import Final
+
+def cond() -> bool:
+    return True
+
+Y: Final[int]
+
+if cond():
+    Y = 1
+else:
+    Y = 2
+
+Y = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `Y` is not allowed"
+```
+
+Multiple conditional blocks don't help — the second `if` body sees that the first may have already
+bound the symbol:
+
+```py
+from typing import Final
+
+def cond() -> bool:
+    return True
+
+Z: Final[int]
+
+if cond():
+    Z = 1
+
+if cond():
+    Z = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `Z` is not allowed"
+```
+
 ### Attributes
 
 Assignments to attributes qualified with `Final` are also not allowed:

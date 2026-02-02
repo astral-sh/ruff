@@ -412,3 +412,95 @@ import b
 # error: [unsupported-operator] "Operator `<` is not supported between objects of type `a.Foo` and `b.Foo`"
 a.Foo() < b.Foo()
 ```
+
+## TypeVar Comparisons
+
+TypeVars with bounds support comparison operations if the bound type supports them.
+
+### TypeVar with `float` bound
+
+Since `float` is treated as `int | float` in type annotations, TypeVars bounded by `float` should
+support all comparison operations that both `int` and `float` support:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T", bound=float)
+
+class Range(Generic[T]):
+    min: T
+    max: T
+
+    def __init__(self, min: T, max: T) -> None:
+        self.min = min
+        self.max = max
+
+    def __contains__(self, value: T) -> bool:
+        return self.min <= value <= self.max
+
+def compare_float_bound(a: T, b: T) -> bool:
+    return a <= b
+
+def compare_with_literal(a: T) -> bool:
+    return a <= 1.0
+```
+
+### TypeVar with `int` bound
+
+TypeVars bounded by `int` should support comparison operations:
+
+```py
+from typing import TypeVar
+
+U = TypeVar("U", bound=int)
+
+def compare_int_bound(a: U, b: U) -> bool:
+    return a <= b
+```
+
+### TypeVar with `str` bound
+
+TypeVars bounded by `str` should support comparison operations:
+
+```py
+from typing import TypeVar
+
+V = TypeVar("V", bound=str)
+
+def compare_str_bound(a: V, b: V) -> bool:
+    return a <= b
+```
+
+### Constrained TypeVar comparisons
+
+Constrained TypeVars support comparisons if all constraints support the operation:
+
+```py
+from typing import TypeVar
+
+W = TypeVar("W", int, str)
+
+def compare_constrained(a: W, b: W) -> bool:
+    # Both int and str support ==
+    return a == b
+
+X = TypeVar("X", int, str)
+
+def compare_constrained_lt(a: X, b: X) -> bool:
+    # Both int and str support <
+    return a < b
+```
+
+### TypeVar with `complex` bound
+
+`complex` is treated as `int | float | complex`. Since `complex` doesn't support ordering
+comparisons like `<` and `<=`, only equality comparisons should work:
+
+```py
+from typing import TypeVar
+
+Y = TypeVar("Y", bound=complex)
+
+def compare_complex_eq(a: Y, b: Y) -> bool:
+    return a == b
+```

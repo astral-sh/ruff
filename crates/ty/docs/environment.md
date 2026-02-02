@@ -18,7 +18,7 @@ Accepts any filter compatible with the `tracing_subscriber` crate.
 
 For example:
 
-- `TY_LOG=uv=debug` is the equivalent of `-vv` to the command line
+- `TY_LOG=ty=debug` is the equivalent of `-vv` to the command line
 - `TY_LOG=trace` will enable all trace-level logging.
 
 See the [tracing documentation](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#example-syntax)
