@@ -101,8 +101,6 @@ def decorator_factory[**P, T]() -> IdentityCallable[P, T]:
     # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
     reveal_type(generic_context(decorator))
 
-    # TODO: no error
-    # error: [invalid-return-type]
     return decorator
 
 # Note that `decorator_factory` returns a generic callable, but is not itself generic!
@@ -178,8 +176,6 @@ def decorator_factory[**P, T]() -> Callable[[Callable[P, T]], Callable[P, T]]:
     # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
     reveal_type(generic_context(decorator))
 
-    # TODO: no error
-    # error: [invalid-return-type]
     return decorator
 
 # Note that `decorator_factory` returns a generic callable, but is not itself generic!
