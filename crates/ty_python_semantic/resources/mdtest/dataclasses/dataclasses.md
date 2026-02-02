@@ -258,6 +258,7 @@ from ty_extensions import TypeOf
 class SomeClass: ...
 
 def some_function() -> None: ...
+
 @dataclass
 class D:
     function_literal: TypeOf[some_function]

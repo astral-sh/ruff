@@ -42,8 +42,7 @@ class Manager: ...
 
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
-    async with Manager():
-        ...
+    async with Manager(): ...
 ```
 
 ## Context manager without an `__aenter__` method
@@ -54,8 +53,7 @@ class Manager:
 
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__`"
-    async with Manager():
-        ...
+    async with Manager(): ...
 ```
 
 ## Context manager without an `__aexit__` method
@@ -66,8 +64,7 @@ class Manager:
 
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aexit__`"
-    async with Manager():
-        ...
+    async with Manager(): ...
 ```
 
 ## Context manager with non-callable `__aenter__` attribute
@@ -80,8 +77,7 @@ class Manager:
 
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not correctly implement `__aenter__`"
-    async with Manager():
-        ...
+    async with Manager(): ...
 ```
 
 ## Context manager with non-callable `__aexit__` attribute
@@ -96,8 +92,7 @@ class Manager:
 
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not correctly implement `__aexit__`"
-    async with Manager():
-        ...
+    async with Manager(): ...
 ```
 
 ## Context expression with possibly-unbound union variants
@@ -165,8 +160,7 @@ class Manager:
 
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
-    async with Manager():
-        ...
+    async with Manager(): ...
 ```
 
 ## Incorrect signatures
@@ -181,8 +175,7 @@ class Manager:
 
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
-    async with Manager():
-        ...
+    async with Manager(): ...
 ```
 
 ## Incorrect number of arguments
@@ -196,8 +189,7 @@ class Manager:
 
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
-    async with Manager():
-        ...
+    async with Manager(): ...
 ```
 
 ## `@asynccontextmanager`

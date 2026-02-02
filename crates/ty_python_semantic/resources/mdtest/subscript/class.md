@@ -33,6 +33,7 @@ def _(flag: bool):
         if flag:
             def __class_getitem__(cls, item: int) -> str:
                 return str(item)
+
         else:
             def __class_getitem__(cls, item: int) -> int:
                 return item
@@ -69,6 +70,7 @@ def _(flag: bool):
 
     else:
         class Spam: ...
+
     # error: [not-subscriptable] "Cannot subscript object of type `<class 'Spam'>` with no `__class_getitem__` method"
     # revealed: str | Unknown
     reveal_type(Spam[42])

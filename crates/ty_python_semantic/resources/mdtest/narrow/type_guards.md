@@ -74,14 +74,20 @@ class _:
     def _(a) -> TypeIs[str]: ...
 
     # errors
-    def _(self) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
-    def _(self, /, *, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(
+        self,
+    ) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(
+        self, /, *, a
+    ) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
     @classmethod
     def _(cls) -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @classmethod
     def _() -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @staticmethod
-    def _(*, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(
+        *, a
+    ) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
 ```
 
 For `TypeIs` functions, the narrowed type must be assignable to the declared type of that parameter,
@@ -237,8 +243,7 @@ def _(d: Any):
     if f():  # error: [missing-argument] "No argument provided for required parameter `a` of function `f`"
         ...
 
-    if g(*d):
-        ...
+    if g(*d): ...
 
     if f("foo"):  # TODO: error: [invalid-type-guard-call]
         ...

@@ -355,6 +355,7 @@ maintain compatibility.)
 
 ```pyi
 from typing import TypeVar
+
 T = TypeVar("T", default=int)
 ```
 
