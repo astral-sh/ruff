@@ -4269,7 +4269,6 @@ impl<'db> BindingError<'db> {
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
             | BindingError::InvalidKeyType { argument_index, .. }
-            | BindingError::KeywordsNotAMapping { argument_index, .. }
             | BindingError::UnknownArgument { argument_index, .. }
             | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
             | BindingError::ParameterAlreadyAssigned { argument_index, .. }
