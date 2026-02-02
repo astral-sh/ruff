@@ -511,6 +511,7 @@ is unsound, and will lead to ty inferring incorrect types elsewhere.
 
 Functions with empty bodies are permitted in certain contexts where they serve as
 declarations rather than implementations:
+
 - Functions in stub files (`.pyi`)
 - Methods in Protocol classes
 - Abstract methods decorated with `@abstractmethod`
