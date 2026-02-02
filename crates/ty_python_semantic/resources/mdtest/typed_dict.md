@@ -1461,8 +1461,9 @@ class Person(TypedDict):
     extra: NotRequired[str]
 
 def _(p: Person) -> None:
-    reveal_type(p.keys())  # revealed: dict_keys[str, object]
-    reveal_type(p.values())  # revealed: dict_values[str, object]
+    reveal_type(p.keys())  # revealed: dict_keys[Literal["name", "age", "extra"], object]
+    reveal_type(p.values())  # revealed: dict_values[Literal["name", "age", "extra"], str | int | None]
+    reveal_type(p.items())  # revealed: dict_items[Literal["name", "age", "extra"], str | int | None]
 
     # `get()` returns the field type for required keys (no None union)
     reveal_type(p.get("name"))  # revealed: str

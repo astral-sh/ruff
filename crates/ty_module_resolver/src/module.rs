@@ -322,6 +322,8 @@ pub enum KnownModule {
     Dataclasses,
     Functools,
     Collections,
+    #[strum(serialize = "_collections_abc")]
+    CollectionsAbc,
     Inspect,
     #[strum(serialize = "string.templatelib")]
     Templatelib,
@@ -355,6 +357,7 @@ impl KnownModule {
             Self::Dataclasses => "dataclasses",
             Self::Functools => "functools",
             Self::Collections => "collections",
+            Self::CollectionsAbc => "_collections_abc",
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",

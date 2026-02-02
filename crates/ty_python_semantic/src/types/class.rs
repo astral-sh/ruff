@@ -3905,6 +3905,86 @@ impl<'db> StaticClassLiteral<'db> {
 
                 Some(Type::function_like_callable(db, signature))
             }
+            (CodeGeneratorKind::TypedDict, "keys") => {
+                let fields = self.fields(db, specialization, field_policy);
+
+                // Create a union of all literal key types
+                let key_type = UnionType::from_elements(
+                    db,
+                    fields.keys().map(|name| Type::string_literal(db, name)),
+                );
+
+                // Return type is dict_keys[Literal[key1, key2, ...], object]
+                let return_type = KnownClass::DictKeys
+                    .to_specialized_instance(db, &[key_type, KnownClass::Object.to_instance(db)]);
+
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty)],
+                    ),
+                    return_type,
+                );
+
+                Some(Type::function_like_callable(db, signature))
+            }
+            (CodeGeneratorKind::TypedDict, "values") => {
+                let fields = self.fields(db, specialization, field_policy);
+
+                // Create a union of all literal key types (for the first type parameter)
+                let key_type = UnionType::from_elements(
+                    db,
+                    fields.keys().map(|name| Type::string_literal(db, name)),
+                );
+
+                // Create a union of all value types
+                let value_type =
+                    UnionType::from_elements(db, fields.values().map(|field| field.declared_ty));
+
+                // Return type is dict_values[Literal[key1, key2, ...], value_type_union]
+                let return_type =
+                    KnownClass::DictValues.to_specialized_instance(db, &[key_type, value_type]);
+
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty)],
+                    ),
+                    return_type,
+                );
+
+                Some(Type::function_like_callable(db, signature))
+            }
+            (CodeGeneratorKind::TypedDict, "items") => {
+                let fields = self.fields(db, specialization, field_policy);
+
+                // Create a union of all literal key types
+                let key_type = UnionType::from_elements(
+                    db,
+                    fields.keys().map(|name| Type::string_literal(db, name)),
+                );
+
+                // Create a union of all value types
+                let value_type =
+                    UnionType::from_elements(db, fields.values().map(|field| field.declared_ty));
+
+                // Return type is dict_items[Literal[key1, key2, ...], value_type_union]
+                let return_type =
+                    KnownClass::DictItems.to_specialized_instance(db, &[key_type, value_type]);
+
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty)],
+                    ),
+                    return_type,
+                );
+
+                Some(Type::function_like_callable(db, signature))
+            }
             _ => None,
         }
     }
@@ -6462,6 +6542,10 @@ pub enum KnownClass {
     DefaultDict,
     Deque,
     OrderedDict,
+    // _collections_abc
+    DictKeys,
+    DictValues,
+    DictItems,
     // sys
     VersionInfo,
     // dataclasses
@@ -6560,6 +6644,9 @@ impl KnownClass {
             | Self::Counter
             | Self::DefaultDict
             | Self::Deque
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::Float
             | Self::Enum
             | Self::EnumType
@@ -6667,6 +6754,9 @@ impl KnownClass {
             | KnownClass::DefaultDict
             | KnownClass::Deque
             | KnownClass::OrderedDict
+            | KnownClass::DictKeys
+            | KnownClass::DictValues
+            | KnownClass::DictItems
             | KnownClass::VersionInfo
             | KnownClass::EllipsisType
             | KnownClass::NotImplementedType
@@ -6756,6 +6846,9 @@ impl KnownClass {
             | KnownClass::DefaultDict
             | KnownClass::Deque
             | KnownClass::OrderedDict
+            | KnownClass::DictKeys
+            | KnownClass::DictValues
+            | KnownClass::DictItems
             | KnownClass::VersionInfo
             | KnownClass::EllipsisType
             | KnownClass::NotImplementedType
@@ -6845,6 +6938,9 @@ impl KnownClass {
             | KnownClass::DefaultDict
             | KnownClass::Deque
             | KnownClass::OrderedDict
+            | KnownClass::DictKeys
+            | KnownClass::DictValues
+            | KnownClass::DictItems
             | KnownClass::EllipsisType
             | KnownClass::NotImplementedType
             | KnownClass::Field
@@ -6934,6 +7030,9 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -7042,6 +7141,9 @@ impl KnownClass {
             | KnownClass::DefaultDict
             | KnownClass::Deque
             | KnownClass::OrderedDict
+            | KnownClass::DictKeys
+            | KnownClass::DictValues
+            | KnownClass::DictItems
             | KnownClass::VersionInfo
             | KnownClass::Field
             | KnownClass::KwOnly
@@ -7113,6 +7215,9 @@ impl KnownClass {
             Self::DefaultDict => "defaultdict",
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
+            Self::DictKeys => "dict_keys",
+            Self::DictValues => "dict_values",
+            Self::DictItems => "dict_items",
             Self::Enum => "Enum",
             Self::EnumType => {
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 {
@@ -7527,6 +7632,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
+            Self::DictKeys | Self::DictValues | Self::DictItems => KnownModule::CollectionsAbc,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
@@ -7591,6 +7697,9 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::SupportsIndex
             | Self::StdlibAlias
             | Self::TypeVar
@@ -7674,6 +7783,9 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::StdlibAlias
             | Self::SupportsIndex
             | Self::BaseException
@@ -7785,6 +7897,9 @@ impl KnownClass {
             "defaultdict" => &[Self::DefaultDict],
             "deque" => &[Self::Deque],
             "OrderedDict" => &[Self::OrderedDict],
+            "dict_keys" => &[Self::DictKeys],
+            "dict_values" => &[Self::DictValues],
+            "dict_items" => &[Self::DictItems],
             "_Alias" => &[Self::StdlibAlias],
             "_SpecialForm" => &[Self::SpecialForm],
             "_NoDefaultType" => &[Self::NoDefaultType],
@@ -7863,6 +7978,9 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
+            | Self::DictKeys
+            | Self::DictValues
+            | Self::DictItems
             | Self::StdlibAlias  // no equivalent class exists in typing_extensions, nor ever will
             | Self::ModuleType
             | Self::VersionInfo
