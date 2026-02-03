@@ -601,6 +601,7 @@ fn fix_by_reexporting<'a>(
             bail!("Expected import bindings");
         }
         imports.sort_unstable();
+        imports.dedup(); // Remove duplicate symbols to prevent infinite loops
         imports
     };
 
