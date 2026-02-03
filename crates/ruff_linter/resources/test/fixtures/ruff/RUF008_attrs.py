@@ -1,8 +1,7 @@
 import typing
 from typing import ClassVar, Sequence
 
-import attr
-import attrs
+import attr, attrs
 from attr import s
 from attrs import define, frozen
 
