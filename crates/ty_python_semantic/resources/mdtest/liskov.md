@@ -478,6 +478,18 @@ class Bad:
         return self.x == other.x
 ```
 
+## Class-private names do not override
+
+```py
+class X:
+    def __get_value(self) -> int:
+        return 0
+
+class Y(X):
+    def __get_value(self) -> str:
+        return "s"
+```
+
 ## Synthesized methods
 
 `NamedTuple` classes and dataclasses both have methods generated at runtime that do not have
