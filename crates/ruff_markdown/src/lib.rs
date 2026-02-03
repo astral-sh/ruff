@@ -93,7 +93,10 @@ pub fn format_code_blocks(
                         let end = code_line.start();
                         let unformatted_code = dedent(&source[TextRange::new(start, end)]);
 
-                        let py_source_type = PySourceType::from_extension(&language);
+                        let py_source_type = match settings.extension.get_extension(&language) {
+                            None => PySourceType::from_extension(&language),
+                            Some(language) => PySourceType::from(language),
+                        };
                         let options =
                             settings.to_format_options(py_source_type, &unformatted_code, path);
 
@@ -132,6 +135,7 @@ pub fn format_code_blocks(
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_linter::settings::types::{ExtensionMapping, ExtensionPair, Language};
     use ruff_workspace::FormatterSettings;
 
     use crate::{MarkdownResult, format_code_blocks};
@@ -382,6 +386,29 @@ print( 'hello' )
             code,
             None,
             &FormatterSettings::default()
+        ), @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_extension_mapping() {
+        // format "py" mapped as "pyi" instead
+        let code = r#"
+```py
+def foo(): ...
+def bar(): ...
+```
+        "#;
+        let mapping = ExtensionMapping::from_iter([ExtensionPair {
+            extension: "py".to_string(),
+            language: Language::Pyi,
+        }]);
+        assert_snapshot!(format_code_blocks(
+            code,
+            None,
+            &FormatterSettings {
+                extension: mapping,
+                ..Default::default()
+            }
         ), @"Unchanged");
     }
 }

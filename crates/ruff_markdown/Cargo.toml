@@ -17,8 +17,12 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ruff_workspace = { workspace = true }
 
-insta = { workspace = true }
 regex = { workspace = true }
+
+[dev-dependencies]
+ruff_linter = { workspace = true }
+
+insta = { workspace = true }
 
 [lints]
 workspace = true
