@@ -811,6 +811,12 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+#[derive(Clone, Copy, Debug)]
+enum ConstructorFallback {
+    Gradual { use_generic_context: bool },
+    ClassBindings,
+}
+
 /// Helper for `recursive_type_normalized_impl` for `TypeGuardLike` types.
 fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
@@ -4123,25 +4129,9 @@ impl<'db> Type<'db> {
                 .into(),
             },
 
-            Type::ClassLiteral(class) => self
-                .known_class_literal_bindings(db, class)
-                .unwrap_or_else(|| {
-                    self.constructor_bindings(db).unwrap_or_else(|| {
-                        // `constructor_bindings` can return `None` for cases where we intentionally
-                        // keep bespoke call behavior (e.g. typed dict codegen and enum functional
-                        // syntax). Fall back to a gradual signature so analysis can continue in
-                        // contexts that don't have dedicated constructor call handling.
-                        Binding::single(
-                            self,
-                            Signature::new_generic(
-                                class.generic_context(db),
-                                Parameters::gradual_form(),
-                                self.to_instance(db).unwrap_or(Type::unknown()),
-                            ),
-                        )
-                        .into()
-                    })
-                }),
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                self.class_like_call_bindings(db)
+            }
 
             Type::SpecialForm(SpecialFormType::TypedDict) => {
                 Binding::single(
@@ -4168,43 +4158,6 @@ impl<'db> Type<'db> {
                 )
                 .into()
             }
-
-            Type::GenericAlias(_) => self.constructor_bindings(db).unwrap_or_else(|| {
-                // TODO annotated return type on `__new__` or metaclass `__call__`
-                // TODO check call vs signatures of `__new__` and/or `__init__`
-                Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::gradual_form(),
-                        self.to_instance(db).unwrap_or(Type::unknown()),
-                    ),
-                )
-                .into()
-            }),
-
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).bindings(db),
-
-                // Most type[] constructor calls are handled by `constructor_bindings` and not via
-                // getting the signature here. This signature can still be used in some cases (e.g.
-                // evaluating callable subtyping) or when constructor bindings are not
-                // available. TODO improve this definition (intersection of `__new__` and
-                // `__init__` signatures? and respect metaclass `__call__`).
-                SubclassOfInner::Class(class) => self
-                    .constructor_bindings(db)
-                    .unwrap_or_else(|| Type::from(class).bindings(db)),
-
-                SubclassOfInner::TypeVar(_) => self.constructor_bindings(db).unwrap_or_else(|| {
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::gradual_form(),
-                            self.to_instance(db).unwrap_or(Type::unknown()),
-                        ),
-                    )
-                    .into()
-                }),
-            },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
                 // Note that for objects that have a (possibly not callable!) `__call__` attribute,
@@ -4313,18 +4266,131 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn class_like_call_bindings(self, db: &'db dyn Db) -> Bindings<'db> {
+        fn gradual_fallback<'db>(
+            callable_type: Type<'db>,
+            return_type: Type<'db>,
+            use_generic_context: bool,
+            class_generic_context: Option<GenericContext<'db>>,
+        ) -> Bindings<'db> {
+            if use_generic_context {
+                Binding::single(
+                    callable_type,
+                    Signature::new_generic(
+                        class_generic_context,
+                        Parameters::gradual_form(),
+                        return_type,
+                    ),
+                )
+                .into()
+            } else {
+                Binding::single(
+                    callable_type,
+                    Signature::new(Parameters::gradual_form(), return_type),
+                )
+                .into()
+            }
+        }
+
+        match self {
+            Type::ClassLiteral(class) => self
+                .known_class_literal_bindings(db, class)
+                .unwrap_or_else(|| {
+                    Self::constructor_bindings(
+                        db,
+                        self,
+                        ClassType::NonGeneric(class),
+                        false,
+                        ConstructorFallback::Gradual {
+                            use_generic_context: true,
+                        },
+                    )
+                }),
+
+            Type::GenericAlias(alias) => Self::constructor_bindings(
+                db,
+                self,
+                ClassType::Generic(alias),
+                false,
+                ConstructorFallback::Gradual {
+                    use_generic_context: false,
+                },
+            ),
+
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+                SubclassOfInner::Dynamic(dynamic_type) => {
+                    Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
+                }
+                SubclassOfInner::Class(class) => Self::constructor_bindings(
+                    db,
+                    self,
+                    class,
+                    false,
+                    ConstructorFallback::ClassBindings,
+                ),
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    let Some(class) = Self::class_from_typevar_for_constructor(db, bound_typevar)
+                    else {
+                        return gradual_fallback(
+                            self,
+                            self.to_instance(db).unwrap_or(Type::unknown()),
+                            false,
+                            None,
+                        );
+                    };
+                    Self::constructor_bindings(
+                        db,
+                        self,
+                        class,
+                        true,
+                        ConstructorFallback::Gradual {
+                            use_generic_context: false,
+                        },
+                    )
+                }
+            },
+
+            _ => unreachable!("`class_like_call_bindings` called on non-class-like type"),
+        }
+    }
+
+    fn class_from_typevar_for_constructor(
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<ClassType<'db>> {
+        let class_from_bound = |bound: Type<'db>| {
+            SubclassOfInner::try_from_instance(db, bound)
+                .and_then(|subclass_of| subclass_of.into_class(db))
+        };
+
+        match bound_typevar.typevar(db).bound_or_constraints(db) {
+            // Unbounded `type[T]` defaults to `object` for `into_class`, but constructor validation
+            // should remain gradual to avoid validating against `object.__new__`.
+            None => None,
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => class_from_bound(bound),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                match &**constraints.elements(db) {
+                    [bound] => class_from_bound(*bound),
+                    // Multi-constraint `type[T]` cannot be modeled as a single constructor; keep it
+                    // permissive and let the caller fall back to a gradual signature.
+                    _ => None,
+                }
+            }
+        }
+    }
+
     fn known_class_literal_bindings(
         self,
         db: &'db dyn Db,
         class: ClassLiteral<'db>,
     ) -> Option<Bindings<'db>> {
-        // TODO: Ideally we'd use `constructor_bindings` for all constructor calls. Currently we
-        // don't for a few special known types, either because their constructors are defined with
-        // overloads, or because we want to special case their return type beyond what typeshed
-        // provides (though this support could likely be moved into the `constructor_bindings`
-        // path).
+        // TODO: Ideally we'd route all constructor calls through `constructor_bindings` and move
+        // these bespoke KnownClass signatures into that path. We keep them here for now because
+        // some constructors are overloaded or have return types that intentionally diverge from
+        // typeshed.
         // TODO: Overloads are supported; follow up to see if any of these cases can be removed or
         // moved into `constructor_bindings`.
+        // https://github.com/astral-sh/ty/issues/2715
         match class.known(db)? {
             KnownClass::Bool => {
                 // ```py
@@ -4670,9 +4736,15 @@ impl<'db> Type<'db> {
         }
     }
 
-    // Build bindings for constructor calls by combining `__new__`/`__init__` signatures; return
-    // `None` for cases that keep their manual call signatures.
-    fn constructor_bindings(self, db: &'db dyn Db) -> Option<Bindings<'db>> {
+    // Build bindings for constructor calls by combining `__new__`/`__init__` signatures.
+    // Returns fallback bindings for cases that intentionally keep bespoke call behavior.
+    fn constructor_bindings(
+        db: &'db dyn Db,
+        callable_type: Type<'db>,
+        class: ClassType<'db>,
+        lookup_from_bound: bool,
+        fallback: ConstructorFallback,
+    ) -> Bindings<'db> {
         fn resolve_dunder_new_callable<'db>(
             db: &'db dyn Db,
             owner: Type<'db>,
@@ -4704,28 +4776,43 @@ impl<'db> Type<'db> {
             })
         }
 
-        let (class, lookup_from_bound) = match self {
-            Type::ClassLiteral(class) => (ClassType::NonGeneric(class), false),
-            Type::GenericAlias(alias) => (ClassType::Generic(alias), false),
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Dynamic(_) => return None,
-                SubclassOfInner::Class(class) => (class, false),
-                inner @ SubclassOfInner::TypeVar(_) => (inner.into_class(db)?, true),
-            },
-            _ => return None,
-        };
-
         let class_literal = class.class_literal(db);
         let class_specialization = class
             .static_class_literal(db)
             .and_then(|(_, specialization)| specialization);
         let class_generic_context = class_literal.generic_context(db);
+        // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
+        let fallback_bindings = || match fallback {
+            ConstructorFallback::Gradual {
+                use_generic_context,
+            } => {
+                let return_type = callable_type.to_instance(db).unwrap_or(Type::unknown());
+                if use_generic_context {
+                    Binding::single(
+                        callable_type,
+                        Signature::new_generic(
+                            class_generic_context,
+                            Parameters::gradual_form(),
+                            return_type,
+                        ),
+                    )
+                    .into()
+                } else {
+                    Binding::single(
+                        callable_type,
+                        Signature::new(Parameters::gradual_form(), return_type),
+                    )
+                    .into()
+                }
+            }
+            ConstructorFallback::ClassBindings => Type::from(class).bindings(db),
+        };
         // This helper is called from multiple `Type` variants (not just the `ClassLiteral` arm in
         // `Type::bindings`), so manual-constructor exemptions must live here too.
         if class_literal.is_typed_dict(db)
             || class::CodeGeneratorKind::TypedDict.matches(db, class_literal, class_specialization)
         {
-            return None;
+            return fallback_bindings();
         }
 
         let known = class.known(db);
@@ -4743,12 +4830,12 @@ impl<'db> Type<'db> {
             )
         ) {
             // Manual signatures for known constructors.
-            return None;
+            return fallback_bindings();
         }
 
         if matches!(known, Some(KnownClass::Tuple)) && !class.is_generic() {
             // Non-generic tuple constructors are defined via overloads.
-            return None;
+            return fallback_bindings();
         }
 
         // temporary special-casing for all subclasses of `enum.Enum`
@@ -4758,7 +4845,7 @@ impl<'db> Type<'db> {
             .to_class_type(db)
             .is_some_and(|enum_class| class.is_subclass_of(db, enum_class))
         {
-            return None;
+            return fallback_bindings();
         }
 
         let identity_specialize_if_generic = |ty: Type<'db>| match ty {
@@ -4776,7 +4863,7 @@ impl<'db> Type<'db> {
         // have the class's typevars still in the method signature when we attempt to call it. To
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
-        let self_type = identity_specialize_if_generic(self);
+        let self_type = identity_specialize_if_generic(callable_type);
 
         // For `type[T]`, validate arguments against the bound/constraint class constructors,
         // but keep the constructed type as `T`.
@@ -4813,12 +4900,16 @@ impl<'db> Type<'db> {
         // constructor-call bindings.
         let new_method = lookup_type.lookup_dunder_new(db);
 
-        let constructor_instance_ty = self_type.to_instance(db)?;
+        let Some(constructor_instance_ty) = self_type.to_instance(db) else {
+            return fallback_bindings();
+        };
 
         // Construct an instance type to look up `__init__`. We use `self_type` (possibly identity-
         // specialized) so the instance retains inferable class typevars during constructor checking.
         // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let lookup_init_ty = lookup_type.to_instance(db)?;
+        let Some(lookup_init_ty) = lookup_type.to_instance(db) else {
+            return fallback_bindings();
+        };
 
         // Lookup the `__init__` instance method in the MRO, excluding `object` initially; we only
         // fall back to `object.__init__` in the `__new__`-absent case (see rules above).
@@ -4915,15 +5006,13 @@ impl<'db> Type<'db> {
                 }
                 (Some((new_bindings, _)), None) => new_bindings,
                 (None, Some((init_bindings, _))) => init_bindings,
-                (None, None) => return None,
+                (None, None) => return fallback_bindings(),
             }
         };
 
-        Some(
-            bindings
-                .with_generic_context(db, class_generic_context)
-                .with_constructor_instance_type(constructor_instance_ty),
-        )
+        bindings
+            .with_generic_context(db, class_generic_context)
+            .with_constructor_instance_type(constructor_instance_ty)
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
