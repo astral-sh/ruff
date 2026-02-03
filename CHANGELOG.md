@@ -90,7 +90,9 @@ This release introduces the new 2026 style guide, with the following changes:
 
 ### Preview features
 
-- Apply formatting to Markdown code blocks ([#22470](https://github.com/astral-sh/ruff/pull/22470))
+- Apply formatting to Markdown code blocks ([#22470](https://github.com/astral-sh/ruff/pull/22470), [#22990](https://github.com/astral-sh/ruff/pull/22990), [#22996](https://github.com/astral-sh/ruff/pull/22996))
+
+    See the [documentation](https://docs.astral.sh/ruff/formatter/#markdown-code-formatting) for more details.
 
 ### Bug fixes
 
