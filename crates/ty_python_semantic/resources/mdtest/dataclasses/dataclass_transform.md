@@ -261,6 +261,14 @@ class TestMeta(ModelBase):
 reveal_type(TestMeta.__init__)  # revealed: (self: TestMeta, *, name: str) -> None
 ```
 
+Metaclass-based transformers with `kw_only_default=True` also don't emit field ordering errors:
+
+```py
+class TestMetaGood(ModelBase):
+    x: int = 1
+    y: str
+```
+
 And for base-class-based transformers:
 
 ```py
@@ -271,6 +279,26 @@ class TestBase(ModelBase):
     name: str
 
 reveal_type(TestBase.__init__)  # revealed: (self: TestBase, *, name: str) -> None
+```
+
+Fields in classes using `kw_only_default=True` transformers don't participate in field ordering
+checks, since all fields are keyword-only by default:
+
+```py
+@dataclass_transform(kw_only_default=True)
+def kw_only_dataclass(cls: type) -> type:
+    return cls
+
+@kw_only_dataclass
+class KwOnlyTransformGood:
+    x: int = 1
+    y: str
+
+@kw_only_dataclass
+class KwOnlyTransformAlsoGood:
+    x: int
+    y: str = "default"
+    z: float
 ```
 
 ### `frozen_default`
