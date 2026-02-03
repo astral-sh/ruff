@@ -7554,21 +7554,14 @@ impl TypeQualifiers {
         }
     }
 
-    /// Iterate over the individual user-visible qualifier flags that are set.
+    /// Returns `true` if this is a non-standard qualifier.
     ///
-    /// Internal-only qualifiers like `IMPLICIT_INSTANCE_ATTRIBUTE` and
-    /// `FROM_MODULE_GETATTR` are excluded.
-    pub fn user_visible(self) -> impl Iterator<Item = TypeQualifiers> {
-        [
-            Self::CLASS_VAR,
-            Self::FINAL,
-            Self::INIT_VAR,
-            Self::REQUIRED,
-            Self::NOT_REQUIRED,
-            Self::READ_ONLY,
-        ]
-        .into_iter()
-        .filter(move |flag| self.contains(*flag))
+    /// Non-standard qualifiers are internal implementation details like
+    /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
+    pub fn is_non_standard(self) -> bool {
+        const NON_STANDARD: TypeQualifiers =
+            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
+        self.intersects(NON_STANDARD)
     }
 }
 

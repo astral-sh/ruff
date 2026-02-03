@@ -159,11 +159,14 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     None => "",
                 };
 
-                let mut user_visible = qualifiers.user_visible().peekable();
-                let qualifier_suffix = if user_visible.peek().is_none() {
+                let mut standard = qualifiers
+                    .iter()
+                    .filter(|q| !q.is_non_standard())
+                    .peekable();
+                let qualifier_suffix = if standard.peek().is_none() {
                     String::new()
                 } else {
-                    let names: Vec<&str> = user_visible.map(TypeQualifiers::name).collect();
+                    let names: Vec<&str> = standard.map(TypeQualifiers::name).collect();
                     format!(" ({})", names.join(", "))
                 };
 
@@ -3191,6 +3194,40 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_final_global_use() {
+        let test = cursor_test(
+            r#"
+        from typing import Final
+
+        x: Final[int] = 1
+
+        def foo():
+            global x
+            print(x<CURSOR>)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int (Final)
+        ---------------------------------------------
+        ```python
+        int (Final)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:11
+          |
+        6 | def foo():
+        7 |     global x
+        8 |     print(x)
+          |           ^- Cursor offset
+          |           |
+          |           source
           |
         ");
     }
