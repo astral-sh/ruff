@@ -31,7 +31,7 @@ use crate::types::{
     TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_callable_type,
     walk_manual_pep_695_type_alias, walk_pep_695_type_alias, walk_type_var_bounds,
 };
-use crate::{Db, FxOrderMap, FxOrderSet};
+use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -582,17 +582,39 @@ impl<'db> GenericContext<'db> {
                             return None;
                         }
 
+                        // We're going to use this later to trim the function's generic context. So
+                        // it's important that we do this first, so that we're tracking the
+                        // original, not-yet-renamed typevars.
                         found_only_inside_callable_return.extend(bound_typevars.iter().copied());
 
-                        let generic_context =
-                            GenericContext::from_typevar_instances(db, bound_typevars);
-                        let signatures = callable
-                            .signatures(db)
-                            .with_inherited_generic_context(db, generic_context);
+                        // Then create a new typevar, with a 'return suffix, for each of the
+                        // typevars that only appear in this callable, and update the callable's
+                        // signature (and generic context) to use those new typevars.
+                        let typevar_replacements: FxIndexMap<_, _> = bound_typevars
+                            .iter()
+                            .map(|bound_typevar| {
+                                (*bound_typevar, bound_typevar.with_name_suffix(db, "return"))
+                            })
+                            .collect();
+                        let apply = ApplySpecialization::ReturnCallables(&typevar_replacements);
+                        let signatures = callable.signatures(db).apply_type_mapping_impl(
+                            db,
+                            &TypeMapping::ApplySpecialization(apply),
+                            TypeContext::default(),
+                            &ApplyTypeMappingVisitor::default(),
+                        );
+                        let generic_context = GenericContext::from_typevar_instances(
+                            db,
+                            typevar_replacements.values().copied(),
+                        );
+                        let signatures =
+                            signatures.with_inherited_generic_context(db, generic_context);
                         let replacement = CallableType::new(db, signatures, callable.kind(db));
+
                         Some((callable, replacement))
                     })
                     .collect();
+
                 (found_only_inside_callable_return, replacements)
             }
         }
@@ -1687,7 +1709,7 @@ impl<'db> Specialization<'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
     Specialization(Specialization<'db>),
     Partial {
@@ -1697,6 +1719,7 @@ pub enum ApplySpecialization<'a, 'db> {
         /// avoid recursively substituting a type inside of itself.
         skip: Option<usize>,
     },
+    ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
 }
 
 impl<'db> ApplySpecialization<'_, 'db> {
@@ -1723,6 +1746,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                     return Some(Type::Never);
                 }
                 types.get(index).copied()
+            }
+            ApplySpecialization::ReturnCallables(replacements) => {
+                replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
         }
     }

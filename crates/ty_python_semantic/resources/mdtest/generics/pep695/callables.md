@@ -93,9 +93,9 @@ def decorator_factory[T]() -> IdentityCallable[T]:
 # revealed: None
 reveal_type(generic_context(decorator_factory))
 
-# revealed: [T](T, /) -> T
+# revealed: [T'return](T'return, /) -> T'return
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[T@decorator_factory]
+# revealed: ty_extensions.GenericContext[T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: Literal[1]
 reveal_type(decorator_factory()(1))
@@ -126,9 +126,9 @@ reveal_type(generic_context(decorator_factory))
 def identity[T](t: T) -> T:
     return t
 
-# revealed: [**P, T]((**P@decorator_factory) -> T, /) -> (**P@decorator_factory) -> T
+# revealed: [**P'return, T'return]((**P'return@decorator_factory) -> T'return, /) -> (**P'return@decorator_factory) -> T'return
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[P@decorator_factory, T@decorator_factory]
+# revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: [T](t: T) -> T
 reveal_type(decorator_factory()(identity))
@@ -163,9 +163,9 @@ def decorator_factory[T]() -> Callable[[T], T]:
 # revealed: None
 reveal_type(generic_context(decorator_factory))
 
-# revealed: [T](T, /) -> T
+# revealed: [T'return](T'return, /) -> T'return
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[T@decorator_factory]
+# revealed: ty_extensions.GenericContext[T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: Literal[1]
 reveal_type(decorator_factory()(1))
@@ -212,9 +212,9 @@ reveal_type(generic_context(decorator_factory))
 def identity[T](t: T) -> T:
     return t
 
-# revealed: [**P, T]((**P@decorator_factory) -> T, /) -> (**P@decorator_factory) -> T
+# revealed: [**P'return, T'return]((**P'return@decorator_factory) -> T'return, /) -> (**P'return@decorator_factory) -> T'return
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[P@decorator_factory, T@decorator_factory]
+# revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: [T](t: T) -> T
 reveal_type(decorator_factory()(identity))

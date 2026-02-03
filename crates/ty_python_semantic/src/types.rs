@@ -7972,6 +7972,18 @@ pub struct TypeVarIdentity<'db> {
 
 impl get_size2::GetSize for TypeVarIdentity<'_> {}
 
+impl<'db> TypeVarIdentity<'db> {
+    fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
+        let name = format!("{}'{}", self.name(db), suffix);
+        Self::new(
+            db,
+            ast::name::Name::from(name),
+            self.definition(db),
+            self.kind(db),
+        )
+    }
+}
+
 /// A specific instance of a type variable that has not been bound to a generic context yet.
 ///
 /// This is usually not the type that you want; if you are working with a typevar, in a generic
@@ -8068,6 +8080,16 @@ impl<'db> TypeVarInstance<'db> {
         binding_context: Definition<'db>,
     ) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context), None)
+    }
+
+    fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
+        Self::new(
+            db,
+            self.identity(db).with_name_suffix(db, suffix),
+            self._bound_or_constraints(db),
+            self.explicit_variance(db),
+            self._default(db),
+        )
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
@@ -8539,6 +8561,15 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
+        Self::new(
+            db,
+            self.typevar(db).with_name_suffix(db, suffix),
+            self.binding_context(db),
+            self.paramspec_attr(db),
+        )
+    }
+
     /// Get the identity of this bound typevar.
     ///
     /// This is used for comparing whether two bound typevars represent the same logical typevar,
