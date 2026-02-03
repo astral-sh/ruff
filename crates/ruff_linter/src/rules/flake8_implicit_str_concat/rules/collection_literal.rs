@@ -90,7 +90,7 @@ pub(crate) fn implicit_string_concatenation_in_collection_literal(
             continue;
         }
 
-        let mut diagnostic = checker.report_diagnostic(
+        let mut diagnostic = checker.report_custom_diagnostic(
             ImplicitStringConcatenationInCollectionLiteral,
             string_like.range(),
         );
