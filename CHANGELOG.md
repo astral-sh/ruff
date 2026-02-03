@@ -24,6 +24,8 @@ guide and overview of the changes!
     # ruff: enable[N803]
     ```
 
+    See the [documentation](https://docs.astral.sh/ruff/linter/#block-level) for more details.
+
 - The `ruff:alpine` Docker image is now based on Alpine 3.23 (up from 3.21).
 
 - The `ruff:debian` and `ruff:debian-slim` Docker images are now based on Debian 13 "Trixie" instead of Debian 12 "Bookworm."
