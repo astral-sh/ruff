@@ -303,12 +303,12 @@ class GroupedDiagnostics:
                         ),
                         key=lambda x: len(x[1]),
                     )
-                    remaining = len(diagnostics) - max_line
+                    remaining = len(diagnostics) - max_line  # ty: ignore[unsupported-operator]
                     # We can never exceed the number of distinct lines
                     # if the diagnostic is multi, so we ignore that case
                     return Evaluation(
                         classification=Classification.FALSE_POSITIVE,
-                        true_positives=max_line,
+                        true_positives=max_line,  # ty: ignore[invalid-argument-type]
                         false_positives=remaining,
                         true_negatives=0,
                         false_negatives=0,
