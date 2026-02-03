@@ -62,7 +62,7 @@ use crate::Violation;
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.1")]
+#[violation_metadata(preview_since = "0.14.15")]
 pub(crate) struct DocstringDifferentOrderParameters;
 
 impl Violation for DocstringDifferentOrderParameters {
