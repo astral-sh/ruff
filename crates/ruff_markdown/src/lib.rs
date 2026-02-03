@@ -33,7 +33,7 @@ static OFF_ON_DIRECTIVES: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?imx)
             ^
-            \s*<!--\s*(?:blacken-docs|ruff)\s*:\s*(?<action>off|on)\s*-->
+            \s*<!--\s*(?:blacken-docs|fmt)\s*:\s*(?<action>off|on)\s*-->
         ",
     )
     .unwrap()
@@ -335,11 +335,11 @@ print( 'hello' )
 print( 'hello' )
 ```
 
-<!-- ruff:off -->
+<!-- fmt:off -->
 ```py
 print( 'hello' )
 ```
-<!-- ruff:on -->
+<!-- fmt:on -->
 
 ```py
 print( 'hello' )
@@ -354,11 +354,11 @@ print( 'hello' )
         print("hello")
         ```
 
-        <!-- ruff:off -->
+        <!-- fmt:off -->
         ```py
         print( 'hello' )
         ```
-        <!-- ruff:on -->
+        <!-- fmt:on -->
 
         ```py
         print("hello")
@@ -369,7 +369,7 @@ print( 'hello' )
     #[test]
     fn format_code_blocks_ignore_to_end() {
         let code = r#"
-<!-- ruff:off -->
+<!-- fmt:off -->
 ```py
 print( 'hello' )
 ```
