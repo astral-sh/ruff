@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/dummy_implementations.py
 ---
 ## Input
 
@@ -141,20 +140,13 @@ class ClassH:
 ```diff
 --- Black
 +++ Ruff
-@@ -82,14 +82,12 @@
+@@ -106,6 +106,7 @@
  
- class ClassC:
-     def f(self):
--
-         ...
-         # Comment
- 
- 
- class ClassD:
+ class ClassG:
      def f(self):  # Comment 1
--
++
          ...  # Comment 2
-         # Comment 3
+ 
  
 ```
 
@@ -245,12 +237,14 @@ class ClassB:
 
 class ClassC:
     def f(self):
+
         ...
         # Comment
 
 
 class ClassD:
     def f(self):  # Comment 1
+
         ...  # Comment 2
         # Comment 3
 
@@ -267,6 +261,7 @@ class ClassF:
 
 class ClassG:
     def f(self):  # Comment 1
+
         ...  # Comment 2
 
 
