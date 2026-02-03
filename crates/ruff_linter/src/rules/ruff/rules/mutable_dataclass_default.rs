@@ -92,7 +92,7 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
         }) = value.as_ref()
         {
             if is_dataclass_field(func, checker.semantic(), dataclass_kind) {
-                arguments.find_keyword("default").map(|kw| &kw.value)
+                arguments.find_argument_value("default", 0)
             } else {
                 Some(value.as_ref())
             }
