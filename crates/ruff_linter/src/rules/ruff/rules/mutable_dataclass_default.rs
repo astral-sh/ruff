@@ -22,7 +22,7 @@ use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_da
 /// If the default value is intended to be mutable, it must be annotated with
 /// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
 ///
-/// This rule also detects mutable defaults passed via the `default` keyword
+/// In [preview](https://docs.astral.sh/ruff/preview/) this rule also detects mutable defaults passed via the `default` keyword
 /// argument in `field()` (for stdlib dataclasses), `attrs.field()`, `attr.ib()`,
 /// and `attr.attrib()` calls.
 ///
