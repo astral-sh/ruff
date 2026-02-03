@@ -196,49 +196,13 @@ pub(crate) const fn is_allow_nested_roots_enabled(settings: &LinterSettings) -> 
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/18572
-pub(crate) const fn is_optional_as_none_in_union_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/20659
 pub(crate) const fn is_future_required_preview_generics_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/18683
-pub(crate) const fn is_safe_super_call_with_parameters_fix_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/19851
-pub(crate) const fn is_maxsplit_without_separator_fix_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20027
-pub(crate) const fn is_unnecessary_default_type_args_stubs_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20343
-pub(crate) const fn is_sim910_expanded_key_support_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/20169
 pub(crate) const fn is_fix_builtin_open_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20178
-pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
-    settings: &LinterSettings,
-) -> bool {
     settings.preview.is_enabled()
 }
 
@@ -289,11 +253,6 @@ pub(crate) const fn is_enumerate_for_loop_int_index_enabled(settings: &LinterSet
 pub(crate) const fn is_s310_resolve_string_literal_bindings_enabled(
     settings: &LinterSettings,
 ) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/21623
-pub(crate) const fn is_range_suppressions_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 

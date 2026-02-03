@@ -36,7 +36,7 @@
       ]
     },
     "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n  ty will exit with a non-zero code if any error diagnostics are emitted.",
+      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n  ty will exit with a non-zero code if any error diagnostics are emitted.",
       "anyOf": [
         {
           "$ref": "#/definitions/Rules"
@@ -513,6 +513,16 @@
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
           "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "final-without-value": {
+          "title": "detects `Final` declarations without a value",
+          "description": "## What it does\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\n\n## Examples\n```python\nfrom typing import Final\n\n# Error: `Final` symbol without a value\nMY_CONSTANT: Final[int]\n\n# OK: `Final` symbol with a value\nMY_CONSTANT: Final[int] = 1\n```",
           "default": "error",
           "oneOf": [
             {

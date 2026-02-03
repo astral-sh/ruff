@@ -3056,6 +3056,38 @@ def function():
     }
 
     #[test]
+    fn hover_bare_final_attribute_assignment() {
+        let test = cursor_test(
+            r#"
+        from typing import Final
+
+        class Foo:
+            def __init__(self, a: str):
+                self.a<CURSOR>: Final = a
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        str
+        ---------------------------------------------
+        ```python
+        str
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:14
+          |
+        4 | class Foo:
+        5 |     def __init__(self, a: str):
+        6 |         self.a: Final = a
+          |              ^- Cursor offset
+          |              |
+          |              source
+          |
+        ");
+    }
+
+    #[test]
     fn hover_type_narrowing() {
         let test = cursor_test(
             r#"

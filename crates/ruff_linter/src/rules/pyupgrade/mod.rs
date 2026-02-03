@@ -144,7 +144,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview", path.to_string_lossy());
@@ -440,12 +439,11 @@ mod tests {
     }
 
     #[test]
-    fn unnecessary_default_type_args_stubs_py312_preview() -> Result<()> {
-        let snapshot = format!("{}__preview", "UP043.pyi");
+    fn unnecessary_default_type_args_stubs_py312() -> Result<()> {
+        let snapshot = "UP043.pyi";
         let diagnostics = test_path(
             Path::new("pyupgrade/UP043.pyi"),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 unresolved_target_version: PythonVersion::PY312.into(),
                 ..settings::LinterSettings::for_rule(Rule::UnnecessaryDefaultTypeArgs)
             },

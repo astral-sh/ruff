@@ -1547,14 +1547,17 @@ class AsyncGenerator(AsyncIterator[_YieldT_co], Protocol[_YieldT_co, _SendT_cont
     def aclose(self) -> Coroutine[Any, Any, None]:
         """Raise GeneratorExit inside coroutine."""
 
-@runtime_checkable
-class Container(Protocol[_T_co]):
-    # This is generic more on vibes than anything else
-    @abstractmethod
-    def __contains__(self, x: object, /) -> bool: ...
+_ContainerT_contra = TypeVar("_ContainerT_contra", contravariant=True, default=Any)
 
 @runtime_checkable
-class Collection(Iterable[_T_co], Container[_T_co], Protocol[_T_co]):
+class Container(Protocol[_ContainerT_contra]):
+    # This is generic more on vibes than anything else
+    @abstractmethod
+    def __contains__(self, x: _ContainerT_contra, /) -> bool: ...
+
+@runtime_checkable
+class Collection(Iterable[_T_co], Container[Any], Protocol[_T_co]):
+    # Note: need to use Container[Any] instead of Container[_T_co] to ensure covariance.
     # Implement Sized (but don't have it as a base class).
     @abstractmethod
     def __len__(self) -> int: ...
@@ -1571,7 +1574,7 @@ class Sequence(Reversible[_T_co], Collection[_T_co]):
     def __getitem__(self, index: int) -> _T_co: ...
     @overload
     @abstractmethod
-    def __getitem__(self, index: slice) -> Sequence[_T_co]: ...
+    def __getitem__(self, index: slice[int | None]) -> Sequence[_T_co]: ...
     # Mixin methods
     def index(self, value: Any, start: int = 0, stop: int = ...) -> int:
         """S.index(value, [start, [stop]]) -> integer -- return first index of value.
@@ -1604,19 +1607,19 @@ class MutableSequence(Sequence[_T]):
     def __getitem__(self, index: int) -> _T: ...
     @overload
     @abstractmethod
-    def __getitem__(self, index: slice) -> MutableSequence[_T]: ...
+    def __getitem__(self, index: slice[int | None]) -> MutableSequence[_T]: ...
     @overload
     @abstractmethod
     def __setitem__(self, index: int, value: _T) -> None: ...
     @overload
     @abstractmethod
-    def __setitem__(self, index: slice, value: Iterable[_T]) -> None: ...
+    def __setitem__(self, index: slice[int | None], value: Iterable[_T]) -> None: ...
     @overload
     @abstractmethod
     def __delitem__(self, index: int) -> None: ...
     @overload
     @abstractmethod
-    def __delitem__(self, index: slice) -> None: ...
+    def __delitem__(self, index: slice[int | None]) -> None: ...
     # Mixin methods
     def append(self, value: _T) -> None:
         """S.append(value) -- append value to the end of the sequence"""
@@ -1868,7 +1871,7 @@ class MutableMapping(Mapping[_KT, _VT]):
     @overload
     def update(self: SupportsGetItem[str, _VT], m: Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> None: ...
     @overload
-    def update(self: SupportsGetItem[str, _VT], **kwargs: _VT) -> None: ...
+    def update(self: SupportsGetItem[str, _VT], /, **kwargs: _VT) -> None: ...
 
 Text = str
 

@@ -702,8 +702,18 @@ impl<'db> Signature<'db> {
             legacy_generic_context,
         );
 
+        // Look for any typevars bound by this function that are only mentioned in a Callable
+        // return type. (We do this after merging the legacy and PEP-695 contexts because we need
+        // to apply this heuristic to PEP-695 typevars as well.)
+        let (generic_context, return_ty) = GenericContext::remove_callable_only_typevars(
+            db,
+            full_generic_context,
+            &parameters,
+            return_ty,
+        );
+
         Self {
-            generic_context: full_generic_context,
+            generic_context,
             definition: Some(definition),
             parameters,
             return_ty,
@@ -1615,12 +1625,14 @@ impl<'db> Signature<'db> {
                 ParameterKind::KeywordVariadic { .. } => {
                     self_keyword_variadic = Some(self_parameter.annotated_type());
                 }
-                ParameterKind::PositionalOnly { .. } => {
+                ParameterKind::PositionalOnly { default_type, .. } => {
                     // These are the unmatched positional-only parameters in `self` from the
                     // previous loop. They cannot be matched against any parameter in `other` which
-                    // only contains keyword-only and keyword-variadic parameters so the subtype
-                    // relation is invalid.
-                    return ConstraintSet::from(false);
+                    // only contains keyword-only and keyword-variadic parameters. However, if the
+                    // parameter has a default, it's valid because callers don't need to provide it.
+                    if default_type.is_none() {
+                        return ConstraintSet::from(false);
+                    }
                 }
                 ParameterKind::Variadic { .. } => {}
             }

@@ -54,7 +54,8 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, attribute_assignments,
+    place_table,
 };
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -68,20 +69,21 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     self, ABSTRACT_METHOD_IN_FINAL_CLASS, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS,
     CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO,
-    DUPLICATE_BASE, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
-    INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
-    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
-    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
-    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
-    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
-    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
-    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
-    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    DUPLICATE_BASE, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DATACLASS, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM,
+    INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
+    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_HEADER,
+    INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
+    NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
+    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -619,6 +621,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.check_overloaded_functions(node);
             self.check_type_guard_definitions();
             self.check_legacy_positional_only_convention();
+            self.check_final_without_value();
         }
     }
 
@@ -1425,11 +1428,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (14) Check for unimplemented abstract methods on final classes.
             self.check_final_class_abstract_methods(class, class_node);
 
+            // (15) Check for Final-qualified declarations without a value.
+            self.check_class_final_without_value(class);
+
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
             }
 
-            // (15) If it's a `TypedDict` class, check that it doesn't include any invalid
+            // (16) If it's a `TypedDict` class, check that it doesn't include any invalid
             // statements: https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
             //
             //     The body of the class definition defines the items of the `TypedDict` type. It
@@ -1592,6 +1598,140 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+    }
+
+    /// Check for `Final`-qualified declarations in module/function scopes that are never
+    /// assigned a value. Class body scopes are handled separately in
+    /// [`Self::check_class_final_without_value`].
+    fn check_final_without_value(&self) {
+        // In stub files, bare declarations without values are normal.
+        if self.in_stub() {
+            return;
+        }
+
+        // Class body scopes are handled separately in check_class_final_without_value,
+        // which has access to the class literal to handle special cases (e.g. dataclasses).
+        let db = self.db();
+        let file_scope_id = self.scope().file_scope_id(db);
+        if self.index.scope(file_scope_id).kind().is_class() {
+            return;
+        }
+
+        let use_def = self.index.use_def_map(file_scope_id);
+        let place_table = self.index.place_table(file_scope_id);
+
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            let result = place_from_declarations(db, declarations);
+            let first_declaration = result.first_declaration;
+            let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
+
+            if !place_and_quals.qualifiers.contains(TypeQualifiers::FINAL) {
+                continue;
+            }
+
+            // Imports inherit the `Final` qualifier from the source module, but the
+            // import itself provides the value. Don't flag imported `Final` symbols,
+            // even if a later `del` removes the binding at end-of-scope.
+            if first_declaration.is_some_and(|decl| decl.kind(db).is_import()) {
+                continue;
+            }
+
+            // Check if the symbol has any bindings in the current scope.
+            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+            let binding_place = place_from_bindings(db, bindings);
+
+            if !binding_place.place.is_undefined() {
+                continue;
+            }
+
+            let place = place_table.place(symbol_id);
+            if let Some(first_decl) = first_declaration {
+                if let Some(builder) = self.context.report_lint(
+                    &FINAL_WITHOUT_VALUE,
+                    first_decl.full_range(db, self.module()),
+                ) {
+                    builder.into_diagnostic(format_args!(
+                        "`Final` symbol `{place}` is not assigned a value"
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Check for `Final`-qualified declarations in a class body scope that are never
+    /// assigned a value.
+    fn check_class_final_without_value(&self, class: StaticClassLiteral<'db>) {
+        // In stub files, bare declarations without values are normal.
+        if self.in_stub() {
+            return;
+        }
+
+        let db = self.db();
+        let body_scope = class.body_scope(db);
+        let body_scope_id = body_scope.file_scope_id(db);
+        let use_def = self.index.use_def_map(body_scope_id);
+        let place_table = self.index.place_table(body_scope_id);
+
+        // In dataclasses (and similar code-generated classes), Final fields without
+        // defaults are initialized by the synthesized __init__, so they are valid.
+        if CodeGeneratorKind::from_class(db, class.into(), None).is_some() {
+            return;
+        }
+
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            let result = place_from_declarations(db, declarations);
+            let first_declaration = result.first_declaration;
+            let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
+
+            if !place_and_quals.qualifiers.contains(TypeQualifiers::FINAL) {
+                continue;
+            }
+
+            // Check if the symbol has any bindings at class level.
+            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+            let binding_place = place_from_bindings(db, bindings);
+
+            if !binding_place.place.is_undefined() {
+                continue;
+            }
+
+            // Per the typing spec, a `Final` attribute declared in a class body without a
+            // value must be initialized in `__init__`. Assignments in other methods don't count.
+            let symbol = place_table.symbol(symbol_id);
+            if self.has_binding_in_init(body_scope, symbol.name().as_str()) {
+                continue;
+            }
+
+            let place = place_table.place(symbol_id);
+            if let Some(first_decl) = first_declaration {
+                if let Some(builder) = self.context.report_lint(
+                    &FINAL_WITHOUT_VALUE,
+                    first_decl.full_range(db, self.module()),
+                ) {
+                    builder.into_diagnostic(format_args!(
+                        "`Final` symbol `{place}` is not assigned a value"
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Returns `true` if `name` has any attribute assignment (`self.<name> = ...`) in an
+    /// `__init__` method of the class whose body scope is `class_body_scope`.
+    fn has_binding_in_init(&self, class_body_scope: ScopeId<'db>, name: &str) -> bool {
+        let db = self.db();
+        attribute_assignments(db, class_body_scope, name).any(|(bindings, scope_id)| {
+            let is_init = self
+                .index
+                .scope(scope_id)
+                .node()
+                .as_function()
+                .is_some_and(|f| f.node(self.module()).name.id == "__init__");
+            is_init
+                && bindings
+                    .into_iter()
+                    .any(|b| b.binding.definition().is_some())
+        })
     }
 
     /// Check the overloaded functions in this scope.
@@ -2672,7 +2812,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let declared_ty = self.file_expression_type(returns);
+            let enclosing_function =
+                nearest_enclosing_function(self.db(), self.index, self.scope())
+                    .expect("should be in a function body scope");
+            let declared_ty = enclosing_function
+                .last_definition_raw_signature(self.db())
+                .return_ty;
             let expected_ty = match declared_ty {
                 Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(self.db()),
                 ty => ty,
@@ -7941,22 +8086,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            if let Some(value) = value {
+            let value_ty = value.as_ref().map(|value| {
                 self.infer_maybe_standalone_expression(
                     value,
                     TypeContext::new(Some(annotated.inner_type())),
-                );
-            }
+                )
+            });
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target, TypeContext::default());
 
-            // But here we explicitly overwrite the type for the overall `self.attr` node with
-            // the annotated type. We do no use `store_expression_type` here, because it checks
-            // that no type has been stored for the expression before.
-            self.expressions
-                .insert((&**target).into(), annotated.inner_type());
+            // But here we explicitly overwrite the type for the overall `self.attr` node.
+            // We do not use `store_expression_type` here, because it checks that no type
+            // has been stored for the expression before. When there's a value, use the
+            // inferred type (matching the name-target definition path); otherwise fall
+            // back to the annotated type.
+            let target_ty = value_ty.unwrap_or_else(|| annotated.inner_type());
+            self.expressions.insert((&**target).into(), target_ty);
         }
     }
 
@@ -11766,10 +11913,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Since an unbound binding is recorded even for an undefined place,
                     // this can only happen if the code is unreachable
                     // and therefore it is correct to set the result to `Never`.
-                    let union = union.build();
-                    if union.is_assignable_to(db, ty) {
-                        ty = union;
-                    }
+                    ty = union.build();
                 }
             }
         }
@@ -14446,26 +14590,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
         let db = self.db();
 
-        let contains_dunder = right.class_member(db, "__contains__".into()).place;
-        let compare_result_opt = match contains_dunder {
-            Place::Defined(DefinedPlace {
-                ty: contains_dunder,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) => {
-                // If `__contains__` is available, it is used directly for the membership test.
-                contains_dunder
-                    .try_call(db, &CallArguments::positional([right, left]))
-                    .map(|bindings| bindings.return_type(db))
-                    .ok()
-            }
-            _ => {
-                // iteration-based membership test
-                right
-                    .try_iterate(db)
-                    .map(|_| KnownClass::Bool.to_instance(db))
-                    .ok()
-            }
+        let compare_result_opt = match right.try_call_dunder(
+            db,
+            "__contains__",
+            CallArguments::positional([left]),
+            TypeContext::default(),
+        ) {
+            // If `__contains__` is available, it is used directly for the membership test.
+            Ok(bindings) => Some(bindings.return_type(db)),
+            // If `__contains__` is not available or possibly unbound,
+            // fall back to iteration-based membership test.
+            Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_)) => right
+                .try_iterate(db)
+                .map(|_| KnownClass::Bool.to_instance(db))
+                .ok(),
+            // `__contains__` exists but can't be called with the given arguments.
+            Err(CallDunderError::CallError(..)) => None,
         };
 
         compare_result_opt
