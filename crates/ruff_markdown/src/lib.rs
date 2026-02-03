@@ -239,7 +239,7 @@ fn (foo: &str) -> &str {
     }
 
     #[test]
-    fn format_code_blocks_tildas() {
+    fn format_code_blocks_tildes() {
         let code = r#"
 ~~~py
 print( 'hello' )
