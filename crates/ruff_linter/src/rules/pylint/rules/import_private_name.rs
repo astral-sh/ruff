@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{helpers::is_dunder, name::QualifiedName};
+use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -138,26 +138,18 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
             None
         };
         let range = match binding.source.map(|id| checker.semantic().statement(id)) {
-            Some(ruff_python_ast::Stmt::ImportFrom(import_from)) => {
+            Some(ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. })) => {
                 if index < import_info.module_name.len() {
-                    import_from
-                        .module
-                        .as_ref()
-                        .map_or(binding.range(), |module| {
-                            let start = module.start();
-                            let offset: usize = import_info.qualified_name.segments()[..index]
-                                .iter()
-                                .map(|segment| segment.len() + 1)
-                                .sum();
+                    module.as_ref().map_or(binding.range(), |module| {
+                        let offset: TextSize = import_info.qualified_name.segments()[..index]
+                            .iter()
+                            .map(|segment| segment.text_len() + TextSize::new(1))
+                            .sum();
 
-                            ruff_text_size::TextRange::at(
-                                start + ruff_text_size::TextSize::try_from(offset).unwrap(),
-                                ruff_text_size::TextSize::try_from(private_name.len()).unwrap(),
-                            )
-                        })
+                        TextRange::at(module.start() + offset, private_name.text_len())
+                    })
                 } else {
-                    import_from
-                        .names
+                    names
                         .iter()
                         .find(|alias| alias.name.as_str() == import_info.member_name)
                         .map_or(binding.range(), |alias| alias.name.range())
