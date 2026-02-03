@@ -65,6 +65,27 @@ reveal_type(42 in A())  # revealed: bool
 reveal_type(42 not in A())  # revealed: bool
 ```
 
+## `__contains__` implemented via descriptor
+
+If `__contains__` is implemented as a descriptor (e.g., a class with `__get__` that returns a
+callable), the descriptor protocol should be properly invoked:
+
+```py
+class Target:
+    def __call__(self, item: object) -> bool:
+        return True
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> Target:
+        return Target()
+
+class Container:
+    __contains__: Descriptor = Descriptor()
+
+reveal_type(1 in Container())  # revealed: bool
+reveal_type("hello" not in Container())  # revealed: bool
+```
+
 ## Wrong Return Type
 
 Python coerces the results of containment checks to `bool`, even if `__contains__` returns a
