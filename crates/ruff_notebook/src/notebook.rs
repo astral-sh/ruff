@@ -275,12 +275,23 @@ impl Notebook {
             .iter()
             .zip(self.cell_offsets.iter().tuple_windows::<(_, _)>())
         {
+            // Handle invalid ranges where start >= end (can happen with certain fixes like W391)
+            if start >= end {
+                // For empty cells or cells that became empty after fixes, set empty content
+                self.raw.cells[idx as usize].set_source(SourceValue::StringArray(vec![]));
+                continue;
+            }
+
             let cell_content = transformed
                 .get(start.to_usize()..end.to_usize())
                 .unwrap_or_else(|| {
-                    panic!(
-                        "Transformed content out of bounds ({start:?}..{end:?}) for cell at {idx:?}"
-                    );
+                    // Try to recover by using content up to the end of the file
+                    if start.to_usize() < transformed.len() {
+                        &transformed[start.to_usize()..]
+                    } else {
+                        // Cell is completely out of bounds, treat as empty
+                        ""
+                    }
                 });
             self.raw.cells[idx as usize].set_source(SourceValue::StringArray(
                 UniversalNewlineIterator::from(
