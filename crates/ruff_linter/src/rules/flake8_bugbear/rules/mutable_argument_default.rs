@@ -5,7 +5,6 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
-use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
@@ -13,10 +12,6 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::{
-    is_b006_check_guaranteed_mutable_expr_enabled,
-    is_b006_unsafe_fix_preserve_assignment_expr_enabled,
-};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -114,12 +109,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             .iter()
             .map(|target| QualifiedName::from_dotted_name(target))
             .collect();
-        let is_mut_expr = if is_b006_check_guaranteed_mutable_expr_enabled(checker.settings()) {
-            is_guaranteed_mutable_expr(default, checker.semantic())
-        } else {
-            is_mutable_expr(default, checker.semantic())
-        };
-        if is_mut_expr
+        if is_mutable_expr(default, checker.semantic())
             && !parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
@@ -131,18 +121,6 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
                 diagnostic.set_fix(fix);
             }
         }
-    }
-}
-
-/// Returns `true` if the expression is guaranteed to create a mutable object.
-fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::Generator(_) => true,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().any(|e| is_guaranteed_mutable_expr(e, semantic))
-        }
-        Expr::Named(ast::ExprNamed { value, .. }) => is_guaranteed_mutable_expr(value, semantic),
-        _ => is_mutable_expr(expr, semantic),
     }
 }
 
@@ -183,24 +161,15 @@ fn move_initialization(
     let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
-    if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
-        let _ = write!(
-            &mut content,
-            "{} = {}",
-            parameter.parameter.name(),
-            locator.slice(
-                parenthesized_range(default.into(), parameter.into(), checker.tokens())
-                    .unwrap_or(default.range())
-            )
-        );
-    } else {
-        let _ = write!(
-            &mut content,
-            "{} = {}",
-            parameter.name(),
-            checker.generator().expr(default)
-        );
-    }
+    let _ = write!(
+        &mut content,
+        "{} = {}",
+        parameter.parameter.name(),
+        locator.slice(
+            parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                .unwrap_or(default.range())
+        )
+    );
 
     content.push_str(stylist.line_ending().as_str());
 

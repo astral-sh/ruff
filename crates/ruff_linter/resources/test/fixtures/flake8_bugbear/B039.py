@@ -38,3 +38,8 @@ ContextVar("cv", default=time.time())
 
 def baz(): ...
 ContextVar("cv", default=baz())
+
+# Bad (generator, walrus, tuple-with-mutable)
+ContextVar("cv", default=(x for x in "cv"))
+ContextVar("cv", default=(x := []))
+ContextVar("cv", default=([],))

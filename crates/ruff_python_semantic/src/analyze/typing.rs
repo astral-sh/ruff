@@ -409,7 +409,12 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
         | Expr::Set(_)
         | Expr::ListComp(_)
         | Expr::DictComp(_)
-        | Expr::SetComp(_) => true,
+        | Expr::SetComp(_)
+        | Expr::Generator(_) => true,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().any(|e| is_mutable_expr(e, semantic))
+        }
+        Expr::Named(ast::ExprNamed { value, .. }) => is_mutable_expr(value, semantic),
         Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(map_subscript(func), semantic),
         _ => false,
     }
