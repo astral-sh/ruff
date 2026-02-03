@@ -4128,8 +4128,9 @@ impl<'db> Type<'db> {
                 // Currently we don't for a few special known types, either because their
                 // constructors are defined with overloads, or because we want to special case
                 // their return type beyond what typeshed provides (though this support could
-                // likely be moved into the `constructor_bindings` path). Once we support
-                // overloads, re-evaluate the need for these arms.
+                // likely be moved into the `constructor_bindings` path).
+                // TODO: Overloads are supported; follow up to see if any of these arms can be
+                // removed or moved into `constructor_bindings`.
                 Some(KnownClass::Bool) => {
                     // ```py
                     // class bool(int):
@@ -4454,12 +4455,11 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                // Most class literal constructor calls are handled by `constructor_bindings` and
-                // not via getting the signature here. This signature can still be used in some
-                // cases (e.g. evaluating callable subtyping). TODO improve this definition
-                // (intersection of `__new__` and `__init__` signatures? and respect metaclass
-                // `__call__`).
                 _ => self.constructor_bindings(db).unwrap_or_else(|| {
+                    // `constructor_bindings` can return `None` for cases where we intentionally keep
+                    // bespoke call behavior (e.g. typed dict codegen and enum functional syntax).
+                    // Fall back to a gradual signature so analysis can continue in contexts that
+                    // don't have dedicated constructor call handling.
                     Binding::single(
                         self,
                         Signature::new_generic(
@@ -4523,9 +4523,6 @@ impl<'db> Type<'db> {
                     .constructor_bindings(db)
                     .unwrap_or_else(|| Type::from(class).bindings(db)),
 
-                // `type[T]` calls should be checked as constructor calls for `T` (or its bound)
-                // TODO annotated return type on `__new__` or metaclass `__call__`
-                // TODO check call vs signatures of `__new__` and/or `__init__`
                 SubclassOfInner::TypeVar(_) => self.constructor_bindings(db).unwrap_or_else(|| {
                     Binding::single(
                         self,

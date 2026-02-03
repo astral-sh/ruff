@@ -149,7 +149,7 @@ reveal_type(Foo(1))  # revealed: Foo
 reveal_type(Foo())  # revealed: Foo
 ```
 
-## `__new__` defined as a staticmethod
+## `__new__` is implicitly a static method, but explicitly marking it as one is harmless
 
 ```py
 class Foo:
@@ -161,6 +161,8 @@ reveal_type(Foo(1))  # revealed: Foo
 ```
 
 ## `__new__` defined as a classmethod
+
+Marking it as a classmethod, on the other hand, breaks at runtime.
 
 ```py
 class Foo:
@@ -273,6 +275,7 @@ def f(cls: type[T]):
     cls(1)
     # error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `str`, found `Literal[2]`"
     cls(1, 2)
+    reveal_type(cls(1, "foo"))  # revealed: T@f
 ```
 
 ## Union of constructors

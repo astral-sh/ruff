@@ -136,7 +136,6 @@ else:
     Rational = Slow
 
 def _(x: int, y: int):
-    # TODO: Relax this if/when we can model runtime config / optional dependencies.
     # error: [too-many-positional-arguments]
     Rational(x, y)
 ```
