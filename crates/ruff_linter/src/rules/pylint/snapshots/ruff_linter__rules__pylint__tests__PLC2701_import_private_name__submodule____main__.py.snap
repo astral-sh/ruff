@@ -75,3 +75,12 @@ PLC2701 Private name import `_ddd` from external module `bbb.ccc`
  9 |
 10 | # Non-errors.
    |
+
+PLC2701 Private name import `_bar` from external module `foo`
+  --> __main__.py:48:14
+   |
+46 |         pass
+47 |
+48 | from foo.    _bar import baz
+   |              ^^^^
+   |

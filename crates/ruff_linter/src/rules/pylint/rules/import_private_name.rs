@@ -5,7 +5,8 @@ use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -141,12 +142,15 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
             Some(ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. })) => {
                 if index < import_info.module_name.len() {
                     module.as_ref().map_or(binding.range(), |module| {
-                        let offset: TextSize = import_info.qualified_name.segments()[..index]
-                            .iter()
-                            .map(|segment| segment.text_len() + TextSize::new(1))
-                            .sum();
-
-                        TextRange::at(module.start() + offset, private_name.text_len())
+                        SimpleTokenizer::starts_at(module.start(), checker.locator().contents())
+                            .skip_trivia()
+                            .find(|token| {
+                                token.kind == SimpleTokenKind::Name
+                                    && checker.locator().slice(token.range()) == *private_name
+                            })
+                            .map_or(binding.range(), |token: ruff_python_trivia::SimpleToken| {
+                                token.range()
+                            })
                     })
                 } else {
                     names
