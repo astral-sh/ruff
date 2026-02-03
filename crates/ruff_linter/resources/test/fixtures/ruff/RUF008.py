@@ -39,13 +39,13 @@ class AWithQuotes:
 # Mutable defaults wrapped in field() calls
 @dataclass
 class C:
-    mutable_default: list[int] = field(default=[])  # okay
-    mutable_default2: dict[str, int] = field(default={})
-    mutable_default3: set[int] = field(default=set())
-    mutable_default4: dict[str, int] = field(default=dict())
-    correct_factory: list[int] = field(default_factory=list)
-    immutable_default: tuple[int, ...] = field(default=())
-    immutable_default2: str = field(default="hello")
-    immutable_default3: int = field(default=1)
-    non_mutable_var: list[int] = field(default=KNOWINGLY_MUTABLE_DEFAULT)
-    class_variable: ClassVar[list[int]] = field(default=[])
+    mutable_default: list[int] = field(default=[])  # RUF008
+    mutable_default2: dict[str, int] = field(default={})  # RUF008
+    mutable_default3: set[int] = field(default=set())  # RUF008
+    mutable_default4: dict[str, int] = field(default=dict())  # RUF008
+    correct_factory: list[int] = field(default_factory=list)  # okay
+    immutable_default: tuple[int, ...] = field(default=())  # okay
+    immutable_default2: str = field(default="hello")  # okay
+    immutable_default3: int = field(default=1)  # okay
+    non_mutable_var: list[int] = field(default=KNOWINGLY_MUTABLE_DEFAULT)  # okay
+    class_variable: ClassVar[list[int]] = field(default=[])  # okay

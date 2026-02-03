@@ -50,28 +50,28 @@ class D:
 # Mutable defaults wrapped in field() calls
 @define
 class E:
-    mutable_default: list[int] = attrs.field(default=[])
-    mutable_default2: dict[str, int] = attrs.field(default={})
-    mutable_default3: set[int] = attrs.field(default=set())
-    mutable_default4: dict[str, int] = attrs.field(default=dict())
-    correct_factory: list[int] = attrs.field(factory=list)
-    immutable_default: tuple[int, ...] = attrs.field(default=())
-    immutable_default2: str = attrs.field(default="hello")
-    immutable_default3: int = attrs.field(default=1)
-    non_mutable_var: list[int] = attrs.field(default=KNOWINGLY_MUTABLE_DEFAULT)
-    class_variable: ClassVar[list[int]] = attrs.field(default=[])
+    mutable_default: list[int] = attrs.field(default=[])  # RUF008
+    mutable_default2: dict[str, int] = attrs.field(default={})  # RUF008
+    mutable_default3: set[int] = attrs.field(default=set())  # RUF008
+    mutable_default4: dict[str, int] = attrs.field(default=dict())  # RUF008
+    correct_factory: list[int] = attrs.field(factory=list)  # okay
+    immutable_default: tuple[int, ...] = attrs.field(default=())  # okay
+    immutable_default2: str = attrs.field(default="hello")  # okay
+    immutable_default3: int = attrs.field(default=1)  # okay
+    non_mutable_var: list[int] = attrs.field(default=KNOWINGLY_MUTABLE_DEFAULT)  # okay
+    class_variable: ClassVar[list[int]] = attrs.field(default=[])  # okay
 
 
 @attr.s
 class F:
-    mutable_default: list[int] = attr.ib(default=[])
-    mutable_default2: dict[str, int] = attr.ib(default={})
-    correct_factory: list[int] = attr.ib(factory=list)
-    immutable_default: tuple[int, ...] = attr.ib(default=())
+    mutable_default: list[int] = attr.ib(default=[])  # RUF008
+    mutable_default2: dict[str, int] = attr.ib(default={})  # RUF008
+    correct_factory: list[int] = attr.ib(factory=list)  # okay
+    immutable_default: tuple[int, ...] = attr.ib(default=())  # okay
 
 
 @attr.s
 class G:
-    mutable_default: list[int] = attr.attrib(default=[])
-    mutable_default2: set[int] = attr.attrib(default=set())
-    correct_factory: list[int] = attr.attrib(factory=list)
+    mutable_default: list[int] = attr.attrib(default=[])  # RUF008
+    mutable_default2: set[int] = attr.attrib(default=set())  # RUF008
+    correct_factory: list[int] = attr.attrib(factory=list)  # okay

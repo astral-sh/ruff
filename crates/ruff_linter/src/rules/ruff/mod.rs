@@ -133,6 +133,21 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
+    fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview__{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn prefer_parentheses_getitem_tuple() -> Result<()> {
         let diagnostics = test_path(

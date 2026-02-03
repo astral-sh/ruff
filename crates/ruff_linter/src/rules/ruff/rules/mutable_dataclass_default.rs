@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_mutable_default_in_dataclass_field_enabled;
 use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_dataclass_field};
 
 /// ## What it does
@@ -90,7 +91,9 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
         let value = match &**value {
             Expr::Call(ast::ExprCall {
                 func, arguments, ..
-            }) if is_dataclass_field(func, checker.semantic(), dataclass_kind) => {
+            }) if is_mutable_default_in_dataclass_field_enabled(checker.settings())
+                && is_dataclass_field(func, checker.semantic(), dataclass_kind) =>
+            {
                 arguments.find_argument_value("default", 0)
             }
             value => Some(value),
