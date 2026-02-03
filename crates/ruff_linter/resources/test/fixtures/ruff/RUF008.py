@@ -39,7 +39,7 @@ class AWithQuotes:
 # Mutable defaults wrapped in field() calls
 @dataclass
 class C:
-    mutable_default: list[int] = field(default=[])
+    mutable_default: list[int] = field(default=[])  # okay
     mutable_default2: dict[str, int] = field(default={})
     mutable_default3: set[int] = field(default=set())
     mutable_default4: dict[str, int] = field(default=dict())
