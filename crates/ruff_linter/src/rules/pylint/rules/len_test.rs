@@ -128,38 +128,49 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
 }
 
 fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Name(ast::ExprName { id: name, .. }) = expr else {
-        return false;
-    };
+    match expr {
+        Expr::Name(ast::ExprName { id: name, .. }) => {
+            let scope = semantic.current_scope();
+            let Some(binding_id) = scope.get(name) else {
+                return false;
+            };
 
-    let scope = semantic.current_scope();
-    let Some(binding_id) = scope.get(name) else {
-        return false;
-    };
+            let binding = semantic.binding(binding_id);
 
-    let binding = semantic.binding(binding_id);
+            // Attempt to find the binding's value
+            let Some(binding_value) = find_binding_value(binding, semantic) else {
+                // If the binding is not an argument, return false
+                if !binding.kind.is_argument() {
+                    return false;
+                }
 
-    // Attempt to find the binding's value
-    let Some(binding_value) = find_binding_value(binding, semantic) else {
-        // If the binding is not an argument, return false
-        if !binding.kind.is_argument() {
-            return false;
+                // Attempt to retrieve the function definition statement
+                let Some(function) = binding
+                    .statement(semantic)
+                    .and_then(|statement| statement.as_function_def_stmt())
+                else {
+                    return false;
+                };
+
+                // If not find in non-default params, it must be varargs or kwargs
+                return function.parameters.find(name).is_none();
+            };
+
+            // If `binding_value` is found, check if it is a sequence
+            is_sequence(binding_value, semantic)
         }
-
-        // Attempt to retrieve the function definition statement
-        let Some(function) = binding
-            .statement(semantic)
-            .and_then(|statement| statement.as_function_def_stmt())
-        else {
-            return false;
-        };
-
-        // If not find in non-default params, it must be varargs or kwargs
-        return function.parameters.find(name).is_none();
-    };
-
-    // If `binding_value` is found, check if it is a sequence
-    is_sequence(binding_value, semantic)
+        Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+            // For attribute access (e.g., self.fruits), check if the base value type
+            // can have sequence attributes. We use a conservative approach here.
+            // Common sequence-like attributes include:
+            // - Instance attributes that might be lists, tuples, etc.
+            // - Class attributes that are sequences
+            // For now, we'll be conservative and assume attribute access could be a sequence
+            // if the base is an identifier (like self, cls, or an instance)
+            matches!(value.as_ref(), Expr::Name(_))
+        }
+        _ => false,
+    }
 }
 
 fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
