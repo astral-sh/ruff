@@ -3262,6 +3262,8 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
  "ruff_workspace",
 ]
 

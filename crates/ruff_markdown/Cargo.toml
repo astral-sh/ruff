@@ -13,6 +13,8 @@ license = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
 ruff_workspace = { workspace = true }
 
 insta = { workspace = true }
