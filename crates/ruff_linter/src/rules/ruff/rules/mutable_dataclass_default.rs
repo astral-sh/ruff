@@ -87,28 +87,24 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             continue;
         };
 
-        let value_to_check = if let Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = value.as_ref()
-        {
-            if is_dataclass_field(func, checker.semantic(), dataclass_kind) {
+        let value = match &**value {
+            Expr::Call(ast::ExprCall {
+                func, arguments, ..
+            }) if is_dataclass_field(func, checker.semantic(), dataclass_kind) => {
                 arguments.find_argument_value("default", 0)
-            } else {
-                Some(value.as_ref())
             }
-        } else {
-            Some(value.as_ref())
+            value => Some(value),
         };
 
-        let Some(value_to_check) = value_to_check else {
+        let Some(value) = value else {
             continue;
         };
 
-        if is_mutable_expr(value_to_check, checker.semantic())
+        if is_mutable_expr(value, checker.semantic())
             && !is_class_var_annotation(annotation, checker.semantic())
             && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {
-            checker.report_diagnostic(MutableDataclassDefault, value_to_check.range());
+            checker.report_diagnostic(MutableDataclassDefault, value.range());
         }
     }
 }

@@ -60,7 +60,7 @@ RUF008 Do not use mutable default values for dataclass attributes
    |
 40 | @dataclass
 41 | class C:
-42 |     mutable_default: list[int] = field(default=[])
+42 |     mutable_default: list[int] = field(default=[])  # okay
    |                                                ^^
 43 |     mutable_default2: dict[str, int] = field(default={})
 44 |     mutable_default3: set[int] = field(default=set())
@@ -70,7 +70,7 @@ RUF008 Do not use mutable default values for dataclass attributes
   --> RUF008.py:43:54
    |
 41 | class C:
-42 |     mutable_default: list[int] = field(default=[])
+42 |     mutable_default: list[int] = field(default=[])  # okay
 43 |     mutable_default2: dict[str, int] = field(default={})
    |                                                      ^^
 44 |     mutable_default3: set[int] = field(default=set())
@@ -80,7 +80,7 @@ RUF008 Do not use mutable default values for dataclass attributes
 RUF008 Do not use mutable default values for dataclass attributes
   --> RUF008.py:44:48
    |
-42 |     mutable_default: list[int] = field(default=[])
+42 |     mutable_default: list[int] = field(default=[])  # okay
 43 |     mutable_default2: dict[str, int] = field(default={})
 44 |     mutable_default3: set[int] = field(default=set())
    |                                                ^^^^^
