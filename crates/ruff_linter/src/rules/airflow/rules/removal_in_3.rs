@@ -329,6 +329,55 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     }
 }
 
+fn check_deprecated_context_key_value_access(
+    checker: &Checker,
+    value: &Expr,
+    range: TextRange,
+) -> bool {
+    // access context["inlet_events"] via a string key is deprecated.
+    if is_value_from_context_key(checker, value, "inlet_events") {
+        checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: "inlet_events[\"<uri>\"]".to_string(),
+                replacement: Replacement::Message(
+                    "Accessing `inlet_events` via a string key is deprecated; use `inlet_events[Asset(\"<uri>\")]` instead (e.g., context[\"inlet_events\"][Asset(\"this://is-url\")]).",
+                ),
+            },
+            range,
+        );
+        return true;
+    }
+    false
+}
+
+/// Check for deprecated/renamed context key access and report diagnostics.
+fn check_deprecated_context_key(checker: &Checker, key: &str, range: TextRange) {
+    if REMOVED_CONTEXT_KEYS.contains(&key) {
+        checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: key.to_string(),
+                replacement: Replacement::None,
+            },
+            range,
+        );
+        return;
+    }
+
+    if key == "triggering_dataset_events" {
+        let mut diagnostic = checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: "triggering_dataset_events".to_string(),
+                replacement: Replacement::AttrName("triggering_asset_events"),
+            },
+            range,
+        );
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "\"triggering_asset_events\"".to_string(),
+            range,
+        )));
+    }
+}
+
 /// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
 ///
 /// Specifically, it flags the following two scenarios:
@@ -362,33 +411,11 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
         return;
     }
 
-    // This must come before the context variable check since value is not the context itself
-    if is_get_call_on_context_key(checker, call_expr, "inlet_events") {
-        if let Some(Expr::StringLiteral(ExprStringLiteral { range, .. })) =
-            call_expr.arguments.find_positional(0)
-        {
-            checker.report_diagnostic(
-                Airflow3Removal {
-                    deprecated: "inlet_events[\"<uri>\"]".to_string(),
-                    replacement: Replacement::Message(
-                        "Accessing `inlet_events` via a string key (URI) is deprecated; use `inlet_events[Asset(\"<uri>\")]` instead.",
-                    ),
-                },
-                *range,
-            );
-            return;
-        }
-    }
-
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
         return;
     };
 
     if attr.as_str() != "get" {
-        return;
-    }
-
-    if !is_context_variable(checker, value) {
         return;
     }
 
@@ -401,32 +428,15 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
         return;
     };
 
-    // Check removed context keys
-    if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
-        checker.report_diagnostic(
-            Airflow3Removal {
-                deprecated: key.to_string(),
-                replacement: Replacement::None,
-            },
-            *range,
-        );
+    if check_deprecated_context_key_value_access(checker, value, *range) {
         return;
     }
 
-    // triggering_dataset_events -> triggering_asset_events
-    if key.to_str() == "triggering_dataset_events" {
-        let mut diagnostic = checker.report_diagnostic(
-            Airflow3Removal {
-                deprecated: "triggering_dataset_events".to_string(),
-                replacement: Replacement::AttrName("triggering_asset_events"),
-            },
-            *range,
-        );
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "\"triggering_asset_events\"".to_string(),
-            *range,
-        )));
+    if !is_context_variable(checker, value) {
+        return;
     }
+
+    check_deprecated_context_key(checker, key.to_str(), *range);
 }
 
 /// Check if a subscript expression accesses a removed Airflow context variable.
@@ -436,55 +446,21 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
         return;
     }
 
-    // This must come before the context variable check since value is not the context itself
-    if is_string_subscript_on_context_key(checker, subscript, "inlet_events") {
-        checker.report_diagnostic(
-            Airflow3Removal {
-                deprecated: "inlet_events[\"<uri>\"]".to_string(),
-                replacement: Replacement::Message(
-                    "Accessing `inlet_events` via a string key (URI) is deprecated; use `inlet_events[Asset(\"<uri>\")]` instead.",
-                ),
-            },
-            subscript.slice.range(),
-        );
-        return;
-    }
-
     let ExprSubscript { value, slice, .. } = subscript;
 
     let Some(ExprStringLiteral { value: key, .. }) = slice.as_string_literal_expr() else {
         return;
     };
 
+    if check_deprecated_context_key_value_access(checker, value, slice.range()) {
+        return;
+    }
+
     if !is_context_variable(checker, value) {
         return;
     }
 
-    if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
-        checker.report_diagnostic(
-            Airflow3Removal {
-                deprecated: key.to_string(),
-                replacement: Replacement::None,
-            },
-            slice.range(),
-        );
-        return;
-    }
-
-    // triggering_dataset_events -> triggering_asset_events
-    if key.to_str() == "triggering_dataset_events" {
-        let mut diagnostic = checker.report_diagnostic(
-            Airflow3Removal {
-                deprecated: "triggering_dataset_events".to_string(),
-                replacement: Replacement::AttrName("triggering_asset_events"),
-            },
-            slice.range(),
-        );
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "\"triggering_asset_events\"".to_string(),
-            slice.range(),
-        )));
-    }
+    check_deprecated_context_key(checker, key.to_str(), slice.range());
 }
 
 /// Check for removed attribute access on context key value.
@@ -1391,40 +1367,6 @@ fn is_removed_context_key_attribute(
     if attr.as_str() != removed_attr {
         return false;
     }
-
-    is_value_from_context_key(checker, value, context_key)
-}
-
-/// Check for string-based subscript access on a context key value.
-fn is_string_subscript_on_context_key(
-    checker: &Checker,
-    subscript_expr: &ExprSubscript,
-    context_key: &str,
-) -> bool {
-    let ExprSubscript { value, slice, .. } = subscript_expr;
-
-    // Must be a string literal (not Dataset(...) or other expression)
-    if !slice.is_string_literal_expr() {
-        return false;
-    }
-
-    is_value_from_context_key(checker, value, context_key)
-}
-
-/// Check for string-based `.get()` call on a context key value.
-fn is_get_call_on_context_key(checker: &Checker, call_expr: &ExprCall, context_key: &str) -> bool {
-    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
-        return false;
-    };
-
-    if attr.as_str() != "get" {
-        return false;
-    }
-
-    // The first argument must be a string literal
-    let Some(Expr::StringLiteral(_)) = call_expr.arguments.find_positional(0) else {
-        return false;
-    };
 
     is_value_from_context_key(checker, value, context_key)
 }
