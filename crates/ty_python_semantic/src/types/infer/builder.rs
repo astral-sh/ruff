@@ -14585,26 +14585,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
         let db = self.db();
 
-        let contains_dunder = right.class_member(db, "__contains__".into()).place;
-        let compare_result_opt = match contains_dunder {
-            Place::Defined(DefinedPlace {
-                ty: contains_dunder,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) => {
-                // If `__contains__` is available, it is used directly for the membership test.
-                contains_dunder
-                    .try_call(db, &CallArguments::positional([right, left]))
-                    .map(|bindings| bindings.return_type(db))
-                    .ok()
-            }
-            _ => {
-                // iteration-based membership test
-                right
-                    .try_iterate(db)
-                    .map(|_| KnownClass::Bool.to_instance(db))
-                    .ok()
-            }
+        let compare_result_opt = match right.try_call_dunder(
+            db,
+            "__contains__",
+            CallArguments::positional([left]),
+            TypeContext::default(),
+        ) {
+            // If `__contains__` is available, it is used directly for the membership test.
+            Ok(bindings) => Some(bindings.return_type(db)),
+            // If `__contains__` is not available or possibly unbound,
+            // fall back to iteration-based membership test.
+            Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound(_)) => right
+                .try_iterate(db)
+                .map(|_| KnownClass::Bool.to_instance(db))
+                .ok(),
+            // `__contains__` exists but can't be called with the given arguments.
+            Err(CallDunderError::CallError(..)) => None,
         };
 
         compare_result_opt
