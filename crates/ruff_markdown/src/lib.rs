@@ -73,45 +73,49 @@ pub fn format_code_blocks(
 
             // Consume lines until reaching the matching/ending code fence
             for code_line in lines.by_ref() {
-                if let Some(closing_capture) = MARKDOWN_CODE_FENCE.captures(&code_line) {
-                    let (_, [_, closing_fence, _, _]) = closing_capture.extract();
-                    // Found the end of the code block
-                    if closing_fence == opening_fence {
-                        let language = language.to_ascii_lowercase();
-                        if state == MarkdownState::On
-                            && matches!(
-                                language.as_str(),
-                                "python" | "py" | "python3" | "py3" | "pyi" | ""
-                            )
+                let Some((_, [_, closing_fence, _, _])) = MARKDOWN_CODE_FENCE
+                    .captures(&code_line)
+                    .map(|cap| cap.extract())
+                else {
+                    continue;
+                };
+
+                // Found the matching end of the code block
+                if closing_fence == opening_fence {
+                    let language = language.to_ascii_lowercase();
+                    if state == MarkdownState::On
+                        && matches!(
+                            language.as_str(),
+                            "python" | "py" | "python3" | "py3" | "pyi" | ""
+                        )
+                    {
+                        // Maybe python, try formatting it
+                        let end = code_line.start();
+                        let unformatted_code = dedent(&source[TextRange::new(start, end)]);
+
+                        let py_source_type = PySourceType::from_extension(&language);
+                        let options =
+                            settings.to_format_options(py_source_type, &unformatted_code, path);
+
+                        // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
+                        // dependency, and I suspect that Rust can optimize the closure away regardless.
+                        #[expect(clippy::redundant_closure_for_method_calls)]
+                        let formatted_code = format_module_source(&unformatted_code, options)
+                            .map(|formatted| formatted.into_code());
+
+                        // Formatting produced changes
+                        if let Ok(formatted_code) = formatted_code
+                            && (formatted_code.len() != unformatted_code.len()
+                                || formatted_code != *unformatted_code)
                         {
-                            // Maybe python, try formatting it
-                            let end = code_line.start();
-                            let unformatted_code = dedent(&source[TextRange::new(start, end)]);
-
-                            let py_source_type = PySourceType::from_extension(&language);
-                            let options =
-                                settings.to_format_options(py_source_type, &unformatted_code, path);
-
-                            // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
-                            // dependency, and I suspect that Rust can optimize the closure away regardless.
-                            #[expect(clippy::redundant_closure_for_method_calls)]
-                            let formatted_code = format_module_source(&unformatted_code, options)
-                                .map(|formatted| formatted.into_code());
-
-                            // Formatting produced changes
-                            if let Ok(formatted_code) = formatted_code
-                                && (formatted_code.len() != unformatted_code.len()
-                                    || formatted_code != *unformatted_code)
-                            {
-                                formatted.push_str(&source[TextRange::new(last_match, start)]);
-                                let formatted_code = indent(&formatted_code, code_indent);
-                                formatted.push_str(&formatted_code);
-                                last_match = end;
-                                changed = true;
-                            }
+                            formatted.push_str(&source[TextRange::new(last_match, start)]);
+                            let formatted_code = indent(&formatted_code, code_indent);
+                            formatted.push_str(&formatted_code);
+                            last_match = end;
+                            changed = true;
                         }
-                        break;
                     }
+                    break;
                 }
             }
         }
