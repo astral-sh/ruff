@@ -2779,7 +2779,7 @@ declare_lint! {
     /// ```
     pub(crate) static UNSAFE_TUPLE_SUBCLASS = {
         summary: "detects unsafe overrides of certain dunder methods in tuple subclasses",
-        status: LintStatus::stable("0.0.6"),
+        status: LintStatus::stable("0.0.14"),
         default_level: Level::Warn,
     }
 }
