@@ -546,12 +546,22 @@ impl<'db> GenericContext<'db> {
     ) -> (Option<Self>, Type<'db>) {
         #[derive(Default)]
         struct TypeVarLocations<'db> {
+            /// The set of typevars that appear somewhere other than in a `Callable` in the return
+            /// type.
             found_outside_callable_return: FxHashSet<BoundTypeVarInstance<'db>>,
+            /// A map containing all of the `Callable`s in the return type, along with the typevars
+            /// that appear in each. (Note that at this point, we have not yet determined if those
+            /// typevars _only_ appear there.)
             found_inside_callable_return:
                 FxHashMap<CallableType<'db>, FxOrderSet<BoundTypeVarInstance<'db>>>,
         }
 
         impl<'db> TypeVarLocations<'db> {
+            /// Returns a set of all of the typevars that _only_ appear in a `Callable` in the
+            /// return type, along with a "replacement map" for those `Callable`s. (The key of the
+            /// map will be a `Callable` as it originally appears in the return type — i.e., with
+            /// no generic context. The corresponding value will be the updated `Callable` with a
+            /// generic context.)
             fn finalize(
                 self,
                 db: &'db dyn Db,
@@ -587,6 +597,8 @@ impl<'db> GenericContext<'db> {
             }
         }
 
+        /// A visitor that walks through the parameter and return type annotations, recording
+        /// whether each typevar appears inside and/or outside of a return type `Callable`.
         struct FindTypeVarLocations<'db> {
             locations: RefCell<TypeVarLocations<'db>>,
             recursion_guard: TypeCollector<'db>,
@@ -662,7 +674,7 @@ impl<'db> GenericContext<'db> {
             return (None, return_type);
         };
 
-        // Find which typevars appear only inside a Callable in the return type annotation.
+        // Find whether each typevar appears inside and/or outside a return type Callable.
         let find_typevar_locations = FindTypeVarLocations {
             locations: RefCell::default(),
             recursion_guard: TypeCollector::default(),
@@ -675,7 +687,8 @@ impl<'db> GenericContext<'db> {
         find_typevar_locations.in_return_type.set(true);
         find_typevar_locations.visit_type(db, return_type);
 
-        // Then update those Callables to be generic.
+        // Then update those return type Callables to be generic, with their generic context
+        // containing the typevars that don't appear outside any return type Callable.
         let (found_only_inside_callable_return, replacements) =
             find_typevar_locations.locations.into_inner().finalize(db);
         let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
