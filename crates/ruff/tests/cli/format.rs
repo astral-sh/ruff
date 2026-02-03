@@ -737,6 +737,39 @@ fn check_silent_mode_no_output() -> Result<()> {
 }
 
 #[test]
+fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
+    // should show diagnostics but not summary
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--quiet"]), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
+    // default mode should show both diagnostics and summary
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--check"]), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    1 file would be reformatted
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn force_exclude() -> Result<()> {
     let test = CliTest::with_files([
         (
