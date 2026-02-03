@@ -117,6 +117,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&INEFFECTIVE_FINAL);
+    registry.register_lint(&FINAL_WITHOUT_VALUE);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&ASSERT_TYPE_UNSPELLABLE_SUBTYPE);
@@ -2053,6 +2054,33 @@ declare_lint! {
         summary: "detects calls to `final()` that type checkers cannot interpret",
         status: LintStatus::stable("0.0.1-alpha.33"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `Final` symbols that are declared without a value and are never
+    /// assigned a value in their scope.
+    ///
+    /// ## Why is this bad?
+    /// A `Final` symbol must be initialized with a value at the time of declaration
+    /// or in a subsequent assignment. At module or function scope, the assignment must
+    /// occur in the same scope. In a class body, the assignment may occur in `__init__`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Final
+    ///
+    /// # Error: `Final` symbol without a value
+    /// MY_CONSTANT: Final[int]
+    ///
+    /// # OK: `Final` symbol with a value
+    /// MY_CONSTANT: Final[int] = 1
+    /// ```
+    pub(crate) static FINAL_WITHOUT_VALUE = {
+        summary: "detects `Final` declarations without a value",
+        status: LintStatus::stable("0.0.15"),
+        default_level: Level::Error,
     }
 }
 
