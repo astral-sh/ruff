@@ -248,11 +248,11 @@ usual within code blocks, the formatter will also skip formatting any code block
 surrounded by appropriate HTML comments, such as:
 
 ````markdown
-<!-- ruff:off -->
+<!-- fmt:off -->
 ```py
 print( 'hello' )
 ```
-<!-- ruff:on -->
+<!-- fmt:on -->
 ````
 
 Any number of code blocks may be contained within a matching pair of `off` and
@@ -261,7 +261,7 @@ will implicitly cover the remaining portion of the document.
 
 The Ruff formatter will also recognize HTML comments from [blacken-docs][],
 `<!-- blacken-docs:off -->` and `<!-- blacken-docs:on -->`, which are equivalent
-to `<!-- ruff:off -->` and `<!-- ruff:on -->` respectively.
+to `<!-- fmt:off -->` and `<!-- fmt:on -->` respectively.
 
 [blacken-docs]: https://github.com/adamchainz/blacken-docs/
 
