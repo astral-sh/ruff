@@ -25,15 +25,19 @@
     ```
 
 - **Alpine Docker image**
+
     The `ruff:alpine` Docker image is now based on Alpine 3.23 (up from 3.21).
 
 - **Debian Docker image**
+
     The `ruff:debian` and `ruff:debian-slim` Docker images are now based on Debian 13 "Trixie" instead of Debian 12 "Bookworm."
 
 - **`ppc64` binaries**
+
     Binaries for the `ppc64` (64-bit big-endian PowerPC) architecture are no longer included in our releases. It should still be possible to build Ruff manually for this platform, if needed.
 
 - **Default Python version and `extend`**
+
     Ruff now resolves all `extend`ed configuration files before falling back on a default Python version.
 
 ## 0.14.0
