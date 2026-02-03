@@ -205,7 +205,6 @@ pub(crate) fn format(
     }
 
     let results = FormatResults::new(results.as_slice(), mode);
-    // Report on the formatting changes.
     if config_arguments.log_level > LogLevel::Silent {
         match mode {
             FormatMode::Write => {}
@@ -222,7 +221,7 @@ pub(crate) fn format(
         }
     }
 
-    // Only show summary for default log level (not for --quiet or --silent)
+    // Report on the formatting changes.
     if config_arguments.log_level >= LogLevel::Default {
         if mode.is_diff() {
             // Allow piping the diff to e.g. a file by writing the summary to stderr
