@@ -7077,19 +7077,18 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
-
         from typing_extensions import TypeAliasType
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2546:26
+            --> stdlib/typing.pyi:2549:26
              |
-        2544 |         """
-        2545 |
-        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2547 |         """
+        2548 |
+        2549 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                          ^^^^
-        2547 |         @property
-        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2550 |         @property
+        2551 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:20
@@ -7100,14 +7099,14 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2546:37
+            --> stdlib/typing.pyi:2549:37
              |
-        2544 |         """
-        2545 |
-        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2547 |         """
+        2548 |
+        2549 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                                     ^^^^^
-        2547 |         @property
-        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2550 |         @property
+        2551 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:32
