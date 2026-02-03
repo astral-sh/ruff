@@ -14,12 +14,24 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
-    #[test_case(Path::new("EXE001_1.py"))]
-    #[test_case(Path::new("EXE001_1_ntfs.py"))]
+    #[cfg_attr(
+        all(unix, not(test_environment = "ntfs")),
+        test_case(Path::new("EXE001_1.py"))
+    )]
+    #[cfg_attr(
+        any(windows, test_environment = "ntfs"),
+        test_case(Path::new("EXE001_1_ntfs.py"))
+    )]
     #[test_case(Path::new("EXE001_2.py"))]
     #[test_case(Path::new("EXE001_3.py"))]
-    #[test_case(Path::new("EXE002_1.py"))]
-    #[test_case(Path::new("EXE002_1_ntfs.py"))]
+    #[cfg_attr(
+        all(unix, not(test_environment = "ntfs")),
+        test_case(Path::new("EXE002_1.py"))
+    )]
+    #[cfg_attr(
+        any(windows, test_environment = "ntfs"),
+        test_case(Path::new("EXE002_1_ntfs.py"))
+    )]
     #[test_case(Path::new("EXE002_2.py"))]
     #[test_case(Path::new("EXE002_3.py"))]
     #[test_case(Path::new("EXE003.py"))]
