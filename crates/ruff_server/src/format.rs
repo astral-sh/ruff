@@ -2,10 +2,11 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use anyhow::Context;
+use anyhow::{Context, Error};
 
 use ruff_formatter::{FormatOptions, PrintedRange};
-use ruff_python_ast::PySourceType;
+use ruff_markdown::{MarkdownResult, format_code_blocks};
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{FormatModuleError, PyFormatOptions, format_module_source};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextRange;
@@ -30,7 +31,7 @@ pub(crate) enum FormatBackend {
 
 pub(crate) fn format(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     path: &Path,
     backend: FormatBackend,
@@ -44,47 +45,75 @@ pub(crate) fn format(
 /// Format using the built-in Ruff formatter.
 fn format_internal(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     path: &Path,
 ) -> crate::Result<Option<String>> {
-    let format_options =
-        formatter_settings.to_format_options(source_type, document.contents(), Some(path));
-    match format_module_source(document.contents(), format_options) {
-        Ok(formatted) => {
-            let formatted = formatted.into_code();
-            if formatted == document.contents() {
-                Ok(None)
-            } else {
-                Ok(Some(formatted))
+    match source_type {
+        SourceType::Python(py_source_type) => {
+            let format_options = formatter_settings.to_format_options(
+                py_source_type,
+                document.contents(),
+                Some(path),
+            );
+            match format_module_source(document.contents(), format_options) {
+                Ok(formatted) => {
+                    let formatted = formatted.into_code();
+                    if formatted == document.contents() {
+                        Ok(None)
+                    } else {
+                        Ok(Some(formatted))
+                    }
+                }
+                // Special case - syntax/parse errors are handled here instead of
+                // being propagated as visible server errors.
+                Err(FormatModuleError::ParseError(error)) => {
+                    tracing::warn!("Unable to format document: {error}");
+                    Ok(None)
+                }
+                Err(err) => Err(err.into()),
             }
         }
-        // Special case - syntax/parse errors are handled here instead of
-        // being propagated as visible server errors.
-        Err(FormatModuleError::ParseError(error)) => {
-            tracing::warn!("Unable to format document: {error}");
-            Ok(None)
+        SourceType::Markdown => {
+            if !formatter_settings.preview.is_enabled() {
+                return Ok(None); // todo
+            }
+
+            match format_code_blocks(document.contents(), Some(path), formatter_settings) {
+                MarkdownResult::Formatted(formatted) => Ok(Some(formatted)),
+                MarkdownResult::Unchanged => Ok(None),
+            }
         }
-        Err(err) => Err(err.into()),
+        SourceType::Toml(_) => Ok(None), // todo
     }
 }
 
 /// Format using an external uv command.
 fn format_external(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     path: &Path,
 ) -> crate::Result<Option<String>> {
-    let format_options =
-        formatter_settings.to_format_options(source_type, document.contents(), Some(path));
-    let uv_command = UvFormatCommand::from(format_options);
-    uv_command.format_document(document.contents(), path)
+    match source_type {
+        SourceType::Python(py_source_type) => {
+            let format_options = formatter_settings.to_format_options(
+                py_source_type,
+                document.contents(),
+                Some(path),
+            );
+            let uv_command = UvFormatCommand::from(format_options);
+            uv_command.format_document(document.contents(), path)
+        }
+        SourceType::Markdown | SourceType::Toml(_) => {
+            Ok(None) // todo
+        }
+    }
 }
 
 pub(crate) fn format_range(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     range: TextRange,
     path: &Path,
@@ -103,48 +132,68 @@ pub(crate) fn format_range(
 /// Format range using the built-in Ruff formatter
 fn format_range_internal(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     range: TextRange,
     path: &Path,
 ) -> crate::Result<Option<PrintedRange>> {
-    let format_options =
-        formatter_settings.to_format_options(source_type, document.contents(), Some(path));
+    match source_type {
+        SourceType::Python(py_source_type) => {
+            let format_options = formatter_settings.to_format_options(
+                py_source_type,
+                document.contents(),
+                Some(path),
+            );
 
-    match ruff_python_formatter::format_range(document.contents(), range, format_options) {
-        Ok(formatted) => {
-            if formatted.as_code() == document.contents() {
-                Ok(None)
-            } else {
-                Ok(Some(formatted))
+            match ruff_python_formatter::format_range(document.contents(), range, format_options) {
+                Ok(formatted) => {
+                    if formatted.as_code() == document.contents() {
+                        Ok(None)
+                    } else {
+                        Ok(Some(formatted))
+                    }
+                }
+                // Special case - syntax/parse errors are handled here instead of
+                // being propagated as visible server errors.
+                Err(FormatModuleError::ParseError(error)) => {
+                    tracing::warn!("Unable to format document range: {error}");
+                    Ok(None)
+                }
+                Err(err) => Err(err.into()),
             }
         }
-        // Special case - syntax/parse errors are handled here instead of
-        // being propagated as visible server errors.
-        Err(FormatModuleError::ParseError(error)) => {
-            tracing::warn!("Unable to format document range: {error}");
-            Ok(None)
+        SourceType::Markdown | SourceType::Toml(_) => {
+            Ok(None) // todo
         }
-        Err(err) => Err(err.into()),
     }
 }
 
 /// Format range using an external command, i.e., `uv`.
 fn format_range_external(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     range: TextRange,
     path: &Path,
 ) -> crate::Result<Option<PrintedRange>> {
-    let format_options =
-        formatter_settings.to_format_options(source_type, document.contents(), Some(path));
-    let uv_command = UvFormatCommand::from(format_options);
+    match source_type {
+        SourceType::Python(py_source_type) => {
+            let format_options = formatter_settings.to_format_options(
+                py_source_type,
+                document.contents(),
+                Some(path),
+            );
+            let uv_command = UvFormatCommand::from(format_options);
 
-    // Format the range using uv and convert the result to `PrintedRange`
-    match uv_command.format_range(document.contents(), range, path, document.index())? {
-        Some(formatted) => Ok(Some(PrintedRange::new(formatted, range))),
-        None => Ok(None),
+            // Format the range using uv and convert the result to `PrintedRange`
+            match uv_command.format_range(document.contents(), range, path, document.index())? {
+                Some(formatted) => Ok(Some(PrintedRange::new(formatted, range))),
+                None => Ok(None),
+            }
+        }
+        SourceType::Markdown | SourceType::Toml(_) => {
+            Ok(None) // todo
+        }
     }
 }
 
@@ -327,7 +376,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_linter::settings::types::{CompiledPerFileTargetVersionList, PerFileTargetVersion};
-    use ruff_python_ast::{PySourceType, PythonVersion};
+    use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
     use ruff_text_size::{TextRange, TextSize};
     use ruff_workspace::FormatterSettings;
 
@@ -349,7 +398,7 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
             .unwrap();
         let result = format(
             &document,
-            PySourceType::Python,
+            SourceType::Python(PySourceType::Python),
             &FormatterSettings {
                 unresolved_target_version: PythonVersion::PY38,
                 per_file_target_version,
@@ -373,7 +422,7 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
         // same as above but without the per_file_target_version override
         let result = format(
             &document,
-            PySourceType::Python,
+            SourceType::Python(PySourceType::Python),
             &FormatterSettings {
                 unresolved_target_version: PythonVersion::PY38,
                 ..Default::default()
@@ -420,7 +469,7 @@ sys.exit(
             .unwrap();
         let result = format_range(
             &document,
-            PySourceType::Python,
+            SourceType::Python(PySourceType::Python),
             &FormatterSettings {
                 unresolved_target_version: PythonVersion::PY38,
                 per_file_target_version,
@@ -445,7 +494,7 @@ sys.exit(
         // same as above but without the per_file_target_version override
         let result = format_range(
             &document,
-            PySourceType::Python,
+            SourceType::Python(PySourceType::Python),
             &FormatterSettings {
                 unresolved_target_version: PythonVersion::PY38,
                 ..Default::default()
@@ -488,7 +537,7 @@ def world(  ):
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &FormatterSettings::default(),
                 Path::new("test.py"),
                 FormatBackend::Uv,
@@ -529,7 +578,7 @@ def another_function(x,y,z):
 
             let result = format_range(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &FormatterSettings::default(),
                 range,
                 Path::new("test.py"),
@@ -571,7 +620,7 @@ def hello(very_long_parameter_name_1, very_long_parameter_name_2, very_long_para
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
@@ -618,7 +667,7 @@ def hello():
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
@@ -650,7 +699,7 @@ def broken(:
             // uv should return None for syntax errors (as indicated by the TODO comment)
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &FormatterSettings::default(),
                 Path::new("test.py"),
                 FormatBackend::Uv,
@@ -684,7 +733,7 @@ line'''
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
@@ -726,7 +775,7 @@ bar = [1, 2, 3,]
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
