@@ -18,22 +18,30 @@ def identity[T](t: T) -> T:
 
 # revealed: ty_extensions.GenericContext[T@identity]
 reveal_type(generic_context(identity))
+# revealed: Literal[1]
+reveal_type(identity(1))
 
 def identity2[**P, T](c: Callable[P, T]) -> Callable[P, T]:
     return c
 
 # revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
 reveal_type(generic_context(identity2))
+# revealed: [T](t: T) -> T
+reveal_type(identity2(identity))
 ```
 
 Generic classes are another example, since you invoke the class to instantiate it:
 
 ```py
 class C[T]:
+    t: T  # invariant
+
     def __init__(self, t: T) -> None: ...
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
+# revealed: C[int]
+reveal_type(C(1))
 ```
 
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
@@ -45,16 +53,22 @@ from ty_extensions import into_callable
 reveal_type(into_callable(identity))
 # revealed: ty_extensions.GenericContext[T@identity]
 reveal_type(generic_context(into_callable(identity)))
+# revealed: Literal[1]
+reveal_type(into_callable(identity)(1))
 
 # revealed: [**P, T](c: (**P@identity2) -> T) -> (**P@identity2) -> T
 reveal_type(into_callable(identity2))
 # revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
 reveal_type(generic_context(into_callable(identity2)))
+# revealed: [T](t: T) -> T
+reveal_type(into_callable(identity2)(identity))
 
 # revealed: [T](t: T) -> C[T]
 reveal_type(into_callable(C))
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(into_callable(C)))
+# revealed: C[int]
+reveal_type(into_callable(C)(1))
 ```
 
 ## Naming a generic `Callable`: type aliases
@@ -83,6 +97,8 @@ reveal_type(generic_context(decorator_factory))
 reveal_type(decorator_factory())
 # revealed: ty_extensions.GenericContext[T@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
+# revealed: Literal[1]
+reveal_type(decorator_factory()(1))
 ```
 
 ## Naming a generic `Callable` with paramspecs: type aliases
@@ -107,10 +123,17 @@ def decorator_factory[**P, T]() -> IdentityCallable[P, T]:
 # revealed: None
 reveal_type(generic_context(decorator_factory))
 
+def identity[T](t: T) -> T:
+    return t
+
 # revealed: [**P, T]((**P@decorator_factory) -> T, /) -> (**P@decorator_factory) -> T
 reveal_type(decorator_factory())
 # revealed: ty_extensions.GenericContext[P@decorator_factory, T@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
+# revealed: [T](t: T) -> T
+reveal_type(decorator_factory()(identity))
+# revealed: Literal[1]
+reveal_type(decorator_factory()(identity)(1))
 ```
 
 ## Naming a generic `Callable`: function return values
@@ -144,6 +167,8 @@ reveal_type(generic_context(decorator_factory))
 reveal_type(decorator_factory())
 # revealed: ty_extensions.GenericContext[T@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
+# revealed: Literal[1]
+reveal_type(decorator_factory()(1))
 ```
 
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
@@ -160,6 +185,8 @@ reveal_type(generic_context(outside_callable))
 reveal_type(outside_callable(1))
 # revealed: None
 reveal_type(generic_context(outside_callable(1)))
+# error: [invalid-argument-type]
+outside_callable(1)("string")
 ```
 
 ## Naming a generic `Callable` with paramspecs: function return values
@@ -182,10 +209,17 @@ def decorator_factory[**P, T]() -> Callable[[Callable[P, T]], Callable[P, T]]:
 # revealed: None
 reveal_type(generic_context(decorator_factory))
 
+def identity[T](t: T) -> T:
+    return t
+
 # revealed: [**P, T]((**P@decorator_factory) -> T, /) -> (**P@decorator_factory) -> T
 reveal_type(decorator_factory())
 # revealed: ty_extensions.GenericContext[P@decorator_factory, T@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
+# revealed: [T](t: T) -> T
+reveal_type(decorator_factory()(identity))
+# revealed: Literal[1]
+reveal_type(decorator_factory()(identity)(1))
 ```
 
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
@@ -198,11 +232,13 @@ def outside_callable[**P, T](func: Callable[P, T]) -> Callable[P, T]:
 # revealed: ty_extensions.GenericContext[P@outside_callable, T@outside_callable]
 reveal_type(generic_context(outside_callable))
 
-def identity(x: int) -> int:
+def int_identity(x: int) -> int:
     return x
 
 # revealed: (x: int) -> int
-reveal_type(outside_callable(identity))
+reveal_type(outside_callable(int_identity))
 # revealed: None
-reveal_type(generic_context(outside_callable(identity)))
+reveal_type(generic_context(outside_callable(int_identity)))
+# error: [invalid-argument-type]
+outside_callable(int_identity)("string")
 ```
