@@ -607,6 +607,32 @@ class GoodChild2(Parent):
     def static_method(x: object) -> bool: ...
 ```
 
+## Overloaded methods with positional-only parameters with defaults
+
+When a base class has an overloaded method where one overload accepts only keyword arguments
+(`**kwargs`), and the subclass overrides it with a positional-only parameter that has a default, the
+override should be valid because callers can still call it without positional arguments.
+
+```pyi
+from typing import overload
+
+class Base:
+    @overload
+    def method(self, x: int, /) -> None: ...
+    @overload
+    def method(self, **kwargs: int) -> None: ...
+    def method(self, *args, **kwargs) -> None: ...
+
+class GoodChild(Base):
+    # This should be fine: the positional-only parameter has a default,
+    # so calls like `obj.method(a=1)` are still valid
+    def method(self, x: int = 0, /, **kwargs: int) -> None: ...
+
+class BadChild(Base):
+    # `x` has no default, so `obj.method(a=1)` would fail
+    def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
+```
+
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
