@@ -110,6 +110,43 @@ CustomerModel(id=1, name="Test")
 CustomerModel()
 ```
 
+### Derived metaclass inheriting from @dataclass_transform metaclass
+
+When a class uses a metaclass that inherits from a `@dataclass_transform`-decorated metaclass (but
+is not itself decorated), the dataclass transform behavior should still be detected.
+
+This pattern matches SQLModel's structure, where the [metaclass example] in the typing spec shows
+that classes using such metaclasses should get dataclass-like semantics:
+
+- `ModelMetaclass` has `@dataclass_transform`
+- `SQLModelMetaclass(ModelMetaclass)` inherits but is NOT decorated
+- `SQLModel(BaseModel, metaclass=SQLModelMetaclass)` uses the derived metaclass
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class BaseMeta(type): ...
+
+# Derived metaclass inherits from decorated metaclass but is NOT itself decorated
+class DerivedMeta(BaseMeta): ...
+class BaseModel(metaclass=BaseMeta): ...
+
+# Uses derived metaclass (like SQLModel does)
+class SQLModel(BaseModel, metaclass=DerivedMeta): ...
+
+class User(SQLModel):
+    id: int
+    name: str
+
+reveal_type(User.__init__)  # revealed: (self: User, id: int, name: str) -> None
+
+User(id=1, name="Test")
+
+# error: [missing-argument]
+User()
+```
+
 ### Decorating a base class
 
 ```py
@@ -1153,4 +1190,5 @@ Model(x=1)
 reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
 ```
 
+[metaclass example]: https://typing.python.org/en/latest/spec/dataclasses.html#metaclass-example
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
