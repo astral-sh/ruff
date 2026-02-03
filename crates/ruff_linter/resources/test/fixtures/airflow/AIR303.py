@@ -91,16 +91,31 @@ class ValidOperatorLink2(BaseOperatorLink):
     def get_link(self, operator, ti_key):
         pass
 
+# Multiple keyword-only args with ti_key
+class ValidOperatorLink3(BaseOperatorLink):
+    def get_link(self, operator, *, ti_key, extra=None):
+        pass
+
+# *args with ti_key keyword-only
+class ValidOperatorLink4(BaseOperatorLink):
+    def get_link(self, operator, *args, ti_key):
+        pass
+
+# **kwargs alongside ti_key
+class ValidOperatorLink5(BaseOperatorLink):
+    def get_link(self, operator, *, ti_key, **kwargs):
+        pass
+
 # not exactly 3 positional args
-class InvalidOperatorLink3(BaseOperatorLink):
+class InvalidOperatorLink1(BaseOperatorLink):
     def get_link(self, operator):
         pass
 
-class InvalidOperatorLink4(BaseOperatorLink):
+class InvalidOperatorLink2(BaseOperatorLink):
     def get_link(self, operator, ti_key, extra):
         pass
 
-class InvalidOperatorLink5(BaseOperatorLink):
+class InvalidOperatorLink3(BaseOperatorLink):
     def get_link(self, operator, *, something):
         pass
 
@@ -113,6 +128,7 @@ class NotOperatorLinkSubclass:
 def get_link(operator, dttm):
     pass
 
+
 from airflow.sdk import BaseOperatorLink
 
 # 3 positional args, 3rd NOT named 'ti_key'
@@ -121,24 +137,48 @@ class DeprecatedOperatorLink2(BaseOperatorLink):
         pass
 
 # keyword-only ti_key
-class ValidOperatorLink3(BaseOperatorLink):
+class ValidOperatorLink6(BaseOperatorLink):
     def get_link(self, operator, *, ti_key):
         pass
 
 # positional ti_key with correct name
-class ValidOperatorLink4(BaseOperatorLink):
+class ValidOperatorLink7(BaseOperatorLink):
     def get_link(self, operator, ti_key):
         pass
 
+# Multiple keyword-only args with ti_key
+class ValidOperatorLink8(BaseOperatorLink):
+    def get_link(self, operator, *, ti_key, extra=None):
+        pass
+
+# *args with ti_key keyword-only
+class ValidOperatorLink9(BaseOperatorLink):
+    def get_link(self, operator, *args, ti_key):
+        pass
+
+# **kwargs alongside ti_key
+class ValidOperatorLink10(BaseOperatorLink):
+    def get_link(self, operator, *, ti_key, **kwargs):
+        pass
+
 # not exactly 3 positional args
-class InvalidOperatorLink6(BaseOperatorLink):
+class InvalidOperatorLink4(BaseOperatorLink):
     def get_link(self, operator):
         pass
 
-class InvalidOperatorLink7(BaseOperatorLink):
+class InvalidOperatorLink5(BaseOperatorLink):
     def get_link(self, operator, ti_key, extra):
         pass
 
-class InvalidOperatorLink8(BaseOperatorLink):
+class InvalidOperatorLink6(BaseOperatorLink):
     def get_link(self, operator, *, something):
         pass
+
+# Not a subclass of BaseOperatorLink
+class NotOperatorLinkSubclass2:
+    def get_link(self, operator, dttm):
+        pass
+
+# Not a class method
+def get_link(operator, dttm):
+    pass

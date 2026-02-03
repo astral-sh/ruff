@@ -299,74 +299,74 @@ AIR303 `get_link` signature is changed in Airflow 3.0
 help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
 
 AIR303 `get_link` signature is changed in Airflow 3.0
-  --> AIR303.py:96:9
-   |
-94 | # not exactly 3 positional args
-95 | class InvalidOperatorLink3(BaseOperatorLink):
-96 |     def get_link(self, operator):
-   |         ^^^^^^^^
-97 |         pass
-   |
-help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
-
-AIR303 `get_link` signature is changed in Airflow 3.0
-   --> AIR303.py:100:9
+   --> AIR303.py:111:9
     |
- 99 | class InvalidOperatorLink4(BaseOperatorLink):
-100 |     def get_link(self, operator, ti_key, extra):
+109 | # not exactly 3 positional args
+110 | class InvalidOperatorLink1(BaseOperatorLink):
+111 |     def get_link(self, operator):
     |         ^^^^^^^^
-101 |         pass
+112 |         pass
     |
 help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
 
 AIR303 `get_link` signature is changed in Airflow 3.0
-   --> AIR303.py:104:9
+   --> AIR303.py:115:9
     |
-103 | class InvalidOperatorLink5(BaseOperatorLink):
-104 |     def get_link(self, operator, *, something):
+114 | class InvalidOperatorLink2(BaseOperatorLink):
+115 |     def get_link(self, operator, ti_key, extra):
     |         ^^^^^^^^
-105 |         pass
+116 |         pass
     |
 help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
 
 AIR303 `get_link` signature is changed in Airflow 3.0
-   --> AIR303.py:120:9
+   --> AIR303.py:119:9
     |
-118 | # 3 positional args, 3rd NOT named 'ti_key'
-119 | class DeprecatedOperatorLink2(BaseOperatorLink):
-120 |     def get_link(self, operator, dttm):
+118 | class InvalidOperatorLink3(BaseOperatorLink):
+119 |     def get_link(self, operator, *, something):
     |         ^^^^^^^^
-121 |         pass
+120 |         pass
     |
 help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
 
 AIR303 `get_link` signature is changed in Airflow 3.0
-   --> AIR303.py:135:9
+   --> AIR303.py:136:9
     |
-133 | # not exactly 3 positional args
-134 | class InvalidOperatorLink6(BaseOperatorLink):
-135 |     def get_link(self, operator):
+134 | # 3 positional args, 3rd NOT named 'ti_key'
+135 | class DeprecatedOperatorLink2(BaseOperatorLink):
+136 |     def get_link(self, operator, dttm):
     |         ^^^^^^^^
-136 |         pass
+137 |         pass
     |
 help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
 
 AIR303 `get_link` signature is changed in Airflow 3.0
-   --> AIR303.py:139:9
+   --> AIR303.py:166:9
     |
-138 | class InvalidOperatorLink7(BaseOperatorLink):
-139 |     def get_link(self, operator, ti_key, extra):
+164 | # not exactly 3 positional args
+165 | class InvalidOperatorLink4(BaseOperatorLink):
+166 |     def get_link(self, operator):
     |         ^^^^^^^^
-140 |         pass
+167 |         pass
     |
 help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
 
 AIR303 `get_link` signature is changed in Airflow 3.0
-   --> AIR303.py:143:9
+   --> AIR303.py:170:9
     |
-142 | class InvalidOperatorLink8(BaseOperatorLink):
-143 |     def get_link(self, operator, *, something):
+169 | class InvalidOperatorLink5(BaseOperatorLink):
+170 |     def get_link(self, operator, ti_key, extra):
     |         ^^^^^^^^
-144 |         pass
+171 |         pass
+    |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:174:9
+    |
+173 | class InvalidOperatorLink6(BaseOperatorLink):
+174 |     def get_link(self, operator, *, something):
+    |         ^^^^^^^^
+175 |         pass
     |
 help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
