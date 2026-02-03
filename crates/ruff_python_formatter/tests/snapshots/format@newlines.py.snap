@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/newlines.py
 ---
 ## Input
 ```python
@@ -693,6 +692,7 @@ class Path:
 
 
 def fakehttp():
+
     class FakeHTTPConnection:
         if mock_close:
 
@@ -828,18 +828,22 @@ def overload4(a: int): ...
 
 # In preview, we preserve these newlines at the start of functions:
 def preserved1():
+
     return 1
 
 
 def preserved2():
+
     pass
 
 
 def preserved3():
+
     def inner(): ...
 
 
 def preserved4():
+
     def inner():
         print("with a body")
         return 1
@@ -848,17 +852,20 @@ def preserved4():
 
 
 def preserved5():
+
     ...
     # trailing comment prevents collapsing the stub
 
 
 def preserved6():
+
     # Comment
 
     return 1
 
 
 def preserved7():
+
     # comment
     # another line
     # and a third
@@ -867,6 +874,7 @@ def preserved7():
 
 
 def preserved8():  # this also prevents collapsing the stub
+
     ...
 
 
@@ -885,6 +893,7 @@ def removed3(): ...  # trailing same-line comment does not prevent collapsing th
 
 # And we discard empty lines after the first:
 def partially_preserved1():
+
     return 1
 
 
@@ -913,15 +922,7 @@ def untouched3():
 ```diff
 --- Stable
 +++ Preview
-@@ -253,6 +253,7 @@
- 
- 
- def fakehttp():
-+
-     class FakeHTTPConnection:
-         if mock_close:
- 
-@@ -277,6 +278,7 @@
+@@ -278,6 +278,7 @@
  
      def a():
          return 1
@@ -929,7 +930,7 @@ def untouched3():
  else:
      pass
  
-@@ -293,6 +295,7 @@
+@@ -294,6 +295,7 @@
  
          def a():
              return 1
@@ -937,7 +938,7 @@ def untouched3():
      case 1:
  
          def a():
-@@ -303,6 +306,7 @@
+@@ -304,6 +306,7 @@
  
      def a():
          return 1
@@ -945,7 +946,7 @@ def untouched3():
  except RuntimeError:
  
      def a():
-@@ -313,6 +317,7 @@
+@@ -314,6 +317,7 @@
  
      def a():
          return 1
@@ -953,7 +954,7 @@ def untouched3():
  finally:
  
      def a():
-@@ -323,18 +328,22 @@
+@@ -324,18 +328,22 @@
  
      def a():
          return 1
@@ -976,64 +977,4 @@ def untouched3():
  finally:
  
      def a():
-@@ -388,18 +397,22 @@
- 
- # In preview, we preserve these newlines at the start of functions:
- def preserved1():
-+
-     return 1
- 
- 
- def preserved2():
-+
-     pass
- 
- 
- def preserved3():
-+
-     def inner(): ...
- 
- 
- def preserved4():
-+
-     def inner():
-         print("with a body")
-         return 1
-@@ -408,17 +421,20 @@
- 
- 
- def preserved5():
-+
-     ...
-     # trailing comment prevents collapsing the stub
- 
- 
- def preserved6():
-+
-     # Comment
- 
-     return 1
- 
- 
- def preserved7():
-+
-     # comment
-     # another line
-     # and a third
-@@ -427,6 +443,7 @@
- 
- 
- def preserved8():  # this also prevents collapsing the stub
-+
-     ...
- 
- 
-@@ -445,6 +462,7 @@
- 
- # And we discard empty lines after the first:
- def partially_preserved1():
-+
-     return 1
- 
- 
 ```
