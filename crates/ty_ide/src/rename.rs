@@ -2114,12 +2114,14 @@ result = func(10, y=20)
                     pass
 
                 @my_func.setter
-                def other_func():
+                def my_func():
                     pass
                 "#,
             )
             .build();
 
+        // Only 2 locations should be found (the definition and the decorator reference),
+        // not the second `my_func` function definition, because `my_func` is not a property.
         assert_snapshot!(test.rename("better_name"), @r#"
         info[rename]: Rename symbol (found 2 locations)
           --> lib.py:8:5
@@ -2132,10 +2134,95 @@ result = func(10, y=20)
         10 |
         11 | @my_func.setter
            |  -------
-        12 | def other_func():
+        12 | def my_func():
         13 |     pass
            |
         "#);
+    }
+
+    /// When renaming the decorated function (not the one referenced in the decorator),
+    /// we should only rename that function, not the one in the decorator.
+    #[test]
+    fn rename_non_property_setter_decorator_from_decorated() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Registry:
+                    def setter(self, func):
+                        return func
+
+                registry = Registry()
+
+                def my_func():
+                    pass
+
+                @my_func.setter
+                def my_func<CURSOR>():
+                    pass
+                "#,
+            )
+            .build();
+
+        // The second `my_func` definition should be renamed. The decorator reference
+        // is incorrectly included because `definitions_for_name` returns all bindings
+        // for a symbol rather than using position-aware lookup (`bindings_at_use`).
+        // Note: The first `def my_func` is correctly excluded since it has a distinct
+        // `Definition` from the second. The decorator should also be excluded since it
+        // semantically refers to the first definition, but fixing this requires using
+        // position-aware binding resolution in `definitions_for_name`.
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+          --> lib.py:11:2
+           |
+         9 |     pass
+        10 |
+        11 | @my_func.setter
+           |  -------
+        12 | def my_func():
+           |     ^^^^^^^
+        13 |     pass
+           |
+        "#);
+    }
+
+    /// A property with differently-named getter and setter should not link them
+    /// together during rename. This is an unusual pattern but valid Python.
+    #[test]
+    fn rename_property_with_different_setter_name() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_getter<CURSOR>(self) -> int:
+                        return 42
+
+                    @my_getter.setter
+                    def my_setter(self, value: int) -> None:
+                        pass
+                "#,
+            )
+            .build();
+
+        // Only the getter should be renamed, not the setter (they have different names).
+        assert_snapshot!(test.rename("new_name"), @r"
+        info[rename]: Rename symbol (found 2 locations)
+         --> lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_getter(self) -> int:
+          |         ^^^^^^^^^
+        5 |         return 42
+        6 |
+        7 |     @my_getter.setter
+          |      ---------
+        8 |     def my_setter(self, value: int) -> None:
+        9 |         pass
+          |
+        ");
     }
 
     #[test]

@@ -1055,6 +1055,10 @@ fn property_getter_definitions<'db>(
     for decorator in &function.decorator_list {
         if let Some(attr_expr) = decorator.expression.as_attribute_expr()
             && matches!(attr_expr.attr.as_str(), "setter" | "deleter")
+            && matches!(
+                attr_expr.value.inferred_type(model),
+                Some(Type::PropertyInstance(_))
+            )
         {
             return definitions_for_expression(model, (&*attr_expr.value).into(), alias_resolution);
         }
