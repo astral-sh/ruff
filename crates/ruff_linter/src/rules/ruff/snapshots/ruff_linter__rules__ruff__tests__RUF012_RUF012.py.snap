@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 132
 ---
 RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
   --> RUF012.py:9:34
@@ -119,12 +120,41 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
     |
 
 RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
-   --> RUF012.py:146:12
+   --> RUF012.py:144:25
     |
-144 | # Lint should trigger RUF012 only  for the `test` field and not the `_fields_`
-145 | class S(ctypes.Structure):
-146 |     test = [""]
+143 | class T:
+144 |     generator_default = (x for x in range(10))
+    |                         ^^^^^^^^^^^^^^^^^^^^^^
+145 |     walrus_default = (x := [])
+146 |     tuple_with_mutable = ([],)
+    |
+
+RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+   --> RUF012.py:145:23
+    |
+143 | class T:
+144 |     generator_default = (x for x in range(10))
+145 |     walrus_default = (x := [])
+    |                       ^^^^^^^
+146 |     tuple_with_mutable = ([],)
+    |
+
+RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+   --> RUF012.py:146:26
+    |
+144 |     generator_default = (x for x in range(10))
+145 |     walrus_default = (x := [])
+146 |     tuple_with_mutable = ([],)
+    |                          ^^^^^
+    |
+
+RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+   --> RUF012.py:152:12
+    |
+150 | # Lint should trigger RUF012 only  for the `test` field and not the `_fields_`
+151 | class S(ctypes.Structure):
+152 |     test = [""]
     |            ^^^^
-147 |     _fields_ = [
-148 |         ("attr_set", ctypes.c_uint64),
+153 |     _fields_ = [
+154 |         ("attr_set", ctypes.c_uint64),
     |
