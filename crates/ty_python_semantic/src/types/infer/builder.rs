@@ -723,7 +723,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Iterate through all class definitions in this scope.
         for (class, class_node) in class_definitions {
-            // (1) Check that the class does not have a cyclic definition
+            // Check that the class does not have a cyclic definition
             if let Some(inheritance_cycle) = class.inheritance_cycle(self.db()) {
                 if inheritance_cycle.is_participant()
                     && let Some(builder) = self
@@ -741,7 +741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            // (2) Check that the class is not an enum and generic
+            // Check that the class is not an enum and generic
             if is_enum_class_by_inheritance(self.db(), class)
                 && class.generic_context(self.db()).is_some()
             {
@@ -755,7 +755,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let class_kind = CodeGeneratorKind::from_class(self.db(), class.into(), None);
 
-            // (3) If it's a `NamedTuple` class, check that no field without a default value
+            // If it's a `NamedTuple` class, check that no field without a default value
             // appears after a field with a default value.
             if class_kind == Some(CodeGeneratorKind::NamedTuple) {
                 let mut field_with_default_encountered = None;
@@ -794,7 +794,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let is_protocol = class.is_protocol(self.db());
 
-            // (4) Check for invalid `@dataclass` applications.
+            // Check for invalid `@dataclass` applications.
             if class.dataclass_params(self.db()).is_some() {
                 if class.has_named_tuple_class_in_mro(self.db()) {
                     if let Some(builder) = self
@@ -853,7 +853,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut disjoint_bases = IncompatibleBases::default();
             let mut protocol_base_with_generic_context = None;
 
-            // (5) Iterate through the class's explicit bases to check for various possible errors:
+            // Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
@@ -1033,7 +1033,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) Check for starred variable-length tuples that cannot be unpacked
+            // Check for starred variable-length tuples that cannot be unpacked
             let class_definition = self.index.expect_single_definition(class_node);
             for base in class_node.bases() {
                 if let ast::Expr::Starred(starred) = base
@@ -1046,7 +1046,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (7) Check that the class's MRO is resolvable
+            // Check that the class's MRO is resolvable
             match class.try_mro(self.db(), None) {
                 Err(mro_error) => match mro_error.reason() {
                     StaticMroErrorKind::DuplicateBases(duplicates) => {
@@ -1117,7 +1117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (8) Check that @total_ordering has a valid ordering method in the MRO
+            // Check that @total_ordering has a valid ordering method in the MRO
             if class.total_ordering(self.db()) && !class.has_ordering_method_in_mro(self.db(), None)
             {
                 // Find the @total_ordering decorator to report the diagnostic at its location
@@ -1136,7 +1136,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (9) Check that the class's metaclass can be determined without error.
+            // Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Cycle => {
@@ -1212,7 +1212,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (10) Check that the class arguments matches the arguments of the
+            // Check that the class arguments matches the arguments of the
             // base class `__init_subclass__` method.
             if let Some(args) = class_node.arguments.as_deref() {
                 if class_kind == Some(CodeGeneratorKind::TypedDict) {
@@ -1308,7 +1308,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (11) If the class is generic, verify that its generic context does not violate any of
+            // If the class is generic, verify that its generic context does not violate any of
             // the typevar scoping rules.
             if let (Some(legacy), Some(inherited)) = (
                 class.legacy_generic_context(self.db()),
@@ -1386,7 +1386,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (12) Check that a dataclass does not have more than one `KW_ONLY`.
+            // Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class.into(), None)
             {
@@ -1421,21 +1421,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (13) Check for violations of the Liskov Substitution Principle,
+            // Check for violations of the Liskov Substitution Principle,
             // and for violations of other rules relating to invalid overrides of some sort.
             overrides::check_class(&self.context, class);
 
-            // (14) Check for unimplemented abstract methods on final classes.
+            // Check for unimplemented abstract methods on final classes.
             self.check_final_class_abstract_methods(class, class_node);
 
-            // (15) Check for Final-qualified declarations without a value.
+            // Check for Final-qualified declarations without a value.
             self.check_class_final_without_value(class);
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
             }
 
-            // (16) If it's a `TypedDict` class, check that it doesn't include any invalid
+            // If it's a `TypedDict` class, check that it doesn't include any invalid
             // statements: https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
             //
             //     The body of the class definition defines the items of the `TypedDict` type. It
@@ -1494,7 +1494,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (17) Check for unsafe overrides of dunder methods in tuple subclasses
+            // Check for unsafe overrides of dunder methods in tuple subclasses
             if class.is_tuple_subclass(self.context.db()) {
                 overrides::check_tuple_subclass(&self.context, class);
             }
