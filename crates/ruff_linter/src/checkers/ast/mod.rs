@@ -422,17 +422,15 @@ impl<'a> Checker<'a> {
         self.context.report_diagnostic_if_enabled(kind, range)
     }
 
-    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, along with its fix title to be
-    /// attached later.
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred.
     ///
     /// Prefer [`Checker::report_diagnostic`] unless you need to attach sub-diagnostics before the
     /// fix title. See its documentation for more details.
-    #[must_use]
     pub(crate) fn report_custom_diagnostic<'chk, T: Violation>(
         &'chk self,
         kind: T,
         range: TextRange,
-    ) -> (DiagnosticGuard<'chk, 'a>, Option<String>) {
+    ) -> DiagnosticGuard<'chk, 'a> {
         self.context.report_custom_diagnostic(kind, range)
     }
 
@@ -3409,18 +3407,16 @@ impl<'a> LintContext<'a> {
         }
     }
 
-    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, along with its fix title to be
-    /// attached later.
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred.
     ///
     /// Prefer [`LintContext::report_diagnostic`] unless you need to attach sub-diagnostics before
     /// the fix title. See its documentation for more details.
     #[expect(clippy::needless_pass_by_value)]
-    #[must_use]
     pub(crate) fn report_custom_diagnostic<'chk, T: Violation>(
         &'chk self,
         kind: T,
         range: TextRange,
-    ) -> (DiagnosticGuard<'chk, 'a>, Option<String>) {
+    ) -> DiagnosticGuard<'chk, 'a> {
         let diagnostic = crate::message::create_lint_diagnostic(
             kind.message(),
             Option::<&'static str>::None,
@@ -3431,15 +3427,19 @@ impl<'a> LintContext<'a> {
             None,
             T::rule(),
         );
-        (
-            DiagnosticGuard {
-                context: self,
-                diagnostic: Some(diagnostic),
-                rule: T::rule(),
-                before_drop_fns: SmallVec::new(),
-            },
-            kind.fix_title(),
-        )
+
+        let mut guard = DiagnosticGuard {
+            context: self,
+            diagnostic: Some(diagnostic),
+            rule: T::rule(),
+            before_drop_fns: SmallVec::new(),
+        };
+
+        if let Some(fix_title) = kind.fix_title() {
+            guard.before_drop(move |diag| diag.help(&fix_title));
+        }
+
+        guard
     }
 
     #[inline]
@@ -3568,15 +3568,14 @@ impl DiagnosticGuard<'_, '_> {
     /// This is intended for use with the [`Checker::report_custom_diagnostic`]
     /// or [`LintContext::report_custom_diagnostic`] methods in cases where a
     /// fix title should be added as a `help` diagnostic after all other
-    /// sub-diagnostics. For example:
+    /// sub-diagnostics. `report_custom_diagnostic` uses this method to defer
+    /// adding the fix title, but you can defer additional diagnostics if you
+    /// want them to appear after the fix title. For example:
     ///
     /// ```ignore
-    /// let (mut diagnostic, fix_title) = checker.report_custom_diagnostic(MyViolation, range);
-    /// diagnostic.before_drop(move |diag| {
-    ///     if let Some(fix_title) = &fix_title {
-    ///         diag.help(fix_title);
-    ///     }
-    /// });
+    /// let mut diagnostic = checker.report_custom_diagnostic(MyViolation, range);
+    /// diagnostic.info("This will appear first");
+    /// diagnostic.before_drop(|diag| diag.info("This will appear last, after the fix title"));
     /// ```
     pub(crate) fn before_drop<F>(&mut self, f: F)
     where
