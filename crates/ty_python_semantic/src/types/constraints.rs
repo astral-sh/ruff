@@ -2337,89 +2337,106 @@ impl<'db> InteriorNode<'db> {
                 source_orders1.cmp(source_orders2)
             });
 
+            let mut solutions = Vec::with_capacity(sorted_paths.len());
             let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, Bounds<'db>> =
                 FxHashMap::default();
-            sorted_paths
-                .into_iter()
-                .map(|path| {
-                    mappings.clear();
-                    for (constraint, _) in path {
-                        let typevar = constraint.typevar(db);
-                        let lower = constraint.lower(db);
-                        let upper = constraint.upper(db);
-                        let bounds = mappings.entry(typevar).or_default();
-                        bounds.add_lower(db, lower);
-                        bounds.add_upper(db, upper);
+            'paths: for path in sorted_paths {
+                mappings.clear();
+                for (constraint, _) in path {
+                    let typevar = constraint.typevar(db);
+                    let lower = constraint.lower(db);
+                    let upper = constraint.upper(db);
+                    let bounds = mappings.entry(typevar).or_default();
+                    bounds.add_lower(db, lower);
+                    bounds.add_upper(db, upper);
 
-                        if let Type::TypeVar(lower_bound_typevar) = lower {
-                            let bounds = mappings.entry(lower_bound_typevar).or_default();
-                            bounds.add_upper(db, Type::TypeVar(typevar));
-                        }
-
-                        if let Type::TypeVar(upper_bound_typevar) = upper {
-                            let bounds = mappings.entry(upper_bound_typevar).or_default();
-                            bounds.add_lower(db, Type::TypeVar(typevar));
-                        }
+                    if let Type::TypeVar(lower_bound_typevar) = lower {
+                        let bounds = mappings.entry(lower_bound_typevar).or_default();
+                        bounds.add_upper(db, Type::TypeVar(typevar));
                     }
 
-                    mappings
-                        .drain()
-                        .filter_map(|(bound_typevar, bounds)| {
-                            match bound_typevar.typevar(db).require_bound_or_constraints(db) {
-                                TypeVarBoundOrConstraints::UpperBound(bound) => {
-                                    let bound = bound.top_materialization(db);
-                                    let lower = UnionType::from_elements(db, bounds.lower);
-                                    if !lower.is_assignable_to(db, bound) {
-                                        // This path does not satisfy the typevar's upper bound, and is
-                                        // therefore not a valid specialization.
-                                        return None;
-                                    }
+                    if let Type::TypeVar(upper_bound_typevar) = upper {
+                        let bounds = mappings.entry(upper_bound_typevar).or_default();
+                        bounds.add_lower(db, Type::TypeVar(typevar));
+                    }
+                }
 
-                                    let upper = IntersectionType::from_elements(
-                                        db,
-                                        bounds.upper.into_iter().chain([bound]),
-                                    );
-                                    let solution = if upper != bound {
-                                        upper
-                                    } else if !lower.is_never() {
-                                        lower
-                                    } else {
-                                        return None;
-                                    };
+                let mut solution = Vec::with_capacity(mappings.len());
+                for (bound_typevar, bounds) in mappings.drain() {
+                    match bound_typevar.typevar(db).require_bound_or_constraints(db) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            let bound = bound.top_materialization(db);
+                            let lower = UnionType::from_elements(db, bounds.lower);
+                            if !lower.is_assignable_to(db, bound) {
+                                // This path does not satisfy the typevar's upper bound, and is
+                                // therefore not a valid specialization.
+                                continue 'paths;
+                            }
 
-                                    Some(TypeVarSolution {
-                                        bound_typevar,
-                                        solution,
-                                    })
+                            // Prefer the lower bound (often the concrete actual type seen) over the
+                            // upper bound (which may include TypeVar bounds/constraints). The upper bound
+                            // should only be used as a fallback when no concrete type was inferred.
+                            if !lower.is_never() {
+                                solution.push(TypeVarSolution {
+                                    bound_typevar,
+                                    solution: lower,
+                                });
+                                continue;
+                            }
+
+                            let upper = IntersectionType::from_elements(
+                                db,
+                                std::iter::chain(bounds.upper, [bound]),
+                            );
+                            if upper != bound {
+                                solution.push(TypeVarSolution {
+                                    bound_typevar,
+                                    solution: upper,
+                                });
+                            }
+                        }
+
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            // Filter out the typevar constraints that aren't satisfied by this path.
+                            let lower = UnionType::from_elements(db, bounds.lower);
+                            let upper = IntersectionType::from_elements(db, bounds.upper);
+                            let compatible_constraints =
+                                constraints.elements(db).iter().filter(|constraint| {
+                                    let constraint_lower = constraint.bottom_materialization(db);
+                                    let constraint_upper = constraint.top_materialization(db);
+                                    lower.is_assignable_to(db, constraint_lower)
+                                        && constraint_upper.is_assignable_to(db, upper)
+                                });
+
+                            // If only one constraint remains, that's our specialization for this path.
+                            match compatible_constraints.at_most_one() {
+                                Ok(None) => {
+                                    // This path does not satisfy any of the constraints, and is
+                                    // therefore not a valid specialization.
+                                    continue 'paths;
                                 }
 
-                                TypeVarBoundOrConstraints::Constraints(constraints) => {
-                                    // Filter out the typevar constraints that aren't satisfied by this path.
-                                    let lower = UnionType::from_elements(db, bounds.lower);
-                                    let upper = IntersectionType::from_elements(db, bounds.upper);
-                                    let compatible_constraints =
-                                        constraints.elements(db).iter().filter(|constraint| {
-                                            let constraint_lower =
-                                                constraint.bottom_materialization(db);
-                                            let constraint_upper =
-                                                constraint.top_materialization(db);
-                                            lower.is_assignable_to(db, constraint_lower)
-                                                && constraint_upper.is_assignable_to(db, upper)
-                                        });
+                                Ok(Some(compatible_constraint)) => {
+                                    solution.push(TypeVarSolution {
+                                        bound_typevar,
+                                        solution: *compatible_constraint,
+                                    });
+                                }
 
-                                    // If only one constraint remains, that's our specialization for this path.
-                                    compatible_constraints.exactly_one().ok().map(
-                                        |compatible_constraint| TypeVarSolution {
-                                            bound_typevar,
-                                            solution: *compatible_constraint,
-                                        },
-                                    )
+                                Err(_) => {
+                                    // This path satisfies multiple constraints. For now, don't
+                                    // prefer any of them, and fall back on the default
+                                    // specialization for this typevar.
                                 }
                             }
-                        })
-                        .collect()
-                })
-                .collect()
+                        }
+                    }
+                }
+
+                solutions.push(solution);
+            }
+
+            solutions
         }
 
         let solutions = solutions_inner(db, self);
