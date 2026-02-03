@@ -73,7 +73,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@2e1816eac09c90140b1ba51d19afc5f59da460f5"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@c6ccb9fc56755ccd826721a24f53fc871a603474"
 
           ecosystem-analyzer \
             --repository ruff \
