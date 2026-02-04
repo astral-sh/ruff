@@ -925,6 +925,31 @@ D1(1.2)  # error: [invalid-argument-type]
 D2(1.2)  # error: [invalid-argument-type]
 ```
 
+### Field specifiers in nested class scopes
+
+When a dataclass-like class is defined inside a method, field specifier calls must still be
+recognized correctly. This is a regression test for a bug where standalone expression inference
+(triggered by being inside a method scope) would lose the field specifier context.
+
+```py
+from typing_extensions import Any, dataclass_transform
+
+def field(*, init: bool = True, kw_only: bool = False, default: Any = ...) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def create_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+class Outer:
+    def method(self):
+        @create_model
+        class Model:
+            x: int = field(kw_only=True)
+            y: str
+
+        reveal_type(Model.__init__)  # revealed: (self: Model, y: str, *, x: int) -> None
+```
+
 ### Use cases
 
 #### Home Assistant
