@@ -731,6 +731,8 @@ pub(crate) fn environment_from_binary(
     binary: &str,
     paths: &str,
 ) -> Option<PythonEnvironment> {
+    // TODO: replace which logic to better respect the environment from System
+    // which_in_global can access environment variables directly, like HOME for tilde expansion
     let binary = which::which_in_global(binary, Some(&paths)).ok()?.next()?;
     let binary = SystemPathBuf::from_path_buf(binary).ok()?;
     let env = PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, system).ok()?;
