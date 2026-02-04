@@ -4710,6 +4710,40 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Attempt to call a dunder method defined on a class itself.
+    ///
+    /// This is used for methods like `__class_getitem__` which are implicitly called
+    /// when subscripting the class itself (e.g., `MyClass[int]`). These dunder methods
+    /// need to be looked up on the metaclass AND the class itself. So unlike
+    /// `try_call_dunder`, this does NOT add `NO_INSTANCE_FALLBACK`, allowing the lookup
+    /// to find methods defined on the class when `self` is a class literal.
+    fn try_call_dunder_on_class(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        argument_types: &CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        match self.member(db, name).place {
+            Place::Defined(DefinedPlace {
+                ty: dunder_callable,
+                definedness: boundness,
+                ..
+            }) => {
+                let bindings = dunder_callable
+                    .bindings(db)
+                    .match_parameters(db, argument_types)
+                    .check_types(db, argument_types, tcx, &[])?;
+
+                if boundness == Definedness::PossiblyUndefined {
+                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                }
+                Ok(bindings)
+            }
+            Place::Undefined => Err(CallDunderError::MethodNotAvailable),
+        }
+    }
+
     /// Apply `__getattr__` / `__getattribute__` fallback to an attribute-lookup result.
     ///
     /// If `result` is already always-defined, return it unchanged. Otherwise, fall back to calling
