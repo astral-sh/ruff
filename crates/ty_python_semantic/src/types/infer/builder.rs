@@ -35,9 +35,9 @@ use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, global_symbol, known_module_symbol,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    explicit_global_symbol, global_symbol, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
+    typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
@@ -1425,35 +1425,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // (12) Check that a dataclass does not have more than one `KW_ONLY`
             // and that required fields are defined before default fields.
-            if let Some(field_policy @ CodeGeneratorKind::DataclassLike(transformer_params)) =
+            if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class.into(), None)
             {
                 let specialization = None;
-
-                // Skip field ordering check for dataclass_transform with custom field_specifiers
-                // because we can't properly analyze custom field functions.
-                // See: https://github.com/astral-sh/ty/issues/1068
-                //
-                // We check if the field_specifiers differs from the standard [dataclasses.field].
-                // This detects both function-based and metaclass/base-class transforms with custom
-                // field specifiers.
-                let standard_field_specifier =
-                    known_module_symbol(self.db(), KnownModule::Dataclasses, "field")
-                        .place
-                        .ignore_possibly_undefined();
-
-                let uses_custom_field_specifiers =
-                    class.dataclass_params(self.db()).is_some_and(|params| {
-                        let specifiers = params.field_specifiers(self.db());
-                        // If specifiers is empty, dataclasses.field should be ignored
-                        // If specifiers is not just [dataclasses.field], it's custom
-                        !specifiers.is_empty()
-                            && (specifiers.len() != 1
-                                || standard_field_specifier
-                                    .map(|s| specifiers[0] != s)
-                                    .unwrap_or(true))
-                    }) || transformer_params
-                        .is_some_and(|params| !params.field_specifiers(self.db()).is_empty());
 
                 let mut kw_only_sentinel_fields = vec![];
                 let mut required_after_default_field_names = vec![];
@@ -1481,12 +1456,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    if !uses_custom_field_specifiers {
-                        if default_ty.is_some() {
-                            has_seen_default_field = true;
-                        } else if has_seen_default_field {
-                            required_after_default_field_names.push(name);
-                        }
+                    if default_ty.is_some() {
+                        has_seen_default_field = true;
+                    } else if has_seen_default_field {
+                        required_after_default_field_names.push(name);
                     }
                 }
 
