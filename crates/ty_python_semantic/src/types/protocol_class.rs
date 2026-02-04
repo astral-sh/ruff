@@ -893,19 +893,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let attribute_type = if member.name == "__call__" {
                 ty
             } else {
-                let Place::Defined(DefinedPlace {
-                    ty: attribute_type,
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }) = ty
-                    .invoke_descriptor_protocol(
+                // For modules, use `.member()` which has special handling for module types
+                // that looks up module-level attributes directly. For other types, use
+                // `invoke_descriptor_protocol` to correctly handle metaclass method lookup.
+                let lookup_result = if ty.as_module_literal().is_some() {
+                    ty.member(db, member.name)
+                } else {
+                    ty.invoke_descriptor_protocol(
                         db,
                         member.name,
                         Place::Undefined.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                         MemberLookupPolicy::default(),
                     )
-                    .place
+                };
+                let Place::Defined(DefinedPlace {
+                    ty: attribute_type,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) = lookup_result.place
                 else {
                     self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
                         member_name: member.name.into(),
