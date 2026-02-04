@@ -80,7 +80,7 @@ pub(crate) fn references(
     let model = SemanticModel::new(db, file);
     let target_definitions = goto_target
         .get_definition_targets(&model, mode.to_import_alias_resolution())?
-        .declaration_targets(db)?;
+        .declaration_targets(&model, goto_target)?;
 
     // Extract the target text from the goto target for fast comparison
     let target_text = goto_target.to_string()?;
@@ -578,7 +578,7 @@ impl LocalReferencesFinder<'_> {
         // Get the definitions for this goto target
         let Some(current_definitions) = goto_target
             .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
-            .and_then(|definitions| definitions.declaration_targets(self.model.db()))
+            .and_then(|definitions| definitions.declaration_targets(self.model, &goto_target))
         else {
             return false;
         };
