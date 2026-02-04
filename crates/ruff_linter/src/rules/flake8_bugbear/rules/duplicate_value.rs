@@ -82,6 +82,7 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
                     },
                     value.range(),
                 );
+                diagnostic.secondary_annotation("Previous occurrence here", existing);
                 diagnostic.try_set_fix(|| {
                     edits::remove_member(&set.elts, index, checker.locator().contents()).map(
                         |edit| {
