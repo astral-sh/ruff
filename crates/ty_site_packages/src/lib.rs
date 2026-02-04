@@ -735,6 +735,7 @@ pub(crate) fn environment_from_binary(
     let binary = SystemPathBuf::from_path_buf(binary).ok()?;
     let env = PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, system).ok()?;
 
+    // TODO: replace this with better shim support, e.g. pyenv
     // sanity check to filter out shims
     env.site_packages_paths(system).ok()?;
 
