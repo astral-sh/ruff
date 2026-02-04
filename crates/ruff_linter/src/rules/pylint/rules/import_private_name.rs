@@ -148,9 +148,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
                                 token.kind == SimpleTokenKind::Name
                                     && checker.locator().slice(token.range()) == *private_name
                             })
-                            .map_or(binding.range(), |token: ruff_python_trivia::SimpleToken| {
-                                token.range()
-                            })
+                            .map_or(binding.range(), |token| token.range())
                     })
                 } else {
                     names
