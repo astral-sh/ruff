@@ -241,7 +241,27 @@ reformatted code would produce an invalid Python program.
 
 Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
 the normal Python code formatting style, while any code blocks marked with
-`pyi` will be formatted like Python type stub files.
+`pyi` will be formatted like Python type stub files:
+
+````markdown
+```py
+print("hello")
+```
+
+```pyi
+def foo(): ...
+def bar(): ...
+```
+````
+
+Ruff also supports [Quarto](https://quarto.org/) style executable code blocks
+with curly braces surrounding the language name:
+
+````markdown
+```{python}
+print("hello")
+```
+````
 
 While [formatting suppression](#format-suppression) comments will be handled as
 usual within code blocks, the formatter will also skip formatting any code block
