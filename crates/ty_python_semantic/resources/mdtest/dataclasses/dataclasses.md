@@ -171,6 +171,11 @@ class GoodWithKwOnly:
     z: float = field(kw_only=True, default=2.0)
 
 @dataclass
+class AlsoGoodWithKwOnly:
+    x: int = field(kw_only=True, default=1)
+    y: str
+
+@dataclass
 class BadWithKwOnly:
     x: int = 1
     y: str = field(kw_only=True)
