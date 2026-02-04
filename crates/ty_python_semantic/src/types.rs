@@ -8980,6 +8980,15 @@ impl<'db> TypeVarConstraints<'db> {
         let mut builder = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
 
+        // Check if the union contains any non-divergent dynamic type (like Unknown).
+        // If it does, we should not consider the attribute as "possibly unbound" just because
+        // other types in the union don't have it. This is because dynamic types have all
+        // attributes by definition.
+        let has_dynamic = self
+            .elements(db)
+            .iter()
+            .any(|ty| ty.is_dynamic() && !ty.is_divergent());
+
         let mut all_unbound = true;
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
@@ -8991,7 +9000,12 @@ impl<'db> TypeVarConstraints<'db> {
             qualifiers |= new_qualifiers;
             match ty_member {
                 Place::Undefined => {
-                    possibly_unbound = true;
+                    // If the union contains a dynamic type (like Unknown), the attribute is
+                    // always bound via the dynamic type, so we don't mark it as possibly unbound
+                    // just because a non-dynamic type doesn't have the attribute.
+                    if !has_dynamic {
+                        possibly_unbound = true;
+                    }
                 }
                 Place::Defined(DefinedPlace {
                     ty: ty_member,
@@ -12223,6 +12237,15 @@ impl<'db> UnionType<'db> {
         let mut builder = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
 
+        // Check if the union contains any non-divergent dynamic type (like Unknown).
+        // If it does, we should not consider the attribute as "possibly unbound" just because
+        // other types in the union don't have it. This is because dynamic types have all
+        // attributes by definition.
+        let has_dynamic = self
+            .elements(db)
+            .iter()
+            .any(|ty| ty.is_dynamic() && !ty.is_divergent());
+
         let mut all_unbound = true;
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
@@ -12234,7 +12257,12 @@ impl<'db> UnionType<'db> {
             qualifiers |= new_qualifiers;
             match ty_member {
                 Place::Undefined => {
-                    possibly_unbound = true;
+                    // If the union contains a dynamic type (like Unknown), the attribute is
+                    // always bound via the dynamic type, so we don't mark it as possibly unbound
+                    // just because a non-dynamic type doesn't have the attribute.
+                    if !has_dynamic {
+                        possibly_unbound = true;
+                    }
                 }
                 Place::Defined(DefinedPlace {
                     ty: ty_member,

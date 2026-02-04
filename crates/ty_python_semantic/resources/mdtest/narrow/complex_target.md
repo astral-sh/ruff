@@ -585,3 +585,39 @@ def _(c: Container):
     if c.data[b"key"] is not None:
         reveal_type(c.data[b"key"])  # revealed: int
 ```
+
+## Attribute access on union with Unknown
+
+When an instance attribute is not explicitly typed, its type becomes a union with `Unknown` (e.g.,
+`Unknown | SomeType`). Accessing an attribute on such a union should not raise
+`possibly-missing-attribute` just because the non-Unknown type doesn't have that attribute, since
+`Unknown` has all attributes by definition.
+
+```py
+from ty_extensions import Unknown
+
+class VarlinkSender:
+    def send_message(self, channel: str, message: str, server: str) -> None:
+        pass
+
+class IrcMonitor:
+    # No type annotation - inferred from assignment, so type becomes Unknown | VarlinkSender
+    varlink_sender = VarlinkSender()
+
+class Agent:
+    irc_monitor = IrcMonitor()
+
+def test_inside_function(agent: Agent):
+    # Inside a function, the type of agent.irc_monitor.varlink_sender is Unknown | VarlinkSender
+    reveal_type(agent.irc_monitor.varlink_sender)  # revealed: Unknown | VarlinkSender
+
+    # Access send_message - this returns Unknown | (bound method)
+    method = agent.irc_monitor.varlink_sender.send_message
+    # revealed: Unknown | (bound method VarlinkSender.send_message(channel: str, message: str, server: str) -> None)
+    reveal_type(method)
+
+    # Now access assert_called - (bound method) doesn't have this, but Unknown does
+    # This should NOT raise possibly-missing-attribute because Unknown can have any attribute
+    assert_called = method.assert_called
+    reveal_type(assert_called)  # revealed: Unknown
+```
