@@ -430,3 +430,26 @@ reveal_type(C())  # revealed: C
 # Meta.__lt__ is implicitly called here:
 reveal_type(C < C)  # revealed: Literal[True]
 ```
+
+## `__new__` return type
+
+When a class has a `__new__` method with a custom return type annotation,
+that return type should be used when calling the class constructor.
+
+```py
+from typing import TypeVar
+
+class SimpleField:
+    def __new__(cls, **kwargs) -> str:
+      return super().__new__(cls)
+
+x = SimpleField()
+reveal_type(x)  # revealed: str
+
+class IntField:
+    def __new__(cls) -> int:
+      return super().__new__(cls)
+
+y = IntField()
+reveal_type(y)  # revealed: int
+```
