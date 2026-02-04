@@ -2302,7 +2302,7 @@ impl<'db> InteriorNode<'db> {
                 if self
                     .upper
                     .iter()
-                    .any(|existing| existing.is_subtype_of(db, ty))
+                    .any(|existing| existing.is_redundant_with(db, ty))
                 {
                     return;
                 }
@@ -2310,7 +2310,7 @@ impl<'db> InteriorNode<'db> {
                 // Otherwise remove any existing clauses that are a supertype of the new type,
                 // since the intersection will clip them to the new type.
                 self.upper
-                    .retain(|existing| !ty.is_subtype_of(db, *existing));
+                    .retain(|existing| !ty.is_redundant_with(db, *existing));
                 self.upper.insert(ty);
             }
         }
