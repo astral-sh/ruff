@@ -426,6 +426,12 @@ impl<'db> ConstraintSet<'db> {
     }
 
     pub(crate) fn solutions(self, db: &'db dyn Db) -> Solutions<'db> {
+        // If the constraint set is cyclic, we'll hit an infinite expansion when trying to add type
+        // mappings for it.
+        if self.is_cyclic(db) {
+            return Solutions::Unsatisfiable;
+        }
+
         self.node.solutions(db)
     }
 

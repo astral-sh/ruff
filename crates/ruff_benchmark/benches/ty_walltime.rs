@@ -171,7 +171,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    3800,
+    4500,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -231,7 +231,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: "2025-08-09",
         python_version: PythonVersion::PY311,
     },
-    1700,
+    1800,
 );
 
 #[track_caller]

@@ -2,6 +2,7 @@ use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
+use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -6121,7 +6122,8 @@ impl<'db> Type<'db> {
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
                         TypeMapping::ReplaceParameterDefaults |
-                        TypeMapping::EagerExpansion => self,
+                        TypeMapping::EagerExpansion |
+                        TypeMapping::RescopeReturnCallables(_) => self,
                     }
                 }
                 KnownInstanceType::UnionType(instance) => {
@@ -6344,6 +6346,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
             }
@@ -6356,7 +6359,8 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
                 TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion => self,
+                TypeMapping::EagerExpansion |
+                TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -7050,6 +7054,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
+
+    /// Updates any `Callable` types in a function signature return type to be generic if possible.
+    RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -7084,7 +7091,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
-            | TypeMapping::EagerExpansion => context,
+            | TypeMapping::EagerExpansion
+            | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf {
                 binding_context, ..
             } => context.remove_self(db, *binding_context),
@@ -7118,7 +7126,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
-            | TypeMapping::EagerExpansion => self.clone(),
+            | TypeMapping::EagerExpansion
+            | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
 }
@@ -7963,6 +7972,18 @@ pub struct TypeVarIdentity<'db> {
 
 impl get_size2::GetSize for TypeVarIdentity<'_> {}
 
+impl<'db> TypeVarIdentity<'db> {
+    fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
+        let name = format!("{}'{}", self.name(db), suffix);
+        Self::new(
+            db,
+            ast::name::Name::from(name),
+            self.definition(db),
+            self.kind(db),
+        )
+    }
+}
+
 /// A specific instance of a type variable that has not been bound to a generic context yet.
 ///
 /// This is usually not the type that you want; if you are working with a typevar, in a generic
@@ -8059,6 +8080,16 @@ impl<'db> TypeVarInstance<'db> {
         binding_context: Definition<'db>,
     ) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context), None)
+    }
+
+    fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
+        Self::new(
+            db,
+            self.identity(db).with_name_suffix(db, suffix),
+            self._bound_or_constraints(db),
+            self.explicit_variance(db),
+            self._default(db),
+        )
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
@@ -8540,6 +8571,15 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
+        Self::new(
+            db,
+            self.typevar(db).with_name_suffix(db, suffix),
+            self.binding_context(db),
+            self.paramspec_attr(db),
+        )
+    }
+
     /// Get the identity of this bound typevar.
     ///
     /// This is used for comparing whether two bound typevars represent the same logical typevar,
@@ -8770,7 +8810,8 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
-            | TypeMapping::EagerExpansion => Type::TypeVar(self),
+            | TypeMapping::EagerExpansion
+            | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
             }
@@ -10682,6 +10723,10 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
+            return replacements.get(&self).copied().unwrap_or(self);
+        }
+
         CallableType::new(
             db,
             self.signatures(db)

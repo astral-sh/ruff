@@ -2812,7 +2812,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let declared_ty = self.file_expression_type(returns);
+            let enclosing_function =
+                nearest_enclosing_function(self.db(), self.index, self.scope())
+                    .expect("should be in a function body scope");
+            let declared_ty = enclosing_function
+                .last_definition_raw_signature(self.db())
+                .return_ty;
             let expected_ty = match declared_ty {
                 Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(self.db()),
                 ty => ty,

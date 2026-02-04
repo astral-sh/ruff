@@ -702,8 +702,18 @@ impl<'db> Signature<'db> {
             legacy_generic_context,
         );
 
+        // Look for any typevars bound by this function that are only mentioned in a Callable
+        // return type. (We do this after merging the legacy and PEP-695 contexts because we need
+        // to apply this heuristic to PEP-695 typevars as well.)
+        let (generic_context, return_ty) = GenericContext::remove_callable_only_typevars(
+            db,
+            full_generic_context,
+            &parameters,
+            return_ty,
+        );
+
         Self {
-            generic_context: full_generic_context,
+            generic_context,
             definition: Some(definition),
             parameters,
             return_ty,
