@@ -747,9 +747,9 @@ class Person:
     age: int = field(default=0)
     tags: list[str] = field(default_factory=list)
     email: str = field(kw_only=True)
-    internal_notes: str = field(alias="notes")
+    internal_notes: str = field(alias="notes", default="")
 
-# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str = ..., *, email: str) -> None
 reveal_type(Person.__init__)
 
 Person("Alice", 30, [], "some notes", email="alice@example.com")
@@ -774,9 +774,9 @@ class Person(ModelBase):
     age: int = field(default=0)
     tags: list[str] = field(default_factory=list)
     email: str = field(kw_only=True)
-    internal_notes: str = field(alias="notes")
+    internal_notes: str = field(alias="notes", default="")
 
-# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str = ..., *, email: str) -> None
 reveal_type(Person.__init__)
 
 Person("Alice", 30, [], "some notes", email="alice@example.com")
@@ -799,9 +799,9 @@ class Person(ModelBase):
     age: int = field(default=0)
     tags: list[str] = field(default_factory=list)
     email: str = field(kw_only=True)
-    internal_notes: str = field(alias="notes")
+    internal_notes: str = field(alias="notes", default="")
 
-# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str = ..., *, email: str) -> None
 reveal_type(Person.__init__)
 
 Person("Alice", 30, [], "some notes", email="alice@example.com")
@@ -1028,6 +1028,158 @@ class Outer:
             y: str
 
         reveal_type(Model.__init__)  # revealed: (self: Model, y: str, *, x: int) -> None
+```
+
+## Field ordering checks
+
+Field ordering checks apply to classes created via `dataclass_transform`, just like normal
+`dataclass`es.
+
+### For function-based transformers
+
+```py
+from typing_extensions import Any, dataclass_transform
+
+def field(*, init: bool = True, kw_only: bool = False, default: Any = ...) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def create_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@create_model
+class ValidModel:
+    x: int
+    y: str = "default"
+
+@create_model
+class ValidModelWithKWOnly:
+    x: int = 1
+    z: float = field(kw_only=True)
+
+@create_model
+class ValidModelWithInitFalse:
+    x: int = field(init=False)
+    y: str = "default"
+
+@create_model
+class InvalidModel:
+    x: int = 1
+    y: str  # error: [dataclass-field-order]
+
+@dataclass_transform(field_specifiers=(field,), kw_only_default=True)
+def create_kwonly_default_model[T](cls: type[T]) -> type[T]:
+    ...
+    return cls
+
+@create_kwonly_default_model
+class ValidKWOnlyDefaultModel:
+    x: int = 1
+    y: str
+
+@create_kwonly_default_model
+class AlsoValidKWOnlyDefaultModel:
+    x: int = 1
+    y: str = field(kw_only=True)
+
+@create_kwonly_default_model
+class InvalidKWOnlyDefaultModel:
+    x: int
+    y: str = field(kw_only=False, default="default")
+    z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
+```
+
+### For metaclass-based transformers
+
+```py
+from typing_extensions import Any, dataclass_transform
+
+def field(*, init: bool = True, kw_only: bool = False, default: Any = ...) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class ValidModel(ModelBase):
+    x: int
+    y: str = "default"
+
+class ValidModelWithKWOnly(ModelBase):
+    x: int = 1
+    z: float = field(kw_only=True)
+
+class ValidModelWithInitFalse(ModelBase):
+    x: int = field(init=False)
+    y: str = "default"
+
+class InvalidModel(ModelBase):
+    x: int = 1
+    y: str  # error: [dataclass-field-order]
+
+@dataclass_transform(field_specifiers=(field,), kw_only_default=True)
+class KWOnlyDefaultModelMeta(type): ...
+
+class KWOnlyDefaultModelBase(metaclass=KWOnlyDefaultModelMeta): ...
+
+class ValidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
+    x: int = 1
+    y: str
+
+class AlsoValidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
+    x: int = 1
+    y: str = field(kw_only=True)
+
+class InvalidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
+    x: int
+    y: str = field(kw_only=False, default="default")
+    z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
+```
+
+### For base-class-based transformers
+
+```py
+from typing_extensions import Any, dataclass_transform
+
+def field(*, init: bool = True, kw_only: bool = False, default: Any = ...) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+class ModelBase:
+    def __init_subclass__(cls):
+        ...
+        super().__init_subclass__()
+
+class ValidModel(ModelBase):
+    x: int
+    y: str = "default"
+
+class ValidModelWithKWOnly(ModelBase):
+    x: int = 1
+    z: float = field(kw_only=True)
+
+class ValidModelWithInitFalse(ModelBase):
+    x: int = field(init=False)
+    y: str = "default"
+
+class InvalidModel(ModelBase):
+    x: int = 1
+    y: str  # error: [dataclass-field-order]
+
+@dataclass_transform(field_specifiers=(field,), kw_only_default=True)
+class KWOnlyDefaultModelBase:
+    def __init_subclass__(cls):
+        ...
+        super().__init_subclass__()
+
+class ValidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
+    x: int = 1
+    y: str
+
+class AlsoValidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
+    x: int = 1
+    y: str = field(kw_only=True)
+
+class InvalidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
+    x: int
+    y: str = field(kw_only=False, default="default")
+    z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
 ```
 
 ### Use cases
