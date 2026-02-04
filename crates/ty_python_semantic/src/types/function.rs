@@ -1589,6 +1589,14 @@ impl KnownFunction {
         definition: Definition<'db>,
         name: &str,
     ) -> Option<Self> {
+        // Special case: `__dataclass_transform__` is recognized as `DataclassTransform`
+        // regardless of module, for backwards compatibility with pre-3.11 libraries
+        // like SQLModel. The name matches the attribute set at runtime by the decorator.
+        // See: https://typing.python.org/en/latest/spec/dataclasses.html#runtime-behavior
+        if name == "__dataclass_transform__" {
+            return Some(Self::DataclassTransform);
+        }
+
         let candidate = Self::from_str(name).ok()?;
         candidate
             .check_module(file_to_module(db, definition.file(db))?.known(db)?)

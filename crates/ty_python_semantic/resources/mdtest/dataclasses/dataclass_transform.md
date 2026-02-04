@@ -1153,4 +1153,48 @@ Model(x=1)
 reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
 ```
 
+## `__dataclass_transform__` compatibility
+
+For backwards compatibility with pre-3.11 Python, ty recognizes any function named
+`__dataclass_transform__` as equivalent to `typing.dataclass_transform`, regardless of which module
+it is defined in. This matches pyright's behavior. The name matches the attribute set at runtime by
+the decorator.
+
+See: <https://typing.python.org/en/latest/spec/dataclasses.html#runtime-behavior>
+
+```py
+from typing import TypeVar, Callable, Any
+
+T = TypeVar("T", bound=type)
+
+def __dataclass_transform__(
+    *,
+    eq_default: bool = True,
+    order_default: bool = False,
+    kw_only_default: bool = False,
+    frozen_default: bool = False,
+    field_specifiers: tuple[type | Callable[..., Any], ...] = (),
+    **kwargs: Any,
+) -> Callable[[T], T]:
+    def decorator(cls: T) -> T:
+        return cls
+    return decorator
+
+@__dataclass_transform__(kw_only_default=True)
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class User(ModelBase):
+    id: int
+    name: str
+
+reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str) -> None
+
+User(id=1, name="Test")
+
+# error: [missing-argument]
+User()
+```
+
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

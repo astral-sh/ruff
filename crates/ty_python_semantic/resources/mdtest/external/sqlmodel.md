@@ -1,5 +1,8 @@
 # SQLModel
 
+SQLModel uses `@__dataclass_transform__()` on its metaclass for backwards compatibility with
+pre-3.11 Python, which ty now recognizes.
+
 ```toml
 [environment]
 python-version = "3.13"
@@ -22,9 +25,27 @@ user = User(id=1, name="John Doe")
 reveal_type(user.id)  # revealed: int
 reveal_type(user.name)  # revealed: str
 
-# TODO: this should not mention `__pydantic_self__`, and have proper parameters defined by the fields
-reveal_type(User.__init__)  # revealed: def __init__(__pydantic_self__, **data: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, id: int, name: str) -> None
 
-# TODO: this should be an error
+# error: [missing-argument]
+User()
+```
+
+## Multi-level inheritance
+
+```py
+from sqlmodel import SQLModel
+
+class Base(SQLModel):
+    id: int
+
+class User(Base):
+    name: str
+
+reveal_type(User.__init__)  # revealed: (self: User, id: int, name: str) -> None
+
+User(id=1, name="Test")
+
+# error: [missing-argument]
 User()
 ```
