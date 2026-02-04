@@ -231,7 +231,7 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
         // Skip `inf` when imported from `math`, `numpy` or `torch`
         Expr::Name(_) => semantic
             .resolve_qualified_name(expr)
-            .map_or(false, |qn| INF_MODULES.contains(&qn.segments())),
+            .is_some_and(|qn| INF_MODULES.contains(&qn.segments())),
 
         _ => false,
     }
