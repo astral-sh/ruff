@@ -1155,7 +1155,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(
                         f.with_type(self.ty),
                         "{}",
-                        string.display_with(self.db, self.settings.clone())
+                        string.display_with(self.db, self.settings.clone()),
                     )
                 }
                 // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,

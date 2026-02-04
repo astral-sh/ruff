@@ -1785,12 +1785,12 @@ impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn mapped(
         &self,
         generic_context: GenericContext<'db>,
-        f: impl Fn(BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
+        f: impl Fn(BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
     ) -> Self {
         let mut types = self.types.clone();
         for (identity, variable) in generic_context.variables_inner(self.db) {
             if let Some(ty) = types.get_mut(identity) {
-                *ty = f(*identity, *variable, *ty);
+                *ty = f(*variable, *ty);
             }
         }
 
@@ -1834,6 +1834,7 @@ impl<'db> SpecializationBuilder<'db> {
                 if bound_typevar.is_paramspec(self.db) {
                     return;
                 }
+
                 *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
             }
             Entry::Vacant(entry) => {

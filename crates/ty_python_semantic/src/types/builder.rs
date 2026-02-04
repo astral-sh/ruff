@@ -39,10 +39,11 @@
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
-    ClassLiteral, IntersectionType, KnownClass, LiteralValueType, LiteralValueTypeKind,
-    NegativeIntersectionElements, Type, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
+    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
+    TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,14 +100,18 @@ impl<'db> Type<'db> {
 
 #[derive(Debug)]
 enum UnionElement<'db> {
-    IntLiterals(FxOrderSet<LiteralValueType<'db>>),
-    StringLiterals(FxOrderSet<LiteralValueType<'db>>),
-    BytesLiterals(FxOrderSet<LiteralValueType<'db>>),
+    Type(Type<'db>),
+    // A map from integer literals to their promotability.
+    //
+    // Note that an unpromotable literal takes higher precedence than the identical literal
+    // in its promotable form.
+    IntLiterals(FxOrderMap<i64, bool>),
+    StringLiterals(FxOrderMap<StringLiteralType<'db>, bool>),
+    BytesLiterals(FxOrderMap<BytesLiteralType<'db>, bool>),
     EnumLiterals {
         enum_class: ClassLiteral<'db>,
-        literals: FxOrderSet<LiteralValueType<'db>>,
+        literals: FxOrderMap<EnumLiteralType<'db>, bool>,
     },
-    Type(Type<'db>),
 }
 
 impl<'db> UnionElement<'db> {
@@ -152,40 +157,56 @@ impl<'db> UnionElement<'db> {
         let should_keep = match self {
             UnionElement::IntLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::Int) {
-                    literals.retain(|literal| should_retain_type(Type::LiteralValue(*literal)));
+                    literals.retain(|literal, promotable| {
+                        should_retain_type(LiteralValueType::new(db, *literal, *promotable).into())
+                    });
                     !literals.is_empty()
                 } else {
-                    !Type::LiteralValue(literals[0]).is_redundant_with(db, other_type)
+                    let (literal, promotable) = literals.first().unwrap();
+                    !Type::from(LiteralValueType::new(db, *literal, *promotable))
+                        .is_redundant_with(db, other_type)
                 }
             }
             UnionElement::StringLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::String) {
-                    literals.retain(|literal| should_retain_type(Type::LiteralValue(*literal)));
+                    literals.retain(|literal, promotable| {
+                        should_retain_type(LiteralValueType::new(db, *literal, *promotable).into())
+                    });
                     !literals.is_empty()
                 } else {
-                    !Type::LiteralValue(literals[0]).is_redundant_with(db, other_type)
+                    let (literal, promotable) = literals.first().unwrap();
+                    !Type::from(LiteralValueType::new(db, *literal, *promotable))
+                        .is_redundant_with(db, other_type)
                 }
             }
             UnionElement::BytesLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::Bytes) {
-                    literals.retain(|literal| should_retain_type(Type::LiteralValue(*literal)));
+                    literals.retain(|literal, promotable| {
+                        should_retain_type(LiteralValueType::new(db, *literal, *promotable).into())
+                    });
                     !literals.is_empty()
                 } else {
-                    !Type::LiteralValue(literals[0]).is_redundant_with(db, other_type)
+                    let (literal, promotable) = literals.first().unwrap();
+                    !Type::from(LiteralValueType::new(db, *literal, *promotable))
+                        .is_redundant_with(db, other_type)
                 }
             }
             UnionElement::EnumLiterals {
                 enum_class,
                 literals,
             } => {
-                let literal_kind = LiteralKind::Enum {
+                let enum_class = LiteralKind::Enum {
                     enum_class: *enum_class,
                 };
-                if other_type.splits_literals(db, literal_kind) {
-                    literals.retain(|literal| should_retain_type(Type::LiteralValue(*literal)));
+                if other_type.splits_literals(db, enum_class) {
+                    literals.retain(|literal, promotable| {
+                        should_retain_type(LiteralValueType::new(db, *literal, *promotable).into())
+                    });
                     !literals.is_empty()
                 } else {
-                    !Type::LiteralValue(literals[0]).is_redundant_with(db, other_type)
+                    let (literal, promotable) = literals.first().unwrap();
+                    !Type::from(LiteralValueType::new(db, *literal, *promotable))
+                        .is_redundant_with(db, other_type)
                 }
             }
             UnionElement::Type(existing) => return ReduceResult::Type(*existing),
@@ -316,11 +337,8 @@ impl<'db> UnionBuilder<'db> {
                     replace_with.push(KnownClass::Bytes.to_instance(self.db));
                 }
                 UnionElement::EnumLiterals { literals, .. } => {
-                    replace_with.push(
-                        literals[0]
-                            .expect_enum(self.db)
-                            .enum_class_instance(self.db),
-                    );
+                    let (enum_literal, _) = literals.first().unwrap();
+                    replace_with.push(enum_literal.enum_class_instance(self.db));
                 }
                 UnionElement::Type(_) => {}
             }
@@ -388,250 +406,266 @@ impl<'db> UnionBuilder<'db> {
                     self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
                 }
             }
-            Type::LiteralValue(literal) => match literal.kind(self.db) {
-                // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
-                // add it to, or an existing element that is a super-type of string literals, which
-                // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
-                // containing it.
-                LiteralValueTypeKind::String(_) => {
-                    let mut found = None;
-                    let mut to_remove = None;
-                    for (index, element) in self.elements.iter_mut().enumerate() {
-                        match element {
-                            UnionElement::StringLiterals(literals) => {
-                                if should_widen(literals.len(), self.recursively_defined) {
-                                    let replace_with = KnownClass::Str.to_instance(self.db);
-                                    self.add_in_place_impl(replace_with, seen_aliases);
-                                    return;
-                                }
-                                found = Some(literals);
-                                continue;
-                            }
-                            UnionElement::Type(existing) => {
-                                // e.g. `existing` could be `Literal[""] & Any`,
-                                // and `ty` could be `Literal[""]`
-                                if ty.is_redundant_with(self.db, *existing) {
-                                    return;
-                                }
-                                if existing.is_redundant_with(self.db, ty) {
-                                    to_remove = Some(index);
+            Type::LiteralValue(literal) => {
+                match literal.kind(self.db) {
+                    // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
+                    // add it to, or an existing element that is a super-type of string literals, which
+                    // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
+                    // containing it.
+                    LiteralValueTypeKind::String(string_literal) => {
+                        let mut found = None;
+                        let mut to_remove = None;
+                        for (index, element) in self.elements.iter_mut().enumerate() {
+                            match element {
+                                UnionElement::StringLiterals(literals) => {
+                                    if should_widen(literals.len(), self.recursively_defined) {
+                                        let replace_with = KnownClass::Str.to_instance(self.db);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        return;
+                                    }
+                                    found = Some(literals);
                                     continue;
                                 }
-                                if ty_negated().is_subtype_of(self.db, *existing) {
-                                    // The type that includes both this new element, and its negation
-                                    // (or a supertype of its negation), must be simply `object`.
-                                    self.collapse_to_object();
-                                    return;
+                                UnionElement::Type(existing) => {
+                                    // e.g. `existing` could be `Literal[""] & Any`,
+                                    // and `ty` could be `Literal[""]`
+                                    if ty.is_redundant_with(self.db, *existing) {
+                                        return;
+                                    }
+                                    if existing.is_redundant_with(self.db, ty) {
+                                        to_remove = Some(index);
+                                        continue;
+                                    }
+                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                        // The type that includes both this new element, and its negation
+                                        // (or a supertype of its negation), must be simply `object`.
+                                        self.collapse_to_object();
+                                        return;
+                                    }
                                 }
+                                _ => {}
                             }
-                            _ => {}
+                        }
+                        if let Some(found) = found {
+                            let is_promotable = literal.is_promotable(self.db);
+                            *found.entry(string_literal).or_insert(is_promotable) &= is_promotable;
+                        } else {
+                            self.elements.push(UnionElement::StringLiterals(
+                                FxOrderMap::from_iter([(
+                                    string_literal,
+                                    literal.is_promotable(self.db),
+                                )]),
+                            ));
+                        }
+                        if let Some(index) = to_remove {
+                            self.elements.swap_remove(index);
                         }
                     }
-                    if let Some(found) = found {
-                        found.insert(literal);
-                    } else {
-                        self.elements
-                            .push(UnionElement::StringLiterals(FxOrderSet::from_iter([
-                                literal,
-                            ])));
-                    }
-                    if let Some(index) = to_remove {
-                        self.elements.swap_remove(index);
-                    }
-                }
-                // Same for bytes literals as for string literals, above.
-                LiteralValueTypeKind::Bytes(_) => {
-                    let mut found = None;
-                    let mut to_remove = None;
-                    for (index, element) in self.elements.iter_mut().enumerate() {
-                        match element {
-                            UnionElement::BytesLiterals(literals) => {
-                                if should_widen(literals.len(), self.recursively_defined) {
-                                    let replace_with = KnownClass::Bytes.to_instance(self.db);
-                                    self.add_in_place_impl(replace_with, seen_aliases);
-                                    return;
-                                }
-                                found = Some(literals);
-                                continue;
-                            }
-                            UnionElement::Type(existing) => {
-                                if ty.is_redundant_with(self.db, *existing) {
-                                    return;
-                                }
-                                // e.g. `existing` could be `Literal[b""] & Any`,
-                                // and `ty` could be `Literal[b""]`
-                                if existing.is_redundant_with(self.db, ty) {
-                                    to_remove = Some(index);
+                    // Same for bytes literals as for string literals, above.
+                    LiteralValueTypeKind::Bytes(bytes_literal) => {
+                        let mut found = None;
+                        let mut to_remove = None;
+                        for (index, element) in self.elements.iter_mut().enumerate() {
+                            match element {
+                                UnionElement::BytesLiterals(literals) => {
+                                    if should_widen(literals.len(), self.recursively_defined) {
+                                        let replace_with = KnownClass::Bytes.to_instance(self.db);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        return;
+                                    }
+                                    found = Some(literals);
                                     continue;
                                 }
-                                if ty_negated().is_subtype_of(self.db, *existing) {
-                                    // The type that includes both this new element, and its negation
-                                    // (or a supertype of its negation), must be simply `object`.
-                                    self.collapse_to_object();
-                                    return;
+                                UnionElement::Type(existing) => {
+                                    if ty.is_redundant_with(self.db, *existing) {
+                                        return;
+                                    }
+                                    // e.g. `existing` could be `Literal[b""] & Any`,
+                                    // and `ty` could be `Literal[b""]`
+                                    if existing.is_redundant_with(self.db, ty) {
+                                        to_remove = Some(index);
+                                        continue;
+                                    }
+                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                        // The type that includes both this new element, and its negation
+                                        // (or a supertype of its negation), must be simply `object`.
+                                        self.collapse_to_object();
+                                        return;
+                                    }
                                 }
+                                _ => {}
                             }
-                            _ => {}
+                        }
+                        if let Some(found) = found {
+                            let is_promotable = literal.is_promotable(self.db);
+                            *found.entry(bytes_literal).or_insert(is_promotable) &= is_promotable;
+                        } else {
+                            self.elements
+                                .push(UnionElement::BytesLiterals(FxOrderMap::from_iter([(
+                                    bytes_literal,
+                                    literal.is_promotable(self.db),
+                                )])));
+                        }
+                        if let Some(index) = to_remove {
+                            self.elements.swap_remove(index);
                         }
                     }
-                    if let Some(found) = found {
-                        found.insert(literal);
-                    } else {
-                        self.elements
-                            .push(UnionElement::BytesLiterals(FxOrderSet::from_iter([
-                                literal,
-                            ])));
-                    }
-                    if let Some(index) = to_remove {
-                        self.elements.swap_remove(index);
-                    }
-                }
-                // And same for int literals as well.
-                LiteralValueTypeKind::Int(_) => {
-                    let mut found = None;
-                    let mut to_remove = None;
-                    for (index, element) in self.elements.iter_mut().enumerate() {
-                        match element {
-                            UnionElement::IntLiterals(literals) => {
-                                if should_widen(literals.len(), self.recursively_defined) {
-                                    let replace_with = KnownClass::Int.to_instance(self.db);
-                                    self.add_in_place_impl(replace_with, seen_aliases);
-                                    return;
-                                }
-                                found = Some(literals);
-                                continue;
-                            }
-                            UnionElement::Type(existing) => {
-                                if ty.is_redundant_with(self.db, *existing) {
-                                    return;
-                                }
-                                // e.g. `existing` could be `Literal[1] & Any`,
-                                // and `ty` could be `Literal[1]`
-                                if existing.is_redundant_with(self.db, ty) {
-                                    to_remove = Some(index);
+                    // And same for int literals as well.
+                    LiteralValueTypeKind::Int(int_literal) => {
+                        let mut found = None;
+                        let mut to_remove = None;
+                        for (index, element) in self.elements.iter_mut().enumerate() {
+                            match element {
+                                UnionElement::IntLiterals(literals) => {
+                                    if should_widen(literals.len(), self.recursively_defined) {
+                                        let replace_with = KnownClass::Int.to_instance(self.db);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        return;
+                                    }
+                                    found = Some(literals);
                                     continue;
                                 }
-                                if ty_negated().is_subtype_of(self.db, *existing) {
-                                    // The type that includes both this new element, and its negation
-                                    // (or a supertype of its negation), must be simply `object`.
-                                    self.collapse_to_object();
-                                    return;
+                                UnionElement::Type(existing) => {
+                                    if ty.is_redundant_with(self.db, *existing) {
+                                        return;
+                                    }
+                                    // e.g. `existing` could be `Literal[1] & Any`,
+                                    // and `ty` could be `Literal[1]`
+                                    if existing.is_redundant_with(self.db, ty) {
+                                        to_remove = Some(index);
+                                        continue;
+                                    }
+                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                        // The type that includes both this new element, and its negation
+                                        // (or a supertype of its negation), must be simply `object`.
+                                        self.collapse_to_object();
+                                        return;
+                                    }
                                 }
+                                _ => {}
                             }
-                            _ => {}
+                        }
+                        if let Some(found) = found {
+                            let is_promotable = literal.is_promotable(self.db);
+                            *found.entry(int_literal).or_insert(is_promotable) &= is_promotable;
+                        } else {
+                            self.elements
+                                .push(UnionElement::IntLiterals(FxOrderMap::from_iter([(
+                                    int_literal,
+                                    literal.is_promotable(self.db),
+                                )])));
+                        }
+                        if let Some(index) = to_remove {
+                            self.elements.swap_remove(index);
                         }
                     }
-                    if let Some(found) = found {
-                        found.insert(literal);
-                    } else {
-                        self.elements
-                            .push(UnionElement::IntLiterals(FxOrderSet::from_iter([literal])));
-                    }
-                    if let Some(index) = to_remove {
-                        self.elements.swap_remove(index);
-                    }
-                }
-                LiteralValueTypeKind::Enum(enum_member_to_add) => {
-                    let enum_class = enum_member_to_add.enum_class(self.db);
-                    let metadata = enum_metadata(self.db, enum_class)
-                        .expect("Class of enum literal is an enum");
+                    LiteralValueTypeKind::Enum(enum_member_to_add) => {
+                        let enum_class = enum_member_to_add.enum_class(self.db);
+                        let metadata = enum_metadata(self.db, enum_class)
+                            .expect("Class of enum literal is an enum");
 
-                    if metadata.members.len() == 1 {
-                        self.add_in_place_impl(
-                            enum_member_to_add.enum_class_instance(self.db),
-                            seen_aliases,
-                        );
-                        return;
-                    }
-
-                    let mut found = None;
-                    let mut to_remove = None;
-                    for (index, element) in self.elements.iter_mut().enumerate() {
-                        match element {
-                            UnionElement::EnumLiterals {
-                                enum_class: existing_enum_class,
-                                literals,
-                            } => {
-                                if *existing_enum_class != enum_class {
-                                    continue;
-                                }
-                                // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
-                                // for why we avoid using the `should_widen` closure here.
-                                let enum_literals_limit =
-                                    if self.recursively_defined.is_yes() && cycle_recovery {
-                                        MAX_RECURSIVE_UNION_LITERALS
-                                    } else {
-                                        MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
-                                    };
-                                if literals.len() >= enum_literals_limit {
-                                    let replace_with = literals[0]
-                                        .expect_enum(self.db)
-                                        .enum_class_instance(self.db);
-                                    self.add_in_place_impl(replace_with, seen_aliases);
-                                    return;
-                                }
-                                found = Some(literals);
-                                continue;
-                            }
-                            UnionElement::Type(existing) => {
-                                if ty.is_redundant_with(self.db, *existing) {
-                                    return;
-                                }
-                                // e.g. `existing` could be `Literal[Foo.X] & Any`,
-                                // and `ty` could be `Literal[Foo.X]`
-                                if existing.is_redundant_with(self.db, ty) {
-                                    to_remove = Some(index);
-                                    continue;
-                                }
-                                if ty_negated().is_subtype_of(self.db, *existing) {
-                                    // The type that includes both this new element, and its negation
-                                    // (or a supertype of its negation), must be simply `object`.
-                                    self.collapse_to_object();
-                                    return;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    if let Some(found) = found {
-                        let newly_added = found.insert(literal);
-                        if newly_added && found.len() == metadata.members.len() {
+                        if metadata.members.len() == 1 {
                             self.add_in_place_impl(
                                 enum_member_to_add.enum_class_instance(self.db),
                                 seen_aliases,
                             );
                             return;
                         }
-                    } else {
-                        self.elements.push(UnionElement::EnumLiterals {
-                            enum_class,
-                            literals: FxOrderSet::from_iter([literal]),
-                        });
+
+                        let mut found = None;
+                        let mut to_remove = None;
+                        for (index, element) in self.elements.iter_mut().enumerate() {
+                            match element {
+                                UnionElement::EnumLiterals {
+                                    enum_class: existing_enum_class,
+                                    literals,
+                                } => {
+                                    if *existing_enum_class != enum_class {
+                                        continue;
+                                    }
+                                    // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
+                                    // for why we avoid using the `should_widen` closure here.
+                                    let enum_literals_limit =
+                                        if self.recursively_defined.is_yes() && cycle_recovery {
+                                            MAX_RECURSIVE_UNION_LITERALS
+                                        } else {
+                                            MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
+                                        };
+                                    if literals.len() >= enum_literals_limit {
+                                        let (literal, _) = literals.first().unwrap();
+                                        let replace_with = literal.enum_class_instance(self.db);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        return;
+                                    }
+                                    found = Some(literals);
+                                    continue;
+                                }
+                                UnionElement::Type(existing) => {
+                                    if ty.is_redundant_with(self.db, *existing) {
+                                        return;
+                                    }
+                                    // e.g. `existing` could be `Literal[Foo.X] & Any`,
+                                    // and `ty` could be `Literal[Foo.X]`
+                                    if existing.is_redundant_with(self.db, ty) {
+                                        to_remove = Some(index);
+                                        continue;
+                                    }
+                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                        // The type that includes both this new element, and its negation
+                                        // (or a supertype of its negation), must be simply `object`.
+                                        self.collapse_to_object();
+                                        return;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        if let Some(found) = found {
+                            match found.entry(enum_member_to_add) {
+                                ordermap::map::Entry::Vacant(entry) => {
+                                    entry.insert(literal.is_promotable(self.db));
+
+                                    if found.len() == metadata.members.len() {
+                                        self.add_in_place_impl(
+                                            enum_member_to_add.enum_class_instance(self.db),
+                                            seen_aliases,
+                                        );
+                                        return;
+                                    }
+                                }
+                                ordermap::map::Entry::Occupied(mut entry) => {
+                                    *entry.get_mut() &= literal.is_promotable(self.db);
+                                }
+                            }
+                        } else {
+                            self.elements.push(UnionElement::EnumLiterals {
+                                enum_class,
+                                literals: FxOrderMap::from_iter([(
+                                    enum_member_to_add,
+                                    literal.is_promotable(self.db),
+                                )]),
+                            });
+                        }
+                        if let Some(index) = to_remove {
+                            self.elements.swap_remove(index);
+                        }
                     }
-                    if let Some(index) = to_remove {
-                        self.elements.swap_remove(index);
-                    }
+                    _ => self.push_type(ty, seen_aliases),
                 }
-                _ => self.push_type(ty, seen_aliases),
-            },
+            }
             // Adding `object` to a union results in `object`.
-            ty if ty.is_object() => {
-                self.collapse_to_object();
-            }
-            _ => {
-                self.push_type(ty, seen_aliases);
-            }
+            ty if ty.is_object() => self.collapse_to_object(),
+            _ => self.push_type(ty, seen_aliases),
         }
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        let bool_pair = if let Type::LiteralValue(literal) = ty
-            && let LiteralValueTypeKind::Bool(b) = literal.kind(self.db)
-        {
-            Some(Type::bool_literal(self.db, !b))
-        } else {
-            None
-        };
+        let bool_pair =
+            if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind(self.db) {
+                Some(LiteralValueTypeKind::Bool(!b))
+            } else {
+                None
+            };
 
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
@@ -663,7 +697,11 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if Some(element_type) == bool_pair {
+            if element_type
+                .as_literal_value_kind(self.db)
+                .zip(bool_pair)
+                .is_some_and(|(element, pair)| element == pair)
+            {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
                 return;
             }
@@ -724,16 +762,24 @@ impl<'db> UnionBuilder<'db> {
         for element in self.elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
-                    types.extend(literals.into_iter().map(Type::LiteralValue));
+                    types.extend(literals.into_iter().map(|(literal, promotable)| {
+                        Type::from(LiteralValueType::new(self.db, literal, promotable))
+                    }));
                 }
                 UnionElement::StringLiterals(literals) => {
-                    types.extend(literals.into_iter().map(Type::LiteralValue));
+                    types.extend(literals.into_iter().map(|(literal, promotable)| {
+                        Type::from(LiteralValueType::new(self.db, literal, promotable))
+                    }));
                 }
                 UnionElement::BytesLiterals(literals) => {
-                    types.extend(literals.into_iter().map(Type::LiteralValue));
+                    types.extend(literals.into_iter().map(|(literal, promotable)| {
+                        Type::from(LiteralValueType::new(self.db, literal, promotable))
+                    }));
                 }
                 UnionElement::EnumLiterals { literals, .. } => {
-                    types.extend(literals.into_iter().map(Type::LiteralValue));
+                    types.extend(literals.into_iter().map(|(literal, promotable)| {
+                        Type::from(LiteralValueType::new(self.db, literal, promotable))
+                    }));
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
