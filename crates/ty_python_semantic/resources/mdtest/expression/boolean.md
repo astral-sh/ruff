@@ -108,7 +108,7 @@ reveal_type(bool(VariadicTupleSubclassWithDunderBoolOverride((1,))))  # revealed
 
 # Same again but for a subclass of a fixed-length tuple:
 class EmptyTupleSubclassWithDunderBoolOverride(tuple[()]):
-    # TODO: we should reject this override as a Liskov violation:
+    # error: [unsafe-tuple-subclass]
     def __bool__(self) -> Literal[True]:
         return True
 

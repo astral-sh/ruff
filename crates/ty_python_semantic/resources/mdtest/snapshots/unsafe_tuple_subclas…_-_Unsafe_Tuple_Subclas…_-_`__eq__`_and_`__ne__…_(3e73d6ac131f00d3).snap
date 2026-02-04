@@ -1,0 +1,78 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unsafe_tuple_subclass.md - Unsafe Tuple Subclass - `__eq__` and `__ne__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/unsafe_tuple_subclass.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A(tuple):
+ 2 |     # error: [unsafe-tuple-subclass]
+ 3 |     def __eq__(self, other):
+ 4 |         return False
+ 5 | 
+ 6 | class B(tuple): ...
+ 7 | 
+ 8 | class C(B):
+ 9 |     # error: [unsafe-tuple-subclass]
+10 |     def __eq__(self, other):
+11 |         return False
+12 | 
+13 | class D(tuple):
+14 |     # error: [unsafe-tuple-subclass]
+15 |     def __ne__(self, other):
+16 |         return False
+```
+
+# Diagnostics
+
+```
+warning[unsafe-tuple-subclass]: Unsafe override of method `__eq__` in a subclass of `tuple`
+ --> src/mdtest_snippet.py:3:9
+  |
+1 | class A(tuple):
+2 |     # error: [unsafe-tuple-subclass]
+3 |     def __eq__(self, other):
+  |         ^^^^^^^^^^^^^^^^^^^
+4 |         return False
+  |
+help: Overriding method `__eq__` in a subclass of `tuple` can cause unexpected behavior
+info: rule `unsafe-tuple-subclass` is enabled by default
+
+```
+
+```
+warning[unsafe-tuple-subclass]: Unsafe override of method `__eq__` in a subclass of `tuple`
+  --> src/mdtest_snippet.py:10:9
+   |
+ 8 | class C(B):
+ 9 |     # error: [unsafe-tuple-subclass]
+10 |     def __eq__(self, other):
+   |         ^^^^^^^^^^^^^^^^^^^
+11 |         return False
+   |
+help: Overriding method `__eq__` in a subclass of `tuple` can cause unexpected behavior
+info: rule `unsafe-tuple-subclass` is enabled by default
+
+```
+
+```
+warning[unsafe-tuple-subclass]: Unsafe override of method `__ne__` in a subclass of `tuple`
+  --> src/mdtest_snippet.py:15:9
+   |
+13 | class D(tuple):
+14 |     # error: [unsafe-tuple-subclass]
+15 |     def __ne__(self, other):
+   |         ^^^^^^^^^^^^^^^^^^^
+16 |         return False
+   |
+help: Overriding method `__ne__` in a subclass of `tuple` can cause unexpected behavior
+info: rule `unsafe-tuple-subclass` is enabled by default
+
+```

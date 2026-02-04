@@ -486,6 +486,7 @@ currently allow subclasses of `tuple` to overwrite `__bool__` (or `__len__`):
 
 ```py
 class NotAlwaysTruthyTuple(tuple[int]):
+    # error: [unsafe-tuple-subclass]
     def __bool__(self) -> bool:
         return False
 

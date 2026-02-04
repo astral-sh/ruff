@@ -2600,6 +2600,20 @@ impl<'db> StaticClassLiteral<'db> {
             })
     }
 
+    /// Determine if this class is a subclass of `tuple`
+    ///
+    /// This returns false if the class is the tuple class.
+    pub(super) fn is_tuple_subclass(self, db: &'db dyn Db) -> bool {
+        if self.is_tuple(db) {
+            return false;
+        }
+
+        self.iter_mro(db, None).into_iter().any(|base| {
+            base.into_class()
+                .is_some_and(|base| base.is_known(db, KnownClass::Tuple))
+        })
+    }
+
     /// Return the types of the decorators on this class
     #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {

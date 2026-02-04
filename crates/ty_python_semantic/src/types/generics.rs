@@ -973,7 +973,7 @@ pub struct Specialization<'db> {
 
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
-    tuple_inner: Option<TupleType<'db>>,
+    pub(crate) tuple_inner: Option<TupleType<'db>>,
 }
 
 // The Salsa heap is tracked separately.
