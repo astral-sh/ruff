@@ -59,10 +59,19 @@ def _():
 
     assert float("infinity") == float("inf")  # ok
 
-    assert math.inf == float("inf")  # ok
+    assert math.inf == 1e300 * 1e300  # ok
 
 
 def _pytest():
     import pytest
 
     assert pytest.approx(1 / 3, rel=1e-6) == 0.333333  # ok
+
+
+def _numpy_torch():
+    from numpy import inf as numpy_inf
+    from torch import inf as torch_inf
+
+    assert numpy_inf == 1e300 * 1e300  # ok
+
+    assert torch_inf == 1e300 * 1e300  # ok
