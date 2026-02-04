@@ -9,6 +9,7 @@ use crate::comments::{
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::empty_parenthesized;
+use crate::options::FunctionParameterIndent;
 use crate::prelude::*;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
@@ -250,29 +251,51 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // If we have a single argument, avoid the inner group, to ensure that we insert a
             // trailing comma if the outer group breaks.
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-            write!(
-                f,
-                [
-                    token("("),
-                    dangling_open_parenthesis_comments(parenthesis_dangling),
-                    soft_block_indent(&format_inner),
-                    token(")")
-                ]
-            )
+            match f.options().function_parameter_indent() {
+                FunctionParameterIndent::Single => write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_block_indent(&format_inner),
+                        token(")")
+                    ]
+                ),
+                FunctionParameterIndent::Double => write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_block_indent(&soft_block_indent(&format_inner)),
+                        token(")")
+                    ]
+                ),
+            }
         } else {
             // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
             // We want parameters to be grouped alongside return types, one level up, so we
             // format them "inline" here.
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-            write!(
-                f,
-                [
-                    token("("),
-                    dangling_open_parenthesis_comments(parenthesis_dangling),
-                    soft_block_indent(&group(&format_inner)),
-                    token(")")
-                ]
-            )
+            match f.options().function_parameter_indent() {
+                FunctionParameterIndent::Single => write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_block_indent(&group(&format_inner)),
+                        token(")")
+                    ]
+                ),
+                FunctionParameterIndent::Double => write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_block_indent(&soft_block_indent(&group(&format_inner))),
+                        token(")")
+                    ]
+                ),
+            }
         }
     }
 }

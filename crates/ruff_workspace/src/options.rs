@@ -38,7 +38,7 @@ use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
-use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
+use ruff_python_formatter::{DocstringCodeLineWidth, FunctionParameterIndent, QuoteStyle};
 use ruff_python_semantic::NameImports;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -3638,6 +3638,43 @@ pub struct FormatOptions {
         "#
     )]
     pub quote_style: Option<QuoteStyle>,
+
+    /// Controls how many indentation levels are used when a function or method
+    /// signature wraps and its parameters are formatted on multiple lines.
+    ///
+    /// With `function-parameter-indent = "single"` (the default), parameters are
+    /// indented one level from the opening parenthesis:
+    ///
+    /// ```python
+    /// async def test_delay_in_plan(
+    ///     stepping_orchestrator: SteppingOrchestrator,
+    ///     mock_http_client: MockHttpClient,
+    ///     operation_responder: OperationResponder,
+    /// ) -> None:
+    ///     ...
+    /// ```
+    ///
+    /// With `function-parameter-indent = "double"`, parameters are indented two
+    /// levels (for an effective “double indent” when using the default
+    /// `indent-width = 4`):
+    ///
+    /// ```python
+    /// async def test_delay_in_plan(
+    ///         stepping_orchestrator: SteppingOrchestrator,
+    ///         mock_http_client: MockHttpClient,
+    ///         operation_responder: OperationResponder,
+    /// ) -> None:
+    ///     ...
+    /// ```
+    #[option(
+        default = r#""single""#,
+        value_type = r#""single" | "double""#,
+        example = r#"
+            # Use a double indent for wrapped function parameters.
+            function-parameter-indent = "double"
+        "#
+    )]
+    pub function_parameter_indent: Option<FunctionParameterIndent>,
 
     /// Ruff uses existing trailing commas as an indication that short lines should be left separate.
     /// If this option is set to `true`, the magic trailing comma is ignored.

@@ -62,6 +62,32 @@ pub struct PyFormatOptions {
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
+
+    /// Controls how many indentation levels are used when function parameters
+    /// wrap across multiple lines relative to the enclosing indentation.
+    ///
+    /// With `Single` (the default), parameters are indented one level from the
+    /// opening parenthesis:
+    ///
+    /// ```python
+    /// async def f(
+    ///     a,
+    ///     b,
+    /// ) -> None:
+    ///     ...
+    /// ```
+    ///
+    /// With `Double`, parameters are indented two levels (for an effective
+    /// “double indent” when using the default `indent_width = 4`):
+    ///
+    /// ```python
+    /// async def f(
+    ///         a,
+    ///         b,
+    /// ) -> None:
+    ///     ...
+    /// ```
+    function_parameter_indent: FunctionParameterIndent,
 }
 
 fn default_line_width() -> LineWidth {
@@ -91,6 +117,7 @@ impl Default for PyFormatOptions {
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
+            function_parameter_indent: FunctionParameterIndent::default(),
         }
     }
 }
@@ -142,6 +169,10 @@ impl PyFormatOptions {
 
     pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    pub const fn function_parameter_indent(&self) -> FunctionParameterIndent {
+        self.function_parameter_indent
     }
 
     #[must_use]
@@ -201,6 +232,15 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_preview(mut self, preview: PreviewMode) -> Self {
         self.preview = preview;
+        self
+    }
+
+    #[must_use]
+    pub fn with_function_parameter_indent(
+        mut self,
+        function_parameter_indent: FunctionParameterIndent,
+    ) -> Self {
+        self.function_parameter_indent = function_parameter_indent;
         self
     }
 
@@ -427,6 +467,36 @@ mod schema {
         );
         map.insert("oneOf".to_string(), Value::Array(vec![schema.into()]));
         schema_object
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum FunctionParameterIndent {
+    /// Use a single extra indentation level for wrapped parameters (default).
+    #[default]
+    Single,
+    /// Use two indentation levels for wrapped parameters.
+    Double,
+}
+
+impl FunctionParameterIndent {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            FunctionParameterIndent::Single => "single",
+            FunctionParameterIndent::Double => "double",
+        }
+    }
+}
+
+impl fmt::Display for FunctionParameterIndent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 

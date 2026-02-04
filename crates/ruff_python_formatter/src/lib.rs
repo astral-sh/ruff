@@ -19,8 +19,8 @@ use crate::comments::{
 pub use crate::context::PyFormatContext;
 pub use crate::db::Db;
 pub use crate::options::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, FunctionParameterIndent, MagicTrailingComma,
+    PreviewMode, PyFormatOptions, QuoteStyle,
 };
 use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
@@ -219,7 +219,10 @@ mod tests {
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::{PyFormatOptions, format_module_ast, format_module_source, format_range};
+    use crate::{
+        FunctionParameterIndent, PyFormatOptions, format_module_ast, format_module_source,
+        format_range,
+    };
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -403,5 +406,35 @@ print ( "format me" )"#
         .expect("Formatting to succeed");
 
         assert_snapshot!(output.print().expect("Printing to succeed").as_code());
+    }
+
+    #[test]
+    fn double_indented_parameters() -> Result<()> {
+        let input = r#"async def this_function_has_many_parameters(
+    a: A,
+    b: B,
+    c: C,
+) -> None:
+    ...
+"#;
+
+        let expected = r#"async def this_function_has_many_parameters(
+        a: A,
+        b: B,
+        c: C,
+) -> None: ...
+"#;
+
+        let actual = format_module_source(
+            input,
+            PyFormatOptions::default()
+                .with_function_parameter_indent(FunctionParameterIndent::Double),
+        )?
+        .as_code()
+        .to_string();
+
+        assert_eq!(expected, actual);
+
+        Ok(())
     }
 }

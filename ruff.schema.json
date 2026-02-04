@@ -1553,6 +1553,17 @@
             "type": "string"
           }
         },
+        "function-parameter-indent": {
+          "description": "Controls how many indentation levels are used when a function or method\nsignature wraps and its parameters are formatted on multiple lines.\n\nWith `function-parameter-indent = \"single\"` (the default), parameters are\nindented one level from the opening parenthesis:\n\n```python\nasync def test_delay_in_plan(\n    stepping_orchestrator: SteppingOrchestrator,\n    mock_http_client: MockHttpClient,\n    operation_responder: OperationResponder,\n) -> None:\n    ...\n```\n\nWith `function-parameter-indent = \"double\"`, parameters are indented two\nlevels (for an effective “double indent” when using the default\n`indent-width = 4`):\n\n```python\nasync def test_delay_in_plan(\n        stepping_orchestrator: SteppingOrchestrator,\n        mock_http_client: MockHttpClient,\n        operation_responder: OperationResponder,\n) -> None:\n    ...\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FunctionParameterIndent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "indent-style": {
           "description": "Whether to use spaces or tabs for indentation.\n\n`indent-style = \"space\"` (default):\n\n```python\ndef f():\n    print(\"Hello\") #  Spaces indent the `print` statement.\n```\n\n`indent-style = \"tab\"`:\n\n```python\ndef f():\n    print(\"Hello\") #  A tab `\\t` indents the `print` statement.\n```\n\nPEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation).\nWe care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.\n\nSee [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.",
           "anyOf": [
@@ -1602,6 +1613,20 @@
         }
       },
       "additionalProperties": false
+    },
+    "FunctionParameterIndent": {
+      "oneOf": [
+        {
+          "description": "Use a single extra indentation level for wrapped parameters (default).",
+          "type": "string",
+          "const": "single"
+        },
+        {
+          "description": "Use two indentation levels for wrapped parameters.",
+          "type": "string",
+          "const": "double"
+        }
+      ]
     },
     "ImportSection": {
       "anyOf": [
