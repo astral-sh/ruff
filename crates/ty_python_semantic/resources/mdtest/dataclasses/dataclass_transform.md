@@ -455,6 +455,86 @@ m.name = "new"  # No error
 reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
 ```
 
+### Override diagnostics on dataclass-like classes
+
+#### Frozen override diagnostics
+
+If a frozen dataclass-like class defines `__setattr__` or `__delattr__`, a diagnostic is emitted:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+def frozen_model(*, frozen: bool = True): ...
+@frozen_model()
+class FrozenWithOverrides:
+    x: int
+
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__setattr__` in frozen dataclass `FrozenWithOverrides`"
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__delattr__` in frozen dataclass `FrozenWithOverrides`"
+    def __delattr__(self, name: str) -> None: ...
+```
+
+No diagnostic is emitted if the class is not frozen:
+
+```py
+@frozen_model(frozen=False)
+class NotFrozenWithOverrides:
+    x: int
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+    def __delattr__(self, name: str) -> None: ...
+```
+
+#### Order override diagnostics
+
+If an ordered dataclass-like class defines comparison dunder methods, a diagnostic is emitted:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+def ordered_model(*, order: bool = False): ...
+@ordered_model(order=True)
+class OrderedWithOverrides:
+    x: int
+
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__lt__` in dataclass `OrderedWithOverrides` with `order=True`"
+    def __lt__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__le__` in dataclass `OrderedWithOverrides` with `order=True`"
+    def __le__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__gt__` in dataclass `OrderedWithOverrides` with `order=True`"
+    def __gt__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__ge__` in dataclass `OrderedWithOverrides` with `order=True`"
+    def __ge__(self, other: object) -> bool:
+        return False
+```
+
+No diagnostic is emitted if the class does not use `order=True`:
+
+```py
+@ordered_model()
+class NotOrderedWithOverrides:
+    x: int
+
+    def __lt__(self, other: object) -> bool:
+        return False
+
+    def __le__(self, other: object) -> bool:
+        return False
+
+    def __gt__(self, other: object) -> bool:
+        return False
+
+    def __ge__(self, other: object) -> bool:
+        return False
+```
+
 ## Other `dataclass` parameters
 
 Other parameters from normal dataclasses can also be set on models created using
