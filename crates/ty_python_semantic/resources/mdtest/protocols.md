@@ -847,6 +847,14 @@ class NamedTupleWithX(NamedTuple):
 
 static_assert(not is_subtype_of(NamedTupleWithX, HasX))
 static_assert(not is_assignable_to(NamedTupleWithX, HasX))
+
+# This also applies to function parameters expecting a protocol:
+def takes_has_x(obj: HasX) -> None:
+    obj.x = 10  # Protocol attributes are mutable
+
+nt = NamedTupleWithX(x=5)
+# error: [invalid-argument-type] "Expected `HasX`, found `NamedTupleWithX`"
+takes_has_x(nt)
 ```
 
 However, a type with a read-write property `x` *does* satisfy the `HasX` protocol. The `HasX`
@@ -2277,6 +2285,32 @@ static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))
 static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))
 static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PClassMethod))
 static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))
+```
+
+## Modules satisfying protocols with `@staticmethod` members
+
+A module with a module-level function can satisfy a protocol with a `@staticmethod` member, since
+module-level functions are functionally equivalent to static methods:
+
+`mymodule.pyi`:
+
+```pyi
+def x(val: int) -> str: ...
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert, is_assignable_to, TypeOf
+
+class PStaticMethod(Protocol):
+    @staticmethod
+    def x(val: int) -> str: ...
+
+import mymodule
+
+static_assert(is_assignable_to(TypeOf[mymodule], PStaticMethod))
 ```
 
 ## Subtyping of protocols with decorated method members

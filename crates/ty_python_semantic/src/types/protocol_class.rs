@@ -1030,19 +1030,25 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             let attribute_type = if self.name == "__call__" {
                 other
             } else {
-                let Place::Defined(DefinedPlace {
-                    ty: attribute_type,
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }) = other
-                    .invoke_descriptor_protocol(
+                // For modules, use `.member()` which has special handling for module types
+                // that looks up module-level attributes directly. For other types, use
+                // `invoke_descriptor_protocol` to correctly handle metaclass method lookup.
+                let lookup_result = if other.as_module_literal().is_some() {
+                    other.member(db, self.name)
+                } else {
+                    other.invoke_descriptor_protocol(
                         db,
                         self.name,
                         Place::Undefined.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                         MemberLookupPolicy::default(),
                     )
-                    .place
+                };
+                let Place::Defined(DefinedPlace {
+                    ty: attribute_type,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) = lookup_result.place
                 else {
                     return ConstraintSet::from(false);
                 };
