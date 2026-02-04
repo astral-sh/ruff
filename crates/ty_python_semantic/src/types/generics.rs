@@ -621,10 +621,11 @@ impl<'db> GenericContext<'db> {
 
         /// A visitor that walks through the parameter and return type annotations, recording
         /// whether each typevar appears inside and/or outside of a return type `Callable`.
+        #[derive(Default)]
         struct FindTypeVarLocations<'db> {
             locations: RefCell<TypeVarLocations<'db>>,
             recursion_guard: TypeCollector<'db>,
-            in_return_type: Cell<bool>,
+            in_return_type: bool,
             in_callable_type: Cell<Option<CallableType<'db>>>,
         }
 
@@ -645,7 +646,7 @@ impl<'db> GenericContext<'db> {
                 };
 
                 let mut locations = self.locations.borrow_mut();
-                if self.in_return_type.get()
+                if self.in_return_type
                     && let Some(callable) = self.in_callable_type.get()
                 {
                     locations
@@ -662,7 +663,7 @@ impl<'db> GenericContext<'db> {
 
             fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
                 // Note: We only consider the outermost Callables in the return type.
-                if self.in_return_type.get() && self.in_callable_type.get().is_none() {
+                if self.in_return_type && self.in_callable_type.get().is_none() {
                     self.in_callable_type.set(Some(callable));
                     walk_callable_type(db, callable, self);
                     self.in_callable_type.set(None);
@@ -697,16 +698,11 @@ impl<'db> GenericContext<'db> {
         };
 
         // Find whether each typevar appears inside and/or outside a return type Callable.
-        let find_typevar_locations = FindTypeVarLocations {
-            locations: RefCell::default(),
-            recursion_guard: TypeCollector::default(),
-            in_return_type: Cell::new(false),
-            in_callable_type: Cell::new(None),
-        };
+        let mut find_typevar_locations = FindTypeVarLocations::default();
         for param in parameters {
             find_typevar_locations.visit_type(db, param.annotated_type());
         }
-        find_typevar_locations.in_return_type.set(true);
+        find_typevar_locations.in_return_type = true;
         find_typevar_locations.visit_type(db, return_type);
 
         // Then update those return type Callables to be generic, with their generic context
