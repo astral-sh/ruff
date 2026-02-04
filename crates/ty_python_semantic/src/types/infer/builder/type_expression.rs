@@ -531,9 +531,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let starred_type = self.infer_type_expression(value);
         if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
             starred_type
-        } else if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = starred_type
-            && typevar.is_typevartuple(self.db())
-        {
+        } else if matches!(
+            starred_type,
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_typevartuple(self.db())
+        ) || matches!(
+            starred_type,
+            Type::TypeVar(bound_typevar)
+                if bound_typevar.typevar(self.db()).is_typevartuple(self.db())
+        ) {
             // *Ts unpacks a TypeVarTuple - return the TypeVar directly
             starred_type
         } else {
@@ -695,12 +701,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if inner_tuple.is_variadic() {
                                 report_too_many_unpacked_tuples();
                             }
-                        } else if self.expression_type(starred_value)
-                            == Type::Dynamic(DynamicType::TodoTypeVarTuple)
-                        {
-                            report_too_many_unpacked_tuples();
                         } else {
-                            // TODO: emit a diagnostic
+                            let starred_value_ty = self.expression_type(starred_value);
+                            let is_typevar_tuple = starred_value_ty
+                                == Type::Dynamic(DynamicType::TodoTypeVarTuple)
+                                || matches!(
+                                    starred_value_ty,
+                                    Type::NominalInstance(instance)
+                                    if instance.has_known_class(
+                                        self.db(),
+                                        KnownClass::TypeVarTuple
+                                    )
+                                )
+                                || matches!(
+                                    starred_value_ty,
+                                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                                    if typevar.is_typevartuple(self.db())
+                                )
+                                || matches!(
+                                    starred_value_ty,
+                                    Type::TypeVar(bound_typevar)
+                                    if bound_typevar
+                                        .typevar(self.db())
+                                        .is_typevartuple(self.db())
+                                );
+                            if is_typevar_tuple {
+                                return_todo = true;
+                                report_too_many_unpacked_tuples();
+                            } else {
+                                // TODO: emit a diagnostic
+                            }
                         }
                     } else {
                         element_types.push(element_ty);
