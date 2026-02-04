@@ -9,7 +9,7 @@ B033 [*] Sets should not contain duplicate item `"value1"`
 4 | incorrect_set = {"value1", 23, 5, "value1"}
   |                  --------         ^^^^^^^^
   |                  |
-  |                  previous occurrence here
+  |                  Previous occurrence here
 5 | incorrect_set = {1, 1, 2}
 6 | incorrect_set_multiline = {
   |
@@ -31,7 +31,7 @@ B033 [*] Sets should not contain duplicate item `1`
 5 | incorrect_set = {1, 1, 2}
   |                  -  ^
   |                  |
-  |                  previous occurrence here
+  |                  Previous occurrence here
 6 | incorrect_set_multiline = {
 7 |     "value1",
   |
@@ -51,7 +51,7 @@ B033 [*] Sets should not contain duplicate item `"value1"`
  5 | incorrect_set = {1, 1, 2}
  6 | incorrect_set_multiline = {
  7 |     "value1",
-   |     -------- previous occurrence here
+   |     -------- Previous occurrence here
  8 |     23,
  9 |     5,
 10 |     "value1",
@@ -76,7 +76,7 @@ B033 [*] Sets should not contain duplicate item `1`
 13 | incorrect_set = {1, 1}
    |                  -  ^
    |                  |
-   |                  previous occurrence here
+   |                  Previous occurrence here
 14 | incorrect_set = {1, 1,}
 15 | incorrect_set = {0, 1, 1,}
    |
@@ -98,7 +98,7 @@ B033 [*] Sets should not contain duplicate item `1`
 14 | incorrect_set = {1, 1,}
    |                  -  ^
    |                  |
-   |                  previous occurrence here
+   |                  Previous occurrence here
 15 | incorrect_set = {0, 1, 1,}
 16 | incorrect_set = {0, 1, 1}
    |
@@ -120,7 +120,7 @@ B033 [*] Sets should not contain duplicate item `1`
 15 | incorrect_set = {0, 1, 1,}
    |                     -  ^
    |                     |
-   |                     previous occurrence here
+   |                     Previous occurrence here
 16 | incorrect_set = {0, 1, 1}
 17 | incorrect_set = {
    |
@@ -142,7 +142,7 @@ B033 [*] Sets should not contain duplicate item `1`
 16 | incorrect_set = {0, 1, 1}
    |                     -  ^
    |                     |
-   |                     previous occurrence here
+   |                     Previous occurrence here
 17 | incorrect_set = {
 18 |     0,
    |
@@ -162,7 +162,7 @@ B033 [*] Sets should not contain duplicate item `1`
 17 | incorrect_set = {
 18 |     0,
 19 |     1,
-   |     - previous occurrence here
+   |     - Previous occurrence here
 20 |     1,
    |     ^
 21 | }
@@ -185,7 +185,7 @@ B033 [*] Sets should not contain duplicate items, but `False` and `0` has the sa
 22 | incorrect_set = {False, 1, 0}
    |                  -----     ^
    |                  |
-   |                  previous occurrence here
+   |                  Previous occurrence here
 23 | incorrect_set_multiline_with_comment = {
 24 |     "value1",
    |
@@ -205,7 +205,7 @@ B033 [*] Sets should not contain duplicate item `"value1"`
 22 | incorrect_set = {False, 1, 0}
 23 | incorrect_set_multiline_with_comment = {
 24 |     "value1",
-   |     -------- previous occurrence here
+   |     -------- Previous occurrence here
 25 |     23,
 26 |     # B033
 27 |     "value1",
