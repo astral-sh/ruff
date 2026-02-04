@@ -404,6 +404,49 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     resolved
 }
 
+pub struct TypedDictKeyHover<'db> {
+    pub owner: String,
+    pub key: String,
+    pub declared_ty: Type<'db>,
+    pub docstring: Option<String>,
+}
+
+pub fn typed_dict_key_definition<'db>(
+    model: &SemanticModel<'db>,
+    subscript: &ast::ExprSubscript,
+    key: &str,
+) -> Option<ResolvedDefinition<'db>> {
+    let value_ty = subscript.value.inferred_type(model)?;
+    let typed_dict = value_ty.as_typed_dict()?;
+    let field = typed_dict.items(model.db()).get(key)?;
+    let definition = field.first_declaration()?;
+    Some(ResolvedDefinition::Definition(definition))
+}
+
+pub fn typed_dict_key_hover<'db>(
+    model: &SemanticModel<'db>,
+    subscript: &ast::ExprSubscript,
+) -> Option<TypedDictKeyHover<'db>> {
+    let key = subscript
+        .slice
+        .as_string_literal_expr()
+        .map(|literal| literal.value.to_str())?;
+    let value_ty = subscript.value.inferred_type(model)?;
+    let typed_dict = value_ty.as_typed_dict()?;
+    let owner = value_ty.display(model.db()).to_string();
+    let field = typed_dict.items(model.db()).get(key)?;
+    let docstring = field
+        .first_declaration()
+        .and_then(|declaration| declaration.docstring(model.db()));
+
+    Some(TypedDictKeyHover {
+        owner,
+        key: key.to_string(),
+        declared_ty: field.declared_ty,
+        docstring,
+    })
+}
+
 /// Returns definitions for a keyword argument in a call expression.
 /// This resolves the keyword argument to the corresponding parameter(s) in the callable's signature(s).
 pub fn definitions_for_keyword_argument<'db>(
