@@ -357,16 +357,16 @@ diagnostic is emitted.
 class InvalidCustomOrderDunderOverrides:
     x: int
 
-    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__lt__` in class `InvalidCustomOrderDunderOverrides`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__lt__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
     def __lt__(self, other: object) -> bool:
         return False
-    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__le__` in class `InvalidCustomOrderDunderOverrides`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__le__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
     def __le__(self, other: object) -> bool:
         return False
-    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__gt__` in class `InvalidCustomOrderDunderOverrides`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__gt__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
     def __gt__(self, other: object) -> bool:
         return False
-    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__ge__` in class `InvalidCustomOrderDunderOverrides`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__ge__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
     def __ge__(self, other: object) -> bool:
         return False
 ```
@@ -461,10 +461,10 @@ from dataclasses import dataclass
 class MyFrozenClass:
     x: int
 
-    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__setattr__` in class `MyFrozenClass`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__setattr__` in frozen dataclass `MyFrozenClass`"
     def __setattr__(self, name: str, value: object) -> None: ...
 
-    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__delattr__` in class `MyFrozenClass`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__delattr__` in frozen dataclass `MyFrozenClass`"
     def __delattr__(self, name: str) -> None: ...
 ```
 

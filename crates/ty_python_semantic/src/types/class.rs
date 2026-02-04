@@ -3967,7 +3967,7 @@ impl<'db> StaticClassLiteral<'db> {
                             literal.node(db, context.file(), context.module()),
                         ) {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Cannot overwrite attribute `{}` in class `{}`",
+                                "Cannot overwrite attribute `{}` in frozen dataclass `{}`",
                                 name,
                                 self.name(db)
                             ));
@@ -3984,7 +3984,7 @@ impl<'db> StaticClassLiteral<'db> {
                             literal.node(db, context.file(), context.module()),
                         ) {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Cannot overwrite attribute `{}` in class `{}`",
+                                "Cannot overwrite attribute `{}` in dataclass `{}` with `order=True`",
                                 name,
                                 self.name(db)
                             ));
