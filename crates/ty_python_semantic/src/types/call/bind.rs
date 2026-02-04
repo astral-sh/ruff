@@ -105,15 +105,6 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
-        if offset == 0 {
-            return;
-        }
-        for binding in &mut self.elements {
-            binding.apply_argument_index_offset(offset);
-        }
-    }
-
     pub(crate) fn with_constructor_instance_type(
         mut self,
         constructor_instance_type: Type<'db>,
@@ -1663,17 +1654,6 @@ impl<'db> CallableBinding<'db> {
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
-        }
-    }
-
-    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
-        if offset == 0 {
-            return;
-        }
-        for overload in &mut self.overloads {
-            for error in &mut overload.errors {
-                error.apply_argument_index_offset(offset);
-            }
         }
     }
 
@@ -3519,15 +3499,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
-        let mut bindings = match Bindings::from(callable_binding)
+        let bindings = match Bindings::from(callable_binding)
             .match_parameters(self.db, &sub_arguments)
             .check_types(self.db, &sub_arguments, self.call_expression_tcx, &[])
         {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => *bindings,
         };
-        let offset = argument_index.unwrap_or(0);
-        bindings.apply_argument_index_offset(offset);
 
         // SAFETY: `bindings` was created from a single `CallableBinding` above.
         let callable_binding = bindings
@@ -3539,22 +3517,38 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 if let [binding] = callable_binding.overloads() {
                     // This is not an overloaded function, so we can propagate its errors to the
                     // outer bindings.
-                    self.errors.extend(binding.errors.iter().cloned());
+                    self.errors.extend(
+                        binding
+                            .errors
+                            .iter()
+                            .cloned()
+                            .map(|e| e.maybe_apply_argument_index_offset(argument_index)),
+                    );
                 } else {
                     let index = callable_binding
                         .matching_overload_before_type_checking
                         .unwrap_or(0);
                     // TODO: We should also update the specialization for the `ParamSpec` to reflect
                     // the matching overload here.
-                    self.errors
-                        .extend(callable_binding.overloads()[index].errors.iter().cloned());
+                    self.errors.extend(
+                        callable_binding.overloads()[index]
+                            .errors
+                            .iter()
+                            .cloned()
+                            .map(|e| e.maybe_apply_argument_index_offset(argument_index)),
+                    );
                 }
             }
             MatchingOverloadIndex::Single(index) => {
                 // TODO: We should also update the specialization for the `ParamSpec` to reflect the
                 // matching overload here.
-                self.errors
-                    .extend(callable_binding.overloads()[index].errors.iter().cloned());
+                self.errors.extend(
+                    callable_binding.overloads()[index]
+                        .errors
+                        .iter()
+                        .cloned()
+                        .map(|e| e.maybe_apply_argument_index_offset(argument_index)),
+                );
             }
             MatchingOverloadIndex::Multiple(_) => {
                 if !matches!(
@@ -3568,7 +3562,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .unwrap()
                             .errors
                             .iter()
-                            .cloned(),
+                            .cloned()
+                            .map(|e| e.maybe_apply_argument_index_offset(argument_index)),
                     );
                 }
             }
@@ -4265,6 +4260,12 @@ pub(crate) enum BindingError<'db> {
 }
 
 impl BindingError<'_> {
+    pub(crate) fn maybe_apply_argument_index_offset(mut self, offset: Option<usize>) -> Self {
+        if let Some(offset) = offset {
+            self.apply_argument_index_offset(offset);
+        }
+        self
+    }
     pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
@@ -4279,13 +4280,20 @@ impl BindingError<'_> {
             }
 
             BindingError::TooManyPositionalArguments {
-                first_excess_argument_index: Some(i),
+                first_excess_argument_index,
                 ..
             } => {
-                *i += offset;
+                if let Some(i) = first_excess_argument_index {
+                    *i += offset;
+                }
             }
 
-            _ => {}
+            BindingError::CalledTopCallable(..)
+            | BindingError::InternalCallError(..)
+            | BindingError::InvalidDataclassApplication(..)
+            | BindingError::MissingArguments { .. }
+            | BindingError::UnmatchedOverload
+            | BindingError::PropertyHasNoSetter(..) => {}
         }
     }
 }

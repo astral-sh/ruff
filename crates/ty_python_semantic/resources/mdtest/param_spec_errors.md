@@ -1,4 +1,4 @@
-# test for paramspec error location
+# `ParamSpec` error locations
 
 <!-- snapshot-diagnostics -->
 
@@ -18,56 +18,24 @@ def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
 foo(fn1, a="a")  # error: [invalid-argument-type]
 
 def fn2(a: int, b: str, c: float) -> None: ...
-def bar[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
 
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
-bar(fn2, a="a", b=2, c="c")
-```
+foo(fn2, a="a", b=2, c="c")
 
-Unknown Argument
+def fn3(a: int) -> None: ...
 
-```py
-from typing import Callable
+foo(fn3, a=1, unknown_param=2)  # error: [unknown-argument]
+foo(fn3, 1, 2, 3)  # error: [too-many-positional-arguments]
 
-def fn(a: int) -> None: ...
-def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+def fn4(a: int, /) -> None: ...
 
-foo(fn, a=1, unknown_param=2)  # error: [unknown-argument]
-```
+foo(fn4, a=1)  # error: [positional-only-parameter-as-kwarg]
 
-Position Only Parameter As Kwarg
-
-```py
-from typing import Callable
-
-def fn(a: int, /) -> None: ...
-def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
-
-foo(fn, a=1)  # error: [positional-only-parameter-as-kwarg]
-```
-
-Parameter Already Assigned
-
-```py
-from typing import Callable
-
-def fn(a: int, b: int) -> None: ...
-def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+def fn5(a: int, b: int) -> None: ...
 
 # error: [parameter-already-assigned]
 # error: [missing-argument]
-foo(fn, 1, a=2)
-```
-
-Too Many Positional Arguments
-
-```py
-from typing import Callable
-
-def fn(a: int) -> None: ...
-def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
-
-foo(fn, 1, 2, 3)  # error: [too-many-positional-arguments]
+foo(fn5, 1, a=2)
 ```
