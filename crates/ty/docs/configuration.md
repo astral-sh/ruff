@@ -5,6 +5,7 @@
 
 Configures the enabled rules and their severity.
 
+The keys are either rule names or `all` to set a default severity for all rules.
 See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
 
 Valid severities are:
@@ -16,7 +17,7 @@ Valid severities are:
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
 **Example usage**:
 
@@ -458,7 +459,7 @@ severity levels or disable them entirely.
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
 **Example usage**:
 

@@ -38,13 +38,22 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// change the argument names, which can lead to a change in behavior when
 /// callers pass arguments by name.
 ///
-/// For example, replacing `foo = lambda x, y: func(x, y)` with `foo = func`,
-/// where `func` is defined as `def func(a, b): return a + b`, would be a
-/// breaking change for callers that execute the lambda by passing arguments by
-/// name, as in: `foo(x=1, y=2)`. Since `func` does not define the arguments
-/// `x` and `y`, unlike the lambda, the call would raise a `TypeError`.
+/// For example:
+///
+/// ```python
+/// def func(a, b):
+///     return a + b
+///
+///
+/// foo = lambda x, y: func(x, y)
+/// ```
+///
+/// Replacing the assignment to `foo` with `foo = func` would be a breaking
+/// change for callers that execute the lambda by passing arguments by name, as
+/// in: `foo(x=1, y=2)`. Since `func` does not define the arguments `x` and `y`,
+/// unlike the lambda, the call would raise a `TypeError`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.2")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct UnnecessaryLambda;
 
 impl Violation for UnnecessaryLambda {

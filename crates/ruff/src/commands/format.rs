@@ -205,17 +205,19 @@ pub(crate) fn format(
     }
 
     let results = FormatResults::new(results.as_slice(), mode);
-    match mode {
-        FormatMode::Write => {}
-        FormatMode::Check => {
-            if preview.is_enabled() {
-                results.write_changed_preview(&mut stdout().lock(), output_format, &errors)?;
-            } else {
-                results.write_changed(&mut stdout().lock())?;
+    if config_arguments.log_level > LogLevel::Silent {
+        match mode {
+            FormatMode::Write => {}
+            FormatMode::Check => {
+                if preview.is_enabled() {
+                    results.write_changed_preview(&mut stdout().lock(), output_format, &errors)?;
+                } else {
+                    results.write_changed(&mut stdout().lock())?;
+                }
             }
-        }
-        FormatMode::Diff => {
-            results.write_diff(&mut stdout().lock())?;
+            FormatMode::Diff => {
+                results.write_diff(&mut stdout().lock())?;
+            }
         }
     }
 

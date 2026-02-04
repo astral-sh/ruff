@@ -65,6 +65,7 @@ pub struct Options {
 
     /// Configures the enabled rules and their severity.
     ///
+    /// The keys are either rule names or `all` to set a default severity for all rules.
     /// See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
     ///
     /// Valid severities are:
@@ -76,7 +77,7 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
-        value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
+        value_type = r#"dict[RuleName | "all", "ignore" | "warn" | "error"]"#,
         example = r#"
             [tool.ty.rules]
             possibly-unresolved-reference = "warn"
@@ -1509,7 +1510,7 @@ pub struct OverrideOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
-        value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
+        value_type = r#"dict[RuleName | "all", "ignore" | "warn" | "error"]"#,
         example = r#"
             [[tool.ty.overrides]]
             include = ["src"]

@@ -14,7 +14,7 @@ use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeK
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension, Solutions};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
@@ -1860,72 +1860,13 @@ impl<'db> SpecializationBuilder<'db> {
         constraints: ConstraintSet<'db>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
-        #[derive(Default)]
-        struct Bounds<'db> {
-            lower: FxOrderSet<Type<'db>>,
-            upper: FxOrderSet<Type<'db>>,
-        }
-
-        // If the constraint set is cyclic, we'll hit an infinite expansion when trying to add type
-        // mappings for it.
-        if constraints.is_cyclic(self.db) {
+        let Solutions::Constrained(solutions) = constraints.solutions(self.db) else {
             return;
-        }
-
-        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
-        // any unions or intersections in our type mappings in a stable order. Constraints might
-        // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
-        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
-        // retain that stable per-tie ordering.
-        let constraints = constraints.limit_to_valid_specializations(self.db);
-        let mut sorted_paths = Vec::new();
-        constraints.for_each_path(self.db, |path| {
-            let mut path: Vec<_> = path.positive_constraints().collect();
-            path.sort_by_key(|(_, source_order)| *source_order);
-            sorted_paths.push(path);
-        });
-        sorted_paths.sort_by(|path1, path2| {
-            let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
-            let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
-            source_orders1.cmp(source_orders2)
-        });
-
-        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, Bounds<'db>> = FxHashMap::default();
-        for path in sorted_paths {
-            mappings.clear();
-            for (constraint, _) in path {
-                let typevar = constraint.typevar(self.db);
-                let lower = constraint.lower(self.db);
-                let upper = constraint.upper(self.db);
-                let bounds = mappings.entry(typevar).or_default();
-                bounds.lower.insert(lower);
-                bounds.upper.insert(upper);
-
-                if let Type::TypeVar(lower_bound_typevar) = lower {
-                    let bounds = mappings.entry(lower_bound_typevar).or_default();
-                    bounds.upper.insert(Type::TypeVar(typevar));
-                }
-
-                if let Type::TypeVar(upper_bound_typevar) = upper {
-                    let bounds = mappings.entry(upper_bound_typevar).or_default();
-                    bounds.lower.insert(Type::TypeVar(typevar));
-                }
-            }
-
-            for (bound_typevar, bounds) in mappings.drain() {
-                let variance = formal.variance_of(self.db, bound_typevar);
-                // Prefer the lower bound (often the concrete actual type seen) over the
-                // upper bound (which may include TypeVar bounds/constraints). The upper bound
-                // should only be used as a fallback when no concrete type was inferred.
-                let lower = UnionType::from_elements(self.db, bounds.lower);
-                if !lower.is_never() {
-                    self.add_type_mapping(bound_typevar, lower, variance, &mut f);
-                    continue;
-                }
-                let upper = IntersectionType::from_elements(self.db, bounds.upper);
-                if !upper.is_object() {
-                    self.add_type_mapping(bound_typevar, upper, variance, &mut f);
-                }
+        };
+        for solution in solutions {
+            for binding in solution {
+                let variance = formal.variance_of(self.db, binding.bound_typevar);
+                self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);
             }
         }
     }

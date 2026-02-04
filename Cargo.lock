@@ -2918,7 +2918,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.14.14"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3179,7 +3179,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.14.14"
+version = "0.15.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3259,9 +3259,12 @@ version = "0.0.0"
 dependencies = [
  "insta",
  "regex",
+ "ruff_linter",
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
  "ruff_workspace",
 ]
 
@@ -3549,7 +3552,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.14.14"
+version = "0.15.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3665,7 +3668,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e9b9ddd4bec50ac777e9353bbb8f1180e5669d89#e9b9ddd4bec50ac777e9353bbb8f1180e5669d89"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3690,12 +3693,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e9b9ddd4bec50ac777e9353bbb8f1180e5669d89#e9b9ddd4bec50ac777e9353bbb8f1180e5669d89"
 
 [[package]]
 name = "salsa-macros"
 version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e9b9ddd4bec50ac777e9353bbb8f1180e5669d89#e9b9ddd4bec50ac777e9353bbb8f1180e5669d89"
 dependencies = [
  "proc-macro2",
  "quote",

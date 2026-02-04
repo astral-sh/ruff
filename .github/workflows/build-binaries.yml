@@ -295,11 +295,6 @@ jobs:
             manylinux: 2_17
             # see https://github.com/astral-sh/ruff/issues/10073
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
-          - target: powerpc64-unknown-linux-gnu
-            arch: ppc64
-            manylinux: 2_17
-            # see https://github.com/astral-sh/ruff/issues/10073
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: arm-unknown-linux-musleabihf
             # Use the cross container, but tag as `linux_armv6l`
             manylinux: auto
@@ -328,7 +323,7 @@ jobs:
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist --compatibility pypi
       - uses: uraimo/run-on-arch-action@d94c13912ea685de38fccc1109385b83fd79427d # v3.0.1
-        if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
+        if: ${{ matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
