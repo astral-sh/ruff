@@ -216,10 +216,8 @@ impl PythonEnvironment {
 
         #[cfg(not(target_family = "wasm"))]
         if let Ok(paths) = system.env_var("PATH")
-            && let Some(python_path) = binary_from_path(system, "python3", &paths)
-                .or_else(|| binary_from_path(system, "python", &paths))
-            && let Ok(env) =
-                PythonEnvironment::new(python_path, SysPrefixPathOrigin::PythonBinary, system)
+            && let Some(env) = environment_from_binary(system, "python3", &paths)
+                .or_else(|| environment_from_binary(system, "python", &paths))
         {
             return Ok(Some(env));
         }
@@ -728,25 +726,19 @@ pub(crate) fn conda_environment_from_env(
 }
 
 #[cfg(not(target_family = "wasm"))]
-pub(crate) fn binary_from_path(
+pub(crate) fn environment_from_binary(
     system: &dyn System,
     binary: &str,
     paths: &str,
-) -> Option<SystemPathBuf> {
+) -> Option<PythonEnvironment> {
     let binary = which::which_in_global(binary, Some(&paths)).ok()?.next()?;
     let binary = SystemPathBuf::from_path_buf(binary).ok()?;
+    let env = PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, system).ok()?;
 
     // sanity check to filter out shims
-    let sys_prefix = SysPrefixPath::new(&binary, SysPrefixPathOrigin::PythonBinary, system).ok()?;
-    site_packages_directories_from_sys_prefix(
-        &sys_prefix,
-        None,
-        PythonImplementation::Unknown,
-        system,
-    )
-    .ok()?;
+    env.site_packages_paths(system).ok()?;
 
-    Some(binary)
+    Some(env)
 }
 
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.
