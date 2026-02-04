@@ -6925,13 +6925,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let arguments = &call_expr.arguments;
-        let python_version = Program::get(db).python_version(db);
-        // Note: typing_extensions.TypeVarTuple also supports default= on older Python versions,
-        // but detecting the callable module during definition inference causes assertion failures.
-        // The diagnostic may be a false positive for typing_extensions usage on Python < 3.13.
-        let assume_all_features = self.in_stub();
-        let have_features_from =
-            |version: PythonVersion| assume_all_features || python_version >= version;
+        let _python_version = Program::get(db).python_version(db);
 
         let mut default = None;
         let mut name_param_ty = None;
@@ -6973,13 +6967,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Some(self.infer_expression(&kwarg.value, TypeContext::default()));
                 }
                 "default" => {
-                    if !have_features_from(PythonVersion::PY313) {
-                        error(
-                            &self.context,
-                            "The `default` parameter of `typing.TypeVarTuple` was added in Python 3.13",
-                            kwarg,
-                        );
-                    }
                     default = Some(TypeVarDefaultEvaluation::Lazy);
                 }
                 name => {

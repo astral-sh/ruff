@@ -1928,8 +1928,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
                     // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                    return_todo |= param_type.is_todo()
-                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                    if matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_)) {
+                        return_todo |= param_type.is_todo()
+                            || matches!(
+                                param_type,
+                                Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                                    if typevar.is_typevartuple(self.db())
+                            )
+                            || matches!(
+                                param_type,
+                                Type::TypeVar(bound_typevar)
+                                    if bound_typevar
+                                        .typevar(self.db())
+                                        .is_typevartuple(self.db())
+                            );
+                    }
                     parameter_types.push(param_type);
                 }
 
