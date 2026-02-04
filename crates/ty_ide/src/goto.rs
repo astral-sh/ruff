@@ -13,6 +13,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ty_python_semantic::ResolvedDefinition;
+use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
@@ -253,9 +254,10 @@ impl<'db> Definitions<'db> {
     /// In this case it basically returns exactly what was found.
     pub(crate) fn declaration_targets(
         self,
-        db: &'db dyn ty_python_semantic::Db,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
     ) -> Option<crate::NavigationTargets> {
-        definitions_to_navigation_targets(db, None, self.0)
+        definitions_to_navigation_targets(model, None, goto_target, self.0)
     }
 
     /// Get the "goto-definition" interpretation of this definition
@@ -264,9 +266,15 @@ impl<'db> Definitions<'db> {
     /// if the definition we have is found in a stub file.
     pub(crate) fn definition_targets(
         self,
-        db: &'db dyn ty_python_semantic::Db,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
     ) -> Option<crate::NavigationTargets> {
-        definitions_to_navigation_targets(db, Some(&StubMapper::new(db)), self.0)
+        definitions_to_navigation_targets(
+            model,
+            Some(&StubMapper::new(model.db())),
+            goto_target,
+            self.0,
+        )
     }
 
     /// Get the docstring for this definition
@@ -1107,18 +1115,44 @@ fn definitions_for_callable<'db>(
 }
 
 /// Shared helper to map and convert resolved definitions into navigation targets.
+///
+/// The `goto_target` corresponds to the original target that definitions were
+/// requested for. In some cases, this can influence the targets returned. For
+/// example, when the target is a constructor for a class, definitions other
+/// than the class definition are filtered out.
 fn definitions_to_navigation_targets<'db>(
-    db: &dyn ty_python_semantic::Db,
+    model: &SemanticModel<'db>,
     stub_mapper: Option<&StubMapper<'db>>,
+    goto_target: &GotoTarget<'_>,
     mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
 ) -> Option<crate::NavigationTargets> {
+    // When our target is a class constructor, we want to exclude
+    // navigation targets to its `__init__` or `__new__` methods.
+    //
+    // See: https://github.com/astral-sh/ty/issues/2218
+    if matches!(*goto_target, GotoTarget::Call { .. })
+        && goto_target
+            .inferred_type(model)
+            .is_some_and(|ty| ty.is_class_literal())
+    {
+        definitions.retain(|resolved_def| {
+            let Some(def) = resolved_def.definition() else {
+                return true;
+            };
+            if !matches!(*def.kind(model.db()), DefinitionKind::Function(_)) {
+                return true;
+            }
+            !def.name(model.db())
+                .is_some_and(|name| name == "__init__" || name == "__new__")
+        });
+    }
     if let Some(mapper) = stub_mapper {
         definitions = mapper.map_definitions(definitions);
     }
     if definitions.is_empty() {
         None
     } else {
-        let targets = convert_resolved_definitions_to_targets(db, definitions);
+        let targets = convert_resolved_definitions_to_targets(model.db(), definitions);
         Some(crate::NavigationTargets::unique(targets))
     }
 }

@@ -21,7 +21,7 @@ pub fn goto_definition(
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definition_targets = goto_target
         .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .definition_targets(db)?;
+        .definition_targets(&model, &goto_target)?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -427,7 +427,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @"
+        assert_snapshot!(test.goto_definition(), @r"
         info[goto-definition]: Go to definition
          --> main.py:3:5
           |
@@ -435,13 +435,12 @@ class MyOtherClass:
         3 | x = MyClass(0)
           |     ^^^^^^^ Clicking here
           |
-        info: Found 2 definitions
+        info: Found 1 definition
          --> mymodule.py:2:7
           |
         2 | class MyClass:
           |       -------
         3 |     def __init__(self, val):
-          |         --------
         4 |         self.val = val
           |
         ");
@@ -1672,23 +1671,14 @@ x = DynCla<CURSOR>ss()
         4 | x = DynClass()
           |     ^^^^^^^^ Clicking here
           |
-        info: Found 2 definitions
-           --> main.py:2:1
-            |
-          2 | DynClass = type("DynClass", (), {})
-            | --------
-          3 |
-          4 | x = DynClass()
-            |
-           ::: stdlib/builtins.pyi:137:9
-            |
-        135 |     def __class__(self, type: type[Self], /) -> None: ...
-        136 |     def __init__(self) -> None: ...
-        137 |     def __new__(cls) -> Self: ...
-            |         -------
-        138 |     # N.B. `object.__setattr__` and `object.__delattr__` are heavily special-cased by type checkers.
-        139 |     # Overriding them in subclasses has different semantics, even if the override has an identical signature.
-            |
+        info: Found 1 definition
+         --> main.py:2:1
+          |
+        2 | DynClass = type("DynClass", (), {})
+          | --------
+        3 |
+        4 | x = DynClass()
+          |
         "#);
     }
 
