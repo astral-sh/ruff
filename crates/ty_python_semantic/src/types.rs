@@ -62,11 +62,11 @@ use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
 };
-pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
-    ApplySpecialization, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
-    typing_self, walk_generic_context,
+    ApplySpecialization, InferableTypeVars, Specialization, bind_typevar, typing_self,
+    walk_generic_context,
 };
+pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
 use crate::types::mro::{Mro, MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{
     NarrowingConstraint, PossiblyNarrowedPlaces, PossiblyNarrowedPlacesBuilder,
@@ -1415,9 +1415,9 @@ impl<'db> Type<'db> {
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn expect_enum_literal(self, db: &'db dyn Db) -> EnumLiteralType<'db> {
-        match self {
-            Type::LiteralValue(literal) => literal.expect_enum(db),
-            _ => panic!("Expected a `Type::LiteralValue` variant"),
+        match self.as_literal_value_kind(db) {
+            Some(LiteralValueTypeKind::Enum(e)) => e,
+            _ => panic!("Expected a `LiteralValueTypeKind::Enum` variant"),
         }
     }
 
@@ -1511,7 +1511,8 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn literal_string(db: &'db dyn Db) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(
+        // Note that `LiteralString`s are never implicitly inferred, and so are always unpromotable.
+        Self::LiteralValue(LiteralValueType::unpromotable(
             db,
             LiteralValueTypeKind::LiteralString,
         ))
@@ -1680,20 +1681,18 @@ impl<'db> Type<'db> {
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    ///
-    /// It also avoids literal promotion if a literal type annotation was provided as type context.
-    pub(crate) fn promote_literals(self, db: &'db dyn Db, tcx: TypeContext<'db>) -> Type<'db> {
+    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
             &TypeMapping::PromoteLiterals(PromoteLiteralsMode::On),
-            tcx,
+            TypeContext::default(),
         )
     }
 
     /// Like [`Type::promote_literals`], but does not recurse into nested types.
-    fn promote_literals_impl(self, db: &'db dyn Db, tcx: TypeContext<'db>) -> Type<'db> {
-        let promoted = match self {
-            Type::LiteralValue(literal) => match literal.kind(db) {
+    fn promote_literals_impl(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::LiteralValue(literal) if literal.is_promotable(db) => match literal.kind(db) {
                 LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::String(_) => {
                     KnownClass::Str.to_instance(db)
                 }
@@ -1704,17 +1703,13 @@ impl<'db> Type<'db> {
             },
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
-            _ => return self,
-        };
-
-        // Avoid literal promotion if it leads to an unassignable type.
-        if tcx.annotation.is_some_and(|annotation| {
-            self.is_assignable_to(db, annotation) && !promoted.is_assignable_to(db, annotation)
-        }) {
-            return self;
+            _ => self,
         }
+    }
 
-        promoted
+    /// Marks (possibly nested) literals as unpromotable.
+    pub(crate) fn unpromote_literals(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(db, &TypeMapping::UnpromoteLiterals, TypeContext::default())
     }
 
     /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
@@ -1728,6 +1723,7 @@ impl<'db> Type<'db> {
     ///   *has* or *does not have* a default value is relevant to whether two `Callable` types  are equivalent.
     /// - Converts class-based protocols into synthesized protocols
     /// - Converts class-based typeddicts into synthesized typeddicts
+    /// - Converts all literal types to their promotable form
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         self.normalized_impl(db, &NormalizedVisitor::default())
@@ -1802,6 +1798,7 @@ impl<'db> Type<'db> {
                     }))
                 })
             }
+            Type::LiteralValue(literal) => Type::LiteralValue(literal.normalized_impl(db, visitor)),
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Never
@@ -1810,8 +1807,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::SpecialForm(_)
-            | Type::LiteralValue(_) => self,
+            | Type::SpecialForm(_) => self,
         }
     }
 
@@ -6230,6 +6226,7 @@ impl<'db> Type<'db> {
                         TypeMapping::ApplySpecialization(_) |
                         TypeMapping::UniqueSpecialization { .. } |
                         TypeMapping::PromoteLiterals(_) |
+                        TypeMapping::UnpromoteLiterals |
                         TypeMapping::BindSelf { .. } |
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
@@ -6290,14 +6287,27 @@ impl<'db> Type<'db> {
                 },
             }
 
-            Type::FunctionLiteral(function) => {
-                let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-
-                match type_mapping {
-                    TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => function.promote_literals_impl(db, tcx),
-                    _ => function
+            Type::FunctionLiteral(function) => match type_mapping {
+                // The annotatated types of a function signature are already unpromotable.
+                TypeMapping::UnpromoteLiterals => self,
+                // Promote the types within the signature before promoting the signature to its
+                // callable form.
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => {
+                    Type::FunctionLiteral(function.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ))
+                    .promote_literals_impl(db)
                 }
-            }
+                _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                )),
+            },
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
@@ -6398,6 +6408,12 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
             Type::TypeAlias(alias) => {
+                // Type alias types are only inferred through an explicit annotation, so any literals
+                // in their value type are never promotable.
+                if matches!(type_mapping, TypeMapping::PromoteLiterals(..) | TypeMapping::UnpromoteLiterals) {
+                    return self;
+                }
+
                 // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                 // detection rather than the visitor's cycle detection, because the visitor tracks
                 // Type values and `RecursiveList` is different from `RecursiveList[T]`.
@@ -6443,8 +6459,22 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ModuleLiteral(_)
-            | Type::LiteralValue(_) => match type_mapping {
+            Type::ModuleLiteral(_) => match type_mapping {
+                TypeMapping::ApplySpecialization(_) |
+                TypeMapping::UniqueSpecialization { .. } |
+                TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::BindSelf { .. } |
+                TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::Materialize(_) |
+                TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::EagerExpansion |
+                TypeMapping::RescopeReturnCallables(_) |
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) |
+                TypeMapping::UnpromoteLiterals => self,
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db)
+            }
+
+            Type::LiteralValue(literal) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
@@ -6455,7 +6485,8 @@ impl<'db> Type<'db> {
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
-                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db),
+                TypeMapping::UnpromoteLiterals => Type::LiteralValue(literal.to_unpromotable(db))
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6465,6 +6496,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
+                TypeMapping::UnpromoteLiterals |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
@@ -7134,6 +7166,8 @@ pub enum TypeMapping<'a, 'db> {
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     PromoteLiterals(PromoteLiteralsMode),
+    /// Marks any literals in the type as unpromotable.
+    UnpromoteLiterals,
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -7186,6 +7220,7 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::PromoteLiterals(_)
+            | TypeMapping::UnpromoteLiterals
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -7223,6 +7258,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::UnpromoteLiterals
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
@@ -8924,6 +8960,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::PromoteLiterals(_)
+            | TypeMapping::UnpromoteLiterals
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
@@ -11738,6 +11775,9 @@ impl<'db> PEP695TypeAliasType<'db> {
         let definition = self.definition(db);
 
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+            // Type alias types are only inferred through an explicit annotation, so any literals
+            // in their value type are never promotable.
+            .unpromote_literals(db)
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
@@ -12947,29 +12987,24 @@ impl<'db> IntersectionType<'db> {
 }
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
-#[derive(
-    PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
-)]
-pub struct LiteralValueType<'db>(LiteralValueTypeRepr<'db>);
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size, constructor=new_repr)]
+#[derive(PartialOrd, Ord)]
+pub struct LiteralValueType<'db> {
+    repr: LiteralValueTypeRepr<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for LiteralValueType<'_> {}
 
 /// Literal values are structured such that promotable values, i.e., the common case, are stored
 /// inline, while unpromotable values require an extra allocation.
 #[derive(
     PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
 )]
-enum LiteralValueTypeRepr<'db> {
+pub enum LiteralValueTypeRepr<'db> {
     Promotable(LiteralValueTypeKind<'db>),
-    Unpromotable(UnpromotableLiteralValueType<'db>),
+    Unpromotable(LiteralValueTypeKind<'db>),
 }
-
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
-pub struct UnpromotableLiteralValueType<'db> {
-    kind: LiteralValueTypeKind<'db>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for UnpromotableLiteralValueType<'_> {}
 
 #[derive(
     PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
@@ -12997,12 +13032,24 @@ pub enum Promotability {
 }
 
 impl<'db> LiteralValueType<'db> {
+    pub fn new(
+        db: &'db dyn Db,
+        kind: impl Into<LiteralValueTypeKind<'db>>,
+        is_promotable: bool,
+    ) -> LiteralValueType<'db> {
+        if is_promotable {
+            Self::promotable(db, kind.into())
+        } else {
+            Self::unpromotable(db, kind.into())
+        }
+    }
+
     /// Creates a literal value that may be promoted during literal promotion.
     pub fn promotable(
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {
-        LiteralValueType(LiteralValueTypeRepr::Promotable(kind.into()))
+        LiteralValueType::new_repr(db, LiteralValueTypeRepr::Promotable(kind.into()))
     }
 
     /// Creates a literal value that should not be promoted during literal promotion.
@@ -13010,35 +13057,43 @@ impl<'db> LiteralValueType<'db> {
         db: &'db dyn Db,
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {
-        LiteralValueType(LiteralValueTypeRepr::Unpromotable(
-            UnpromotableLiteralValueType::new(db, kind.into()),
-        ))
+        LiteralValueType::new_repr(db, LiteralValueTypeRepr::Unpromotable(kind.into()))
     }
 
-    /// Returns the promotability of this literal value.
-    pub fn promotability(self) -> Promotability {
-        match self.0 {
-            LiteralValueTypeRepr::Promotable(_) => Promotability::Promotable,
-            LiteralValueTypeRepr::Unpromotable(_) => Promotability::Unpromotable,
+    /// Returns the promotable form of this literal value.
+    #[must_use]
+    pub fn to_promotable(self, db: &'db dyn Db) -> Self {
+        match self.repr(db) {
+            LiteralValueTypeRepr::Promotable(_) => self,
+            LiteralValueTypeRepr::Unpromotable(literal) => {
+                Self::new_repr(db, LiteralValueTypeRepr::Promotable(literal))
+            }
         }
     }
 
-    /// Creates a literal value with the same promotability as another literal value.
-    pub fn with_promotability(
-        db: &'db dyn Db,
-        kind: impl Into<LiteralValueTypeKind<'db>>,
-        promotability: Promotability,
-    ) -> LiteralValueType<'db> {
-        match promotability {
-            Promotability::Promotable => Self::promotable(db, kind),
-            Promotability::Unpromotable => Self::unpromotable(db, kind),
+    /// Returns the unpromotable form of this literal value.
+    #[must_use]
+    pub fn to_unpromotable(self, db: &'db dyn Db) -> Self {
+        match self.repr(db) {
+            LiteralValueTypeRepr::Unpromotable(_) => self,
+            LiteralValueTypeRepr::Promotable(literal) => {
+                Self::new_repr(db, LiteralValueTypeRepr::Unpromotable(literal))
+            }
+        }
+    }
+
+    /// Returns `true` if this literal value should be eagerly promoted to its instance type.
+    pub fn is_promotable(self, db: &'db dyn Db) -> bool {
+        match self.repr(db) {
+            LiteralValueTypeRepr::Promotable(_) => true,
+            LiteralValueTypeRepr::Unpromotable(_) => false,
         }
     }
 
     pub fn kind(self, db: &'db dyn Db) -> LiteralValueTypeKind<'db> {
-        match self.0 {
+        match self.repr(db) {
             LiteralValueTypeRepr::Promotable(kind) => kind,
-            LiteralValueTypeRepr::Unpromotable(literal) => literal.kind(db),
+            LiteralValueTypeRepr::Unpromotable(kind) => kind,
         }
     }
 
@@ -13056,11 +13111,6 @@ impl<'db> LiteralValueType<'db> {
         } else {
             None
         }
-    }
-
-    pub(crate) fn expect_enum(self, db: &'db dyn Db) -> EnumLiteralType<'db> {
-        self.as_enum(db)
-            .expect("Expected a `LiteralValueTypeKind::Enum` variant")
     }
 
     pub fn as_string(self, db: &'db dyn Db) -> Option<StringLiteralType<'db>> {
@@ -13109,6 +13159,14 @@ impl<'db> LiteralValueType<'db> {
 
     pub fn is_bytes(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), LiteralValueTypeKind::Bytes(..))
+    }
+
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        _visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        self.to_promotable(db)
     }
 }
 

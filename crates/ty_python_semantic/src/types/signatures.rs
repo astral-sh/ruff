@@ -2710,7 +2710,7 @@ mod tests {
     use super::*;
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
-    use crate::types::{FunctionType, KnownClass};
+    use crate::types::{FunctionType, KnownClass, LiteralValueType};
     use ruff_db::system::DbWithWritableSystem as _;
 
     #[track_caller]
@@ -2777,14 +2777,14 @@ mod tests {
                 Parameter::positional_or_keyword(Name::new_static("e"))
                     .with_default_type(Type::int_literal(&db, 3)),
                 Parameter::positional_or_keyword(Name::new_static("f"))
-                    .with_annotated_type(Type::int_literal(&db, 4))
-                    .with_default_type(Type::int_literal(&db, 4)),
+                    .with_annotated_type(LiteralValueType::unpromotable(&db, 4).into())
+                    .with_default_type(LiteralValueType::unpromotable(&db, 4).into()),
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_only(Name::new_static("g"))
                     .with_default_type(Type::int_literal(&db, 5)),
                 Parameter::keyword_only(Name::new_static("h"))
-                    .with_annotated_type(Type::int_literal(&db, 6))
-                    .with_default_type(Type::int_literal(&db, 6)),
+                    .with_annotated_type(LiteralValueType::unpromotable(&db, 6).into())
+                    .with_default_type(LiteralValueType::unpromotable(&db, 6).into()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(KnownClass::Str.to_instance(&db)),
             ],

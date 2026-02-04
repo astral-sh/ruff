@@ -1853,6 +1853,7 @@ impl<'db> SpecializationBuilder<'db> {
                 if bound_typevar.is_paramspec(self.db) {
                     return;
                 }
+
                 *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
             }
             Entry::Vacant(entry) => {

@@ -3284,11 +3284,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
-        // For a given type variable, we keep track of the variance of any assignments to
-        // that type variable in the type context.
-        let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
-            FxHashMap::default();
-
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
         // are not assignable to the concrete subset of the declared type, as they may be assignable
@@ -3341,7 +3336,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             &mut builder,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
-            &mut variance_in_arguments,
             &mut specialization_errors,
         );
 
@@ -3358,7 +3352,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
-                &mut variance_in_arguments,
                 &mut specialization_errors,
             );
         }
@@ -3380,24 +3373,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
-
-            let mut combined_tcx = TypeContext::default();
             let mut variance_in_return = TypeVarVariance::Bivariant;
 
             // Find all occurrences of the type variable in the return type.
-            let visit_return_ty = |_, ty, variance, tcx: TypeContext<'db>| {
+            let visit_return_ty = |_, ty, variance, _| {
                 if ty != Type::TypeVar(typevar) {
                     return;
-                }
-
-                // We always prefer the declared type when attempting literal promotion,
-                // so we take the union of every applicable type context.
-                match (tcx.annotation, &mut combined_tcx.annotation) {
-                    (Some(_), None) => combined_tcx = tcx,
-                    (Some(ty), Some(combined_ty)) => {
-                        *combined_ty = UnionType::from_elements(self.db, [*combined_ty, ty]);
-                    }
-                    _ => {}
                 }
 
                 variance_in_return = variance_in_return.join(variance);
@@ -3411,16 +3392,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            // If the type variable is a non-covariant position in any argument, then we avoid
-            // promotion, respecting any literals in the parameter type.
-            if variance_in_arguments
-                .get(&typevar.identity(self.db))
-                .is_some_and(|variance| !variance.is_covariant())
-            {
-                return ty;
-            }
-
-            let promoted = ty.promote_literals(self.db, combined_tcx);
+            let promoted = ty.promote_literals(self.db);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.
@@ -3446,7 +3418,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         builder: &mut SpecializationBuilder<'db>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
-        variance_in_arguments: &mut FxHashMap<BoundTypeVarIdentity<'db>, TypeVarVariance>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let mut assignable_to_declared_type = true;
@@ -3461,7 +3432,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let specialization_result = builder.infer_map(
                     parameters[parameter_index].annotated_type(),
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, variance, inferred_ty)| {
+                    |(identity, _, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if let Some(preferred_ty) = preferred_type_mappings.get(&identity) {
@@ -3475,11 +3446,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                 assignable_to_declared_type = false;
                             }
                         }
-
-                        variance_in_arguments
-                            .entry(identity)
-                            .and_modify(|current| *current = current.join(variance))
-                            .or_insert(variance);
 
                         Some(inferred_ty)
                     },

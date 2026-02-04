@@ -2662,7 +2662,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(type_and_qualifiers) => {
-                (type_and_qualifiers, type_and_qualifiers.inner_type())
+                // Avoid promoting literal values originating from an explicit declared type.
+                let inferred_ty = type_and_qualifiers
+                    .inner_type()
+                    .unpromote_literals(self.db());
+
+                (type_and_qualifiers, inferred_ty)
             }
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
@@ -2712,6 +2717,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         };
+
         self.declarations
             .insert(definition, declared_ty, self.multi_inference_state);
         self.bindings
@@ -3400,6 +3406,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
@@ -10515,7 +10522,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if self.inner_expression_inference_state.is_get() {
             return self.expression_type(expression);
         }
-        let ty = match expression {
+        let mut ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
                 node_index: _,
@@ -10570,6 +10577,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("Ipy escape command support")
             }
         };
+
+        // Avoid promoting explicitly annotated literal values.
+        if let Type::LiteralValue(literal) = ty
+            && let Some(tcx) = tcx.annotation
+            && let Type::Union(_) | Type::LiteralValue(_) = tcx
+                .resolve_type_alias(self.db())
+                .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
+            && ty.is_assignable_to(self.db(), tcx)
+        {
+            ty = Type::LiteralValue(literal.to_unpromotable(self.db()));
+        }
 
         self.store_expression_type_impl(expression, ty, tcx);
 
@@ -10864,7 +10882,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if tuple.len() > MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE {
                 // Promote literals for very large unannotated tuples,
                 // to avoid pathological performance issues
-                self.infer_expression(elt, ctx).promote_literals(db, ctx)
+                self.infer_expression(elt, ctx).promote_literals(db)
             } else {
                 self.infer_expression(elt, ctx)
             }
@@ -11282,8 +11300,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
-                let inferred_elt_ty =
-                    inferred_elt_ty.promote_literals(self.db(), TypeContext::new(elt_tcx));
+                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db());
 
                 builder
                     .infer(

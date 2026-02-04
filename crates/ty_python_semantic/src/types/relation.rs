@@ -199,6 +199,10 @@ impl TypeRelation<'_> {
         matches!(self, TypeRelation::Subtyping)
     }
 
+    pub(crate) const fn is_redundancy(self) -> bool {
+        matches!(self, TypeRelation::Redundancy)
+    }
+
     pub(crate) const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
         match self {
             TypeRelation::Assignability
@@ -960,6 +964,16 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
+            // For union simplification, we want to preserve the unpromotable form of a literal value,
+            // and so redundancy is not symmetric.
+            (Type::LiteralValue(this), Type::LiteralValue(target)) if relation.is_redundancy() => {
+                ConstraintSet::from(this.kind(db) == target.kind(db) && this.is_promotable(db))
+            }
+
+            (Type::LiteralValue(this), Type::LiteralValue(target)) => {
+                ConstraintSet::from(this.kind(db) == target.kind(db))
+            }
+
             // No literal type is a subtype of any other literal type, unless they are the same
             // type (which is handled above). This case is not necessary from a correctness
             // perspective (the fallback cases below will handle it correctly), but it is important
@@ -1592,6 +1606,10 @@ impl<'db> Type<'db> {
                 first.is_equivalent_to_impl(db, second, inferable, visitor)
             }
 
+            (Type::LiteralValue(left), Type::LiteralValue(right)) => {
+                ConstraintSet::from(left.kind(db) == right.kind(db))
+            }
+
             (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
                 first.is_equivalent_to_impl(db, second, inferable, visitor)
             }
@@ -1909,12 +1927,15 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
+            (Type::LiteralValue(left), Type::LiteralValue(right)) => {
+                ConstraintSet::from(left.kind(db) != right.kind(db))
+            }
+
             // any single-valued type is disjoint from another single-valued type
             // iff the two types are nonequal
             (
                 // note `LiteralString` is not single-valued, but we handle the special case above
-                left @ (Type::LiteralValue(..)
-                | Type::FunctionLiteral(..)
+                left @ (Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
@@ -1922,8 +1943,7 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
-                right @ (Type::LiteralValue(..)
-                | Type::FunctionLiteral(..)
+                right @ (Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
