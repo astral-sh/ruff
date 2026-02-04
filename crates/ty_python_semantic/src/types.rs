@@ -4709,13 +4709,13 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Attempt to call a dunder method defined on a class itself (not its metaclass).
+    /// Attempt to call a dunder method defined on a class itself.
     ///
-    /// This is used for methods like `__class_getitem__` which are defined on the class
-    /// and looked up when subscripting the class directly (e.g., `MyClass[int]`).
-    ///
-    /// Unlike `try_call_dunder`, this does NOT add `NO_INSTANCE_FALLBACK`, allowing
-    /// the lookup to find methods defined on the class when `self` is a class literal.
+    /// This is used for methods like `__class_getitem__` which are implicitly called
+    /// when subscripting the class itself (e.g., `MyClass[int]`). These dunder methods
+    /// need to be looked up on the metaclass AND the class itself. So unlike
+    /// `try_call_dunder`, this does NOT add `NO_INSTANCE_FALLBACK`, allowing the lookup
+    /// to find methods defined on the class when `self` is a class literal.
     fn try_call_dunder_on_class(
         self,
         db: &'db dyn Db,
