@@ -16093,8 +16093,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             error = Some(ExplicitSpecializationError::MissingTypeVars);
         }
 
+        let has_typevartuple = generic_context
+            .variables(db)
+            .any(|typevar| typevar.typevar(db).is_typevartuple(db));
+
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
-            if let Type::GenericAlias(alias) = value_ty
+            if has_typevartuple {
+                // Variadic type parameters can consume any number of arguments.
+            } else if let Type::GenericAlias(alias) = value_ty
                 && let spec = alias.specialization(self.db())
                 && spec
                     .types(self.db())
@@ -16228,6 +16234,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             |typevars: Type<'db>| -> Result<GenericContext<'db>, LegacyGenericContextError<'db>> {
                 let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(db);
 
+                let is_unpacked_expr = |expr: &ast::Expr| {
+                    matches!(expr, ast::Expr::Starred(_))
+                        || matches!(
+                            expr,
+                            ast::Expr::Subscript(sub)
+                            if self.expression_type(&sub.value)
+                                == Type::SpecialForm(SpecialFormType::Unpack)
+                        )
+                };
+
+                let unpacked_flags: Vec<bool> = match subscript.slice.as_ref() {
+                    ast::Expr::Tuple(tuple) => tuple.elts.iter().map(is_unpacked_expr).collect(),
+                    expr => vec![is_unpacked_expr(expr)],
+                };
+
                 let typevars = if let Some(tuple_spec) = typevars_class_tuple_spec.as_deref() {
                     match tuple_spec {
                         Tuple::Fixed(typevars) => typevars.elements_slice(),
@@ -16240,9 +16261,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 let mut validated_typevars = FxOrderSet::default();
-                for ty in typevars {
+                for (index, ty) in typevars.iter().enumerate() {
                     let argument_ty = *ty;
+                    let is_unpacked = unpacked_flags.get(index).copied().unwrap_or(false);
                     if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = argument_ty {
+                        if typevar.is_typevartuple(db) && !is_unpacked {
+                            return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
+                        }
                         let bound = bind_typevar(
                             db,
                             self.index,
@@ -16258,6 +16283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     } else if let Type::NominalInstance(instance) = argument_ty
                         && instance.has_known_class(db, KnownClass::TypeVarTuple)
+                        && !is_unpacked
                     {
                         return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
                     } else if any_over_type(db, argument_ty, true, |inner_ty| match inner_ty {
