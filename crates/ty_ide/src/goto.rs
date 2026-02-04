@@ -18,8 +18,8 @@ use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
 };
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
-    definitions_for_name,
+    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
+    definitions_for_imported_symbol, definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -376,6 +376,14 @@ impl GotoTarget<'_> {
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
             | GotoTarget::Globals { .. } => None,
+        }
+    }
+
+    /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for this goto target.
+    pub(crate) fn type_qualifiers(&self, model: &SemanticModel<'_>) -> TypeQualifiers {
+        match self {
+            GotoTarget::Expression(expr) => model.type_qualifiers(*expr),
+            _ => TypeQualifiers::empty(),
         }
     }
 
