@@ -464,6 +464,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.scope
     }
 
+    /// If the current scope is a class body scope of a dataclass-like class, populate
+    /// `self.dataclass_field_specifiers` with the field specifiers from the class's
+    /// `dataclass_params` or `dataclass_transform` parameters. This is needed so that
+    /// calls to field-specifier functions are recognized during type inference of the
+    /// right-hand side of annotated assignments.
+    fn setup_dataclass_field_specifiers(&mut self) {
+        fn field_specifiers<'db>(
+            db: &'db dyn Db,
+            index: &'db SemanticIndex<'db>,
+            scope: ScopeId<'db>,
+        ) -> Option<SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>> {
+            let enclosing_scope = index.scope(scope.file_scope_id(db));
+            let class_node = enclosing_scope.node().as_class()?;
+            let class_definition = index.expect_single_definition(class_node);
+            let class_literal = infer_definition_types(db, class_definition)
+                .declaration_type(class_definition)
+                .inner_type()
+                .as_class_literal()?
+                .as_static()?;
+
+            class_literal
+                .dataclass_params(db)
+                .map(|params| SmallVec::from(params.field_specifiers(db)))
+                .or_else(|| {
+                    Some(SmallVec::from(
+                        CodeGeneratorKind::from_class(db, class_literal.into(), None)?
+                            .dataclass_transformer_params()?
+                            .field_specifiers(db),
+                    ))
+                })
+        }
+
+        if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
+            self.dataclass_field_specifiers = specifiers;
+        }
+    }
+
     /// Set the multi-inference state, returning the previous value.
     fn set_multi_inference_state(&mut self, state: MultiInferenceState) -> MultiInferenceState {
         std::mem::replace(&mut self.multi_inference_state, state)
@@ -2219,6 +2256,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>, tcx: TypeContext<'db>) {
+        self.setup_dataclass_field_specifiers();
+
         match expression.kind(self.db()) {
             ExpressionKind::Normal => {
                 self.infer_expression_impl(expression.node_ref(self.db(), self.module()), tcx);
@@ -8279,35 +8318,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
-            fn field_specifiers<'db>(
-                db: &'db dyn Db,
-                index: &'db SemanticIndex<'db>,
-                scope: ScopeId<'db>,
-            ) -> Option<SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>> {
-                let enclosing_scope = index.scope(scope.file_scope_id(db));
-                let class_node = enclosing_scope.node().as_class()?;
-                let class_definition = index.expect_single_definition(class_node);
-                let class_literal = infer_definition_types(db, class_definition)
-                    .declaration_type(class_definition)
-                    .inner_type()
-                    .as_class_literal()?
-                    .as_static()?;
-
-                class_literal
-                    .dataclass_params(db)
-                    .map(|params| SmallVec::from(params.field_specifiers(db)))
-                    .or_else(|| {
-                        Some(SmallVec::from(
-                            CodeGeneratorKind::from_class(db, class_literal.into(), None)?
-                                .dataclass_transformer_params()?
-                                .field_specifiers(db),
-                        ))
-                    })
-            }
-
-            if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
-                self.dataclass_field_specifiers = specifiers;
-            }
+            self.setup_dataclass_field_specifiers();
 
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
             let previous_deferred_state = self.deferred_state;
