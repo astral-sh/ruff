@@ -1379,7 +1379,39 @@ mod tests {
         --> test.py:1:1
         info: This indicates a bug in Ruff.
         info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
-        info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
+        info: Backtrace:
+           0: ruff_db::panic::install_hook::{{closure}}::{{closure}}
+                     at /home/kenlog/Documents/Programming/RuffForkRepo/ruff_fork/crates/ruff_db/src/panic.rs:114:34
+           1: std::panicking::panic_with_hook
+           2: std::panicking::panic_handler::{{closure}}
+           3: std::sys::backtrace::__rust_end_short_backtrace
+           4: __rustc::rust_begin_unwind
+           5: core::panicking::panic_fmt
+           6: ruff::commands::format::tests::error_diagnostics::{{closure}}
+                     at ./src/commands/format.rs:1306:13
+           7: std::panicking::catch_unwind::do_call
+                     at /build/rustc-1.91.1-src/library/std/src/panicking.rs:590:40
+           8: __rust_try
+           9: std::panicking::catch_unwind
+                     at /build/rustc-1.91.1-src/library/std/src/panicking.rs:553:19
+          10: std::panic::catch_unwind
+                     at /build/rustc-1.91.1-src/library/std/src/panic.rs:359:14
+          11: ruff_db::panic::catch_unwind
+                     at /home/kenlog/Documents/Programming/RuffForkRepo/ruff_fork/crates/ruff_db/src/panic.rs:145:18
+          12: ruff::commands::format::tests::error_diagnostics
+                     at ./src/commands/format.rs:1305:27
+          13: ruff::commands::format::tests::error_diagnostics::{{closure}}
+                     at ./src/commands/format.rs:1298:31
+          14: core::ops::function::FnOnce::call_once
+                     at /build/rustc-1.91.1-src/library/core/src/ops/function.rs:250:5
+          15: test::__rust_begin_short_backtrace
+          16: test::types::RunnableTest::run
+          17: test::run_test::{{closure}}
+          18: std::sys::backtrace::__rust_begin_short_backtrace
+          19: core::ops::function::FnOnce::call_once{{vtable.shim}}
+          20: std::sys::thread::unix::Thread::new::thread_start
+          21: start_thread
+          22: __GI___clone3
         ");
 
         Ok(())

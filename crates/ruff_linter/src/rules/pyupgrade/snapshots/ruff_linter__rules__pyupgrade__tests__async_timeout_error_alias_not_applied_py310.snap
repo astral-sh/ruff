@@ -44,35 +44,54 @@ UP041 [*] Replace aliased errors with `TimeoutError`
    |
 25 | try:
 26 |     pass
-27 | except (asyncio.TimeoutError, socket.timeout,):
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+27 | except (socket.timeout,):
+   |        ^^^^^^^^^^^^^^^^^
 28 |     pass
    |
 help: Replace with builtin `TimeoutError`
 24 |
 25 | try:
 26 |     pass
-   - except (asyncio.TimeoutError, socket.timeout,):
-27 + except (TimeoutError, asyncio.TimeoutError):
+   - except (socket.timeout,):
+27 + except TimeoutError:
 28 |     pass
-29 |
-30 | # Should be kept in parentheses (because multiple)
+29 | 
+30 | try:
 
 UP041 [*] Replace aliased errors with `TimeoutError`
-  --> UP041.py:34:8
+  --> UP041.py:37:8
    |
-32 | try:
-33 |     pass
-34 | except (asyncio.TimeoutError, socket.timeout, KeyError, TimeoutError):
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-35 |     pass
+35 | try:
+36 |     pass
+37 | except (asyncio.TimeoutError, socket.timeout, concurrent.futures.TimeoutError):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 |     pass
    |
 help: Replace with builtin `TimeoutError`
-31 |
-32 | try:
-33 |     pass
-   - except (asyncio.TimeoutError, socket.timeout, KeyError, TimeoutError):
-34 + except (asyncio.TimeoutError, KeyError, TimeoutError):
-35 |     pass
-36 |
-37 | # First should change, second should not
+34 | 
+35 | try:
+36 |     pass
+   - except (asyncio.TimeoutError, socket.timeout, concurrent.futures.TimeoutError):
+37 + except (TimeoutError, asyncio.TimeoutError, concurrent.futures.TimeoutError):
+38 |     pass
+39 | 
+40 | # Should be kept in parentheses (because multiple)
+
+UP041 [*] Replace aliased errors with `TimeoutError`
+  --> UP041.py:44:8
+   |
+42 | try:
+43 |     pass
+44 | except (asyncio.TimeoutError, socket.timeout, concurrent.futures.TimeoutError, KeyError, TimeoutError):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |     pass
+   |
+help: Replace with builtin `TimeoutError`
+41 | 
+42 | try:
+43 |     pass
+   - except (asyncio.TimeoutError, socket.timeout, concurrent.futures.TimeoutError, KeyError, TimeoutError):
+44 + except (asyncio.TimeoutError, concurrent.futures.TimeoutError, KeyError, TimeoutError):
+45 |     pass
+46 | 
+47 | # First should change, second should not

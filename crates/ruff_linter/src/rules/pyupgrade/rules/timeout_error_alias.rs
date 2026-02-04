@@ -73,7 +73,9 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
             if target_version >= PythonVersion::PY311 {
                 matches!(
                     qualified_name.segments(),
-                    ["socket", "timeout"] | ["asyncio", "TimeoutError"]
+                    ["socket", "timeout"]
+                        | ["asyncio", "TimeoutError"]
+                        | ["concurrent", "futures", "TimeoutError"]
                 )
             } else {
                 // N.B. This lint is only invoked for Python 3.10+. We assume
