@@ -42,8 +42,7 @@ y: Bar[int, str, bytes]  # fine
 
 class Baz[*Ts]: ...
 
-# TODO: false positive
-z: Baz[int, str, bytes]  # error: [not-subscriptable]
+z: Baz[int, str, bytes]  # fine
 ```
 
 And we also provide some basic validation in some cases:

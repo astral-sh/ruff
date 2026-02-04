@@ -335,7 +335,7 @@ Ts = TypeVarTuple("Ts")
 
 def _(c: Callable[[int, *Ts], int]):
     # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (int, Ts@_, /) -> int
 ```
 
 And, using the legacy syntax using `Unpack`:
