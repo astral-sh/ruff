@@ -1157,10 +1157,7 @@ reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
 
 For backwards compatibility with pre-3.11 Python, ty recognizes any function named
 `__dataclass_transform__` as equivalent to `typing.dataclass_transform`, regardless of which module
-it is defined in. This matches pyright's behavior. The name matches the attribute set at runtime by
-the decorator.
-
-See: <https://typing.python.org/en/latest/spec/dataclasses.html#runtime-behavior>
+it is defined in. This matches [pyright's behavior].
 
 ```py
 from typing import TypeVar, Callable, Any
@@ -1197,4 +1194,5 @@ User(id=1, name="Test")
 User()
 ```
 
+[pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
