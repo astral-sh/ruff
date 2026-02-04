@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
-use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -200,6 +200,13 @@ pub(crate) enum GotoTarget<'a> {
         callable: ast::ExprRef<'a>,
         /// The call of the callable
         call: &'a ast::ExprCall,
+        /// Whether the cursor is positioned on the parenthesis.
+        ///
+        /// This is useful for tweaking the behavior of goto-def.
+        /// e.g., When on the name of a class, we jump to its
+        /// class definition. When on the paren, we jump to its
+        /// constructor (if present).
+        on_parenthesis: bool,
     },
 
     /// Go to on a sub-expression of a string annotation's sub-AST
@@ -549,7 +556,7 @@ impl GotoTarget<'_> {
             // For callables, both the definition of the callable and the actual function impl are relevant.
             //
             // Prefer the function impl over the callable so that its docstrings win if defined.
-            GotoTarget::Call { callable, call } => {
+            GotoTarget::Call { callable, call, .. } => {
                 let mut definitions = Vec::new();
 
                 // We prefer the specific overload for hover, go-to-def etc. However,
@@ -871,6 +878,7 @@ impl GotoTarget<'_> {
                             return Some(GotoTarget::Call {
                                 call,
                                 callable: attribute_expr,
+                                on_parenthesis: parenthesis_token(tokens, offset).is_some(),
                             });
                         }
                     }
@@ -970,15 +978,25 @@ impl GotoTarget<'_> {
             }
 
             node => {
-                // Check if this is seemingly a callable being invoked (the `x` in `x(...)`)
-                let parent = covering_node.parent();
-                if let (Some(AnyNodeRef::ExprCall(call)), AnyNodeRef::ExprName(name)) =
-                    (parent, node)
+                // Check if this is seemingly a callable being invoked (the `x` in `x(...)`).
+                //
+                // Note that `node` might be the `foo()` call itself or
+                // the name `foo` inside of `foo()`. So we check both the
+                // parent and the current node for a callable target.
+                for node in covering_node
+                    .parent()
+                    .into_iter()
+                    .chain(std::iter::once(node))
                 {
-                    return Some(GotoTarget::Call {
-                        call,
-                        callable: name.into(),
-                    });
+                    if let AnyNodeRef::ExprCall(call) = node
+                        && let ast::Expr::Name(ref name) = *call.func
+                    {
+                        return Some(GotoTarget::Call {
+                            call,
+                            callable: name.into(),
+                            on_parenthesis: parenthesis_token(tokens, offset).is_some(),
+                        });
+                    }
                 }
                 node.as_expr_ref().map(GotoTarget::Expression)
             }
@@ -1129,22 +1147,38 @@ fn definitions_to_navigation_targets<'db>(
     // When our target is a class constructor, we want to exclude
     // navigation targets to its `__init__` or `__new__` methods.
     //
+    // ... unless the cursor is on the parenthesis of the call,
+    // in which case we want to prefer the constructor methods
+    // if available.
+    //
     // See: https://github.com/astral-sh/ty/issues/2218
-    if matches!(*goto_target, GotoTarget::Call { .. })
+    if let GotoTarget::Call { on_parenthesis, .. } = *goto_target
         && goto_target
             .inferred_type(model)
             .is_some_and(|ty| ty.is_class_literal())
     {
-        definitions.retain(|resolved_def| {
+        let is_constructor_method = |resolved_def: &ty_python_semantic::ResolvedDefinition<'_>| {
             let Some(def) = resolved_def.definition() else {
-                return true;
+                return false;
             };
             if !matches!(*def.kind(model.db()), DefinitionKind::Function(_)) {
-                return true;
+                return false;
             }
-            !def.name(model.db())
+            def.name(model.db())
                 .is_some_and(|name| name == "__init__" || name == "__new__")
-        });
+        };
+
+        if on_parenthesis {
+            // Only limit to constructor methods if we have at least one.
+            // Otherwise we could end up removing all navigation targets.
+            // e.g., See `goto_definition_dynamic_namedtuple_literal_parenthesis`
+            // test.
+            if definitions.iter().any(is_constructor_method) {
+                definitions.retain(|resolved_def| is_constructor_method(resolved_def));
+            }
+        } else {
+            definitions.retain(|resolved_def| !is_constructor_method(resolved_def));
+        }
     }
     if let Some(mapper) = stub_mapper {
         definitions = mapper.map_definitions(definitions);
@@ -1171,22 +1205,28 @@ pub(crate) fn find_goto_target_impl<'a>(
     syntax: AnyNodeRef<'a>,
     offset: TextSize,
 ) -> Option<GotoTarget<'a>> {
-    let token = tokens
-        .at_offset(offset)
-        .max_by_key(|token| match token.kind() {
-            TokenKind::Name
-            | TokenKind::String
-            | TokenKind::Complex
-            | TokenKind::Float
-            | TokenKind::Int => 1,
+    let token = parenthesis_token(tokens, offset).or_else(|| {
+        tokens
+            .at_offset(offset)
+            .max_by_key(|token| match token.kind() {
+                TokenKind::Name
+                | TokenKind::String
+                | TokenKind::Complex
+                | TokenKind::Float
+                | TokenKind::Int => 1,
 
-            TokenKind::Comment => -1,
+                TokenKind::Comment => -1,
 
-            // if we have a<CURSOR>+b`, prefer the `+` token (by respecting the token ordering)
-            // This matches VS Code's behavior where it sends the start of the clicked token as offset.
-            kind if kind.as_binary_operator().is_some() || kind.as_unary_operator().is_some() => 1,
-            _ => 0,
-        })?;
+                // if we have a<CURSOR>+b`, prefer the `+` token (by respecting the token ordering)
+                // This matches VS Code's behavior where it sends the start of the clicked token as offset.
+                kind if kind.as_binary_operator().is_some()
+                    || kind.as_unary_operator().is_some() =>
+                {
+                    1
+                }
+                _ => 0,
+            })
+    })?;
 
     if token.kind().is_comment() {
         return None;
@@ -1254,4 +1294,32 @@ fn import_name(module_name: &str, component_index: usize) -> &str {
         .unwrap_or(module_name.len());
 
     &module_name[..idx]
+}
+
+/// Helper to return a parenthesis token only when the cursor (at
+/// `offset`) is on a parenthesis token.
+fn parenthesis_token(tokens: &Tokens, offset: TextSize) -> Option<Token> {
+    match tokens.at_offset(offset) {
+        TokenAt::Single(tok) => {
+            if matches!(tok.kind(), TokenKind::Lpar | TokenKind::Rpar) {
+                return Some(tok);
+            }
+        }
+        // Note that we specifically only look for a opening parenthesis
+        // here. Matching on a closing parenthesis seems ambiguous. e.g.,
+        // what do you do in the case of `func(a<CURSOR>)`? Arguably the
+        // cursor is "inside" the function call. In any case, when AG tried
+        // to match on a closing parenthesis here, a bunch of tests failed
+        // in an undesirable way.
+        //
+        // ... Except, we allow a closing parenthesis when the left token
+        // is an opening parenthesis. i.e., There's no ambiguity with
+        // `foo(<CURSOR>)`.
+        TokenAt::Between(left, right) => match (left.kind(), right.kind()) {
+            (_, TokenKind::Lpar) | (TokenKind::Lpar, TokenKind::Rpar) => return Some(left),
+            _ => {}
+        },
+        TokenAt::None => {}
+    }
+    None
 }
