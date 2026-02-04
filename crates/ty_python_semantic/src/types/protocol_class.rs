@@ -15,9 +15,9 @@ use crate::{
         ApplyTypeMappingVisitor, AttributeAssignmentError, BoundTypeVarInstance, CallArguments,
         CallableType, CallableTypeKind, ClassBase, ClassType, FindLegacyTypeVarsVisitor,
         HasRelationToVisitor, InstanceFallbackShadowsNonDataDescriptor, IsDisjointVisitor,
-        KnownFunction, MemberLookupPolicy, PropertyInstanceType, Signature,
-        StaticClassLiteral, Type, TypeContext, TypeMapping, TypeQualifiers, TypeRelation,
-        TypeVarVariance, UnionType, VarianceInferable,
+        KnownFunction, MemberLookupPolicy, PropertyInstanceType, Signature, StaticClassLiteral,
+        Type, TypeContext, TypeMapping, TypeQualifiers, TypeRelation, TypeVarVariance, UnionType,
+        VarianceInferable,
         constraints::{
             ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
             OptionConstraintsExtension, ResultConstraintsExtension,
@@ -998,19 +998,25 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             let attribute_type = if self.name == "__call__" {
                 other
             } else {
-                let Place::Defined(DefinedPlace {
-                    ty: attribute_type,
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }) = other
-                    .invoke_descriptor_protocol(
+                // For modules, use `.member()` which has special handling for module types
+                // that looks up module-level attributes directly. For other types, use
+                // `invoke_descriptor_protocol` to correctly handle metaclass method lookup.
+                let lookup_result = if other.as_module_literal().is_some() {
+                    other.member(db, self.name)
+                } else {
+                    other.invoke_descriptor_protocol(
                         db,
                         self.name,
                         Place::Undefined.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                         MemberLookupPolicy::default(),
                     )
-                    .place
+                };
+                let Place::Defined(DefinedPlace {
+                    ty: attribute_type,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) = lookup_result.place
                 else {
                     return ConstraintSet::from_bool(constraints, false);
                 };
@@ -1070,46 +1076,49 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 )
             })
             .and(db, constraints, || {
-                self.instance_set_type().when_err_or(db, constraints, |set_type| {
-                    ConstraintSet::from_bool(
-                        constraints,
-                        other
-                            .validate_attribute_assignment(db, self.name, set_type)
-                            .is_ok(),
-                    )
-                })
+                self.instance_set_type()
+                    .when_err_or(db, constraints, |set_type| {
+                        ConstraintSet::from_bool(
+                            constraints,
+                            other
+                                .validate_attribute_assignment(db, self.name, set_type)
+                                .is_ok(),
+                        )
+                    })
             })
             .and(db, constraints, || {
-                self.meta_get_type(db).when_none_or(db, constraints, |get_type| {
-                    let Place::Defined(DefinedPlace {
-                        ty: attribute_type,
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    }) = other.class_member(db, Name::from(self.name)).place
-                    else {
-                        return ConstraintSet::from_bool(constraints, false);
-                    };
-                    attribute_type.has_relation_to_impl(
-                        db,
-                        get_type,
-                        constraints,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
+                self.meta_get_type(db)
+                    .when_none_or(db, constraints, |get_type| {
+                        let Place::Defined(DefinedPlace {
+                            ty: attribute_type,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        }) = other.class_member(db, Name::from(self.name)).place
+                        else {
+                            return ConstraintSet::from_bool(constraints, false);
+                        };
+                        attribute_type.has_relation_to_impl(
+                            db,
+                            get_type,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             })
             .and(db, constraints, || {
-                self.meta_set_type().when_err_or(db, constraints, |set_type| {
-                    ConstraintSet::from_bool(
-                        constraints,
-                        other
-                            .to_meta_type(db)
-                            .validate_attribute_assignment(db, self.name, set_type)
-                            .is_ok(),
-                    )
-                })
+                self.meta_set_type()
+                    .when_err_or(db, constraints, |set_type| {
+                        ConstraintSet::from_bool(
+                            constraints,
+                            other
+                                .to_meta_type(db)
+                                .validate_attribute_assignment(db, self.name, set_type)
+                                .is_ok(),
+                        )
+                    })
             })
     }
 }

@@ -1863,35 +1863,41 @@ impl<'db> Type<'db> {
             disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
             relation_visitor: &HasRelationToVisitor<'db, 'c>,
         ) -> ConstraintSet<'db, 'c> {
-            protocol.interface(db).members(db).when_any(db, constraints, |member| {
-                let attribute = member.name();
+            protocol
+                .interface(db)
+                .members(db)
+                .when_any(db, constraints, |member| {
+                    let attribute = member.name();
 
-                member
-                    .instance_get_type(db)
-                    .when_some_and(db, constraints, |get_type| {
-                        other
-                            .member(db, attribute)
-                            .place
-                            .ignore_possibly_undefined()
-                            .when_none_or(db, constraints, |attribute_type| {
-                                get_type.is_disjoint_from_impl(
-                                    db,
-                                    attribute_type,
-                                    constraints,
-                                    inferable,
-                                    disjointness_visitor,
-                                    relation_visitor,
-                                )
-                            })
-                    })
-                    .or(db, constraints, || {
-                        ConstraintSet::from_bool(constraints, member.instance_set_type().is_ok_and(|set_type| {
+                    member
+                        .instance_get_type(db)
+                        .when_some_and(db, constraints, |get_type| {
                             other
-                                .validate_attribute_assignment(db, attribute, set_type)
-                                .is_err()
-                        }))
-                    })
-            })
+                                .member(db, attribute)
+                                .place
+                                .ignore_possibly_undefined()
+                                .when_none_or(db, constraints, |attribute_type| {
+                                    get_type.is_disjoint_from_impl(
+                                        db,
+                                        attribute_type,
+                                        constraints,
+                                        inferable,
+                                        disjointness_visitor,
+                                        relation_visitor,
+                                    )
+                                })
+                        })
+                        .or(db, constraints, || {
+                            ConstraintSet::from_bool(
+                                constraints,
+                                member.instance_set_type().is_ok_and(|set_type| {
+                                    other
+                                        .validate_attribute_assignment(db, attribute, set_type)
+                                        .is_err()
+                                }),
+                            )
+                        })
+                })
         }
 
         match (self, other) {
@@ -2310,24 +2316,31 @@ impl<'db> Type<'db> {
             (Type::ProtocolInstance(protocol), other_ty)
             | (other_ty, Type::ProtocolInstance(protocol)) => {
                 disjointness_visitor.visit((self, other), || {
-                    protocol.interface(db).members(db).when_any(db, constraints, |member| {
-                        member.instance_get_type(db).when_some_and(db, constraints, |get_type| {
-                            let Place::Defined(DefinedPlace {
-                                ty: attribute_type, ..
-                            }) = other_ty.member(db, member.name()).place
-                            else {
-                                return ConstraintSet::from_bool(constraints, false);
-                            };
-                            get_type.is_disjoint_from_impl(
+                    protocol
+                        .interface(db)
+                        .members(db)
+                        .when_any(db, constraints, |member| {
+                            member.instance_get_type(db).when_some_and(
                                 db,
-                                attribute_type,
                                 constraints,
-                                inferable,
-                                disjointness_visitor,
-                                relation_visitor,
+                                |get_type| {
+                                    let Place::Defined(DefinedPlace {
+                                        ty: attribute_type, ..
+                                    }) = other_ty.member(db, member.name()).place
+                                    else {
+                                        return ConstraintSet::from_bool(constraints, false);
+                                    };
+                                    get_type.is_disjoint_from_impl(
+                                        db,
+                                        attribute_type,
+                                        constraints,
+                                        inferable,
+                                        disjointness_visitor,
+                                        relation_visitor,
+                                    )
+                                },
                             )
                         })
-                    })
                 })
             }
 
