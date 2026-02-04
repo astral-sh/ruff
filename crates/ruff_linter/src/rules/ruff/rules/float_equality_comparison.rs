@@ -192,6 +192,8 @@ fn is_numeric_expr(expr: &Expr) -> bool {
     }
 }
 
+const INF_MODULES: &[&[&str]] = &[&["math", "inf"], &["numpy", "inf"], &["torch", "inf"]];
+
 fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::Call(ast::ExprCall {
@@ -199,16 +201,16 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
         }) => {
             // Skip `pytest.approx` or `math.inf`
             if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
-                if matches!(
-                    qualified_name.segments(),
-                    ["pytest", "approx"] | ["math", "inf"]
-                ) {
+                if matches!(qualified_name.segments(), ["pytest", "approx"]) {
                     return true;
                 }
             }
 
             // Skip `float("inf")`, `float("-inf")`, `float("infinity")`
-            if semantic.match_builtin_expr(func, "float") {
+            if ["float", "complex"]
+                .iter()
+                .any(|s| semantic.match_builtin_expr(func, s))
+            {
                 return arguments.args.len() == 1
                     && arguments.keywords.is_empty()
                     && is_infinity_string_literal(&arguments.args[0]).is_some();
@@ -216,6 +218,26 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
 
             false
         }
+
+        // Skip `math.inf`, `numpy.inf`, `torch.inf`
+        Expr::Attribute(_) => {
+            if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
+                INF_MODULES.contains(&qualified_name.segments())
+            } else {
+                false
+            }
+        }
+
+        // Skip `inf` when imported from `math`, `numpy` or `torch`
+        Expr::Name(name_expr) => semantic
+            .resolve_name(name_expr)
+            .and_then(|binding_id| {
+                let binding = semantic.binding(binding_id);
+                binding.source
+            })
+            .and_then(|source| semantic.expression(source))
+            .and_then(|source_expr| semantic.resolve_qualified_name(source_expr))
+            .map_or(false, |qn| INF_MODULES.contains(&qn.segments())),
 
         _ => false,
     }
