@@ -2325,7 +2325,7 @@ class Bing(TypedDict):
 def _(u: Foo | Bar | Baz | Bing):
     if u["tag"] == "foo":
         reveal_type(u)  # revealed: Foo
-    elif u["tag"] == 42:
+    elif 42 == u["tag"]:
         reveal_type(u)  # revealed: Bar
     elif u["tag"] == b"baz":
         reveal_type(u)  # revealed: Baz
