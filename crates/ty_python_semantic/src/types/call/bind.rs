@@ -1161,9 +1161,8 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::DataclassTransform) => {
-                            // Use named parameter lookup to handle custom __dataclass_transform__
-                            // functions that may have different signatures than typing.dataclass_transform
-                            // (e.g., SQLModel defines its own with fewer parameters).
+                            // Use named parameter lookup to handle custom `__dataclass_transform__` functions
+                            // which were allowed in older versions of the `dataclass_transform` spec.
                             let mut flags = DataclassTransformerFlags::empty();
 
                             let eq_default = overload
@@ -1196,7 +1195,8 @@ impl<'db> Bindings<'db> {
                                 flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
                             }
 
-                            // Try both "field_specifiers" (typing spec) and "field_descriptors" (SQLModel)
+                            // Try both `field_specifiers` (the specified name of this `dataclass_transform`
+                            // parameter) and `field_descriptors`, which was used in earlier versions of the spec.
                             let field_specifiers_param = overload
                                 .parameter_type_by_name("field_specifiers", false)
                                 .ok()

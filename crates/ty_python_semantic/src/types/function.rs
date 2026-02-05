@@ -1590,8 +1590,8 @@ impl KnownFunction {
         name: &str,
     ) -> Option<Self> {
         // Special case: `__dataclass_transform__` is recognized as `DataclassTransform`
-        // regardless of module, for backwards compatibility with pre-3.11 libraries
-        // like SQLModel. This matches pyright's behavior:
+        // regardless of module, for backwards compatibility with earlier versions of the
+        // `dataclass_transform` specification. This matches pyright's behavior:
         // https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
         if name == "__dataclass_transform__" {
             return Some(Self::DataclassTransform);
