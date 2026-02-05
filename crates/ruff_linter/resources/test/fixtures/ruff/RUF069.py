@@ -61,6 +61,8 @@ def _():
 
     assert math.inf == 1e300 * 1e300  # ok
 
+    assert complex("inf") == inf  # ok
+
 
 def _pytest():
     import pytest
