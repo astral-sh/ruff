@@ -323,10 +323,12 @@ class Bar:
     def bar(self: Self, x: Foo[Self]):
         # revealed: bound method Foo[Self@bar].foo() -> Self@bar
         reveal_type(x.foo)
+        reveal_type(x.foo())  # revealed: Self@bar
 
 def f[U: Bar](x: Foo[U]):
     # revealed: bound method Foo[U@f].foo() -> U@f
     reveal_type(x.foo)
+    reveal_type(x.foo())  # revealed: U@f
 ```
 
 ## typing_extensions
@@ -473,9 +475,6 @@ reveal_type(Child.create())  # revealed: Child
 
 ## Attributes
 
-TODO: The use of `Self` to annotate the `next_node` attribute should be
-[modeled as a property][self attribute], using `Self` in its parameter and return type.
-
 ```py
 from typing import Self
 
@@ -485,11 +484,56 @@ class LinkedList:
 
     def next(self: Self) -> Self:
         reveal_type(self.value)  # revealed: int
-        # TODO: no error
-        # error: [invalid-return-type]
         return self.next_node
 
 reveal_type(LinkedList().next())  # revealed: LinkedList
+```
+
+Dataclass fields can also use `Self` in their annotations:
+
+```py
+from dataclasses import dataclass
+from typing import Optional, Self
+
+@dataclass
+class Node:
+    parent: Optional[Self] = None
+
+Node(Node())
+```
+
+Attributes annotated with `Self` can be assigned on instances:
+
+```py
+from typing import Optional, Self
+
+class MyClass:
+    field: Optional[Self] = None
+
+def _(c: MyClass):
+    c.field = c
+```
+
+Accessing base class attributes through `Self` should work correctly. This is a common pattern in
+ORMs like Django where a base `Model` class defines methods that access `self` attributes, and those
+methods are inherited by subclasses:
+
+```py
+from typing import Self
+
+class Model:
+    id: int
+    name: str
+
+    def get_id(self: Self) -> int:
+        # Self is bounded by Model here, but should still find id
+        reveal_type(self.id)  # revealed: int
+        return self.id
+
+class User(Model):
+    email: str
+
+reveal_type(User().get_id())  # revealed: int
 ```
 
 Attributes can also refer to a generic parameter:
@@ -504,6 +548,26 @@ class C(Generic[T]):
     def method(self) -> None:
         reveal_type(self)  # revealed: Self@method
         reveal_type(self.foo)  # revealed: T@C
+```
+
+## Callable attributes that return `Self`
+
+Attributes annotated as callables returning `Self` should bind to the concrete class.
+
+```py
+from typing import Callable, Self
+
+class Factory:
+    maker: Callable[[], Self]
+
+    def __init__(self) -> None:
+        self.maker = lambda: self
+
+class Sub(Factory):
+    pass
+
+def _(s: Sub):
+    reveal_type(s.maker())  # revealed: Sub
 ```
 
 ## Generic Classes
@@ -776,4 +840,174 @@ def _(c: CallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None
 ```
 
-[self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
+## Bound methods from internal data structures stored as instance attributes
+
+This tests the pattern where a class stores bound methods from internal data structures (like
+`deque` or `dict`) as instance attributes for performance. When these bound methods are later
+accessed and called through `self`, the `Self` type binding should not interfere with their
+signatures.
+
+This is a regression test for false positives found in ecosystem projects like jinja's `LRUCache`
+and beartype's `CacheUnboundedStrong`.
+
+TODO: The errors below are false positives. The bound methods stored as attributes should have their
+`Self` typevars resolved when the method is bound to the internal data structure, but currently we
+don't resolve `Self` in stored bound method attribute types.
+
+```py
+from collections import deque
+from typing import Any
+
+class LRUCache:
+    """A simple LRU cache that stores bound methods from an internal deque."""
+
+    def __init__(self, capacity: int) -> None:
+        self.capacity = capacity
+        self._mapping: dict[Any, Any] = {}
+        self._queue: deque[Any] = deque()
+        self._postinit()
+
+    def _postinit(self) -> None:
+        # Store bound methods from the internal deque for faster attribute lookup
+        self._popleft = self._queue.popleft
+        self._pop = self._queue.pop
+        self._remove = self._queue.remove
+        self._append = self._queue.append
+
+    def __getitem__(self, key: Any) -> Any:
+        self._remove(key)  # error: [invalid-argument-type]
+        self._append(key)  # error: [invalid-argument-type]
+        return self._mapping[key]
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._remove(key)  # error: [invalid-argument-type]
+        if len(self._queue) >= self.capacity:
+            self._popleft()  # error: [invalid-argument-type]
+        self._append(key)  # error: [invalid-argument-type]
+        self._mapping[key] = value
+
+    def __delitem__(self, key: Any) -> None:
+        self._remove(key)  # error: [invalid-argument-type]
+        del self._mapping[key]
+```
+
+Similarly for dict-based patterns:
+
+```py
+from typing import Hashable
+
+class CacheMap:
+    """A cache that stores bound methods from an internal dict."""
+
+    def __init__(self) -> None:
+        self._key_to_value: dict[Hashable, object] = {}
+        self._key_to_value_get = self._key_to_value.get
+        self._key_to_value_set = self._key_to_value.__setitem__
+
+    def cache_or_get_cached_value(self, key: Hashable, value: object) -> object:
+        cached_value = self._key_to_value_get(key)  # error: [invalid-argument-type]
+        if cached_value is not None:
+            return cached_value
+        self._key_to_value_set(key, value)  # error: [invalid-argument-type]
+        return value
+```
+
+## Self in class attributes with generic classes
+
+Django-like patterns where a class attribute uses `Self` as a type argument to a generic class. Both
+class access (`Confirmation.objects`) and instance access (`instance.objects`) should properly bind
+`Self` to the concrete class.
+
+```py
+from typing import Self, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Manager(Generic[T]):
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Model:
+    objects: Manager[Self]
+
+class Confirmation(Model):
+    expiry_date: int
+
+def test() -> None:
+    # Class access: Self is bound to Confirmation
+    confirmation = Confirmation.objects.get()
+    reveal_type(confirmation)  # revealed: Confirmation
+    x = confirmation.expiry_date  # Should work - Confirmation has expiry_date
+
+    # Instance access: Self should also be bound to Confirmation
+    instance = Confirmation()
+    reveal_type(instance.objects)  # revealed: Manager[Confirmation]
+    instance_result = instance.objects.get()
+    reveal_type(instance_result)  # revealed: Confirmation
+```
+
+## Limitation: Stubs that rely on type checker plugins
+
+Some stub packages like `django-stubs` rely on mypy plugins to synthesize attributes that don't
+exist in the stubs themselves. For example, Django's `Model` class automatically gets an `id: int`
+field at runtime, but `django-stubs` doesn't include this in the stub because the mypy plugin adds
+it dynamically based on the model definition.
+
+Without plugin support, type checkers (including ty, mypy, and pyright) will correctly report that
+the attribute doesn't exist. This is the expected behavior - the stubs are incomplete without the
+plugin.
+
+```py
+from typing import Self, Generic, TypeVar, ClassVar, Any
+
+_T = TypeVar("_T", bound="Model", covariant=True)
+
+class Manager(Generic[_T]):
+    def create(self, **kwargs: Any) -> _T:
+        raise NotImplementedError
+
+class Model:
+    # django-stubs defines pk: Any but NOT id: int
+    # The id field is supposed to be synthesized by the mypy plugin
+    pk: Any
+    objects: ClassVar[Manager[Self]]
+
+class CustomerPlan(Model):
+    name: str
+
+plan = CustomerPlan.objects.create(name="test")
+
+# Self binding works correctly - plan is CustomerPlan, not Unknown
+reveal_type(plan)  # revealed: CustomerPlan
+
+# pk works because it's defined in Model
+reveal_type(plan.pk)  # revealed: Any
+
+# id fails because it's not in the stubs (requires mypy plugin)
+# error: [unresolved-attribute]
+plan.id
+```
+
+The workaround is to add the missing attributes to a custom base class:
+
+```py
+from typing import Self, Generic, TypeVar, ClassVar, Any
+
+_T = TypeVar("_T", bound="Model", covariant=True)
+
+class Manager(Generic[_T]):
+    def create(self, **kwargs: Any) -> _T:
+        raise NotImplementedError
+
+class Model:
+    id: int  # Explicitly add id to work without mypy plugin
+    pk: Any
+    objects: ClassVar[Manager[Self]]
+
+class CustomerPlan(Model):
+    name: str
+
+plan = CustomerPlan.objects.create(name="test")
+reveal_type(plan)  # revealed: CustomerPlan
+reveal_type(plan.id)  # revealed: int
+```

@@ -88,6 +88,13 @@ pub(crate) fn bind_typevar<'db>(
                 }
             }
         }
+
+        // Handle `Self` directly in class body annotations (not inside a method).
+        let scope = index.scope(containing_scope);
+        if let Some(class_node) = scope.node().as_class() {
+            let definition = index.expect_single_definition(class_node);
+            return Some(typevar.with_binding_context(db, definition));
+        }
     }
     enclosing_generic_contexts(db, index, containing_scope)
         .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
