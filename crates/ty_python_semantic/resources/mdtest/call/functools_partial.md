@@ -154,6 +154,30 @@ reveal_type(p("hello", 3.14))  # revealed: bool
 reveal_type(p(b="hello", c=3.14))  # revealed: bool
 ```
 
+## Wrong positional arg type
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, "not_an_int")  # error: [invalid-argument-type]
+reveal_type(p)  # revealed: (b: str) -> bool
+```
+
+## Wrong keyword arg type
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, b=42)  # error: [invalid-argument-type]
+reveal_type(p)  # revealed: (a: int) -> bool
+```
+
 ## Bound method
 
 ```py
