@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+assertion_line: 82
 ---
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
   --> B901.py:9:9
@@ -64,3 +65,30 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 88 |     return [1, 2, 3]
    |     ^^^^^^^^^^^^^^^^
    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   --> B901.py:112:5
+    |
+110 | def pytest_configure():
+111 |     yield
+112 |     return "should error"
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   --> B901.py:119:5
+    |
+117 | def pytest_unconfigure():
+118 |     yield
+119 |     return "should error"
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   --> B901.py:126:5
+    |
+124 | def my_fixture():
+125 |     yield
+126 |     return "should error"
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |
