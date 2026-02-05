@@ -168,6 +168,7 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
                     match op {
                         ast::Operator::Div => {
                             // Only trigger for numeric divisions, not path operations
+                            // Ex) `Path(__file__).parents[2] / "text.txt"`
                             is_numeric_expr(left) || is_numeric_expr(right)
                         }
                         _ => has_float(left, semantic) || has_float(right, semantic),
@@ -199,14 +200,14 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
-            // Skip `pytest.approx` or `math.inf`
+            // Skip `pytest.approx`
             if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
                 if matches!(qualified_name.segments(), ["pytest", "approx"]) {
                     return true;
                 }
             }
 
-            // Skip `float("inf")`, `float("-inf")`, `float("infinity")`
+            // Skip `float("inf" / "-inf" / etc.)` / `complex("inf" / "-inf" / etc.)`
             if ["float", "complex"]
                 .iter()
                 .any(|s| semantic.match_builtin_expr(func, s))
@@ -219,7 +220,7 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
             false
         }
 
-        // Skip `math.inf`, `numpy.inf`, `torch.inf`
+        // Skip `math.inf`, `numpy.inf`, `torch.inf` import's
         Expr::Attribute(_) => {
             if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
                 INF_MODULES.contains(&qualified_name.segments())
