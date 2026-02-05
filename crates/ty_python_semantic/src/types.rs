@@ -2811,13 +2811,14 @@ impl<'db> Type<'db> {
         self.is_data_descriptor_impl(d, false)
     }
 
-    /// Returns whether this type is static and may be a data descriptor.
+    /// Returns whether this type should be considered a possible data descriptor.
     /// If this type is a union, returns true if _any_ element is a data descriptor.
     /// This is used to determine whether an attribute assignment is valid for narrowing.
-    /// In theory, dynamic types are data descriptor types, so it is unsafe to use attribute assignment for narrowing if the inferred type of an attribute contains a dynamic type.
-    /// However, strictly applying this rule would disable narrowing for most implicit attributes.
-    /// Therefore, for practical convenience, we will relax the rule and disable narrowing only if the attribute type is static and a data descriptor.
-    pub(crate) fn is_static_and_may_be_data_descriptor(self, d: &'db dyn Db) -> bool {
+    /// In theory, dynamic types might be data descriptor types, so it is unsafe to use
+    /// attribute assignment for narrowing if the inferred type of an attribute contains a dynamic type.
+    /// However, strictly applying this rule would disable narrowing too frequently.
+    /// Therefore, for practical convenience, we don't consider dynamic types as data descriptors.
+    pub(crate) fn may_be_data_descriptor(self, d: &'db dyn Db) -> bool {
         self.is_data_descriptor_impl(d, true)
     }
 

@@ -13856,7 +13856,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 .class_member(db, attr.id.clone())
                 .place
                 .ignore_possibly_undefined()
-                .is_some_and(|ty| ty.is_static_and_may_be_data_descriptor(db))
+                .is_some_and(|ty| ty.may_be_data_descriptor(db))
             {
                 bound_ty = declared_ty;
             }
