@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/function_trailing_comma.py
 ---
 ## Input
 
@@ -144,7 +143,20 @@ variable: (
      json = {
          "k": {
              "k2": {
-@@ -130,9 +130,7 @@
+@@ -98,7 +98,11 @@
+ 
+ # Make sure inner one-element tuple won't explode
+ some_module.some_function(
+-    argument1, (one_element_tuple,), argument4, argument5, argument6
++    argument1,
++    (one_element_tuple,),
++    argument4,
++    argument5,
++    argument6,
+ )
+ 
+ # Inner trailing comma causes outer to explode
+@@ -130,9 +134,7 @@
  
  def foo() -> (
      # comment inside parenthesised new union return type
@@ -155,7 +167,7 @@ variable: (
  ): ...
  
  
-@@ -153,16 +151,18 @@
+@@ -153,16 +155,18 @@
  
  def foo(
      arg: (  # comment with non-return annotation
@@ -283,7 +295,11 @@ def func() -> (
 
 # Make sure inner one-element tuple won't explode
 some_module.some_function(
-    argument1, (one_element_tuple,), argument4, argument5, argument6
+    argument1,
+    (one_element_tuple,),
+    argument4,
+    argument5,
+    argument6,
 )
 
 # Inner trailing comma causes outer to explode

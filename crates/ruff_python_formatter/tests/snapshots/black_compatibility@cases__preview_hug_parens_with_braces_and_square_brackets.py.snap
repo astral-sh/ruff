@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_hug_parens_with_braces_and_square_brackets.py
 ---
 ## Input
 
@@ -242,7 +241,21 @@ for foo in ["a", "b"]:
      x
      for x in [
          x
-@@ -131,10 +137,12 @@
+@@ -123,18 +129,24 @@
+ ])
+ 
+ foooooooooooooooooooo(
+-    [{c: n + 1 for c in range(256)} for n in range(100)] + [{}], {size}
++    [{c: n + 1 for c in range(256)} for n in range(100)] + [{}],
++    {size},
+ )
+ 
+ baaaaaaaaaaaaar(
+-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], {x}, "a string", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
++    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
++    {x},
++    "a string",
++    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
  )
  
  nested_mapping = {
@@ -259,7 +272,7 @@ for foo in ["a", "b"]:
  }
  explicit_exploding = [
      [
-@@ -164,9 +172,9 @@
+@@ -164,9 +176,9 @@
  })
  
  # Edge case when deciding whether to hug the brackets without inner content.
@@ -408,11 +421,15 @@ func([
 ])
 
 foooooooooooooooooooo(
-    [{c: n + 1 for c in range(256)} for n in range(100)] + [{}], {size}
+    [{c: n + 1 for c in range(256)} for n in range(100)] + [{}],
+    {size},
 )
 
 baaaaaaaaaaaaar(
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], {x}, "a string", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    {x},
+    "a string",
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
 )
 
 nested_mapping = {
