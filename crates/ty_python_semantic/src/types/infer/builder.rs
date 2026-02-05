@@ -7392,6 +7392,88 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// and a 3-argument `type(name, bases, dict)` overload. Both are handled here.
     /// The `definition` parameter should be `Some()` if this call to `builtins.type()`
     /// occurs on the right-hand side of an assignment statement that has a [`Definition`]
+    /// Try to infer a precise callable type for a `functools.partial(func, ...)` call.
+    ///
+    /// Returns `Some(callable_type)` if we can compute the remaining signature after
+    /// binding some arguments, or `None` to fall back to the default `partial[T]` type.
+    fn infer_functools_partial_call(&self, arguments: &ast::Arguments) -> Option<Type<'db>> {
+        let db = self.db();
+
+        // We need at least one positional argument (the wrapped function).
+        let func_expr = arguments.args.first()?;
+
+        // Bail on starred positional args in the partial() call itself.
+        if arguments.args.iter().any(ast::Expr::is_starred_expr) {
+            return None;
+        }
+        // Bail on **kwargs splats in the partial() call.
+        if arguments.keywords.iter().any(|kw| kw.arg.is_none()) {
+            return None;
+        }
+
+        let func_ty = self.expression_type(func_expr);
+
+        // Get a single, non-overloaded callable signature for the wrapped function.
+        let callable = func_ty.try_upcast_to_callable(db)?.exactly_one()?;
+        let overloads = &callable.signatures(db).overloads;
+        // Bail on overloaded functions.
+        if overloads.len() != 1 {
+            return None;
+        }
+        let signature = &overloads[0];
+
+        // Bail on generic functions.
+        if signature.generic_context.is_some() {
+            return None;
+        }
+
+        let params = signature.parameters().as_slice();
+        let return_ty = signature.return_ty;
+
+        // Count bound positional args (skip first arg which is `func` itself).
+        let bound_positional_count = arguments.args.len() - 1;
+
+        // Collect bound keyword arg names.
+        let bound_keywords: Vec<&str> = arguments
+            .keywords
+            .iter()
+            .filter_map(|kw| kw.arg.as_ref().map(ast::Identifier::as_str))
+            .collect();
+
+        let mut remaining = Vec::new();
+        let mut positional_consumed = 0usize;
+
+        for param in params {
+            if param.is_variadic() || param.is_keyword_variadic() {
+                // Keep variadic and keyword-variadic params as-is.
+                remaining.push(param.clone());
+            } else if param.is_positional() {
+                if positional_consumed < bound_positional_count {
+                    // This positional param is consumed by a bound positional arg.
+                    positional_consumed += 1;
+                } else if let Some(name) = param.name()
+                    && bound_keywords.contains(&name.as_str())
+                {
+                    // This positional param is consumed by a bound keyword arg.
+                } else {
+                    remaining.push(param.clone());
+                }
+            } else if param.is_keyword_only() {
+                if let Some(name) = param.name()
+                    && bound_keywords.contains(&name.as_str())
+                {
+                    // This keyword-only param is consumed by a bound keyword arg.
+                } else {
+                    remaining.push(param.clone());
+                }
+            }
+        }
+
+        let new_params = Parameters::new(db, remaining);
+        let new_signature = Signature::new(new_params, return_ty);
+        Some(Type::single_callable(db, new_signature))
+    }
+
     /// associated with it in the semantic index.
     ///
     /// If it's unclear which overload we should pick, we return `type[Unknown]`,
@@ -12299,6 +12381,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope = self.scope();
         let return_ty = bindings.return_type(db);
+
+        if let Some(class) = class
+            && class.is_known(db, KnownClass::FunctoolsPartial)
+        {
+            if let Some(partial_ty) = self.infer_functools_partial_call(arguments) {
+                return partial_ty;
+            }
+        }
 
         let find_narrowed_place = || match arguments.args.first() {
             None => {
