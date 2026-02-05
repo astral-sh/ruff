@@ -86,7 +86,7 @@ pub fn format_code_blocks(
                     if state == MarkdownState::On
                         && matches!(
                             language.as_str(),
-                            "python" | "py" | "python3" | "py3" | "pyi" | ""
+                            "python" | "py" | "python3" | "py3" | "pyi"
                         )
                     {
                         // Maybe python, try formatting it
@@ -217,13 +217,7 @@ print( "hello" )
         "#;
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
-            @r#"
-        This is poorly formatted code:
-
-        ```
-        print("hello")
-        ```
-        "#);
+            @"Unchanged");
     }
 
     #[test]
