@@ -581,7 +581,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the deprecated info if this class is deprecated.
-    pub(crate) fn deprecated(self, db: &'db dyn Db) -> Option<DeprecatedInstance<'db>> {
+    pub fn deprecated(self, db: &'db dyn Db) -> Option<DeprecatedInstance<'db>> {
         self.as_static().and_then(|class| class.deprecated(db))
     }
 

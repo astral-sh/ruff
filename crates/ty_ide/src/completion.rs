@@ -303,6 +303,9 @@ impl<'db> Completion<'db> {
     }
 }
 
+// TODO: Not sure about this. I need to pass the deprecated value to relevance and this seems
+// like the way
+#[expect(clippy::struct_excessive_bools)]
 /// A builder for construction a `Completion`.
 #[derive(Debug)]
 struct CompletionBuilder<'db> {
@@ -319,6 +322,7 @@ struct CompletionBuilder<'db> {
     is_type_check_only: bool,
     documentation: Option<Docstring>,
     module_dependency_kind: Option<ModuleDependencyKind>,
+    deprecated: bool,
 }
 
 impl<'db> CompletionBuilder<'db> {
@@ -341,6 +345,7 @@ impl<'db> CompletionBuilder<'db> {
             is_type_check_only: false,
             documentation: None,
             module_dependency_kind: None,
+            deprecated: false,
         }
     }
 
@@ -414,6 +419,14 @@ impl<'db> CompletionBuilder<'db> {
                         )
                     );
             }
+
+            self.deprecated = {
+                match ty {
+                    Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
+                    Type::ClassLiteral(c) => c.deprecated(db).is_some(),
+                    _ => false,
+                }
+            };
         }
         let kind = self
             .kind
@@ -1163,6 +1176,8 @@ struct Relevance {
     /// Sorts based on whether this symbol is only available during
     /// type checking and not at runtime.
     type_check_only: Sort,
+    /// Deprecated symbols appear lower in the completion result
+    deprecated: Sort,
 }
 
 impl Relevance {
@@ -1209,6 +1224,11 @@ impl Relevance {
             },
             module_dependency_kind: c.module_dependency_kind,
             type_check_only: if c.is_type_check_only {
+                Sort::Lower
+            } else {
+                Sort::Even
+            },
+            deprecated: if c.deprecated {
                 Sort::Lower
             } else {
                 Sort::Even

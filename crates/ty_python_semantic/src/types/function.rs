@@ -1009,10 +1009,7 @@ impl<'db> FunctionType<'db> {
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.
-    pub(crate) fn implementation_deprecated(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<DeprecatedInstance<'db>> {
+    pub fn implementation_deprecated(self, db: &'db dyn Db) -> Option<DeprecatedInstance<'db>> {
         self.literal(db).implementation_deprecated(db)
     }
 
