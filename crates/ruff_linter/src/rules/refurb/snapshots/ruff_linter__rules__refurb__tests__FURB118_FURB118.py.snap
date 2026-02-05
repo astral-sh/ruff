@@ -1009,3 +1009,27 @@ help: Replace with `operator.itemgetter(slice(-5, -3))`
 133 |     )
 134 |     def test_inlet_asset_alias_extra_slice(self, slicer, expected):
 note: This is an unsafe fix and may change runtime behavior
+
+FURB118 [*] Use `operator.itemgetter(x.find("="), 1)` instead of defining a lambda
+   --> FURB118.py:169:19
+    |
+167 | # Regression https://github.com/astral-sh/ruff/issues/23076
+168 | def func(rows):
+169 |     rows.sort(key=lambda x: (x[x.find("=")], x[1]))
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with `operator.itemgetter(x.find("="), 1)`
+146 | 
+147 | # https://github.com/astral-sh/ruff/issues/19305
+148 | import pytest
+149 + import operator
+150 | 
+151 | @pytest.fixture
+152 | def my_fixture_with_param(request):
+--------------------------------------------------------------------------------
+167 | 
+168 | # Regression https://github.com/astral-sh/ruff/issues/23076
+169 | def func(rows):
+    -     rows.sort(key=lambda x: (x[x.find("=")], x[1]))
+170 +     rows.sort(key=operator.itemgetter(x.find("="), 1))
+note: This is an unsafe fix and may change runtime behavior
