@@ -3,13 +3,14 @@ use crate::fix::edits::remove_unused_imports;
 use crate::importer::ImportRequest;
 use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::name::QualifiedNameBuilder;
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, ExprAttribute, ExprName, StmtFunctionDef, StmtTry};
 use ruff_python_semantic::Exceptions;
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::class::any_qualified_base_class;
 use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
@@ -277,7 +278,7 @@ pub(crate) fn is_method_in_subclass<F>(
     is_base_class: F,
 ) -> bool
 where
-    F: Fn(&[&str]) -> bool,
+    F: Fn(QualifiedName) -> bool,
 {
     if function_def.name.as_str() != method_name {
         return false;
@@ -287,9 +288,5 @@ where
         return false;
     };
 
-    class_def.bases().iter().any(|class_base| {
-        semantic
-            .resolve_qualified_name(class_base)
-            .is_some_and(|qualified_name| is_base_class(qualified_name.segments()))
-    })
+    any_qualified_base_class(class_def, semantic, &is_base_class)
 }

@@ -105,12 +105,17 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
     }
 
     // Check for deprecated get_link signature in BaseOperatorLink subclasses
-    if is_method_in_subclass(function_def, checker.semantic(), "get_link", |segments| {
-        matches!(
-            segments,
-            ["airflow", "models" | "sdk", .., "BaseOperatorLink"]
-        )
-    }) {
+    if is_method_in_subclass(
+        function_def,
+        checker.semantic(),
+        "get_link",
+        |qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["airflow", "models" | "sdk", .., "BaseOperatorLink"]
+            )
+        },
+    ) {
         let parameters = &function_def.parameters;
         let positional_count = parameters.posonlyargs.len() + parameters.args.len();
 

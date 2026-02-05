@@ -1199,7 +1199,7 @@ fn is_execute_method_inherits_from_airflow_operator(
     function_def: &StmtFunctionDef,
     semantic: &SemanticModel,
 ) -> bool {
-    is_method_in_subclass(function_def, semantic, "execute", |segments| {
-        matches!(segments, ["airflow", .., "BaseOperator"])
+    is_method_in_subclass(function_def, semantic, "execute", |qualified_name| {
+        matches!(qualified_name.segments(), ["airflow", .., "BaseOperator"])
     })
 }
