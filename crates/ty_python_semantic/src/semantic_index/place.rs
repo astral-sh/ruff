@@ -261,7 +261,7 @@ pub(crate) struct PlaceTableBuilder {
 
 impl PlaceTableBuilder {
     /// Looks up a place ID by its expression.
-    pub(super) fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
+    pub(crate) fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
         match expression {
             PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
             PlaceExprRef::Member(member) => {
