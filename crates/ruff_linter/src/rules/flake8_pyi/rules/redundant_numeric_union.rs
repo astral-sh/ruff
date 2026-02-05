@@ -81,11 +81,15 @@ impl Violation for RedundantNumericUnion {
 /// PYI041
 pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
     for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
-        check_annotation(checker, annotation);
+        check_annotation(
+            checker,
+            checker.map_maybe_stringized_annotation(annotation),
+            annotation,
+        );
     }
 }
 
-fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
+fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr, unresolved_annotation: &'a Expr) {
     let mut numeric_flags = NumericFlags::empty();
 
     let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {
@@ -142,12 +146,20 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
         return;
     }
 
+    let string_annotation = unresolved_annotation.as_string_literal_expr();
+    if string_annotation.is_some_and(|s| s.value.is_implicit_concatenated()) {
+        // No fix for concatenated string literals. They're rare and too complex to handle.
+        // https://github.com/astral-sh/ruff/issues/19184#issuecomment-3047695205
+        return;
+    }
+
     // Mark [`Fix`] as unsafe when comments are in range.
-    let applicability = if checker.comment_ranges().intersects(annotation.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    let applicability =
+        if string_annotation.is_some() || checker.comment_ranges().intersects(annotation.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
     // Generate the flattened fix once.
     let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
