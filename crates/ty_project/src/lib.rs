@@ -463,7 +463,22 @@ impl Project {
             CheckMode::OpenFiles => self.open_files(db).contains(&file),
             CheckMode::AllFiles => {
                 // Virtual files are always checked.
-                path.is_system_virtual_path() || self.files(db).contains(&file)
+                //
+                // We also check the open file set. In theory, we
+                // shouldn't need to do this since it is accounted for
+                // by the virtual file check (for the case when a file
+                // wants to be checked but isn't saved to disk yet).
+                // However, not all clients follow the LSP convention
+                // that URIs for documents not on disk yet use the
+                // `untitled://...` scheme. That is, we assume that a
+                // `file://...` scheme corresponds to a saved file on
+                // disk, and anything else is "virtual." For example,
+                // neovim uses `file://...` even for an open buffer
+                // that does not correspond to a file saved to disk
+                // yet.
+                path.is_system_virtual_path()
+                    || self.files(db).contains(&file)
+                    || self.open_files(db).contains(&file)
             }
         }
     }
