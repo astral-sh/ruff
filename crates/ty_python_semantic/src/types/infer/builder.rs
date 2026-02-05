@@ -108,7 +108,7 @@ use crate::types::function::{
     OverloadLiteral, function_body_kind, is_implicit_classmethod,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
+    ApplySpecialization, GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
     enclosing_generic_contexts, typing_self,
 };
 use crate::types::infer::nearest_enclosing_function;
@@ -122,17 +122,17 @@ use crate::types::typed_dict::{
     validate_typed_dict_key_assignment,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError,
+    CallableBinding, CallableSignature, CallableType, CallableTypeKind, ClassType, DataclassParams,
+    DynamicType, InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
+    KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type, binding_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -6926,6 +6926,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// Returns `Some(callable_type)` if we can compute the remaining signature after
     /// binding some arguments, or `None` to fall back to the default `partial[T]` type.
+    /// Try to infer a precise callable type for a `functools.partial(func, ...)` call.
+    ///
+    /// Returns `Some(callable_type)` if we can compute the remaining signature after
+    /// binding some arguments, or `None` to fall back to the default `partial[T]` type.
     fn infer_functools_partial_call(&self, arguments: &ast::Arguments) -> Option<Type<'db>> {
         let db = self.db();
 
@@ -6943,65 +6947,133 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let func_ty = self.expression_type(func_expr);
 
-        // Get a single, non-overloaded callable signature for the wrapped function.
         let callable = func_ty.try_upcast_to_callable(db)?.exactly_one()?;
         let overloads = &callable.signatures(db).overloads;
-        // Bail on overloaded functions.
-        if overloads.len() != 1 {
-            return None;
-        }
-        let signature = &overloads[0];
 
-        // Bail on generic functions.
-        if signature.generic_context.is_some() {
-            return None;
-        }
+        // Collect bound positional arg types (skip first arg which is `func` itself).
+        let bound_positional: Vec<Type<'db>> = arguments.args[1..]
+            .iter()
+            .map(|arg| self.expression_type(arg))
+            .collect();
+
+        // Collect bound keyword arg (name, type) pairs.
+        let bound_keywords: Vec<(&str, Type<'db>)> = arguments
+            .keywords
+            .iter()
+            .filter_map(|kw| {
+                kw.arg
+                    .as_ref()
+                    .map(|id| (id.as_str(), self.expression_type(&kw.value)))
+            })
+            .collect();
+
+        let new_overloads: Vec<_> = overloads
+            .iter()
+            .map(|sig| {
+                Self::apply_partial_to_signature(db, sig, &bound_positional, &bound_keywords)
+            })
+            .collect();
+
+        let new_callable_sig = CallableSignature::from_overloads(new_overloads);
+        Some(Type::Callable(CallableType::new(
+            db,
+            new_callable_sig,
+            CallableTypeKind::Regular,
+        )))
+    }
+
+    /// Apply partial binding to a single signature, returning the remaining signature
+    /// or `None` if this signature cannot be partially applied.
+    ///
+    /// For generic signatures, type variables are inferred from the bound arguments
+    /// and the signature is specialized before removing bound parameters.
+    fn apply_partial_to_signature(
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+        bound_positional: &[Type<'db>],
+        bound_keywords: &[(&str, Type<'db>)],
+    ) -> Signature<'db> {
+        let signature = if let Some(generic_context) = signature.generic_context {
+            let inferable = generic_context.inferable_typevars(db);
+            let mut builder = SpecializationBuilder::new(db, inferable);
+
+            let params = signature.parameters().as_slice();
+            let mut positional_consumed = 0usize;
+
+            // Infer type variable assignments from bound positional args.
+            for param in params {
+                if param.is_positional() && positional_consumed < bound_positional.len() {
+                    let _ = builder.infer(
+                        param.annotated_type(),
+                        bound_positional[positional_consumed],
+                    );
+                    positional_consumed += 1;
+                }
+            }
+
+            // Infer type variable assignments from bound keyword args.
+            for param in params {
+                if let Some(name) = param.name() {
+                    if let Some(&(_, arg_ty)) =
+                        bound_keywords.iter().find(|(kw, _)| *kw == name.as_str())
+                    {
+                        let _ = builder.infer(param.annotated_type(), arg_ty);
+                    }
+                }
+            }
+
+            // Promote literal types (e.g. Literal[1] -> int) in inferred type
+            // variable assignments, since partial() creates a reusable callable.
+            let mut builder = builder.mapped(generic_context, |_, _, ty| {
+                ty.promote_literals(db, TypeContext::default())
+            });
+            let specialization = builder.build(generic_context);
+            let type_mapping = TypeMapping::ApplySpecialization(
+                ApplySpecialization::Specialization(specialization),
+            );
+            signature.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            )
+        } else {
+            signature.clone()
+        };
 
         let params = signature.parameters().as_slice();
         let return_ty = signature.return_ty;
-
-        // Count bound positional args (skip first arg which is `func` itself).
-        let bound_positional_count = arguments.args.len() - 1;
-
-        // Collect bound keyword arg names.
-        let bound_keywords: Vec<&str> = arguments
-            .keywords
-            .iter()
-            .filter_map(|kw| kw.arg.as_ref().map(ast::Identifier::as_str))
-            .collect();
+        let bound_positional_count = bound_positional.len();
+        let bound_keyword_names: Vec<&str> = bound_keywords.iter().map(|(k, _)| *k).collect();
 
         let mut remaining = Vec::new();
         let mut positional_consumed = 0usize;
 
         for param in params {
             if param.is_variadic() || param.is_keyword_variadic() {
-                // Keep variadic and keyword-variadic params as-is.
                 remaining.push(param.clone());
             } else if param.is_positional() {
                 if positional_consumed < bound_positional_count {
-                    // This positional param is consumed by a bound positional arg.
                     positional_consumed += 1;
                 } else if let Some(name) = param.name()
-                    && bound_keywords.contains(&name.as_str())
+                    && bound_keyword_names.contains(&name.as_str())
                 {
-                    // This positional param is consumed by a bound keyword arg.
+                    // Consumed by a bound keyword arg.
                 } else {
                     remaining.push(param.clone());
                 }
             } else if param.is_keyword_only() {
                 if let Some(name) = param.name()
-                    && bound_keywords.contains(&name.as_str())
+                    && bound_keyword_names.contains(&name.as_str())
                 {
-                    // This keyword-only param is consumed by a bound keyword arg.
+                    // Consumed by a bound keyword arg.
                 } else {
                     remaining.push(param.clone());
                 }
             }
         }
 
-        let new_params = Parameters::new(db, remaining);
-        let new_signature = Signature::new(new_params, return_ty);
-        Some(Type::single_callable(db, new_signature))
+        Signature::new(Parameters::new(db, remaining), return_ty)
     }
 
     /// associated with it in the semantic index.
