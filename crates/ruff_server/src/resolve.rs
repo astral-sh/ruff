@@ -74,7 +74,7 @@ fn is_document_excluded(
         tracing::debug!("Included path via Python language ID: {}", path.display());
         false
     } else if let Some(LanguageId::Markdown) = language_id
-        && let Some(_) = formatter_settings
+        && formatter_settings.is_some()
     {
         tracing::debug!("Included path via Markdown language ID: {}", path.display());
         false

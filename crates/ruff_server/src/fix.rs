@@ -55,7 +55,7 @@ pub(crate) fn fix_all(
     };
 
     let SourceType::Python(source_type) = query.source_type() else {
-        return Ok(Fixes::default()); // todo?
+        return Ok(Fixes::default());
     };
 
     // We need to iteratively apply all safe fixes onto a single file and then
