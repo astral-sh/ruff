@@ -2075,6 +2075,9 @@ pub(crate) enum FieldKind<'db> {
         kw_only: Option<bool>,
         /// The name for this field in the `__init__` signature, if specified.
         alias: Option<Box<str>>,
+        /// The type of the converter's first positional parameter, if a `converter` was specified.
+        /// This overrides the field's declared type in the synthesized `__init__` signature.
+        converter_input_type: Option<Type<'db>>,
     },
     /// `TypedDict` field metadata
     TypedDict {
@@ -3230,15 +3233,23 @@ impl<'db> StaticClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
-                let (init, mut default_ty, kw_only, alias) = match &field.kind {
-                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None),
+                let (init, mut default_ty, kw_only, alias, converter_input_type) = match &field.kind
+                {
+                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None, None),
                     FieldKind::Dataclass {
                         init,
                         default_ty,
                         kw_only,
                         alias,
+                        converter_input_type,
                         ..
-                    } => (*init, *default_ty, *kw_only, alias.as_ref()),
+                    } => (
+                        *init,
+                        *default_ty,
+                        *kw_only,
+                        alias.as_ref(),
+                        *converter_input_type,
+                    ),
                     FieldKind::TypedDict { .. } => continue,
                 };
                 let mut field_ty = field.declared_ty;
@@ -3301,6 +3312,12 @@ impl<'db> StaticClassLiteral<'db> {
                                 .unwrap_or_else(Type::unknown);
                         }
                     }
+                }
+
+                // If a converter is specified, the __init__ parameter type is determined
+                // by the converter's first positional parameter, not the field's declared type.
+                if let Some(converter_ty) = converter_input_type {
+                    field_ty = converter_ty;
                 }
 
                 let is_kw_only =
@@ -4127,6 +4144,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut init = true;
                 let mut kw_only = None;
                 let mut alias = None;
+                let mut converter_input_type = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
                     if self
@@ -4141,6 +4159,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init = field.init(db);
                         kw_only = field.kw_only(db);
                         alias = field.alias(db);
+                        converter_input_type = field.converter_input_type(db);
                     }
                 }
 
@@ -4152,6 +4171,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init,
                         kw_only,
                         alias,
+                        converter_input_type,
                     },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {

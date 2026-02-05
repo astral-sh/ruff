@@ -1451,5 +1451,80 @@ User(id=1, name="Test")
 User()
 ```
 
+## Converters
+
+When a field specifier uses a `converter` parameter, the synthesized `__init__` parameter type
+should be the converter's input type (i.e. the type of its first positional parameter), not the
+field's declared type.
+
+### Basic converter with a function
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def field(*, converter: Any = ..., default: Any = ...) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+def str_to_int(x: str) -> int:
+    return int(x)
+
+@my_model
+class MyClass:
+    x: int = field(converter=str_to_int)
+    y: str
+
+reveal_type(MyClass.__init__)  # revealed: (self: MyClass, x: str, y: str) -> None
+
+MyClass("1", "hello")
+MyClass(x="1", y="hello")
+```
+
+### Converter with a class
+
+When using a class like `int` or `float` as a converter, its `__init__`/`__new__` bindings are
+gradual, so we get `Unknown` for the parameter type (which accepts anything without false
+positives).
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def field(*, converter: Any = ...) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@my_model
+class MyClass:
+    x: float = field(converter=float)
+
+# No error: converter accepts unknown, so any argument is fine
+MyClass("1")
+MyClass(1)
+MyClass(1.5)
+```
+
+### Converter with a default value
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def field(*, converter: Any = ..., default: Any = ...) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+def parse_int(x: str) -> int:
+    return int(x)
+
+@my_model
+class MyClass:
+    x: int = field(converter=parse_int, default="0")
+
+MyClass()
+MyClass("42")
+```
+
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

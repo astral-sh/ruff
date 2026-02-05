@@ -45,13 +45,17 @@ reveal_type(user.internal_name)  # revealed: str
 ```py
 from attrs import define, field
 
+def serialize_data(data: dict[str, int]) -> bytes:
+    raise NotImplementedError
+
 @define
 class Product:
     id: int = field(init=False)
     name: str = field()
     price_cent: int = field(kw_only=True)
+    data: bytes = field(converter=serialize_data, kw_only=True)
 
-reveal_type(Product.__init__)  # revealed: (self: Product, name: str, *, price_cent: int) -> None
+reveal_type(Product.__init__)  # revealed: (self: Product, name: str, *, price_cent: int, data: dict[str, int]) -> None
 ```
 
 ## Dedicated support for the `default` decorator?
