@@ -7259,7 +7259,12 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
-            TypeMapping::BindSelf(binding) => context.remove_self(db, binding.binding_context),
+            TypeMapping::BindSelf(binding) => GenericContext::from_typevar_instances(
+                db,
+                context
+                    .variables(db)
+                    .filter(|bound_typevar| !binding.should_bind(db, *bound_typevar)),
+            ),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
                 context.variables(db).map(|typevar| {
