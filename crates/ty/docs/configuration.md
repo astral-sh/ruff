@@ -278,14 +278,13 @@ The root paths of the project, used for finding first-party modules.
 
 Accepts a list of directory paths searched in priority order (first has highest priority).
 
-If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:
+If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.
+The project root (`.`) is always included. Additionally, the following directories are included
+if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
 
-* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-* otherwise, default to `.` (flat layout)
-
-Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
-it will also be included in the first party search path.
+* `./src`
+* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+* `./python`
 
 **Default value**: `null`
 
@@ -731,14 +730,13 @@ Enabled by default.
 
 The root of the project, used for finding first-party modules.
 
-If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
+The project root (`.`) is always included. Additionally, the following directories are included
+if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
 
-* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-* otherwise, default to `.` (flat layout)
-
-Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
-it will also be included in the first party search path.
+* `./src`
+* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+* `./python`
 
 **Default value**: `null`
 
