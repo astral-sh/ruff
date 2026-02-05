@@ -171,8 +171,8 @@ reveal_type(p())  # revealed: str
 
 ## Non-callable first argument
 
-`partial(42)` is an error caught by the constructor call; we fall back
-to the default `partial[T]` type.
+`partial(42)` is an error caught by the constructor call; we fall back to the default `partial[T]`
+type.
 
 ```py
 from functools import partial
@@ -181,7 +181,9 @@ p = partial(42)  # error: [invalid-argument-type]
 reveal_type(p)  # revealed: partial[Unknown]
 ```
 
-## Fallback for generic functions
+## Generic functions
+
+Type variables are inferred from the bound arguments:
 
 ```py
 from functools import partial
@@ -192,12 +194,27 @@ T = TypeVar("T")
 def identity(x: T) -> T:
     return x
 
-# TODO: support generic functions in partial
 p = partial(identity, 1)
-reveal_type(p)  # revealed: partial[Unknown]
+reveal_type(p)  # revealed: () -> int
 ```
 
-## Fallback for overloaded functions
+## Generic functions with remaining params
+
+```py
+from functools import partial
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def pair(a: T, b: T) -> tuple[T, T]:
+    return (a, b)
+
+p = partial(pair, 1)
+reveal_type(p)  # revealed: (b: int) -> tuple[int, int]
+reveal_type(p(2))  # revealed: tuple[int, int]
+```
+
+## Overloaded functions
 
 ```py
 from functools import partial
@@ -210,9 +227,25 @@ def f(a: str) -> str: ...
 def f(a: int | str) -> int | str:
     return a
 
-# TODO: support overloaded functions in partial
 p = partial(f, 1)
-reveal_type(p)  # revealed: partial[int | str]
+reveal_type(p)  # revealed: Overload[() -> int, () -> str]
+```
+
+## Overloaded functions with remaining params
+
+```py
+from functools import partial
+from typing import overload
+
+@overload
+def g(a: int, b: str) -> int: ...
+@overload
+def g(a: str, b: str) -> str: ...
+def g(a: int | str, b: str) -> int | str:
+    return a
+
+p = partial(g, 1)
+reveal_type(p)  # revealed: Overload[(b: str) -> int, (b: str) -> str]
 ```
 
 ## Fallback for starred args
