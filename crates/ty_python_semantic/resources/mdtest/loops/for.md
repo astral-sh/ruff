@@ -448,6 +448,10 @@ python-version = "3.11"
 from ty_extensions import Intersection
 
 def _(x: Intersection[tuple[int, *tuple[str, ...], bytes], tuple[object, *tuple[str, ...]]]):
+    # After resizing, the intersection becomes:
+    # tuple[int & object, *tuple[str & str, ...], bytes & str]
+    # = tuple[int, *tuple[str, ...], Never]
+    # Iterating yields: int | str | Never = int | str
     for item in x:
         reveal_type(item)  # revealed: int | str
 ```
