@@ -1006,6 +1006,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
+        fn narrowable_ast(expr: &ast::Expr) -> bool {
+            matches!(
+                expr,
+                ast::Expr::Name(_)
+                    | ast::Expr::Attribute(_)
+                    | ast::Expr::Subscript(_)
+                    | ast::Expr::Named(_)
+            )
+        }
+
         let ast::ExprCompare {
             range: _,
             node_index: _,
@@ -1265,42 +1275,29 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if x is not y`
             // - `if x in y`
             // - `if x not in y`
-            //
+            if narrowable_ast(left)
+                && let Some(left) = PlaceExpr::try_from_expr(left)
+                && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
+            {
+                let place = self.expect_place(&left);
+                constraints.insert(place, NarrowingConstraint::intersection(ty));
+            }
+
             // Right-hand side narrowing for:
             // - `if y == x`
             // - `if y != x`
             // - `if y is x`
             // - `if y is not x`
-            if let (
-                narrowable @ (ast::Expr::Name(_)
-                | ast::Expr::Attribute(_)
-                | ast::Expr::Subscript(_)
-                | ast::Expr::Named(_)),
-                narrowable_type,
-                _,
-                other_type,
-            )
-            | (
-                _,
-                other_type,
-                narrowable @ (ast::Expr::Name(_)
-                | ast::Expr::Attribute(_)
-                | ast::Expr::Subscript(_)
-                | ast::Expr::Named(_)),
-                narrowable_type,
-            ) = (left, lhs_ty, right, rhs_ty)
+            if narrowable_ast(right)
+                && let ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot = op
+                && let Some(right) = PlaceExpr::try_from_expr(right)
+                && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
             {
                 // The right-hand side can only be narrowed for a symmetric operator.
                 // `in` and `not in` are not symmetric.
-                if (narrowable == left || !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn))
-                    && let Some(narrowable) = PlaceExpr::try_from_expr(narrowable)
-                    && let Some(ty) =
-                        self.evaluate_expr_compare_op(narrowable_type, other_type, *op, is_positive)
-                {
-                    let place = self.expect_place(&narrowable);
-                    constraints.insert(place, NarrowingConstraint::intersection(ty));
-                    continue;
-                }
+
+                let place = self.expect_place(&right);
+                constraints.insert(place, NarrowingConstraint::intersection(ty));
             }
         }
         Some(constraints)

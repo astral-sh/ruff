@@ -214,3 +214,24 @@ def h(x: object):
     else:
         reveal_type(x)  # revealed: None
 ```
+
+## `is` for the RHS
+
+```py
+class C:
+    pass
+
+class D:
+    pass
+
+def _(x: C, y: D):
+    if x is y:
+        reveal_type(x)  # revealed: C & D
+        reveal_type(y)  # revealed: D & C
+
+def _(x: C | None, y: None):
+    if y is x:
+        reveal_type(x)  # revealed: None
+    else:
+        reveal_type(x)  # revealed: C
+```
