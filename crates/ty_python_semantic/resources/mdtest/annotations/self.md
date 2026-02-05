@@ -850,10 +850,6 @@ signatures.
 This is a regression test for false positives found in ecosystem projects like jinja's `LRUCache`
 and beartype's `CacheUnboundedStrong`.
 
-TODO: The errors below are false positives. The bound methods stored as attributes should have their
-`Self` typevars resolved when the method is bound to the internal data structure, but currently we
-don't resolve `Self` in stored bound method attribute types.
-
 ```py
 from collections import deque
 from typing import Any
@@ -875,19 +871,19 @@ class LRUCache:
         self._append = self._queue.append
 
     def __getitem__(self, key: Any) -> Any:
-        self._remove(key)  # error: [invalid-argument-type]
-        self._append(key)  # error: [invalid-argument-type]
+        self._remove(key)
+        self._append(key)
         return self._mapping[key]
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        self._remove(key)  # error: [invalid-argument-type]
+        self._remove(key)
         if len(self._queue) >= self.capacity:
-            self._popleft()  # error: [invalid-argument-type]
-        self._append(key)  # error: [invalid-argument-type]
+            self._popleft()
+        self._append(key)
         self._mapping[key] = value
 
     def __delitem__(self, key: Any) -> None:
-        self._remove(key)  # error: [invalid-argument-type]
+        self._remove(key)
         del self._mapping[key]
 ```
 
@@ -905,10 +901,10 @@ class CacheMap:
         self._key_to_value_set = self._key_to_value.__setitem__
 
     def cache_or_get_cached_value(self, key: Hashable, value: object) -> object:
-        cached_value = self._key_to_value_get(key)  # error: [invalid-argument-type]
+        cached_value = self._key_to_value_get(key)
         if cached_value is not None:
             return cached_value
-        self._key_to_value_set(key, value)  # error: [invalid-argument-type]
+        self._key_to_value_set(key, value)
         return value
 ```
 
