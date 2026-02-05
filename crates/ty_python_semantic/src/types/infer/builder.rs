@@ -5722,6 +5722,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }),
                         qualifiers,
                     } => {
+                        // Resolve `Self` type variables to the concrete instance type.
+                        let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty, None);
+
                         if invalid_assignment_to_final(self, qualifiers) {
                             return false;
                         }
@@ -5773,6 +5776,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             } =
                                 object_ty.instance_member(db, attribute)
                             {
+                                let instance_attr_ty =
+                                    instance_attr_ty.bind_self_typevars(db, object_ty, None);
                                 let value_ty =
                                     infer_value_ty(self, TypeContext::new(Some(instance_attr_ty)));
                                 if invalid_assignment_to_final(self, qualifiers) {
@@ -5818,6 +5823,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             qualifiers,
                         } = object_ty.instance_member(db, attribute)
                         {
+                            let instance_attr_ty =
+                                instance_attr_ty.bind_self_typevars(db, object_ty, None);
                             let value_ty =
                                 infer_value_ty(self, TypeContext::new(Some(instance_attr_ty)));
                             if invalid_assignment_to_final(self, qualifiers) {
