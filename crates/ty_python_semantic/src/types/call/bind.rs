@@ -1161,46 +1161,70 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::DataclassTransform) => {
-                            if let [
-                                eq_default,
-                                order_default,
-                                kw_only_default,
-                                frozen_default,
-                                field_specifiers,
-                                _kwargs,
-                            ] = overload.parameter_types()
-                            {
-                                let mut flags = DataclassTransformerFlags::empty();
+                            // Use named parameter lookup to handle custom `__dataclass_transform__` functions
+                            // which were allowed in older versions of the `dataclass_transform` spec.
+                            let mut flags = DataclassTransformerFlags::empty();
 
-                                if to_bool(eq_default, true) {
-                                    flags |= DataclassTransformerFlags::EQ_DEFAULT;
-                                }
-                                if to_bool(order_default, false) {
-                                    flags |= DataclassTransformerFlags::ORDER_DEFAULT;
-                                }
-                                if to_bool(kw_only_default, false) {
-                                    flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
-                                }
-                                if to_bool(frozen_default, false) {
-                                    flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
-                                }
+                            let eq_default = overload
+                                .parameter_type_by_name("eq_default", false)
+                                .ok()
+                                .flatten();
+                            let order_default = overload
+                                .parameter_type_by_name("order_default", false)
+                                .ok()
+                                .flatten();
+                            let kw_only_default = overload
+                                .parameter_type_by_name("kw_only_default", false)
+                                .ok()
+                                .flatten();
+                            let frozen_default = overload
+                                .parameter_type_by_name("frozen_default", false)
+                                .ok()
+                                .flatten();
 
-                                let field_specifiers: Box<[Type<'db>]> = field_specifiers
-                                    .map(|tuple_type| {
-                                        tuple_type
-                                            .exact_tuple_instance_spec(db)
-                                            .iter()
-                                            .flat_map(|tuple_spec| tuple_spec.fixed_elements())
-                                            .copied()
-                                            .collect()
-                                    })
-                                    .unwrap_or_default();
-
-                                let params =
-                                    DataclassTransformerParams::new(db, flags, field_specifiers);
-
-                                overload.set_return_type(Type::DataclassTransformer(params));
+                            if to_bool(&eq_default, true) {
+                                flags |= DataclassTransformerFlags::EQ_DEFAULT;
                             }
+                            if to_bool(&order_default, false) {
+                                flags |= DataclassTransformerFlags::ORDER_DEFAULT;
+                            }
+                            if to_bool(&kw_only_default, false) {
+                                flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
+                            }
+                            if to_bool(&frozen_default, false) {
+                                flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
+                            }
+
+                            // Try both `field_specifiers` (the specified name of this `dataclass_transform`
+                            // parameter) and `field_descriptors`, which was used in earlier versions of the spec.
+                            let field_specifiers_param = overload
+                                .parameter_type_by_name("field_specifiers", false)
+                                .ok()
+                                .flatten()
+                                .or_else(|| {
+                                    overload
+                                        .parameter_type_by_name("field_descriptors", false)
+                                        .ok()
+                                        .flatten()
+                                });
+
+                            let field_specifiers: Box<[Type<'db>]> = field_specifiers_param
+                                .and_then(|tuple_type| {
+                                    tuple_type
+                                        .exact_tuple_instance_spec(db)
+                                        .iter()
+                                        .flat_map(|tuple_spec| tuple_spec.fixed_elements())
+                                        .copied()
+                                        .collect::<Vec<_>>()
+                                        .into()
+                                })
+                                .map(|v: Vec<_>| v.into_boxed_slice())
+                                .unwrap_or_default();
+
+                            let params =
+                                DataclassTransformerParams::new(db, flags, field_specifiers);
+
+                            overload.set_return_type(Type::DataclassTransformer(params));
                         }
 
                         _ => {
