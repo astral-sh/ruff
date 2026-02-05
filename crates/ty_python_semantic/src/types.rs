@@ -1789,6 +1789,167 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn try_upcast_to_callable(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
+        match self {
+            Type::Callable(callable) => Some(CallableTypes::one(callable)),
+
+            Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like(
+                db,
+                Signature::dynamic(self),
+            ))),
+
+            Type::FunctionLiteral(function_literal) => {
+                Some(CallableTypes::one(function_literal.into_callable_type(db)))
+            }
+            Type::BoundMethod(bound_method) => {
+                Some(CallableTypes::one(bound_method.into_callable_type(db)))
+            }
+
+            Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
+                let call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place;
+
+                if let Place::Defined(place) = call_symbol
+                    && place.is_definitely_defined()
+                {
+                    place.ty.try_upcast_to_callable(db)
+                } else {
+                    None
+                }
+            }
+            Type::ClassLiteral(class_literal) => {
+                Some(class_literal.identity_specialization(db).into_callable(db))
+            }
+
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
+
+            Type::NewTypeInstance(newtype) => {
+                newtype.concrete_base_type(db).try_upcast_to_callable(db)
+            }
+
+            // TODO: This is unsound so in future we can consider an opt-in option to disable it.
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        let upcast_callables = bound.to_meta_type(db).try_upcast_to_callable(db)?;
+                        Some(upcast_callables.map(|callable| {
+                            let signatures = callable
+                                .signatures(db)
+                                .into_iter()
+                                .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
+                            CallableType::new(
+                                db,
+                                CallableSignature::from_overloads(signatures),
+                                callable.kind(db),
+                            )
+                        }))
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        let mut callables = SmallVec::new();
+                        for constraint in constraints.elements(db) {
+                            let element_upcast =
+                                constraint.to_meta_type(db).try_upcast_to_callable(db)?;
+                            for callable in element_upcast.into_inner() {
+                                let signatures = callable
+                                    .signatures(db)
+                                    .into_iter()
+                                    .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
+                                callables.push(CallableType::new(
+                                    db,
+                                    CallableSignature::from_overloads(signatures),
+                                    callable.kind(db),
+                                ));
+                            }
+                        }
+                        Some(CallableTypes(callables))
+                    }
+                    None => Some(CallableTypes::one(CallableType::single(
+                        db,
+                        Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
+                    ))),
+                },
+                SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
+                ))),
+            },
+
+            Type::Union(union) => {
+                let mut callables = SmallVec::new();
+                for element in union.elements(db) {
+                    let element_callable = element.try_upcast_to_callable(db)?;
+                    callables.extend(element_callable.into_inner());
+                }
+                Some(CallableTypes(callables))
+            }
+
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Enum(enum_literal) => enum_literal
+                    .enum_class_instance(db)
+                    .try_upcast_to_callable(db),
+                _ => None,
+            },
+
+            Type::TypeAlias(alias) => alias.value_type(db).try_upcast_to_callable(db),
+
+            Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
+                db,
+                CallableSignature::from_overloads(method.signatures(db)),
+                CallableTypeKind::Regular,
+            ))),
+
+            Type::WrapperDescriptor(wrapper_descriptor) => {
+                Some(CallableTypes::one(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
+                    CallableTypeKind::Regular,
+                )))
+            }
+
+            Type::KnownInstance(KnownInstanceType::NewType(newtype)) => {
+                Some(CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [Parameter::positional_only(None)
+                                .with_annotated_type(newtype.base(db).instance_type(db))],
+                        ),
+                        Type::NewTypeInstance(newtype),
+                    ),
+                )))
+            }
+
+            Type::Never
+            | Type::DataclassTransformer(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypedDict(_) => None,
+
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                Some(CallableTypes::one(callable))
+            }
+
+            // TODO
+            Type::DataclassDecorator(_)
+            | Type::ModuleLiteral(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::Intersection(_)
+            | Type::TypeVar(_)
+            | Type::BoundSuper(_) => None,
+        }
+    }
+
     /// Recursively visit the specialization of a generic class instance.
     ///
     /// The provided closure will be called with each assignment of a type variable present in this
@@ -2023,6 +2184,9 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            // Each `partial()` call creates a distinct object at runtime.
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
+
             Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -3146,6 +3310,19 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable))
+                if name_str == "__call__" =>
+            {
+                Place::bound(Type::Callable(callable)).into()
+            }
+
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                let known_instance = KnownInstanceType::FunctoolsPartial(callable);
+                known_instance
+                    .instance_fallback(db)
+                    .member_lookup_with_policy(db, name, policy)
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::NewTypeInstance(..)
@@ -3813,6 +3990,10 @@ impl<'db> Type<'db> {
             )
             .into(),
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                Type::Callable(callable).bindings(db)
+            }
+
             Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
             }
@@ -4128,6 +4309,47 @@ impl<'db> Type<'db> {
                 )
             }
 
+            KnownClass::FunctoolsPartial => {
+                // ```py
+                // class partial(Generic[_T]):
+                //     def __new__(cls, func: Callable[..., _T], /, *args: Any, **kwargs: Any) -> Self: ...
+                // ```
+                let return_ty = BoundTypeVarInstance::synthetic(
+                    db,
+                    Name::new_static("_T"),
+                    TypeVarVariance::Covariant,
+                );
+
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [return_ty])),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("func")))
+                                        .with_annotated_type(Type::single_callable(
+                                            db,
+                                            Signature::new(
+                                                Parameters::gradual_form(),
+                                                Type::TypeVar(return_ty),
+                                            ),
+                                        )),
+                                    Parameter::variadic(Name::new_static("args"))
+                                        .with_annotated_type(Type::any()),
+                                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                        .with_annotated_type(Type::any()),
+                                ],
+                            ),
+                            KnownClass::FunctoolsPartial
+                                .to_specialized_instance(db, &[Type::TypeVar(return_ty)]),
+                        ),
+                    )
+                    .into(),
+                )
+            }
+
             KnownClass::Tuple => {
                 let element_ty = BoundTypeVarInstance::synthetic(
                     db,
@@ -4245,6 +4467,7 @@ impl<'db> Type<'db> {
                     | KnownClass::Str
                     | KnownClass::Type
                     | KnownClass::Object
+                    | KnownClass::FunctoolsPartial
                     | KnownClass::Property
                     | KnownClass::Super
                     | KnownClass::TypeAliasType
@@ -4956,6 +5179,12 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
+                        *self, scope_id
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
             },
 
             Type::SpecialForm(special_form) => {
@@ -5606,7 +5835,8 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
-                | KnownInstanceType::NewType(_) => {
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
@@ -6260,6 +6490,7 @@ impl<'db> TypeMapping<'_, 'db> {
         }
     }
 }
+
 
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
