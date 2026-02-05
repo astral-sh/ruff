@@ -7420,7 +7420,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let callable = func_ty.try_upcast_to_callable(db)?.exactly_one()?;
         let overloads = &callable.signatures(db).overloads;
 
-        // Collect bound positional arg types (skip first arg which is `func` itself).
+        // Collect bound positional arg expressions and types (skip first arg = `func`).
         let bound_positional: Vec<Type<'db>> = arguments.args[1..]
             .iter()
             .map(|arg| self.expression_type(arg))
@@ -7437,6 +7437,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
             .collect();
 
+        // Specialize each overload and remove bound params.
         let new_overloads: Vec<_> = overloads
             .iter()
             .map(|sig| {
@@ -7444,12 +7445,150 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
             .collect();
 
+        // Type-check bound args against the wrapped function's parameter types.
+        // For overloaded functions, only report if no overload matches.
+        self.check_partial_bound_args(arguments, overloads, &bound_positional, &bound_keywords);
+
         let new_callable_sig = CallableSignature::from_overloads(new_overloads);
         Some(Type::Callable(CallableType::new(
             db,
             new_callable_sig,
             CallableTypeKind::Regular,
         )))
+    }
+
+    /// Check that bound arguments to `partial()` are compatible with the wrapped
+    /// function's parameter types, and emit diagnostics for mismatches.
+    fn check_partial_bound_args(
+        &self,
+        arguments: &ast::Arguments,
+        overloads: &[Signature<'db>],
+        bound_positional: &[Type<'db>],
+        bound_keywords: &[(&str, Type<'db>)],
+    ) {
+        let db = self.db();
+        let positional_arg_exprs = &arguments.args[1..];
+
+        // For overloaded functions, only check against the first overload for now.
+        // A full implementation would check if *any* overload matches.
+        let Some(overload) = overloads.first() else {
+            return;
+        };
+
+        // Specialize generic signatures so we check against concrete types.
+        let signature =
+            Self::specialize_partial_signature(db, overload, bound_positional, bound_keywords);
+        let params = signature.parameters().as_slice();
+
+        // Check bound positional args.
+        let mut positional_consumed = 0usize;
+        for param in params {
+            if param.is_positional() && positional_consumed < bound_positional.len() {
+                let arg_ty = bound_positional[positional_consumed];
+                let param_ty = param.annotated_type();
+                if !arg_ty.is_assignable_to(db, param_ty) {
+                    if let Some(arg_expr) = positional_arg_exprs.get(positional_consumed)
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, arg_expr)
+                    {
+                        let param_name = param
+                            .name()
+                            .map(|n| format!("`{n}`"))
+                            .unwrap_or_else(|| format!("{}", positional_consumed + 1));
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Argument to bound parameter {param_name} is incorrect"
+                        ));
+                        diagnostic.set_primary_message(format_args!(
+                            "Expected `{}`, found `{}`",
+                            param_ty.display(db),
+                            arg_ty.display(db),
+                        ));
+                    }
+                }
+                positional_consumed += 1;
+            }
+        }
+
+        // Check bound keyword args.
+        for keyword in &arguments.keywords {
+            let Some(arg_ident) = &keyword.arg else {
+                continue;
+            };
+            let arg_ty = self.expression_type(&keyword.value);
+
+            // Find the corresponding parameter.
+            let Some(param) = params
+                .iter()
+                .find(|p| p.name().is_some_and(|n| n.as_str() == arg_ident.as_str()))
+            else {
+                continue;
+            };
+
+            let param_ty = param.annotated_type();
+            if !arg_ty.is_assignable_to(db, param_ty) {
+                if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, keyword) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Argument to bound parameter `{}` is incorrect",
+                        arg_ident.as_str()
+                    ));
+                    diagnostic.set_primary_message(format_args!(
+                        "Expected `{}`, found `{}`",
+                        param_ty.display(db),
+                        arg_ty.display(db),
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Specialize a generic signature based on bound argument types, without removing
+    /// any parameters. Used for type-checking bound arguments.
+    fn specialize_partial_signature(
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+        bound_positional: &[Type<'db>],
+        bound_keywords: &[(&str, Type<'db>)],
+    ) -> Signature<'db> {
+        let Some(generic_context) = signature.generic_context else {
+            return signature.clone();
+        };
+
+        let inferable = generic_context.inferable_typevars(db);
+        let mut builder = SpecializationBuilder::new(db, inferable);
+        let params = signature.parameters().as_slice();
+        let mut positional_consumed = 0usize;
+
+        for param in params {
+            if param.is_positional() && positional_consumed < bound_positional.len() {
+                let _ = builder.infer(
+                    param.annotated_type(),
+                    bound_positional[positional_consumed],
+                );
+                positional_consumed += 1;
+            }
+        }
+        for param in params {
+            if let Some(name) = param.name() {
+                if let Some(&(_, arg_ty)) =
+                    bound_keywords.iter().find(|(kw, _)| *kw == name.as_str())
+                {
+                    let _ = builder.infer(param.annotated_type(), arg_ty);
+                }
+            }
+        }
+
+        let mut builder = builder.mapped(generic_context, |_, _, ty| {
+            ty.promote_literals(db, TypeContext::default())
+        });
+        let specialization = builder.build(generic_context);
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
+        signature.apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 
     /// Apply partial binding to a single signature, returning the remaining signature
