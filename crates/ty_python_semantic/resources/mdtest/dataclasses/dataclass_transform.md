@@ -1455,9 +1455,7 @@ User()
 
 When a field specifier uses a `converter` parameter, the synthesized `__init__` parameter type
 should be the converter's input type (i.e. the type of its first positional parameter), not the
-field's declared type.
-
-### Basic converter with a function
+field's declared type. Attribute writes also accept the converter's input type.
 
 ```py
 from typing_extensions import dataclass_transform, Any
@@ -1469,77 +1467,53 @@ def my_model[T](cls: type[T]) -> type[T]:
 
 def str_to_int(x: str) -> int:
     return int(x)
+```
 
+A function converter uses the converter's input type in `__init__`. A class converter (`float`) has
+a gradual signature, so accepts `Any` (no false positives). A converter combined with a `default`
+value makes the field optional.
+
+```py
 @my_model
-class MyClass:
+class ModelWithConverters:
     x: int = field(converter=str_to_int)
-    y: str
+    y: float = field(converter=float)
+    z: int = field(converter=str_to_int, default="0")
 
-reveal_type(MyClass.__init__)  # revealed: (self: MyClass, x: str, y: str) -> None
+reveal_type(ModelWithConverters.__init__)  # revealed: (self: ModelWithConverters, x: str, y: Any, z: str = ...) -> None
 
-MyClass("1", "hello")
-MyClass(x="1", y="hello")
+ModelWithConverters("1", "2")
+ModelWithConverters(x="1", y=3.14, z="99")
+ModelWithConverters(1, "2")  # error: [invalid-argument-type]
+```
 
-MyClass(1, "hello")  # error: [invalid-argument-type]
+Reads return the declared type; writes accept the converter's input type:
 
-obj = MyClass("1", "hello")
-obj.x = "2"
+```py
+obj = ModelWithConverters("1", "2")
 reveal_type(obj.x)  # revealed: int
-
+reveal_type(obj.y)  # revealed: int | float
+obj.x = "2"
 obj.x = 3  # error: [invalid-assignment]
+obj.y = "1"
+obj.y = 1
+obj.y = 1.5
 ```
 
-### Converter with a class
-
-When using a class like `int` or `float` as a converter, its `__init__`/`__new__` bindings are
-gradual, so we get `Unknown` for the parameter type (which accepts anything without false
-positives).
+A variadic converter (`*args`) uses the variadic parameter's element type as the input type:
 
 ```py
-from typing_extensions import dataclass_transform, Any
-
-def field(*, converter: Any = ...) -> Any: ...
-@dataclass_transform(field_specifiers=(field,))
-def my_model[T](cls: type[T]) -> type[T]:
-    return cls
+def variadic_converter(*args: str) -> int:
+    return int(args[0])
 
 @my_model
-class MyClass:
-    x: float = field(converter=float)
+class WithVariadicConverter:
+    x: int = field(converter=variadic_converter)
 
-# No error: converter accepts unknown, so any argument is fine
-MyClass("1")
-MyClass(1)
-MyClass(1.5)
+reveal_type(WithVariadicConverter.__init__)  # revealed: (self: WithVariadicConverter, x: str) -> None
 
-obj = MyClass(1)
-obj.x = "1"
-obj.x = 1
-obj.x = 1.5
-reveal_type(obj.x)  # revealed: float
-```
-
-### Converter with a default value
-
-```py
-from typing_extensions import dataclass_transform, Any
-
-def field(*, converter: Any = ..., default: Any = ...) -> Any: ...
-@dataclass_transform(field_specifiers=(field,))
-def my_model[T](cls: type[T]) -> type[T]:
-    return cls
-
-def parse_int(x: str) -> int:
-    return int(x)
-
-@my_model
-class MyClass:
-    x: int = field(converter=parse_int, default="0")
-
-MyClass()
-MyClass("42")
-
-MyClass(123)  # error: [invalid-argument-type]
+WithVariadicConverter("1")
+WithVariadicConverter(1)  # error: [invalid-argument-type]
 ```
 
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033

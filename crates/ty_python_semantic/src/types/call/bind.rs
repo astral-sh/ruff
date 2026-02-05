@@ -773,12 +773,14 @@ impl<'db> Bindings<'db> {
                             let mut found_any = false;
                             for binding in &converter_ty.bindings(db) {
                                 for overload in binding {
-                                    if let Some(first_param) =
-                                        overload.signature.parameters().get_positional(0)
-                                    {
+                                    let params = overload.signature.parameters();
+                                    if let Some(first_param) = params.get_positional(0) {
                                         input_types = input_types.add(first_param.annotated_type());
                                         found_any = true;
-                                    } else if overload.signature.parameters().is_gradual() {
+                                    } else if let Some((_, variadic)) = params.variadic() {
+                                        input_types = input_types.add(variadic.annotated_type());
+                                        found_any = true;
+                                    } else if params.is_gradual() {
                                         input_types = input_types.add(Type::unknown());
                                         found_any = true;
                                     }
