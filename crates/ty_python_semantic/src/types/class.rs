@@ -1724,6 +1724,24 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns the converter input type for a dataclass field, if the field has a `converter`.
+    pub(super) fn converter_input_type_for_field(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::NonGeneric(ClassLiteral::Static(class)) => {
+                class.converter_input_type_for_field(db, name)
+            }
+            Self::Generic(generic) => generic
+                .origin(db)
+                .converter_input_type_for_field(db, name)
+                .map(|ty| ty.apply_optional_specialization(db, Some(generic.specialization(db)))),
+            Self::NonGeneric(ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_)) => None,
+        }
+    }
+
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
@@ -2057,6 +2075,8 @@ pub(crate) enum FieldKind<'db> {
         kw_only: Option<bool>,
         /// The name for this field in the `__init__` signature, if specified.
         alias: Option<Box<str>>,
+        /// The type of the converter's first positional parameter, if a `converter` was specified.
+        converter_input_type: Option<Type<'db>>,
     },
     /// `TypedDict` field metadata
     TypedDict {
@@ -3250,15 +3270,23 @@ impl<'db> StaticClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
-                let (init, mut default_ty, kw_only, alias) = match &field.kind {
-                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None),
+                let (init, mut default_ty, kw_only, alias, converter_input_type) = match &field.kind
+                {
+                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None, None),
                     FieldKind::Dataclass {
                         init,
                         default_ty,
                         kw_only,
                         alias,
+                        converter_input_type,
                         ..
-                    } => (*init, *default_ty, *kw_only, alias.as_ref()),
+                    } => (
+                        *init,
+                        *default_ty,
+                        *kw_only,
+                        alias.as_ref(),
+                        *converter_input_type,
+                    ),
                     FieldKind::TypedDict { .. } => continue,
                 };
                 let mut field_ty = field.declared_ty;
@@ -3326,6 +3354,10 @@ impl<'db> StaticClassLiteral<'db> {
                                 .unwrap_or_else(Type::unknown);
                         }
                     }
+                }
+
+                if let Some(converter_ty) = converter_input_type {
+                    field_ty = converter_ty;
                 }
 
                 let is_kw_only =
@@ -4159,6 +4191,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut init = true;
                 let mut kw_only = None;
                 let mut alias = None;
+                let mut converter_input_type = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
                     if self
@@ -4173,6 +4206,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init = field.init(db);
                         kw_only = field.kw_only(db);
                         alias = field.alias(db);
+                        converter_input_type = field.converter_input_type(db);
                     }
                 }
 
@@ -4184,6 +4218,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init,
                         kw_only,
                         alias,
+                        converter_input_type,
                     },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {
@@ -4842,6 +4877,26 @@ impl<'db> StaticClassLiteral<'db> {
                 ..
             }
         )
+    }
+
+    /// Returns the converter's input type (i.e., the type of its first positional parameter) for a
+    /// dataclass field, if the field has a converter function specified.
+    fn converter_input_type_for_field(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let field_policy = CodeGeneratorKind::from_static_class(db, self, None)?;
+        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+            return None;
+        }
+        let fields = self.own_fields(db, None, field_policy);
+        let field = fields.get(name)?;
+        if let FieldKind::Dataclass {
+            converter_input_type,
+            ..
+        } = field.kind
+        {
+            converter_input_type
+        } else {
+            None
+        }
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
