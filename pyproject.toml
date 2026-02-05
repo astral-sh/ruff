@@ -118,6 +118,8 @@ ignore_labels = ["internal", "ci", "testing", "ty"]
 version_files = [
     "README.md",
     "pyproject.toml",
+    # Might become unneeded once Markdown formatting is stabilized.
+    "docs/formatter.md",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
