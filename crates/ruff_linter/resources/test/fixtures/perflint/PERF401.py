@@ -29,7 +29,7 @@ def f():
     items = [1, 2, 3, 4]
     result = []
     for i in items:
-        result.append(i)  # OK
+        result.append(i)  # PERF401
 
 
 def f():
@@ -317,3 +317,53 @@ def f():
     data.append("initial")
     for x in range(5):
         data.append(x)  # PERF401 (Should suggest .extend, not list comprehension)
+
+def f():
+    data = []
+    data.append("header")
+    for x in range(5):
+        data.append(x)  # PERF401
+    data.append("footer")
+
+def f():
+    data = []
+    data.append("initial")
+    for x in range(5):
+        data.append(x)  # PERF401
+
+def f():
+    data = []
+    for x in range(5):
+        data.append(x)  # PERF401
+    data.append("final")
+
+def f():
+    data = []
+    for x in range(5):
+        data.append(x)  # PERF401
+        data.append(x * 2)
+
+def f():
+    data = []
+    for x in range(5):
+        data.append(x)  # PERF401
+    print(len(data))
+
+def process_errors(exceptions: list[ValidationError]) -> None:
+    for item in data:
+        if check(item):
+            exceptions.append(ValidationError(item))    # OK
+
+def build_properties():
+    properties = []
+    if condition:
+        properties.append("a")
+    for item in items:
+        properties.append(item) #PERF401
+    return properties
+
+def process_items(tis):
+    tis = list(tis)
+    for item in tis:
+        results.append(item)
+    return results

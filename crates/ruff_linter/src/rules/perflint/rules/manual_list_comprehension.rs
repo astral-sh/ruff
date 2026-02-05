@@ -11,7 +11,7 @@ use anyhow::{Result, anyhow};
 use crate::rules::perflint::helpers::comment_strings_in_range;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::{Binding, analyze::typing::is_list};
+use ruff_python_semantic::{Binding, BindingKind, analyze::typing::is_list};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 /// ## What it does
@@ -198,6 +198,11 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
+    // Check if binding is a parameter
+    if matches!(list_binding.kind, BindingKind::Argument) {
+        return;
+    }
+
     // Avoid if the list is used in the conditional test, e.g.,
     //
     // ```python
@@ -240,23 +245,13 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // leak outside the loop.
     for target in targets {
         let ast::Expr::Name(ast::ExprName {
-            id: target_id,
+            id: _target_id,
             range: target_range,
             ..
         }) = target
         else {
             return;
         };
-
-        // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
-        // `manual-list-copy` doesn't cover.
-        if !for_stmt.is_async {
-            if if_test.is_none() {
-                if arg.as_name_expr().is_some_and(|arg| arg.id == *target_id) {
-                    return;
-                }
-            }
-        }
 
         let Some(target_binding) = checker
             .semantic()
@@ -339,22 +334,11 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 .any(|text_range| from_assign_to_loop.contains_range(text_range))
         });
 
-    // Ensure the list isn't modified anywhere else
-    let is_only_modified_here = list_binding.references().all(|ref_id| {
-        let reference = checker.semantic().reference(ref_id);
-
-        if reference.is_load() {
-            return true;
-        }
-        range.contains_range(reference.range())
-    });
-
     // A list extend works in every context, while a list comprehension only works when all the criteria are true
     let comprehension_type = if binding_is_empty_list
         && assignment_in_same_statement
         && binding_has_one_target
         && binding_unused_between
-        && is_only_modified_here
     {
         ComprehensionType::ListComprehension
     } else {

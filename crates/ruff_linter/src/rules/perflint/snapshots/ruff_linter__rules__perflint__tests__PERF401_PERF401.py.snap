@@ -21,6 +21,16 @@ PERF401 Use a list comprehension to create a transformed list
    |
 help: Replace for loop with list comprehension
 
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401.py:32:9
+   |
+30 |     result = []
+31 |     for i in items:
+32 |         result.append(i)  # PERF401
+   |         ^^^^^^^^^^^^^^^^
+   |
+help: Replace for loop with list comprehension
+
 PERF401 Use an async list comprehension to create a transformed list
   --> PERF401.py:82:13
    |
@@ -294,3 +304,71 @@ PERF401 Use a list comprehension to create a transformed list
 294 | G_INDEX = None
     |
 help: Replace for loop with list comprehension
+
+PERF401 Use `list.extend` to create a transformed list
+   --> PERF401.py:319:9
+    |
+317 |     data.append("initial")
+318 |     for x in range(5):
+319 |         data.append(x)  # PERF401 (Should suggest .extend, not list comprehension)
+    |         ^^^^^^^^^^^^^^
+320 |
+321 | def f():
+    |
+help: Replace for loop with list.extend
+
+PERF401 Use `list.extend` to create a transformed list
+   --> PERF401.py:325:9
+    |
+323 |     data.append("header")
+324 |     for x in range(5):
+325 |         data.append(x)  # PERF401
+    |         ^^^^^^^^^^^^^^
+326 |     data.append("footer")
+    |
+help: Replace for loop with list.extend
+
+PERF401 Use `list.extend` to create a transformed list
+   --> PERF401.py:332:9
+    |
+330 |     data.append("initial")
+331 |     for x in range(5):
+332 |         data.append(x)  # PERF401
+    |         ^^^^^^^^^^^^^^
+333 |
+334 | def f():
+    |
+help: Replace for loop with list.extend
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:337:9
+    |
+335 |     data = []
+336 |     for x in range(5):
+337 |         data.append(x)  # PERF401
+    |         ^^^^^^^^^^^^^^
+338 |     data.append("final")
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:349:9
+    |
+347 |     data = []
+348 |     for x in range(5):
+349 |         data.append(x)  # PERF401
+    |         ^^^^^^^^^^^^^^
+350 |     print(len(data))
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use `list.extend` to create a transformed list
+   --> PERF401.py:362:9
+    |
+360 |         properties.append("a")
+361 |     for item in items:
+362 |         properties.append(item) #PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+363 |     return properties
+    |
+help: Replace for loop with list.extend

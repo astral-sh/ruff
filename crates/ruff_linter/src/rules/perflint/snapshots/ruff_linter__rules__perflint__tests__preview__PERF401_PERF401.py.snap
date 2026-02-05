@@ -43,6 +43,27 @@ help: Replace for loop with list comprehension
 14 | def f():
 note: This is an unsafe fix and may change runtime behavior
 
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401.py:32:9
+   |
+30 |     result = []
+31 |     for i in items:
+32 |         result.append(i)  # PERF401
+   |         ^^^^^^^^^^^^^^^^
+   |
+help: Replace for loop with list comprehension
+27 | 
+28 | def f():
+29 |     items = [1, 2, 3, 4]
+   -     result = []
+   -     for i in items:
+   -         result.append(i)  # PERF401
+30 +     result = [i for i in items]  # PERF401
+31 | 
+32 | 
+33 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
 PERF401 [*] Use an async list comprehension to create a transformed list
   --> PERF401.py:82:13
    |
@@ -650,4 +671,134 @@ help: Replace for loop with list comprehension
 312 | 
 313 | def f():
 314 |     data = []
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use `list.extend` to create a transformed list
+   --> PERF401.py:319:9
+    |
+317 |     data.append("initial")
+318 |     for x in range(5):
+319 |         data.append(x)  # PERF401 (Should suggest .extend, not list comprehension)
+    |         ^^^^^^^^^^^^^^
+320 |
+321 | def f():
+    |
+help: Replace for loop with list.extend
+315 | def f():
+316 |     data = []
+317 |     data.append("initial")
+    -     for x in range(5):
+    -         data.append(x)  # PERF401 (Should suggest .extend, not list comprehension)
+318 +     data.extend(x for x in range(5))  # PERF401 (Should suggest .extend, not list comprehension)
+319 | 
+320 | def f():
+321 |     data = []
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use `list.extend` to create a transformed list
+   --> PERF401.py:325:9
+    |
+323 |     data.append("header")
+324 |     for x in range(5):
+325 |         data.append(x)  # PERF401
+    |         ^^^^^^^^^^^^^^
+326 |     data.append("footer")
+    |
+help: Replace for loop with list.extend
+321 | def f():
+322 |     data = []
+323 |     data.append("header")
+    -     for x in range(5):
+    -         data.append(x)  # PERF401
+324 +     data.extend(x for x in range(5))  # PERF401
+325 |     data.append("footer")
+326 | 
+327 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use `list.extend` to create a transformed list
+   --> PERF401.py:332:9
+    |
+330 |     data.append("initial")
+331 |     for x in range(5):
+332 |         data.append(x)  # PERF401
+    |         ^^^^^^^^^^^^^^
+333 |
+334 | def f():
+    |
+help: Replace for loop with list.extend
+328 | def f():
+329 |     data = []
+330 |     data.append("initial")
+    -     for x in range(5):
+    -         data.append(x)  # PERF401
+331 +     data.extend(x for x in range(5))  # PERF401
+332 | 
+333 | def f():
+334 |     data = []
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:337:9
+    |
+335 |     data = []
+336 |     for x in range(5):
+337 |         data.append(x)  # PERF401
+    |         ^^^^^^^^^^^^^^
+338 |     data.append("final")
+    |
+help: Replace for loop with list comprehension
+332 |         data.append(x)  # PERF401
+333 | 
+334 | def f():
+    -     data = []
+    -     for x in range(5):
+    -         data.append(x)  # PERF401
+335 +     data = [x for x in range(5)]  # PERF401
+336 |     data.append("final")
+337 | 
+338 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:349:9
+    |
+347 |     data = []
+348 |     for x in range(5):
+349 |         data.append(x)  # PERF401
+    |         ^^^^^^^^^^^^^^
+350 |     print(len(data))
+    |
+help: Replace for loop with list comprehension
+344 |         data.append(x * 2)
+345 | 
+346 | def f():
+    -     data = []
+    -     for x in range(5):
+    -         data.append(x)  # PERF401
+347 +     data = [x for x in range(5)]  # PERF401
+348 |     print(len(data))
+349 | 
+350 | def process_errors(exceptions: list[ValidationError]) -> None:
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use `list.extend` to create a transformed list
+   --> PERF401.py:362:9
+    |
+360 |         properties.append("a")
+361 |     for item in items:
+362 |         properties.append(item) #PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+363 |     return properties
+    |
+help: Replace for loop with list.extend
+358 |     properties = []
+359 |     if condition:
+360 |         properties.append("a")
+    -     for item in items:
+    -         properties.append(item) #PERF401
+361 +     properties.extend(item for item in items) #PERF401
+362 |     return properties
+363 | 
+364 | def process_items(tis):
 note: This is an unsafe fix and may change runtime behavior
