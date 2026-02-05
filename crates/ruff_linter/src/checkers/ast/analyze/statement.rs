@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_standalone_mock_non_existent_enabled;
 use crate::registry::Rule;
 use crate::rules::{
     airflow, fastapi, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
@@ -1613,7 +1614,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::InvalidMockAccess) {
                 pygrep_hooks::rules::uncalled_mock_method(checker, value);
-                pygrep_hooks::rules::non_existent_mock_method(checker, value);
+                if is_standalone_mock_non_existent_enabled(checker.settings()) {
+                    pygrep_hooks::rules::non_existent_mock_method(checker, value);
+                }
             }
             if checker.is_rule_enabled(Rule::NamedExprWithoutContext) {
                 pylint::rules::named_expr_without_context(checker, value);
