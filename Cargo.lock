@@ -3208,6 +3208,7 @@ dependencies = [
  "ruff_cache",
  "ruff_db",
  "ruff_diagnostics",
+ "ruff_index",
  "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
