@@ -279,3 +279,28 @@ def _(x: Literal["a", "b"] | tuple[int, int]):
         # tuple type remains in the else branch
         reveal_type(x)  # revealed: Literal["b"] | tuple[int, int]
 ```
+
+## `==` and `!=` can narrow both operands
+
+When both operands are variables with literal types, both should be narrowed:
+
+```py
+from typing import Literal
+
+def _(x: Literal[1, 2], y: Literal[2, 3]):
+    if x == y:
+        reveal_type(x)  # revealed: Literal[2]
+        reveal_type(y)  # revealed: Literal[2]
+
+def _(x: Literal[1, 2], y: Literal[2, 3]):
+    if x != y:
+        reveal_type(x)  # revealed: Literal[1, 2]
+        reveal_type(y)  # revealed: Literal[2, 3]
+    else:
+        reveal_type(x)  # revealed: Literal[2]
+        reveal_type(y)  # revealed: Literal[2]
+
+def _(x: Literal["A"], y: str):
+    if x != y:
+        reveal_type(y)  # revealed: str & ~Literal["A"]
+```

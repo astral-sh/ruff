@@ -215,7 +215,7 @@ def h(x: object):
         reveal_type(x)  # revealed: None
 ```
 
-## `is` for the RHS
+## `is` narrows both operands
 
 ```py
 class C:

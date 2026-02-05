@@ -86,7 +86,7 @@ def _(x: Single | int):
 
 ## `is not` for non-singleton types
 
-Non-singleton types should *not* narrow the type: two instances of a non-singleton class may occupy
+Non-singleton types should _not_ narrow the type: two instances of a non-singleton class may occupy
 different addresses in memory even if they compare equal.
 
 ```py
@@ -147,4 +147,28 @@ if (x := f()) is not None:
     reveal_type(x)  # revealed: int | str
 else:
     reveal_type(x)  # revealed: None
+```
+
+## `is not` narrows both operands
+
+```py
+class C:
+    pass
+
+class D:
+    pass
+
+def _(x: C, y: D):
+    if x is not y:
+        reveal_type(x)  # revealed: C
+        reveal_type(y)  # revealed: D
+    else:
+        reveal_type(x)  # revealed: C & D
+        reveal_type(y)  # revealed: D & C
+
+def _(x: C | None, y: None):
+    if y is not x:
+        reveal_type(x)  # revealed: C
+    else:
+        reveal_type(x)  # revealed: None
 ```
