@@ -320,8 +320,8 @@ reveal_type(f.e)  # revealed: Mock
 f2 = F()
 reveal_type(f2.e.d)  # revealed: Unknown | D
 f2.e.d = Mock()
-# Strictly speaking, this narrowing is not safe because the inferred attribute type includes `Unknown` (`Unknown` is a data descriptor type),
-# but we enable it for practical convenience.
+# Strictly speaking, this narrowing is not safe because the inferred attribute type includes `Unknown`,
+# and `Unknown` could be a data descriptor type. But we enable it for practical convenience.
 reveal_type(f2.e.d)  # revealed: Mock
 ```
 
