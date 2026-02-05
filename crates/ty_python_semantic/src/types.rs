@@ -7180,6 +7180,14 @@ impl<'db> SelfBinding<'db> {
             return false;
         }
 
+        // Fast path for the common method-signature case where the bound `Self`
+        // carries the same binding context as this mapping.
+        if let Some(binding_context) = self.binding_context
+            && bound_typevar.binding_context(db) == binding_context
+        {
+            return true;
+        }
+
         self.class_mro.as_ref().is_none_or(|class_mro| {
             self_typevar_owner_class_literal(db, bound_typevar)
                 .is_none_or(|owner_class| class_mro.contains(&owner_class))
