@@ -77,7 +77,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                 // This logic is even necessary when using preserve and the target python version doesn't support PEP701 because
                 // we might end up joining two f-strings that have different quote styles, in which case we need to alternate the quotes
                 // for inner strings to avoid a syntax error: `string = "this is my string with " f'"{params.get("mine")}"'`
-                else if !preferred_quote_style.is_preserve() || !supports_pep_701 {
+                if !preferred_quote_style.is_preserve() || !supports_pep_701 {
                     return QuoteStyle::from(parent_flags.quote_style().opposite());
                 }
             }
