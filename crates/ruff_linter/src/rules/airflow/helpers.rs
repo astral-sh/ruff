@@ -13,6 +13,9 @@ use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
+/// Warning message for internal modules that are not part of the public API.
+pub(crate) const INTERNAL_MODULE_WARNING: &str = "This is an internal module which is not suggested to be used and is subject to change without notice.";
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Replacement {
     // There's no replacement or suggestion other than removal
@@ -32,6 +35,20 @@ pub(crate) enum Replacement {
     SourceModuleMoved {
         module: &'static str,
         name: String,
+    },
+    // Symbols moved to Task SDK in Airflow 3. Used when we want to match multiple names.
+    // e.g., `airflow.io.get_fs | has_fs | Properties` to `airflow.sdk.io.get_fs | has_fs | Properties`
+    SourceModuleMovedToSDK {
+        module: &'static str,
+        name: String,
+        version: &'static str,
+    },
+    // Symbols updated in Airflow 3 with only module changed. Used when we want to include custom message and optionally report diagnostics.
+    SourceModuleMovedWithMessage {
+        module: &'static str,
+        name: String,
+        message: &'static str,
+        suggest_fix: bool,
     },
 }
 

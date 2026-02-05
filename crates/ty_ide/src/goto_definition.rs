@@ -1649,6 +1649,103 @@ Traceb<CURSOR>ackType
         assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
+    /// goto-definition on a dynamic class literal (created via `type()`)
+    #[test]
+    fn goto_definition_dynamic_class_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+DynClass = type("DynClass", (), {})
+
+x = DynCla<CURSOR>ss()
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:5
+          |
+        2 | DynClass = type("DynClass", (), {})
+        3 |
+        4 | x = DynClass()
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 2 definitions
+           --> main.py:2:1
+            |
+          2 | DynClass = type("DynClass", (), {})
+            | --------
+          3 |
+          4 | x = DynClass()
+            |
+           ::: stdlib/builtins.pyi:137:9
+            |
+        135 |     def __class__(self, type: type[Self], /) -> None: ...
+        136 |     def __init__(self) -> None: ...
+        137 |     def __new__(cls) -> Self: ...
+            |         -------
+        138 |     # N.B. `object.__setattr__` and `object.__delattr__` are heavily special-cased by type checkers.
+        139 |     # Overriding them in subclasses has different semantics, even if the override has an identical signature.
+            |
+        "#);
+    }
+
+    /// goto-definition on a dangling dynamic class literal (not assigned to a variable)
+    #[test]
+    fn goto_definition_dangling_dynamic_class_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class Foo(type("Ba<CURSOR>r", (), {})):
+    pass
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    /// goto-definition on a dynamic namedtuple class literal (created via `collections.namedtuple()`)
+    #[test]
+    fn goto_definition_dynamic_namedtuple_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from collections import namedtuple
+
+Point = namedtuple("Point", ["x", "y"])
+
+p = Poi<CURSOR>nt(1, 2)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:6:5
+          |
+        4 | Point = namedtuple("Point", ["x", "y"])
+        5 |
+        6 | p = Point(1, 2)
+          |     ^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:4:1
+          |
+        2 | from collections import namedtuple
+        3 |
+        4 | Point = namedtuple("Point", ["x", "y"])
+          | -----
+        5 |
+        6 | p = Point(1, 2)
+          |
+        "#);
+    }
+
     // TODO: Should only list `a: int`
     #[test]
     fn redeclarations() {
@@ -1693,6 +1790,138 @@ Traceb<CURSOR>ackType
           | -
           |
         "#);
+    }
+
+    /// Goto-definition works when accessing type attributes on class objects.
+    #[test]
+    fn goto_definition_for_type_attributes_on_class_objects() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                class Foo: ...
+
+                Foo.__dictoff<CURSOR>set__
+                ",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:5
+          |
+        2 | class Foo: ...
+        3 |
+        4 | Foo.__dictoffset__
+          |     ^^^^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+           --> stdlib/builtins.pyi:262:9
+            |
+        260 |     __dict__: Final[types.MappingProxyType[str, Any]]  # type: ignore[assignment]
+        261 |     @property
+        262 |     def __dictoffset__(self) -> int: ...
+            |         --------------
+        263 |     @property
+        264 |     def __flags__(self) -> int: ...
+            |
+        "#);
+    }
+
+    /// Goto-definition performs lookups on the metaclass when attributes are not found.
+    #[test]
+    fn goto_definition_performs_lookups_on_metaclass() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                class Foo(type):
+                    a: int
+
+                class Bar(metaclass=Foo): ...
+                Bar.<CURSOR>a
+                ",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:6:5
+          |
+        5 | class Bar(metaclass=Foo): ...
+        6 | Bar.a
+          |     ^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        2 | class Foo(type):
+        3 |     a: int
+          |     -
+        4 |
+        5 | class Bar(metaclass=Foo): ...
+          |
+        "#);
+    }
+
+    /// Goto-definition does not look up instance members on the metaclass.
+    #[test]
+    fn goto_definition_on_members_of_class_instances() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                class Foo(type):
+                    a: int
+
+                class Bar(metaclass=Foo): ...
+                Bar().<CURSOR>a
+                ",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"No goto target found"#);
+    }
+
+    /// Check that we don't fall into infinite recursion when e.g.
+    /// looking up attributes on the metaclass of `type`
+    /// (`type` is its own metaclass)
+    #[test]
+    fn goto_definition_on_builtins_dot_type_itself_unresolved() {
+        let test = CursorTest::builder()
+            .source("main.py", "type.<CURSOR>a")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"No goto target found"#);
+    }
+
+    /// Check that we don't fall into infinite recursion when e.g.
+    /// looking up attributes on the metaclass of `type`
+    /// (`type` is its own metaclass)
+    #[test]
+    fn goto_definition_on_builtins_dot_type_itself_resolved() {
+        let test = CursorTest::builder()
+            .source("main.py", "type.__dict<CURSOR>offset__")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:1:6
+          |
+        1 | type.__dictoffset__
+          |      ^^^^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+           --> stdlib/builtins.pyi:262:9
+            |
+        260 |     __dict__: Final[types.MappingProxyType[str, Any]]  # type: ignore[assignment]
+        261 |     @property
+        262 |     def __dictoffset__(self) -> int: ...
+            |         --------------
+        263 |     @property
+        264 |     def __flags__(self) -> int: ...
+            |
+        ");
     }
 
     impl CursorTest {

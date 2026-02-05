@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 use std::fmt;
 
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span,
+    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_ast::token::TokenKind;
@@ -24,10 +24,10 @@ use crate::{Db, declare_lint, lint::LintId};
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
+    /// Checks for `ty: ignore` directives that are no longer applicable.
     ///
     /// ## Why is this bad?
-    /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
+    /// A `ty: ignore` directive that no longer matches any diagnostic violations is likely
     /// included by mistake, and should be removed to avoid confusion.
     ///
     /// ## Examples
@@ -40,10 +40,44 @@ declare_lint! {
     /// ```py
     /// a = 20 / 2
     /// ```
+    ///
+    /// ## Options
+    /// Set [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
+    /// to `false` to prevent this rule from reporting unused `type: ignore` comments.
     pub static UNUSED_IGNORE_COMMENT = {
-        summary: "detects unused `type: ignore` comments",
+        summary: "detects unused `ty: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Ignore,
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `type: ignore` directives that are no longer applicable.
+    ///
+    /// ## Why is this bad?
+    /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
+    /// included by mistake, and should be removed to avoid confusion.
+    ///
+    /// ## Examples
+    /// ```py
+    /// a = 20 / 2  # type: ignore
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```py
+    /// a = 20 / 2
+    /// ```
+    ///
+    /// ## Options
+    ///
+    /// This rule is skipped if [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
+    /// to `false`.
+    pub(crate) static UNUSED_TYPE_IGNORE_COMMENT = {
+        summary: "detects unused `type: ignore` comments",
+        status: LintStatus::stable("0.0.14"),
+        default_level: Level::Warn,
     }
 }
 
@@ -96,12 +130,16 @@ declare_lint! {
     }
 }
 
+pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
+    name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
+}
+
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
 
-    let respect_type_ignore = db.analysis_settings().respect_type_ignore_comments;
+    let respect_type_ignore = db.analysis_settings(file).respect_type_ignore_comments;
 
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());
     let mut line_start = TextSize::default();

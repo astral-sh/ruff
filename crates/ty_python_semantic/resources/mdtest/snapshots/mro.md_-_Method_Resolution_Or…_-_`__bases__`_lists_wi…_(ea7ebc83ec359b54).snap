@@ -83,7 +83,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 68 | # error: [duplicate-base]
 69 | class D(
 70 |     A,
-71 |     # error: [unused-ignore-comment]
+71 |     # error: [unused-type-ignore-comment]
 72 |     A,  # type: ignore[duplicate-base]
 73 | ): ...
 74 | 
@@ -92,7 +92,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 77 |     A,
 78 |     A
 79 | ):
-80 |     # error: [unused-ignore-comment]
+80 |     # error: [unused-type-ignore-comment]
 81 |     x: int  # type: ignore[duplicate-base]
 82 | 
 83 | # fmt: on
@@ -280,7 +280,7 @@ error[duplicate-base]: Duplicate base class `A`
 69 |   class D(
    |  _______^
 70 | |     A,
-71 | |     # error: [unused-ignore-comment]
+71 | |     # error: [unused-type-ignore-comment]
 72 | |     A,  # type: ignore[duplicate-base]
 73 | | ): ...
    | |_^
@@ -294,7 +294,7 @@ info: The definition of class `D` will raise `TypeError` at runtime
 69 | class D(
 70 |     A,
    |     - Class `A` first included in bases list here
-71 |     # error: [unused-ignore-comment]
+71 |     # error: [unused-type-ignore-comment]
 72 |     A,  # type: ignore[duplicate-base]
    |     ^ Class `A` later repeated here
 73 | ): ...
@@ -304,11 +304,11 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[unused-ignore-comment]: Unused blanket `type: ignore` directive
+warning[unused-type-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:72:9
    |
 70 |     A,
-71 |     # error: [unused-ignore-comment]
+71 |     # error: [unused-type-ignore-comment]
 72 |     A,  # type: ignore[duplicate-base]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 73 | ): ...
@@ -316,7 +316,7 @@ info[unused-ignore-comment]: Unused blanket `type: ignore` directive
 help: Remove the unused suppression comment
 69 | class D(
 70 |     A,
-71 |     # error: [unused-ignore-comment]
+71 |     # error: [unused-type-ignore-comment]
    -     A,  # type: ignore[duplicate-base]
 72 +     A,
 73 | ): ...
@@ -336,7 +336,7 @@ error[duplicate-base]: Duplicate base class `A`
 78 | |     A
 79 | | ):
    | |_^
-80 |       # error: [unused-ignore-comment]
+80 |       # error: [unused-type-ignore-comment]
 81 |       x: int  # type: ignore[duplicate-base]
    |
 info: The definition of class `E` will raise `TypeError` at runtime
@@ -349,18 +349,18 @@ info: The definition of class `E` will raise `TypeError` at runtime
 78 |     A
    |     ^ Class `A` later repeated here
 79 | ):
-80 |     # error: [unused-ignore-comment]
+80 |     # error: [unused-type-ignore-comment]
    |
 info: rule `duplicate-base` is enabled by default
 
 ```
 
 ```
-info[unused-ignore-comment]: Unused blanket `type: ignore` directive
+warning[unused-type-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:81:13
    |
 79 | ):
-80 |     # error: [unused-ignore-comment]
+80 |     # error: [unused-type-ignore-comment]
 81 |     x: int  # type: ignore[duplicate-base]
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 82 |
@@ -369,7 +369,7 @@ info[unused-ignore-comment]: Unused blanket `type: ignore` directive
 help: Remove the unused suppression comment
 78 |     A
 79 | ):
-80 |     # error: [unused-ignore-comment]
+80 |     # error: [unused-type-ignore-comment]
    -     x: int  # type: ignore[duplicate-base]
 81 +     x: int
 82 | 

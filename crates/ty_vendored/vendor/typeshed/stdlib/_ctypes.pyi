@@ -8,7 +8,7 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from ctypes import CDLL, ArgumentError as ArgumentError, c_void_p
 from types import GenericAlias
-from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, final, overload, type_check_only
+from typing import Any, ClassVar, Final, Generic, Literal, SupportsIndex, TypeVar, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 _T = TypeVar("_T")
@@ -170,7 +170,7 @@ class _Pointer(_PointerLike, _CData, Generic[_CT], metaclass=_PyCPointerType):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> list[Any]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Any]: ...
     def __setitem__(self, key: int, value: Any, /) -> None:
         """Set self[key] to value."""
 
@@ -448,13 +448,13 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> list[Any]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Any]: ...
     @overload
     def __setitem__(self, key: int, value: Any, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[Any], /) -> None: ...
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[Any], /) -> None: ...
     def __iter__(self) -> Iterator[Any]: ...
     # Can't inherit from Sized because the metaclass conflict between
     # Sized and _CData prevents using _CDataMeta.

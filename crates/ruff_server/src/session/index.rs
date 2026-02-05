@@ -127,9 +127,10 @@ impl Index {
     pub(super) fn key_from_url(&self, url: Url) -> DocumentKey {
         if self.notebook_cells.contains_key(&url) {
             DocumentKey::NotebookCell(url)
-        } else if Path::new(url.path())
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
+        } else if self
+            .documents
+            .get(&url)
+            .is_some_and(|controller| controller.as_notebook().is_some())
         {
             DocumentKey::Notebook(url)
         } else {
@@ -563,9 +564,10 @@ impl DocumentQuery {
     /// Generate a source kind used by the linter.
     pub(crate) fn make_source_kind(&self) -> ruff_linter::source_kind::SourceKind {
         match self {
-            Self::Text { document, .. } => {
-                ruff_linter::source_kind::SourceKind::Python(document.contents().to_string())
-            }
+            Self::Text { document, .. } => ruff_linter::source_kind::SourceKind::Python {
+                code: document.contents().to_string(),
+                is_stub: ruff_python_ast::PySourceType::from(self.virtual_file_path()).is_stub(),
+            },
             Self::Notebook { notebook, .. } => {
                 ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())
             }

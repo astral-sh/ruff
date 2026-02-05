@@ -16,9 +16,9 @@ use crate::{
     },
     semantic_index::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map},
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-        ClassType, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
-        KnownFunction, MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
+        FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
+        MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, StaticClassLiteral,
         Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
@@ -29,11 +29,11 @@ use crate::{
     },
 };
 
-impl<'db> ClassLiteral<'db> {
+impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
     pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
         self.is_protocol(db)
-            .then_some(ProtocolClass(ClassType::NonGeneric(self)))
+            .then_some(ProtocolClass(ClassType::NonGeneric(self.into())))
     }
 }
 
@@ -76,10 +76,12 @@ impl<'db> ProtocolClass<'db> {
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db)
-            .0
-            .known_function_decorators(db)
-            .contains(&KnownFunction::RuntimeCheckable)
+        self.static_class_literal(db)
+            .is_some_and(|(class_literal, _)| {
+                class_literal
+                    .known_function_decorators(db)
+                    .contains(&KnownFunction::RuntimeCheckable)
+            })
     }
 
     /// Iterate through the body of the protocol class. Check that all definitions
@@ -88,7 +90,10 @@ impl<'db> ProtocolClass<'db> {
     pub(super) fn validate_members(self, context: &InferContext) {
         let db = context.db();
         let interface = self.interface(db);
-        let body_scope = self.class_literal(db).0.body_scope(db);
+        let Some((class_literal, _)) = self.static_class_literal(db) else {
+            return;
+        };
+        let body_scope = class_literal.body_scope(db);
         let class_place_table = place_table(db, body_scope);
 
         for (symbol_id, mut bindings_iterator) in
@@ -104,7 +109,11 @@ impl<'db> ProtocolClass<'db> {
                 self.iter_mro(db)
                     .filter_map(ClassBase::into_class)
                     .any(|superclass| {
-                        let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+                        let Some((superclass_literal, _)) = superclass.static_class_literal(db)
+                        else {
+                            return false;
+                        };
+                        let superclass_scope = superclass_literal.body_scope(db);
                         let Some(scoped_symbol_id) =
                             place_table(db, superclass_scope).symbol_id(symbol_name)
                         else {
@@ -217,7 +226,7 @@ impl<'db> ProtocolInterface<'db> {
                         db,
                         [Parameter::positional_only(Some(Name::new_static("self")))],
                     ),
-                    Some(ty.normalized(db)),
+                    ty.normalized(db),
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
                 let property = PropertyInstanceType::new(db, Some(property_getter), None);
@@ -226,6 +235,7 @@ impl<'db> ProtocolInterface<'db> {
                     ProtocolMemberData {
                         qualifiers: TypeQualifiers::default(),
                         kind: ProtocolMemberKind::Property(property),
+                        definition: None,
                     },
                 )
             })
@@ -248,7 +258,14 @@ impl<'db> ProtocolInterface<'db> {
             name,
             kind: data.kind,
             qualifiers: data.qualifiers,
+            definition: data.definition,
         })
+    }
+
+    pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db, 'db>> {
+        self.members(db)
+            .filter(|member| !member.is_method() && !member.ty().is_todo())
+            .collect()
     }
 
     fn member_by_name<'a>(self, db: &'db dyn Db, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
@@ -256,11 +273,21 @@ impl<'db> ProtocolInterface<'db> {
             name,
             kind: data.kind,
             qualifiers: data.qualifiers,
+            definition: data.definition,
         })
     }
 
     pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.inner(db).contains_key(name)
+    }
+
+    /// Returns the `__call__` method's callable type if this protocol has a `__call__` method member.
+    pub(super) fn call_method(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
+        self.member_by_name(db, "__call__")
+            .and_then(|member| match member.kind {
+                ProtocolMemberKind::Method(callable) => Some(callable),
+                _ => None,
+            })
     }
 
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -479,6 +506,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
+    definition: Option<Definition<'db>>,
 }
 
 impl<'db> ProtocolMemberData<'db> {
@@ -490,6 +518,7 @@ impl<'db> ProtocolMemberData<'db> {
         Self {
             kind: self.kind.normalized_impl(db, visitor),
             qualifiers: self.qualifiers,
+            definition: None,
         }
     }
 
@@ -516,6 +545,7 @@ impl<'db> ProtocolMemberData<'db> {
                 ),
             },
             qualifiers: self.qualifiers,
+            definition: self.definition,
         })
     }
 
@@ -531,6 +561,7 @@ impl<'db> ProtocolMemberData<'db> {
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             qualifiers: self.qualifiers,
+            definition: self.definition,
         }
     }
 
@@ -660,6 +691,7 @@ pub(super) struct ProtocolMember<'a, 'db> {
     name: &'a str,
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
+    definition: Option<Definition<'db>>,
 }
 
 fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -683,6 +715,14 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     pub(super) fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
+    }
+
+    pub(super) const fn is_method(&self) -> bool {
+        matches!(self.kind, ProtocolMemberKind::Method(_))
+    }
+
+    pub(super) fn definition(&self) -> Option<Definition<'db>> {
+        self.definition
     }
 
     fn ty(&self) -> Type<'db> {
@@ -879,7 +919,7 @@ impl BoundOnClass {
     }
 }
 
-/// Inner Salsa query for [`ProtocolClassLiteral::interface`].
+/// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(cycle_initial=proto_interface_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
@@ -887,15 +927,16 @@ fn cached_protocol_interface<'db>(
 ) -> ProtocolInterface<'db> {
     let mut members = BTreeMap::default();
 
-    for (parent_protocol, specialization) in class
+    for (parent_scope, specialization) in class
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
         .filter_map(|class| {
-            let (class, specialization) = class.class_literal(db);
-            Some((class.into_protocol_class(db)?, specialization))
+            let (class_literal, specialization) = class.static_class_literal(db)?;
+            let protocol_class = class_literal.into_protocol_class(db)?;
+            let parent_scope = protocol_class.static_class_literal(db)?.0.body_scope(db);
+            Some((parent_scope, specialization))
         })
     {
-        let parent_scope = parent_protocol.class_literal(db).0.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
         let place_table = place_table(db, parent_scope);
         let mut direct_members = FxHashMap::default();
@@ -909,32 +950,42 @@ fn cached_protocol_interface<'db>(
         // type narrowing that uses `isinstance()` or `issubclass()` with
         // runtime-checkable protocols.
         for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
-            let Some(ty) = place_from_bindings(db, bindings)
-                .place
-                .ignore_possibly_undefined()
-            else {
+            let place_and_definition = place_from_bindings(db, bindings);
+            let Some(ty) = place_and_definition.place.ignore_possibly_undefined() else {
                 continue;
             };
             direct_members.insert(
                 symbol_id,
-                (ty, TypeQualifiers::default(), BoundOnClass::Yes),
+                (
+                    ty,
+                    TypeQualifiers::default(),
+                    place_and_definition.first_definition,
+                    BoundOnClass::Yes,
+                ),
             );
         }
 
         for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
-            let place = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+            let place_result = place_from_declarations(db, declarations);
+            let first_declaration = place_result.first_declaration;
+            let place = place_result.ignore_conflicting_declarations();
             if let Some(new_type) = place.place.ignore_possibly_undefined() {
                 direct_members
                     .entry(symbol_id)
-                    .and_modify(|(ty, quals, _)| {
+                    .and_modify(|(ty, quals, _, _)| {
                         *ty = new_type;
                         *quals = place.qualifiers;
                     })
-                    .or_insert((new_type, place.qualifiers, BoundOnClass::No));
+                    .or_insert((
+                        new_type,
+                        place.qualifiers,
+                        first_declaration,
+                        BoundOnClass::No,
+                    ));
             }
         }
 
-        for (symbol_id, (ty, qualifiers, bound_on_class)) in direct_members {
+        for (symbol_id, (ty, qualifiers, definition, bound_on_class)) in direct_members {
             let name = place_table.symbol(symbol_id).name();
             if excluded_from_proto_members(name) {
                 continue;
@@ -970,6 +1021,7 @@ fn cached_protocol_interface<'db>(
                 ProtocolMemberData {
                     kind: member,
                     qualifiers,
+                    definition,
                 },
             );
         }

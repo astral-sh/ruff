@@ -275,6 +275,7 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Assignment(AssignmentDefinitionNodeRef<'ast, 'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef<'ast>),
     AugmentedAssignment(&'ast ast::StmtAugAssign),
+    DictKeyAssignment(DictKeyAssignmentNodeRef<'ast, 'db>),
     Comprehension(ComprehensionDefinitionNodeRef<'ast, 'db>),
     VariadicPositionalParameter(&'ast ast::Parameter),
     VariadicKeywordParameter(&'ast ast::Parameter),
@@ -371,6 +372,12 @@ impl<'ast> From<AnnotatedAssignmentDefinitionNodeRef<'ast>> for DefinitionNodeRe
     }
 }
 
+impl<'ast, 'db> From<DictKeyAssignmentNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node_ref: DictKeyAssignmentNodeRef<'ast, 'db>) -> Self {
+        Self::DictKeyAssignment(node_ref)
+    }
+}
+
 impl<'ast, 'db> From<WithItemDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
     fn from(node_ref: WithItemDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::WithItem(node_ref)
@@ -439,6 +446,13 @@ pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
     pub(crate) annotation: &'ast ast::Expr,
     pub(crate) value: Option<&'ast ast::Expr>,
     pub(crate) target: &'ast ast::Expr,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
+    pub(crate) key: &'ast ast::Expr,
+    pub(crate) value: &'ast ast::Expr,
+    pub(crate) assignment: Definition<'db>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -550,6 +564,15 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
+            DefinitionNodeRef::DictKeyAssignment(DictKeyAssignmentNodeRef {
+                key,
+                value,
+                assignment,
+            }) => DefinitionKind::DictKeyAssignment(DictKeyAssignmentKind {
+                key: AstNodeRef::new(parsed, key),
+                value: AstNodeRef::new(parsed, value),
+                assignment,
+            }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
                 unpack,
                 iterable,
@@ -658,6 +681,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
+            Self::DictKeyAssignment(node) => DefinitionNodeKey(NodeKey::from_node(node.key)),
             Self::For(ForStmtDefinitionNodeRef {
                 target,
                 iterable: _,
@@ -742,6 +766,7 @@ pub enum DefinitionKind<'db> {
     Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionKind),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
+    DictKeyAssignment(DictKeyAssignmentKind<'db>),
     For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind<'db>),
     VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
@@ -816,6 +841,9 @@ impl DefinitionKind<'_> {
             DefinitionKind::AugmentedAssignment(aug_assign) => {
                 aug_assign.node(module).target.range()
             }
+            DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
+                dict_key_assignment.key.node(module).range()
+            }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => {
@@ -865,6 +893,9 @@ impl DefinitionKind<'_> {
                 full_range
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
+            DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
+                dict_key_assignment.key.node(module).range()
+            }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => {
@@ -927,7 +958,8 @@ impl DefinitionKind<'_> {
                 }
             }
             // all of these bind values without declaring a type
-            DefinitionKind::NamedExpression(_)
+            DefinitionKind::DictKeyAssignment(_)
+            | DefinitionKind::NamedExpression(_)
             | DefinitionKind::Assignment(_)
             | DefinitionKind::AugmentedAssignment(_)
             | DefinitionKind::For(_)
@@ -936,6 +968,18 @@ impl DefinitionKind<'_> {
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
+        }
+    }
+
+    /// Returns the value expression for assignment-based definitions.
+    ///
+    /// Returns `Some` for `Assignment` and `AnnotatedAssignment` (if it has a value),
+    /// `None` for all other definition kinds.
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        match self {
+            DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+            _ => None,
         }
     }
 }
@@ -1130,6 +1174,23 @@ impl AnnotatedAssignmentDefinitionKind {
 
     pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.target.node(module)
+    }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct DictKeyAssignmentKind<'db> {
+    pub(crate) key: AstNodeRef<ast::Expr>,
+    pub(crate) value: AstNodeRef<ast::Expr>,
+    pub(crate) assignment: Definition<'db>,
+}
+
+impl DictKeyAssignmentKind<'_> {
+    pub(crate) fn key<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.key.node(module)
+    }
+
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.value.node(module)
     }
 }
 

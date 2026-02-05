@@ -1,4 +1,5 @@
 use ast::{ExprAttribute, ExprName, Identifier};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::analyze::typing::is_dict;
@@ -29,6 +30,9 @@ use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
 /// for country, stars in flag_stars.items():
 ///     print(f"{country}'s flag has {stars} stars.")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
 /// - [Python documentation: `dict.items`](https://docs.python.org/3/library/stdtypes.html#dict.items)
@@ -122,10 +126,17 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
         },
         expr.range(),
     );
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        expected,
-        expr.range(),
-    )));
+
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(expected, expr.range()),
+        applicability,
+    ));
 }
 
 fn get_var_attr_args(expr: &Expr) -> Option<(&ExprName, &Identifier, &Arguments)> {

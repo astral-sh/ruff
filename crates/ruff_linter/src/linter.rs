@@ -405,7 +405,7 @@ pub fn add_noqa_to_path(
     );
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let diagnostics = check_path(
@@ -479,7 +479,7 @@ pub fn lint_only(
     );
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
 
     // Generate diagnostics.
     let diagnostics = check_path(
@@ -596,7 +596,7 @@ pub fn lint_fix<'a>(
         );
 
         // Parse range suppression comments
-        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
 
         // Generate diagnostics.
         let diagnostics = check_path(
@@ -978,7 +978,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
         let mut diagnostics = check_path(
             path,
             None,
@@ -1027,7 +1027,10 @@ mod tests {
         );
         let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
         let contents = std::fs::read_to_string(&path)?;
-        let source_kind = SourceKind::Python(contents);
+        let source_kind = SourceKind::Python {
+            code: contents,
+            is_stub: false,
+        };
 
         let diagnostics = test_contents_syntax_errors(
             &source_kind,
@@ -1085,7 +1088,10 @@ mod tests {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
         let diagnostics = test_contents_syntax_errors(
-            &SourceKind::Python(std::fs::read_to_string(&path)?),
+            &SourceKind::Python {
+                code: std::fs::read_to_string(&path)?,
+                is_stub: false,
+            },
             &path,
             &LinterSettings::for_rule(rule),
         );
@@ -1207,8 +1213,15 @@ mod tests {
         let snapshot = format!("disabled_typing_extensions_pyi_{name}");
         let path = Path::new("<filename>.pyi");
         let contents = dedent(contents);
-        let diagnostics =
-            test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0;
+        let diagnostics = test_contents(
+            &SourceKind::Python {
+                code: contents.into_owned(),
+                is_stub: true,
+            },
+            path,
+            settings,
+        )
+        .0;
         assert_diagnostics!(snapshot, diagnostics);
     }
 }

@@ -1127,6 +1127,35 @@ import os
 }
 
 #[test]
+fn required_version_fails_to_parse() -> Result<()> {
+    let fixture = CliTest::with_file(
+        "ruff.toml",
+        r#"
+required-version = "pikachu"
+"#,
+    )?;
+    assert_cmd_snapshot!(fixture
+        .check_command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
+      Cause: Failed to parse [TMP]/ruff.toml
+      Cause: TOML parse error at line 2, column 20
+      |
+    2 | required-version = "pikachu"
+      |                    ^^^^^^^^^
+    Failed to parse version: Unexpected end of version specifier, expected operator:
+    pikachu
+    ^^^^^^^
+    "#);
+    Ok(())
+}
+
+#[test]
 fn required_version_exact_mismatch() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
@@ -1137,10 +1166,10 @@ required-version = "0.1.0"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(version, "[VERSION]")]
-    }, {
-    assert_cmd_snapshot!(fixture
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(version, "[VERSION]");
+    settings.bind(|| {
+        assert_cmd_snapshot!(fixture
         .check_command()
         .arg("--config")
         .arg("ruff.toml")
@@ -1154,6 +1183,7 @@ import os
 
     ----- stderr -----
     ruff failed
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
       Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
     ");
     });
@@ -1212,10 +1242,10 @@ required-version = ">{version}"
         ),
     )?;
 
-    insta::with_settings!({
-        filters => vec![(version, "[VERSION]")]
-    }, {
-    assert_cmd_snapshot!(fixture
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(version, "[VERSION]");
+    settings.bind(|| {
+        assert_cmd_snapshot!(fixture
         .check_command()
         .arg("--config")
         .arg("ruff.toml")
@@ -1229,6 +1259,48 @@ import os
 
     ----- stderr -----
     ruff failed
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
+      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+    ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_precedes_rule_validation() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let fixture = CliTest::with_file(
+        "ruff.toml",
+        &format!(
+            r#"
+required-version = ">{version}"
+
+[lint]
+select = ["RUF999"]
+"#
+        ),
+    )?;
+
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(version, "[VERSION]");
+    settings.bind(|| {
+        assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--config")
+        .arg("ruff.toml")
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
       Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
     ");
     });
@@ -1467,22 +1539,6 @@ import sys
         .args(["--config", "ruff.toml"])
         .arg("noqa.py"),
         @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    noqa.py:5:8: F401 [*] `sys` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
-
-    ----- stderr -----
-    ");
-
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .args(["--config", "ruff.toml"])
-        .arg("noqa.py")
-        .args(["--preview"]),
-        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1491,12 +1547,12 @@ import sys
     ----- stderr -----
     ");
 
-    // with --ignore-noqa --preview
+    // with --ignore-noqa
     assert_cmd_snapshot!(fixture
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
-        .args(["--ignore-noqa", "--preview"]),
+        .args(["--ignore-noqa"]),
         @"
     success: false
     exit_code: 1

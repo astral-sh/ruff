@@ -8,9 +8,11 @@ use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::{ParameterKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, KnownUnion, Type, TypeContext, UnionType,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownUnion, Type,
+    TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasType, SemanticModel};
+use itertools::Either;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -168,9 +170,9 @@ pub fn definitions_for_name<'db>(
                 // instead of `int` (hover only shows the docstring of the first definition).
                 .rev()
                 .filter_map(|ty| ty.as_nominal_instance())
-                .map(|instance| {
-                    let definition = instance.class_literal(db).definition(db);
-                    ResolvedDefinition::Definition(definition)
+                .filter_map(|instance| {
+                    let definition = instance.class_literal(db).definition(db)?;
+                    Some(ResolvedDefinition::Definition(definition))
                 })
                 .collect();
         }
@@ -228,18 +230,18 @@ pub fn definitions_for_attribute<'db>(
     };
 
     let tys = match lhs_ty {
-        Type::Union(union) => union.elements(model.db()).to_vec(),
-        _ => vec![lhs_ty],
+        Type::Union(union) => union.elements(model.db()),
+        _ => std::slice::from_ref(&lhs_ty),
     };
 
     // Expand intersections for each subtype into their components
     let expanded_tys = tys
-        .into_iter()
+        .iter()
         .flat_map(|ty| match ty {
-            Type::Intersection(intersection) => intersection.positive(db).iter().copied().collect(),
-            _ => vec![ty],
+            Type::Intersection(intersection) => Either::Left(intersection.positive(db).iter()),
+            _ => Either::Right(std::iter::once(ty)),
         })
-        .collect::<Vec<_>>();
+        .copied();
 
     for ty in expanded_tys {
         // Handle modules
@@ -258,40 +260,125 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
-        // First, transform the type to its meta type, unless it's already a class-like type.
-        let meta_type = match ty {
+        let meta_type = ty.to_meta_type(db);
+
+        // Look up the attribute first on the meta-type, unless it's already a class-like type.
+        let lookup_type = match ty {
             Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => ty,
-            _ => ty.to_meta_type(db),
+            _ => meta_type,
         };
-        let class_literal = match meta_type {
+
+        let class_literal = match lookup_type {
             Type::ClassLiteral(class_literal) => class_literal,
             Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
-                Some(cls) => cls.class_literal(db).0,
+                Some(cls) => match cls.static_class_literal(db) {
+                    Some((lit, _)) => ClassLiteral::Static(lit),
+                    None => continue,
+                },
                 None => continue,
             },
             _ => continue,
         };
 
-        // Walk the MRO: include class and its ancestors, but stop when we find a match
-        'scopes: for ancestor in class_literal
-            .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
-            .map(|cls| cls.class_literal(db).0)
-        {
-            let class_scope = ancestor.body_scope(db);
-            let class_place_table = crate::semantic_index::place_table(db, class_scope);
+        resolved.extend(definitions_for_attribute_in_class_hierarchy(
+            &class_literal,
+            model,
+            name_str,
+        ));
 
-            // Look for class-level declarations and bindings
-            if let Some(place_id) = class_place_table.symbol_id(name_str) {
-                let use_def = use_def_map(db, class_scope);
+        // The metaclass of a derived class must be a subclass of the metaclasses of all of
+        // its base classes. This is why we only have to look at the metaclass of the
+        // class_literal.
+        // Only look up definitions on the metaclass if the type is a class object to begin with in
+        // order to prevent looking up instance members on the class metaclass
+        if resolved.is_empty() && meta_type != lookup_type {
+            let class_literal = match meta_type {
+                Type::ClassLiteral(class_literal) => class_literal,
+                Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
+                    Some(cls) => match cls.static_class_literal(db) {
+                        Some((lit, _)) => ClassLiteral::Static(lit),
+                        None => continue,
+                    },
+                    None => continue,
+                },
+                _ => continue,
+            };
+
+            resolved.extend(definitions_for_attribute_in_class_hierarchy(
+                &class_literal,
+                model,
+                name_str,
+            ));
+        }
+    }
+
+    resolved
+}
+
+fn definitions_for_attribute_in_class_hierarchy<'db>(
+    class_literal: &ClassLiteral<'db>,
+    model: &SemanticModel<'db>,
+    attribute_name: &str,
+) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
+    let mut resolved = Vec::new();
+    'scopes: for ancestor in class_literal
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
+    {
+        let class_scope = ancestor.body_scope(db);
+        let class_place_table = crate::semantic_index::place_table(db, class_scope);
+
+        // Look for class-level declarations and bindings
+        if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
+            let use_def = use_def_map(db, class_scope);
+
+            // Check declarations first
+            for decl in use_def.reachable_symbol_declarations(place_id) {
+                if let Some(def) = decl.declaration.definition() {
+                    resolved.extend(resolve_definition(
+                        db,
+                        def,
+                        Some(attribute_name),
+                        ImportAliasResolution::ResolveAliases,
+                    ));
+                    break 'scopes;
+                }
+            }
+
+            // If no declarations found, check bindings
+            for binding in use_def.reachable_symbol_bindings(place_id) {
+                if let Some(def) = binding.binding.definition() {
+                    resolved.extend(resolve_definition(
+                        db,
+                        def,
+                        Some(attribute_name),
+                        ImportAliasResolution::ResolveAliases,
+                    ));
+                    break 'scopes;
+                }
+            }
+        }
+
+        // Look for instance attributes in method scopes (e.g., self.x = 1)
+        let file = class_scope.file(db);
+        let index = semantic_index(db, file);
+
+        for function_scope_id in attribute_scopes(db, class_scope) {
+            if let Some(place_id) = index
+                .place_table(function_scope_id)
+                .member_id_by_instance_attribute_name(attribute_name)
+            {
+                let use_def = index.use_def_map(function_scope_id);
 
                 // Check declarations first
-                for decl in use_def.reachable_symbol_declarations(place_id) {
+                for decl in use_def.reachable_member_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
                         resolved.extend(resolve_definition(
                             db,
                             def,
-                            Some(name_str),
+                            Some(attribute_name),
                             ImportAliasResolution::ResolveAliases,
                         ));
                         break 'scopes;
@@ -299,59 +386,18 @@ pub fn definitions_for_attribute<'db>(
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.reachable_symbol_bindings(place_id) {
+                for binding in use_def.reachable_member_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
                         resolved.extend(resolve_definition(
                             db,
                             def,
-                            Some(name_str),
+                            Some(attribute_name),
                             ImportAliasResolution::ResolveAliases,
                         ));
                         break 'scopes;
                     }
                 }
             }
-
-            // Look for instance attributes in method scopes (e.g., self.x = 1)
-            let file = class_scope.file(db);
-            let index = semantic_index(db, file);
-
-            for function_scope_id in attribute_scopes(db, class_scope) {
-                if let Some(place_id) = index
-                    .place_table(function_scope_id)
-                    .member_id_by_instance_attribute_name(name_str)
-                {
-                    let use_def = index.use_def_map(function_scope_id);
-
-                    // Check declarations first
-                    for decl in use_def.reachable_member_declarations(place_id) {
-                        if let Some(def) = decl.declaration.definition() {
-                            resolved.extend(resolve_definition(
-                                db,
-                                def,
-                                Some(name_str),
-                                ImportAliasResolution::ResolveAliases,
-                            ));
-                            break 'scopes;
-                        }
-                    }
-
-                    // If no declarations found, check bindings
-                    for binding in use_def.reachable_member_bindings(place_id) {
-                        if let Some(def) = binding.binding.definition() {
-                            resolved.extend(resolve_definition(
-                                db,
-                                def,
-                                Some(name_str),
-                                ImportAliasResolution::ResolveAliases,
-                            ));
-                            break 'scopes;
-                        }
-                    }
-                }
-            }
-
-            // TODO: Add support for metaclass attribute lookups
         }
     }
 
@@ -456,8 +502,8 @@ pub struct CallSignatureDetails<'db> {
     /// Parameter kinds, useful to determine correct autocomplete suggestions.
     pub parameter_kinds: Vec<ParameterKind<'db>>,
 
-    /// Parameter kinds, useful to determine correct autocomplete suggestions.
-    pub parameter_types: Vec<Option<Type<'db>>>,
+    /// Annotated types of parameters. If no annotation was provided, this is `Unknown`.
+    pub parameter_types: Vec<Type<'db>>,
 
     /// The definition where this callable was originally defined (useful for
     /// extracting docstrings).
@@ -521,12 +567,11 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(model.db()).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
-                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Option<Type>>) =
-                    signature
-                        .parameters()
-                        .iter()
-                        .map(|param| (param.kind().clone(), param.annotated_type()))
-                        .unzip();
+                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
+                    .parameters()
+                    .iter()
+                    .map(|param| (param.kind().clone(), param.annotated_type()))
+                    .unzip();
 
                 CallSignatureDetails {
                     definition: signature.definition(),
@@ -1364,6 +1409,7 @@ mod resolve_definition {
             | DefinitionKind::Assignment(_)
             | DefinitionKind::AnnotatedAssignment(_)
             | DefinitionKind::AugmentedAssignment(_)
+            | DefinitionKind::DictKeyAssignment(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::VariadicPositionalParameter(_)

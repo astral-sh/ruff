@@ -745,63 +745,26 @@ items = {(123)}
 
 ### Long lambda expressions
 
-In [preview](../preview.md), Ruff will keep lambda parameters on a single line,
-just like Black:
+Both Ruff and Black will keep lambda parameters on a single
+line. However, if the body expression exceeds the configured line length,
+Ruff will additionally add parentheses around the lambda body and break
+it over multiple lines:
+
 
 ```python
-# Input
+# Ruff
 def a():
     return b(
         c,
         d,
         e,
-        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ),
-    )
-
-# Ruff Stable
-def a():
-    return b(
-        c,
-        d,
-        e,
-        f=lambda self,
-        *args,
-        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
-    )
-
-# Black and Ruff Preview
-def a():
-    return b(
-        c,
-        d,
-        e,
-        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ),
-    )
-```
-
-However, if the body expression exceeds the configured line length, Ruff will
-additionally add parentheses around the lambda body and break it over multiple
-lines:
-
-```python
-# Input
-def a():
-    return b(
-        c,
-        d,
-        e,
-        # Additional `b` character pushes this over the line length
-        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
+        f=lambda self, *args, **kwargs: (
+            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
         ),
         # More complex expressions also trigger wrapping
-        g=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ) + 1,
+        g=lambda self, *args, **kwargs: (
+            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+        ),
     )
 
 # Black
@@ -810,8 +773,7 @@ def a():
         c,
         d,
         e,
-        # Additional `b` character pushes this over the line length
-        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
             *args, **kwargs
         ),
         # More complex expressions also trigger wrapping
@@ -820,20 +782,46 @@ def a():
         )
         + 1,
     )
+```
 
-# Ruff Preview
-def a():
-    return b(
-        c,
-        d,
-        e,
-        # Additional `b` character pushes this over the line length
-        f=lambda self, *args, **kwargs: (
-            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
-        ),
-        # More complex expressions also trigger wrapping
-        g=lambda self, *args, **kwargs: (
-            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
-        ),
-    )
+### Require single blank line between function and decorated class in stubs
+
+In stub files, Ruff enforces a single blank line between functions
+and decorated classes, whereas Black does not.
+
+```python
+# Input and Ruff
+def hello(): ...
+
+@lambda _, /: _
+class A: ...
+
+# Black
+def foo(): ...
+@decorator
+class Bar: ...
+```
+
+### Avoiding additional space around escaped quote in triple-quoted docstring
+
+In certain cases it is required to maintain a trailing space in a
+triple-quoted docstring in order to avoid escaping a quote or ending
+with too many quotes. However, if the last quote is escaped this
+is not necessary, and Ruff respects this. Black, however, adds the
+extra space.
+
+```python
+# Input and Ruff
+class Sample:
+    """Hello "World\""""
+
+    def __init__(self, name):
+        self.name = name
+
+# Black
+class Sample:
+    """Hello "World\" """
+
+    def __init__(self, name):
+        self.name = name
 ```

@@ -32,37 +32,37 @@ FBT003 Boolean positional value in function call
    |
 
 FBT003 Boolean positional value in function call
-   --> FBT.py:120:10
+   --> FBT.py:123:10
     |
-120 | settings(True)
+123 | settings(True)
     |          ^^^^
     |
 
 FBT003 Boolean positional value in function call
-   --> FBT.py:144:20
+   --> FBT.py:147:20
     |
-142 |     is_foo_or_bar=Case(
-143 |         When(Q(is_foo=True) | Q(is_bar=True)),
-144 |         then=Value(True),
+145 |     is_foo_or_bar=Case(
+146 |         When(Q(is_foo=True) | Q(is_bar=True)),
+147 |         then=Value(True),
     |                    ^^^^
-145 |     ),
-146 |     default=Value(False),
+148 |     ),
+149 |     default=Value(False),
     |
 
 FBT003 Boolean positional value in function call
-   --> FBT.py:146:19
+   --> FBT.py:149:19
     |
-144 |         then=Value(True),
-145 |     ),
-146 |     default=Value(False),
+147 |         then=Value(True),
+148 |     ),
+149 |     default=Value(False),
     |                   ^^^^^
-147 | )
+150 | )
     |
 
 FBT003 Boolean positional value in function call
-   --> FBT.py:156:23
+   --> FBT.py:159:23
     |
-155 | class Settings(BaseSettings):
-156 |     foo: bool = Field(True, exclude=True)
+158 | class Settings(BaseSettings):
+159 |     foo: bool = Field(True, exclude=True)
     |                       ^^^^
     |

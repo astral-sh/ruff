@@ -1139,8 +1139,8 @@ SubclassOfP = type[P]
 reveal_type(SubclassOfA)  # revealed: <special-form 'type[A]'>
 reveal_type(SubclassOfAny)  # revealed: <special-form 'type[Any]'>
 reveal_type(SubclassOfAOrB1)  # revealed: <special-form 'type[A | B]'>
-reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'type[A] | type[B]'>
-reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A] | type[B]'>
+reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'type[A | B]'>
+reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A | B]'>
 reveal_type(SubclassOfG)  # revealed: <special-form 'type[G[Unknown]]'>
 reveal_type(SubclassOfGInt)  # revealed: <special-form 'type[G[int]]'>
 reveal_type(SubclassOfP)  # revealed: <special-form 'type[P]'>
@@ -1161,13 +1161,13 @@ def _(
     reveal_type(subclass_of_any)  # revealed: type[Any]
     reveal_type(subclass_of_any())  # revealed: Any
 
-    reveal_type(subclass_of_a_or_b1)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b1)  # revealed: type[A | B]
     reveal_type(subclass_of_a_or_b1())  # revealed: A | B
 
-    reveal_type(subclass_of_a_or_b2)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b2)  # revealed: type[A | B]
     reveal_type(subclass_of_a_or_b2())  # revealed: A | B
 
-    reveal_type(subclass_of_a_or_b3)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b3)  # revealed: type[A | B]
     reveal_type(subclass_of_a_or_b3())  # revealed: A | B
 
     reveal_type(subclass_of_g)  # revealed: type[G[Unknown]]
@@ -1200,10 +1200,10 @@ def _(
     subclass_of_union_alias1: SubclassOfUnionAlias1,
     subclass_of_union_alias2: SubclassOfUnionAlias2,
 ):
-    reveal_type(subclass_of_union_alias1)  # revealed: type[C] | type[D]
+    reveal_type(subclass_of_union_alias1)  # revealed: type[C | D]
     reveal_type(subclass_of_union_alias1())  # revealed: C | D
 
-    reveal_type(subclass_of_union_alias2)  # revealed: type[C] | type[D]
+    reveal_type(subclass_of_union_alias2)  # revealed: type[C | D]
     reveal_type(subclass_of_union_alias2())  # revealed: C | D
 ```
 
@@ -1255,8 +1255,8 @@ SubclassOfP = Type[P]
 reveal_type(SubclassOfA)  # revealed: <special-form 'type[A]'>
 reveal_type(SubclassOfAny)  # revealed: <special-form 'type[Any]'>
 reveal_type(SubclassOfAOrB1)  # revealed: <special-form 'type[A | B]'>
-reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'type[A] | type[B]'>
-reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A] | type[B]'>
+reveal_type(SubclassOfAOrB2)  # revealed: <types.UnionType special-form 'type[A | B]'>
+reveal_type(SubclassOfAOrB3)  # revealed: <types.UnionType special-form 'type[A | B]'>
 reveal_type(SubclassOfG)  # revealed: <special-form 'type[G[Unknown]]'>
 reveal_type(SubclassOfGInt)  # revealed: <special-form 'type[G[int]]'>
 reveal_type(SubclassOfP)  # revealed: <special-form 'type[P]'>
@@ -1277,13 +1277,13 @@ def _(
     reveal_type(subclass_of_any)  # revealed: type[Any]
     reveal_type(subclass_of_any())  # revealed: Any
 
-    reveal_type(subclass_of_a_or_b1)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b1)  # revealed: type[A | B]
     reveal_type(subclass_of_a_or_b1())  # revealed: A | B
 
-    reveal_type(subclass_of_a_or_b2)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b2)  # revealed: type[A | B]
     reveal_type(subclass_of_a_or_b2())  # revealed: A | B
 
-    reveal_type(subclass_of_a_or_b3)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b3)  # revealed: type[A | B]
     reveal_type(subclass_of_a_or_b3())  # revealed: A | B
 
     reveal_type(subclass_of_g)  # revealed: type[G[Unknown]]

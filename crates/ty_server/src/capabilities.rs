@@ -459,6 +459,15 @@ pub(crate) fn server_capabilities(
             }]
             .to_vec(),
         })),
+        workspace: Some(lsp_types::WorkspaceServerCapabilities {
+            workspace_folders: Some(lsp_types::WorkspaceFoldersServerCapabilities {
+                // N.B. It seems this is purely informational:
+                // https://github.com/microsoft/language-server-protocol/issues/1720#issuecomment-1514732305
+                supported: Some(true),
+                change_notifications: Some(OneOf::Left(true)),
+            }),
+            ..Default::default()
+        }),
         ..Default::default()
     }
 }

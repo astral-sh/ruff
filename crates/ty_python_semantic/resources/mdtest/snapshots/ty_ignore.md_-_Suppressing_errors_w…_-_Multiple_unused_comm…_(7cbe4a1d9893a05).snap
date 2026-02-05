@@ -27,7 +27,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/suppressions/ty_ignore.m
 # Diagnostics
 
 ```
-info[unused-ignore-comment]: Unused `ty: ignore` directive
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
  --> src/mdtest_snippet.py:2:13
   |
 1 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive"
@@ -47,7 +47,7 @@ help: Remove the unused suppression comment
 ```
 
 ```
-info[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment'
+warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment'
  --> src/mdtest_snippet.py:6:26
   |
 4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
@@ -70,7 +70,7 @@ help: Remove the unused suppression code
 ```
 
 ```
-info[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-reference'
+warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-reference'
  --> src/mdtest_snippet.py:6:64
   |
 4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
@@ -93,7 +93,7 @@ help: Remove the unused suppression code
 ```
 
 ```
-info[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'
+warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'
  --> src/mdtest_snippet.py:9:26
   |
 8 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"

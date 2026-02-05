@@ -1,6 +1,6 @@
 # Utility types for typeshed
 
-This package and its submodules contains various common types used by
+This package and its submodules contain various common types used by
 typeshed. It can also be used by packages outside typeshed, but beware
 the API stability guarantees below.
 

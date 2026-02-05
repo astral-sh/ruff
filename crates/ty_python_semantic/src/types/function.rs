@@ -68,9 +68,12 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
-    report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
+    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
+    report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
+    report_issubclass_check_against_protocol_with_non_method_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
+    report_runtime_check_against_typed_dict,
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
@@ -87,7 +90,8 @@ use crate::types::{
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, binding_type, definition_expression_type, infer_definition_types, walk_signature,
+    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_definition_types,
+    walk_signature,
 };
 use crate::{Db, FxOrderSet};
 
@@ -431,7 +435,7 @@ impl<'db> OverloadLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+    pub(super) fn raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
         /// - No parameters in the method use PEP-570 syntax AND
@@ -460,7 +464,7 @@ impl<'db> OverloadLiteral<'db> {
                 return false;
             }
 
-            if literal.is_staticmethod(db) {
+            if literal.is_staticmethod(db) && literal.name(db) != "__new__" {
                 return false;
             }
 
@@ -563,10 +567,11 @@ impl<'db> OverloadLiteral<'db> {
                 let index = semantic_index(db, scope_id.file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class).expect(
-                    "We should always find the surrounding class \
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
+                    .expect(
+                        "We should always find the surrounding class \
                      for an implicit self: Self annotation",
-                );
+                    );
 
                 if self.is_classmethod(db) {
                     Some(SubclassOfType::from(
@@ -597,12 +602,11 @@ impl<'db> OverloadLiteral<'db> {
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function()?.node(&module);
+    ) -> (Span, Span) {
+        let file = self.file(db);
+        let span = Span::from(file);
+        let module = parsed_module(db, file).load(db);
+        let func_def = self.node(db, file, &module);
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
@@ -614,26 +618,25 @@ impl<'db> OverloadLiteral<'db> {
             .unwrap_or(func_def.parameters.range);
         let name_span = span.clone().with_range(func_def.name.range);
         let parameter_span = span.with_range(range);
-        Some((name_span, parameter_span))
+        (name_span, parameter_span)
     }
 
-    pub(crate) fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
-        let function_scope = self.body_scope(db);
-        let span = Span::from(function_scope.file(db));
-        let node = function_scope.node(db);
+    pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
+        let file = self.file(db);
+        let span = Span::from(file);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function()?.node(&module);
+        let func_def = self.node(db, file, &module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
         if let Some(return_type_range) = return_type_range {
             signature = signature.cover(return_type_range);
         }
-        Some(FunctionSpans {
+        FunctionSpans {
             signature: span.clone().with_range(signature),
             name: span.clone().with_range(func_def.name.range),
             parameters: span.clone().with_range(func_def.parameters.range),
             return_type: return_type_range.map(|range| span.clone().with_range(range)),
-        })
+        }
     }
 }
 
@@ -653,14 +656,6 @@ pub struct FunctionLiteral<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionLiteral<'_> {}
-
-fn overloads_and_implementation_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _self: FunctionLiteral<'db>,
-) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-    (Box::new([]), None)
-}
 
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
@@ -692,15 +687,11 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).definition(db)
     }
 
-    fn parameter_span(
-        self,
-        db: &'db dyn Db,
-        parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
+    fn parameter_span(self, db: &'db dyn Db, parameter_index: Option<usize>) -> (Span, Span) {
         self.last_definition(db).parameter_span(db, parameter_index)
     }
 
-    fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+    fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.last_definition(db).spans(db)
     }
 
@@ -710,8 +701,8 @@ impl<'db> FunctionLiteral<'db> {
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         #[salsa::tracked(
             returns(ref),
+            cycle_initial=|_, _, _| (Box::default(), None),
             heap_size=ruff_memory_usage::heap_size,
-            cycle_initial=overloads_and_implementation_cycle_initial
         )]
         fn overloads_and_implementation_inner<'db>(
             db: &'db dyn Db,
@@ -747,9 +738,9 @@ impl<'db> FunctionLiteral<'db> {
     fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
-        let (implementation, overloads) = self.overloads_and_implementation(db);
-        overloads.into_iter().chain(implementation.iter().copied())
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
+        let (overloads, implementation) = self.overloads_and_implementation(db);
+        overloads.iter().copied().chain(implementation)
     }
 
     /// Typed externally-visible signature for this function.
@@ -798,6 +789,72 @@ impl<'db> FunctionLiteral<'db> {
     /// over-invalidation.
     fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.last_definition(db).raw_signature(db)
+    }
+
+    /// Return `Some()` if this function is an abstract method.
+    ///
+    /// A method can be abstract if it is explicitly decorated with `@abstractmethod`,
+    /// or if it is an overloaded `Protocol` method without an implementation,
+    /// or if it is a `Protocol` method with a body that solely consists of `pass`/`...`
+    /// statements, or if it is a `Protocol` method that only has a docstring,
+    /// or if it is a `Protocol` method whose body only consists of a single
+    /// `raise NotImplementedError` statement.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn as_abstract_method(
+        self,
+        db: &'db dyn Db,
+        enclosing_class: ClassType<'db>,
+    ) -> Option<AbstractMethodKind> {
+        if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
+            return Some(AbstractMethodKind::Explicit);
+        }
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        if file.is_stub(db) {
+            return None;
+        }
+        if !enclosing_class.is_protocol(db) {
+            return None;
+        }
+        let (_, implementation) = self.overloads_and_implementation(db);
+        let Some(implementation) = implementation else {
+            return Some(AbstractMethodKind::ImplicitDueToStubBody);
+        };
+        let module = parsed_module(db, file).load(db);
+        let node = implementation.node(db, file, &module);
+        let body_kind = function_body_kind(db, node, |expr| {
+            definition_expression_type(db, definition, expr)
+        });
+        match body_kind {
+            FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
+            FunctionBodyKind::AlwaysRaisesNotImplementedError => {
+                Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
+            }
+            FunctionBodyKind::Regular => None,
+        }
+    }
+}
+
+/// Indicates whether a method is explicitly or implicitly abstract.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(super) enum AbstractMethodKind {
+    /// The method is explicitly marked as abstract using `@abstractmethod`.
+    Explicit,
+    /// The method is implicitly abstract due to being in a `Protocol` class without an
+    /// implementation.
+    ImplicitDueToStubBody,
+    /// The method is implicitly abstract due to being in a `Protocol` class with a body that
+    /// solely consists of `raise NotImplementedError` statements.
+    ImplicitDueToAlwaysRaising,
+}
+
+impl AbstractMethodKind {
+    pub(super) const fn is_explicit(self) -> bool {
+        matches!(self, AbstractMethodKind::Explicit)
+    }
+
+    pub(super) const fn is_implicit_due_to_stub_body(self) -> bool {
+        matches!(self, AbstractMethodKind::ImplicitDueToStubBody)
     }
 }
 
@@ -998,7 +1055,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
-    ) -> Option<(Span, Span)> {
+    ) -> (Span, Span) {
         self.literal(db).parameter_span(db, parameter_index)
     }
 
@@ -1015,7 +1072,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// An example of a good use case is to improve
     /// a diagnostic.
-    pub(crate) fn spans(self, db: &'db dyn Db) -> Option<FunctionSpans> {
+    pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.literal(db).spans(db)
     }
 
@@ -1033,7 +1090,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
+    ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
         self.literal(db).iter_overloads_and_implementation(db)
     }
 
@@ -1055,7 +1112,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::single(Signature::bottom()), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
@@ -1209,6 +1266,14 @@ impl<'db> FunctionType<'db> {
             updated_last_definition_signature,
         ))
     }
+
+    pub(super) fn as_abstract_method(
+        self,
+        db: &'db dyn Db,
+        enclosing_class: ClassType<'db>,
+    ) -> Option<AbstractMethodKind> {
+        self.literal(db).as_abstract_method(db, enclosing_class)
+    }
 }
 
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
@@ -1226,10 +1291,7 @@ fn is_instance_truthiness<'db>(
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
-                .any(|c| match c {
-                    ClassType::Generic(c) => c.origin(db) == class,
-                    ClassType::NonGeneric(c) => c == class,
-                })
+                .any(|c| c.class_literal(db) == class)
         {
             return true;
         }
@@ -1320,20 +1382,79 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-fn signature_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _id: salsa::Id,
-    _function: FunctionType<'db>,
-) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom())
-}
-
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
     Signature::bottom()
+}
+
+/// Classify the body of this function:
+/// - [`FunctionBodyKind::Stub`] if it is a stub function (i.e., only contains `pass` or `...`
+/// - [`FunctionBodyKind::AlwaysRaisesNotImplementedError`] if it consists of a single
+///   `raise NotImplementedError` statement
+/// - [`FunctionBodyKind::Regular`] otherwise
+///
+/// In all cases, we allow a docstring as the first statement in the function body;
+/// the analysis is only done on the remaining statements if the first is a docstring.
+pub(super) fn function_body_kind<'db>(
+    db: &'db dyn Db,
+    node: &ast::StmtFunctionDef,
+    infer_type: impl Fn(&ast::Expr) -> Type<'db>,
+) -> FunctionBodyKind {
+    // Allow docstrings, but only as the first statement.
+    let suite = if let Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) = node.body.first()
+        && value.is_string_literal_expr()
+    {
+        &node.body[1..]
+    } else {
+        &node.body[..]
+    };
+
+    if suite.iter().all(|stmt| match stmt {
+        ast::Stmt::Pass(_) => true,
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+        _ => false,
+    }) {
+        return FunctionBodyKind::Stub;
+    }
+
+    if let [ast::Stmt::Raise(raise)] = suite
+        && let ast::StmtRaise {
+            exc: Some(exc),
+            cause: None,
+            node_index: _,
+            range: _,
+        } = raise
+        && infer_type(exc).is_subtype_of(
+            db,
+            UnionType::from_elements(
+                db,
+                [
+                    KnownClass::NotImplementedError.to_class_literal(db),
+                    KnownClass::NotImplementedError.to_instance(db),
+                ],
+            ),
+        )
+    {
+        return FunctionBodyKind::AlwaysRaisesNotImplementedError;
+    }
+
+    FunctionBodyKind::Regular
+}
+
+/// Classification of function body kinds.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum FunctionBodyKind {
+    /// The function body only consists of `...`, `pass`, and/or a docstring.
+    Stub,
+    /// The function body consists of a single `raise NotImplementedError` statement,
+    /// possibly preceded by a docstring.
+    AlwaysRaisesNotImplementedError,
+    /// Any function body that is not a stub and does not consist of a single
+    /// `raise NotImplementedError` statement.
+    Regular,
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
@@ -1468,6 +1589,14 @@ impl KnownFunction {
         definition: Definition<'db>,
         name: &str,
     ) -> Option<Self> {
+        // Special case: `__dataclass_transform__` is recognized as `DataclassTransform`
+        // regardless of module, for backwards compatibility with earlier versions of the
+        // `dataclass_transform` specification. This matches pyright's behavior:
+        // https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
+        if name == "__dataclass_transform__" {
+            return Some(Self::DataclassTransform);
+        }
+
         let candidate = Self::from_str(name).ok()?;
         candidate
             .check_module(file_to_module(db, definition.file(db))?.known(db)?)
@@ -1580,8 +1709,13 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
                     return;
                 }
-                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                {
+                let diagnostic =
+                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(db, *asserted_ty) {
+                        &TYPE_ASSERTION_FAILURE
+                    } else {
+                        &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
+                    };
+                if let Some(builder) = context.report_lint(diagnostic, call_expression) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
                         asserted_ty.display(db),
@@ -1819,10 +1953,19 @@ impl KnownFunction {
                     let mut diag = builder.into_diagnostic("Revealed MRO");
                     let span = context.span(&call_expression.arguments.args[0]);
                     let mut message = String::new();
+                    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+                        db,
+                        classes
+                            .iter()
+                            .flat_map(|class| class.iter_mro(db))
+                            .filter_map(ClassBase::into_class),
+                    );
                     for (i, class) in classes.iter().enumerate() {
                         message.push('(');
                         for class in class.iter_mro(db) {
-                            message.push_str(&class.display(db).to_string());
+                            message.push_str(
+                                &class.display_with(db, display_settings.clone()).to_string(),
+                            );
                             // Omit the comma for the last element (which is always `object`)
                             if class
                                 .into_class()
@@ -1854,15 +1997,33 @@ impl KnownFunction {
 
                 match second_argument {
                     Type::ClassLiteral(class) => {
-                        if let Some(protocol_class) = class.into_protocol_class(db)
-                            && !protocol_class.is_runtime_checkable(db)
-                        {
-                            report_runtime_check_against_non_runtime_checkable_protocol(
+                        if class.is_typed_dict(db) {
+                            report_runtime_check_against_typed_dict(
                                 context,
                                 call_expression,
-                                protocol_class,
+                                *class,
                                 self,
                             );
+                        } else if let Some(protocol_class) = class.into_protocol_class(db) {
+                            if !protocol_class.is_runtime_checkable(db) {
+                                report_runtime_check_against_non_runtime_checkable_protocol(
+                                    context,
+                                    call_expression,
+                                    protocol_class,
+                                    self,
+                                );
+                            } else if self == KnownFunction::IsSubclass {
+                                let non_method_members =
+                                    protocol_class.interface(db).non_method_members(db);
+                                if !non_method_members.is_empty() {
+                                    report_issubclass_check_against_protocol_with_non_method_members(
+                                        context,
+                                        call_expression,
+                                        protocol_class,
+                                        &non_method_members,
+                                    );
+                                }
+                            }
                         }
 
                         if self == KnownFunction::IsInstance {
@@ -2005,8 +2166,35 @@ impl KnownFunction {
 
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
+
+            KnownFunction::TotalOrdering => {
+                // When `total_ordering(cls)` is called as a function (not as a decorator),
+                // check that the class defines at least one ordering method.
+                let [Some(class_type)] = parameter_types else {
+                    return;
+                };
+
+                let class = match class_type {
+                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
+                    Type::GenericAlias(generic) => ClassType::Generic(*generic),
+                    _ => return,
+                };
+
+                if !class.has_ordering_method_in_mro(db) {
+                    report_invalid_total_ordering_call(
+                        context,
+                        class.class_literal(db),
+                        call_expression,
+                    );
+                }
+            }
+
             _ => {}
         }
+    }
+
+    pub(crate) fn name(self) -> &'static str {
+        self.into()
     }
 }
 
@@ -2023,7 +2211,7 @@ pub(crate) mod tests {
         let db = setup_db();
 
         for function in KnownFunction::iter() {
-            let function_name: &'static str = function.into();
+            let function_name = function.name();
 
             let module = match function {
                 KnownFunction::Len

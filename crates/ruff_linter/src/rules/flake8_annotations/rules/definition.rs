@@ -774,7 +774,7 @@ pub(crate) fn definition(
                 let return_type = if is_stub_function(function, checker) {
                     None
                 } else {
-                    auto_return_type(function)
+                    auto_return_type(function, checker.semantic())
                         .and_then(|return_type| {
                             return_type.into_expression(checker, function.parameters.start())
                         })
@@ -801,7 +801,7 @@ pub(crate) fn definition(
                 let return_type = if is_stub_function(function, checker) {
                     None
                 } else {
-                    auto_return_type(function)
+                    auto_return_type(function, checker.semantic())
                         .and_then(|return_type| {
                             return_type.into_expression(checker, function.parameters.start())
                         })
@@ -887,7 +887,7 @@ pub(crate) fn definition(
                         let return_type = if is_stub_function(function, checker) {
                             None
                         } else {
-                            auto_return_type(function)
+                            auto_return_type(function, checker.semantic())
                                 .and_then(|return_type| {
                                     return_type
                                         .into_expression(checker, function.parameters.start())
@@ -922,7 +922,7 @@ pub(crate) fn definition(
                         let return_type = if is_stub_function(function, checker) {
                             None
                         } else {
-                            auto_return_type(function)
+                            auto_return_type(function, checker.semantic())
                                 .and_then(|return_type| {
                                     return_type
                                         .into_expression(checker, function.parameters.start())

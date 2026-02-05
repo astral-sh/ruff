@@ -153,15 +153,15 @@ def countOf(a: Iterable[object], b: object, /) -> int:
     """Return the number of items in a which are, or which equal, b."""
 
 @overload
-def delitem(a: MutableSequence[Any], b: SupportsIndex, /) -> None:
+def delitem(a: MutableSequence[Any], b: int, /) -> None:
     """Same as del a[b]."""
 
 @overload
-def delitem(a: MutableSequence[Any], b: slice, /) -> None: ...
+def delitem(a: MutableSequence[Any], b: slice[int | None], /) -> None: ...
 @overload
 def delitem(a: MutableMapping[_K, Any], b: _K, /) -> None: ...
 @overload
-def getitem(a: Sequence[_T], b: slice, /) -> Sequence[_T]:
+def getitem(a: Sequence[_T], b: slice[int | None], /) -> Sequence[_T]:
     """Same as a[b]."""
 
 @overload
@@ -170,11 +170,11 @@ def indexOf(a: Iterable[_T], b: _T, /) -> int:
     """Return the first index of b in a."""
 
 @overload
-def setitem(a: MutableSequence[_T], b: SupportsIndex, c: _T, /) -> None:
+def setitem(a: MutableSequence[_T], b: int, c: _T, /) -> None:
     """Same as a[b] = c."""
 
 @overload
-def setitem(a: MutableSequence[_T], b: slice, c: Sequence[_T], /) -> None: ...
+def setitem(a: MutableSequence[_T], b: slice[int | None], c: Sequence[_T], /) -> None: ...
 @overload
 def setitem(a: MutableMapping[_K, _V], b: _K, c: _V, /) -> None: ...
 def length_hint(obj: object, default: int = 0, /) -> int:

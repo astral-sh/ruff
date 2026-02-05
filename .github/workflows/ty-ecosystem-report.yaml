@@ -25,16 +25,17 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
+        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
         with:
           enable-cache: true
+          version: "0.9.28"
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
@@ -55,7 +56,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@2e1816eac09c90140b1ba51d19afc5f59da460f5"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@c6ccb9fc56755ccd826721a24f53fc871a603474"
 
           ecosystem-analyzer \
             --verbose \

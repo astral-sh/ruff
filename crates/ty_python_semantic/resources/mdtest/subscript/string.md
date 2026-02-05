@@ -80,6 +80,17 @@ def _(m: int, n: int, s2: str):
     reveal_type(substring2)  # revealed: str
 ```
 
+## LiteralString
+
+```py
+from typing_extensions import LiteralString
+
+def f(x: LiteralString):
+    reveal_type(x[0])  # revealed: LiteralString
+    reveal_type(x[True])  # revealed: LiteralString
+    reveal_type(x[1:42])  # revealed: LiteralString
+```
+
 ## Unsupported slice types
 
 ```py

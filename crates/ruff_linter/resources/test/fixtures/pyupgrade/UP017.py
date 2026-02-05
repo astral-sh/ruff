@@ -26,3 +26,14 @@ def func():
     import datetime as dt
 
     print(dt.timezone.utc)
+
+
+def func():
+    import datetime
+
+    print((
+        datetime
+        .timezone  # text
+        .utc
+    ))
+
