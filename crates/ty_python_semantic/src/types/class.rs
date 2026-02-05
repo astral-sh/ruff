@@ -1699,6 +1699,25 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns the converter input type for a dataclass field, if the field has a `converter`.
+    /// This is used during attribute assignment validation.
+    pub(super) fn converter_input_type_for_field(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::NonGeneric(ClassLiteral::Static(class)) => {
+                class.converter_input_type_for_field(db, name)
+            }
+            Self::Generic(generic) => generic
+                .origin(db)
+                .converter_input_type_for_field(db, name)
+                .map(|ty| ty.apply_optional_specialization(db, Some(generic.specialization(db)))),
+            Self::NonGeneric(ClassLiteral::Dynamic(_) | ClassLiteral::DynamicNamedTuple(_)) => None,
+        }
+    }
+
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
@@ -4828,6 +4847,27 @@ impl<'db> StaticClassLiteral<'db> {
                 ..
             }
         )
+    }
+
+    /// Returns the converter input type for a dataclass field, if the field has a converter.
+    /// This is used during attribute assignment validation: when a converter is present,
+    /// the assignment should accept the converter's input type.
+    fn converter_input_type_for_field(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let field_policy = CodeGeneratorKind::from_static_class(db, self, None)?;
+        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+            return None;
+        }
+        let fields = self.own_fields(db, None, field_policy);
+        let field = fields.get(name)?;
+        if let FieldKind::Dataclass {
+            converter_input_type,
+            ..
+        } = &field.kind
+        {
+            *converter_input_type
+        } else {
+            None
+        }
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {

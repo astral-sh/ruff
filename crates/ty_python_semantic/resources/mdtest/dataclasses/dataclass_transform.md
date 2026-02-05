@@ -1479,6 +1479,14 @@ reveal_type(MyClass.__init__)  # revealed: (self: MyClass, x: str, y: str) -> No
 
 MyClass("1", "hello")
 MyClass(x="1", y="hello")
+
+MyClass(1, "hello")  # error: [invalid-argument-type]
+
+obj = MyClass("1", "hello")
+obj.x = "2"
+reveal_type(obj.x)  # revealed: int
+
+obj.x = 3  # error: [invalid-assignment]
 ```
 
 ### Converter with a class
@@ -1503,6 +1511,12 @@ class MyClass:
 MyClass("1")
 MyClass(1)
 MyClass(1.5)
+
+obj = MyClass(1)
+obj.x = "1"
+obj.x = 1
+obj.x = 1.5
+reveal_type(obj.x)  # revealed: float
 ```
 
 ### Converter with a default value
@@ -1524,6 +1538,8 @@ class MyClass:
 
 MyClass()
 MyClass("42")
+
+MyClass(123)  # error: [invalid-argument-type]
 ```
 
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
