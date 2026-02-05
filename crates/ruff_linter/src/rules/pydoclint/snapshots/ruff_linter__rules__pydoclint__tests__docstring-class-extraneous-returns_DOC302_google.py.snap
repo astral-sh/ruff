@@ -1,0 +1,16 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC302 The class docstring does not need a `Returns` section, because `__init__()` cannot return anything
+  --> DOC302_google.py:7:1
+   |
+ 5 |       Docstring of the class
+ 6 |
+ 7 | /     Returns:
+ 8 | |         int: Final integer.
+ 9 | |     """
+   | |____^
+10 |
+11 |       def __init__(self, a: int, b: int) -> None:
+   |
+help: Remove `Returns` section from class docstring
