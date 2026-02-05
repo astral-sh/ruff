@@ -165,12 +165,42 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         (self.arguments.iter().copied()).zip(self.types.iter_mut())
     }
 
+    pub(crate) fn type_at_mut(&mut self, index: usize) -> Option<&mut Option<Type<'db>>> {
+        self.types.get_mut(index)
+    }
+
     /// Create a new [`CallArguments`] starting from the specified index.
-    pub(super) fn start_from(&self, index: usize) -> Self {
+    pub(crate) fn start_from(&self, index: usize) -> Self {
         Self {
             arguments: self.arguments[index..].to_vec(),
             types: self.types[index..].to_vec(),
         }
+    }
+
+    /// Returns the `functools.partial(...)` bound-argument slice when argument expansion is
+    /// concrete enough for partial-application analysis.
+    pub(crate) fn functools_partial_bound_arguments(&self, db: &'db dyn Db) -> Option<Self> {
+        let bound_call_arguments = self.start_from(1);
+
+        // We only handle variadics and keyword-maps that can be normalized to concrete argument
+        // positions for overload matching.
+        if bound_call_arguments.iter().any(|(argument, argument_ty)| {
+            let argument_ty = argument_ty.unwrap_or_else(Type::unknown);
+            match argument {
+                Argument::Variadic => !matches!(
+                    argument_ty
+                        .as_nominal_instance()
+                        .and_then(|nominal| nominal.tuple_spec(db)),
+                    Some(spec) if spec.as_fixed_length().is_some()
+                ),
+                Argument::Keywords => argument_ty.as_typed_dict().is_none(),
+                Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => false,
+            }
+        }) {
+            return None;
+        }
+
+        Some(bound_call_arguments)
     }
 
     /// Returns an iterator on performing [argument type expansion].
