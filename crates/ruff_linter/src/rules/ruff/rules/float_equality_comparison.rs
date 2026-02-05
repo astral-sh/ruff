@@ -193,8 +193,6 @@ fn is_numeric_expr(expr: &Expr) -> bool {
     }
 }
 
-const INF_MODULES: &[&[&str]] = &[&["math", "inf"], &["numpy", "inf"], &["torch", "inf"]];
-
 fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::Call(ast::ExprCall {
@@ -220,20 +218,14 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
             false
         }
 
-        // Skip `math.inf`, `numpy.inf`, `torch.inf` import's
-        Expr::Attribute(_) => {
-            if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
-                INF_MODULES.contains(&qualified_name.segments())
-            } else {
-                false
-            }
-        }
-
         // Skip `inf` when imported from `math`, `numpy` or `torch`
-        Expr::Name(_) => semantic
+        _ => semantic
             .resolve_qualified_name(expr)
-            .is_some_and(|qn| INF_MODULES.contains(&qn.segments())),
-
-        _ => false,
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["math" | "numpy" | "torch", "inf"]
+                )
+            }),
     }
 }
