@@ -1005,9 +1005,6 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     /// Records a narrowing constraint for only the specified places.
-    ///
-    /// This is more efficient than `record_narrowing_constraint` when we know
-    /// which places could possibly be narrowed by the predicate.
     pub(super) fn record_narrowing_constraint_for_places(
         &mut self,
         predicate: ScopedPredicateId,

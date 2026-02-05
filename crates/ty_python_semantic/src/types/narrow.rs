@@ -1897,7 +1897,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
 /// Builder for computing the conservative set of places that could possibly be narrowed.
 ///
 /// This mirrors the structure of `NarrowingConstraintsBuilder` but only computes which places
-/// *could* be narrowed, without performing full type inference to determine the actual constraints.
+/// *could* be narrowed, without performing type inference to determine the actual constraints.
 pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a> {
     db: &'db dyn Db,
     places: &'a PlaceTableBuilder,
@@ -1995,7 +1995,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             }
         }
 
-        // bool(x) can delegate to narrowing x itself
+        // `bool(expr)` can delegate to narrowing `expr` itself, e.g. `bool(x is not None)`
         if let Some(first_arg) = expr_call.arguments.args.first() {
             if expr_call.arguments.args.len() == 1 && expr_call.arguments.keywords.is_empty() {
                 places.extend(self.expression_node(first_arg));
