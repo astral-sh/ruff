@@ -138,6 +138,18 @@ def _(x_flag: bool, y_flag: bool):
         reveal_type(y)  # revealed: bool
 ```
 
+## `is not` with two narrowable operands
+
+Both operands should be narrowed when both are narrowable expressions.
+
+```py
+def _(x: None, y: int | None):
+    if x is not y:
+        reveal_type(y)  # revealed: int
+    if y is not x:
+        reveal_type(y)  # revealed: int
+```
+
 ## Assignment expressions
 
 ```py
