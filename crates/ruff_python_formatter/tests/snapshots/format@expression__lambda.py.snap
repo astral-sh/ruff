@@ -1162,7 +1162,9 @@ class C:
 
 
 name = re.sub(
-    r"[^\x21\x23-\x5b\x5d-\x7e]...............", lambda m: f"\\{m.group(0)}", p["name"]
+    r"[^\x21\x23-\x5b\x5d-\x7e]...............",
+    lambda m: f"\\{m.group(0)}",
+    p["name"],
 )
 
 
@@ -1238,7 +1240,9 @@ very_long_variable_name_x, very_long_variable_name_y = (
 
 very_long_variable_name_for_result += lambda x: (
     very_long_function_call_that_should_definitely_be_parenthesized_now(
-        x, more_args, additional_parameters
+        x,
+        more_args,
+        additional_parameters,
     )
 )
 
@@ -1687,7 +1691,7 @@ lambda x: (x := 1)
 ```diff
 --- Stable
 +++ Preview
-@@ -471,7 +471,8 @@
+@@ -475,7 +475,8 @@
          # inside the body.
          param(
              lambda left, right: (
@@ -1697,7 +1701,7 @@ lambda x: (x := 1)
                  .cast(dt.date)
                  .between(left, right)
                  .between(left, right)
-@@ -594,7 +595,8 @@
+@@ -598,7 +599,8 @@
  
  (
      lambda left, right: (
