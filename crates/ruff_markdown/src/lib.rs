@@ -21,7 +21,7 @@ static MARKDOWN_CODE_FENCE: LazyLock<Regex> = LazyLock::new(|| {
             ^
             (?<indent>\s*)
             (?<fence>(?:```+|~~~+))\s*
-            (?<language>(?:\w+)?)\s*
+            \{?(?<language>(?:\w+)?)\}?\s*
             (?<info>(?:.*))\s*
             $
         ",
@@ -410,5 +410,31 @@ def bar(): ...
                 ..Default::default()
             }
         ), @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_quarto() {
+        let code = r#"
+```{py}
+print( 'hello' )
+```
+
+~~~{pyi}
+def foo(): ...
+
+
+def bar(): ...
+~~~
+        "#;
+        assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()), @r#"
+        ```{py}
+        print("hello")
+        ```
+
+        ~~~{pyi}
+        def foo(): ...
+        def bar(): ...
+        ~~~
+        "#);
     }
 }
