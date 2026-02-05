@@ -151,7 +151,6 @@ class _:
 
         class _3:
             reveal_type(a)  # revealed: A
-            # TODO: should be `D | None`
             reveal_type(a.b.c1.d)  # revealed: D
 
 a.b.c1 = C()
