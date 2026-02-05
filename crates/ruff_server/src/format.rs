@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use anyhow::{Context, Error};
+use anyhow::Context;
 
 use ruff_formatter::{FormatOptions, PrintedRange};
 use ruff_markdown::{MarkdownResult, format_code_blocks};
@@ -76,7 +76,8 @@ fn format_internal(
         }
         SourceType::Markdown => {
             if !formatter_settings.preview.is_enabled() {
-                return Ok(None); // todo
+                tracing::warn!("Markdown formatting is experimental, enable preview mode.");
+                return Ok(None);
             }
 
             match format_code_blocks(document.contents(), Some(path), formatter_settings) {
@@ -84,7 +85,10 @@ fn format_internal(
                 MarkdownResult::Unchanged => Ok(None),
             }
         }
-        SourceType::Toml(_) => Ok(None), // todo
+        SourceType::Toml(_) => {
+            tracing::warn!("Formatting TOML files not supported");
+            Ok(None)
+        }
     }
 }
 
@@ -95,20 +99,22 @@ fn format_external(
     formatter_settings: &FormatterSettings,
     path: &Path,
 ) -> crate::Result<Option<String>> {
-    match source_type {
+    let format_options = match source_type {
         SourceType::Python(py_source_type) => {
-            let format_options = formatter_settings.to_format_options(
-                py_source_type,
-                document.contents(),
-                Some(path),
-            );
-            let uv_command = UvFormatCommand::from(format_options);
-            uv_command.format_document(document.contents(), path)
+            formatter_settings.to_format_options(py_source_type, document.contents(), Some(path))
         }
-        SourceType::Markdown | SourceType::Toml(_) => {
-            Ok(None) // todo
+        SourceType::Markdown => formatter_settings.to_format_options(
+            PySourceType::Python,
+            document.contents(),
+            Some(path),
+        ),
+        SourceType::Toml(_) => {
+            tracing::warn!("Formatting TOML files not supported");
+            return Ok(None);
         }
-    }
+    };
+    let uv_command = UvFormatCommand::from(format_options);
+    uv_command.format_document(document.contents(), path)
 }
 
 pub(crate) fn format_range(
@@ -119,12 +125,23 @@ pub(crate) fn format_range(
     path: &Path,
     backend: FormatBackend,
 ) -> crate::Result<Option<PrintedRange>> {
+    let py_source_type = match source_type {
+        SourceType::Python(py_source_type) => py_source_type,
+        SourceType::Markdown => {
+            tracing::warn!("Range formatting for Markdown files not supported");
+            return Ok(None);
+        }
+        SourceType::Toml(_) => {
+            tracing::warn!("Formatting TOML files not supported");
+            return Ok(None);
+        }
+    };
     match backend {
         FormatBackend::Uv => {
-            format_range_external(document, source_type, formatter_settings, range, path)
+            format_range_external(document, py_source_type, formatter_settings, range, path)
         }
         FormatBackend::Internal => {
-            format_range_internal(document, source_type, formatter_settings, range, path)
+            format_range_internal(document, py_source_type, formatter_settings, range, path)
         }
     }
 }
@@ -132,68 +149,48 @@ pub(crate) fn format_range(
 /// Format range using the built-in Ruff formatter
 fn format_range_internal(
     document: &TextDocument,
-    source_type: SourceType,
+    source_type: PySourceType,
     formatter_settings: &FormatterSettings,
     range: TextRange,
     path: &Path,
 ) -> crate::Result<Option<PrintedRange>> {
-    match source_type {
-        SourceType::Python(py_source_type) => {
-            let format_options = formatter_settings.to_format_options(
-                py_source_type,
-                document.contents(),
-                Some(path),
-            );
+    let format_options =
+        formatter_settings.to_format_options(source_type, document.contents(), Some(path));
 
-            match ruff_python_formatter::format_range(document.contents(), range, format_options) {
-                Ok(formatted) => {
-                    if formatted.as_code() == document.contents() {
-                        Ok(None)
-                    } else {
-                        Ok(Some(formatted))
-                    }
-                }
-                // Special case - syntax/parse errors are handled here instead of
-                // being propagated as visible server errors.
-                Err(FormatModuleError::ParseError(error)) => {
-                    tracing::warn!("Unable to format document range: {error}");
-                    Ok(None)
-                }
-                Err(err) => Err(err.into()),
+    match ruff_python_formatter::format_range(document.contents(), range, format_options) {
+        Ok(formatted) => {
+            if formatted.as_code() == document.contents() {
+                Ok(None)
+            } else {
+                Ok(Some(formatted))
             }
         }
-        SourceType::Markdown | SourceType::Toml(_) => {
-            Ok(None) // todo
+        // Special case - syntax/parse errors are handled here instead of
+        // being propagated as visible server errors.
+        Err(FormatModuleError::ParseError(error)) => {
+            tracing::warn!("Unable to format document range: {error}");
+            Ok(None)
         }
+        Err(err) => Err(err.into()),
     }
 }
 
 /// Format range using an external command, i.e., `uv`.
 fn format_range_external(
     document: &TextDocument,
-    source_type: SourceType,
+    source_type: PySourceType,
     formatter_settings: &FormatterSettings,
     range: TextRange,
     path: &Path,
 ) -> crate::Result<Option<PrintedRange>> {
-    match source_type {
-        SourceType::Python(py_source_type) => {
-            let format_options = formatter_settings.to_format_options(
-                py_source_type,
-                document.contents(),
-                Some(path),
-            );
-            let uv_command = UvFormatCommand::from(format_options);
+    let format_options =
+        formatter_settings.to_format_options(source_type, document.contents(), Some(path));
+    let uv_command = UvFormatCommand::from(format_options);
 
-            // Format the range using uv and convert the result to `PrintedRange`
-            match uv_command.format_range(document.contents(), range, path, document.index())? {
-                Some(formatted) => Ok(Some(PrintedRange::new(formatted, range))),
-                None => Ok(None),
-            }
-        }
-        SourceType::Markdown | SourceType::Toml(_) => {
-            Ok(None) // todo
-        }
+    // Format the range using uv and convert the result to `PrintedRange`
+    match uv_command.format_range(document.contents(), range, path, document.index())? {
+        Some(formatted) => Ok(Some(PrintedRange::new(formatted, range))),
+        None => Ok(None),
     }
 }
 
