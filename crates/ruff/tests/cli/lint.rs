@@ -3596,6 +3596,7 @@ match 42:  # invalid-syntax
     let fixture = CliTest::with_settings(|_project_dir, mut settings| {
         // JSON double escapes backslashes
         settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+        settings.add_filter(r" \([a-f0-9]+ \d{4}-\d{2}-\d{2}\)", "");
 
         settings
     })?;
