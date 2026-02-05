@@ -303,11 +303,9 @@ impl<'db> Completion<'db> {
     }
 }
 
-// TODO: Not sure about this. I need to pass the deprecated value to relevance and this seems
-// like the way
-#[expect(clippy::struct_excessive_bools)]
 /// A builder for construction a `Completion`.
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools)]
 struct CompletionBuilder<'db> {
     // See comments on `Completion` for the meaning of fields.
     name: Name,
@@ -420,13 +418,7 @@ impl<'db> CompletionBuilder<'db> {
                     );
             }
 
-            self.deprecated = {
-                match ty {
-                    Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
-                    Type::ClassLiteral(c) => c.deprecated(db).is_some(),
-                    _ => false,
-                }
-            };
+            self.deprecated = ty.is_deprecated(db);
         }
         let kind = self
             .kind
