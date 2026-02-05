@@ -363,9 +363,13 @@ pub enum OutputFormat {
     /// Print diagnostics in the JSON format expected by GitLab Code Quality reports.
     #[value(name = "gitlab")]
     Gitlab,
-    #[value(name = "github")]
     /// Print diagnostics in the format used by GitHub Actions workflow error annotations.
+    #[value(name = "github")]
     Github,
+    /// Print diagnostics as a JUnit-style XML report, commonly used by test &
+    /// Continuous-Integration tools
+    #[value(name = "junit")]
+    Junit,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -375,6 +379,7 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
+            OutputFormat::Junit => Self::Junit,
         }
     }
 }
