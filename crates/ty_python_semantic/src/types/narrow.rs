@@ -980,6 +980,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             )
         }
 
+        fn narrowable_ast(expr: &ast::Expr) -> bool {
+            matches!(
+                expr,
+                ast::Expr::Name(_)
+                    | ast::Expr::Attribute(_)
+                    | ast::Expr::Subscript(_)
+                    | ast::Expr::Named(_)
+            )
+        }
+
         /// Attempt to find an underlying class literal for purposes of `if type(x) is Y` narrowing.
         ///
         /// We deliberately return `None` for generic-alias types, since narrowing based
@@ -1265,13 +1275,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if x is not y`
             // - `if x in y`
             // - `if x not in y`
-            if matches!(
-                left,
-                ast::Expr::Name(_)
-                    | ast::Expr::Attribute(_)
-                    | ast::Expr::Subscript(_)
-                    | ast::Expr::Named(_)
-            ) && let Some(narrowable) = PlaceExpr::try_from_expr(left)
+            if narrowable_ast(left)
+                && let Some(narrowable) = PlaceExpr::try_from_expr(left)
                 && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
@@ -1292,13 +1297,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             //
             // `in` and `not in` are not symmetric, so we don't narrow the right-hand side.
             if !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn)
-                && matches!(
-                    right,
-                    ast::Expr::Name(_)
-                        | ast::Expr::Attribute(_)
-                        | ast::Expr::Subscript(_)
-                        | ast::Expr::Named(_)
-                )
+                && narrowable_ast(right)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(right)
                 && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
             {
