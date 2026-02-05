@@ -128,11 +128,11 @@ use crate::types::{
     LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
     ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
     StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    TypeContext, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5722,6 +5722,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }),
                         qualifiers,
                     } => {
+                        let bind_self = match object_ty {
+                            Type::NominalInstance(_) => true,
+                            Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => true,
+                            _ => false,
+                        };
+                        let meta_attr_ty = if meta_attr_ty.contains_self(db) && bind_self {
+                            meta_attr_ty.apply_type_mapping(
+                                db,
+                                &TypeMapping::BindSelf {
+                                    self_type: object_ty,
+                                    binding_context: None,
+                                },
+                                TypeContext::default(),
+                            )
+                        } else {
+                            meta_attr_ty
+                        };
+
                         if invalid_assignment_to_final(self, qualifiers) {
                             return false;
                         }

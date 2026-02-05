@@ -2552,7 +2552,20 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Place::bound(self).into(),
 
-            Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
+            Type::NominalInstance(instance) => {
+                let member = instance.class(db).instance_member(db, name);
+                let self_type = Type::NominalInstance(*instance);
+                member.map_type(|ty| {
+                    ty.apply_type_mapping(
+                        db,
+                        &TypeMapping::BindSelf {
+                            self_type,
+                            binding_context: None,
+                        },
+                        TypeContext::default(),
+                    )
+                })
+            }
             Type::NewTypeInstance(newtype) => {
                 newtype.concrete_base_type(db).instance_member(db, name)
             }
@@ -3359,6 +3372,37 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(..)
             | Type::TypedDict(_) => {
                 let fallback = self.instance_member(db, name_str);
+
+                // Bind `Self` in fallback types to the concrete instance.
+                let fallback = match self {
+                    Type::NominalInstance(instance) => {
+                        let self_type = Type::NominalInstance(instance);
+                        fallback.map_type(|ty| {
+                            ty.apply_type_mapping(
+                                db,
+                                &TypeMapping::BindSelf {
+                                    self_type,
+                                    binding_context: None,
+                                },
+                                TypeContext::default(),
+                            )
+                        })
+                    }
+                    Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
+                        let self_type = self;
+                        fallback.map_type(|ty| {
+                            ty.apply_type_mapping(
+                                db,
+                                &TypeMapping::BindSelf {
+                                    self_type,
+                                    binding_context: None,
+                                },
+                                TypeContext::default(),
+                            )
+                        })
+                    }
+                    _ => fallback,
+                };
 
                 let result = self.invoke_descriptor_protocol(
                     db,

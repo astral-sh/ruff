@@ -176,13 +176,21 @@ pub(crate) fn typing_self<'db>(
         })
         .unwrap_or_else(|| scope_id.file_scope_id(db));
 
-    bind_typevar(
+    let bound = bind_typevar(
         db,
         index,
         containing_scope,
         typevar_binding_context,
         typevar,
-    )
+    );
+
+    if bound.is_none() {
+        class
+            .definition(db)
+            .map(|definition| typevar.with_binding_context(db, definition))
+    } else {
+        bound
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

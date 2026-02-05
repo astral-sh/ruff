@@ -58,6 +58,36 @@ class NoDefaultSpecificClass(SomeClass):
 reveal_type(NoDefaultSpecificClass(SpecificConfiguration()).config)  # revealed: SpecificConfiguration | None
 ```
 
+## Self-typed fields
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from dataclasses import dataclass
+from typing import Optional, Self
+
+@dataclass
+class Node:
+    parent: Optional[Self] = None
+
+root = Node()
+child = Node(root)
+```
+
+```py
+from dataclasses import dataclass
+from typing import Optional, Self
+
+@dataclass(frozen=True)
+class MyClass:
+    field: Optional[Self] = None
+
+MyClass(MyClass())
+```
+
 ## Descriptor-typed fields with defaults
 
 A dataclass field whose declared type is a descriptor should still resolve through the descriptor

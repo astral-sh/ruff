@@ -115,6 +115,18 @@ class NestedClassExplicitSelf:
                 reveal_type(self)  # revealed: Self@method_a
 ```
 
+## Class-body attributes
+
+```py
+from typing import Optional, Self
+
+class MyClass:
+    field: Optional[Self] = None
+
+def _(c: MyClass):
+    c.field = c
+```
+
 ## Type of (unannotated) `self` parameters
 
 In instance methods, the first parameter (regardless of its name) is assumed to have the type
