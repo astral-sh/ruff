@@ -274,6 +274,6 @@ pub(crate) const fn is_mutable_default_in_dataclass_field_enabled(
 }
 
 // https://github.com/astral-sh/ruff/pull/22830
-pub(crate) const fn is_standalone_mock_non_existent_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_standalone_mock_non_existent_enabled(settings: &LinterSettings) -> bool {   
     settings.preview.is_enabled()
 }
