@@ -466,7 +466,7 @@ AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
 189 |     print(context.get("inlet_events")["this://is-url"])
 190 |     print(context["inlet_events"].get("this://is-url"))
     |
-help: Accessing `inlet_events` via a string key is deprecated; use `inlet_events[Asset("<uri>")]` instead (e.g., context["inlet_events"][Asset("this://is-url")]).
+help: Accessing `inlet_events` via a string key is deprecated; use `context["inlet_events"][Asset(uri="<uri>")]` instead of `context["inlet_events"]["this://is-url"]`.
 
 AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
    --> AIR301_context.py:189:39
@@ -478,7 +478,7 @@ AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
 190 |     print(context["inlet_events"].get("this://is-url"))
 191 |     print(context.get("inlet_events").get("this://is-url"))
     |
-help: Accessing `inlet_events` via a string key is deprecated; use `inlet_events[Asset("<uri>")]` instead (e.g., context["inlet_events"][Asset("this://is-url")]).
+help: Accessing `inlet_events` via a string key is deprecated; use `context["inlet_events"][Asset(uri="<uri>")]` instead of `context["inlet_events"]["this://is-url"]`.
 
 AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
    --> AIR301_context.py:190:39
@@ -489,7 +489,7 @@ AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
     |                                       ^^^^^^^^^^^^^^^
 191 |     print(context.get("inlet_events").get("this://is-url"))
     |
-help: Accessing `inlet_events` via a string key is deprecated; use `inlet_events[Asset("<uri>")]` instead (e.g., context["inlet_events"][Asset("this://is-url")]).
+help: Accessing `inlet_events` via a string key is deprecated; use `context["inlet_events"][Asset(uri="<uri>")]` instead of `context["inlet_events"]["this://is-url"]`.
 
 AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
    --> AIR301_context.py:191:43
@@ -499,7 +499,7 @@ AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
 191 |     print(context.get("inlet_events").get("this://is-url"))
     |                                           ^^^^^^^^^^^^^^^
     |
-help: Accessing `inlet_events` via a string key is deprecated; use `inlet_events[Asset("<uri>")]` instead (e.g., context["inlet_events"][Asset("this://is-url")]).
+help: Accessing `inlet_events` via a string key is deprecated; use `context["inlet_events"][Asset(uri="<uri>")]` instead of `context["inlet_events"]["this://is-url"]`.
 
 AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
    --> AIR301_context.py:197:24
@@ -510,7 +510,7 @@ AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
     |                        ^^^^^^^^^^^^^^^
 198 |     print(inlet_events.get("this://is-url"))
     |
-help: Accessing `inlet_events` via a string key is deprecated; use `inlet_events[Asset("<uri>")]` instead (e.g., context["inlet_events"][Asset("this://is-url")]).
+help: Accessing `inlet_events` via a string key is deprecated; use `context["inlet_events"][Asset(uri="<uri>")]` instead of `context["inlet_events"]["this://is-url"]`.
 
 AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
    --> AIR301_context.py:198:28
@@ -520,4 +520,4 @@ AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
 198 |     print(inlet_events.get("this://is-url"))
     |                            ^^^^^^^^^^^^^^^
     |
-help: Accessing `inlet_events` via a string key is deprecated; use `inlet_events[Asset("<uri>")]` instead (e.g., context["inlet_events"][Asset("this://is-url")]).
+help: Accessing `inlet_events` via a string key is deprecated; use `context["inlet_events"][Asset(uri="<uri>")]` instead of `context["inlet_events"]["this://is-url"]`.
