@@ -2,7 +2,7 @@ use std::{path::Path, sync::LazyLock};
 
 use regex::Regex;
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::{PyFormatOptions, format_module_source};
+use ruff_python_formatter::format_module_source;
 use ruff_python_trivia::textwrap::{dedent, indent};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{TextLen, TextRange, TextSize};
