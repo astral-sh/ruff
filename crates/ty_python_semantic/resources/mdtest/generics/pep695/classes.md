@@ -118,6 +118,19 @@ reveal_mro(Baz)
 reveal_mro(Baz[int])
 ```
 
+## Class keyword arguments
+
+Class keyword arguments are evaluated inside the type-parameter scope, so they must be resolved
+cross-scope when validating against `__init_subclass__`:
+
+```py
+class Base:
+    def __init_subclass__(cls, *, setting: int) -> None: ...
+
+class Valid[T](Base, setting=1): ...
+class InvalidType[T](Base, setting="x"): ...  # error: [invalid-argument-type]
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
