@@ -1529,6 +1529,7 @@ result = func(10, y=20)
             )
             .build();
 
+        // Includes import binding and underlying definition in one rename set.
         assert_snapshot!(test.rename("mypkg"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> mypackage/__init__.py:2:21
@@ -1678,6 +1679,7 @@ result = func(10, y=20)
             )
             .build();
 
+        // Includes all overload declarations plus implementation from usage-site rename.
         assert_snapshot!(test.rename("better_name"), @r#"
        info[rename]: Rename symbol (found 6 locations)
          --> main.py:2:17

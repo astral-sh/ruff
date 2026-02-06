@@ -1298,6 +1298,9 @@ result = func(value=10)
             )
             .build();
 
+        // TODO(parameter-keyword-references): Nested callable owners are intentionally excluded by
+        // the external-visibility heuristic (perf/signal tradeoff).
+        // Ideal output would also include `caller.py` at `func(value=10)` on `value`.
         assert_snapshot!(test.references(), @r#"
         info[references]: Found 2 references
          --> outer.py:3:15
@@ -1711,6 +1714,7 @@ func<CURSOR>_alias()
             )
             .build();
 
+        // Includes both the local import binding and the underlying definition target.
         assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> mypackage/__init__.py:2:21

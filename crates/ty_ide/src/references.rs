@@ -215,6 +215,11 @@ fn references_for_keyword_arguments_in_file(
     AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
 }
 
+/// Cheap text prefilter for keyword-argument labels before AST/semantic validation.
+///
+/// Heuristically matches an ASCII approximation of `\b{name}\b\s*=\s*(?!=)`.
+/// This is intentionally permissive and may include non-call contexts (e.g. assignments),
+/// but it helps skip files that cannot possibly contain a matching `name=` label.
 fn source_contains_keyword_argument_candidate(source: &str, name: &str) -> bool {
     if name.is_empty() {
         return false;
@@ -228,30 +233,21 @@ fn source_contains_keyword_argument_candidate(source: &str, name: &str) -> bool 
         let pos = start + rel_pos;
 
         // Word boundary check before.
-        if pos > 0 {
-            let prev = bytes[pos - 1];
-            if prev.is_ascii_alphanumeric() || prev == b'_' {
-                start = pos + needle.len();
-                continue;
-            }
+        if let Some(prev) = pos.checked_sub(1).and_then(|i| bytes.get(i))
+            && (prev.is_ascii_alphanumeric() || *prev == b'_')
+        {
+            start = pos + needle.len();
+            continue;
         }
 
-        // Word boundary check after.
         let after = pos + needle.len();
-        if after < bytes.len() {
-            let next = bytes[after];
-            if next.is_ascii_alphanumeric() || next == b'_' {
-                start = after;
-                continue;
-            }
-        }
 
         // Skip whitespace and check for '=' (but not '==').
         let mut i = after;
-        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+        while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
             i += 1;
         }
-        if i < bytes.len() && bytes[i] == b'=' && bytes.get(i + 1) != Some(&b'=') {
+        if bytes.get(i) == Some(&b'=') && bytes.get(i + 1) != Some(&b'=') {
             return true;
         }
 
@@ -259,6 +255,23 @@ fn source_contains_keyword_argument_candidate(source: &str, name: &str) -> bool 
     }
 
     false
+}
+
+/// Return true if the declaration-target sets intersect.
+///
+/// A symbol can resolve to multiple declaration targets (for example, overload groups or an
+/// import binding plus its underlying definition). Intersection semantics avoid missing valid
+/// references/renames when target ordering differs.
+fn navigation_targets_intersect(
+    target_definitions: &NavigationTargets,
+    current_targets: &NavigationTargets,
+) -> bool {
+    target_definitions.iter().any(|target_definition| {
+        current_targets.iter().any(|current_target| {
+            current_target.file == target_definition.file
+                && current_target.focus_range == target_definition.focus_range
+        })
+    })
 }
 
 /// Find all references to a local symbol within the current file.
@@ -567,7 +580,7 @@ impl LocalReferencesFinder<'_> {
                 .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
                 // Check if any of the current definitions match our target definitions
-                if self.navigation_targets_match(&current_definitions) {
+                if navigation_targets_intersect(self.target_definitions, &current_definitions) {
                     // Determine if this is a read or write reference
                     let kind = self.determine_reference_kind(covering_node);
                     let target =
@@ -576,20 +589,6 @@ impl LocalReferencesFinder<'_> {
                 }
             }
         }
-    }
-
-    /// Check if `Vec<NavigationTarget>` match our target definitions
-    fn navigation_targets_match(&self, current_targets: &NavigationTargets) -> bool {
-        for target_definition in self.target_definitions {
-            for current_target in current_targets {
-                if current_target.file == target_definition.file
-                    && current_target.focus_range == target_definition.focus_range
-                {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     /// Determine whether a reference is a read or write operation based on its context
@@ -715,7 +714,7 @@ impl KeywordArgumentReferencesFinder<'_> {
                 .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
                 .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
-                if self.navigation_targets_match(&current_definitions) {
+                if navigation_targets_intersect(self.target_definitions, &current_definitions) {
                     let target = ReferenceTarget::new(
                         self.model.file(),
                         covering_node.node().range(),
@@ -725,18 +724,5 @@ impl KeywordArgumentReferencesFinder<'_> {
                 }
             }
         }
-    }
-
-    fn navigation_targets_match(&self, current_targets: &NavigationTargets) -> bool {
-        for target_definition in self.target_definitions {
-            for current_target in current_targets {
-                if current_target.file == target_definition.file
-                    && current_target.focus_range == target_definition.focus_range
-                {
-                    return true;
-                }
-            }
-        }
-        false
     }
 }
