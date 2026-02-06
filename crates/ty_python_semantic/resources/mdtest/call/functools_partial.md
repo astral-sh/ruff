@@ -272,7 +272,7 @@ p = partial(g, 1)
 reveal_type(p)  # revealed: Overload[(b: str) -> int, (b: str) -> str]
 ```
 
-## Fallback for starred args
+## Starred args with fixed-length tuple
 
 ```py
 from functools import partial
@@ -280,13 +280,87 @@ from functools import partial
 def f(a: int, b: str) -> bool:
     return True
 
-args = (1,)
-# TODO: support starred args in partial call
+args: tuple[int] = (1,)
 p = partial(f, *args)
+reveal_type(p)  # revealed: (b: str) -> bool
+```
+
+## Starred args with multiple elements
+
+```py
+from functools import partial
+
+def f(a: int, b: str, c: float) -> bool:
+    return True
+
+args: tuple[int, str] = (1, "hello")
+p = partial(f, *args)
+reveal_type(p)  # revealed: (c: int | float) -> bool
+```
+
+## Mixed positional and starred args
+
+```py
+from functools import partial
+
+def f(a: int, b: str, c: float) -> bool:
+    return True
+
+args: tuple[str] = ("hello",)
+p = partial(f, 1, *args)
+reveal_type(p)  # revealed: (c: int | float) -> bool
+```
+
+## Fallback for starred args with variable-length tuple
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+def get_args() -> tuple[int, ...]:
+    return (1,)
+
+p = partial(f, *get_args())
 reveal_type(p)  # revealed: partial[bool]
 ```
 
-## Fallback for kwargs splat
+## Kwargs splat with TypedDict
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class MyKwargs(TypedDict):
+    b: str
+
+def f(a: int, b: str) -> bool:
+    return True
+
+kwargs: MyKwargs = {"b": "hello"}
+p = partial(f, **kwargs)
+reveal_type(p)  # revealed: (a: int) -> bool
+```
+
+## Mixed keywords and kwargs splat
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class MyKwargs(TypedDict):
+    c: float
+
+def f(a: int, b: str, c: float) -> bool:
+    return True
+
+kwargs: MyKwargs = {"c": 3.14}
+p = partial(f, b="hello", **kwargs)
+reveal_type(p)  # revealed: (a: int) -> bool
+```
+
+## Fallback for kwargs splat with dict
 
 ```py
 from functools import partial
@@ -295,7 +369,6 @@ def f(a: int, b: str) -> bool:
     return True
 
 kwargs = {"a": 1}
-# TODO: support **kwargs in partial call
 p = partial(f, **kwargs)
 reveal_type(p)  # revealed: partial[bool]
 ```

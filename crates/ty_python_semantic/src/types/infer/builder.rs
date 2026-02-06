@@ -6936,12 +6936,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We need at least one positional argument (the wrapped function).
         let func_expr = arguments.args.first()?;
 
-        // Bail on starred positional args in the partial() call itself.
-        if arguments.args.iter().any(ast::Expr::is_starred_expr) {
-            return None;
-        }
-        // Bail on **kwargs splats in the partial() call.
-        if arguments.keywords.iter().any(|kw| kw.arg.is_none()) {
+        // The first positional arg (the function) must not be starred.
+        if func_expr.is_starred_expr() {
             return None;
         }
 
@@ -6950,22 +6946,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let callable = func_ty.try_upcast_to_callable(db)?.exactly_one()?;
         let overloads = &callable.signatures(db).overloads;
 
-        // Collect bound positional arg expressions and types (skip first arg = `func`).
-        let bound_positional: Vec<Type<'db>> = arguments.args[1..]
-            .iter()
-            .map(|arg| self.expression_type(arg))
-            .collect();
+        // Collect bound positional arg types (skip first arg = `func`).
+        // Starred args with fixed-length tuple types are unpacked inline.
+        let mut bound_positional: Vec<Type<'db>> = Vec::new();
+        for arg in &arguments.args[1..] {
+            if let Some(starred) = arg.as_starred_expr() {
+                let iterable_ty = self.expression_type(&starred.value);
+                if let Type::NominalInstance(nominal) = iterable_ty
+                    && let Some(tuple_spec) = nominal.tuple_spec(db)
+                    && let Some(fixed) = tuple_spec.as_fixed_length()
+                {
+                    bound_positional.extend(fixed.all_elements().iter().copied());
+                } else {
+                    return None;
+                }
+            } else {
+                bound_positional.push(self.expression_type(arg));
+            }
+        }
 
         // Collect bound keyword arg (name, type) pairs.
-        let bound_keywords: Vec<(&str, Type<'db>)> = arguments
-            .keywords
-            .iter()
-            .filter_map(|kw| {
-                kw.arg
-                    .as_ref()
-                    .map(|id| (id.as_str(), self.expression_type(&kw.value)))
-            })
-            .collect();
+        // **kwargs splats with TypedDict types are unpacked inline.
+        let mut bound_keywords: Vec<(&str, Type<'db>)> = Vec::new();
+        for kw in &arguments.keywords {
+            if let Some(id) = &kw.arg {
+                bound_keywords.push((id.as_str(), self.expression_type(&kw.value)));
+            } else {
+                let splat_ty = self.expression_type(&kw.value);
+                if let Some(typed_dict) = splat_ty.as_typed_dict() {
+                    for (name, field) in typed_dict.items(db) {
+                        bound_keywords.push((name.as_str(), field.declared_ty));
+                    }
+                } else {
+                    return None;
+                }
+            }
+        }
 
         // Specialize each overload and remove bound params.
         let new_overloads: Vec<_> = overloads
