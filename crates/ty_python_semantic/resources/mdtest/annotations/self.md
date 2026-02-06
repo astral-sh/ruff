@@ -536,6 +536,52 @@ class User(Model):
 reveal_type(User().get_id())  # revealed: int
 ```
 
+Self from class body annotations and method signatures represent the same logical type variable.
+When a method returns an attribute annotated with `Self` in the class body, the class-body `Self`
+and the method's `Self` should be considered the same type, even though they have different binding
+contexts internally:
+
+```py
+from typing import Self
+
+class Chain:
+    next: Self
+    value: int
+
+    def advance(self: Self) -> Self:
+        return self.next
+
+    def advance_twice(self: Self) -> Self:
+        return self.advance().advance()
+
+class SubChain(Chain):
+    extra: str
+
+reveal_type(SubChain().advance())  # revealed: SubChain
+reveal_type(SubChain().advance_twice())  # revealed: SubChain
+```
+
+Self-typed attributes that flow through generic containers should also work:
+
+```py
+from typing import Self
+
+class TreeNode:
+    children: list[Self]
+    parent: Self | None
+
+    def first_child(self) -> Self | None:
+        if self.children:
+            return self.children[0]
+        return None
+
+    def root(self) -> Self:
+        node = self
+        while node.parent is not None:
+            node = node.parent
+        return node
+```
+
 Attributes can also refer to a generic parameter:
 
 ```py

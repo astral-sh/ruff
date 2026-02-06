@@ -3476,6 +3476,9 @@ impl<'db> Type<'db> {
                 // BEFORE the descriptor protocol. At this point, methods are still
                 // FunctionLiteral types, which `supports_self_binding` will skip.
                 // Data attributes like `Manager[Self]` will have Self bound.
+                //
+                // `to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`,
+                // and `SubclassOf`, so the `unwrap_or` is just a defensive fallback.
                 let self_instance = self.to_instance(db).unwrap_or(self);
                 let class_attr_plain =
                     class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance, None));
@@ -6203,7 +6206,7 @@ impl<'db> Type<'db> {
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
-            TypeMapping::BindSelf(binding) if self == binding.ty => return self,
+            TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
             _ => {}
         }
 
@@ -7151,9 +7154,19 @@ fn class_mro_literals<'db>(
 /// is in the MRO of the self type's class.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
-    pub(crate) ty: Type<'db>,
+    ty: Type<'db>,
     class_literal: Option<ClassLiteral<'db>>,
-    pub(crate) binding_context: Option<BindingContext<'db>>,
+    binding_context: Option<BindingContext<'db>>,
+}
+
+impl<'db> SelfBinding<'db> {
+    pub(crate) fn self_type(&self) -> Type<'db> {
+        self.ty
+    }
+
+    pub(crate) fn binding_context(&self) -> Option<BindingContext<'db>> {
+        self.binding_context
+    }
 }
 
 impl<'db> SelfBinding<'db> {
@@ -7193,6 +7206,10 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
+        // When `class_literal` is `None` (e.g. the self type is `Never`, a dynamic type, or
+        // another non-nominal type), we can't perform MRO-based matching, so we
+        // optimistically bind. When `class_literal` is `Some`, we check that the Self
+        // typevar's owner class is in the MRO of the self type's class.
         self.class_literal.is_none_or(|class_literal| {
             let class_mro = class_mro_literals(db, class_literal);
             self_typevar_owner_class_literal(db, bound_typevar)
@@ -7274,8 +7291,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
-                if binding.binding_context.is_some() {
-                    context.remove_self(db, binding.binding_context)
+                if binding.binding_context().is_some() {
+                    context.remove_self(db, binding.binding_context())
                 } else {
                     context
                 }
@@ -8912,7 +8929,20 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
     /// differences in their bounds or constraints due to materialization.
+    ///
+    /// For `Self` typevars, two instances are considered the same if they share the same owner
+    /// class (derived from their upper bound), even if their binding contexts differ (e.g.,
+    /// `Self@LinkedList` from a class body vs `Self@next` from a method).
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
+        if self.typevar(db).is_self(db) && other.typevar(db).is_self(db) {
+            if let (Some(left), Some(right)) = (
+                self_typevar_owner_class_literal(db, self),
+                self_typevar_owner_class_literal(db, other),
+            ) {
+                return left == right && self.paramspec_attr(db) == other.paramspec_attr(db);
+            }
+        }
+
         self.identity(db) == other.identity(db)
     }
 
@@ -9030,7 +9060,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::BindSelf(binding) => {
                 if binding.should_bind(db, self) {
-                    binding.ty
+                    binding.self_type()
                 } else {
                     Type::TypeVar(self)
                 }
