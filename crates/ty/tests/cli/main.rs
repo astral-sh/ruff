@@ -95,6 +95,33 @@ fn test_quiet_output() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_output_format_env() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [not-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
+        "#,
+    )?;
+    // Test output of cli command against output of same command with env var set.
+    assert_eq!(
+        case.command()
+            .arg("--output-format=github")
+            .arg("--warn")
+            .arg("unresolved-reference")
+            .output()?,
+        case.command()
+            .env("TY_OUTPUT_FORMAT", "github")
+            .arg("--warn")
+            .arg("unresolved-reference")
+            .output()?
+    );
+    Ok(())
+}
+
+#[test]
 fn test_run_in_sub_directory() -> anyhow::Result<()> {
     let case = CliTest::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @"
