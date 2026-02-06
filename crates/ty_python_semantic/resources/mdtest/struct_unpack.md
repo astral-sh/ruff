@@ -58,6 +58,19 @@ def _(buf: bytes):
     reveal_type(unpack("@n2xN18446744073709551616c@i", buf))  # revealed: tuple[Unknown, ...]
 ```
 
+## Whitespace in Format Strings
+
+```py
+from struct import *
+
+def _(buf: bytes):
+    # Whitespace between format specifiers is ignored
+    reveal_type(unpack("> b h l", buf))  # revealed: tuple[int, int, int]
+    reveal_type(unpack("i i i", buf))  # revealed: tuple[int, int, int]
+    reveal_type(unpack("  2h  2i  ", buf))  # revealed: tuple[int, int, int, int]
+    reveal_type(unpack("c s", buf))  # revealed: tuple[bytes, bytes]
+```
+
 ## Unknown Formats
 
 ```py

@@ -1244,6 +1244,11 @@ impl<'db> Bindings<'db> {
                             let mut chars = core.chars().peekable();
 
                             while chars.peek().is_some() {
+                                // Skip whitespace (allowed between format specifiers)
+                                while chars.peek().is_some_and(|c| c.is_ascii_whitespace()) {
+                                    chars.next();
+                                }
+
                                 // Extract count (optional)
                                 let mut count: usize = 0;
                                 let mut has_count = false;
