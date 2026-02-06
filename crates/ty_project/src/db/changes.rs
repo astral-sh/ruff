@@ -120,6 +120,20 @@ impl ProjectDatabase {
                                 }
                             }
                         }
+
+                        // Some LSP clients will send a `change` event for a file
+                        // without a `created` event. So we try to detect that
+                        // case here.
+                        if self.system().is_file(&path)
+                            && project.is_file_included(self, &path)
+                            && let Some(file) = self.files().try_system(self, &path)
+                            && !project.files(self).contains(&file)
+                        {
+                            // Add the parent directory because `walkdir`
+                            // always visits explicitly passed files even if
+                            // they match an exclude filter.
+                            added_paths.insert(path.parent().unwrap().to_path_buf());
+                        }
                     }
                 }
 
@@ -147,8 +161,9 @@ impl ProjectDatabase {
 
                     if self.system().is_file(&path) {
                         if project.is_file_included(self, &path) {
-                            // Add the parent directory because `walkdir` always visits explicitly passed files
-                            // even if they match an exclude filter.
+                            // Add the parent directory because `walkdir`
+                            // always visits explicitly passed files even if
+                            // they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
                         }
                     } else if project.is_directory_included(self, &path) {
