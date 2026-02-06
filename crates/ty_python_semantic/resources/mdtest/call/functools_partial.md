@@ -14,6 +14,9 @@ reveal_type(p)  # revealed: (b: str) -> bool
 
 ## Keyword binding
 
+Keyword-bound parameters are kept with a default, since `partial` allows overriding keyword
+arguments at call time.
+
 ```py
 from functools import partial
 
@@ -21,7 +24,7 @@ def f(a: int, b: str) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: (a: int) -> bool
+reveal_type(p)  # revealed: (a: int, b: str = "hello") -> bool
 ```
 
 ## Mixed positional and keyword binding
@@ -33,7 +36,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, 1, c=3.14)
-reveal_type(p)  # revealed: (b: str) -> bool
+reveal_type(p)  # revealed: (b: str, c: int | float = ...) -> bool
 ```
 
 ## All args bound
@@ -93,7 +96,7 @@ def f(a: int, *, b: str) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: (a: int) -> bool
+reveal_type(p)  # revealed: (a: int, *, b: str = "hello") -> bool
 ```
 
 ## Variadic preserved
@@ -175,7 +178,7 @@ def f(a: int, b: str) -> bool:
     return True
 
 p = partial(f, b=42)  # error: [invalid-argument-type]
-reveal_type(p)  # revealed: (a: int) -> bool
+reveal_type(p)  # revealed: (a: int, b: str = 42) -> bool
 ```
 
 ## Bound method
@@ -340,7 +343,7 @@ def f(a: int, b: str) -> bool:
 
 kwargs: MyKwargs = {"b": "hello"}
 p = partial(f, **kwargs)
-reveal_type(p)  # revealed: (a: int) -> bool
+reveal_type(p)  # revealed: (a: int, b: str = ...) -> bool
 ```
 
 ## Mixed keywords and kwargs splat
@@ -357,7 +360,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 kwargs: MyKwargs = {"c": 3.14}
 p = partial(f, b="hello", **kwargs)
-reveal_type(p)  # revealed: (a: int) -> bool
+reveal_type(p)  # revealed: (a: int, b: str = "hello", c: int | float = ...) -> bool
 ```
 
 ## Fallback for kwargs splat with dict
@@ -440,7 +443,7 @@ def f(a: int, b: str, c: float, d: bool) -> int:
     return 0
 
 p = partial(f, b="hello", d=True)
-reveal_type(p)  # revealed: (a: int, c: int | float) -> int
+reveal_type(p)  # revealed: (a: int, b: str = "hello", c: int | float, d: bool = True) -> int
 ```
 
 ## Mixed positional-only, regular, and keyword-only
@@ -457,11 +460,11 @@ reveal_type(p1)  # revealed: (b: str, *, c: int | float) -> bool
 
 # Bind a keyword-only param by keyword
 p2 = partial(f, c=3.14)
-reveal_type(p2)  # revealed: (a: int, /, b: str) -> bool
+reveal_type(p2)  # revealed: (a: int, /, b: str, *, c: int | float = ...) -> bool
 
 # Bind both positional-only and keyword-only
 p3 = partial(f, 1, c=3.14)
-reveal_type(p3)  # revealed: (b: str) -> bool
+reveal_type(p3)  # revealed: (b: str, *, c: int | float = ...) -> bool
 ```
 
 ## Starred args combined with keyword args
@@ -474,7 +477,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[int] = (1,)
 p = partial(f, *args, c=3.14)
-reveal_type(p)  # revealed: (b: str) -> bool
+reveal_type(p)  # revealed: (b: str, c: int | float = ...) -> bool
 ```
 
 ## Starred args with empty tuple
@@ -554,6 +557,23 @@ def f(a: int | str) -> int | str:
 # "hello" matches the second overload (str -> str), so no error.
 p = partial(f, "hello")
 reveal_type(p)  # revealed: Overload[() -> int, () -> str]
+```
+
+## Overriding keyword-bound args at call time
+
+`partial` allows keyword arguments to be overridden when calling the result:
+
+```py
+from functools import partial
+
+def f(a: int, b: str, c: float) -> bool:
+    return True
+
+p = partial(f, b="hello")
+reveal_type(p)  # revealed: (a: int, b: str = "hello", c: int | float) -> bool
+
+# Override b at call time
+reveal_type(p(1, b="world", c=3.14))  # revealed: bool
 ```
 
 ## Keyword binding to positional-only param
