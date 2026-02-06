@@ -77,6 +77,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 
+use crate::types::class::GenericAlias;
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
@@ -244,6 +245,19 @@ impl<'db> ConstraintSet<'db> {
                     .borrow_mut()
                     .insert(bound_typevar.identity(db));
                 walk_bound_type_var_type(db, bound_typevar, self);
+            }
+
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                // Override the default `walk_generic_alias` to skip walking the generic
+                // context. The generic context contains the typevar *definitions* for the
+                // specialization (the mapping keys), but those typevars are bound — they
+                // are not free occurrences in the type. Walking them here would cause false
+                // cycles: e.g. the constraint `list[int] ≤ _T@list` would appear cyclic
+                // because `_T@list` is found in the generic context of `list[int]`, even
+                // though `_T` is bound to `int` in that specialization.
+                for ty in alias.specialization(db).types(db) {
+                    self.visit_type(db, *ty);
+                }
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
