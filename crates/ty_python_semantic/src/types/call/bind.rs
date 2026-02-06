@@ -3495,7 +3495,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         } else {
             CallArguments::none()
         };
-        let max_arg_index = self.arguments.len().saturating_sub(1);
+        let num_synthetic_args = self
+            .arguments
+            .iter()
+            .filter(|(arg, _)| matches!(arg, Argument::Synthetic))
+            .count();
+        let max_arg_index = self.arguments.len().saturating_sub(1 + num_synthetic_args);
         // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
