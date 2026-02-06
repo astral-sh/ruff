@@ -867,31 +867,25 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// Returns `true` if this type contains a `Self` type variable and supports `Self` binding.
-    ///
-    /// This returns `false` for `FunctionLiteral`, `BoundMethod`, and function-like `Callable`
-    /// types (synthesized methods like `__replace__`), which have their own Self binding mechanism
-    /// through signature binding.
-    pub(crate) fn supports_self_binding(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::FunctionLiteral(_) | Type::BoundMethod(_) => return false,
-            Type::Callable(callable) if callable.is_function_like(db) => return false,
-            _ => {}
-        }
-        self.contains_self(db)
-    }
-
     /// Bind `Self` type variables in this type to a concrete self type.
     ///
     /// Uses MRO-based matching: a `Self` typevar is only bound if its owner class
     /// is in the MRO of the self type's class.
+    ///
+    /// Callable types whose `Self` binding is handled through the descriptor protocol /
+    /// signature binding path (e.g. `FunctionLiteral`, `BoundMethod`, function-like
+    /// `Callable`) are treated as opaque by the `BindSelf` type mapping — it will not
+    /// recurse into their signatures. This means `bind_self_typevars` can be called
+    /// uniformly on any attribute type: data attributes like `Manager[Self]` will have
+    /// `Self` bound eagerly, while functions/methods will defer `Self` binding to call
+    /// time (where `Self` is inferred from the explicit `self` argument).
     pub(crate) fn bind_self_typevars(
         self,
         db: &'db dyn Db,
         self_type: Type<'db>,
         self_binding_context: Option<BindingContext<'db>>,
     ) -> Self {
-        if !self.supports_self_binding(db) {
+        if !self.contains_self(db) {
             return self;
         }
 
@@ -3473,9 +3467,10 @@ impl<'db> Type<'db> {
                 );
 
                 // Resolve `Self` type variables in class-level attribute access
-                // BEFORE the descriptor protocol. At this point, methods are still
-                // FunctionLiteral types, which `supports_self_binding` will skip.
-                // Data attributes like `Manager[Self]` will have Self bound.
+                // BEFORE the descriptor protocol. The `BindSelf` type mapping treats
+                // function-like types as opaque (not recursing into their signatures),
+                // so only data attributes like `Manager[Self]` will have Self bound
+                // here. Functions/methods defer Self binding to call time.
                 //
                 // `to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`,
                 // and `SubclassOf`, so the `unwrap_or` is just a defensive fallback.
@@ -6283,6 +6278,12 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
+                // `BindSelf` does not recurse into function literals: their `Self` binding
+                // is deferred to call time via `Signature::bind_self`.
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
+
                 let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
 
                 match type_mapping {
@@ -6291,11 +6292,19 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
-                db,
-                method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            )),
+            Type::BoundMethod(method) => {
+                // `BindSelf` does not recurse into bound methods: their `Self` binding
+                // is deferred to call time via `BoundMethodType::into_callable_type`.
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
+
+                Type::BoundMethod(BoundMethodType::new(
+                    db,
+                    method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
 
             Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::PromoteLiterals(PromoteLiteralsMode::On)) => {
                 match instance.known_class(db) {
@@ -6327,30 +6336,46 @@ impl<'db> Type<'db> {
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                     function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
                     function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(
                     property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(
                     property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
             Type::Callable(callable) => {
+                // Function-like callables bind `Self` at call time, not at access time.
+                if callable.is_function_like(db) && matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
