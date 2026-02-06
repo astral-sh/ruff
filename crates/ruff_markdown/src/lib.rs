@@ -2,7 +2,7 @@ use std::{path::Path, sync::LazyLock};
 
 use regex::Regex;
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::format_module_source;
+use ruff_python_formatter::{PyFormatOptions, format_module_source};
 use ruff_python_trivia::textwrap::{dedent, indent};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
@@ -80,46 +80,52 @@ pub fn format_code_blocks(
                     continue;
                 };
 
-                // Found the matching end of the code block
-                if closing_fence == opening_fence {
-                    let language = language.to_ascii_lowercase();
-                    if state == MarkdownState::On
-                        && matches!(
-                            language.as_str(),
-                            "python" | "py" | "python3" | "py3" | "pyi"
-                        )
-                    {
-                        // Maybe python, try formatting it
-                        let end = code_line.start();
-                        let unformatted_code = dedent(&source[TextRange::new(start, end)]);
+                if closing_fence != opening_fence {
+                    continue;
+                }
 
-                        let py_source_type = match settings.extension.get_extension(&language) {
-                            None => PySourceType::from_extension(&language),
-                            Some(language) => PySourceType::from(language),
-                        };
+                // Found the matching end of the code block
+                if state != MarkdownState::On {
+                    break;
+                }
+
+                // Maybe python, try formatting it
+                let language = language.to_ascii_lowercase();
+                let py_source_type = match settings.extension.get_extension(&language) {
+                    None => PySourceType::from_extension(&language),
+                    Some(language) => PySourceType::from(language),
+                };
+
+                let end = code_line.start();
+                let unformatted_code = dedent(&source[TextRange::new(start, end)]);
+
+                let formatted_code = match language.as_str() {
+                    "python" | "py" | "python3" | "py3" | "pyi" => {
                         let options =
                             settings.to_format_options(py_source_type, &unformatted_code, path);
-
                         // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
                         // dependency, and I suspect that Rust can optimize the closure away regardless.
                         #[expect(clippy::redundant_closure_for_method_calls)]
-                        let formatted_code = format_module_source(&unformatted_code, options)
-                            .map(|formatted| formatted.into_code());
-
-                        // Formatting produced changes
-                        if let Ok(formatted_code) = formatted_code
-                            && (formatted_code.len() != unformatted_code.len()
-                                || formatted_code != *unformatted_code)
-                        {
-                            formatted.push_str(&source[TextRange::new(last_match, start)]);
-                            let formatted_code = indent(&formatted_code, code_indent);
-                            formatted.push_str(&formatted_code);
-                            last_match = end;
-                            changed = true;
-                        }
+                        format_module_source(&unformatted_code, options)
+                            .map(|formatted| formatted.into_code())
+                            .ok()
                     }
-                    break;
+                    "pycon" => format_pycon_block(&unformatted_code, path, settings),
+                    _ => None,
+                };
+
+                // Formatting produced changes
+                if let Some(formatted_code) = formatted_code
+                    && (formatted_code.len() != unformatted_code.len()
+                        || formatted_code != *unformatted_code)
+                {
+                    formatted.push_str(&source[TextRange::new(last_match, start)]);
+                    let formatted_code = indent(&formatted_code, code_indent);
+                    formatted.push_str(&formatted_code);
+                    last_match = end;
+                    changed = true;
                 }
+                break;
             }
         }
     }
@@ -129,6 +135,63 @@ pub fn format_code_blocks(
         MarkdownResult::Formatted(formatted)
     } else {
         MarkdownResult::Unchanged
+    }
+}
+
+fn format_pycon_block(
+    source: &str,
+    path: Option<&Path>,
+    settings: &FormatterSettings,
+) -> Option<String> {
+    let offset = TextSize::new(4);
+    let mut changed = false;
+    let mut result = String::with_capacity(source.len());
+    let mut unformatted = String::with_capacity(source.len());
+    let mut last_match = TextSize::new(0);
+    let mut lines = source.universal_newlines().peekable();
+
+    while let Some(line) = lines.next() {
+        unformatted.clear();
+        if line.starts_with(">>> ") {
+            let start = line.start();
+            let mut end = line.full_end();
+            unformatted.push_str(&source[TextRange::new(line.start() + offset, line.full_end())]);
+            while let Some(next_line) = lines.peek() {
+                if next_line.starts_with("... ") {
+                    end = next_line.full_end();
+                    unformatted.push_str(&source[TextRange::new(next_line.start() + offset, end)]);
+                    lines.next();
+                } else {
+                    break;
+                }
+            }
+            let options = settings.to_format_options(PySourceType::Python, &unformatted, path);
+            // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
+            // dependency, and I suspect that Rust can optimize the closure away regardless.
+            #[expect(clippy::redundant_closure_for_method_calls)]
+            let Ok(formatted) =
+                format_module_source(&unformatted, options).map(|formatted| formatted.into_code())
+            else {
+                continue;
+            };
+
+            if formatted.len() != unformatted.len() || formatted != unformatted {
+                result.push_str(&source[TextRange::new(last_match, start)]);
+                for (idx, line) in formatted.universal_newlines().enumerate() {
+                    result.push_str(if idx == 0 { ">>> " } else { "... " });
+                    result.push_str(&formatted[TextRange::new(line.start(), line.full_end())]);
+                }
+                last_match = end;
+                changed = true;
+            }
+        }
+    }
+
+    if changed {
+        result.push_str(&source[last_match.to_usize()..]);
+        Some(result)
+    } else {
+        None
     }
 }
 
