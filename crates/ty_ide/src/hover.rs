@@ -4710,6 +4710,89 @@ def function():
         ");
     }
 
+    #[test]
+    fn hover_call_expression_annotation() {
+        let test = cursor_test(
+            r#"
+            def foo() -> int:
+                return 1
+
+            class A:
+                a: foo()
+
+            A.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        foo()
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        foo()
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:3
+          |
+        6 |     a: foo()
+        7 |
+        8 | A.a
+          |   ^- Cursor offset
+          |   |
+          |   source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_call_expression_annotation_with_existing_docstring() {
+        let test = cursor_test(
+            r#"
+            def foo() -> int:
+                return 1
+
+            class A:
+                a: foo()
+                """existing docs"""
+
+            A.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        int
+        ---------------------------------------------
+        existing docs
+
+        foo()
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        existing docs  
+          
+        foo()
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:3
+          |
+        7 |     """existing docs"""
+        8 |
+        9 | A.a
+          |   ^- Cursor offset
+          |   |
+          |   source
+          |
+        "#);
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;

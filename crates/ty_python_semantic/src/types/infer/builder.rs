@@ -8295,10 +8295,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
-        let mut declared = self.infer_annotation_expression_allow_pep_613(
-            annotation,
-            DeferredExpressionState::from(self.defer_annotations()),
-        );
+        // If this is an annotation-only statement (no RHS value) and the annotation is a
+        // call expression, infer the call's return type instead of treating it as an invalid
+        // type expression. This allows patterns like `a: foo()` to resolve to the return
+        // type of `foo()` instead of `Unknown`.
+        let mut declared = if value.is_none()
+            && let Some(call_expr) = annotation.as_call_expr()
+        {
+            let return_ty = self.infer_call_expression(call_expr, TypeContext::default());
+            self.store_expression_type(annotation, return_ty);
+            TypeAndQualifiers::declared(return_ty)
+        } else {
+            self.infer_annotation_expression_allow_pep_613(
+                annotation,
+                DeferredExpressionState::from(self.defer_annotations()),
+            )
+        };
 
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
