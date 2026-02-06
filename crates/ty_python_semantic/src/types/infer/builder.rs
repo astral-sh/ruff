@@ -7396,7 +7396,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We need at least one positional argument (the wrapped function).
         let func_expr = arguments.args.first()?;
 
-        // The first positional arg (the function) must not be starred.
+        // If the first positional arg is starred (e.g. `partial(*args)`), we
+        // can't statically determine the wrapped function; fall back.
         if func_expr.is_starred_expr() {
             return None;
         }
@@ -7443,19 +7444,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let bound_keyword_names: Vec<&str> = bound_keywords.iter().map(|(k, _)| *k).collect();
-
         // Specialize each overload and remove bound params.
         let new_overloads: Vec<_> = overloads
             .iter()
             .map(|sig| {
-                Self::apply_partial_to_signature(
-                    db,
-                    sig,
-                    &bound_positional,
-                    &bound_keywords,
-                    &bound_keyword_names,
-                )
+                Self::apply_partial_to_signature(db, sig, &bound_positional, &bound_keywords)
             })
             .collect();
 
@@ -7678,7 +7671,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         signature: &Signature<'db>,
         bound_positional: &[Type<'db>],
         bound_keywords: &[(&str, Type<'db>)],
-        bound_keyword_names: &[&str],
     ) -> Signature<'db> {
         let signature = Self::specialize_signature_from_bound_args(
             db,
@@ -7699,20 +7691,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 remaining.push(param.clone());
             } else if param.is_positional() {
                 if positional_consumed < bound_positional_count {
+                    // Consumed by a bound positional arg (cannot be overridden).
                     positional_consumed += 1;
                 } else if !param.is_positional_only()
                     && let Some(name) = param.name()
-                    && bound_keyword_names.contains(&name.as_str())
+                    && let Some(&(_, bound_ty)) =
+                        bound_keywords.iter().find(|(k, _)| *k == name.as_str())
                 {
-                    // Consumed by a bound keyword arg (only for positional-or-keyword params).
+                    // Bound by keyword, but `partial` allows overriding keyword
+                    // args at call time, so keep the parameter with a default.
+                    remaining.push(param.clone().with_default_type(bound_ty));
                 } else {
                     remaining.push(param.clone());
                 }
             } else if param.is_keyword_only() {
                 if let Some(name) = param.name()
-                    && bound_keyword_names.contains(&name.as_str())
+                    && let Some(&(_, bound_ty)) =
+                        bound_keywords.iter().find(|(k, _)| *k == name.as_str())
                 {
-                    // Consumed by a bound keyword arg.
+                    // Bound by keyword, but can be overridden at call time.
+                    remaining.push(param.clone().with_default_type(bound_ty));
                 } else {
                     remaining.push(param.clone());
                 }
