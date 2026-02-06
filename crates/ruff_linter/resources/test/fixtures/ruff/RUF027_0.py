@@ -84,3 +84,9 @@ def in_type_def():
 # https://github.com/astral-sh/ruff/issues/18860
 def fuzz_bug():
     c('{\t"i}')
+
+# Test case for backslash handling in f-string interpolations
+# Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
+def backslash_test():
+    x = "test"
+    print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
