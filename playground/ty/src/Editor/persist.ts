@@ -1,4 +1,5 @@
 import { fetchPlayground, savePlayground } from "./api";
+import { generatePlaygroundMarkdown } from "./markdown";
 
 interface Workspace {
   files: { [name: string]: string };
@@ -16,6 +17,17 @@ export async function persist(workspace: Workspace): Promise<void> {
   await navigator.clipboard.writeText(
     `${window.location.origin}/${encodeURIComponent(id)}`,
   );
+}
+
+/**
+ * Persist the configuration and copy markdown representation to clipboard.
+ */
+export async function copyAsMarkdown(workspace: Workspace): Promise<void> {
+  const id = await savePlayground(workspace);
+  const shareUrl = `${window.location.origin}/${encodeURIComponent(id)}`;
+  const markdown = generatePlaygroundMarkdown(workspace.files, shareUrl);
+
+  await navigator.clipboard.writeText(markdown);
 }
 
 /**
