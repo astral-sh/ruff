@@ -40,6 +40,16 @@ def _(buf: bytes):
 from struct import *
 
 def _(buf: bytes):
+    # 32 is the maximum supported repetition count
+
+    # revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
+    reveal_type(unpack("32i", buf))
+
+    # 33+ repetitions will use a more general fallback type
+
+    # revealed: tuple[Unknown, ...]
+    reveal_type(unpack("33i", buf))
+
     reveal_type(unpack("18446744073709551616c", buf))  # revealed: tuple[Unknown, ...]
     reveal_type(unpack("65536i", buf))  # revealed: tuple[Unknown, ...]
     reveal_type(unpack("18446744073709551616c@i", buf))  # revealed: tuple[Unknown, ...]

@@ -1295,8 +1295,8 @@ impl<'db> Bindings<'db> {
                                             // yielding a single bytes object.
                                             elements.push(ty);
                                         } else {
-                                            // To prevent OOM errors, we cap the number of repetitions by escaping to Unknown.
-                                            if count >= 2 ^ 16 {
+                                            // To prevent large tuple types, we cap the number of repetitions.
+                                            if count > 32 {
                                                 escaped = true;
                                                 break;
                                             }
