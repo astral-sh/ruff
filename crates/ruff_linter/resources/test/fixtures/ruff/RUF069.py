@@ -1,267 +1,79 @@
-from contextlib import contextmanager, asynccontextmanager
-from contextlib import contextmanager as cm
-import contextlib
+a = 1.0
+b = 2.0
+x = 99
 
+# ok
+if a is None: ...
+if a == 1: ...
+if a != b: ...
+if a > 1.0: ...
 
-# Errors
+# errors
+assert x == 0.0
+print(3.14 != a)
+if x == 0.3: ...
+if x ==       0.42: ...
 
-@contextmanager
-def bad1():
-    print("start")
-    yield  # RUF069
-    print("cleanup")
 
+def foo(a, b):
+    return a == b - 0.1
 
-@contextmanager
-def bad_with_code_after_yield():
-    with other_cm():
-        yield  # RUF069
-        print("cleanup")
+print(x == 3.0 == 3.0)
+print(1.0 == x == 2)
 
+assert x == float(1)
+assert (a + b) == 1.0
+assert -x == 1.0
+assert -x == -1.0
+assert x**2 == 4.0
+assert x / 2 == 1.5
+assert (y := x + 1.0) == 2.0
 
-@contextmanager
-def bad_nested_conditional_not_last():
-    if condition:
-        yield  # RUF069
-    print("after if")
+[i for i in range(10) if i == 1.0]
+{i for i in range(10) if i != 2.0}
 
+assert x / 2 == 1
+assert (x / 2) == (y / 3)
 
-@contextmanager
-def bad_nested_in_loop_not_last():
-    for i in range(10):
-        yield  # RUF069
-    print("after loop")
+# ok
+assert Path(__file__).parent / ".txt" == 1
 
+def foo(a, b):
+    return a == b * float("2")
 
-# OK
+assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
 
-@contextmanager
-def good_yield_last():
-    print("setup")
-    yield
+assert (y := x / 2) == 1
 
+assert (0.3 if x > 0 else 1) == 0.1 + 0.2
 
-@asynccontextmanager
-async def good_async_yield_last():
-    yield
 
+def _():
+    import math
 
-@contextmanager
-def good_yield_from_last():
-    yield from other_generator()
+    inf = float("inf")
 
+    assert inf == float("inf")  # ok
 
-@contextmanager
-def good_try_finally():
-    print("start")
-    try:
-        yield
-    finally:
-        print("cleanup")
+    assert float("-inf") == float("-infinity")  # ok
 
+    assert float("infinity") == float("inf")  # ok
 
-@asynccontextmanager
-async def good_async_try_finally():
-    try:
-        yield
-    finally:
-        print("cleanup")
+    assert math.inf == 1e300 * 1e300  # ok
 
+    assert complex("inf") == inf  # ok
 
-@contextmanager
-def good_with_delegation():
-    with other_cm():
-        yield
 
+def _pytest():
+    import pytest
 
-@contextmanager
-def good_with_delegation_nested():
-    with cm1():
-        with cm2():
-            yield
+    assert pytest.approx(1 / 3, rel=1e-6) == 0.333333  # ok
 
 
-@contextmanager
-def good_with_multiple_cms():
-    with cm1(), cm2():
-        yield
+def _numpy_torch():
+    from numpy import inf as numpy_inf
+    from torch import inf as torch_inf
 
+    assert numpy_inf == 1e300 * 1e300  # ok
 
-@asynccontextmanager
-async def good_async_with_delegation():
-    async with other_async_cm():
-        yield
-
-
-@contextmanager
-def good_try_finally_with_except():
-    try:
-        yield
-    except Exception:
-        pass
-    finally:
-        print("cleanup")
-
-
-@contextmanager
-def good_nested_try_finally():
-    try:
-        try:
-            yield
-        finally:
-            print("inner cleanup")
-    finally:
-        print("outer cleanup")
-
-
-@contextmanager
-def good_conditional_inside_try_finally():
-    try:
-        if condition:
-            yield
-        else:
-            yield
-    finally:
-        print("cleanup")
-
-
-def not_a_context_manager():
-    yield
-
-
-@some_other_decorator
-def other_decorator():
-    yield
-
-
-@contextmanager
-def good_with_nested_function():
-    def inner():
-        yield
-
-    try:
-        yield
-    finally:
-        print("cleanup")
-
-
-@contextmanager
-def good_with_generator_expr():
-    gen = (x for x in range(10))
-    try:
-        yield
-    finally:
-        print("cleanup")
-
-
-@contextmanager
-def good_multiple_yields():
-    try:
-        yield 1
-        yield 2
-    finally:
-        print("cleanup")
-
-
-@contextmanager
-def good_with_class():
-    class Inner:
-        def method(self):
-            yield
-
-    try:
-        yield
-    finally:
-        print("cleanup")
-
-
-@contextmanager
-def good_try_except_without_finally():
-    try:
-        yield
-    except Exception:
-        pass
-
-
-@contextmanager
-def good_try_except_with_else():
-    try:
-        yield
-    except Exception:
-        pass
-    else:
-        print("no exception")
-
-
-@contextmanager
-def good_yield_in_except_no_finally():
-    try:
-        do_something()
-    except Exception:
-        yield
-
-
-@cm
-def good_aliased_import():
-    yield
-
-
-@contextlib.contextmanager
-def good_attribute_import():
-    yield
-
-
-@contextmanager
-def good_with_code_after_with_block():
-    with other_cm():
-        yield
-    print("after with")
-
-
-@contextmanager
-def good_yield_in_except_with_finally():
-    try:
-        do_something()
-    except Exception:
-        yield
-    finally:
-        cleanup()
-
-
-@contextmanager
-def good_yield_in_else_with_finally():
-    try:
-        do_something()
-    except Exception:
-        pass
-    else:
-        yield
-    finally:
-        cleanup()
-
-
-@contextmanager
-def good_yield_terminal_in_conditional():
-    if condition:
-        yield
-
-
-@contextmanager
-def good_yield_terminal_in_loop():
-    for i in range(10):
-        yield
-
-
-@contextmanager
-def good_yield_before_return():
-    print("setup")
-    yield
-    return
-
-
-@contextmanager
-def good_yield_terminal_in_branches():
-    if condition:
-        yield
-    else:
-        yield
+    assert torch_inf == 1e300 * 1e300  # ok
