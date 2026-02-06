@@ -105,19 +105,16 @@ fn test_output_format_env() -> anyhow::Result<()> {
         reveal_type('str'.lower())  # [revealed-type]
         "#,
     )?;
-    // Test output of cli command against output of same command with env var set.
-    assert_eq!(
-        case.command()
-            .arg("--output-format=github")
-            .arg("--warn")
-            .arg("unresolved-reference")
-            .output()?,
-        case.command()
-            .env("TY_OUTPUT_FORMAT", "github")
-            .arg("--warn")
-            .arg("unresolved-reference")
-            .output()?
-    );
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "github").arg("--warn").arg("unresolved-reference"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
+
+    ----- stderr -----
+    ");
     Ok(())
 }
 
