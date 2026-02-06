@@ -1207,7 +1207,7 @@ impl<'db> Node<'db> {
         db: &'db dyn Db,
         nodes: impl Iterator<Item = Self>,
         zero: Self,
-        one: Self,
+        is_one: impl Fn(Self, &'db dyn Db) -> bool,
         mut combine: impl FnMut(Self, &'db dyn Db, Self) -> Self,
     ) -> Self {
         // To implement the "linear" shape described above, we could collect the iterator elements
@@ -1236,8 +1236,8 @@ impl<'db> Node<'db> {
         // until the iterator passes 256 elements.
         let mut accumulator: SmallVec<[(Node<'db>, u8); 8]> = SmallVec::default();
         for node in nodes {
-            if node == one {
-                return one;
+            if is_one(node, db) {
+                return node;
             }
 
             let (mut node, mut depth) = (node, 0);
@@ -1247,8 +1247,8 @@ impl<'db> Node<'db> {
             {
                 let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
                 node = combine(existing, db, node);
-                if node == one {
-                    return one;
+                if is_one(node, db) {
+                    return node;
                 }
                 depth += 1;
             }
@@ -1268,7 +1268,7 @@ impl<'db> Node<'db> {
             db,
             nodes,
             Node::AlwaysFalse,
-            Node::AlwaysTrue,
+            Self::is_always_satisfied,
             Self::or_with_offset,
         )
     }
@@ -1278,7 +1278,7 @@ impl<'db> Node<'db> {
             db,
             nodes,
             Node::AlwaysTrue,
-            Node::AlwaysFalse,
+            Self::is_never_satisfied,
             Self::and_with_offset,
         )
     }
