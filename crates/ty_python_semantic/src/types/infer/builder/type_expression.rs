@@ -1769,7 +1769,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         parameters: &'param ast::Expr,
     ) -> Result<Type<'db>, Vec<&'param ast::Expr>> {
-        Ok(match parameters {
+        let ty = match parameters {
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
@@ -1821,6 +1821,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             literal @ ast::Expr::NumberLiteral(number) if number.value.is_int() => {
                 self.infer_expression(literal, TypeContext::default())
             }
+
             // for negative and positive numbers
             ast::Expr::UnaryOp(u)
                 if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
@@ -1865,6 +1866,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(parameters, TypeContext::default());
                 return Err(vec![parameters]);
             }
+        };
+
+        Ok(if let Type::LiteralValue(literal) = ty {
+            // Avoid promoting values originating from an explicitly annotated literal type.
+            Type::LiteralValue(literal.to_unpromotable(self.db()))
+        } else {
+            ty
         })
     }
 

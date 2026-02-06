@@ -378,10 +378,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        // Avoid promoting values originating from an explicitly annotated literal type.
-        let annotation_ty = annotation_ty.map_type(|ty| ty.unpromote_literals(self.db()));
         self.store_expression_type(annotation, annotation_ty.inner_type());
-
         annotation_ty
     }
 
