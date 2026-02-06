@@ -786,6 +786,24 @@ for tup in my_other_args:
     f4(*tup, e=None)
 ```
 
+Regression test for <https://github.com/astral-sh/ty/issues/2734>.
+
+```py
+def f5(x: int | None = None, y: str = "") -> None: ...
+def f6(flag: bool) -> None:
+    args = () if flag else (1,)
+    f5(*args)
+
+def f7(x: int | None = None, y: str = "") -> None: ...
+def f8(flag: bool) -> None:
+    args = () if flag else ("bad",)
+    f7(*args)  # error: [invalid-argument-type]
+
+def f11(*args: int) -> None: ...
+def f12(args: tuple[int] | int) -> None:
+    f11(*args)  # error: [not-iterable]
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
