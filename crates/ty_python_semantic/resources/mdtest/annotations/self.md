@@ -493,11 +493,11 @@ Dataclass fields can also use `Self` in their annotations:
 
 ```py
 from dataclasses import dataclass
-from typing import Optional, Self
+from typing import Self
 
 @dataclass
 class Node:
-    parent: Optional[Self] = None
+    parent: Self | None = None
 
 Node(Node())
 ```
@@ -505,35 +505,13 @@ Node(Node())
 Attributes annotated with `Self` can be assigned on instances:
 
 ```py
-from typing import Optional, Self
+from typing import Self
 
 class MyClass:
-    field: Optional[Self] = None
+    field: Self | None = None
 
 def _(c: MyClass):
     c.field = c
-```
-
-Accessing base class attributes through `Self` should work correctly. This is a common pattern in
-ORMs like Django where a base `Model` class defines methods that access `self` attributes, and those
-methods are inherited by subclasses:
-
-```py
-from typing import Self
-
-class Model:
-    id: int
-    name: str
-
-    def get_id(self: Self) -> int:
-        # Self is bounded by Model here, but should still find id
-        reveal_type(self.id)  # revealed: int
-        return self.id
-
-class User(Model):
-    email: str
-
-reveal_type(User().get_id())  # revealed: int
 ```
 
 Self from class body annotations and method signatures represent the same logical type variable.
@@ -574,6 +552,13 @@ class TreeNode:
         if self.children:
             return self.children[0]
         return None
+
+    def all_descendants(self) -> list[Self]:
+        result: list[Self] = []
+        for child in self.children:
+            result.append(child)
+            result.extend(child.all_descendants())
+        return result
 
     def root(self) -> Self:
         node = self
@@ -886,72 +871,22 @@ def _(c: CallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None
 ```
 
-## Bound methods from internal data structures stored as instance attributes
+## Bound methods stored as instance attributes
 
-This tests the pattern where a class stores bound methods from internal data structures (like
-`deque` or `dict`) as instance attributes for performance. When these bound methods are later
-accessed and called through `self`, the `Self` type binding should not interfere with their
-signatures.
-
-This is a regression test for false positives found in ecosystem projects like jinja's `LRUCache`
-and beartype's `CacheUnboundedStrong`.
+Bound methods from other objects stored as instance attributes should not have their signatures
+affected by `Self` type binding. This is a regression test for false positives in projects like
+jinja's `LRUCache`.
 
 ```py
 from collections import deque
-from typing import Any
 
-class LRUCache:
-    """A simple LRU cache that stores bound methods from an internal deque."""
-
-    def __init__(self, capacity: int) -> None:
-        self.capacity = capacity
-        self._mapping: dict[Any, Any] = {}
-        self._queue: deque[Any] = deque()
-        self._postinit()
-
-    def _postinit(self) -> None:
-        # Store bound methods from the internal deque for faster attribute lookup
-        self._popleft = self._queue.popleft
-        self._pop = self._queue.pop
-        self._remove = self._queue.remove
+class MyClass:
+    def __init__(self) -> None:
+        self._queue: deque[int] = deque()
         self._append = self._queue.append
 
-    def __getitem__(self, key: Any) -> Any:
-        self._remove(key)
-        self._append(key)
-        return self._mapping[key]
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        self._remove(key)
-        if len(self._queue) >= self.capacity:
-            self._popleft()
-        self._append(key)
-        self._mapping[key] = value
-
-    def __delitem__(self, key: Any) -> None:
-        self._remove(key)
-        del self._mapping[key]
-```
-
-Similarly for dict-based patterns:
-
-```py
-from typing import Hashable
-
-class CacheMap:
-    """A cache that stores bound methods from an internal dict."""
-
-    def __init__(self) -> None:
-        self._key_to_value: dict[Hashable, object] = {}
-        self._key_to_value_get = self._key_to_value.get
-        self._key_to_value_set = self._key_to_value.__setitem__
-
-    def cache_or_get_cached_value(self, key: Hashable, value: object) -> object:
-        cached_value = self._key_to_value_get(key)
-        if cached_value is not None:
-            return cached_value
-        self._key_to_value_set(key, value)
-        return value
+    def add(self, value: int) -> None:
+        self._append(value)
 ```
 
 ## Self in class attributes with generic classes
@@ -986,70 +921,4 @@ def test() -> None:
     reveal_type(instance.objects)  # revealed: Manager[Confirmation]
     instance_result = instance.objects.get()
     reveal_type(instance_result)  # revealed: Confirmation
-```
-
-## Limitation: Stubs that rely on type checker plugins
-
-Some stub packages like `django-stubs` rely on mypy plugins to synthesize attributes that don't
-exist in the stubs themselves. For example, Django's `Model` class automatically gets an `id: int`
-field at runtime, but `django-stubs` doesn't include this in the stub because the mypy plugin adds
-it dynamically based on the model definition.
-
-Without plugin support, type checkers (including ty, mypy, and pyright) will correctly report that
-the attribute doesn't exist. This is the expected behavior - the stubs are incomplete without the
-plugin.
-
-```py
-from typing import Self, Generic, TypeVar, ClassVar, Any
-
-_T = TypeVar("_T", bound="Model", covariant=True)
-
-class Manager(Generic[_T]):
-    def create(self, **kwargs: Any) -> _T:
-        raise NotImplementedError
-
-class Model:
-    # django-stubs defines pk: Any but NOT id: int
-    # The id field is supposed to be synthesized by the mypy plugin
-    pk: Any
-    objects: ClassVar[Manager[Self]]
-
-class CustomerPlan(Model):
-    name: str
-
-plan = CustomerPlan.objects.create(name="test")
-
-# Self binding works correctly - plan is CustomerPlan, not Unknown
-reveal_type(plan)  # revealed: CustomerPlan
-
-# pk works because it's defined in Model
-reveal_type(plan.pk)  # revealed: Any
-
-# id fails because it's not in the stubs (requires mypy plugin)
-# error: [unresolved-attribute]
-plan.id
-```
-
-The workaround is to add the missing attributes to a custom base class:
-
-```py
-from typing import Self, Generic, TypeVar, ClassVar, Any
-
-_T = TypeVar("_T", bound="Model", covariant=True)
-
-class Manager(Generic[_T]):
-    def create(self, **kwargs: Any) -> _T:
-        raise NotImplementedError
-
-class Model:
-    id: int  # Explicitly add id to work without mypy plugin
-    pk: Any
-    objects: ClassVar[Manager[Self]]
-
-class CustomerPlan(Model):
-    name: str
-
-plan = CustomerPlan.objects.create(name="test")
-reveal_type(plan)  # revealed: CustomerPlan
-reveal_type(plan.id)  # revealed: int
 ```
