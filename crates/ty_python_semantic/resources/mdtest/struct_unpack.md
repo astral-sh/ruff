@@ -30,8 +30,8 @@ def _(buf: bytes):
     reveal_type(unpack("d2xH", buf))  # revealed: tuple[float, int]
     reveal_type(unpack("2i4x2h", buf))  # revealed: tuple[int, int, int, int]
     reveal_type(unpack("iP", buf))  # revealed: tuple[int, int]
-    reveal_type(unpack(">n2xN", buf))  # revealed: tuple[int, int]
-    reveal_type(unpack("!P4x", buf))  # revealed: tuple[int]
+    reveal_type(unpack("@n2xN", buf))  # revealed: tuple[int, int]
+    reveal_type(unpack("@P4x", buf))  # revealed: tuple[int]
 ```
 
 ## Escape Large Repetition Counts
@@ -55,7 +55,7 @@ def _(buf: bytes):
     reveal_type(unpack("18446744073709551616c@i", buf))  # revealed: tuple[Unknown, ...]
     reveal_type(unpack("65536i@i", buf))  # revealed: tuple[Unknown, ...]
     reveal_type(unpack("18446744073709551616c2h", buf))  # revealed: tuple[Unknown, ...]
-    reveal_type(unpack(">n2xN18446744073709551616c@i", buf))  # revealed: tuple[Unknown, ...]
+    reveal_type(unpack("@n2xN18446744073709551616c@i", buf))  # revealed: tuple[Unknown, ...]
 ```
 
 ## Unknown Formats
