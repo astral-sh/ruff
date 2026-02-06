@@ -15,7 +15,7 @@ pub(crate) struct ImportBinding<'a> {
     pub(crate) parent_range: Option<TextRange>,
     /// Whether the binding needs `from __future__ import annotations` to be imported.
     pub(crate) needs_future_import: bool,
-    /// The first runtime reference.
+    /// A runtime reference to this import, used for diagnostic annotations.
     pub(crate) runtime_reference: Option<&'a ResolvedReference>,
 }
 
