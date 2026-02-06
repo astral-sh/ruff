@@ -2723,6 +2723,32 @@ impl<'db> StaticClassLiteral<'db> {
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
+    /// Return `true` if this class is a metaclass (i.e., a subclass of `type`).
+    pub(super) fn is_metaclass(self, db: &'db dyn Db) -> bool {
+        let mut visiting = FxHashSet::default();
+        self.is_metaclass_inner(db, &mut visiting)
+    }
+
+    fn is_metaclass_inner(self, db: &'db dyn Db, visiting: &mut FxHashSet<Self>) -> bool {
+        // The `type` class itself is a metaclass.
+        if self.is_known(db, KnownClass::Type) {
+            return true;
+        }
+
+        // If we encounter a cycle, conservatively return false.
+        if !visiting.insert(self) {
+            return false;
+        }
+
+        // Check if any explicit base is a metaclass. This is more efficient than
+        // iterating the full MRO because explicit bases are typically few.
+        self.explicit_bases(db).iter().any(|base| {
+            base.as_class_literal()
+                .and_then(ClassLiteral::as_static)
+                .is_some_and(|cls| cls.is_metaclass_inner(db, visiting))
+        })
+    }
+
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
     /// `typing.NamedTuple`, either directly or indirectly, including functional forms like
     /// `NamedTuple("X", ...)`).

@@ -1037,6 +1037,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn is_typing_self(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::SpecialForm(SpecialFormType::TypingSelf) => true,
+            Type::TypeVar(typevar) => typevar.kind(db) == TypeVarKind::TypingSelf,
+            _ => false,
+        }
+    }
+
     pub(crate) const fn is_dynamic(&self) -> bool {
         matches!(self, Type::Dynamic(_))
     }
