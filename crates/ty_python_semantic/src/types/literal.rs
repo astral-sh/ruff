@@ -2,7 +2,7 @@ use compact_str::CompactString;
 use ruff_python_ast::name::Name;
 
 use crate::Db;
-use crate::types::{ClassLiteral, NormalizedVisitor, Type};
+use crate::types::{ClassLiteral, KnownClass, NormalizedVisitor, Type};
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
 #[derive(
@@ -266,6 +266,18 @@ impl<'db> LiteralValueType<'db> {
 
     pub(crate) fn is_bytes(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), LiteralValueTypeKind::Bytes(..))
+    }
+
+    pub(crate) fn fallback_instance(self, db: &'db dyn Db) -> Type<'db> {
+        match self.kind(db) {
+            LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
+                KnownClass::Str.to_instance(db)
+            }
+            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db),
+            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db),
+            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db),
+            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
+        }
     }
 
     pub(crate) fn normalized_impl(

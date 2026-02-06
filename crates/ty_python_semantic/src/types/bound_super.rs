@@ -9,9 +9,9 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
-        LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType, NormalizedVisitor,
-        SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints,
-        TypeVarConstraints, TypeVarInstance, UnionBuilder,
+        MemberLookupPolicy, NominalInstanceType, NormalizedVisitor, SpecialFormType,
+        SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarConstraints,
+        TypeVarInstance, UnionBuilder,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         todo_type, visitor,
@@ -560,23 +560,7 @@ impl<'db> BoundSuperType<'db> {
             Type::TypeIs(_) | Type::TypeGuard(_) => {
                 return delegate_to(KnownClass::Bool.to_instance(db));
             }
-            Type::LiteralValue(literal) => match literal.kind(db) {
-                LiteralValueTypeKind::Bool(_) => {
-                    return delegate_to(KnownClass::Bool.to_instance(db));
-                }
-                LiteralValueTypeKind::Int(_) => {
-                    return delegate_to(KnownClass::Int.to_instance(db));
-                }
-                LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                    return delegate_to(KnownClass::Str.to_instance(db));
-                }
-                LiteralValueTypeKind::Bytes(_) => {
-                    return delegate_to(KnownClass::Bytes.to_instance(db));
-                }
-                LiteralValueTypeKind::Enum(enum_literal_type) => {
-                    return delegate_to(enum_literal_type.enum_class_instance(db));
-                }
-            },
+            Type::LiteralValue(literal) => return delegate_to(literal.fallback_instance(db)),
             Type::SpecialForm(special_form) => {
                 return delegate_to(special_form.instance_fallback(db));
             }
