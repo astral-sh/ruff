@@ -3495,12 +3495,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         } else {
             CallArguments::none()
         };
-
-        let offset = if sub_arguments.len() == 0 {
-            None
-        } else {
-            argument_index
-        };
+        let max_arg_index = self.arguments.len().saturating_sub(1);
         // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
@@ -3522,13 +3517,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 if let [binding] = callable_binding.overloads() {
                     // This is not an overloaded function, so we can propagate its errors to the
                     // outer bindings.
-                    self.errors.extend(
-                        binding
-                            .errors
-                            .iter()
-                            .cloned()
-                            .map(|e| e.maybe_apply_argument_index_offset(offset)),
-                    );
+                    self.errors.extend(binding.errors.iter().cloned().map(|e| {
+                        e.maybe_apply_argument_index_offset(argument_index, max_arg_index)
+                    }));
                 } else {
                     let index = callable_binding
                         .matching_overload_before_type_checking
@@ -3540,7 +3531,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .errors
                             .iter()
                             .cloned()
-                            .map(|e| e.maybe_apply_argument_index_offset(offset)),
+                            .map(|e| {
+                                e.maybe_apply_argument_index_offset(argument_index, max_arg_index)
+                            }),
                     );
                 }
             }
@@ -3552,7 +3545,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .errors
                         .iter()
                         .cloned()
-                        .map(|e| e.maybe_apply_argument_index_offset(offset)),
+                        .map(|e| {
+                            e.maybe_apply_argument_index_offset(argument_index, max_arg_index)
+                        }),
                 );
             }
             MatchingOverloadIndex::Multiple(_) => {
@@ -3568,7 +3563,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .errors
                             .iter()
                             .cloned()
-                            .map(|e| e.maybe_apply_argument_index_offset(offset)),
+                            .map(|e| {
+                                e.maybe_apply_argument_index_offset(argument_index, max_arg_index)
+                            }),
                     );
                 }
             }
@@ -4265,13 +4262,17 @@ pub(crate) enum BindingError<'db> {
 }
 
 impl BindingError<'_> {
-    pub(crate) fn maybe_apply_argument_index_offset(mut self, offset: Option<usize>) -> Self {
+    pub(crate) fn maybe_apply_argument_index_offset(
+        mut self,
+        offset: Option<usize>,
+        max_arg_index: usize,
+    ) -> Self {
         if let Some(offset) = offset {
-            self.apply_argument_index_offset(offset);
+            self.apply_argument_index_offset(offset, max_arg_index);
         }
         self
     }
-    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize, max_arg_index: usize) {
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
             | BindingError::InvalidKeyType { argument_index, .. }
@@ -4280,7 +4281,12 @@ impl BindingError<'_> {
             | BindingError::ParameterAlreadyAssigned { argument_index, .. }
             | BindingError::SpecializationError { argument_index, .. } => {
                 if let Some(i) = argument_index {
-                    *i += offset;
+                    let new_index = *i + offset;
+                    if new_index > max_arg_index {
+                        *argument_index = None;
+                    } else {
+                        *i = new_index;
+                    }
                 }
             }
 
@@ -4289,7 +4295,12 @@ impl BindingError<'_> {
                 ..
             } => {
                 if let Some(i) = first_excess_argument_index {
-                    *i += offset;
+                    let new_index = *i + offset;
+                    if new_index > max_arg_index {
+                        *first_excess_argument_index = None;
+                    } else {
+                        *i = new_index;
+                    }
                 }
             }
 

@@ -38,4 +38,7 @@ def fn5(a: int, b: int) -> None: ...
 # error: [parameter-already-assigned]
 # error: [missing-argument]
 foo(fn5, 1, a=2)
+
+# error: [missing-argument]
+foo(fn5)
 ```

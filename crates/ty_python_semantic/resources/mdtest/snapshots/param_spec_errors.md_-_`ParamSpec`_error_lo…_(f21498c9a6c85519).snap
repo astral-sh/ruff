@@ -41,6 +41,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/param_spec_errors.md
 26 | # error: [parameter-already-assigned]
 27 | # error: [missing-argument]
 28 | foo(fn5, 1, a=2)
+29 | 
+30 | # error: [missing-argument]
+31 | foo(fn5)
 ```
 
 # Diagnostics
@@ -219,6 +222,8 @@ error[missing-argument]: No argument provided for required parameter `b` of func
 27 | # error: [missing-argument]
 28 | foo(fn5, 1, a=2)
    | ^^^^^^^^^^^^^^^^
+29 |
+30 | # error: [missing-argument]
    |
 info: Parameter declared here
  --> src/mdtest_snippet.py:4:37
@@ -241,7 +246,30 @@ error[parameter-already-assigned]: Multiple values provided for parameter `a` of
 27 | # error: [missing-argument]
 28 | foo(fn5, 1, a=2)
    |             ^^^
+29 |
+30 | # error: [missing-argument]
    |
 info: rule `parameter-already-assigned` is enabled by default
+
+```
+
+```
+error[missing-argument]: No arguments provided for required parameters `a`, `b` of function `foo`
+  --> src/mdtest_snippet.py:31:1
+   |
+30 | # error: [missing-argument]
+31 | foo(fn5)
+   | ^^^^^^^^
+   |
+info: Parameters declared here
+ --> src/mdtest_snippet.py:4:16
+  |
+3 | def fn1(a: int) -> None: ...
+4 | def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 |
+6 | foo(fn1, a="a")  # error: [invalid-argument-type]
+  |
+info: rule `missing-argument` is enabled by default
 
 ```
