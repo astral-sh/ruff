@@ -49,3 +49,154 @@ def _(x: int | None):
 
     reveal_type(x)  # revealed: int
 ```
+
+## Narrowing is preserved when a terminal branch prevents a path from flowing through
+
+When one branch of an if/elif/else is terminal (e.g. contains `return`), narrowing from the
+non-terminal branches is preserved after the merge point.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: A | B | C):
+    if isinstance(x, A):
+        pass
+    elif isinstance(x, B):
+        pass
+    else:
+        return
+
+    # Only the if-branch (A) and elif-branch (B) flow through.
+    # The else-branch returned, so its narrowing doesn't participate.
+    reveal_type(x)  # revealed: B | (A & ~B)
+```
+
+## Narrowing is preserved with multiple terminal branches
+
+```py
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+def _(x: A | B | C | D):
+    if isinstance(x, A):
+        return
+    elif isinstance(x, B):
+        pass
+    elif isinstance(x, C):
+        pass
+    else:
+        return
+
+    # Only the elif-B and elif-C branches flow through.
+    reveal_type(x)  # revealed: (C & ~A) | (B & ~A & ~C)
+```
+
+## Multiple sequential if-statements don't leak narrowing
+
+After a complete if/else where both branches flow through (no terminal), narrowing should be
+cancelled out at the merge point.
+
+```py
+def _(x: int | str | None):
+    if isinstance(x, int):
+        pass
+    else:
+        pass
+
+    # Narrowing cancels out: both paths flow, so type is unchanged.
+    reveal_type(x)  # revealed: int | str | None
+
+    if isinstance(x, str):
+        y = 1
+    else:
+        y = 2
+
+    # Second if-statement's narrowing also cancels out.
+    reveal_type(x)  # revealed: int | str | None
+```
+
+## Narrowing after a `NoReturn` call in one branch
+
+When a branch calls a function that returns `NoReturn`/`Never`, we know that branch terminates and
+doesn't contribute to the type after the if statement.
+
+```py
+import sys
+
+def _(val: int | None):
+    if val is None:
+        sys.exit()
+    reveal_type(val)  # revealed: int
+```
+
+This also works when the `NoReturn` function is called in the else branch:
+
+```py
+import sys
+
+def _(val: int | None):
+    if val is not None:
+        pass
+    else:
+        sys.exit()
+    reveal_type(val)  # revealed: int
+```
+
+And for elif branches:
+
+```py
+import sys
+
+def _(val: int | str | None):
+    if val is None:
+        sys.exit()
+    elif isinstance(val, int):
+        pass
+    else:
+        sys.exit()
+    reveal_type(val)  # revealed: int
+```
+
+## Narrowing from `assert` should not affect reassigned variables
+
+When a variable is reassigned after an `assert`, the narrowing from the assert should not apply to
+the new value.
+
+```py
+def foo(arg: int) -> int | None:
+    return None
+
+def bar() -> None:
+    v = foo(1)
+    assert v is None
+
+    v = foo(2)
+    # v was reassigned, so the assert narrowing shouldn't apply
+    reveal_type(v)  # revealed: int | None
+```
+
+## Narrowing from `NoReturn` should not affect reassigned variables
+
+When a variable is narrowed due to a `NoReturn` call in one branch and then reassigned, the
+narrowing should only apply before the reassignment, not after.
+
+```py
+import sys
+
+def foo() -> int | None:
+    return 3
+
+def bar():
+    v = foo()
+    if v is None:
+        sys.exit()
+    reveal_type(v)  # revealed: int
+
+    v = foo()
+    # v was reassigned, so any narrowing shouldn't apply
+    reveal_type(v)  # revealed: int | None
+```
