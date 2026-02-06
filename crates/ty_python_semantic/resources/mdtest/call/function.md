@@ -1531,3 +1531,76 @@ def _(arg: int):
     # error: [not-iterable] "Object of type `int` is not iterable"
     foo(*arg)
 ```
+
+## TODO regressions: false positives from variadic binding
+
+```py
+from datetime import datetime, timezone
+from ty_extensions import Unknown
+
+# TODO: No `parameter-already-assigned` diagnostics should be emitted here.
+def _scipy_regression() -> None:
+    class Dist:
+        def rvs(self, mu=0, lmbda=1, a=1, b=1, size=None, random_state=None): ...
+
+    class Frozen:
+        def __init__(self) -> None:
+            self._dist: Unknown | Dist = Dist()
+            self._shapes = (0, 1, 1, 1)
+
+        def rvs(self, size=None, random_state=None):
+            # error: [parameter-already-assigned]
+            # error: [parameter-already-assigned]
+            self._dist.rvs(*self._shapes, size=size, random_state=random_state)
+
+# TODO: No `parameter-already-assigned` diagnostic should be emitted here.
+def _cki_regression() -> None:
+    cases = [
+        ("*/5 * * * *", [(0, 5, 0), (0, 10, 0), (0, 15, 0)]),
+        ("*/10 * * * *", [(0, 10, 0), (0, 20, 0), (0, 30, 0)]),
+        ("0 */2 * * *", [(2, 0, 0), (4, 0, 0), (6, 0, 0)]),
+    ]
+
+    for _schedule, times in cases:
+        for expected_next in times:
+            # error: [parameter-already-assigned]
+            datetime(2010, 1, 2, *expected_next, tzinfo=timezone.utc)
+            expected_next = datetime(2010, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
+
+# TODO: No diagnostics should be emitted here.
+def _apprise_regression() -> None:
+    def validate_regex(
+        value: str,
+        regex: str = r"[^\s]+",
+        flags: str | int = 0,
+        strip: object = True,
+        fmt: str | None = None,
+    ) -> str:
+        return value
+
+    class NotifyBase:
+        template_tokens: dict[str, dict[str, str | bool | tuple[str, str]]] = {
+            "default": {"name": "x", "required": False, "regex": ("x", "i")},
+        }
+
+    class NotifyTelegram(NotifyBase):
+        template_tokens = dict(
+            NotifyBase.template_tokens,
+            **{
+                "bot_token": {
+                    "name": "Bot Token",
+                    "required": True,
+                    "regex": (r"^(bot)?(?P<key>[0-9]+:[a-z0-9_-]+)$", "i"),
+                }
+            },
+        )
+
+        def __init__(self, bot_token: str) -> None:
+            self.bot_token = validate_regex(
+                bot_token,
+                # error: [not-iterable]
+                *self.template_tokens["bot_token"]["regex"],
+                # error: [parameter-already-assigned]
+                fmt="{key}",
+            )
+```
