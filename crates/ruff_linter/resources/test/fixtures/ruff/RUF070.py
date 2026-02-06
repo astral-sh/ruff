@@ -33,6 +33,30 @@ def bad_nested_in_loop_not_last():
     print("after loop")
 
 
+@contextmanager
+def bad_nested_in_while_not_last():
+    while condition:
+        yield  # RUF070
+    print("after while")
+
+
+@contextmanager
+def bad_nested_in_elif():
+    if condition1:
+        pass
+    elif condition2:
+        yield  # RUF070
+    print("after if")
+
+
+@contextmanager
+def bad_nested_in_match_not_last():
+    match x:
+        case 1:
+            yield  # RUF070
+    print("after match")
+
+
 # OK
 
 @contextmanager
@@ -264,4 +288,87 @@ def good_yield_terminal_in_branches():
     if condition:
         yield
     else:
+        yield
+
+
+@contextmanager
+def good_yield_terminal_in_while():
+    while condition:
+        yield
+
+
+@contextmanager
+def good_yield_terminal_in_elif():
+    if condition1:
+        yield
+    elif condition2:
+        yield
+
+
+@contextmanager
+def good_yield_terminal_in_match():
+    match x:
+        case 1:
+            yield
+        case _:
+            yield
+
+
+@contextmanager
+def good_yield_in_for_else():
+    for i in range(10):
+        pass
+    else:
+        yield
+
+
+@contextmanager
+def good_yield_in_while_else():
+    while condition:
+        pass
+    else:
+        yield
+
+
+@contextmanager
+def good_try_finally_non_terminal():
+    try:
+        yield
+    finally:
+        print("cleanup")
+    print("code after try")
+
+
+@contextmanager
+def good_try_except_non_terminal():
+    try:
+        yield
+    except Exception:
+        print("handle error")
+    print("code after try")
+
+
+@contextmanager
+def good_return_yield():
+    return (yield)
+
+
+@contextmanager
+def bad_yield_in_with_items():
+    with some_call((yield)):  # RUF070
+        pass
+    print("cleanup")
+
+
+@contextmanager
+def good_yield_in_with_items_terminal():
+    with some_call((yield)):
+        pass
+
+
+@contextmanager
+def good_yield_in_finally():
+    try:
+        do_something()
+    finally:
         yield

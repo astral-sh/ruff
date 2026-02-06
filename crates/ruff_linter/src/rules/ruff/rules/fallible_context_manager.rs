@@ -128,7 +128,7 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 orelse,
                 finalbody,
                 ..
-            }) if !finalbody.is_empty() || !handlers.is_empty() => {
+            }) => {
                 let prev = self.in_protected_try;
                 self.in_protected_try = true;
                 self.visit_body(body);
@@ -140,7 +140,10 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 self.visit_body(finalbody);
             }
 
-            Stmt::With(ast::StmtWith { body, .. }) => {
+            Stmt::With(ast::StmtWith { items, body, .. }) => {
+                for item in items {
+                    self.visit_expr(&item.context_expr);
+                }
                 self.visit_with_body(body);
             }
 
@@ -241,19 +244,14 @@ impl YieldFinallyVisitor<'_, '_> {
     /// The last statement in a `with` block inherits terminal status from the parent context
     /// and is additionally marked as a "with last statement" if it is a yield.
     fn visit_with_body(&mut self, body: &[Stmt]) {
-        if body.is_empty() {
-            return;
-        }
+        let [rest @ .., last] = body else { return };
 
         let parent_terminal = self.in_terminal_position;
 
-        // Non-last statements: delegate terminal tracking to visit_body_with_terminal
-        if body.len() > 1 {
-            self.visit_body_with_terminal(&body[..body.len() - 1], false);
-        }
+        // Non-last statements: not terminal
+        self.visit_body_with_terminal(rest, false);
 
         // Last statement: inherit terminal from parent, set with-last-statement if yield
-        let last = &body[body.len() - 1];
         let prev_terminal = self.in_terminal_position;
         self.in_terminal_position = parent_terminal;
 

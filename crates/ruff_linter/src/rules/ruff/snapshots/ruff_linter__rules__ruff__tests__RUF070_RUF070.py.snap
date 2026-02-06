@@ -40,3 +40,44 @@ RUF070 Context manager does not catch exceptions
    |         ^^^^^
 33 |     print("after loop")
    |
+
+RUF070 Context manager does not catch exceptions
+  --> RUF070.py:39:9
+   |
+37 | def bad_nested_in_while_not_last():
+38 |     while condition:
+39 |         yield  # RUF070
+   |         ^^^^^
+40 |     print("after while")
+   |
+
+RUF070 Context manager does not catch exceptions
+  --> RUF070.py:48:9
+   |
+46 |         pass
+47 |     elif condition2:
+48 |         yield  # RUF070
+   |         ^^^^^
+49 |     print("after if")
+   |
+
+RUF070 Context manager does not catch exceptions
+  --> RUF070.py:56:13
+   |
+54 |     match x:
+55 |         case 1:
+56 |             yield  # RUF070
+   |             ^^^^^
+57 |     print("after match")
+   |
+
+RUF070 Context manager does not catch exceptions
+   --> RUF070.py:358:21
+    |
+356 | @contextmanager
+357 | def bad_yield_in_with_items():
+358 |     with some_call((yield)):  # RUF070
+    |                     ^^^^^
+359 |         pass
+360 |     print("cleanup")
+    |
