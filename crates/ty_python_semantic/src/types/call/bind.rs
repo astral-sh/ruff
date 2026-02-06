@@ -3496,6 +3496,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             CallArguments::none()
         };
 
+        let offset = if sub_arguments.len() == 0 {
+            None
+        } else {
+            argument_index
+        };
         // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
@@ -3522,7 +3527,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .errors
                             .iter()
                             .cloned()
-                            .map(|e| e.maybe_apply_argument_index_offset(argument_index)),
+                            .map(|e| e.maybe_apply_argument_index_offset(offset)),
                     );
                 } else {
                     let index = callable_binding
@@ -3535,7 +3540,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .errors
                             .iter()
                             .cloned()
-                            .map(|e| e.maybe_apply_argument_index_offset(argument_index)),
+                            .map(|e| e.maybe_apply_argument_index_offset(offset)),
                     );
                 }
             }
@@ -3547,7 +3552,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .errors
                         .iter()
                         .cloned()
-                        .map(|e| e.maybe_apply_argument_index_offset(argument_index)),
+                        .map(|e| e.maybe_apply_argument_index_offset(offset)),
                 );
             }
             MatchingOverloadIndex::Multiple(_) => {
@@ -3563,7 +3568,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .errors
                             .iter()
                             .cloned()
-                            .map(|e| e.maybe_apply_argument_index_offset(argument_index)),
+                            .map(|e| e.maybe_apply_argument_index_offset(offset)),
                     );
                 }
             }
