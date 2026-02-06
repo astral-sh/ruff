@@ -24,6 +24,7 @@ use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Sig
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
+use crate::subscript::PyIndex;
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
@@ -2990,13 +2991,91 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             // `*args: P.args` (another ParamSpec).
             Some(argument_type) => match argument_type.as_paramspec_typevar(db) {
                 Some(paramspec) => VariadicArgumentType::ParamSpec(paramspec),
-                // TODO: `Type::iterate` internally handles unions, but in a lossy way.
-                // It might be superior here to manually map over the union and call `try_iterate`
-                // on each element, similar to the way that `unpacker.rs` does in the `unpack_inner` method.
-                // It might be a bit of a refactor, though.
-                // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
-                // for more details. --Alex
-                None => VariadicArgumentType::Other(argument_type.iterate(db)),
+                None => match argument_type {
+                    // `Type::iterate` unions tuple specs in a way that can invent additional
+                    // arities. For signatures where all remaining positional parameters are
+                    // defaulted, map each possible tuple index from the union to the
+                    // corresponding optional positional parameter.
+                    Type::Union(union)
+                        if self.parameters.variadic().is_none()
+                            && self
+                                .parameters
+                                .positional()
+                                .skip(self.next_positional)
+                                .all(|parameter| parameter.default_type().is_some()) =>
+                    {
+                        let tuple_specs = union
+                            .elements(db)
+                            .iter()
+                            .map(|ty| {
+                                ty.try_iterate(db).unwrap_or_else(|err| {
+                                    Cow::Owned(TupleSpec::homogeneous(
+                                        err.fallback_element_type(db),
+                                    ))
+                                })
+                            })
+                            .collect_vec();
+
+                        let mut tuple_index = 0usize;
+
+                        while self
+                            .parameters
+                            .get_positional(self.next_positional)
+                            .is_some()
+                        {
+                            let Ok(tuple_index_i32) = i32::try_from(tuple_index) else {
+                                break;
+                            };
+
+                            let positional_types = tuple_specs
+                                .iter()
+                                .filter_map(|tuple| tuple.py_index(db, tuple_index_i32).ok())
+                                .collect_vec();
+
+                            if positional_types.is_empty() {
+                                break;
+                            }
+
+                            let argument_type =
+                                UnionType::from_elements_leave_aliases(db, positional_types);
+
+                            self.match_positional(
+                                argument_index,
+                                argument,
+                                Some(argument_type),
+                                false,
+                            )?;
+                            tuple_index += 1;
+                        }
+
+                        // If any union element can still provide another positional argument,
+                        // preserve the "too-many-positional-arguments" diagnostic.
+                        let excess_positional_types: Vec<Type<'db>> =
+                            i32::try_from(tuple_index).map_or_else(
+                                |_| Vec::new(),
+                                |tuple_index_i32| {
+                                    tuple_specs
+                                        .iter()
+                                        .filter_map(|tuple| tuple.py_index(db, tuple_index_i32).ok())
+                                        .collect()
+                                },
+                            );
+
+                        if !excess_positional_types.is_empty() {
+                            let argument_type =
+                                UnionType::from_elements_leave_aliases(db, excess_positional_types);
+                            let _ = self.match_positional(
+                                argument_index,
+                                argument,
+                                Some(argument_type),
+                                false,
+                            );
+                        }
+
+                        return Ok(());
+                    }
+                    _ => VariadicArgumentType::Other(argument_type.iterate(db)),
+                },
             },
             None => VariadicArgumentType::None,
         };
