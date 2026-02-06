@@ -491,4 +491,37 @@ def bar(): ...
         ~~~
         "#);
     }
+
+    #[test]
+    fn format_code_blocks_python_console() {
+        let code = r#"
+```pycon
+>>> print( 'hello there' )
+hello there
+>>> def foo(): pass
+>>> def bar():
+...   print( 'thing1', "thing2", )
+... bar()
+thing1 thing2
+```
+        "#;
+        assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()), @r#"
+
+        ```pycon
+        >>> print("hello there")
+        hello there
+        >>> def foo():
+        ...     pass
+        >>> def bar():
+        ...     print(
+        ...         "thing1",
+        ...         "thing2",
+        ...     )
+        ... 
+        ... 
+        ... bar()
+        thing1 thing2
+        ```
+        "#);
+    }
 }
