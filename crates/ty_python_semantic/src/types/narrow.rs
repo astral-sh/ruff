@@ -478,7 +478,7 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
                 // `True == 1` and `False == 0`.
                 (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(i))
                 | (LiteralValueTypeKind::Int(i), LiteralValueTypeKind::Bool(b)) => {
-                    i64::from(b) == i
+                    i64::from(b) == i.as_i64()
                 }
                 _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
             }
@@ -843,9 +843,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             (Type::NominalInstance(instance), Some(LiteralValueTypeKind::Int(i)))
                 if instance.has_known_class(self.db, KnownClass::Bool) =>
             {
-                if i == 0 {
+                if i.as_i64() == 0 {
                     Some(Type::bool_literal(self.db, false).negate(self.db))
-                } else if i == 1 {
+                } else if i.as_i64() == 1 {
                     Some(Type::bool_literal(self.db, true).negate(self.db))
                 } else {
                     None

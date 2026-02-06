@@ -3544,7 +3544,7 @@ impl<'db> Type<'db> {
         let type_to_truthiness = |ty: Type<'db>| {
             match ty.as_literal_value_kind(db) {
                 Some(LiteralValueTypeKind::Bool(bool_val)) => Truthiness::from(bool_val),
-                Some(LiteralValueTypeKind::Int(int_val)) => Truthiness::from(int_val != 0),
+                Some(LiteralValueTypeKind::Int(int_val)) => Truthiness::from(int_val.as_i64() != 0),
                 // anything else is handled lower down
                 _ => Truthiness::Ambiguous,
             }
@@ -3785,7 +3785,7 @@ impl<'db> Type<'db> {
                     .enum_class_instance(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)?,
 
-                LiteralValueTypeKind::Int(num) => Truthiness::from(num != 0),
+                LiteralValueTypeKind::Int(num) => Truthiness::from(num.as_i64() != 0),
                 LiteralValueTypeKind::Bool(bool) => Truthiness::from(bool),
                 LiteralValueTypeKind::String(str) => Truthiness::from(!str.value(db).is_empty()),
                 LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
@@ -3816,7 +3816,7 @@ impl<'db> Type<'db> {
             match ty {
                 // TODO: Emit diagnostic for non-integers and negative integers
                 Type::LiteralValue(literal) => match literal.kind(db) {
-                    LiteralValueTypeKind::Int(value) => (value >= 0).then_some(ty),
+                    LiteralValueTypeKind::Int(value) => (value.as_i64() >= 0).then_some(ty),
                     LiteralValueTypeKind::Bool(value) => {
                         Some(Type::int_literal(db, i64::from(value)))
                     }
@@ -4984,7 +4984,7 @@ impl<'db> Type<'db> {
                             TupleSpec::heterogeneous(
                                 bytes_literal
                                     .iter()
-                                    .map(|b| Type::int_literal(db ,i64::from(*b))),
+                                    .map(|b| Type::int_literal(db, i64::from(*b))),
                             )
                         } else {
                             TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
@@ -13072,14 +13072,10 @@ impl<'db> IntersectionType<'db> {
 }
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size, constructor=new_repr)]
-#[derive(PartialOrd, Ord)]
-pub struct LiteralValueType<'db> {
-    repr: LiteralValueTypeRepr<'db>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for LiteralValueType<'_> {}
+#[derive(
+    PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
+)]
+pub struct LiteralValueType<'db>(LiteralValueTypeRepr<'db>);
 
 /// Literal values are structured such that promotable values, i.e., the common case, are stored
 /// inline, while unpromotable values require an extra allocation.
@@ -13088,15 +13084,24 @@ impl get_size2::GetSize for LiteralValueType<'_> {}
 )]
 pub enum LiteralValueTypeRepr<'db> {
     Promotable(LiteralValueTypeKind<'db>),
-    Unpromotable(LiteralValueTypeKind<'db>),
+    Unpromotable(UnpromotableLiteralValueType<'db>),
 }
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct UnpromotableLiteralValueType<'db> {
+    kind: LiteralValueTypeKind<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for UnpromotableLiteralValueType<'_> {}
 
 #[derive(
     PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
 )]
 pub enum LiteralValueTypeKind<'db> {
     /// An integer literal
-    Int(i64),
+    Int(IntLiteralType),
     /// A boolean literal, either `True` or `False`.
     Bool(bool),
     /// A string literal whose value is known
@@ -13131,10 +13136,10 @@ impl<'db> LiteralValueType<'db> {
 
     /// Creates a literal value that may be promoted during literal promotion.
     pub fn promotable(
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {
-        LiteralValueType::new_repr(db, LiteralValueTypeRepr::Promotable(kind.into()))
+        Self(LiteralValueTypeRepr::Promotable(kind.into()))
     }
 
     /// Creates a literal value that should not be promoted during literal promotion.
@@ -13142,16 +13147,18 @@ impl<'db> LiteralValueType<'db> {
         db: &'db dyn Db,
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {
-        LiteralValueType::new_repr(db, LiteralValueTypeRepr::Unpromotable(kind.into()))
+        Self(LiteralValueTypeRepr::Unpromotable(
+            UnpromotableLiteralValueType::new(db, kind.into()),
+        ))
     }
 
     /// Returns the promotable form of this literal value.
     #[must_use]
     pub fn to_promotable(self, db: &'db dyn Db) -> Self {
-        match self.repr(db) {
+        match self.0 {
             LiteralValueTypeRepr::Promotable(_) => self,
             LiteralValueTypeRepr::Unpromotable(literal) => {
-                Self::new_repr(db, LiteralValueTypeRepr::Promotable(literal))
+                Self(LiteralValueTypeRepr::Promotable(literal.kind(db)))
             }
         }
     }
@@ -13159,26 +13166,26 @@ impl<'db> LiteralValueType<'db> {
     /// Returns the unpromotable form of this literal value.
     #[must_use]
     pub fn to_unpromotable(self, db: &'db dyn Db) -> Self {
-        match self.repr(db) {
+        match self.0 {
             LiteralValueTypeRepr::Unpromotable(_) => self,
-            LiteralValueTypeRepr::Promotable(literal) => {
-                Self::new_repr(db, LiteralValueTypeRepr::Unpromotable(literal))
-            }
+            LiteralValueTypeRepr::Promotable(kind) => Self(LiteralValueTypeRepr::Unpromotable(
+                UnpromotableLiteralValueType::new(db, kind),
+            )),
         }
     }
 
     /// Returns `true` if this literal value should be eagerly promoted to its instance type.
-    pub fn is_promotable(self, db: &'db dyn Db) -> bool {
-        match self.repr(db) {
+    pub fn is_promotable(self, _db: &'db dyn Db) -> bool {
+        match self.0 {
             LiteralValueTypeRepr::Promotable(_) => true,
             LiteralValueTypeRepr::Unpromotable(_) => false,
         }
     }
 
     pub fn kind(self, db: &'db dyn Db) -> LiteralValueTypeKind<'db> {
-        match self.repr(db) {
+        match self.0 {
             LiteralValueTypeRepr::Promotable(kind) => kind,
-            LiteralValueTypeRepr::Unpromotable(kind) => kind,
+            LiteralValueTypeRepr::Unpromotable(literal) => literal.kind(db),
         }
     }
 
@@ -13216,7 +13223,7 @@ impl<'db> LiteralValueType<'db> {
 
     pub fn as_int(self, db: &'db dyn Db) -> Option<i64> {
         if let LiteralValueTypeKind::Int(v) = self.kind(db) {
-            Some(v)
+            Some(v.as_i64())
         } else {
             None
         }
@@ -13257,7 +13264,7 @@ impl<'db> LiteralValueType<'db> {
 
 impl From<i64> for LiteralValueTypeKind<'_> {
     fn from(v: i64) -> Self {
-        Self::Int(v)
+        Self::Int(IntLiteralType::from_i64(v))
     }
 }
 
@@ -13288,6 +13295,42 @@ impl<'db> From<EnumLiteralType<'db>> for LiteralValueTypeKind<'db> {
 impl<'db> From<LiteralValueType<'db>> for Type<'db> {
     fn from(value: LiteralValueType<'db>) -> Self {
         Type::LiteralValue(value)
+    }
+}
+
+// This type has the same alignment as `salsa::Id`, allowing `LiteralValueType` to use a smaller
+// discriminant.
+#[derive(PartialOrd, Ord, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct IntLiteralType {
+    high: u32,
+    low: u32,
+}
+
+impl IntLiteralType {
+    pub fn as_i64(self) -> i64 {
+        (i64::from(self.high) << 32) | i64::from(self.low)
+    }
+
+    #[expect(clippy::cast_possible_truncation)]
+    pub fn from_i64(value: i64) -> Self {
+        let value = value.cast_unsigned();
+
+        Self {
+            high: (value >> 32) as u32,
+            low: value as u32,
+        }
+    }
+}
+
+impl std::fmt::Display for IntLiteralType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.as_i64(), f)
+    }
+}
+
+impl std::fmt::Debug for IntLiteralType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.as_i64(), f)
     }
 }
 

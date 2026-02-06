@@ -547,11 +547,12 @@ impl<'db> UnionBuilder<'db> {
                         }
                         if let Some(found) = found {
                             let is_promotable = literal.is_promotable(self.db);
-                            *found.entry(int_literal).or_insert(is_promotable) &= is_promotable;
+                            *found.entry(int_literal.as_i64()).or_insert(is_promotable) &=
+                                is_promotable;
                         } else {
                             self.elements
                                 .push(UnionElement::IntLiterals(FxOrderMap::from_iter([(
-                                    int_literal,
+                                    int_literal.as_i64(),
                                     literal.is_promotable(self.db),
                                 )])));
                         }

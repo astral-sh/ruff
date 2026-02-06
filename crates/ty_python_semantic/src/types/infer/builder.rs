@@ -12973,13 +12973,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
-                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), value),
+                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), value.as_i64()),
                 LiteralValueTypeKind::Bool(value) => Type::int_literal(self.db(), i64::from(value)),
                 _ => fallback_unary_expression_type(),
             },
 
             (ast::UnaryOp::USub, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
-                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), -value),
+                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), -value.as_i64()),
                 LiteralValueTypeKind::Bool(value) => {
                     Type::int_literal(self.db(), -i64::from(value))
                 }
@@ -12987,7 +12987,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
 
             (ast::UnaryOp::Invert, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
-                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), !value),
+                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), !value.as_i64()),
                 LiteralValueTypeKind::Bool(value) => {
                     Type::int_literal(self.db(), !i64::from(value))
                 }
@@ -13237,12 +13237,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // may emit a diagnostic
         if !emitted_division_by_zero_diagnostic
             && matches!(
-                (op, right_ty.as_literal_value_kind(self.db())),
-                (
-                    ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                    Some(LiteralValueTypeKind::Int(0) | LiteralValueTypeKind::Bool(false))
-                )
+                op,
+                ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod
             )
+            && right_ty.as_literal_value().is_some_and(|literal| {
+                literal.as_bool(self.db()) == Some(false) || literal.as_int(self.db()) == Some(0)
+            })
         {
             emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
         }
@@ -13469,7 +13469,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::Add,
                     ) => Some(
-                        n.checked_add(m)
+                        n.as_i64()
+                            .checked_add(m.as_i64())
                             .map(|i| Type::int_literal(self.db(), i))
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
                     ),
@@ -13479,7 +13480,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::Sub,
                     ) => Some(
-                        n.checked_sub(m)
+                        n.as_i64()
+                            .checked_sub(m.as_i64())
                             .map(|i| Type::int_literal(self.db(), i))
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
                     ),
@@ -13489,7 +13491,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::Mult,
                     ) => Some(
-                        n.checked_mul(m)
+                        n.as_i64()
+                            .checked_mul(m.as_i64())
                             .map(|i| Type::int_literal(self.db(), i))
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
                     ),
@@ -13505,11 +13508,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::FloorDiv,
                     ) => Some({
-                        let mut q = n.checked_div(m);
-                        let r = n.checked_rem(m);
+                        let mut q = n.as_i64().checked_div(m.as_i64());
+                        let r = n.as_i64().checked_rem(m.as_i64());
                         // Division works differently in Python than in Rust. If the result is negative and
                         // there is a remainder, the division rounds down (instead of towards zero):
-                        if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
+                        if n.as_i64().is_negative() != m.as_i64().is_negative()
+                            && r.unwrap_or(0) != 0
+                        {
                             q = q.map(|q| q - 1);
                         }
                         q.map(|i| Type::int_literal(self.db(), i))
@@ -13521,12 +13526,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::Mod,
                     ) => Some({
-                        let mut r = n.checked_rem(m);
+                        let mut r = n.as_i64().checked_rem(m.as_i64());
                         // Division works differently in Python than in Rust. If the result is negative and
                         // there is a remainder, the division rounds down (instead of towards zero). Adjust
                         // the remainder to compensate so that q * m + r == n:
-                        if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
-                            r = r.map(|x| x + m);
+                        if n.as_i64().is_negative() != m.as_i64().is_negative()
+                            && r.unwrap_or(0) != 0
+                        {
+                            r = r.map(|x| x + m.as_i64());
                         }
                         r.map(|i| Type::int_literal(self.db(), i))
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
@@ -13537,12 +13544,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::Pow,
                     ) => Some({
-                        if m < 0 {
+                        if m.as_i64() < 0 {
                             KnownClass::Float.to_instance(self.db())
                         } else {
-                            u32::try_from(m)
+                            u32::try_from(m.as_i64())
                                 .ok()
-                                .and_then(|m| n.checked_pow(m))
+                                .and_then(|m| n.as_i64().checked_pow(m))
                                 .map(|i| Type::int_literal(self.db(), i))
                                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
                         }
@@ -13552,19 +13559,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::BitOr,
-                    ) => Some(Type::int_literal(self.db(), n | m)),
+                    ) => Some(Type::int_literal(self.db(), n.as_i64() | m.as_i64())),
 
                     (
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::BitAnd,
-                    ) => Some(Type::int_literal(self.db(), n & m)),
+                    ) => Some(Type::int_literal(self.db(), n.as_i64() & m.as_i64())),
 
                     (
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::BitXor,
-                    ) => Some(Type::int_literal(self.db(), n ^ m)),
+                    ) => Some(Type::int_literal(self.db(), n.as_i64() ^ m.as_i64())),
 
                     (
                         LiteralValueTypeKind::Bytes(lhs),
@@ -13607,9 +13614,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::String(s),
                         ast::Operator::Mult,
                     ) => {
-                        let ty = if n < 1 {
+                        let ty = if n.as_i64() < 1 {
                             Type::string_literal(self.db(), "")
-                        } else if let Ok(n) = usize::try_from(n)
+                        } else if let Ok(n) = usize::try_from(n.as_i64())
                             && n.checked_mul(s.value(self.db()).len())
                                 .is_some_and(|new_length| {
                                     new_length <= Self::MAX_STRING_LITERAL_SIZE
@@ -13633,7 +13640,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::LiteralString,
                         ast::Operator::Mult,
                     ) => {
-                        let ty = if n < 1 {
+                        let ty = if n.as_i64() < 1 {
                             Type::string_literal(self.db(), "")
                         } else {
                             Type::literal_string(self.db())
@@ -14442,7 +14449,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Booleans are coded as integers (False = 0, True = 1)
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Bool(b)) => {
                     Some(self.infer_binary_type_comparison(
-                        Type::int_literal(self.db(), n),
+                        Type::int_literal(self.db(), n.as_i64()),
                         op,
                         Type::int_literal(self.db(), i64::from(b)),
                         range,
@@ -14453,7 +14460,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Some(self.infer_binary_type_comparison(
                         Type::int_literal(self.db(), i64::from(b)),
                         op,
-                        Type::int_literal(self.db(), m),
+                        Type::int_literal(self.db(), m.as_i64()),
                         range,
                         visitor,
                     ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
