@@ -1152,6 +1152,51 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    /// Records a narrowing constraint (from a predicate ID) for all places in the current scope.
+    ///
+    /// This is used for if-statement conditions: even when a condition doesn't narrow any
+    /// specific variable, the condition's truthiness gates which branches are reachable.
+    /// By including the condition in all places' narrowing TDDs, we ensure that unreachable
+    /// branches (e.g., the else-branch of `if 1 + 1 == 2:`) contribute `Never` rather than
+    /// diluting narrowing from reachable branches.
+    ///
+    /// Uses the same `ScopedPredicateId` as `record_narrowing_constraint_for_places`, so
+    /// the TDD atom is shared (idempotent via hash-consing). For places that were already
+    /// narrowed by this predicate, `AND(atom, atom) = atom` — no duplication occurs.
+    pub(super) fn record_narrowing_predicate_for_all_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+    ) {
+        if predicate == ScopedPredicateId::ALWAYS_TRUE
+            || predicate == ScopedPredicateId::ALWAYS_FALSE
+        {
+            return;
+        }
+
+        let atom = self.reachability_constraints.add_atom(predicate);
+        self.record_narrowing_constraint_for_all_places(atom);
+    }
+
+    /// Records a negated narrowing constraint (from a predicate ID) for all places in scope.
+    ///
+    /// Counterpart to [`Self::record_narrowing_predicate_for_all_places`] for the else/elif
+    /// branch. Uses TDD-level negation so that `atom(P) OR NOT(atom(P))` simplifies to
+    /// `ALWAYS_TRUE`, correctly cancelling narrowing when both branches flow through.
+    pub(super) fn record_negated_narrowing_predicate_for_all_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+    ) {
+        if predicate == ScopedPredicateId::ALWAYS_TRUE
+            || predicate == ScopedPredicateId::ALWAYS_FALSE
+        {
+            return;
+        }
+
+        let atom = self.reachability_constraints.add_atom(predicate);
+        let negated = self.reachability_constraints.add_not_constraint(atom);
+        self.record_narrowing_constraint_for_all_places(negated);
+    }
+
     pub(super) fn record_reachability_constraint(
         &mut self,
         constraint: ScopedReachabilityConstraintId,

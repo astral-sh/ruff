@@ -161,6 +161,30 @@ def _(val: int | str | None):
     reveal_type(val)  # revealed: int
 ```
 
+## Narrowing through always-true branches
+
+When a terminal (`return`) is inside an always-true branch, narrowing propagates through because the
+else-branch is unreachable and contributes `Never` to the union.
+
+```py
+def _(x: int | None):
+    if True:
+        if x is None:
+            return
+        reveal_type(x)  # revealed: int
+    reveal_type(x)  # revealed: int
+```
+
+```py
+def _(x: int | None):
+    if 1 + 1 == 2:
+        if x is None:
+            return
+        reveal_type(x)  # revealed: int
+
+    reveal_type(x)  # revealed: int
+```
+
 ## Narrowing from `assert` should not affect reassigned variables
 
 When a variable is reassigned after an `assert`, the narrowing from the assert should not apply to
