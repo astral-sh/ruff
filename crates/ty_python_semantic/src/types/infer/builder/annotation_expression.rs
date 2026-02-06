@@ -371,7 +371,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         self.store_expression_type(annotation, annotation_ty.inner_type());
-
         annotation_ty
     }
 

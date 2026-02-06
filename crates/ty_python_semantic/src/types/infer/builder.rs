@@ -125,14 +125,14 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    LintDiagnosticGuard, LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate,
+    PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -1257,7 +1257,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         match keyword.arg.as_deref() {
                             Some(arg_name @ ("total" | "closed")) => {
                                 let passed_type = self.expression_type(&keyword.value);
-                                if !matches!(passed_type, Type::BooleanLiteral(_))
+                                if passed_type
+                                    .as_literal_value()
+                                    .is_none_or(|literal| !literal.is_bool(self.db()))
                                     && let Some(builder) =
                                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
                                 {
@@ -2338,7 +2340,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         left: Type<'db>,
     ) -> bool {
         match left {
-            Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
+            Type::LiteralValue(literal)
+                if matches!(
+                    literal.kind(self.db()),
+                    LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_)
+                ) => {}
             Type::NominalInstance(instance)
                 if matches!(
                     instance.known_class(self.db()),
@@ -2676,6 +2682,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         };
+
         self.declarations
             .insert(definition, declared_ty, self.multi_inference_state);
         self.bindings
@@ -3364,6 +3371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
@@ -4815,7 +4823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db: &'db dyn Db,
             slice_ty: Type<'db>,
         ) -> Option<impl Iterator<Item = &'db str> + 'db> {
-            if let Some(literal) = slice_ty.as_string_literal() {
+            if let Some(literal) = slice_ty.as_string_literal(db) {
                 Some(Either::Left(std::iter::once(literal.value(db))))
             } else {
                 slice_ty.as_union().map(|union| {
@@ -4823,7 +4831,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         union
                             .elements(db)
                             .iter()
-                            .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                            .filter_map(|ty| ty.as_string_literal(db).map(|lit| lit.value(db))),
                     )
                 })
             }
@@ -4924,8 +4932,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let assigned_d = rhs_value_ty.display(db);
                     let value_d = object_ty.display(db);
 
-                    if slice_ty.is_assignable_to(db, Type::LiteralString)
-                        && !slice_ty.is_equivalent_to(db, Type::LiteralString)
+                    if slice_ty.is_assignable_to(db, Type::literal_string(db))
+                        && !slice_ty.is_equivalent_to(db, Type::literal_string(db))
                     {
                         if let Some(builder) = self
                             .context
@@ -5038,7 +5046,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             CallErrorKind::BindingError => {
                                 if let Some(typed_dict) = object_ty.as_typed_dict() {
-                                    if let Some(key) = slice_ty.as_string_literal() {
+                                    if let Some(key) = slice_ty.as_string_literal(db) {
                                         let key = key.value(db);
                                         validate_typed_dict_key_assignment(
                                             &self.context,
@@ -5262,7 +5270,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     // For deletions of string literal keys on `TypedDict`, provide
                                     // a more detailed diagnostic.
                                     if let Some(typed_dict) = object_ty.as_typed_dict() {
-                                        if let Type::StringLiteral(string_literal) = slice_ty {
+                                        if let Some(string_literal) = slice_ty.as_string_literal(db)
+                                        {
                                             let key = string_literal.value(db);
                                             let items = typed_dict.items(db);
 
@@ -5608,12 +5617,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
-            | Type::BooleanLiteral(..)
-            | Type::IntLiteral(..)
-            | Type::StringLiteral(..)
-            | Type::BytesLiteral(..)
-            | Type::EnumLiteral(..)
-            | Type::LiteralString
+            | Type::LiteralValue(..)
             | Type::SpecialForm(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
@@ -6287,7 +6291,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
-                    Type::BooleanLiteral(true)
+                    Type::bool_literal(self.db(), true)
                 } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                     Type::unknown()
                 } else {
@@ -6420,7 +6424,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let Some(name_param) = name_param_ty
+            .as_string_literal(db)
+            .map(|name| name.value(db))
+        else {
             return error(
                 &self.context,
                 "The first argument to `ParamSpec` must be a string literal",
@@ -6637,7 +6644,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let Some(name_param) = name_param_ty
+            .as_string_literal(db)
+            .map(|name| name.value(db))
+        else {
             return error(
                 &self.context,
                 "The first argument to `TypeVar` must be a string literal.",
@@ -6755,7 +6765,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
 
-        let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let Some(name) = name_param_ty
+            .as_string_literal(db)
+            .map(|name| name.value(db))
+        else {
             return error(
                 &self.context,
                 "The first argument to `NewType` must be a string literal",
@@ -7042,7 +7055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let all_keys_are_string_literals = dict.items.iter().all(|item| {
                     item.key
                         .as_ref()
-                        .is_some_and(|k| matches!(self.expression_type(k), Type::StringLiteral(_)))
+                        .is_some_and(|k| self.expression_type(k).is_string_literal(db))
                 });
                 let members = dict
                     .items
@@ -7050,10 +7063,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .filter_map(|item| {
                         // Only extract items with string literal keys.
                         let key_expr = item.key.as_ref()?;
-                        let key_name = match self.expression_type(key_expr) {
-                            Type::StringLiteral(s) => ast::name::Name::new(s.value(db)),
-                            _ => return None,
-                        };
+                        let key_name = self.expression_type(key_expr).as_string_literal(db)?;
+                        let key_name = ast::name::Name::new(key_name.value(db));
                         // Get the already-inferred type from when we inferred the dict above.
                         let value_ty = self.expression_type(&item.value);
                         Some((key_name, value_ty))
@@ -7094,7 +7105,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Extract name and base classes.
-        let name = if let Type::StringLiteral(literal) = name_type {
+        let name = if let Some(literal) = name_type.as_string_literal(db) {
             ast::name::Name::new(literal.value(db))
         } else {
             if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
@@ -7524,7 +7535,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Extract name.
-        let name = if let Type::StringLiteral(literal) = name_type {
+        let name = if let Some(literal) = name_type.as_string_literal(db) {
             Name::new(literal.value(db))
         } else {
             // Name is not a string literal; use <unknown> like we do for type() calls.
@@ -7614,7 +7625,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Extract field names, first from the inferred type, then from the AST.
         let maybe_field_names: Option<Box<[Name]>> =
-            if let Type::StringLiteral(string_literal) = fields_type {
+            if let Some(string_literal) = fields_type.as_string_literal(db) {
                 // Handle space/comma-separated string.
                 Some(
                     string_literal
@@ -7631,7 +7642,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 fixed_tuple
                     .all_elements()
                     .iter()
-                    .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
+                    .map(|elt| elt.as_string_literal(db).map(|s| Name::new(s.value(db))))
                     .collect()
             } else {
                 // Get the elements from the list or tuple literal.
@@ -7646,7 +7657,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|elt| {
                             // Each element should be a string literal.
                             let field_ty = self.expression_type(elt);
-                            let field_lit = field_ty.as_string_literal()?;
+                            let field_lit = field_ty.as_string_literal(db)?;
                             Some(Name::new(field_lit.value(db)))
                         })
                         .collect::<Option<_>>()
@@ -7842,7 +7853,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             self.store_expression_type(element, element_type);
 
-            let Type::StringLiteral(name) = name_type else {
+            let Some(name) = name_type.as_string_literal(db) else {
                 for element in &elements[(i + 1)..] {
                     self.infer_expression(element, TypeContext::default());
                 }
@@ -8361,7 +8372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // otherwise, assigning something other than `False` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
             }
-            declared.inner = Type::BooleanLiteral(true);
+            declared.inner = Type::bool_literal(self.db(), true);
         }
 
         // Handle various singletons.
@@ -8407,7 +8418,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
             {
-                Type::BooleanLiteral(true)
+                Type::bool_literal(self.db(), true)
             } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                 declared.inner_type()
             } else {
@@ -9595,12 +9606,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::PropertyInstance(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
-                | Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::EnumLiteral(_)
-                | Type::LiteralString
-                | Type::BytesLiteral(_)
+                | Type::LiteralValue(_)
                 | Type::TypeVar(_)
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
@@ -10169,7 +10175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if self.inner_expression_inference_state.is_get() {
             return self.expression_type(expression);
         }
-        let ty = match expression {
+        let mut ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
                 node_index: _,
@@ -10224,6 +10230,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("Ipy escape command support")
             }
         };
+
+        // Avoid promoting explicitly annotated literal values.
+        if let Type::LiteralValue(literal) = ty
+            && let Some(tcx) = tcx.annotation
+            && let Type::Union(_) | Type::LiteralValue(_) = tcx
+                .resolve_type_alias(self.db())
+                .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
+            && ty.is_assignable_to(self.db(), tcx)
+        {
+            ty = Type::LiteralValue(literal.to_unpromotable(self.db()));
+        }
 
         self.store_expression_type_impl(expression, ty, tcx);
 
@@ -10290,14 +10307,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match value {
             ast::Number::Int(n) => n
                 .as_i64()
-                .map(Type::IntLiteral)
+                .map(|n| Type::int_literal(db, n))
                 .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
             ast::Number::Float(_) => KnownClass::Float.to_instance(db),
             ast::Number::Complex { .. } => KnownClass::Complex.to_instance(db),
         }
     }
 
-    #[expect(clippy::unused_self)]
     fn infer_boolean_literal_expression(&mut self, literal: &ast::ExprBooleanLiteral) -> Type<'db> {
         let ast::ExprBooleanLiteral {
             range: _,
@@ -10305,7 +10321,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = literal;
 
-        Type::BooleanLiteral(*value)
+        Type::bool_literal(self.db(), *value)
     }
 
     fn infer_string_literal_expression(
@@ -10323,7 +10339,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
             Type::string_literal(self.db(), literal.value.to_str())
         } else {
-            Type::LiteralString
+            Type::literal_string(self.db())
         }
     }
 
@@ -10381,7 +10397,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 {
                                     collector.add_expression();
                                 } else {
-                                    if let Type::StringLiteral(literal) = ty.str(self.db()) {
+                                    if let Some(literal) =
+                                        ty.str(self.db()).as_string_literal(self.db())
+                                    {
                                         collector.push_str(literal.value(self.db()));
                                     } else {
                                         collector.add_expression();
@@ -10517,7 +10535,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if tuple.len() > MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE {
                 // Promote literals for very large unannotated tuples,
                 // to avoid pathological performance issues
-                self.infer_expression(elt, ctx).promote_literals(db, ctx)
+                self.infer_expression(elt, ctx).promote_literals(db)
             } else {
                 self.infer_expression(elt, ctx)
             }
@@ -10714,7 +10732,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 item_types.insert(key.node_index().load(), key_ty);
             }
 
-            let value_ty = if let Some(Type::StringLiteral(key)) = key_ty
+            let value_ty = if let Some(key_ty) = key_ty
+                && let Some(key) = key_ty.as_string_literal(self.db())
                 && let Some(field) = typed_dict_items.get(key.value(self.db()))
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
@@ -10924,8 +10943,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
-                let inferred_elt_ty =
-                    inferred_elt_ty.promote_literals(self.db(), TypeContext::new(elt_tcx));
+                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db());
 
                 builder
                     .infer(
@@ -12912,6 +12930,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         operand_type: Type<'db>,
         unary: &ast::ExprUnaryOp,
     ) -> Type<'db> {
+        let fallback_unary_expression_type = || {
+            let unary_dunder_method = match op {
+                ast::UnaryOp::Invert => "__invert__",
+                ast::UnaryOp::UAdd => "__pos__",
+                ast::UnaryOp::USub => "__neg__",
+                ast::UnaryOp::Not => {
+                    unreachable!("Not operator is handled in its own case");
+                }
+            };
+
+            match operand_type.try_call_dunder(
+                self.db(),
+                unary_dunder_method,
+                CallArguments::none(),
+                TypeContext::default(),
+            ) {
+                Ok(outcome) => outcome.return_type(self.db()),
+                Err(e) => {
+                    if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, unary) {
+                        builder.into_diagnostic(format_args!(
+                            "Unary operator `{op}` is not supported for object of type `{}`",
+                            operand_type.display(self.db()),
+                        ));
+                    }
+                    e.fallback_return_type(self.db())
+                }
+            }
+        };
+
         match (op, operand_type) {
             (_, Type::Dynamic(_)) => operand_type,
             (_, Type::Never) => Type::Never,
@@ -12920,15 +12967,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
             }
 
-            (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
-            (ast::UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
-            (ast::UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
+            (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
+                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), value.as_i64()),
+                LiteralValueTypeKind::Bool(value) => Type::int_literal(self.db(), i64::from(value)),
+                _ => fallback_unary_expression_type(),
+            },
 
-            (ast::UnaryOp::UAdd, Type::BooleanLiteral(bool)) => Type::IntLiteral(i64::from(bool)),
-            (ast::UnaryOp::USub, Type::BooleanLiteral(bool)) => Type::IntLiteral(-i64::from(bool)),
-            (ast::UnaryOp::Invert, Type::BooleanLiteral(bool)) => {
-                Type::IntLiteral(!i64::from(bool))
-            }
+            (ast::UnaryOp::USub, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
+                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), -value.as_i64()),
+                LiteralValueTypeKind::Bool(value) => {
+                    Type::int_literal(self.db(), -i64::from(value))
+                }
+                _ => fallback_unary_expression_type(),
+            },
+
+            (ast::UnaryOp::Invert, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
+                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), !value.as_i64()),
+                LiteralValueTypeKind::Bool(value) => {
+                    Type::int_literal(self.db(), !i64::from(value))
+                }
+                _ => fallback_unary_expression_type(),
+            },
 
             (
                 ast::UnaryOp::Invert,
@@ -13037,7 +13096,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (
-                op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
+                ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert,
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::WrapperDescriptor(_)
@@ -13058,45 +13117,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
-                | Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BytesLiteral(_)
-                | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
-            ) => {
-                let unary_dunder_method = match op {
-                    ast::UnaryOp::Invert => "__invert__",
-                    ast::UnaryOp::UAdd => "__pos__",
-                    ast::UnaryOp::USub => "__neg__",
-                    ast::UnaryOp::Not => {
-                        unreachable!("Not operator is handled in its own case");
-                    }
-                };
-
-                match operand_type.try_call_dunder(
-                    self.db(),
-                    unary_dunder_method,
-                    CallArguments::none(),
-                    TypeContext::default(),
-                ) {
-                    Ok(outcome) => outcome.return_type(self.db()),
-                    Err(e) => {
-                        if let Some(builder) =
-                            self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Unary operator `{op}` is not supported for object of type `{}`",
-                                operand_type.display(self.db()),
-                            ));
-                        }
-                        e.fallback_return_type(self.db())
-                    }
-                }
-            }
+            ) => fallback_unary_expression_type(),
         }
     }
 
@@ -13206,12 +13232,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // may emit a diagnostic
         if !emitted_division_by_zero_diagnostic
             && matches!(
-                (op, right_ty),
-                (
-                    ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                    Type::IntLiteral(0) | Type::BooleanLiteral(false)
-                )
+                op,
+                ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod
             )
+            && right_ty.as_literal_value().is_some_and(|literal| {
+                literal.as_bool(self.db()) == Some(false) || literal.as_int(self.db()) == Some(0)
+            })
         {
             emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
         }
@@ -13431,152 +13457,235 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
-                n.checked_add(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+            (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
+                match (left.kind(self.db()), right.kind(self.db()), op) {
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Add,
+                    ) => Some(
+                        n.as_i64()
+                            .checked_add(m.as_i64())
+                            .map(|i| Type::int_literal(self.db(), i))
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
+                    ),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => Some(
-                n.checked_sub(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Sub,
+                    ) => Some(
+                        n.as_i64()
+                            .checked_sub(m.as_i64())
+                            .map(|i| Type::int_literal(self.db(), i))
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
+                    ),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => Some(
-                n.checked_mul(m)
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Mult,
+                    ) => Some(
+                        n.as_i64()
+                            .checked_mul(m.as_i64())
+                            .map(|i| Type::int_literal(self.db(), i))
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
+                    ),
 
-            (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
-                Some(KnownClass::Float.to_instance(self.db()))
-            }
+                    (
+                        LiteralValueTypeKind::Int(_),
+                        LiteralValueTypeKind::Int(_),
+                        ast::Operator::Div,
+                    ) => Some(KnownClass::Float.to_instance(self.db())),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => Some({
-                let mut q = n.checked_div(m);
-                let r = n.checked_rem(m);
-                // Division works differently in Python than in Rust. If the result is negative and
-                // there is a remainder, the division rounds down (instead of towards zero):
-                if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
-                    q = q.map(|q| q - 1);
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::FloorDiv,
+                    ) => Some({
+                        let mut q = n.as_i64().checked_div(m.as_i64());
+                        let r = n.as_i64().checked_rem(m.as_i64());
+                        // Division works differently in Python than in Rust. If the result is negative and
+                        // there is a remainder, the division rounds down (instead of towards zero):
+                        if n.as_i64().is_negative() != m.as_i64().is_negative()
+                            && r.unwrap_or(0) != 0
+                        {
+                            q = q.map(|q| q - 1);
+                        }
+                        q.map(|i| Type::int_literal(self.db(), i))
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+                    }),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Mod,
+                    ) => Some({
+                        let mut r = n.as_i64().checked_rem(m.as_i64());
+                        // Division works differently in Python than in Rust. If the result is negative and
+                        // there is a remainder, the division rounds down (instead of towards zero). Adjust
+                        // the remainder to compensate so that q * m + r == n:
+                        if n.as_i64().is_negative() != m.as_i64().is_negative()
+                            && r.unwrap_or(0) != 0
+                        {
+                            r = r.map(|x| x + m.as_i64());
+                        }
+                        r.map(|i| Type::int_literal(self.db(), i))
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+                    }),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Pow,
+                    ) => Some({
+                        if m.as_i64() < 0 {
+                            KnownClass::Float.to_instance(self.db())
+                        } else {
+                            u32::try_from(m.as_i64())
+                                .ok()
+                                .and_then(|m| n.as_i64().checked_pow(m))
+                                .map(|i| Type::int_literal(self.db(), i))
+                                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+                        }
+                    }),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::BitOr,
+                    ) => Some(Type::int_literal(self.db(), n.as_i64() | m.as_i64())),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::BitAnd,
+                    ) => Some(Type::int_literal(self.db(), n.as_i64() & m.as_i64())),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::BitXor,
+                    ) => Some(Type::int_literal(self.db(), n.as_i64() ^ m.as_i64())),
+
+                    (
+                        LiteralValueTypeKind::Bytes(lhs),
+                        LiteralValueTypeKind::Bytes(rhs),
+                        ast::Operator::Add,
+                    ) => {
+                        let bytes = [lhs.value(self.db()), rhs.value(self.db())].concat();
+                        Some(Type::bytes_literal(self.db(), &bytes))
+                    }
+
+                    (
+                        LiteralValueTypeKind::String(lhs),
+                        LiteralValueTypeKind::String(rhs),
+                        ast::Operator::Add,
+                    ) => {
+                        let lhs_value = lhs.value(self.db()).to_string();
+                        let rhs_value = rhs.value(self.db());
+                        let ty =
+                            if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+                                Type::string_literal(self.db(), &(lhs_value + rhs_value))
+                            } else {
+                                Type::literal_string(self.db())
+                            };
+                        Some(ty)
+                    }
+
+                    (
+                        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString,
+                        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString,
+                        ast::Operator::Add,
+                    ) => Some(Type::literal_string(self.db())),
+
+                    (
+                        LiteralValueTypeKind::String(s),
+                        LiteralValueTypeKind::Int(n),
+                        ast::Operator::Mult,
+                    )
+                    | (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::String(s),
+                        ast::Operator::Mult,
+                    ) => {
+                        let ty = if n.as_i64() < 1 {
+                            Type::string_literal(self.db(), "")
+                        } else if let Ok(n) = usize::try_from(n.as_i64())
+                            && n.checked_mul(s.value(self.db()).len())
+                                .is_some_and(|new_length| {
+                                    new_length <= Self::MAX_STRING_LITERAL_SIZE
+                                })
+                        {
+                            let new_literal = s.value(self.db()).repeat(n);
+                            Type::string_literal(self.db(), &new_literal)
+                        } else {
+                            Type::literal_string(self.db())
+                        };
+                        Some(ty)
+                    }
+
+                    (
+                        LiteralValueTypeKind::LiteralString,
+                        LiteralValueTypeKind::Int(n),
+                        ast::Operator::Mult,
+                    )
+                    | (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::LiteralString,
+                        ast::Operator::Mult,
+                    ) => {
+                        let ty = if n.as_i64() < 1 {
+                            Type::string_literal(self.db(), "")
+                        } else {
+                            Type::literal_string(self.db())
+                        };
+                        Some(ty)
+                    }
+
+                    (
+                        LiteralValueTypeKind::Bool(b1),
+                        LiteralValueTypeKind::Bool(b2),
+                        ast::Operator::BitOr,
+                    ) => Some(Type::bool_literal(self.db(), b1 | b2)),
+
+                    (
+                        LiteralValueTypeKind::Bool(b1),
+                        LiteralValueTypeKind::Bool(b2),
+                        ast::Operator::BitAnd,
+                    ) => Some(Type::bool_literal(self.db(), b1 & b2)),
+
+                    (
+                        LiteralValueTypeKind::Bool(b1),
+                        LiteralValueTypeKind::Bool(b2),
+                        ast::Operator::BitXor,
+                    ) => Some(Type::bool_literal(self.db(), b1 ^ b2)),
+
+                    (
+                        LiteralValueTypeKind::Bool(b1),
+                        LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_),
+                        op,
+                    ) => self.infer_binary_expression_type(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        Type::int_literal(self.db(), i64::from(b1)),
+                        right_ty,
+                        op,
+                    ),
+                    (LiteralValueTypeKind::Int(_), LiteralValueTypeKind::Bool(b2), op) => self
+                        .infer_binary_expression_type(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            left_ty,
+                            Type::int_literal(self.db(), i64::from(b2)),
+                            op,
+                        ),
+
+                    _ => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
+                        .map(|outcome| outcome.return_type(self.db()))
+                        .ok(),
                 }
-                q.map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
-            }),
-
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => Some({
-                let mut r = n.checked_rem(m);
-                // Division works differently in Python than in Rust. If the result is negative and
-                // there is a remainder, the division rounds down (instead of towards zero). Adjust
-                // the remainder to compensate so that q * m + r == n:
-                if n.is_negative() != m.is_negative() && r.unwrap_or(0) != 0 {
-                    r = r.map(|x| x + m);
-                }
-                r.map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
-            }),
-
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => Some({
-                if m < 0 {
-                    KnownClass::Float.to_instance(self.db())
-                } else {
-                    u32::try_from(m)
-                        .ok()
-                        .and_then(|m| n.checked_pow(m))
-                        .map(Type::IntLiteral)
-                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
-                }
-            }),
-
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::BitOr) => {
-                Some(Type::IntLiteral(n | m))
             }
-
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::BitAnd) => {
-                Some(Type::IntLiteral(n & m))
-            }
-
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::BitXor) => {
-                Some(Type::IntLiteral(n ^ m))
-            }
-
-            (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
-                let bytes = [lhs.value(self.db()), rhs.value(self.db())].concat();
-                Some(Type::bytes_literal(self.db(), &bytes))
-            }
-
-            (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
-                let lhs_value = lhs.value(self.db()).to_string();
-                let rhs_value = rhs.value(self.db());
-                let ty = if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-                    Type::string_literal(self.db(), &(lhs_value + rhs_value))
-                } else {
-                    Type::LiteralString
-                };
-                Some(ty)
-            }
-
-            (
-                Type::StringLiteral(_) | Type::LiteralString,
-                Type::StringLiteral(_) | Type::LiteralString,
-                ast::Operator::Add,
-            ) => Some(Type::LiteralString),
-
-            (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
-            | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
-                let ty = if n < 1 {
-                    Type::string_literal(self.db(), "")
-                } else if let Ok(n) = usize::try_from(n)
-                    && n.checked_mul(s.value(self.db()).len())
-                        .is_some_and(|new_length| new_length <= Self::MAX_STRING_LITERAL_SIZE)
-                {
-                    let new_literal = s.value(self.db()).repeat(n);
-                    Type::string_literal(self.db(), &new_literal)
-                } else {
-                    Type::LiteralString
-                };
-                Some(ty)
-            }
-
-            (Type::LiteralString, Type::IntLiteral(n), ast::Operator::Mult)
-            | (Type::IntLiteral(n), Type::LiteralString, ast::Operator::Mult) => {
-                let ty = if n < 1 {
-                    Type::string_literal(self.db(), "")
-                } else {
-                    Type::LiteralString
-                };
-                Some(ty)
-            }
-
-            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitOr) => {
-                Some(Type::BooleanLiteral(b1 | b2))
-            }
-
-            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitAnd) => {
-                Some(Type::BooleanLiteral(b1 & b2))
-            }
-
-            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitXor) => {
-                Some(Type::BooleanLiteral(b1 ^ b2))
-            }
-
-            (Type::BooleanLiteral(b1), Type::BooleanLiteral(_) | Type::IntLiteral(_), op) => self
-                .infer_binary_expression_type(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    Type::IntLiteral(i64::from(b1)),
-                    right_ty,
-                    op,
-                ),
-            (Type::IntLiteral(_), Type::BooleanLiteral(b2), op) => self
-                .infer_binary_expression_type(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    left_ty,
-                    Type::IntLiteral(i64::from(b2)),
-                    op,
-                ),
 
             (
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
@@ -13701,7 +13810,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // fall back on looking for dunder methods on one of the operand types.
             (
                 Type::FunctionLiteral(_)
-                | Type::BooleanLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
                 | Type::WrapperDescriptor(_)
@@ -13720,18 +13828,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
-                | Type::IntLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BytesLiteral(_)
-                | Type::EnumLiteral(_)
+                | Type::LiteralValue(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_),
                 Type::FunctionLiteral(_)
-                | Type::BooleanLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
                 | Type::WrapperDescriptor(_)
@@ -13750,11 +13853,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
-                | Type::IntLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BytesLiteral(_)
-                | Type::EnumLiteral(_)
+                | Type::LiteralValue(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
@@ -13889,7 +13988,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         *op,
                         right_ty,
                         range,
-                        &BinaryComparisonVisitor::new(Ok(Type::BooleanLiteral(true))),
+                        &BinaryComparisonVisitor::new(Ok(Type::bool_literal(builder.db(), true))),
                     )
                     .unwrap_or_else(|error| {
                         report_unsupported_comparison(
@@ -13950,7 +14049,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             };
 
-            if let Ok(Type::BooleanLiteral(_)) = result {
+            if result
+                .ok()
+                .and_then(Type::as_literal_value)
+                .is_some_and(|literal| literal.is_bool(self.db()))
+            {
                 return result;
             }
         }
@@ -13965,14 +14068,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 IntersectionOn::Right => self
                     .infer_binary_type_comparison(other, op, *neg, range, visitor)
                     .ok(),
-            };
+            }
+            .and_then(|ty| ty.as_literal_value_kind(self.db()));
 
             match (op, result) {
-                (ast::CmpOp::Is, Some(Type::BooleanLiteral(true))) => {
-                    return Ok(Type::BooleanLiteral(false));
+                (ast::CmpOp::Is, Some(LiteralValueTypeKind::Bool(true))) => {
+                    return Ok(Type::bool_literal(self.db(), false));
                 }
-                (ast::CmpOp::IsNot, Some(Type::BooleanLiteral(false))) => {
-                    return Ok(Type::BooleanLiteral(true));
+                (ast::CmpOp::IsNot, Some(LiteralValueTypeKind::Bool(false))) => {
+                    return Ok(Type::bool_literal(self.db(), true));
                 }
                 _ => {}
             }
@@ -14115,18 +14219,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 ast::CmpOp::Is => {
                     if left.is_disjoint_from(db, right) {
-                        Ok(Type::BooleanLiteral(false))
+                        Ok(Type::bool_literal(db, false))
                     } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                        Ok(Type::BooleanLiteral(true))
+                        Ok(Type::bool_literal(db, true))
                     } else {
                         Ok(KnownClass::Bool.to_instance(db))
                     }
                 }
                 ast::CmpOp::IsNot => {
                     if left.is_disjoint_from(db, right) {
-                        Ok(Type::BooleanLiteral(true))
+                        Ok(Type::bool_literal(db, true))
                     } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                        Ok(Type::BooleanLiteral(false))
+                        Ok(Type::bool_literal(db, false))
                     } else {
                         Ok(KnownClass::Bool.to_instance(db))
                     }
@@ -14306,153 +14410,158 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            (Type::IntLiteral(n), Type::IntLiteral(m)) => Some(match op {
-                ast::CmpOp::Eq => Ok(Type::BooleanLiteral(n == m)),
-                ast::CmpOp::NotEq => Ok(Type::BooleanLiteral(n != m)),
-                ast::CmpOp::Lt => Ok(Type::BooleanLiteral(n < m)),
-                ast::CmpOp::LtE => Ok(Type::BooleanLiteral(n <= m)),
-                ast::CmpOp::Gt => Ok(Type::BooleanLiteral(n > m)),
-                ast::CmpOp::GtE => Ok(Type::BooleanLiteral(n >= m)),
-                // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
-                // Even if they are the same value, they may not be the same object.
-                ast::CmpOp::Is => {
-                    if n == m {
-                        Ok(KnownClass::Bool.to_instance(self.db()))
-                    } else {
-                        Ok(Type::BooleanLiteral(false))
+            (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => match (left_literal.kind(self.db()), right_literal.kind(self.db())) {
+                (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => Some(match op {
+                    ast::CmpOp::Eq => Ok(Type::bool_literal(self.db(), n == m)),
+                    ast::CmpOp::NotEq => Ok(Type::bool_literal(self.db(), n != m)),
+                    ast::CmpOp::Lt => Ok(Type::bool_literal(self.db(), n < m)),
+                    ast::CmpOp::LtE => Ok(Type::bool_literal(self.db(), n <= m)),
+                    ast::CmpOp::Gt => Ok(Type::bool_literal(self.db(), n > m)),
+                    ast::CmpOp::GtE => Ok(Type::bool_literal(self.db(), n >= m)),
+                    // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
+                    // Even if they are the same value, they may not be the same object.
+                    ast::CmpOp::Is => {
+                        if n == m {
+                            Ok(KnownClass::Bool.to_instance(self.db()))
+                        } else {
+                            Ok(Type::bool_literal(self.db(), false))
+                        }
                     }
-                }
-                ast::CmpOp::IsNot => {
-                    if n == m {
-                        Ok(KnownClass::Bool.to_instance(self.db()))
-                    } else {
-                        Ok(Type::BooleanLiteral(true))
+                    ast::CmpOp::IsNot => {
+                        if n == m {
+                            Ok(KnownClass::Bool.to_instance(self.db()))
+                        } else {
+                            Ok(Type::bool_literal(self.db(), true))
+                        }
                     }
-                }
-                // Undefined for (int, int)
-                ast::CmpOp::In | ast::CmpOp::NotIn => Err(UnsupportedComparisonError {
-                    op,
-                    left_ty: left,
-                    right_ty: right,
+                    // Undefined for (int, int)
+                    ast::CmpOp::In | ast::CmpOp::NotIn => Err(UnsupportedComparisonError {
+                        op,
+                        left_ty: left,
+                        right_ty: right,
+                    }),
                 }),
-            }),
+                // Booleans are coded as integers (False = 0, True = 1)
+                (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Bool(b)) => {
+                    Some(self.infer_binary_type_comparison(
+                        Type::int_literal(self.db(), n.as_i64()),
+                        op,
+                        Type::int_literal(self.db(), i64::from(b)),
+                        range,
+                        visitor,
+                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
+                }
+                (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(m)) => {
+                    Some(self.infer_binary_type_comparison(
+                        Type::int_literal(self.db(), i64::from(b)),
+                        op,
+                        Type::int_literal(self.db(), m.as_i64()),
+                        range,
+                        visitor,
+                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
+                }
+                (LiteralValueTypeKind::Bool(a), LiteralValueTypeKind::Bool(b)) => {
+                    Some(self.infer_binary_type_comparison(
+                        Type::int_literal(self.db(), i64::from(a)),
+                        op,
+                        Type::int_literal(self.db(), i64::from(b)),
+                        range,
+                        visitor,
+                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
+                }
 
-            // Booleans are coded as integers (False = 0, True = 1)
-            (Type::IntLiteral(n), Type::BooleanLiteral(b)) => {
-                Some(self.infer_binary_type_comparison(
-                    Type::IntLiteral(n),
-                    op,
-                    Type::IntLiteral(i64::from(b)),
-                    range,
-                    visitor,
-                ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-            }
-            (Type::BooleanLiteral(b), Type::IntLiteral(m)) => {
-                Some(self.infer_binary_type_comparison(
-                    Type::IntLiteral(i64::from(b)),
-                    op,
-                    Type::IntLiteral(m),
-                    range,
-                    visitor,
-                ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-            }
-            (Type::BooleanLiteral(a), Type::BooleanLiteral(b)) => {
-                Some(self.infer_binary_type_comparison(
-                    Type::IntLiteral(i64::from(a)),
-                    op,
-                    Type::IntLiteral(i64::from(b)),
-                    range,
-                    visitor,
-                ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-            }
+                (LiteralValueTypeKind::String(salsa_s1), LiteralValueTypeKind::String(salsa_s2)) => {
+                    let s1 = salsa_s1.value(self.db());
+                    let s2 = salsa_s2.value(self.db());
+                    let result = match op {
+                        ast::CmpOp::Eq => Type::bool_literal(self.db(), s1 == s2),
+                        ast::CmpOp::NotEq => Type::bool_literal(self.db(), s1 != s2),
+                        ast::CmpOp::Lt => Type::bool_literal(self.db(), s1 < s2),
+                        ast::CmpOp::LtE => Type::bool_literal(self.db(), s1 <= s2),
+                        ast::CmpOp::Gt => Type::bool_literal(self.db(), s1 > s2),
+                        ast::CmpOp::GtE => Type::bool_literal(self.db(), s1 >= s2),
+                        ast::CmpOp::In => Type::bool_literal(self.db(), s2.contains(s1)),
+                        ast::CmpOp::NotIn => Type::bool_literal(self.db(), !s2.contains(s1)),
+                        ast::CmpOp::Is => {
+                            if s1 == s2 {
+                                KnownClass::Bool.to_instance(self.db())
+                            } else {
+                                Type::bool_literal(self.db(), false)
+                            }
+                        }
+                        ast::CmpOp::IsNot => {
+                            if s1 == s2 {
+                                KnownClass::Bool.to_instance(self.db())
+                            } else {
+                                Type::bool_literal(self.db(), true)
+                            }
+                        }
+                    };
+                    Some(Ok(result))
+                }
 
-            (Type::StringLiteral(salsa_s1), Type::StringLiteral(salsa_s2)) => {
-                let s1 = salsa_s1.value(self.db());
-                let s2 = salsa_s2.value(self.db());
-                let result = match op {
-                    ast::CmpOp::Eq => Type::BooleanLiteral(s1 == s2),
-                    ast::CmpOp::NotEq => Type::BooleanLiteral(s1 != s2),
-                    ast::CmpOp::Lt => Type::BooleanLiteral(s1 < s2),
-                    ast::CmpOp::LtE => Type::BooleanLiteral(s1 <= s2),
-                    ast::CmpOp::Gt => Type::BooleanLiteral(s1 > s2),
-                    ast::CmpOp::GtE => Type::BooleanLiteral(s1 >= s2),
-                    ast::CmpOp::In => Type::BooleanLiteral(s2.contains(s1)),
-                    ast::CmpOp::NotIn => Type::BooleanLiteral(!s2.contains(s1)),
-                    ast::CmpOp::Is => {
-                        if s1 == s2 {
-                            KnownClass::Bool.to_instance(self.db())
-                        } else {
-                            Type::BooleanLiteral(false)
+                (LiteralValueTypeKind::Bytes(salsa_b1), LiteralValueTypeKind::Bytes(salsa_b2)) => {
+                    let b1 = salsa_b1.value(self.db());
+                    let b2 = salsa_b2.value(self.db());
+                    let result = match op {
+                        ast::CmpOp::Eq => Type::bool_literal(self.db(), b1 == b2),
+                        ast::CmpOp::NotEq => Type::bool_literal(self.db(), b1 != b2),
+                        ast::CmpOp::Lt => Type::bool_literal(self.db(), b1 < b2),
+                        ast::CmpOp::LtE => Type::bool_literal(self.db(), b1 <= b2),
+                        ast::CmpOp::Gt => Type::bool_literal(self.db(), b1 > b2),
+                        ast::CmpOp::GtE => Type::bool_literal(self.db(), b1 >= b2),
+                        ast::CmpOp::In => {
+                            Type::bool_literal(self.db(), memchr::memmem::find(b2, b1).is_some())
                         }
-                    }
-                    ast::CmpOp::IsNot => {
-                        if s1 == s2 {
-                            KnownClass::Bool.to_instance(self.db())
-                        } else {
-                            Type::BooleanLiteral(true)
+                        ast::CmpOp::NotIn => {
+                            Type::bool_literal(self.db(), memchr::memmem::find(b2, b1).is_none())
                         }
-                    }
-                };
-                Some(Ok(result))
-            }
-            (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
-                let b1 = salsa_b1.value(self.db());
-                let b2 = salsa_b2.value(self.db());
-                let result = match op {
-                    ast::CmpOp::Eq => Type::BooleanLiteral(b1 == b2),
-                    ast::CmpOp::NotEq => Type::BooleanLiteral(b1 != b2),
-                    ast::CmpOp::Lt => Type::BooleanLiteral(b1 < b2),
-                    ast::CmpOp::LtE => Type::BooleanLiteral(b1 <= b2),
-                    ast::CmpOp::Gt => Type::BooleanLiteral(b1 > b2),
-                    ast::CmpOp::GtE => Type::BooleanLiteral(b1 >= b2),
-                    ast::CmpOp::In => {
-                        Type::BooleanLiteral(memchr::memmem::find(b2, b1).is_some())
-                    }
-                    ast::CmpOp::NotIn => {
-                        Type::BooleanLiteral(memchr::memmem::find(b2, b1).is_none())
-                    }
-                    ast::CmpOp::Is => {
-                        if b1 == b2 {
-                            KnownClass::Bool.to_instance(self.db())
-                        } else {
-                            Type::BooleanLiteral(false)
+                        ast::CmpOp::Is => {
+                            if b1 == b2 {
+                                KnownClass::Bool.to_instance(self.db())
+                            } else {
+                                Type::bool_literal(self.db(), false)
+                            }
                         }
-                    }
-                    ast::CmpOp::IsNot => {
-                        if b1 == b2 {
-                            KnownClass::Bool.to_instance(self.db())
-                        } else {
-                            Type::BooleanLiteral(true)
+                        ast::CmpOp::IsNot => {
+                            if b1 == b2 {
+                                KnownClass::Bool.to_instance(self.db())
+                            } else {
+                                Type::bool_literal(self.db(), true)
+                            }
                         }
-                    }
-                };
-                Some(Ok(result))
-            }
-            (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
-                if op == ast::CmpOp::Eq =>
-            {
-                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                    Ok(ty) => ty,
-                    Err(_) => Type::BooleanLiteral(literal_1 == literal_2),
-                }))
-            }
-            (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
-                if op == ast::CmpOp::NotEq =>
-            {
-                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                    Ok(ty) => ty,
-                    Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
-                }))
+                    };
+                    Some(Ok(result))
+                }
+
+                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
+                    if op == ast::CmpOp::Eq =>
+                {
+                    Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                        Ok(ty) => ty,
+                        Err(_) => Type::bool_literal(self.db(), literal_1 == literal_2),
+                    }))
+                }
+                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
+                    if op == ast::CmpOp::NotEq =>
+                {
+                    Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                        Ok(ty) => ty,
+                        Err(_) => Type::bool_literal(self.db(), literal_1 != literal_2),
+                    }))
+                }
+
+                _ => None
             }
 
             (
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
             ) => match op {
-                ast::CmpOp::Eq => Some(Ok(Type::BooleanLiteral(
+                ast::CmpOp::Eq => Some(Ok(Type::bool_literal(self.db(),
                     left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
                 ))),
-                ast::CmpOp::NotEq => Some(Ok(Type::BooleanLiteral(
+                ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(self.db(),
                     !left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
                 ))),
                 _ => None,
@@ -14503,9 +14612,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
 
                             if any_eq {
-                                Ok(Type::BooleanLiteral(op.is_in()))
+                                Ok(Type::bool_literal(self.db(), op.is_in()))
                             } else if !any_ambiguous {
-                                Ok(Type::BooleanLiteral(op.is_not_in()))
+                                Ok(Type::bool_literal(self.db(), op.is_not_in()))
                             } else {
                                 Ok(KnownClass::Bool.to_instance(self.db()))
                             }
@@ -14523,7 +14632,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // for `is` and `is not` comparisons. This is an implementation detail
                                 // for how we determine the truthiness of a type.
                                 ty => match ty.bool(self.db()) {
-                                    Truthiness::AlwaysFalse => Type::BooleanLiteral(op.is_is_not()),
+                                    Truthiness::AlwaysFalse => Type::bool_literal(self.db(), op.is_is_not()),
                                     _ => KnownClass::Bool.to_instance(self.db()),
                                 },
                             })
@@ -14710,8 +14819,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
                                 // NOTE: The CPython implementation does not account for non-boolean return types
                                 // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
-                                RichCompareOperator::Eq => Type::BooleanLiteral(false),
-                                RichCompareOperator::Ne => Type::BooleanLiteral(true),
+                                RichCompareOperator::Eq => Type::bool_literal(self.db(), false),
+                                RichCompareOperator::Ne => Type::bool_literal(self.db(), true),
                             };
 
                             builder = builder.add(pairwise_compare_result);
@@ -14728,14 +14837,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // if no more items to compare, we just compare sizes
                 let (left_len, right_len) = (left.len(), right.len());
 
-                builder = builder.add(Type::BooleanLiteral(match op {
-                    RichCompareOperator::Eq => left_len == right_len,
-                    RichCompareOperator::Ne => left_len != right_len,
-                    RichCompareOperator::Lt => left_len < right_len,
-                    RichCompareOperator::Le => left_len <= right_len,
-                    RichCompareOperator::Gt => left_len > right_len,
-                    RichCompareOperator::Ge => left_len >= right_len,
-                }));
+                builder = builder.add(Type::bool_literal(
+                    self.db(),
+                    match op {
+                        RichCompareOperator::Eq => left_len == right_len,
+                        RichCompareOperator::Ne => left_len != right_len,
+                        RichCompareOperator::Lt => left_len < right_len,
+                        RichCompareOperator::Le => left_len <= right_len,
+                        RichCompareOperator::Gt => left_len > right_len,
+                        RichCompareOperator::Ge => left_len >= right_len,
+                    },
+                ));
 
                 Ok(builder.build())
             }
@@ -15778,7 +15890,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty_step = self.infer_optional_expression(step.as_deref(), TypeContext::default());
 
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(ty @ (Type::IntLiteral(_) | Type::BooleanLiteral(_))) => SliceArg::Arg(ty),
+            Some(ty @ Type::LiteralValue(literal))
+                if literal.is_int(self.db()) || literal.is_bool(self.db()) =>
+            {
+                SliceArg::Arg(ty)
+            }
             Some(ty @ Type::NominalInstance(instance))
                 if instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
@@ -16279,7 +16395,7 @@ impl StringPartsCollector {
         } else if let Some(concatenated) = self.concatenated {
             Type::string_literal(db, &concatenated)
         } else {
-            Type::LiteralString
+            Type::literal_string(db)
         }
     }
 }

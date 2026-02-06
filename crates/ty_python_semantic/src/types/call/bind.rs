@@ -46,9 +46,9 @@ use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, GenericAlias, InternedConstraintSet, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members, todo_type,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
+    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarVariance,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -348,8 +348,10 @@ impl<'db> Bindings<'db> {
         dataclass_field_specifiers: &[Type<'db>],
     ) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
-            if let Some(Type::BooleanLiteral(value)) = ty {
-                *value
+            if let Some(ty) = ty
+                && let Some(LiteralValueTypeKind::Bool(value)) = ty.as_literal_value_kind(db)
+            {
+                value
             } else {
                 // TODO: emit a diagnostic if we receive `bool`
                 default
@@ -597,10 +599,11 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)) => {
-                        if let [Some(Type::StringLiteral(prefix)), None, None] =
-                            overload.parameter_types()
+                        if let [Some(first), None, None] = overload.parameter_types()
+                            && let Some(prefix) = first.as_string_literal(db)
                         {
-                            overload.set_return_type(Type::BooleanLiteral(
+                            overload.set_return_type(Type::bool_literal(
+                                db,
                                 literal.value(db).starts_with(prefix.value(db)),
                             ));
                         }
@@ -745,13 +748,13 @@ impl<'db> Bindings<'db> {
 
                         let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
                         {
-                            match kw_only {
+                            match kw_only.and_then(|ty| ty.as_literal_value_kind(db)) {
                                 // We are more conservative here when turning the type for `kw_only`
                                 // into a bool, because a field specifier in a stub might use
                                 // `kw_only: bool = ...` and the truthiness of `...` is always true.
                                 // This is different from `init` above because may need to fall back
                                 // to `kw_only_default`, whereas `init_default` does not exist.
-                                Some(Type::BooleanLiteral(yes)) => Some(yes),
+                                Some(LiteralValueTypeKind::Bool(yes)) => Some(yes),
                                 _ => None,
                             }
                         } else {
@@ -759,7 +762,7 @@ impl<'db> Bindings<'db> {
                         };
 
                         let alias = alias
-                            .and_then(Type::as_string_literal)
+                            .and_then(|ty| ty.as_string_literal(db))
                             .map(|literal| Box::from(literal.value(db)));
 
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
@@ -821,14 +824,17 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSingleton) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                                overload
+                                    .set_return_type(Type::bool_literal(db, ty.is_singleton(db)));
                             }
                         }
 
                         Some(KnownFunction::IsSingleValued) => {
                             if let [Some(ty)] = overload.parameter_types() {
-                                overload
-                                    .set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                                overload.set_return_type(Type::bool_literal(
+                                    db,
+                                    ty.is_single_valued(db),
+                                ));
                             }
                         }
 
@@ -1002,7 +1008,8 @@ impl<'db> Bindings<'db> {
                                 // would return `True` for the given type. Internally we consider `SupportsAbs[int]` to
                                 // be a "(specialised) protocol class", but `typing.is_protocol(SupportsAbs[int])` returns
                                 // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
-                                overload.set_return_type(Type::BooleanLiteral(
+                                overload.set_return_type(Type::bool_literal(
+                                    db,
                                     ty.as_class_literal()
                                         .is_some_and(|class| class.is_protocol(db)),
                                 ));
@@ -1035,7 +1042,7 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
 
-                            let Some(attr_name) = attr_name.as_string_literal() else {
+                            let Some(attr_name) = attr_name.as_string_literal(db) else {
                                 continue;
                             };
 
@@ -1231,7 +1238,7 @@ impl<'db> Bindings<'db> {
                                 continue;
                             };
 
-                            let Some(format_literal) = format.as_string_literal() else {
+                            let Some(format_literal) = format.as_string_literal(db) else {
                                 continue;
                             };
 
@@ -1263,8 +1270,10 @@ impl<'db> Bindings<'db> {
                                 let mut flags = dataclass_params.flags(db);
 
                                 for (param, flag) in DATACLASS_FLAGS {
-                                    if let Ok(Some(Type::BooleanLiteral(value))) =
+                                    if let Ok(Some(ty)) =
                                         overload.parameter_type_by_name(param, false)
+                                        && let Some(LiteralValueTypeKind::Bool(value)) =
+                                            ty.as_literal_value_kind(db)
                                     {
                                         flags.set(*flag, value);
                                     }
@@ -1453,7 +1462,7 @@ impl<'db> Bindings<'db> {
                         let result = tracked
                             .constraints(db)
                             .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
-                        overload.set_return_type(Type::BooleanLiteral(result));
+                        overload.set_return_type(Type::bool_literal(db, result));
                     }
 
                     Type::KnownBoundMethod(
@@ -1481,7 +1490,7 @@ impl<'db> Bindings<'db> {
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
-                            [None] => overload.set_return_type(Type::BooleanLiteral(false)),
+                            [None] => overload.set_return_type(Type::bool_literal(db, false)),
                             _ => {}
                         },
 
@@ -3174,11 +3183,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
-        // For a given type variable, we keep track of the variance of any assignments to
-        // that type variable in the type context.
-        let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
-            FxHashMap::default();
-
         // Attempt to to solve the specialization while preferring the declared type of non-covariant
         // type parameters from generic classes.
         let preferred_type_mappings = return_with_tcx
@@ -3208,7 +3212,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let assignable_to_declared_type = self.infer_argument_types(
             &mut builder,
             &preferred_type_mappings,
-            &mut variance_in_arguments,
             &mut specialization_errors,
         );
 
@@ -3224,7 +3227,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.infer_argument_types(
                 &mut builder,
                 &FxHashMap::default(),
-                &mut variance_in_arguments,
                 &mut specialization_errors,
             );
         }
@@ -3232,26 +3234,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any literal types assigned to the specialization.
-        let maybe_promote = |identity, typevar, ty: Type<'db>| {
+        let maybe_promote = |typevar, ty: Type<'db>| {
             let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
-
-            let mut combined_tcx = TypeContext::default();
             let mut variance_in_return = TypeVarVariance::Bivariant;
 
             // Find all occurrences of the type variable in the return type.
-            let visit_return_ty = |_, ty, variance, tcx: TypeContext<'db>| {
+            let visit_return_ty = |_, ty, variance, _| {
                 if ty != Type::TypeVar(typevar) {
                     return;
-                }
-
-                // We always prefer the declared type when attempting literal promotion,
-                // so we take the union of every applicable type context.
-                match (tcx.annotation, &mut combined_tcx.annotation) {
-                    (Some(_), None) => combined_tcx = tcx,
-                    (Some(ty), Some(combined_ty)) => {
-                        *combined_ty = UnionType::from_elements(self.db, [*combined_ty, ty]);
-                    }
-                    _ => {}
                 }
 
                 variance_in_return = variance_in_return.join(variance);
@@ -3265,16 +3255,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            // If the type variable is a non-covariant position in any argument, then we avoid
-            // promotion, respecting any literals in the parameter type.
-            if variance_in_arguments
-                .get(&identity)
-                .is_some_and(|variance| !variance.is_covariant())
-            {
-                return ty;
-            }
-
-            ty.promote_literals(self.db, combined_tcx)
+            ty.promote_literals(self.db)
         };
 
         let specialization = builder
@@ -3289,7 +3270,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         &mut self,
         builder: &mut SpecializationBuilder<'db>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-        variance_in_arguments: &mut FxHashMap<BoundTypeVarIdentity<'db>, TypeVarVariance>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let mut assignable_to_declared_type = true;
@@ -3304,7 +3284,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let specialization_result = builder.infer_map(
                     parameters[parameter_index].annotated_type(),
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, variance, inferred_ty)| {
+                    |(identity, _, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if let Some(preferred_ty) = preferred_type_mappings.get(&identity) {
@@ -3314,11 +3294,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                             assignable_to_declared_type = false;
                         }
-
-                        variance_in_arguments
-                            .entry(identity)
-                            .and_modify(|current| *current = current.join(variance))
-                            .or_insert(variance);
 
                         Some(inferred_ty)
                     },
