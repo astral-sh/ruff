@@ -340,7 +340,7 @@ fn check_deprecated_context_key_value_access(
             Airflow3Removal {
                 deprecated: "inlet_events[\"<uri>\"]".to_string(),
                 replacement: Replacement::Message(
-                    "Accessing `inlet_events` via a string key is deprecated; use `context[\"inlet_events\"][Asset(uri=\"<uri>\")]` instead of `context[\"inlet_events\"][\"this://is-url\"]`.",
+                    "Accessing `inlet_events` via a string key is deprecated; use `context[\"inlet_events\"][Asset(uri=\"this://is-url\")]` instead of `context[\"inlet_events\"][\"this://is-url\"]`.",
                 ),
             },
             range,
