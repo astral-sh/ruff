@@ -59,6 +59,7 @@ impl Db {
             let AnalysisSettings {
                 respect_type_ignore_comments: respect_type_ignore_comments_default,
                 allowed_unresolved_imports: allowed_unresolved_imports_default,
+                replace_imports_with_any: replace_imports_with_any_default,
             } = AnalysisSettings::default();
 
             let allowed_unresolved_imports = if let Some(allowed_unresolved_imports) =
@@ -75,11 +76,26 @@ impl Db {
                 allowed_unresolved_imports_default
             };
 
+            let replace_imports_with_any = if let Some(replace_imports_with_any) =
+                options.replace_imports_with_any.as_deref()
+            {
+                let mut builder = ModuleGlobSetBuilder::new();
+                for pattern in replace_imports_with_any {
+                    builder
+                        .add(pattern)
+                        .expect("Invalid `replace-imports-with-any` pattern `{pattern}");
+                }
+                builder.build().unwrap()
+            } else {
+                replace_imports_with_any_default
+            };
+
             AnalysisSettings {
                 respect_type_ignore_comments: options
                     .respect_type_ignore_comments
                     .unwrap_or(respect_type_ignore_comments_default),
                 allowed_unresolved_imports,
+                replace_imports_with_any,
             }
         } else {
             AnalysisSettings::default()
