@@ -127,15 +127,54 @@ impl<'db> Definition<'db> {
                 let annotation_expr = assign_def.annotation(&module);
                 if assign_def.value(&module).is_none() && annotation_expr.is_call_expr() {
                     let source = source_text(db, file);
-                    let call_text = &source[annotation_expr.range()];
-                    match existing_docstring {
-                        Some(mut doc) => {
-                            doc.push_str("\n\n");
-                            doc.push_str(call_text);
-                            Some(doc)
+
+                    // If we can inspect the call node, pretty-print arguments
+                    // one-per-line when there is more than one argument.
+                    annotation_expr.as_call_expr().and_then(|call| {
+                        let args_len = call.arguments.args.len() + call.arguments.keywords.len();
+                        let mut out = String::new();
+                        out.push_str("```python\n");
+                        match args_len {
+                            0 => out.push_str(&source[annotation_expr.range()]),
+                            1 => {
+                                // Reformat the call with one argument still on one line.
+                                out.push_str(&source[call.func.range()]);
+                                out.push_str("(");
+                                if call.arguments.args.len() == 1 {
+                                    out.push_str(&source[call.arguments.args[0].range()]);
+                                } else {
+                                    out.push_str(&source[call.arguments.keywords[0].range()]);
+                                }
+                                out.push(')');
+                            }
+                            _ => {
+                                // Reformat the call with one argument per line.
+                                out.push_str(&source[call.func.range()]);
+                                out.push_str("(\n");
+                                for arg in call.arguments.args.iter() {
+                                    out.push_str("    ");
+                                    out.push_str(&source[arg.range()]);
+                                    out.push_str(",\n");
+                                }
+                                for kw in call.arguments.keywords.iter() {
+                                    out.push_str("    ");
+                                    out.push_str(&source[kw.range()]);
+                                    out.push_str(",\n");
+                                }
+                                out.push(')');
+                            }
                         }
-                        None => Some(call_text.to_owned()),
-                    }
+                        out.push_str("\n```");
+                        match existing_docstring {
+                            Some(doc) => {
+                                // annotated-call above existing attribute docstring
+                                out.push_str("\n\n");
+                                out.push_str(&doc);
+                                Some(out)
+                            }
+                            None => Some(out),
+                        }
+                    })
                 } else {
                     existing_docstring
                 }
