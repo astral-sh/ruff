@@ -1674,15 +1674,7 @@ impl<'db> Type<'db> {
         match self {
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
             Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
-            Type::LiteralValue(literal) => match literal.kind(db) {
-                LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                    Some(KnownClass::Str.to_instance(db))
-                }
-                LiteralValueTypeKind::Bool(_) => Some(KnownClass::Bool.to_instance(db)),
-                LiteralValueTypeKind::Int(_) => Some(KnownClass::Int.to_instance(db)),
-                LiteralValueTypeKind::Bytes(_) => Some(KnownClass::Bytes.to_instance(db)),
-                LiteralValueTypeKind::Enum(literal) => Some(literal.enum_class_instance(db)),
-            },
+            Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
             _ => None,
         }
     }
@@ -1703,15 +1695,9 @@ impl<'db> Type<'db> {
     /// Like [`Type::promote_literals`], but does not recurse into nested types.
     fn promote_literals_impl(self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::LiteralValue(literal) if literal.is_promotable(db) => match literal.kind(db) {
-                LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::String(_) => {
-                    KnownClass::Str.to_instance(db)
-                }
-                LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db),
-                LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db),
-                LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db),
-                LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
-            },
+            Type::LiteralValue(literal) if literal.is_promotable(db) => {
+                literal.fallback_instance(db)
+            }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
             _ => self,
@@ -2664,23 +2650,7 @@ impl<'db> Type<'db> {
                 KnownClass::Bool.to_instance(db).instance_member(db, name)
             }
 
-            Type::LiteralValue(literal) => match literal.kind(db) {
-                LiteralValueTypeKind::Int(_) => {
-                    KnownClass::Int.to_instance(db).instance_member(db, name)
-                }
-                LiteralValueTypeKind::Bool(_) => {
-                    KnownClass::Bool.to_instance(db).instance_member(db, name)
-                }
-                LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                    KnownClass::Str.to_instance(db).instance_member(db, name)
-                }
-                LiteralValueTypeKind::Bytes(_) => {
-                    KnownClass::Bytes.to_instance(db).instance_member(db, name)
-                }
-                LiteralValueTypeKind::Enum(enum_literal) => enum_literal
-                    .enum_class_instance(db)
-                    .instance_member(db, name),
-            },
+            Type::LiteralValue(literal) => literal.fallback_instance(db).instance_member(db, name),
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object().instance_member(db, name),
             Type::ModuleLiteral(_) => KnownClass::ModuleType
