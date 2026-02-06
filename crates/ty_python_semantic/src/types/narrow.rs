@@ -1270,6 +1270,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                                 .negate_if(self.db, !is_positive),
                         ),
                     );
+                    last_rhs_ty = Some(rhs_ty);
                     continue;
                 }
             }
