@@ -219,12 +219,13 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
         }
 
         // Skip `inf` when imported from `math`, `cmath`, `numpy` or `torch`
+        // and `infj` from `cmath`
         _ => semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
-                    ["math" | "cmath" | "numpy" | "torch", "inf"]
+                    ["math" | "numpy" | "torch", "inf"] | ["cmath", "inf" | "infj"]
                 )
             }),
     }
