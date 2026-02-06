@@ -7133,6 +7133,18 @@ fn self_typevar_owner_class_literal<'db>(
         })
 }
 
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn class_mro_literals<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+) -> Vec<ClassLiteral<'db>> {
+    class_literal
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .map(|class| class.class_literal(db))
+        .collect()
+}
+
 /// Information needed to bind `Self` typevars to a concrete type.
 ///
 /// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
@@ -7140,7 +7152,7 @@ fn self_typevar_owner_class_literal<'db>(
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
     pub(crate) ty: Type<'db>,
-    class_mro: Option<Vec<ClassLiteral<'db>>>,
+    class_literal: Option<ClassLiteral<'db>>,
     pub(crate) binding_context: Option<BindingContext<'db>>,
 }
 
@@ -7161,16 +7173,9 @@ impl<'db> SelfBinding<'db> {
             _ => None,
         };
 
-        let class_mro = class_literal.map(|lit| {
-            lit.iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .map(|class| class.class_literal(db))
-                .collect()
-        });
-
         Self {
             ty: self_type,
-            class_mro,
+            class_literal,
             binding_context,
         }
     }
@@ -7188,7 +7193,8 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
-        self.class_mro.as_ref().is_none_or(|class_mro| {
+        self.class_literal.is_none_or(|class_literal| {
+            let class_mro = class_mro_literals(db, class_literal);
             self_typevar_owner_class_literal(db, bound_typevar)
                 .is_none_or(|owner_class| class_mro.contains(&owner_class))
         })
