@@ -372,3 +372,202 @@ kwargs = {"a": 1}
 p = partial(f, **kwargs)
 reveal_type(p)  # revealed: partial[bool]
 ```
+
+## Too many positional args
+
+Extra positional arguments are silently consumed. The constructor doesn't flag this because
+`partial.__init__` accepts `*args`.
+
+```py
+from functools import partial
+
+def f(a: int) -> bool:
+    return True
+
+# TODO: should emit a diagnostic for excess positional args
+p = partial(f, 1, 2, 3)
+reveal_type(p)  # revealed: () -> bool
+```
+
+## Nested partial
+
+```py
+from functools import partial
+
+def f(a: int, b: str, c: float) -> bool:
+    return True
+
+p1 = partial(f, 1)
+reveal_type(p1)  # revealed: (b: str, c: int | float) -> bool
+
+p2 = partial(p1, "hello")
+reveal_type(p2)  # revealed: (c: int | float) -> bool
+```
+
+## Class constructor
+
+```py
+from functools import partial
+
+class MyClass:
+    def __init__(self, x: int, y: str) -> None:
+        pass
+
+p = partial(MyClass, 1)
+reveal_type(p)  # revealed: (y: str) -> MyClass
+```
+
+## Binding a default parameter
+
+Binding a parameter that has a default value removes it from the signature.
+
+```py
+from functools import partial
+
+def f(a: int, b: str = "default", c: float = 0.0) -> bool:
+    return True
+
+p = partial(f, 1, "hello")
+reveal_type(p)  # revealed: (c: int | float = ...) -> bool
+```
+
+## Multiple keyword bindings
+
+```py
+from functools import partial
+
+def f(a: int, b: str, c: float, d: bool) -> int:
+    return 0
+
+p = partial(f, b="hello", d=True)
+reveal_type(p)  # revealed: (a: int, c: int | float) -> int
+```
+
+## Mixed positional-only, regular, and keyword-only
+
+```py
+from functools import partial
+
+def f(a: int, /, b: str, *, c: float) -> bool:
+    return True
+
+# Bind the positional-only param
+p1 = partial(f, 1)
+reveal_type(p1)  # revealed: (b: str, *, c: int | float) -> bool
+
+# Bind a keyword-only param by keyword
+p2 = partial(f, c=3.14)
+reveal_type(p2)  # revealed: (a: int, /, b: str) -> bool
+
+# Bind both positional-only and keyword-only
+p3 = partial(f, 1, c=3.14)
+reveal_type(p3)  # revealed: (b: str) -> bool
+```
+
+## Starred args combined with keyword args
+
+```py
+from functools import partial
+
+def f(a: int, b: str, c: float) -> bool:
+    return True
+
+args: tuple[int] = (1,)
+p = partial(f, *args, c=3.14)
+reveal_type(p)  # revealed: (b: str) -> bool
+```
+
+## Starred args with empty tuple
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+args: tuple[()] = ()
+p = partial(f, *args)
+reveal_type(p)  # revealed: (a: int, b: str) -> bool
+```
+
+## Generic function with multiple type variables
+
+Unresolved type variables are replaced with `Unknown` since the signature is fully specialized.
+
+```py
+from functools import partial
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def combine(a: T, b: U) -> tuple[T, U]:
+    return (a, b)
+
+p = partial(combine, 1)
+reveal_type(p)  # revealed: (b: Unknown) -> tuple[int, Unknown]
+```
+
+## Callable object (class with `__call__`)
+
+```py
+from functools import partial
+
+class Adder:
+    def __call__(self, a: int, b: int) -> int:
+        return a + b
+
+adder = Adder()
+p = partial(adder, 1)
+reveal_type(p)  # revealed: (b: int) -> int
+```
+
+## Staticmethod
+
+```py
+from functools import partial
+
+class MyClass:
+    @staticmethod
+    def f(a: int, b: str) -> bool:
+        return True
+
+p = partial(MyClass.f, 1)
+reveal_type(p)  # revealed: (b: str) -> bool
+```
+
+## Overloaded function with later matching overload
+
+When the bound argument matches a later overload but not the first, no error should be emitted:
+
+```py
+from functools import partial
+from typing import overload
+
+@overload
+def f(a: int) -> int: ...
+@overload
+def f(a: str) -> str: ...
+def f(a: int | str) -> int | str:
+    return a
+
+# "hello" matches the second overload (str -> str), so no error.
+p = partial(f, "hello")
+reveal_type(p)  # revealed: Overload[() -> int, () -> str]
+```
+
+## Keyword binding to positional-only param
+
+Positional-only parameters cannot be bound by keyword in `partial()`. The parameter should be
+preserved in the resulting callable:
+
+```py
+from functools import partial
+
+def f(x: int, /, y: str) -> bool:
+    return True
+
+# `x` is positional-only, so `x=1` does not bind it.
+p = partial(f, x=1)
+reveal_type(p)  # revealed: (x: int, /, y: str) -> bool
+```
