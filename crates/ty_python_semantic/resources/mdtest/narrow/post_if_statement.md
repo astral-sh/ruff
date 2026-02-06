@@ -185,6 +185,17 @@ def _(x: int | None):
     reveal_type(x)  # revealed: int
 ```
 
+This also works when the always-true condition is nested inside a narrowing branch:
+
+```py
+def _(val: int | None):
+    if val is None:
+        if 1 + 1 == 2:
+            return
+
+    reveal_type(val)  # revealed: int
+```
+
 ## Narrowing from `assert` should not affect reassigned variables
 
 When a variable is reassigned after an `assert`, the narrowing from the assert should not apply to
