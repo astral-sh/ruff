@@ -3048,30 +3048,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             tuple_index += 1;
                         }
 
-                        // If any union element can still provide another positional argument,
-                        // preserve the "too-many-positional-arguments" diagnostic.
-                        let excess_positional_types: Vec<Type<'db>> =
-                            i32::try_from(tuple_index).map_or_else(
-                                |_| Vec::new(),
-                                |tuple_index_i32| {
-                                    tuple_specs
-                                        .iter()
-                                        .filter_map(|tuple| tuple.py_index(db, tuple_index_i32).ok())
-                                        .collect()
-                                },
-                            );
-
-                        if !excess_positional_types.is_empty() {
-                            let argument_type =
-                                UnionType::from_elements_leave_aliases(db, excess_positional_types);
-                            let _ = self.match_positional(
-                                argument_index,
-                                argument,
-                                Some(argument_type),
-                                false,
-                            );
-                        }
-
                         return Ok(());
                     }
                     _ => VariadicArgumentType::Other(argument_type.iterate(db)),
