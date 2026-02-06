@@ -49,6 +49,8 @@ pub struct Definition<'db> {
 
     /// This is a dedicated field to avoid accessing `kind` to compute this value.
     pub(crate) is_reexported: bool,
+
+    dummy: u64,
 }
 
 // The Salsa heap is tracked separately.
