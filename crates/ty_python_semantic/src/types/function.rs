@@ -1573,6 +1573,8 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.reveal_mro`
     RevealMro,
+    /// `struct.unpack`
+    Unpack,
 }
 
 impl KnownFunction {
@@ -1589,6 +1591,14 @@ impl KnownFunction {
         definition: Definition<'db>,
         name: &str,
     ) -> Option<Self> {
+        // Special case: `__dataclass_transform__` is recognized as `DataclassTransform`
+        // regardless of module, for backwards compatibility with earlier versions of the
+        // `dataclass_transform` specification. This matches pyright's behavior:
+        // https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
+        if name == "__dataclass_transform__" {
+            return Some(Self::DataclassTransform);
+        }
+
         let candidate = Self::from_str(name).ok()?;
         candidate
             .check_module(file_to_module(db, definition.file(db))?.known(db)?)
@@ -1646,6 +1656,9 @@ impl KnownFunction {
             | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
+            Self::Unpack => {
+                matches!(module, KnownModule::Struct)
+            }
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
             Self::NamedTuple => matches!(module, KnownModule::Collections),
@@ -2256,6 +2269,7 @@ pub(crate) mod tests {
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,
                 KnownFunction::TotalOrdering => KnownModule::Functools,
+                KnownFunction::Unpack => KnownModule::Struct,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

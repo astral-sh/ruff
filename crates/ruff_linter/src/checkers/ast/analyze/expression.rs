@@ -255,6 +255,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::Airflow3Removal) {
                         airflow::rules::airflow_3_removal_expr(checker, expr);
                     }
+                    if checker.is_rule_enabled(Rule::Airflow31Moved) {
+                        airflow::rules::airflow_3_1_moved_expr(checker, expr);
+                    }
                     if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
                         airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
                     }
@@ -479,6 +482,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::Airflow31Moved) {
+                airflow::rules::airflow_3_1_moved_expr(checker, expr);
             }
             if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
                 airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
@@ -1642,6 +1648,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::YodaConditions) {
                 flake8_simplify::rules::yoda_conditions(checker, expr, left, ops, comparators);
+            }
+            if checker.is_rule_enabled(Rule::FloatEqualityComparison) {
+                ruff::rules::float_equality_comparison(checker, compare);
             }
             if checker.is_rule_enabled(Rule::PandasNuniqueConstantSeriesCheck) {
                 pandas_vet::rules::nunique_constant_series_check(

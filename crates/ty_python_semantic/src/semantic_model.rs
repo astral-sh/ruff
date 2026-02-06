@@ -1,5 +1,5 @@
 use ruff_db::files::{File, FilePath};
-use ruff_db::parsed::parsed_string_annotation;
+use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
@@ -15,8 +15,11 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
+use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
-use crate::types::{Type, binding_type, infer_complete_scope_types};
+use crate::types::{
+    Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -385,6 +388,42 @@ impl<'db> SemanticModel<'db> {
             )),
         };
         Some((ast, model))
+    }
+
+    /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for a given expression,
+    /// if the expression refers to a name or attribute with declared qualifiers.
+    pub fn type_qualifiers(&self, expr: ExprRef<'_>) -> TypeQualifiers {
+        match expr {
+            ExprRef::Name(name) => {
+                let Some(definition) =
+                    definition_for_name(self, name, ImportAliasResolution::ResolveAliases)
+                else {
+                    return TypeQualifiers::empty();
+                };
+                let module = parsed_module(self.db, self.file).load(self.db);
+                if !definition
+                    .kind(self.db)
+                    .category(self.file.is_stub(self.db), &module)
+                    .is_declaration()
+                {
+                    return TypeQualifiers::empty();
+                }
+                declaration_type(self.db, definition).qualifiers()
+            }
+            ExprRef::Attribute(attr) => {
+                let Some(value_ty) = attr.value.inferred_type(self) else {
+                    return TypeQualifiers::empty();
+                };
+                value_ty
+                    .member_lookup_with_policy(
+                        self.db,
+                        attr.attr.id.clone(),
+                        crate::types::MemberLookupPolicy::default(),
+                    )
+                    .qualifiers
+            }
+            _ => TypeQualifiers::empty(),
+        }
     }
 }
 

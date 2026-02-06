@@ -4003,39 +4003,71 @@ impl<'db> StaticClassLiteral<'db> {
             let attr = result.ignore_conflicting_declarations();
             let symbol = table.symbol(symbol_id);
             let name = symbol.name();
-            if let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
-                && matches!(name.as_str(), "__setattr__" | "__delattr__")
-            {
-                if let CodeGeneratorKind::DataclassLike(_) = field_policy
-                    && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
-                {
-                    if let Some(builder) = context.report_lint(
-                        &INVALID_DATACLASS_OVERRIDE,
-                        literal.node(db, context.file(), context.module()),
-                    ) {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Cannot overwrite attribute `{}` in class `{}`",
-                            name,
-                            self.name(db)
-                        ));
-                        diagnostic.info(name);
+
+            let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
+            else {
+                continue;
+            };
+
+            match name.as_str() {
+                "__setattr__" | "__delattr__" => {
+                    if let CodeGeneratorKind::DataclassLike(_) = field_policy
+                        && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
+                    {
+                        if let Some(builder) = context.report_lint(
+                            &INVALID_DATACLASS_OVERRIDE,
+                            literal.node(db, context.file(), context.module()),
+                        ) {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot overwrite attribute `{}` in frozen dataclass `{}`",
+                                name,
+                                self.name(db)
+                            ));
+                            diagnostic.info(name);
+                        }
                     }
                 }
+                "__lt__" | "__le__" | "__gt__" | "__ge__" => {
+                    if let CodeGeneratorKind::DataclassLike(_) = field_policy
+                        && self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER)
+                    {
+                        if let Some(builder) = context.report_lint(
+                            &INVALID_DATACLASS_OVERRIDE,
+                            literal.node(db, context.file(), context.module()),
+                        ) {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot overwrite attribute `{}` in dataclass `{}` with `order=True`",
+                                name,
+                                self.name(db)
+                            ));
+                            diagnostic.info(name);
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }
 
-    /// Returns a list of all annotated attributes defined in the body of this class. This is similar
-    /// to the `__annotations__` attribute at runtime, but also contains default values.
+    /// Returns a map of all annotated attributes defined in the body of this class.
+    /// This extends the `__annotations__` attribute at runtime by also including default values
+    /// and computed field properties.
     ///
     /// For a class body like
     /// ```py
-    /// @dataclass
+    /// @dataclass(kw_only=True)
     /// class C:
     ///     x: int
-    ///     y: str = "a"
+    ///     y: str = "hello"
+    ///     z: float = field(kw_only=False, default=1.0)
     /// ```
-    /// we return a map `{"x": (int, None), "y": (str, Some(Literal["a"]))}`.
+    /// we return a map `{"x": Field, "y": Field, "z": Field}` where each `Field` contains
+    /// the annotated type, default value (if any), and field properties.
+    ///
+    /// **Important**: The returned `Field` objects represent our full understanding of the fields,
+    /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
+    /// and dataclass-transform parameters (like `kw_only_default=True`). They do not represent
+    /// only what is explicitly specified in each field definition.
     pub(super) fn own_fields(
         self,
         db: &'db dyn Db,

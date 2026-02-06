@@ -21,7 +21,7 @@ static MARKDOWN_CODE_FENCE: LazyLock<Regex> = LazyLock::new(|| {
             ^
             (?<indent>\s*)
             (?<fence>(?:```+|~~~+))\s*
-            (?<language>(?:\w+)?)\s*
+            \{?(?<language>(?:\w+)?)\}?\s*
             (?<info>(?:.*))\s*
             $
         ",
@@ -86,7 +86,7 @@ pub fn format_code_blocks(
                     if state == MarkdownState::On
                         && matches!(
                             language.as_str(),
-                            "python" | "py" | "python3" | "py3" | "pyi" | ""
+                            "python" | "py" | "python3" | "py3" | "pyi"
                         )
                     {
                         // Maybe python, try formatting it
@@ -217,13 +217,7 @@ print( "hello" )
         "#;
         assert_snapshot!(
             format_code_blocks(code, None, &FormatterSettings::default()),
-            @r#"
-        This is poorly formatted code:
-
-        ```
-        print("hello")
-        ```
-        "#);
+            @"Unchanged");
     }
 
     #[test]
@@ -410,5 +404,31 @@ def bar(): ...
                 ..Default::default()
             }
         ), @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_quarto() {
+        let code = r#"
+```{py}
+print( 'hello' )
+```
+
+~~~{pyi}
+def foo(): ...
+
+
+def bar(): ...
+~~~
+        "#;
+        assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()), @r#"
+        ```{py}
+        print("hello")
+        ```
+
+        ~~~{pyi}
+        def foo(): ...
+        def bar(): ...
+        ~~~
+        "#);
     }
 }

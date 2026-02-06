@@ -417,6 +417,45 @@ def _(x: Intersection[tuple[int, str], tuple[object, object]]):
         reveal_type(item)  # revealed: int | str
 ```
 
+## Intersection of variable-length and fixed-length tuple
+
+When iterating over an intersection of a variable-length tuple with a fixed-length tuple, we should
+preserve the fixed-length structure and intersect each element type with the variable-length tuple's
+element type.
+
+```py
+from ty_extensions import Intersection
+
+def _(x: Intersection[tuple[str, ...], tuple[object, object]]):
+    # `tuple[str, ...]` yields `str` when iterated.
+    # `tuple[object, object]` yields `object` when iterated.
+    # The intersection should yield `(str & object) | (str & object)` = `str`.
+    for item in x:
+        reveal_type(item)  # revealed: str
+```
+
+## Intersection of variable-length tuples
+
+When iterating over an intersection of two variable-length tuples, we should intersect the element
+types position-by-position.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from ty_extensions import Intersection
+
+def _(x: Intersection[tuple[int, *tuple[str, ...], bytes], tuple[object, *tuple[str, ...]]]):
+    # After resizing, the intersection becomes:
+    # tuple[int & object, *tuple[str & str, ...], bytes & str]
+    # = tuple[int, *tuple[str, ...], Never]
+    # Iterating yields: int | str | Never = int | str
+    for item in x:
+        reveal_type(item)  # revealed: int | str
+```
+
 ## Intersection of fixed-length tuple with homogeneous iterable
 
 When iterating over an intersection of a fixed-length tuple with a class that implements `__iter__`

@@ -2136,6 +2136,38 @@ impl<'db> SpecializationBuilder<'db> {
                             }
                         }
 
+                        // If `ty` is itself a constrained TypeVar, check whether each
+                        // of its constraints is equivalent to at least one constraint of
+                        // the formal TypeVar. This handles the case where two TypeVars
+                        // with identical constraint sets are used across function
+                        // boundaries.
+                        //
+                        // We require equivalence rather than assignability to maintain
+                        // soundness: constrained TypeVars allow narrowing via
+                        // `isinstance` checks inside the function body, so a constraint
+                        // that is a strict subtype (e.g. `bool` vs `int`) would allow
+                        // the callee to return a widened type that violates the caller's
+                        // constraint.
+                        if let Type::TypeVar(actual_typevar) = ty
+                            && let Some(actual_constraints) =
+                                actual_typevar.typevar(self.db).constraints(self.db)
+                        {
+                            let all_satisfied =
+                                actual_constraints.iter().all(|actual_constraint| {
+                                    constraints
+                                        .elements(self.db)
+                                        .iter()
+                                        .any(|formal_constraint| {
+                                            actual_constraint
+                                                .is_equivalent_to(self.db, *formal_constraint)
+                                        })
+                                });
+                            if all_satisfied {
+                                self.add_type_mapping(bound_typevar, ty, polarity, f);
+                                return Ok(());
+                            }
+                        }
+
                         for constraint in constraints.elements(self.db) {
                             let is_satisfied = if polarity.is_contravariant() {
                                 constraint

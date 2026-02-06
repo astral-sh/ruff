@@ -61,7 +61,7 @@ impl<P: AsRef<Path>> From<P> for SourceType {
             Some(filename) if filename == "poetry.lock" => Self::Toml(TomlSourceType::Poetry),
             _ => match path.as_ref().extension() {
                 Some(ext) if ext == "toml" => Self::Toml(TomlSourceType::Unrecognized),
-                Some(ext) if ext == "md" => Self::Markdown,
+                Some(ext) if ext == "md" || ext == "qmd" => Self::Markdown,
                 _ => Self::Python(PySourceType::from(path)),
             },
         }

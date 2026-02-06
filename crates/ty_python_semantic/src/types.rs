@@ -68,7 +68,10 @@ use crate::types::generics::{
     typing_self, walk_generic_context,
 };
 use crate::types::mro::{Mro, MroIterator, StaticMroError};
-pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
+pub(crate) use crate::types::narrow::{
+    NarrowingConstraint, PossiblyNarrowedPlaces, PossiblyNarrowedPlacesBuilder,
+    infer_narrowing_constraint,
+};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
@@ -2897,20 +2900,24 @@ impl<'db> Type<'db> {
         self.is_data_descriptor_impl(d, false)
     }
 
-    /// Returns whether this type may be a data descriptor.
+    /// Returns whether this type should be considered a possible data descriptor.
     /// If this type is a union, returns true if _any_ element is a data descriptor.
+    /// This is used to determine whether an attribute assignment is valid for narrowing.
+    /// In theory, dynamic types might be data descriptor types, so it is unsafe to use
+    /// attribute assignment for narrowing if the inferred type of an attribute contains a dynamic type.
+    /// However, strictly applying this rule would disable narrowing too frequently.
+    /// Therefore, for practical convenience, we don't consider dynamic types as data descriptors.
     pub(crate) fn may_be_data_descriptor(self, d: &'db dyn Db) -> bool {
         self.is_data_descriptor_impl(d, true)
     }
 
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
-            Type::Dynamic(_) | Type::Never | Type::PropertyInstance(_) => true,
+            Type::Dynamic(_) => !any_of_union,
+            Type::Never | Type::PropertyInstance(_) => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)
                 .iter()
-                // Types of instance attributes that are not explicitly typed are unioned with `Unknown`, it should be excluded when checking.
-                .filter(|ty| !ty.is_unknown())
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
             Type::Union(union) => union
                 .elements(db)
@@ -4716,6 +4723,40 @@ impl<'db> Type<'db> {
             )
             .place
         {
+            Place::Defined(DefinedPlace {
+                ty: dunder_callable,
+                definedness: boundness,
+                ..
+            }) => {
+                let bindings = dunder_callable
+                    .bindings(db)
+                    .match_parameters(db, argument_types)
+                    .check_types(db, argument_types, tcx, &[])?;
+
+                if boundness == Definedness::PossiblyUndefined {
+                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                }
+                Ok(bindings)
+            }
+            Place::Undefined => Err(CallDunderError::MethodNotAvailable),
+        }
+    }
+
+    /// Attempt to call a dunder method defined on a class itself.
+    ///
+    /// This is used for methods like `__class_getitem__` which are implicitly called
+    /// when subscripting the class itself (e.g., `MyClass[int]`). These dunder methods
+    /// need to be looked up on the metaclass AND the class itself. So unlike
+    /// `try_call_dunder`, this does NOT add `NO_INSTANCE_FALLBACK`, allowing the lookup
+    /// to find methods defined on the class when `self` is a class literal.
+    fn try_call_dunder_on_class(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        argument_types: &CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        match self.member(db, name).place {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
@@ -7541,7 +7582,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
-    pub(crate) struct TypeQualifiers: u8 {
+    pub struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -7572,7 +7613,7 @@ impl TypeQualifiers {
     ///
     /// Note that this function can only be called on sets with a single member.
     /// Panics if more than a single bit is set.
-    fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::CLASS_VAR => "ClassVar",
             Self::FINAL => "Final",
@@ -7586,6 +7627,16 @@ impl TypeQualifiers {
                 )
             }
         }
+    }
+
+    /// Returns `true` if this is a non-standard qualifier.
+    ///
+    /// Non-standard qualifiers are internal implementation details like
+    /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
+    pub fn is_non_standard(self) -> bool {
+        const NON_STANDARD: TypeQualifiers =
+            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
+        self.intersects(NON_STANDARD)
     }
 }
 

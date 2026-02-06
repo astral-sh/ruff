@@ -68,22 +68,22 @@ use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     self, ABSTRACT_METHOD_IN_FINAL_CLASS, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO,
-    DUPLICATE_BASE, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DATACLASS, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM,
-    INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
-    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_HEADER,
-    INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
-    NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION,
+    DATACLASS_FIELD_ORDER, DIVISION_BY_ZERO, DUPLICATE_BASE, DUPLICATE_KW_ONLY,
+    FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
+    INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
+    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
+    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
+    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
+    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
+    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
+    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -462,6 +462,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn scope(&self) -> ScopeId<'db> {
         self.scope
+    }
+
+    /// If the current scope is a class body scope of a dataclass-like class, populate
+    /// `self.dataclass_field_specifiers` with the field specifiers from the class's
+    /// `dataclass_params` or `dataclass_transform` parameters. This is needed so that
+    /// calls to field-specifier functions are recognized during type inference of the
+    /// right-hand side of annotated assignments.
+    fn setup_dataclass_field_specifiers(&mut self) {
+        fn field_specifiers<'db>(
+            db: &'db dyn Db,
+            index: &'db SemanticIndex<'db>,
+            scope: ScopeId<'db>,
+        ) -> Option<SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>> {
+            let enclosing_scope = index.scope(scope.file_scope_id(db));
+            let class_node = enclosing_scope.node().as_class()?;
+            let class_definition = index.expect_single_definition(class_node);
+            let class_literal = infer_definition_types(db, class_definition)
+                .declaration_type(class_definition)
+                .inner_type()
+                .as_class_literal()?
+                .as_static()?;
+
+            class_literal
+                .dataclass_params(db)
+                .map(|params| SmallVec::from(params.field_specifiers(db)))
+                .or_else(|| {
+                    Some(SmallVec::from(
+                        CodeGeneratorKind::from_class(db, class_literal.into(), None)?
+                            .dataclass_transformer_params()?
+                            .field_specifiers(db),
+                    ))
+                })
+        }
+
+        if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
+            self.dataclass_field_specifiers = specifiers;
+        }
     }
 
     /// Set the multi-inference state, returning the previous value.
@@ -1386,19 +1423,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (12) Check that a dataclass does not have more than one `KW_ONLY`.
+            // (12) Check that a dataclass does not have more than one `KW_ONLY`
+            // and that required fields are defined before default fields.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class.into(), None)
             {
                 let specialization = None;
 
-                let kw_only_sentinel_fields: Vec<_> = class
-                    .own_fields(self.db(), specialization, field_policy)
-                    .into_iter()
-                    .filter_map(|(name, field)| {
-                        field.is_kw_only_sentinel(self.db()).then_some(name)
-                    })
-                    .collect();
+                let mut kw_only_sentinel_fields = vec![];
+                let mut required_after_default_field_names = vec![];
+                let mut has_seen_default_field = false;
+
+                for (name, field) in class.own_fields(self.db(), specialization, field_policy) {
+                    if field.is_kw_only_sentinel(self.db()) {
+                        kw_only_sentinel_fields.push(name);
+                        continue;
+                    }
+
+                    // Extract dataclass field properties
+                    let FieldKind::Dataclass {
+                        default_ty,
+                        init,
+                        kw_only,
+                        ..
+                    } = &field.kind
+                    else {
+                        continue;
+                    };
+
+                    // Fields with init=False or kw_only=true don't participate in ordering check
+                    if !init || *kw_only == Some(true) {
+                        continue;
+                    }
+
+                    if default_ty.is_some() {
+                        has_seen_default_field = true;
+                    } else if has_seen_default_field {
+                        required_after_default_field_names.push(name);
+                    }
+                }
 
                 if kw_only_sentinel_fields.len() > 1 {
                     // TODO: The fields should be displayed in a subdiagnostic.
@@ -1417,6 +1480,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .map(|name| format!("`{name}`"))
                                 .join(", ")
                         ));
+                    }
+                }
+
+                if !required_after_default_field_names.is_empty() {
+                    // Report field ordering violations
+                    let body_scope = class.body_scope(self.db()).file_scope_id(self.db());
+                    let use_def_map = self.index.use_def_map(body_scope);
+                    let place_table = self.index.place_table(body_scope);
+
+                    for name in required_after_default_field_names {
+                        let Some(symbol_id) = place_table.symbol_id(name.as_str()) else {
+                            continue;
+                        };
+                        for decl_with_constraints in
+                            use_def_map.end_of_scope_symbol_declarations(symbol_id)
+                        {
+                            let Some(definition) = decl_with_constraints.declaration.definition()
+                            else {
+                                continue;
+                            };
+                            if let DefinitionKind::AnnotatedAssignment(ann_assign) =
+                                definition.kind(self.db())
+                            {
+                                if let Some(builder) = self.context.report_lint(
+                                    &DATACLASS_FIELD_ORDER,
+                                    ann_assign.target(self.module()),
+                                ) {
+                                    builder.into_diagnostic(format_args!(
+                                        "Required field `{name}` cannot be defined after fields with default values",
+                                    ));
+                                }
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -2219,6 +2316,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>, tcx: TypeContext<'db>) {
+        self.setup_dataclass_field_specifiers();
+
         match expression.kind(self.db()) {
             ExpressionKind::Normal => {
                 self.infer_expression_impl(expression.node_ref(self.db(), self.module()), tcx);
@@ -8279,35 +8378,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
-            fn field_specifiers<'db>(
-                db: &'db dyn Db,
-                index: &'db SemanticIndex<'db>,
-                scope: ScopeId<'db>,
-            ) -> Option<SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>> {
-                let enclosing_scope = index.scope(scope.file_scope_id(db));
-                let class_node = enclosing_scope.node().as_class()?;
-                let class_definition = index.expect_single_definition(class_node);
-                let class_literal = infer_definition_types(db, class_definition)
-                    .declaration_type(class_definition)
-                    .inner_type()
-                    .as_class_literal()?
-                    .as_static()?;
-
-                class_literal
-                    .dataclass_params(db)
-                    .map(|params| SmallVec::from(params.field_specifiers(db)))
-                    .or_else(|| {
-                        Some(SmallVec::from(
-                            CodeGeneratorKind::from_class(db, class_literal.into(), None)?
-                                .dataclass_transformer_params()?
-                                .field_specifiers(db),
-                        ))
-                    })
-            }
-
-            if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
-                self.dataclass_field_specifiers = specifiers;
-            }
+            self.setup_dataclass_field_specifiers();
 
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
             let previous_deferred_state = self.deferred_state;
@@ -11682,20 +11753,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx,
         );
 
-        // Validate `TypedDict` constructor calls after argument type inference
-        if let Type::ClassLiteral(class_literal) = callable_type
-            && class_literal.is_typed_dict(self.db())
-        {
-            let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
-            if let Some(typed_dict) = typed_dict_type.as_typed_dict() {
-                validate_typed_dict_constructor(
-                    &self.context,
-                    typed_dict,
-                    arguments,
-                    func.as_ref().into(),
-                    |expr| self.expression_type(expr),
-                );
+        // Validate `TypedDict` constructor calls after argument type inference.
+        // This needs to run for direct class literals (e.g. `MyTD(...)`), generic aliases
+        // (e.g. `MyGenTD[str](...)`), and `type[MyTD]`-style subclass targets.
+        let typed_dict = match callable_type {
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(self.db()) => {
+                Type::typed_dict(ClassType::NonGeneric(class_literal)).as_typed_dict()
             }
+            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(self.db()) => {
+                Type::typed_dict(ClassType::Generic(generic_alias)).as_typed_dict()
+            }
+            Type::SubclassOf(subclass_of) if subclass_of.is_typed_dict(self.db()) => subclass_of
+                .subclass_of()
+                .into_class(self.db())
+                .and_then(|class| Type::typed_dict(class).as_typed_dict()),
+            _ => None,
+        };
+
+        if let Some(typed_dict) = typed_dict {
+            validate_typed_dict_constructor(
+                &self.context,
+                typed_dict,
+                arguments,
+                func.as_ref().into(),
+                |expr| self.expression_type(expr),
+            );
         }
 
         let mut bindings = match bindings_result {
@@ -14254,24 +14336,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     right_ty: right,
                 }),
             }),
-            (Type::IntLiteral(_), Type::NominalInstance(_)) => {
-                Some(self.infer_binary_type_comparison(
-                    KnownClass::Int.to_instance(self.db()),
-                    op,
-                    right,
-                    range,
-                    visitor,
-                ).map_err(|_| UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-            }
-            (Type::NominalInstance(_), Type::IntLiteral(_)) => {
-                Some(self.infer_binary_type_comparison(
-                    left,
-                    op,
-                    KnownClass::Int.to_instance(self.db()),
-                    range,
-                    visitor,
-                ).map_err(|_|UnsupportedComparisonError { op, left_ty: left, right_ty: right }))
-            }
 
             // Booleans are coded as integers (False = 0, True = 1)
             (Type::IntLiteral(n), Type::BooleanLiteral(b)) => {
@@ -14331,36 +14395,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 Some(Ok(result))
             }
-            (Type::StringLiteral(_), _) => Some(self.infer_binary_type_comparison(
-                KnownClass::Str.to_instance(self.db()),
-                op,
-                right,
-                range,
-                visitor,
-            ).map_err(|err|UnsupportedComparisonError {op, left_ty: left, right_ty: err.right_ty})),
-            (_, Type::StringLiteral(_)) => Some(self.infer_binary_type_comparison(
-                left,
-                op,
-                KnownClass::Str.to_instance(self.db()),
-                range,
-                visitor,
-            ).map_err(|err|UnsupportedComparisonError {op, left_ty: err.left_ty, right_ty: right})),
-
-            (Type::LiteralString, _) => Some(self.infer_binary_type_comparison(
-                KnownClass::Str.to_instance(self.db()),
-                op,
-                right,
-                range,
-                visitor,
-            ).map_err(|err|UnsupportedComparisonError {op, left_ty: left, right_ty: err.right_ty})),
-            (_, Type::LiteralString) => Some(self.infer_binary_type_comparison(
-                left,
-                op,
-                KnownClass::Str.to_instance(self.db()),
-                range,
-                visitor,
-            ).map_err(|err|UnsupportedComparisonError {op, left_ty: err.left_ty, right_ty: right})),
-
             (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
                 let b1 = salsa_b1.value(self.db());
                 let b2 = salsa_b2.value(self.db());
@@ -14394,21 +14428,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 Some(Ok(result))
             }
-            (Type::BytesLiteral(_), _) => Some(self.infer_binary_type_comparison(
-                KnownClass::Bytes.to_instance(self.db()),
-                op,
-                right,
-                range,
-                visitor,
-            ).map_err(|err| UnsupportedComparisonError { op, left_ty: left, right_ty: err.right_ty })),
-            (_, Type::BytesLiteral(_)) => Some(self.infer_binary_type_comparison(
-                left,
-                op,
-                KnownClass::Bytes.to_instance(self.db()),
-                range,
-                visitor,
-            ).map_err(|err| UnsupportedComparisonError { op, left_ty: err.left_ty, right_ty: right })),
-
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>
             {

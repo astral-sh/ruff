@@ -18,8 +18,8 @@ use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
 };
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
-    definitions_for_name,
+    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
+    definitions_for_imported_symbol, definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -379,6 +379,14 @@ impl GotoTarget<'_> {
         }
     }
 
+    /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for this goto target.
+    pub(crate) fn type_qualifiers(&self, model: &SemanticModel<'_>) -> TypeQualifiers {
+        match self {
+            GotoTarget::Expression(expr) => model.type_qualifiers(*expr),
+            _ => TypeQualifiers::empty(),
+        }
+    }
+
     /// Try to get a simplified display of this callable type by resolving overloads
     pub(crate) fn call_type_simplified_by_overloads(
         &self,
@@ -412,10 +420,18 @@ impl GotoTarget<'_> {
             GotoTarget::Expression(expression) => {
                 definitions_for_expression(model, *expression, alias_resolution)
             }
-            // For already-defined symbols, they are their own definitions
-            GotoTarget::FunctionDef(function) => Some(vec![ResolvedDefinition::Definition(
-                function.definition(model),
-            )]),
+            // For already-defined symbols, they are their own definitions.
+            // For property setters/deleters, the getter is a co-definition of
+            // the same logical symbol.
+            GotoTarget::FunctionDef(function) => {
+                let mut defs = vec![ResolvedDefinition::Definition(function.definition(model))];
+                defs.extend(
+                    property_getter_definitions(function, model, alias_resolution)
+                        .into_iter()
+                        .flatten(),
+                );
+                Some(defs)
+            }
 
             GotoTarget::ClassDef(class) => Some(vec![ResolvedDefinition::Definition(
                 class.definition(model),
@@ -1033,6 +1049,29 @@ fn convert_resolved_definitions_to_targets<'db>(
             }
         })
         .collect()
+}
+
+/// If a function is a property setter or deleter (e.g., decorated with
+/// `@my_property.setter`), return the definitions for the property getter.
+/// This ensures that the setter/deleter function name is recognized as a
+/// co-definition of the same logical symbol as the getter.
+fn property_getter_definitions<'db>(
+    function: &ast::StmtFunctionDef,
+    model: &SemanticModel<'db>,
+    alias_resolution: ImportAliasResolution,
+) -> Option<Vec<ResolvedDefinition<'db>>> {
+    for decorator in &function.decorator_list {
+        if let Some(attr_expr) = decorator.expression.as_attribute_expr()
+            && matches!(attr_expr.attr.as_str(), "setter" | "deleter")
+            && matches!(
+                attr_expr.value.inferred_type(model),
+                Some(Type::PropertyInstance(_))
+            )
+        {
+            return definitions_for_expression(model, (&*attr_expr.value).into(), alias_resolution);
+        }
+    }
+    None
 }
 
 /// Shared helper to get definitions for an expr (that is presumably a name/attr)

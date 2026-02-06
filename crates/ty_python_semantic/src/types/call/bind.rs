@@ -1161,46 +1161,85 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::DataclassTransform) => {
-                            if let [
-                                eq_default,
-                                order_default,
-                                kw_only_default,
-                                frozen_default,
-                                field_specifiers,
-                                _kwargs,
-                            ] = overload.parameter_types()
-                            {
-                                let mut flags = DataclassTransformerFlags::empty();
+                            // Use named parameter lookup to handle custom `__dataclass_transform__` functions
+                            // which were allowed in older versions of the `dataclass_transform` spec.
+                            let mut flags = DataclassTransformerFlags::empty();
 
-                                if to_bool(eq_default, true) {
-                                    flags |= DataclassTransformerFlags::EQ_DEFAULT;
-                                }
-                                if to_bool(order_default, false) {
-                                    flags |= DataclassTransformerFlags::ORDER_DEFAULT;
-                                }
-                                if to_bool(kw_only_default, false) {
-                                    flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
-                                }
-                                if to_bool(frozen_default, false) {
-                                    flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
-                                }
+                            let eq_default = overload
+                                .parameter_type_by_name("eq_default", false)
+                                .ok()
+                                .flatten();
+                            let order_default = overload
+                                .parameter_type_by_name("order_default", false)
+                                .ok()
+                                .flatten();
+                            let kw_only_default = overload
+                                .parameter_type_by_name("kw_only_default", false)
+                                .ok()
+                                .flatten();
+                            let frozen_default = overload
+                                .parameter_type_by_name("frozen_default", false)
+                                .ok()
+                                .flatten();
 
-                                let field_specifiers: Box<[Type<'db>]> = field_specifiers
-                                    .map(|tuple_type| {
-                                        tuple_type
-                                            .exact_tuple_instance_spec(db)
-                                            .iter()
-                                            .flat_map(|tuple_spec| tuple_spec.fixed_elements())
-                                            .copied()
-                                            .collect()
-                                    })
-                                    .unwrap_or_default();
-
-                                let params =
-                                    DataclassTransformerParams::new(db, flags, field_specifiers);
-
-                                overload.set_return_type(Type::DataclassTransformer(params));
+                            if to_bool(&eq_default, true) {
+                                flags |= DataclassTransformerFlags::EQ_DEFAULT;
                             }
+                            if to_bool(&order_default, false) {
+                                flags |= DataclassTransformerFlags::ORDER_DEFAULT;
+                            }
+                            if to_bool(&kw_only_default, false) {
+                                flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
+                            }
+                            if to_bool(&frozen_default, false) {
+                                flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
+                            }
+
+                            // Try both `field_specifiers` (the specified name of this `dataclass_transform`
+                            // parameter) and `field_descriptors`, which was used in earlier versions of the spec.
+                            let field_specifiers_param = overload
+                                .parameter_type_by_name("field_specifiers", false)
+                                .ok()
+                                .flatten()
+                                .or_else(|| {
+                                    overload
+                                        .parameter_type_by_name("field_descriptors", false)
+                                        .ok()
+                                        .flatten()
+                                });
+
+                            let field_specifiers: Box<[Type<'db>]> = field_specifiers_param
+                                .and_then(|tuple_type| {
+                                    tuple_type
+                                        .exact_tuple_instance_spec(db)
+                                        .iter()
+                                        .flat_map(|tuple_spec| tuple_spec.fixed_elements())
+                                        .copied()
+                                        .collect::<Vec<_>>()
+                                        .into()
+                                })
+                                .map(|v: Vec<_>| v.into_boxed_slice())
+                                .unwrap_or_default();
+
+                            let params =
+                                DataclassTransformerParams::new(db, flags, field_specifiers);
+
+                            overload.set_return_type(Type::DataclassTransformer(params));
+                        }
+                        Some(KnownFunction::Unpack) => {
+                            let [Some(format), Some(_buffer)] = overload.parameter_types() else {
+                                continue;
+                            };
+
+                            let Some(format_literal) = format.as_string_literal() else {
+                                continue;
+                            };
+
+                            let return_type = parse_struct_format(db, format_literal.value(db))
+                                .map(|elements| Type::heterogeneous_tuple(db, elements.into_iter()))
+                                .unwrap_or_else(|| Type::homogeneous_tuple(db, Type::unknown()));
+
+                            overload.set_return_type(return_type);
                         }
 
                         _ => {
@@ -4964,4 +5003,59 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         CallableSignature::single(new_signature),
         CallableTypeKind::FunctionLike,
     )))
+}
+
+/// Maximum repetition count for struct format specifiers.
+/// Larger counts fall back to `tuple[Unknown, ...]`.
+const STRUCT_FORMAT_MAX_REPETITION: usize = 32;
+
+/// Parse a `struct` module format string and return the element types.
+///
+/// Returns `None` if the format contains unsupported specifiers or
+/// repetition counts exceed the limit, indicating a fallback to `tuple[Unknown, ...]`.
+fn parse_struct_format<'db>(db: &'db dyn Db, format_string: &str) -> Option<Vec<Type<'db>>> {
+    // Strip the byte order/size/alignment prefix
+    let format = format_string.trim_start_matches(['@', '=', '<', '>', '!']);
+    let mut chars = format.chars().peekable();
+    let mut elements = Vec::new();
+
+    while chars.peek().is_some() {
+        // Skip whitespace between format specifiers
+        while chars.next_if(char::is_ascii_whitespace).is_some() {}
+
+        // Parse optional repeat count (defaults to 1)
+        let mut count: usize = 1;
+        if let Some(digit) = chars.next_if(char::is_ascii_digit) {
+            count = digit.to_digit(10).unwrap() as usize;
+            while let Some(digit) = chars.next_if(char::is_ascii_digit) {
+                count = count
+                    .saturating_mul(10)
+                    .saturating_add(digit.to_digit(10).unwrap() as usize);
+            }
+        }
+
+        let Some(specifier) = chars.next() else {
+            break;
+        };
+
+        // Map specifier to (type, repeat_count). For 's'/'p', count is byte length, not repetition.
+        let (ty, repeat) = match specifier {
+            'x' => continue, // Pad byte: no value produced
+            's' | 'p' => (KnownClass::Bytes.to_instance(db), 1),
+            'c' => (KnownClass::Bytes.to_instance(db), count),
+            'b' | 'B' | 'h' | 'H' | 'i' | 'I' | 'l' | 'L' | 'q' | 'Q' | 'n' | 'N' | 'P' => {
+                (KnownClass::Int.to_instance(db), count)
+            }
+            '?' => (KnownClass::Bool.to_instance(db), count),
+            'e' | 'f' | 'd' => (KnownClass::Float.to_instance(db), count),
+            _ => return None,
+        };
+
+        if repeat > STRUCT_FORMAT_MAX_REPETITION {
+            return None;
+        }
+        elements.extend(std::iter::repeat_n(ty, repeat));
+    }
+
+    Some(elements)
 }

@@ -110,14 +110,98 @@ reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 If attributes without default values are declared after attributes with default values, a
-`TypeError` will be raised at runtime. Ideally, we would emit a diagnostic in that case:
+`TypeError` will be raised at runtime. We emit a diagnostic in that case:
 
 ```py
+from dataclasses import field
+
 @dataclass
 class D:
     x: int = 1
-    # TODO: this should be an error: field without default defined after field with default
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: str
+
+@dataclass
+class E:
+    x: int = field(default=3)
+    y: int = field(default_factory=lambda: 4)
+    # error: [dataclass-field-order]
+    z: str
+
+import sys
+
+@dataclass
+class F:
+    x: int = 1
+    if sys.version_info > (3, 7):
+        # error: [dataclass-field-order]
+        y: str
+```
+
+Fields with `init=False` do not participate in the ordering check since they don't appear in
+`__init__`:
+
+```py
+@dataclass
+class GoodWithInitFalse:
+    x: int = 1
+    y: str = field(init=False)
+    z: float = 2.0
+
+@dataclass
+class BadWithInitFalse:
+    x: int = 1
+    y: str = field(init=False)
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float
+```
+
+Keyword-only fields (using `kw_only=True`) also don't participate in the positional ordering check:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+@dataclass
+class GoodWithKwOnly:
+    x: int = 1
+    y: str = field(kw_only=True)
+    z: float = field(kw_only=True, default=2.0)
+
+@dataclass
+class AlsoGoodWithKwOnly:
+    x: int = field(kw_only=True, default=1)
+    y: str
+
+@dataclass
+class BadWithKwOnly:
+    x: int = 1
+    y: str = field(kw_only=True)
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float
+```
+
+Fields after a `KW_ONLY` sentinel are also keyword-only and don't participate in ordering checks:
+
+```py
+from dataclasses import KW_ONLY
+
+@dataclass
+class GoodWithKwOnlySentinel:
+    x: int = 1
+    _: KW_ONLY
+    y: str
+    z: float = 2.0
+
+@dataclass
+class BadWithKwOnlySentinel:
+    x: int = 1
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    y: str
+    _: KW_ONLY
+    z: float
 ```
 
 Pure class attributes (`ClassVar`) are not included in the signature of `__init__`:
@@ -349,16 +433,25 @@ GenericWithOrder[int](1) < GenericWithOrder[int](1)
 GenericWithOrder[int](1) < GenericWithOrder[str]("a")  # error: [unsupported-operator]
 ```
 
-If a class already defines one of the comparison methods, a `TypeError` is raised at runtime.
-Ideally, we would emit a diagnostic in that case:
+If a class already defines one of the comparison methods, a `TypeError` is raised at runtime and a
+diagnostic is emitted.
 
 ```py
 @dataclass(order=True)
-class AlreadyHasCustomDunderLt:
+class InvalidCustomOrderDunderOverrides:
     x: int
 
-    # TODO: Ideally, we would emit a diagnostic here
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__lt__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
     def __lt__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__le__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
+    def __le__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__gt__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
+    def __gt__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__ge__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
+    def __ge__(self, other: object) -> bool:
         return False
 ```
 
@@ -452,10 +545,10 @@ from dataclasses import dataclass
 class MyFrozenClass:
     x: int
 
-    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__setattr__` in class `MyFrozenClass`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__setattr__` in frozen dataclass `MyFrozenClass`"
     def __setattr__(self, name: str, value: object) -> None: ...
 
-    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__delattr__` in class `MyFrozenClass`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__delattr__` in frozen dataclass `MyFrozenClass`"
     def __delattr__(self, name: str) -> None: ...
 ```
 
@@ -699,6 +792,34 @@ class C:
 
 C(x=1)
 C(1)
+```
+
+No fields of a `kw_only=True` dataclass participate in field ordering checks.
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass(kw_only=True)
+class KwOnlyClassGood:
+    x: int = 1
+    y: str
+
+@dataclass(kw_only=True)
+class KwOnlyClassAlsoGood:
+    x: int
+    y: str = "default"
+    z: float
+```
+
+The class-level `kw_only` parameter can be overridden per-field.
+
+```py
+@dataclass(kw_only=True)
+class KwOnlyClassWithPositionalField:
+    x: int = 1
+    y: str = field(kw_only=False, default="hello")
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float = field(kw_only=False)
 ```
 
 ### `kw_only` - Python < 3.10
