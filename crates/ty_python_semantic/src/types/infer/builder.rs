@@ -11753,20 +11753,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx,
         );
 
-        // Validate `TypedDict` constructor calls after argument type inference
-        if let Type::ClassLiteral(class_literal) = callable_type
-            && class_literal.is_typed_dict(self.db())
-        {
-            let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
-            if let Some(typed_dict) = typed_dict_type.as_typed_dict() {
-                validate_typed_dict_constructor(
-                    &self.context,
-                    typed_dict,
-                    arguments,
-                    func.as_ref().into(),
-                    |expr| self.expression_type(expr),
-                );
+        // Validate `TypedDict` constructor calls after argument type inference.
+        // This needs to run for direct class literals (e.g. `MyTD(...)`), generic aliases
+        // (e.g. `MyGenTD[str](...)`), and `type[MyTD]`-style subclass targets.
+        let typed_dict = match callable_type {
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(self.db()) => {
+                Type::typed_dict(ClassType::NonGeneric(class_literal)).as_typed_dict()
             }
+            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(self.db()) => {
+                Type::typed_dict(ClassType::Generic(generic_alias)).as_typed_dict()
+            }
+            Type::SubclassOf(subclass_of) if subclass_of.is_typed_dict(self.db()) => subclass_of
+                .subclass_of()
+                .into_class(self.db())
+                .and_then(|class| Type::typed_dict(class).as_typed_dict()),
+            _ => None,
+        };
+
+        if let Some(typed_dict) = typed_dict {
+            validate_typed_dict_constructor(
+                &self.context,
+                typed_dict,
+                arguments,
+                func.as_ref().into(),
+                |expr| self.expression_type(expr),
+            );
         }
 
         let mut bindings = match bindings_result {
