@@ -9992,7 +9992,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
 
                     let specialization = builder
-                        // Default specialize any type variables to `Unknown`, which will be ignored
+                        // Default specialize any type variables to a marker type, which will be ignored
                         // during argument inference, allowing the concrete subset of the parameter
                         // type to still affect argument inference.
                         //
@@ -10002,7 +10002,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // not yet clear how we're going to do that. (We might have to start inferring
                         // constraint sets for each expression, instead of simple types?)
                         .with_default(generic_context, |_| {
-                            Type::Dynamic(DynamicType::UnknownGeneric(generic_context))
+                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
                         })
                         .build(generic_context);
 
@@ -10796,11 +10796,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         collection_instance,
                         |(typevar, variance, inferred_ty)| {
                             // Avoid inferring a preferred type based on partially specialized type context
-                            // from an outer generic call, which is default specialized to `Unknown`. If
-                            // the type context is a union, we try to keep any concrete elements.
-                            let inferred_ty = inferred_ty
-                                .filter_union(self.db(), |ty| !ty.has_unknown_generic(self.db()));
-                            if inferred_ty.has_unknown_generic(self.db()) {
+                            // from an outer generic call. If the type context is a union, we try to keep
+                            // any concrete elements.
+                            let inferred_ty = inferred_ty.filter_union(self.db(), |ty| {
+                                !ty.has_unspecialized_type_var(self.db())
+                            });
+                            if inferred_ty.has_unspecialized_type_var(self.db()) {
                                 return None;
                             }
 
@@ -13393,6 +13394,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
+
+            (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
+            | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
 
             (
                 todo @ Type::Dynamic(

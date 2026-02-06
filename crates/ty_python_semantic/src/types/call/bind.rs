@@ -3189,17 +3189,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         // Avoid inferring a preferred type based on partially specialized type context
-                        // from an outer generic call, which is default specialized to `Unknown`. If
-                        // the type context is a union, we try to keep any concrete elements.
+                        // from an outer generic call. If the type context is a union, we try to keep
+                        // any concrete elements.
                         let inferred_ty = inferred_ty.filter_union(self.db, |ty| {
-                            if ty.has_unknown_generic(self.db) {
+                            if ty.has_unspecialized_type_var(self.db) {
                                 partially_specialized_declared_type.insert(identity);
                                 false
                             } else {
                                 true
                             }
                         });
-                        if inferred_ty.has_unknown_generic(self.db) {
+                        if inferred_ty.has_unspecialized_type_var(self.db) {
                             return None;
                         }
 
