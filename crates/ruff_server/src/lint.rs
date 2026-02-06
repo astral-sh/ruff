@@ -97,7 +97,7 @@ pub(crate) fn check(
     };
 
     let SourceType::Python(source_type) = query.source_type() else {
-        return DiagnosticsMap::default(); // todo?
+        return DiagnosticsMap::default();
     };
 
     let target_version = settings.linter.resolve_target_version(&document_path);
