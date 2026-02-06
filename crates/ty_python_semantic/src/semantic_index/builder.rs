@@ -1966,12 +1966,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
+                // Limit the number of if/elif conditions for which we record
+                // all-places narrowing. This prevents exponential blowup in
+                // the narrowing TDD evaluation for long if/elif chains (each
+                // non-narrowing ambiguous atom doubles the evaluation work).
+                // A limit of 4 allows nested always-true conditions to work
+                // while keeping the evaluation bounded at ~2^4 = 16 paths.
+                const ALL_PLACES_NARROWING_LIMIT: usize = 4;
+
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
+                let mut all_places_narrowing_count: usize = 1;
                 self.current_use_def_map_mut()
                     .record_narrowing_predicate_for_all_places(last_narrowing_id);
+
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
 
@@ -2013,8 +2023,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_restore(no_branch_taken.clone());
 
                     self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
-                    self.current_use_def_map_mut()
-                        .record_negated_narrowing_predicate_for_all_places(last_narrowing_id);
+                    if all_places_narrowing_count <= ALL_PLACES_NARROWING_LIMIT {
+                        self.current_use_def_map_mut()
+                            .record_negated_narrowing_predicate_for_all_places(last_narrowing_id);
+                    }
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     if let Some(elif_test) = clause_test {
@@ -2024,8 +2036,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                         (last_predicate, last_narrowing_id) =
                             self.record_expression_narrowing_constraint(elif_test);
-                        self.current_use_def_map_mut()
-                            .record_narrowing_predicate_for_all_places(last_narrowing_id);
+                        all_places_narrowing_count += 1;
+                        if all_places_narrowing_count <= ALL_PLACES_NARROWING_LIMIT {
+                            self.current_use_def_map_mut()
+                                .record_narrowing_predicate_for_all_places(last_narrowing_id);
+                        }
 
                         last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
