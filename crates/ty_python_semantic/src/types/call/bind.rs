@@ -3102,6 +3102,23 @@ struct ArgumentTypeChecker<'a, 'db> {
 
     inferable_typevars: InferableTypeVars<'db, 'db>,
     specialization: Option<Specialization<'db>>,
+
+    /// Argument indices for which the constraint-set solver produced a `NoSolution` error. We
+    /// silence diagnostics from `check_argument_type` for these arguments to avoid duplicates: the
+    /// constraint-set solver is the authority for these parameters, and the post-specialization
+    /// assignability check would re-detect the same incompatibility against a less-informative
+    /// fallback specialization.
+    ///
+    /// This is only needed because we currently use a hybrid of two solvers. The old heuristic
+    /// solver (which unions type mappings) never produces `NoSolution` errors for assignability
+    /// failures — it relies on `check_argument_type` as the sole diagnostic authority. The new
+    /// constraint-set solver detects errors during inference, making the subsequent
+    /// `check_argument_type` redundant for those arguments.
+    ///
+    /// TODO: Once we fully migrate to constraint sets for all specialization inference, this field
+    /// can be removed: `infer_specialization` will be the sole authority for generic parameters,
+    /// and `check_argument_type` will only be needed for non-generic parameters.
+    constraint_set_errors: Vec<bool>,
 }
 
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
@@ -3131,6 +3148,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             errors,
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
+            constraint_set_errors: vec![false; arguments.len()],
         }
     }
 
@@ -3325,6 +3343,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 );
 
                 if let Err(error) = specialization_result {
+                    // Record if the specialization error comes from the new constraint set solver.
+                    // If so, we will silence any diagnostics from check_argument_types for this
+                    // argument. The constraint-set solver is the authority for these parameters,
+                    // and the post-specialization assignability check would re-detect the same
+                    // incompatibility against a less-informative fallback specialization.
+                    if error.comes_from_new_solver() {
+                        self.constraint_set_errors[argument_index] = true;
+                    }
                     specialization_errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
@@ -3338,6 +3364,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_argument_type(
         &mut self,
+        argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
         mut argument_type: Type<'db>,
@@ -3354,12 +3381,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // where assignability holds; normally we want to check that assignability holds for
         // _all_ specializations.
         //
+        // Note that we silence diagnostics here if we already got a SpecializationError from the
+        // new constraint set solver for this argument. The constraint-set solver is the authority
+        // for these parameters, and this assignability check would re-detect the same
+        // incompatibility against a less-informative fallback specialization.
+        //
         // TODO: Soon we will go further, and build the actual specializations from the
         // constraint set that we get from this assignability check, instead of inferring and
         // building them in an earlier separate step.
         //
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
-        if !parameter.has_starred_annotation()
+        if !self.constraint_set_errors[argument_index]
+            && !parameter.has_starred_annotation()
             && argument_type
                 .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
                 .is_never_satisfied(self.db)
@@ -3418,6 +3451,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     // If the argument isn't splatted, just check its type directly.
                     for parameter_index in &self.argument_matches[argument_index].parameters {
                         self.check_argument_type(
+                            argument_index,
                             adjusted_argument_index,
                             argument,
                             argument_type,
@@ -3604,6 +3638,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.argument_matches[argument_index].iter()
         {
             self.check_argument_type(
+                argument_index,
                 adjusted_argument_index,
                 argument,
                 variadic_argument_type.unwrap_or_else(Type::unknown),
@@ -3627,6 +3662,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
+                    argument_index,
                     adjusted_argument_index,
                     argument,
                     argument_type,
@@ -3668,6 +3704,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 std::iter::repeat(value_type).zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
+                    argument_index,
                     adjusted_argument_index,
                     Argument::Keywords,
                     argument_type,

@@ -681,8 +681,6 @@ reveal_type(change_return_type(int_int))  # revealed: Overload[(x: int) -> str, 
 # error: [invalid-argument-type]
 reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
-# TODO: only one error
-# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
@@ -1068,8 +1066,6 @@ class Unrelated:
     def __init__(self, x: int):
         pass
 
-# TODO: only one error
-# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 create(Unrelated, 1)
 ```
@@ -1089,7 +1085,6 @@ def call_factory[**P](ctr: Factory[P], *args: P.args, **kwargs: P.kwargs) -> int
 
 # TODO: This should be OK - P should be inferred as [] since my_factory only has `arg: str`
 # which matches the prefix. Currently this is a false positive.
-# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 call_factory(my_factory)
 ```

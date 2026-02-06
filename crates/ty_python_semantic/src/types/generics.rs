@@ -2507,6 +2507,10 @@ pub(crate) enum SpecializationError<'db> {
 }
 
 impl<'db> SpecializationError<'db> {
+    pub(crate) fn comes_from_new_solver(&self) -> bool {
+        matches!(self, SpecializationError::NoSolution { .. })
+    }
+
     pub(crate) fn bound_typevar(&self) -> Option<BoundTypeVarInstance<'db>> {
         match self {
             Self::NoSolution { .. } => None,
