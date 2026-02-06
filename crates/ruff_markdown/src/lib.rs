@@ -5,7 +5,7 @@ use ruff_python_ast::PySourceType;
 use ruff_python_formatter::{PyFormatOptions, format_module_source};
 use ruff_python_trivia::textwrap::{dedent, indent};
 use ruff_source_file::{Line, UniversalNewlines};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -143,7 +143,10 @@ fn format_pycon_block(
     path: Option<&Path>,
     settings: &FormatterSettings,
 ) -> Option<String> {
-    let offset = TextSize::new(4);
+    static FIRST_LINE: &str = ">>> ";
+    static CONTINUATION: &str = "... ";
+
+    let offset = FIRST_LINE.text_len();
     let mut changed = false;
     let mut result = String::with_capacity(source.len());
     let mut unformatted = String::with_capacity(source.len());
@@ -152,12 +155,12 @@ fn format_pycon_block(
 
     while let Some(line) = lines.next() {
         unformatted.clear();
-        if line.starts_with(">>> ") {
+        if line.starts_with(FIRST_LINE) {
             let start = line.start();
             let mut end = line.full_end();
             unformatted.push_str(&source[TextRange::new(line.start() + offset, line.full_end())]);
             while let Some(next_line) = lines.peek() {
-                if next_line.starts_with("... ") {
+                if next_line.starts_with(CONTINUATION) {
                     end = next_line.full_end();
                     unformatted.push_str(&source[TextRange::new(next_line.start() + offset, end)]);
                     lines.next();
@@ -178,7 +181,7 @@ fn format_pycon_block(
             if formatted.len() != unformatted.len() || formatted != unformatted {
                 result.push_str(&source[TextRange::new(last_match, start)]);
                 for (idx, line) in formatted.universal_newlines().enumerate() {
-                    result.push_str(if idx == 0 { ">>> " } else { "... " });
+                    result.push_str(if idx == 0 { FIRST_LINE } else { CONTINUATION });
                     result.push_str(&formatted[TextRange::new(line.start(), line.full_end())]);
                 }
                 last_match = end;
