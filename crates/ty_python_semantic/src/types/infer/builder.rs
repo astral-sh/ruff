@@ -2632,12 +2632,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(type_and_qualifiers) => {
-                // Avoid promoting literal values originating from an explicit declared type.
-                let inferred_ty = type_and_qualifiers
-                    .inner_type()
-                    .unpromote_literals(self.db());
-
-                (type_and_qualifiers, inferred_ty)
+                (type_and_qualifiers, type_and_qualifiers.inner_type())
             }
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,

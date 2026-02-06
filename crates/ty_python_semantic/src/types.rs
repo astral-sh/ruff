@@ -1685,11 +1685,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Marks (possibly nested) literals as unpromotable.
-    pub(crate) fn unpromote_literals(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_type_mapping(db, &TypeMapping::UnpromoteLiterals, TypeContext::default())
-    }
-
     /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
     ///
     /// A normalized type:
@@ -6199,7 +6194,6 @@ impl<'db> Type<'db> {
                         TypeMapping::ApplySpecialization(_) |
                         TypeMapping::UniqueSpecialization { .. } |
                         TypeMapping::PromoteLiterals(_) |
-                        TypeMapping::UnpromoteLiterals |
                         TypeMapping::BindSelf { .. } |
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
@@ -6261,8 +6255,6 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => match type_mapping {
-                // The annotatated types of a function signature are already unpromotable.
-                TypeMapping::UnpromoteLiterals => self,
                 // Promote the types within the signature before promoting the signature to its
                 // callable form.
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => {
@@ -6381,12 +6373,6 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
             Type::TypeAlias(alias) => {
-                // Type alias types are only inferred through an explicit annotation, so any literals
-                // in their value type are never promotable.
-                if matches!(type_mapping, TypeMapping::PromoteLiterals(..) | TypeMapping::UnpromoteLiterals) {
-                    return self;
-                }
-
                 // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                 // detection rather than the visitor's cycle detection, because the visitor tracks
                 // Type values and `RecursiveList` is different from `RecursiveList[T]`.
@@ -6442,12 +6428,11 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) |
-                TypeMapping::UnpromoteLiterals => self,
+                TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db)
             }
 
-            Type::LiteralValue(literal) => match type_mapping {
+            Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
@@ -6459,7 +6444,6 @@ impl<'db> Type<'db> {
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db),
-                TypeMapping::UnpromoteLiterals => Type::LiteralValue(literal.to_unpromotable(db))
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6469,7 +6453,6 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
-                TypeMapping::UnpromoteLiterals |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
@@ -7139,8 +7122,6 @@ pub enum TypeMapping<'a, 'db> {
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     PromoteLiterals(PromoteLiteralsMode),
-    /// Marks any literals in the type as unpromotable.
-    UnpromoteLiterals,
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -7193,7 +7174,6 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::PromoteLiterals(_)
-            | TypeMapping::UnpromoteLiterals
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -7231,7 +7211,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
-            | TypeMapping::UnpromoteLiterals
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
@@ -8925,7 +8904,6 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::PromoteLiterals(_)
-            | TypeMapping::UnpromoteLiterals
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
@@ -11841,9 +11819,6 @@ impl<'db> PEP695TypeAliasType<'db> {
         let definition = self.definition(db);
 
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
-            // Type alias types are only inferred through an explicit annotation, so any literals
-            // in their value type are never promotable.
-            .unpromote_literals(db)
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
