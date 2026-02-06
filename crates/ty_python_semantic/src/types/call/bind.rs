@@ -5019,6 +5019,9 @@ fn parse_struct_format<'db>(db: &'db dyn Db, format_string: &str) -> Option<Vec<
             }
             '?' => (KnownClass::Bool.to_instance(db), count),
             'e' | 'f' | 'd' => (KnownClass::Float.to_instance(db), count),
+            'F' | 'D' if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
+                (KnownClass::Complex.to_instance(db), count)
+            }
             _ => return None,
         };
 

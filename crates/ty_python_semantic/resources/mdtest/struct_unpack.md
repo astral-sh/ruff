@@ -35,6 +35,21 @@ def _(buf: bytes):
     reveal_type(unpack("@P4x", buf))  # revealed: tuple[int]
 ```
 
+Support for format characters for complex numbers was added in Python 3.14:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from struct import *
+
+def _(buf: bytes):
+    reveal_type(unpack("2F", buf))  # revealed: tuple[complex, complex]
+    reveal_type(unpack("3D", buf))  # revealed: tuple[complex, complex, complex]
+```
+
 ## Escape Large Repetition Counts
 
 ```py
