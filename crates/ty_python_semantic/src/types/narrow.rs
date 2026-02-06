@@ -1100,6 +1100,51 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
+        // Narrow discriminated unions based on attribute identity checks. For example:
+        //
+        //     class A:
+        //         kind: Literal["a"]
+        //     class B:
+        //         kind: Literal["b"]
+        //     def _(x: A | B):
+        //         if x.kind is "a":
+        //             reveal_type(x)  # A
+        if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
+            && let ast::Expr::Attribute(attr_expr) = &**left
+            && let Type::Union(union) = inference
+                .expression_type(&*attr_expr.value)
+                .resolve_type_alias(self.db)
+            && let Some(attr_place_expr) = PlaceExpr::try_from_expr(&attr_expr.value)
+            && let rhs_ty = inference.expression_type(&comparators[0])
+            && rhs_ty.is_singleton(self.db)
+        {
+            let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
+            let attr_name = &attr_expr.attr;
+            let union_elements = union.elements(self.db);
+            let filtered: Vec<_> = union_elements
+                .iter()
+                .filter(|elem| {
+                    elem.instance_member(self.db, attr_name)
+                        .ignore_possibly_undefined()
+                        .is_none_or(|attr_ty| {
+                            if is_positive_check {
+                                !attr_ty.is_disjoint_from(self.db, rhs_ty)
+                            } else {
+                                !attr_ty.is_subtype_of(self.db, rhs_ty)
+                            }
+                        })
+                })
+                .copied()
+                .collect();
+            if filtered.len() < union_elements.len() {
+                let place = self.expect_place(&attr_place_expr);
+                constraints.insert(
+                    place,
+                    NarrowingConstraint::replacement(UnionType::from_elements(self.db, filtered)),
+                );
+            }
+        }
+
         // Narrow tagged unions of `TypedDict`s with `Literal` keys, for example:
         //
         //     class Foo(TypedDict):
@@ -1137,6 +1182,33 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 inference.expression_type(&*subscript.value),
                 &subscript.value,
                 inference.expression_type(&*subscript.slice),
+                inference.expression_type(&comparators[0]),
+                constrain_with_equality,
+            ) {
+                constraints.insert(place, constraint);
+            }
+        }
+
+        // Narrow discriminated unions based on attribute comparisons. For example:
+        //
+        //     class A:
+        //         kind: Literal["a"]
+        //     class B:
+        //         kind: Literal["b"]
+        //     def _(x: A | B):
+        //         if x.kind == "a":
+        //             reveal_type(x)  # A
+        //
+        // Like the subscript cases above, `x.kind` isn't the place we constrain;
+        // instead, we constrain `x` itself.
+        if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq])
+            && let ast::Expr::Attribute(attr_expr) = &**left
+        {
+            let constrain_with_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
+            if let Some((place, constraint)) = self.narrow_attribute_access(
+                inference.expression_type(&*attr_expr.value),
+                &attr_expr.value,
+                &attr_expr.attr,
                 inference.expression_type(&comparators[0]),
                 constrain_with_equality,
             ) {
@@ -1580,6 +1652,20 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
+        // Narrow discriminated unions based on attribute access, just like `if` statements.
+        if let ast::Expr::Attribute(attr_expr) = subject_node {
+            let inference = infer_expression_types(self.db, subject, TypeContext::default());
+            if let Some((place, constraint)) = self.narrow_attribute_access(
+                inference.expression_type(&*attr_expr.value),
+                &attr_expr.value,
+                &attr_expr.attr,
+                value_ty,
+                is_positive,
+            ) {
+                constraints.insert(place, constraint);
+            }
+        }
+
         Some(constraints)
     }
 
@@ -1816,6 +1902,86 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             None
         }
     }
+
+    /// Narrow discriminated unions based on attribute access.
+    ///
+    /// Given an attribute expression like `obj.kind` where `obj` is a union type, and a
+    /// comparison value like `"foo"`, this method creates a constraint on `obj` (not
+    /// `obj.kind`) that narrows it based on the attribute value.
+    ///
+    /// For example:
+    /// ```python
+    /// class A:
+    ///     kind: Literal["a"]
+    /// class B:
+    ///     kind: Literal["b"]
+    /// def _(x: A | B):
+    ///     if x.kind == "a":
+    ///         reveal_type(x)  # A
+    /// ```
+    ///
+    /// Returns `Some((place, constraint))` if narrowing is possible, `None` otherwise.
+    fn narrow_attribute_access(
+        &self,
+        value_type: Type<'db>,
+        value_expr: &ast::Expr,
+        attr_name: &str,
+        rhs_type: Type<'db>,
+        constrain_with_equality: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        // We need a union type for narrowing to be useful.
+        let Type::Union(union) = value_type.resolve_type_alias(self.db) else {
+            return None;
+        };
+
+        // The comparison value must be a supported literal type.
+        if !is_supported_tag_literal(rhs_type) {
+            return None;
+        }
+
+        let value_place_expr = PlaceExpr::try_from_expr(value_expr)?;
+
+        // For equality constraints, all matching attributes must have literal types to safely
+        // narrow. Non-literal types (like `str` or `int`) could have subclasses that override
+        // `__eq__` in unexpected ways. For inequality constraints, we can narrow even with
+        // non-literal attribute types.
+        if constrain_with_equality
+            && !all_matching_attribute_types_are_literals(self.db, union, attr_name)
+        {
+            return None;
+        }
+
+        // Filter the union based on whether each member's attribute could match the rhs.
+        let union_elements = union.elements(self.db);
+        let filtered: Vec<_> = union_elements
+            .iter()
+            .filter(|elem| {
+                elem.instance_member(self.db, attr_name)
+                    .ignore_possibly_undefined()
+                    .is_none_or(|attr_ty| {
+                        if constrain_with_equality {
+                            // Keep members where attribute could be equal to rhs.
+                            !attr_ty.is_disjoint_from(self.db, rhs_type)
+                        } else {
+                            // Keep members where attribute is not always equal to rhs.
+                            !attr_ty.is_subtype_of(self.db, rhs_type)
+                        }
+                    })
+            })
+            .copied()
+            .collect();
+
+        // Only create a constraint if we actually narrowed something.
+        if filtered.len() < union_elements.len() {
+            let place = self.expect_place(&value_place_expr);
+            Some((
+                place,
+                NarrowingConstraint::replacement(UnionType::from_elements(self.db, filtered)),
+            ))
+        } else {
+            None
+        }
+    }
 }
 
 // Return true if the given type is a `TypedDict` or a union or intersection that includes at least
@@ -1996,6 +2162,23 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     })
 }
 
+/// Check that all union members' attributes with the given name have literal types.
+///
+/// For equality narrowing to be safe, we need to ensure that the attribute types
+/// are literals (which have well-defined equality). Non-literal types (like `str`
+/// or `int`) could have subclasses that override `__eq__` in unexpected ways.
+fn all_matching_attribute_types_are_literals<'db>(
+    db: &'db dyn Db,
+    union: UnionType<'db>,
+    attr_name: &str,
+) -> bool {
+    union.elements(db).iter().all(|elem| {
+        elem.instance_member(db, attr_name)
+            .ignore_possibly_undefined()
+            .is_none_or(is_supported_tag_literal)
+    })
+}
+
 /// Builder for computing the conservative set of places that could possibly be narrowed.
 ///
 /// This mirrors the structure of `NarrowingConstraintsBuilder` but only computes which places
@@ -2074,6 +2257,16 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // (TypedDict and tuple discriminated union narrowing)
         if let ast::Expr::Subscript(subscript) = &*expr_compare.left {
             if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
+                if let Some(place) = self.places.place_id((&place_expr).into()) {
+                    places.insert(place);
+                }
+            }
+        }
+
+        // For attribute expressions on the left, the attribute base can also be narrowed
+        // (discriminated union narrowing)
+        if let ast::Expr::Attribute(attr_expr) = &*expr_compare.left {
+            if let Some(place_expr) = PlaceExpr::try_from_expr(&attr_expr.value) {
                 if let Some(place) = self.places.place_id((&place_expr).into()) {
                     places.insert(place);
                 }
@@ -2163,6 +2356,15 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // For subscript subjects, the subscript base can also be narrowed (TypedDict/tuple narrowing)
         if let ast::Expr::Subscript(subscript) = subject_node {
             if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
+                if let Some(place) = self.places.place_id((&place_expr).into()) {
+                    places.insert(place);
+                }
+            }
+        }
+
+        // For attribute subjects, the attribute base can also be narrowed (discriminated union narrowing)
+        if let ast::Expr::Attribute(attr_expr) = subject_node {
+            if let Some(place_expr) = PlaceExpr::try_from_expr(&attr_expr.value) {
                 if let Some(place) = self.places.place_id((&place_expr).into()) {
                     places.insert(place);
                 }

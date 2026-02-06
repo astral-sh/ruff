@@ -585,3 +585,135 @@ def _(c: Container):
     if c.data[b"key"] is not None:
         reveal_type(c.data[b"key"])  # revealed: int
 ```
+
+## Discriminated unions via attribute access (equality narrowing)
+
+Narrow unions of class instances based on a discriminating attribute using `==` comparison:
+
+```py
+from typing import Literal
+
+class A:
+    kind: Literal["a"]
+    a_attr: int
+
+class B:
+    kind: Literal["b"]
+    b_attr: str
+
+class C:
+    kind: Literal["c"]
+    c_attr: float
+
+def _(x: A | B):
+    if x.kind == "a":
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: B
+
+def _(x: A | B):
+    if x.kind != "a":
+        reveal_type(x)  # revealed: B
+    else:
+        reveal_type(x)  # revealed: A
+
+# With int literals
+class IntA:
+    tag: Literal[1]
+
+class IntB:
+    tag: Literal[2]
+
+def _(x: IntA | IntB):
+    if x.tag == 1:
+        reveal_type(x)  # revealed: IntA
+    else:
+        reveal_type(x)  # revealed: IntB
+
+# Multiple union variants
+def _(x: A | B | C):
+    if x.kind == "a":
+        reveal_type(x)  # revealed: A
+    elif x.kind == "b":
+        reveal_type(x)  # revealed: B
+    else:
+        reveal_type(x)  # revealed: C
+```
+
+Narrowing is restricted to `Literal` tag attributes. If any union member has a non-literal type for
+the attribute, we can't safely narrow with equality:
+
+```py
+from typing import Literal
+
+class A:
+    kind: Literal["a"]
+
+class B:
+    kind: str
+
+def _(x: A | B):
+    # Can't narrow because B has `str` (not literal) for `kind`
+    if x.kind == "a":
+        reveal_type(x)  # revealed: A | B
+    else:
+        # But we *can* narrow with inequality
+        reveal_type(x)  # revealed: B
+```
+
+Non-class types in the union are preserved when they might have the attribute:
+
+```py
+from typing import Literal
+
+class A:
+    kind: Literal["a"]
+
+class B:
+    kind: Literal["b"]
+
+def _(x: A | B | int):
+    if x.kind == "a":  # error: [possibly-missing-attribute]
+        reveal_type(x)  # revealed: A | int
+```
+
+## Discriminated unions via attribute access (identity narrowing)
+
+Narrow discriminated unions using `is` / `is not` with singleton values:
+
+```py
+class WithNone:
+    value: None
+
+class WithInt:
+    value: int
+
+def _(x: WithNone | WithInt):
+    if x.value is None:
+        reveal_type(x)  # revealed: WithNone
+    else:
+        reveal_type(x)  # revealed: WithInt
+```
+
+## Discriminated unions via attribute access (match statement)
+
+Narrow discriminated unions using match statements:
+
+```py
+from typing import Literal
+
+class A:
+    kind: Literal["a"]
+    a_attr: int
+
+class B:
+    kind: Literal["b"]
+    b_attr: str
+
+def _(x: A | B):
+    match x.kind:
+        case "a":
+            reveal_type(x)  # revealed: A
+        case "b":
+            reveal_type(x)  # revealed: B
+```
