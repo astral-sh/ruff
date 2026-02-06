@@ -198,11 +198,18 @@ fn references_for_keyword_arguments_in_file(
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
 ) {
+    // This path is used for cross-file parameter keyword-label references.
+    // DocumentHighlights is same-file-only and should never route through here.
+    debug_assert!(
+        !matches!(mode, ReferencesMode::DocumentHighlights),
+        "keyword-label cross-file scan should not run in DocumentHighlights mode"
+    );
+
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
 
-    let mut finder = KeywordArgumentReferencesFinder {
+    let mut finder = KeywordArgumentReferencesFinder(LocalReferencesFinder {
         model: &model,
         tokens: module.tokens(),
         target_definitions,
@@ -210,7 +217,7 @@ fn references_for_keyword_arguments_in_file(
         mode,
         target_text,
         ancestors: Vec::new(),
-    };
+    });
 
     AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
 }
@@ -397,15 +404,7 @@ struct LocalReferencesFinder<'a> {
 }
 
 /// AST visitor that searches only keyword-argument labels for semantic matches against a target.
-struct KeywordArgumentReferencesFinder<'a> {
-    model: &'a SemanticModel<'a>,
-    tokens: &'a Tokens,
-    target_definitions: &'a NavigationTargets,
-    references: &'a mut Vec<ReferenceTarget>,
-    mode: ReferencesMode,
-    target_text: &'a str,
-    ancestors: Vec<AnyNodeRef<'a>>,
-}
+struct KeywordArgumentReferencesFinder<'a>(LocalReferencesFinder<'a>);
 
 impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
@@ -522,11 +521,11 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
 
 impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-        self.ancestors.push(node);
+        self.0.ancestors.push(node);
 
         if let AnyNodeRef::Keyword(keyword) = node {
             if let Some(arg) = &keyword.arg {
-                self.check_identifier_reference(arg);
+                self.0.check_identifier_reference(arg);
             }
         }
 
@@ -534,8 +533,8 @@ impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
     }
 
     fn leave_node(&mut self, node: AnyNodeRef<'a>) {
-        debug_assert_eq!(self.ancestors.last(), Some(&node));
-        self.ancestors.pop();
+        debug_assert_eq!(self.0.ancestors.last(), Some(&node));
+        self.0.ancestors.pop();
     }
 }
 
@@ -564,30 +563,38 @@ impl LocalReferencesFinder<'_> {
         self.check_reference_from_covering_node(&covering_node);
     }
 
-    /// Determines whether the given covering node is a reference to
-    /// the symbol we are searching for
-    fn check_reference_from_covering_node(&mut self, covering_node: &CoveringNode<'_>) {
+    /// Returns true if the covering node's resolved definitions intersect `target_definitions`.
+    fn matches_target_definitions(&self, covering_node: &CoveringNode<'_>) -> bool {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
         let offset = covering_node.node().start();
-        if let Some(goto_target) =
+        let Some(goto_target) =
             GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens)
-        {
-            // Get the definitions for this goto target
-            if let Some(current_definitions) = goto_target
-                .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
-                .and_then(|definitions| definitions.declaration_targets(self.model.db()))
-            {
-                // Check if any of the current definitions match our target definitions
-                if navigation_targets_intersect(self.target_definitions, &current_definitions) {
-                    // Determine if this is a read or write reference
-                    let kind = self.determine_reference_kind(covering_node);
-                    let target =
-                        ReferenceTarget::new(self.model.file(), covering_node.node().range(), kind);
-                    self.references.push(target);
-                }
-            }
+        else {
+            return false;
+        };
+
+        // Get the definitions for this goto target
+        let Some(current_definitions) = goto_target
+            .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
+            .and_then(|definitions| definitions.declaration_targets(self.model.db()))
+        else {
+            return false;
+        };
+
+        // Check if any of the current definitions match our target definitions
+        navigation_targets_intersect(self.target_definitions, &current_definitions)
+    }
+
+    /// Pushes a reference target when the covering node resolves to any target definition
+    fn check_reference_from_covering_node(&mut self, covering_node: &CoveringNode<'_>) {
+        if self.matches_target_definitions(covering_node) {
+            // Determine if this is a read or write reference
+            let kind = self.determine_reference_kind(covering_node);
+            let target =
+                ReferenceTarget::new(self.model.file(), covering_node.node().range(), kind);
+            self.references.push(target);
         }
     }
 
@@ -690,39 +697,5 @@ impl LocalReferencesFinder<'_> {
     /// Helper to check if an expression contains a given range
     fn expr_contains_range(expr: &ast::Expr, range: TextRange) -> bool {
         expr.range().contains_range(range)
-    }
-}
-
-impl KeywordArgumentReferencesFinder<'_> {
-    fn check_identifier_reference(&mut self, identifier: &ast::Identifier) {
-        if identifier.id != self.target_text {
-            return;
-        }
-
-        let mut ancestors_with_identifier = self.ancestors.clone();
-        ancestors_with_identifier.push(AnyNodeRef::from(identifier));
-        let covering_node = CoveringNode::from_ancestors(ancestors_with_identifier);
-        self.check_reference_from_covering_node(&covering_node);
-    }
-
-    fn check_reference_from_covering_node(&mut self, covering_node: &CoveringNode<'_>) {
-        let offset = covering_node.node().start();
-        if let Some(goto_target) =
-            GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens)
-        {
-            if let Some(current_definitions) = goto_target
-                .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
-                .and_then(|definitions| definitions.declaration_targets(self.model.db()))
-            {
-                if navigation_targets_intersect(self.target_definitions, &current_definitions) {
-                    let target = ReferenceTarget::new(
-                        self.model.file(),
-                        covering_node.node().range(),
-                        ReferenceKind::Other,
-                    );
-                    self.references.push(target);
-                }
-            }
-        }
     }
 }
