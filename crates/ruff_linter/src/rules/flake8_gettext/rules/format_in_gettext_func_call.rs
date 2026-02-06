@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_gettext::is_ngettext_call;
 
 /// ## What it does
 /// Checks for `str.format` calls in `gettext` function calls.
@@ -46,22 +47,48 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.260")]
-pub(crate) struct FormatInGetTextFuncCall;
+pub(crate) struct FormatInGetTextFuncCall {
+    is_plural: bool,
+}
 
 impl Violation for FormatInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
+        if self.is_plural {
+            "`format` method in plural argument is resolved before function call".to_string()
+        } else {
+            "`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
+        }
     }
 }
 
 /// INT002
-pub(crate) fn format_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
+pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+    // Check first argument (singular)
     if let Some(first) = args.first() {
         if let Expr::Call(ast::ExprCall { func, .. }) = &first {
             if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
                 if attr == "format" {
-                    checker.report_diagnostic(FormatInGetTextFuncCall {}, first.range());
+                    checker.report_diagnostic(
+                        FormatInGetTextFuncCall { is_plural: false },
+                        first.range(),
+                    );
+                }
+            }
+        }
+    }
+
+    // Check second argument (plural) for ngettext calls
+    if is_ngettext_call(checker, func) {
+        if let Some(second) = args.get(1) {
+            if let Expr::Call(ast::ExprCall { func, .. }) = &second {
+                if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
+                    if attr == "format" {
+                        checker.report_diagnostic(
+                            FormatInGetTextFuncCall { is_plural: true },
+                            second.range(),
+                        );
+                    }
                 }
             }
         }
