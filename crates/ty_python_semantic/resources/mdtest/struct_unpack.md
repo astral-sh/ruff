@@ -17,6 +17,7 @@ def _(buf: bytes):
     reveal_type(unpack("2c", buf))  # revealed: tuple[bytes, bytes]
     reveal_type(unpack("5c", buf))  # revealed: tuple[bytes, bytes, bytes, bytes, bytes]
     reveal_type(unpack("0s", buf))  # revealed: tuple[bytes]
+    reveal_type(unpack("0c", buf))  # revealed: tuple[()]
     reveal_type(unpack("1s", buf))  # revealed: tuple[bytes]
     reveal_type(unpack("255s", buf))  # revealed: tuple[bytes]
     reveal_type(unpack("e", buf))  # revealed: tuple[float]
