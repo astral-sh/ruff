@@ -1477,6 +1477,7 @@ impl<'db> Type<'db> {
             || (self.is_enum(db) && !self.overrides_equality(db))
     }
 
+    /// Create a promotable string literal.
     pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(
             db,
@@ -1484,14 +1485,17 @@ impl<'db> Type<'db> {
         ))
     }
 
+    /// Create a promotable enum literal.
     pub(crate) fn enum_literal(db: &'db dyn Db, value: EnumLiteralType<'db>) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(db, value))
     }
 
+    /// Create a promotable integer literal.
     pub(crate) fn int_literal(db: &'db dyn Db, int: i64) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(db, int))
     }
 
+    /// Create a promotable single-character string literal.
     pub(crate) fn single_char_string_literal(db: &'db dyn Db, c: char) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(
             db,
@@ -1499,6 +1503,7 @@ impl<'db> Type<'db> {
         ))
     }
 
+    /// Create a promotable bytes literal.
     pub(crate) fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(
             db,
@@ -1506,10 +1511,12 @@ impl<'db> Type<'db> {
         ))
     }
 
+    /// Create a promotable boolean literal.
     pub fn bool_literal(db: &'db dyn Db, value: bool) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(db, value))
     }
 
+    /// Create a `LiteralString`.
     pub(crate) fn literal_string(db: &'db dyn Db) -> Self {
         // Note that `LiteralString`s are never implicitly inferred, and so are always unpromotable.
         Self::LiteralValue(LiteralValueType::unpromotable(
