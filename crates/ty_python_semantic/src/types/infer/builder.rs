@@ -14325,46 +14325,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     right_ty: right,
                 }),
             }),
-            (Type::IntLiteral(_), Type::NominalInstance(_)) => {
-                // First try with the literal type, then fall back to widening to int
-                Some(
-                    try_dunder(self, MemberLookupPolicy::default())
-                        .or_else(|_| {
-                            self.infer_binary_type_comparison(
-                                KnownClass::Int.to_instance(self.db()),
-                                op,
-                                right,
-                                range,
-                                visitor,
-                            )
-                        })
-                        .map_err(|_| UnsupportedComparisonError {
-                            op,
-                            left_ty: left,
-                            right_ty: right,
-                        }),
-                )
-            }
-            (Type::NominalInstance(_), Type::IntLiteral(_)) => {
-                // First try with the literal type, then fall back to widening to int
-                Some(
-                    try_dunder(self, MemberLookupPolicy::default())
-                        .or_else(|_| {
-                            self.infer_binary_type_comparison(
-                                left,
-                                op,
-                                KnownClass::Int.to_instance(self.db()),
-                                range,
-                                visitor,
-                            )
-                        })
-                        .map_err(|_| UnsupportedComparisonError {
-                            op,
-                            left_ty: left,
-                            right_ty: right,
-                        }),
-                )
-            }
 
             // Booleans are coded as integers (False = 0, True = 1)
             (Type::IntLiteral(n), Type::BooleanLiteral(b)) => {
@@ -14424,46 +14384,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 Some(Ok(result))
             }
-            (Type::StringLiteral(_), Type::NominalInstance(_)) => {
-                // First try with the literal type, then fall back to widening to str
-                Some(
-                    try_dunder(self, MemberLookupPolicy::default())
-                        .or_else(|_| {
-                            self.infer_binary_type_comparison(
-                                KnownClass::Str.to_instance(self.db()),
-                                op,
-                                right,
-                                range,
-                                visitor,
-                            )
-                        })
-                        .map_err(|_| UnsupportedComparisonError {
-                            op,
-                            left_ty: left,
-                            right_ty: right,
-                        }),
-                )
-            }
-            (Type::NominalInstance(_), Type::StringLiteral(_)) => {
-                // First try with the literal type, then fall back to widening to str
-                Some(
-                    try_dunder(self, MemberLookupPolicy::default())
-                        .or_else(|_| {
-                            self.infer_binary_type_comparison(
-                                left,
-                                op,
-                                KnownClass::Str.to_instance(self.db()),
-                                range,
-                                visitor,
-                            )
-                        })
-                        .map_err(|_| UnsupportedComparisonError {
-                            op,
-                            left_ty: left,
-                            right_ty: right,
-                        }),
-                )
-            }
             (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
                 let b1 = salsa_b1.value(self.db());
                 let b2 = salsa_b2.value(self.db());
@@ -14496,46 +14416,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 };
                 Some(Ok(result))
-            }
-            (Type::BytesLiteral(_), Type::NominalInstance(_)) => {
-                // First try with the literal type, then fall back to widening to bytes
-                Some(
-                    try_dunder(self, MemberLookupPolicy::default())
-                        .or_else(|_| {
-                            self.infer_binary_type_comparison(
-                                KnownClass::Bytes.to_instance(self.db()),
-                                op,
-                                right,
-                                range,
-                                visitor,
-                            )
-                        })
-                        .map_err(|_| UnsupportedComparisonError {
-                            op,
-                            left_ty: left,
-                            right_ty: right,
-                        }),
-                )
-            }
-            (Type::NominalInstance(_), Type::BytesLiteral(_)) => {
-                // First try with the literal type, then fall back to widening to bytes
-                Some(
-                    try_dunder(self, MemberLookupPolicy::default())
-                        .or_else(|_| {
-                            self.infer_binary_type_comparison(
-                                left,
-                                op,
-                                KnownClass::Bytes.to_instance(self.db()),
-                                range,
-                                visitor,
-                            )
-                        })
-                        .map_err(|_| UnsupportedComparisonError {
-                            op,
-                            left_ty: left,
-                            right_ty: right,
-                        }),
-                )
             }
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>

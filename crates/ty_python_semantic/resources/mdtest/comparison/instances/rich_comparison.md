@@ -507,8 +507,8 @@ def compare_complex_eq(a: Y, b: Y) -> bool:
 
 ## Literal Types in Comparison Methods
 
-Classes can define comparison methods that accept literal types. The type checker should preserve
-the literal type when checking these comparisons.
+Classes can define comparison methods that accept literal types. We should preserve the literal type
+when checking these comparisons.
 
 ### Integer Literals
 
