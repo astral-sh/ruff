@@ -262,6 +262,13 @@ mod tests {
         FOO = 42",
         "f401_preview_first_party_submodule_dunder_all"
     )]
+    #[test_case(
+        r#"
+        import submodule.c
+        import submodule.b
+        __all__ = ["submodule"]"#,
+        "f401_dunder_all_multiple_bindings"
+    )]
     fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
             &SourceKind::Python {
