@@ -718,6 +718,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             place,
             kind,
             is_reexported,
+            false,
         );
 
         let num_definitions = {
