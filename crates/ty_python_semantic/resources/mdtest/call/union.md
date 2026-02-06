@@ -7,6 +7,7 @@ def _(flag: bool):
     if flag:
         def f() -> int:
             return 1
+
     else:
         def f() -> str:
             return "foo"
@@ -825,6 +826,7 @@ def _(flag: bool):
     if flag:
         def f(x: T) -> int:
             return 1
+
     else:
         def f(x: dict[str, int]) -> int:
             return 1

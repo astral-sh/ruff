@@ -226,6 +226,7 @@ from dataclasses import field
 
 @dataclass_transform(kw_only_default=True)
 def create_model(*, kw_only: bool = True): ...
+
 @create_model()
 class A:
     name: str
@@ -282,6 +283,7 @@ from typing import dataclass_transform
 
 @dataclass_transform(frozen_default=True)
 def create_model(*, frozen: bool = True): ...
+
 @create_model()
 class ImmutableModel:
     name: str
@@ -339,6 +341,7 @@ from typing import dataclass_transform
 
 @dataclass_transform(eq_default=True, order_default=False, kw_only_default=True, frozen_default=True)
 def create_model(*, eq: bool = True, order: bool = False, kw_only: bool = True, frozen: bool = True): ...
+
 @create_model(eq=False, order=True, kw_only=False, frozen=False)
 class OverridesAllParametersModel:
     name: str
@@ -367,6 +370,7 @@ from typing import dataclass_transform
 
 @dataclass_transform(frozen_default=True)
 def default_frozen_model(*, frozen: bool = True, order: bool = False): ...
+
 @default_frozen_model()
 class Frozen:
     name: str
@@ -466,6 +470,7 @@ from typing import dataclass_transform
 
 @dataclass_transform(frozen_default=True)
 def frozen_model(*, frozen: bool = True): ...
+
 @frozen_model()
 class FrozenWithOverrides:
     x: int
@@ -497,6 +502,7 @@ from typing import dataclass_transform
 
 @dataclass_transform()
 def ordered_model(*, order: bool = False): ...
+
 @ordered_model(order=True)
 class OrderedWithOverrides:
     x: int
@@ -652,6 +658,7 @@ reveal_type(alice.age)  # revealed: int | None
 from typing_extensions import dataclass_transform, Any
 
 def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
+
 @dataclass_transform(field_specifiers=(fancy_field,))
 class FancyMeta(type):
     def __new__(cls, name, bases, namespace):
@@ -680,6 +687,7 @@ reveal_type(alice.age)  # revealed: int | None
 from typing_extensions import dataclass_transform, Any
 
 def fancy_field(*, init: bool = True, kw_only: bool = False, alias: str | None = None) -> Any: ...
+
 @dataclass_transform(field_specifiers=(fancy_field,))
 class FancyBase:
     def __init_subclass__(cls):
@@ -763,6 +771,7 @@ from typing import Any
 from typing_extensions import dataclass_transform
 
 def field(**kwargs: Any) -> Any: ...
+
 @dataclass_transform(field_specifiers=(field,))
 class ModelMeta(type): ...
 
@@ -790,6 +799,7 @@ from typing import Any
 from typing_extensions import dataclass_transform
 
 def field(**kwargs: Any) -> Any: ...
+
 @dataclass_transform(field_specifiers=(field,))
 class ModelBase: ...
 
@@ -1094,6 +1104,7 @@ class InvalidKWOnlyDefaultModel:
 from typing_extensions import Any, dataclass_transform
 
 def field(*, init: bool = True, kw_only: bool = False, default: Any = ...) -> Any: ...
+
 @dataclass_transform(field_specifiers=(field,))
 class ModelMeta(type): ...
 
@@ -1140,6 +1151,7 @@ class InvalidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
 from typing_extensions import Any, dataclass_transform
 
 def field(*, init: bool = True, kw_only: bool = False, default: Any = ...) -> Any: ...
+
 @dataclass_transform(field_specifiers=(field,))
 class ModelBase:
     def __init_subclass__(cls):

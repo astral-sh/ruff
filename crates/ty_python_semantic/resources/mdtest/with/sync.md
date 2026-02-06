@@ -46,8 +46,7 @@ def _(flag: bool):
 class Manager: ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
-with Manager():
-    ...
+with Manager(): ...
 ```
 
 ## Context manager without an `__enter__` method
@@ -57,8 +56,7 @@ class Manager:
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__`"
-with Manager():
-    ...
+with Manager(): ...
 ```
 
 ## Context manager without an `__exit__` method
@@ -68,8 +66,7 @@ class Manager:
     def __enter__(self): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__exit__`"
-with Manager():
-    ...
+with Manager(): ...
 ```
 
 ## Context manager with non-callable `__enter__` attribute
@@ -81,8 +78,7 @@ class Manager:
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__enter__`"
-with Manager():
-    ...
+with Manager(): ...
 ```
 
 ## Context manager with non-callable `__exit__` attribute
@@ -96,8 +92,7 @@ class Manager:
     __exit__: int = 32
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__exit__`"
-with Manager():
-    ...
+with Manager(): ...
 ```
 
 ## Context expression with possibly-unbound union variants
@@ -163,8 +158,7 @@ class Manager:
     async def __aexit__(self, *args): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
-with Manager():
-    ...
+with Manager(): ...
 ```
 
 ## Incorrect signatures
@@ -178,8 +172,7 @@ class Manager:
     async def __aexit__(self, typ: str, exc, traceback): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
-with Manager():
-    ...
+with Manager(): ...
 ```
 
 ## Incorrect number of arguments
@@ -192,6 +185,5 @@ class Manager:
     async def __aexit__(self, typ, exc, traceback, wrong_extra_arg): ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
-with Manager():
-    ...
+with Manager(): ...
 ```
