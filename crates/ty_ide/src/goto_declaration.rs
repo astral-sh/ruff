@@ -21,7 +21,7 @@ pub fn goto_declaration(
 
     let declaration_targets = goto_target
         .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .declaration_targets(db)?;
+        .declaration_targets(&model, &goto_target)?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -104,7 +104,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @"
+        assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Go to declaration
          --> main.py:6:12
           |
@@ -113,13 +113,12 @@ mod tests {
         6 | instance = MyClass()
           |            ^^^^^^^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> main.py:2:7
           |
         2 | class MyClass:
           |       -------
         3 |     def __init__(self):
-          |         --------
         4 |         pass
           |
         ");

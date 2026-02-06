@@ -26,7 +26,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 
     let definition_targets = goto_target
         .get_definition_targets(&model, ReferencesMode::Rename.to_import_alias_resolution())?
-        .declaration_targets(db)?;
+        .declaration_targets(&model, &goto_target)?;
 
     for target in &definition_targets {
         let target_file = target.file();

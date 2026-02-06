@@ -920,7 +920,7 @@ mod resolve_definition {
     }
 
     impl<'db> ResolvedDefinition<'db> {
-        pub(crate) fn definition(&self) -> Option<Definition<'db>> {
+        pub fn definition(&self) -> Option<Definition<'db>> {
             match self {
                 ResolvedDefinition::Definition(definition) => Some(*definition),
                 ResolvedDefinition::Module(_) => None,
