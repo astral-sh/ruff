@@ -1679,29 +1679,32 @@ impl<'db> Type<'db> {
         ) -> ConstraintSet<'db> {
             protocol.interface(db).members(db).when_any(db, |member| {
                 let attribute = member.name();
+                let attribute_type = other
+                    .member(db, attribute)
+                    .place
+                    .ignore_possibly_undefined();
 
                 member
                     .instance_get_type(db)
                     .when_some_and(|get_type| {
-                        other
-                            .member(db, attribute)
-                            .place
-                            .ignore_possibly_undefined()
-                            .when_none_or(|attribute_type| {
-                                get_type.is_disjoint_from_impl(
-                                    db,
-                                    attribute_type,
-                                    inferable,
-                                    disjointness_visitor,
-                                    relation_visitor,
-                                )
-                            })
+                        attribute_type.when_none_or(|attribute_type| {
+                            get_type.is_disjoint_from_impl(
+                                db,
+                                attribute_type,
+                                inferable,
+                                disjointness_visitor,
+                                relation_visitor,
+                            )
+                        })
                     })
                     .or(db, || {
                         ConstraintSet::from(member.instance_set_type().is_ok_and(|set_type| {
-                            other
-                                .validate_attribute_assignment(db, attribute, set_type)
-                                .is_err()
+                            attribute_type.is_none_or(|attribute_type| {
+                                set_type.is_disjoint_from(db, attribute_type)
+                                    || other
+                                        .validate_attribute_assignment(db, attribute, set_type)
+                                        .is_err()
+                            })
                         }))
                     })
             })
