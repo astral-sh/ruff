@@ -224,7 +224,7 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
-                    ["math" | "numpy" | "torch", "inf"]
+                    ["math" | "cmath" | "numpy" | "torch", "inf"]
                 )
             }),
     }
