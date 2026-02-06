@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
@@ -118,8 +119,26 @@ impl<'db> Definition<'db> {
             }
             DefinitionKind::AnnotatedAssignment(assign_def) => {
                 let assign_node = assign_def.target(&module);
-                attribute_docstring(&module, assign_node)
-                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+                let existing_docstring = attribute_docstring(&module, assign_node)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned());
+
+                // If this is an annotation-only statement with a call expression,
+                // synthesize/append the call source text into the docstring.
+                let annotation_expr = assign_def.annotation(&module);
+                if assign_def.value(&module).is_none() && annotation_expr.is_call_expr() {
+                    let source = source_text(db, file);
+                    let call_text = &source[annotation_expr.range()];
+                    match existing_docstring {
+                        Some(mut doc) => {
+                            doc.push_str("\n\n");
+                            doc.push_str(call_text);
+                            Some(doc)
+                        }
+                        None => Some(call_text.to_owned()),
+                    }
+                } else {
+                    existing_docstring
+                }
             }
             DefinitionKind::Function(function_def) => {
                 let function_node = function_def.node(&module);
