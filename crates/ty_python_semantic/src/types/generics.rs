@@ -1890,13 +1890,25 @@ impl<'db> SpecializationBuilder<'db> {
                     .when_constraint_set_assignable_to(self.db, formal_signature, self.inferable);
                 self.add_type_mappings_from_constraint_set(formal, when, &mut *f)?;
             } else {
+                // An overloaded actual callable is compatible with the formal signature if at
+                // least one of its overloads is. We collect type mappings from all satisfiable
+                // overloads, and only report an error if none of them are satisfiable.
+                let mut any_satisfiable = false;
                 for actual_signature in &actual_callable.signatures(self.db).overloads {
                     let when = actual_signature.when_constraint_set_assignable_to_signatures(
                         self.db,
                         formal_signature,
                         self.inferable,
                     );
-                    self.add_type_mappings_from_constraint_set(formal, when, &mut *f)?;
+                    if self
+                        .add_type_mappings_from_constraint_set(formal, when, &mut *f)
+                        .is_ok()
+                    {
+                        any_satisfiable = true;
+                    }
+                }
+                if !any_satisfiable {
+                    return Err(());
                 }
             }
         }
