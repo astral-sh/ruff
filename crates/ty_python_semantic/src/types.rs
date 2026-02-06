@@ -990,7 +990,8 @@ impl<'db> Type<'db> {
             DynamicType::Any
             | DynamicType::Unknown
             | DynamicType::UnknownGeneric(_)
-            | DynamicType::Divergent(_) => false,
+            | DynamicType::Divergent(_)
+            | DynamicType::UnspecializedTypeVar => false,
             DynamicType::Todo(_)
             | DynamicType::TodoStarredExpression
             | DynamicType::TodoUnpack
@@ -1191,6 +1192,15 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
+    }
+
+    pub(crate) fn has_unspecialized_type_var(self, db: &'db dyn Db) -> bool {
+        any_over_type(
+            db,
+            self,
+            &|ty| matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar)),
+            false,
+        )
     }
 
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
@@ -6841,7 +6851,7 @@ impl<'db> Type<'db> {
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression | DynamicType::TodoTypeVarTuple)
+            Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression | DynamicType::TodoTypeVarTuple | DynamicType::UnspecializedTypeVar)
             | Self::Callable(_)
             | Self::TypeIs(_)
             | Self::TypeGuard(_) => None,
@@ -7500,6 +7510,12 @@ pub enum DynamicType<'db> {
     /// TODO: Once we implement <https://github.com/astral-sh/ty/issues/1711>, this variant might
     /// not be needed anymore.
     UnknownGeneric(GenericContext<'db>),
+    /// An unspecialized type variable during generic call inference.
+    ///
+    /// TODO: This variant should be removed once type variables are unified across nested generic
+    /// calls. For now, we replace unspecialized type variables with this marker type, and ignore them
+    /// during generic inference.
+    UnspecializedTypeVar,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
     /// This variant should eventually be removed once ty is spec-compliant.
@@ -7543,6 +7559,7 @@ impl std::fmt::Display for DynamicType<'_> {
         match self {
             DynamicType::Any => f.write_str("Any"),
             DynamicType::Unknown | DynamicType::UnknownGeneric(_) => f.write_str("Unknown"),
+            DynamicType::UnspecializedTypeVar => f.write_str("UnspecializedTypeVar"),
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
@@ -8426,6 +8443,7 @@ impl<'db> TypeVarInstance<'db> {
                     DynamicType::Any
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
+                    | DynamicType::UnspecializedTypeVar
                     | DynamicType::Divergent(_) => Parameters::unknown(),
                 },
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {

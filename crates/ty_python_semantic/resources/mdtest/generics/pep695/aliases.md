@@ -344,8 +344,8 @@ def head[T](my_list: MyList[T]) -> T:
 def get_value[K, V](my_dict: MyDict[K, V], key: K) -> V:
     return my_dict[key]
 
-reveal_type(head([1, 2]))  # revealed: int
-reveal_type(head(["a", "b"]))  # revealed: str
+reveal_type(head([1, 2]))  # revealed: Unknown | int
+reveal_type(head(["a", "b"]))  # revealed: Unknown | str
 
 d: dict[str, int] = {"a": 1}
 reveal_type(get_value(d, "a"))  # revealed: int

@@ -3179,6 +3179,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
             FxHashMap::default();
 
+        // Type variables for which we inferred a declared type based on a partially specialized
+        // type from an outer generic context. For these type variables, we may infer types that
+        // are not assignable to the concrete subset of the declared type, as they may be assignable
+        // to a wider declared type after specialization.
+        let mut partially_specialized_declared_type: FxHashSet<BoundTypeVarIdentity<'_>> =
+            FxHashSet::default();
+
         // Attempt to to solve the specialization while preferring the declared type of non-covariant
         // type parameters from generic classes.
         let preferred_type_mappings = return_with_tcx
@@ -3187,12 +3194,27 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .class_specialization(self.db)?;
 
                 builder
-                    .infer_reverse_map(tcx, return_ty, |(_, variance, inferred_ty)| {
+                    .infer_reverse_map(tcx, return_ty, |(identity, variance, inferred_ty)| {
                         // Avoid unnecessarily widening the return type based on a covariant
                         // type parameter from the type context, as it can lead to argument
                         // assignability errors if the type variable is constrained by a narrower
                         // parameter type.
                         if variance.is_covariant() {
+                            return None;
+                        }
+
+                        // Avoid inferring a preferred type based on partially specialized type context
+                        // from an outer generic call. If the type context is a union, we try to keep
+                        // any concrete elements.
+                        let inferred_ty = inferred_ty.filter_union(self.db, |ty| {
+                            if ty.has_unspecialized_type_var(self.db) {
+                                partially_specialized_declared_type.insert(identity);
+                                false
+                            } else {
+                                true
+                            }
+                        });
+                        if inferred_ty.has_unspecialized_type_var(self.db) {
                             return None;
                         }
 
@@ -3208,6 +3230,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let assignable_to_declared_type = self.infer_argument_types(
             &mut builder,
             &preferred_type_mappings,
+            &partially_specialized_declared_type,
             &mut variance_in_arguments,
             &mut specialization_errors,
         );
@@ -3224,6 +3247,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.infer_argument_types(
                 &mut builder,
                 &FxHashMap::default(),
+                &FxHashSet::default(),
                 &mut variance_in_arguments,
                 &mut specialization_errors,
             );
@@ -3232,7 +3256,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any literal types assigned to the specialization.
-        let maybe_promote = |identity, typevar, ty: Type<'db>| {
+        let maybe_promote = |typevar, ty: Type<'db>| {
             let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
 
             let mut combined_tcx = TypeContext::default();
@@ -3268,7 +3292,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // If the type variable is a non-covariant position in any argument, then we avoid
             // promotion, respecting any literals in the parameter type.
             if variance_in_arguments
-                .get(&identity)
+                .get(&typevar.identity(self.db))
                 .is_some_and(|variance| !variance.is_covariant())
             {
                 return ty;
@@ -3289,6 +3313,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         &mut self,
         builder: &mut SpecializationBuilder<'db>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+        partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         variance_in_arguments: &mut FxHashMap<BoundTypeVarIdentity<'db>, TypeVarVariance>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
@@ -3312,7 +3337,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                 return None;
                             }
 
-                            assignable_to_declared_type = false;
+                            // If this is a partially specialized type, the type we infer may still
+                            // be assignable to it once fully specialized.
+                            if !partially_specialized_declared_type.contains(&identity) {
+                                assignable_to_declared_type = false;
+                            }
                         }
 
                         variance_in_arguments
