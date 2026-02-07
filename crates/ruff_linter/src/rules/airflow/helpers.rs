@@ -72,8 +72,13 @@ pub(crate) enum ProviderReplacement {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FunctionSignatureChange {
-    /// Carries a message describing the function signature change.
+    /// A message describing the function signature change.
     Message(&'static str),
+    /// The keyword argument name has been changed.
+    KeywordArg {
+        old: &'static str,
+        new: &'static str,
+    },
 }
 
 pub(crate) fn is_guarded_by_try_except(

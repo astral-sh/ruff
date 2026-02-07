@@ -182,3 +182,27 @@ class NotOperatorLinkSubclass2:
 # Not a class method
 def get_link(operator, dttm):
     pass
+
+
+# airflow.sdk.Variable
+from airflow.sdk import Variable
+
+Variable.get("key", default_var="deprecated")
+Variable.get(key="key", default_var="deprecated")
+
+Variable.get("key", default="default")
+Variable.get(key="key", default="default")
+Variable.get("key")
+
+
+# airflow.providers.standard.operators.python (provide_context parameter removed)
+from airflow.providers.standard.operators.python import (
+    PythonOperator,
+    PythonVirtualenvOperator,
+)
+
+PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+PythonVirtualenvOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+
+PythonOperator(task_id="task", python_callable=lambda: None)
+PythonVirtualenvOperator(task_id="task", python_callable=lambda: None)

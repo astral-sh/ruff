@@ -370,3 +370,63 @@ AIR303 `get_link` signature is changed in Airflow 3.0
 175 |         pass
     |
 help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 [*] `Variable.get` signature is changed in Airflow 3.0
+   --> AIR303.py:190:21
+    |
+188 | from airflow.sdk import Variable
+189 |
+190 | Variable.get("key", default_var="deprecated")
+    |                     ^^^^^^^^^^^
+191 | Variable.get(key="key", default_var="deprecated")
+    |
+help: Use `default` instead of `default_var`
+187 | # airflow.sdk.Variable
+188 | from airflow.sdk import Variable
+189 | 
+    - Variable.get("key", default_var="deprecated")
+190 + Variable.get("key", default="deprecated")
+191 | Variable.get(key="key", default_var="deprecated")
+192 | 
+193 | Variable.get("key", default="default")
+
+AIR303 [*] `Variable.get` signature is changed in Airflow 3.0
+   --> AIR303.py:191:25
+    |
+190 | Variable.get("key", default_var="deprecated")
+191 | Variable.get(key="key", default_var="deprecated")
+    |                         ^^^^^^^^^^^
+192 |
+193 | Variable.get("key", default="default")
+    |
+help: Use `default` instead of `default_var`
+188 | from airflow.sdk import Variable
+189 | 
+190 | Variable.get("key", default_var="deprecated")
+    - Variable.get(key="key", default_var="deprecated")
+191 + Variable.get(key="key", default="deprecated")
+192 | 
+193 | Variable.get("key", default="default")
+194 | Variable.get(key="key", default="default")
+
+AIR303 `PythonOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:204:62
+    |
+202 | )
+203 |
+204 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                              ^^^^^^^^^^^^^^^^^^^^
+205 | PythonVirtualenvOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |
+help: `provide_context` is deprecated as of 2.0 and no longer required in 3.0
+
+AIR303 `PythonVirtualenvOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:205:72
+    |
+204 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+205 | PythonVirtualenvOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                        ^^^^^^^^^^^^^^^^^^^^
+206 |
+207 | PythonOperator(task_id="task", python_callable=lambda: None)
+    |
+help: `provide_context` is deprecated as of 2.0 and no longer required in 3.0

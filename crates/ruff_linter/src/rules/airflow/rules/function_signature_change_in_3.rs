@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::rules::airflow::helpers::{FunctionSignatureChange, is_method_in_subclass};
-use crate::{FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, Identifier, StmtFunctionDef};
@@ -43,7 +43,7 @@ pub(crate) struct Airflow3IncompatibleFunctionSignature {
 }
 
 impl Violation for Airflow3IncompatibleFunctionSignature {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -53,8 +53,12 @@ impl Violation for Airflow3IncompatibleFunctionSignature {
 
     fn fix_title(&self) -> Option<String> {
         let Airflow3IncompatibleFunctionSignature { change, .. } = self;
-        let FunctionSignatureChange::Message(message) = change;
-        Some((*message).to_string())
+        match change {
+            FunctionSignatureChange::Message(message) => Some((*message).to_string()),
+            FunctionSignatureChange::KeywordArg { old, new } => {
+                Some(format!("Use `{new}` instead of `{old}`"))
+            }
+        }
     }
 }
 
@@ -73,13 +77,17 @@ pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, expr:
 
     // Handle method calls on instances
     if let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() {
-        // Resolve the qualified name: try variable assignments first, then fall back to direct
-        // constructor calls.
-        let qualified_name = typing::resolve_assignment(value, checker.semantic()).or_else(|| {
-            value
-                .as_call_expr()
-                .and_then(|call| checker.semantic().resolve_qualified_name(&call.func))
-        });
+        // Resolve the qualified name:
+        // 1. Variable assignments (e.g., `var = SomeClass(); var.method()`)
+        // 2. Direct constructor calls (e.g., `SomeClass().method()`)
+        // 3. Class/static method calls (e.g., `Variable.get()`)
+        let qualified_name = typing::resolve_assignment(value, checker.semantic())
+            .or_else(|| {
+                value
+                    .as_call_expr()
+                    .and_then(|call| checker.semantic().resolve_qualified_name(&call.func))
+            })
+            .or_else(|| checker.semantic().resolve_qualified_name(value));
 
         if let Some(qualified_name) = qualified_name {
             check_method_arguments(checker, &qualified_name, attr, arguments);
@@ -155,12 +163,12 @@ fn check_method_arguments(
     attr: &Identifier,
     arguments: &Arguments,
 ) {
-    let has_positional_args =
-        arguments.find_positional(0).is_some() || arguments.args.iter().any(Expr::is_starred_expr);
-
-    if let ["airflow", "lineage", "hook", "HookLineageCollector"] = qualified_name.segments() {
-        if attr.as_str() == "create_asset" && has_positional_args {
-            checker.report_diagnostic(
+    let (violation, range) = match (qualified_name.segments(), attr.as_str()) {
+        (["airflow", "lineage", "hook", "HookLineageCollector"], "create_asset")
+            if arguments.find_positional(0).is_some()
+                || arguments.args.iter().any(Expr::is_starred_expr) =>
+        {
+            (
                 Airflow3IncompatibleFunctionSignature {
                     function_name: attr.to_string(),
                     change: FunctionSignatureChange::Message(
@@ -168,8 +176,36 @@ fn check_method_arguments(
                     ),
                 },
                 attr.range(),
-            );
+            )
         }
+        (["airflow", "sdk", "Variable"], "get")
+            if arguments.find_keyword("default_var").is_some() =>
+        {
+            let keyword = arguments.find_keyword("default_var").unwrap();
+            (
+                Airflow3IncompatibleFunctionSignature {
+                    function_name: "Variable.get".to_string(),
+                    change: FunctionSignatureChange::KeywordArg {
+                        old: "default_var",
+                        new: "default",
+                    },
+                },
+                keyword.arg.as_ref().unwrap().range(),
+            )
+        }
+        _ => return,
+    };
+
+    let fix = match &violation.change {
+        FunctionSignatureChange::KeywordArg { new, .. } => Some(Fix::safe_edit(
+            Edit::range_replacement((*new).to_string(), range),
+        )),
+        FunctionSignatureChange::Message(_) => None,
+    };
+
+    let mut diagnostic = checker.report_diagnostic(violation, range);
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
     }
 }
 
@@ -179,25 +215,47 @@ fn check_constructor_arguments(
     arguments: &Arguments,
     func: &Expr,
 ) {
-    if let ["airflow", "Dataset"]
-    | ["airflow", "datasets", "Dataset"]
-    | ["airflow", "sdk", "Asset"] = qualified_name.segments()
-    {
-        if let Some(second_arg) = arguments.find_positional(1) {
-            if is_dict_expression(checker, second_arg) {
-                let function_name = qualified_name.segments().last().unwrap_or(&"").to_string();
-                checker.report_diagnostic(
-                    Airflow3IncompatibleFunctionSignature {
-                        function_name,
-                        change: FunctionSignatureChange::Message(
-                            "Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)",
-                        ),
-                    },
-                    func.range(),
-                );
-            }
+    let (violation, range) = match qualified_name.segments() {
+        [
+            "airflow",
+            "providers",
+            "standard",
+            "operators",
+            "python",
+            "PythonOperator" | "PythonVirtualenvOperator",
+        ] if arguments.find_keyword("provide_context").is_some() => {
+            let keyword = arguments.find_keyword("provide_context").unwrap();
+            (
+                Airflow3IncompatibleFunctionSignature {
+                    function_name: qualified_name.segments().last().unwrap_or(&"").to_string(),
+                    change: FunctionSignatureChange::Message(
+                        "`provide_context` is deprecated as of 2.0 and no longer required in 3.0",
+                    ),
+                },
+                keyword.range(),
+            )
         }
-    }
+        ["airflow", "Dataset"]
+        | ["airflow", "datasets", "Dataset"]
+        | ["airflow", "sdk", "Asset"]
+            if arguments
+                .find_positional(1)
+                .is_some_and(|second_arg| is_dict_expression(checker, second_arg)) =>
+        {
+            (
+                Airflow3IncompatibleFunctionSignature {
+                    function_name: qualified_name.segments().last().unwrap_or(&"").to_string(),
+                    change: FunctionSignatureChange::Message(
+                        "Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)",
+                    ),
+                },
+                func.range(),
+            )
+        }
+        _ => return,
+    };
+
+    checker.report_diagnostic(violation, range);
 }
 
 /// Check if an expression is a dictionary.
