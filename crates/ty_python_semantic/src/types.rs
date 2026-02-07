@@ -5462,7 +5462,8 @@ impl<'db> Type<'db> {
             (Some(Place::Defined(DefinedPlace { ty: new_method, .. })), Place::Undefined) => Some(
                 new_method
                     .bindings(db)
-                    .map(|binding| binding.with_bound_type(self_type)),
+                    .map(|binding| binding.with_bound_type(self_type))
+                    .with_constructor_instance_type(init_ty),
             ),
 
             (
@@ -5470,7 +5471,11 @@ impl<'db> Type<'db> {
                 Place::Defined(DefinedPlace {
                     ty: init_method, ..
                 }),
-            ) => Some(init_method.bindings(db)),
+            ) => Some(
+                init_method
+                    .bindings(db)
+                    .with_constructor_instance_type(init_ty),
+            ),
 
             (
                 Some(Place::Defined(DefinedPlace { ty: new_method, .. })),
@@ -5484,10 +5489,10 @@ impl<'db> Type<'db> {
                     .bindings(db)
                     .map(|binding| binding.with_bound_type(self_type));
 
-                Some(Bindings::from_union(
-                    callable,
-                    [new_method_bindings, init_method.bindings(db)],
-                ))
+                Some(
+                    Bindings::from_union(callable, [new_method_bindings, init_method.bindings(db)])
+                        .with_constructor_instance_type(init_ty),
+                )
             }
 
             _ => None,
