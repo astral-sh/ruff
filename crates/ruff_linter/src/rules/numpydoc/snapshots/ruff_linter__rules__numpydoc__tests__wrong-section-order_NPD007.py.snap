@@ -1,0 +1,261 @@
+---
+source: crates/ruff_linter/src/rules/numpydoc/mod.rs
+---
+NPD007 [*] Sections are in the wrong order ("Returns" out of place). Correct order is: Parameters, Returns
+  --> NPD007.py:28:5
+   |
+26 |     """Calculate something.
+27 |
+28 |     Returns
+   |     ^^^^^^^
+29 |     -------
+30 |     int
+   |
+help: Reorder sections to match numpydoc convention
+25 | def wrong_order_returns_before_parameters():  # NPD007
+26 |     """Calculate something.
+27 | 
+28 +     Parameters
+29 +     ----------
+30 +     x : int
+31 +         Input value.
+32 + 
+33 |     Returns
+34 |     -------
+35 |     int
+36 |         Output value.
+   - 
+   -     Parameters
+   -     ----------
+   -     x : int
+   -         Input value.
+37 |     """
+38 |     return 42
+39 | 
+
+NPD007 [*] Sections are in the wrong order ("Examples" out of place). Correct order is: Parameters, Returns, Examples
+  --> NPD007.py:49:5
+   |
+47 |         Input value.
+48 |
+49 |     Examples
+   |     ^^^^^^^^
+50 |     --------
+51 |     >>> wrong_order_examples_before_returns()
+   |
+help: Reorder sections to match numpydoc convention
+46 |     x : int
+47 |         Input value.
+48 | 
+49 +     Returns
+50 +     -------
+51 +     int
+52 +         Output value.
+53 + 
+54 |     Examples
+55 |     --------
+56 |     >>> wrong_order_examples_before_returns()
+57 |     42
+   - 
+   -     Returns
+   -     -------
+   -     int
+   -         Output value.
+58 |     """
+59 |     return 42
+60 | 
+
+NPD007 [*] Sections are in the wrong order ("Notes" out of place). Correct order is: Parameters, Returns, See Also, Notes
+  --> NPD007.py:70:5
+   |
+68 |         Input value.
+69 |
+70 |     Notes
+   |     ^^^^^
+71 |     -----
+72 |     Some notes here.
+   |
+help: Reorder sections to match numpydoc convention
+67 |     x : int
+68 |         Input value.
+69 | 
+   -     Notes
+   -     -----
+   -     Some notes here.
+70 +     Returns
+71 +     -------
+72 +     int
+73 +         Output value.
+74 | 
+75 |     See Also
+76 |     --------
+77 |     other_function : Related function.
+78 | 
+   -     Returns
+   -     -------
+   -     int
+   -         Output value.
+79 +     Notes
+80 +     -----
+81 +     Some notes here.
+82 |     """
+83 |     return 42
+84 | 
+
+NPD007 [*] Sections are in the wrong order ("See Also" out of place). Correct order is: Parameters, Returns, Raises, See Also
+   --> NPD007.py:144:5
+    |
+142 |         Output value.
+143 |
+144 |     See Also
+    |     ^^^^^^^^
+145 |     --------
+146 |     other_function : Related function.
+    |
+help: Reorder sections to match numpydoc convention
+141 |     int
+142 |         Output value.
+143 | 
+    -     See Also
+    -     --------
+    -     other_function : Related function.
+    - 
+144 |     Raises
+145 |     ------
+146 |     ValueError
+147 |         If x is negative.
+148 + 
+149 +     See Also
+150 +     --------
+151 +     other_function : Related function.
+152 |     """
+153 |     return 42
+154 | 
+
+NPD007 [*] Sections are in the wrong order ("See Also" out of place). Correct order is: Parameters, Returns, Raises, See Also
+   --> NPD007.py:164:5
+    |
+162 |         If x is negative.
+163 |
+164 |     See Also
+    |     ^^^^^^^^
+165 |     --------
+166 |     other_function : Related function.
+    |
+help: Reorder sections to match numpydoc convention
+156 | def wrong_order_multiple():  # NPD007
+157 |     """Calculate something.
+158 | 
+159 +     Parameters
+160 +     ----------
+161 +     x : int
+162 +         Input value.
+163 + 
+164 +     Returns
+165 +     -------
+166 +     int
+167 +         Output value.
+168 + 
+169 |     Raises
+170 |     ------
+171 |     ValueError
+--------------------------------------------------------------------------------
+174 |     See Also
+175 |     --------
+176 |     other_function : Related function.
+    - 
+    -     Returns
+    -     -------
+    -     int
+    -         Output value.
+    - 
+    -     Parameters
+    -     ----------
+    -     x : int
+    -         Input value.
+177 | 
+178 |     """
+179 |     return 42
+
+NPD007 [*] Sections are in the wrong order ("Examples" out of place). Correct order is: Parameters, Returns, Examples
+   --> NPD007.py:213:5
+    |
+211 |     """Calculate something complex.
+212 |
+213 |     Examples
+    |     ^^^^^^^^
+214 |     --------
+215 |     Here's how to use it:
+    |
+help: Reorder sections to match numpydoc convention
+210 | def complex_content_wrong_order():  # NPD007
+211 |     """Calculate something complex.
+212 | 
+    -     Examples
+    -     --------
+    -     Here's how to use it:
+    - 
+    -     >>> result = complex_content_wrong_order(5)
+    -     >>> print(result)
+    -     10
+    - 
+    -     You can also do:
+    -     >>> complex_content_wrong_order(-1)
+    -     0
+    - 
+213 |     Parameters
+214 |     ----------
+215 |     x : int
+--------------------------------------------------------------------------------
+222 |     int
+223 |         The output value.
+224 |         This is also multi-line.
+225 + 
+226 +     Examples
+227 +     --------
+228 +     Here's how to use it:
+229 + 
+230 +     >>> result = complex_content_wrong_order(5)
+231 +     >>> print(result)
+232 +     10
+233 + 
+234 +     You can also do:
+235 +     >>> complex_content_wrong_order(-1)
+236 +     0
+237 |     """
+238 |     return max(0, x * 2)
+239 | 
+
+NPD007 [*] Sections are in the wrong order ("Returns" out of place). Correct order is: Parameters, Returns
+   --> NPD007.py:244:5
+    |
+242 |     """Calculate something.
+243 |
+244 |     Returns
+    |     ^^^^^^^
+245 |     -------
+246 |     int
+    |
+help: Reorder sections to match numpydoc convention
+241 | def extra_text_between_sections():  # NPD007
+242 |     """Calculate something.
+243 | 
+244 +     Parameters
+245 +     ----------
+246 +     x : int
+247 +         Input value.
+248 + 
+249 |     Returns
+250 |     -------
+251 |     int
+--------------------------------------------------------------------------------
+253 | 
+254 |     This is some random text that appears between sections.
+255 |     It's not part of any official section.
+    - 
+    -     Parameters
+    -     ----------
+    -     x : int
+    -         Input value.
+256 |     """
+257 |     return 42
