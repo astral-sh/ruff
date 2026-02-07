@@ -1,12 +1,16 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_python_semantic::analyze::typing::{
+    is_immutable_annotation, is_mutable_expr, is_mutable_expr_extended,
+};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::is_mutable_default_in_dataclass_field_enabled;
+use crate::preview::{
+    is_extended_mutable_expr_enabled, is_mutable_default_in_dataclass_field_enabled,
+};
 use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_dataclass_field};
 
 /// ## What it does
@@ -103,7 +107,12 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             continue;
         };
 
-        if is_mutable_expr(value, checker.semantic())
+        let is_mutable = if is_extended_mutable_expr_enabled(checker.settings()) {
+            is_mutable_expr_extended(value, checker.semantic())
+        } else {
+            is_mutable_expr(value, checker.semantic())
+        };
+        if is_mutable
             && !is_class_var_annotation(annotation, checker.semantic())
             && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {

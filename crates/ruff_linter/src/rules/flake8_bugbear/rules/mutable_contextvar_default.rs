@@ -3,11 +3,14 @@ use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
-use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, is_mutable_func};
+use ruff_python_semantic::analyze::typing::{
+    is_immutable_func, is_mutable_expr, is_mutable_expr_extended, is_mutable_func,
+};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_extended_mutable_expr_enabled;
 
 /// ## What it does
 /// Checks for uses of mutable objects as `ContextVar` defaults.
@@ -90,7 +93,13 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
         .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
-    if (is_mutable_expr(default, checker.semantic())
+    let is_mutable = if is_extended_mutable_expr_enabled(checker.settings()) {
+        is_mutable_expr_extended(default, checker.semantic())
+    } else {
+        is_mutable_expr(default, checker.semantic())
+    };
+
+    if (is_mutable
         || matches!(
             default,
             Expr::Call(ast::ExprCall { func, .. })
