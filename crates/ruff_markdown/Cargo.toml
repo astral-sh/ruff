@@ -10,7 +10,6 @@ authors = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff_formatter = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_trivia = { workspace = true }

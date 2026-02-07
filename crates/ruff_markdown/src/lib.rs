@@ -103,8 +103,11 @@ pub fn format_code_blocks(
                     "python" | "py" | "python3" | "py3" | "pyi" => {
                         let options =
                             settings.to_format_options(py_source_type, &unformatted_code, path);
+                        // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
+                        // dependency, and I suspect that Rust can optimize the closure away regardless.
+                        #[expect(clippy::redundant_closure_for_method_calls)]
                         format_module_source(&unformatted_code, options)
-                            .map(ruff_formatter::Printed::into_code)
+                            .map(|formatted| formatted.into_code())
                             .ok()
                     }
                     "pycon" => format_pycon_block(&unformatted_code, path, settings),
@@ -171,8 +174,11 @@ fn format_pycon_block(
                 }
             }
             let options = settings.to_format_options(PySourceType::Python, &unformatted, path);
+            // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
+            // dependency, and I suspect that Rust can optimize the closure away regardless.
+            #[expect(clippy::redundant_closure_for_method_calls)]
             let Ok(formatted) =
-                format_module_source(&unformatted, options).map(ruff_formatter::Printed::into_code)
+                format_module_source(&unformatted, options).map(|formatted| formatted.into_code())
             else {
                 continue;
             };
