@@ -541,6 +541,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let starred_type = self.infer_type_expression(value);
         if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
             starred_type
+        } else if matches!(
+            starred_type,
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_typevartuple(self.db())
+        ) || matches!(
+            starred_type,
+            Type::TypeVar(bound_typevar)
+                if bound_typevar.typevar(self.db()).is_typevartuple(self.db())
+        ) {
+            // *Ts unpacks a TypeVarTuple - return the TypeVar directly
+            starred_type
         } else {
             Type::Dynamic(DynamicType::TodoStarredExpression)
         }
@@ -700,12 +711,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if inner_tuple.is_variadic() {
                                 report_too_many_unpacked_tuples();
                             }
-                        } else if self.expression_type(starred_value)
-                            == Type::Dynamic(DynamicType::TodoTypeVarTuple)
-                        {
-                            report_too_many_unpacked_tuples();
                         } else {
-                            // TODO: emit a diagnostic
+                            let starred_value_ty = self.expression_type(starred_value);
+                            let is_typevar_tuple = starred_value_ty
+                                == Type::Dynamic(DynamicType::TodoTypeVarTuple)
+                                || matches!(
+                                    starred_value_ty,
+                                    Type::NominalInstance(instance)
+                                    if instance.has_known_class(
+                                        self.db(),
+                                        KnownClass::TypeVarTuple
+                                    )
+                                )
+                                || matches!(
+                                    starred_value_ty,
+                                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                                    if typevar.is_typevartuple(self.db())
+                                )
+                                || matches!(
+                                    starred_value_ty,
+                                    Type::TypeVar(bound_typevar)
+                                    if bound_typevar
+                                        .typevar(self.db())
+                                        .is_typevartuple(self.db())
+                                );
+                            if is_typevar_tuple {
+                                return_todo = true;
+                                report_too_many_unpacked_tuples();
+                            } else {
+                                // TODO: emit a diagnostic
+                            }
                         }
                     } else {
                         element_types.push(element_ty);
@@ -1683,7 +1718,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 inferred_type
             }
             SpecialFormType::Unpack => {
-                self.infer_type_expression(arguments_slice);
+                let inner_ty = self.infer_type_expression(arguments_slice);
+                // If the argument is a TypeVarTuple, return it directly
+                // Unpack[Ts] in type contexts essentially means "expand Ts here"
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = inner_ty
+                    && typevar.is_typevartuple(self.db())
+                {
+                    return inner_ty;
+                }
                 todo_type!("`Unpack[]` special form")
             }
             SpecialFormType::NoReturn
@@ -1896,8 +1938,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
                     // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                    return_todo |= param_type.is_todo()
-                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                    if matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_)) {
+                        return_todo |= param_type.is_todo()
+                            || matches!(
+                                param_type,
+                                Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                                    if typevar.is_typevartuple(self.db())
+                            )
+                            || matches!(
+                                param_type,
+                                Type::TypeVar(bound_typevar)
+                                    if bound_typevar
+                                        .typevar(self.db())
+                                        .is_typevartuple(self.db())
+                            );
+                    }
                     parameter_types.push(param_type);
                 }
 

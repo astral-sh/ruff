@@ -2308,6 +2308,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::ParamSpec(paramspec) => {
                 self.infer_paramspec_deferred(paramspec.node(self.module()));
             }
+            DefinitionKind::TypeVarTuple(typevartuple) => {
+                self.infer_typevartuple_deferred(typevartuple.node(self.module()));
+            }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_deferred(assignment.value(self.module()));
             }
@@ -4324,6 +4327,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred_state = previous_deferred_state;
     }
 
+    fn infer_typevartuple_deferred(&mut self, node: &ast::TypeParamTypeVarTuple) {
+        let ast::TypeParamTypeVarTuple {
+            range: _,
+            node_index: _,
+            name: _,
+            default: Some(default),
+        } = node
+        else {
+            return;
+        };
+        let previous_deferred_state =
+            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
+        self.infer_type_expression(default);
+        self.deferred_state = previous_deferred_state;
+    }
+
     fn infer_paramspec_default(&mut self, default_expr: &ast::Expr) {
         match default_expr {
             ast::Expr::EllipsisLiteral(ellipsis) => {
@@ -4543,15 +4562,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::TypeParamTypeVarTuple {
             range: _,
             node_index: _,
-            name: _,
+            name,
             default,
         } = node;
-        self.infer_optional_expression(default.as_deref(), TypeContext::default());
-        let pep_695_todo = todo_type!("PEP-695 TypeVarTuple definition types");
+
+        // Handle deferred default evaluation
+        if default.is_some() {
+            self.deferred.insert(definition, self.multi_inference_state);
+        }
+
+        // Create the TypeVarTuple identity
+        let identity = TypeVarIdentity::new(
+            self.db(),
+            &name.id,
+            Some(definition),
+            TypeVarKind::Pep695TypeVarTuple,
+        );
+
+        // Create the TypeVar instance (TypeVarTuple has no bounds/constraints)
+        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            self.db(),
+            identity,
+            None, // TypeVarTuple has no bounds or constraints
+            None, // explicit_variance
+            default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
+        )));
+
         self.add_declaration_with_binding(
             node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
+            &DeclaredAndInferredType::are_the_same_type(ty),
         );
     }
 
@@ -6254,6 +6294,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 definition,
                                 paramspec_class,
                             ),
+                            Some(KnownClass::TypeVarTuple) => {
+                                self.infer_legacy_typevartuple(target, call_expr, definition)
+                            }
                             Some(KnownClass::NewType) => {
                                 self.infer_newtype_expression(target, call_expr, definition)
                             }
@@ -6456,6 +6499,137 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity =
             TypeVarIdentity::new(db, target_name, Some(definition), TypeVarKind::ParamSpec);
+        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            db, identity, None, None, default,
+        )))
+    }
+
+    fn infer_legacy_typevartuple(
+        &mut self,
+        target: &ast::Expr,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        fn error<'db>(
+            context: &InferContext<'db, '_>,
+            message: impl std::fmt::Display,
+            node: impl Ranged,
+        ) -> Type<'db> {
+            if let Some(builder) = context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, node) {
+                builder.into_diagnostic(message);
+            }
+            // If the call doesn't create a valid TypeVarTuple, we'll emit diagnostics and fall back to
+            // just creating a regular instance of `typing.TypeVarTuple`.
+            KnownClass::TypeVarTuple.to_instance(context.db())
+        }
+
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+        let _python_version = Program::get(db).python_version(db);
+
+        let mut default = None;
+        let mut name_param_ty = None;
+
+        if arguments.args.len() > 1 {
+            return error(
+                &self.context,
+                "`TypeVarTuple` can only have one positional argument",
+                call_expr,
+            );
+        }
+
+        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+            return error(
+                &self.context,
+                "Starred arguments are not supported in `TypeVarTuple` creation",
+                starred,
+            );
+        }
+
+        for kwarg in &arguments.keywords {
+            let Some(identifier) = kwarg.arg.as_ref() else {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `TypeVarTuple` creation",
+                    kwarg,
+                );
+            };
+            match identifier.id().as_str() {
+                "name" => {
+                    if !arguments.args.is_empty() {
+                        return error(
+                            &self.context,
+                            "The `name` parameter of `TypeVarTuple` can only be provided once",
+                            kwarg,
+                        );
+                    }
+                    name_param_ty =
+                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                }
+                "default" => {
+                    default = Some(TypeVarDefaultEvaluation::Lazy);
+                }
+                name => {
+                    error(
+                        &self.context,
+                        format_args!(
+                            "Unknown keyword argument `{name}` in `TypeVarTuple` creation"
+                        ),
+                        kwarg,
+                    );
+                    self.infer_expression(&kwarg.value, TypeContext::default());
+                }
+            }
+        }
+
+        let Some(name_param_ty) = name_param_ty.or_else(|| {
+            arguments
+                .find_positional(0)
+                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+        }) else {
+            return error(
+                &self.context,
+                "The `name` parameter of `TypeVarTuple` is required.",
+                call_expr,
+            );
+        };
+
+        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+            return error(
+                &self.context,
+                "The first argument to `TypeVarTuple` must be a string literal",
+                call_expr,
+            );
+        };
+
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
+            return error(
+                &self.context,
+                "A `TypeVarTuple` definition must be a simple variable assignment",
+                target,
+            );
+        };
+
+        if name_param != target_name {
+            return error(
+                &self.context,
+                format_args!(
+                    "The name of a `TypeVarTuple` (`{name_param}`) must match \
+                    the name of the variable it is assigned to (`{target_name}`)"
+                ),
+                target,
+            );
+        }
+
+        if default.is_some() {
+            self.deferred.insert(definition, self.multi_inference_state);
+        }
+
+        let identity =
+            TypeVarIdentity::new(db, target_name, Some(definition), TypeVarKind::TypeVarTuple);
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db, identity, None, None, default,
         )))
@@ -11873,6 +12047,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
+
+        // TypeVarTuples should be returned directly without iteration
+        match iterable_type {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_typevartuple(db) =>
+            {
+                return iterable_type;
+            }
+            Type::TypeVar(bound_typevar) if bound_typevar.typevar(db).is_typevartuple(db) => {
+                return iterable_type;
+            }
+            _ => {}
+        }
+
         iterable_type
             .try_iterate(db)
             .map(|spec| Type::tuple(TupleType::new(db, &spec)))
@@ -15470,8 +15658,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             error = Some(ExplicitSpecializationError::MissingTypeVars);
         }
 
+        let has_typevartuple = generic_context
+            .variables(db)
+            .any(|typevar| typevar.typevar(db).is_typevartuple(db));
+
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
-            if let Type::GenericAlias(alias) = value_ty
+            if has_typevartuple {
+                // Variadic type parameters can consume any number of arguments.
+            } else if let Type::GenericAlias(alias) = value_ty
                 && let spec = alias.specialization(self.db())
                 && spec
                     .types(self.db())
@@ -15605,6 +15799,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             |typevars: Type<'db>| -> Result<GenericContext<'db>, LegacyGenericContextError<'db>> {
                 let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(db);
 
+                let is_unpacked_expr = |expr: &ast::Expr| {
+                    matches!(expr, ast::Expr::Starred(_))
+                        || matches!(
+                            expr,
+                            ast::Expr::Subscript(sub)
+                            if self.expression_type(&sub.value)
+                                == Type::SpecialForm(SpecialFormType::Unpack)
+                        )
+                };
+
+                let unpacked_flags: Vec<bool> = match subscript.slice.as_ref() {
+                    ast::Expr::Tuple(tuple) => tuple.elts.iter().map(is_unpacked_expr).collect(),
+                    expr => vec![is_unpacked_expr(expr)],
+                };
+
                 let typevars = if let Some(tuple_spec) = typevars_class_tuple_spec.as_deref() {
                     match tuple_spec {
                         Tuple::Fixed(typevars) => typevars.elements_slice(),
@@ -15617,9 +15826,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 let mut validated_typevars = FxOrderSet::default();
-                for ty in typevars {
+                for (index, ty) in typevars.iter().enumerate() {
                     let argument_ty = *ty;
+                    let is_unpacked = unpacked_flags.get(index).copied().unwrap_or(false);
                     if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = argument_ty {
+                        if typevar.is_typevartuple(db) && !is_unpacked {
+                            return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
+                        }
                         let bound = bind_typevar(
                             db,
                             self.index,
@@ -15635,6 +15848,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     } else if let Type::NominalInstance(instance) = argument_ty
                         && instance.has_known_class(db, KnownClass::TypeVarTuple)
+                        && !is_unpacked
                     {
                         return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
                     } else if any_over_type(
@@ -15738,6 +15952,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         error @ (LegacyGenericContextError::NotYetSupported
                         | LegacyGenericContextError::VariadicTupleArguments),
                     ) => Ok(error.into_type()),
+                }
+            }
+            Type::SpecialForm(SpecialFormType::Unpack) => {
+                // If the argument is a TypeVarTuple, return it directly
+                // Unpack[Ts] expands the TypeVarTuple
+                match slice_ty {
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                        if typevar.is_typevartuple(db) =>
+                    {
+                        Ok(slice_ty)
+                    }
+                    Type::TypeVar(bound_typevar)
+                        if bound_typevar.typevar(db).is_typevartuple(db) =>
+                    {
+                        Ok(slice_ty)
+                    }
+                    _ => Ok(Type::Dynamic(DynamicType::TodoUnpack)),
                 }
             }
             Type::SpecialForm(SpecialFormType::Concatenate) => {
