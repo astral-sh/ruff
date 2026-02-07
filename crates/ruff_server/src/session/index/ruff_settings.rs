@@ -83,6 +83,52 @@ impl RuffSettings {
             }
         }
 
+        // First, try looking for any settings files in the file's directory or
+        // above. This is useful when the editor has opened the file in
+        // single-file mode outside of an open workspace. However, this means we
+        // can't cache any found settings for other files in the same directory
+        for directory in root.ancestors() {
+            tracing::debug!("Looking for settings in {directory:?}");
+            match settings_toml(directory) {
+                Ok(Some(pyproject)) => {
+                    match ruff_workspace::resolver::resolve_root_settings(
+                        &pyproject,
+                        &EditorConfigurationTransformer(editor_settings, root),
+                        ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
+                    ) {
+                        Ok(settings) => {
+                            tracing::debug!("Loaded settings from: `{}`", pyproject.display());
+                            return Self {
+                                path: Some(pyproject),
+                                settings,
+                            };
+                        }
+                        error => {
+                            tracing::error!(
+                                "{:#}",
+                                error
+                                    .with_context(|| {
+                                        format!(
+                                            "Failed to resolve settings for {}",
+                                            pyproject.display()
+                                        )
+                                    })
+                                    .unwrap_err()
+                            );
+                            continue;
+                        }
+                    }
+                }
+                Ok(None) => continue,
+                Err(err) => {
+                    tracing::error!("{err:#}");
+                    continue;
+                }
+            }
+        }
+
+        tracing::warn!("Falling back to default settings");
+
         find_user_settings_toml()
             .and_then(|user_settings| {
                 tracing::debug!(
@@ -145,6 +191,56 @@ impl RuffSettings {
 }
 
 impl RuffSettingsIndex {
+    pub(super) fn find_and_add_new_settings(
+        &mut self,
+        root: &Path,
+        editor_settings: &EditorSettings,
+    ) {
+        for directory in root.ancestors() {
+            tracing::debug!("Looking for settings in {directory:?}");
+            match settings_toml(directory) {
+                Ok(Some(pyproject)) => {
+                    match ruff_workspace::resolver::resolve_root_settings(
+                        &pyproject,
+                        &EditorConfigurationTransformer(editor_settings, root),
+                        ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
+                    ) {
+                        Ok(settings) => {
+                            tracing::debug!("Loaded settings from: `{}`", pyproject.display());
+                            self.index.insert(
+                                directory.to_path_buf(),
+                                Arc::new(RuffSettings {
+                                    path: Some(pyproject),
+                                    settings,
+                                }),
+                            );
+                            break;
+                        }
+                        error => {
+                            tracing::error!(
+                                "{:#}",
+                                error
+                                    .with_context(|| {
+                                        format!(
+                                            "Failed to resolve settings for {}",
+                                            pyproject.display()
+                                        )
+                                    })
+                                    .unwrap_err()
+                            );
+                            continue;
+                        }
+                    }
+                }
+                Ok(None) => continue,
+                Err(err) => {
+                    tracing::error!("{err:#}");
+                    continue;
+                }
+            }
+        }
+    }
+
     /// Create the settings index for the given workspace root.
     ///
     /// This will create the index in the following order:
@@ -383,6 +479,13 @@ impl RuffSettingsIndex {
             .map(|(_, settings)| settings)
             .unwrap_or_else(|| &self.fallback)
             .clone()
+    }
+
+    pub(super) fn has_settings_for(&self, document_path: &Path) -> bool {
+        self.index
+            .range(..document_path.to_path_buf())
+            .rfind(|(path, _)| document_path.starts_with(path))
+            .is_some()
     }
 
     pub(super) fn fallback(&self) -> Arc<RuffSettings> {
