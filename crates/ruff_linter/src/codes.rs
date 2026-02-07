@@ -221,6 +221,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0206") => rules::pylint::rules::DictIndexMissingItems,
         (Pylint, "C0207") => rules::pylint::rules::MissingMaxsplitArg,
         (Pylint, "C0208") => rules::pylint::rules::IterationOverSet,
+        (Pylint, "C0302") => rules::pylint::rules::TooManyLines,
         (Pylint, "C0414") => rules::pylint::rules::UselessImportAlias,
         (Pylint, "C0415") => rules::pylint::rules::ImportOutsideTopLevel,
         (Pylint, "C1802") => rules::pylint::rules::LenTest,
