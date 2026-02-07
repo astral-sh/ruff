@@ -101,6 +101,7 @@ pub(crate) use unnecessary_list_index_lookup::*;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) use unreachable::*;
 pub(crate) use unspecified_encoding::*;
+pub(crate) use unused_private_member::*;
 pub(crate) use useless_else_on_loop::*;
 pub(crate) use useless_exception_statement::*;
 pub(crate) use useless_import_alias::*;
@@ -212,6 +213,7 @@ mod unnecessary_list_index_lookup;
 #[cfg(any(feature = "test-rules", test))]
 mod unreachable;
 mod unspecified_encoding;
+mod unused_private_member;
 mod useless_else_on_loop;
 mod useless_exception_statement;
 mod useless_import_alias;
