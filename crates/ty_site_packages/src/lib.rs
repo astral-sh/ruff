@@ -270,6 +270,11 @@ impl PythonEnvironment {
             Self::System(env) => &env.root_path.origin,
         }
     }
+
+    /// Returns `true` if this is a virtual environment (has a `pyvenv.cfg` file).
+    pub fn is_virtual(&self) -> bool {
+        matches!(self, Self::Virtual(_))
+    }
 }
 
 /// Enumeration of the subdirectories of `sys.prefix` that could contain a
@@ -1673,14 +1678,8 @@ impl SysPrefixPathOrigin {
             | Self::PythonCliFlag
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
-            | Self::CondaPrefixVar => false,
-            // It's not strictly true that the self environment must be virtual, e.g., ty could be
-            // installed in a system Python environment and users may expect us to respect
-            // dependencies installed alongside it. However, we're intentionally excluding support
-            // for this to start. Note a change here has downstream implications, i.e., we probably
-            // don't want the packages in a system environment to take precedence over those in a
-            // virtual environment and would need to reverse the ordering in that case.
-            Self::SelfEnvironment => true,
+            | Self::CondaPrefixVar
+            | Self::SelfEnvironment => false,
         }
     }
 
@@ -2148,6 +2147,20 @@ mod tests {
             matches!(err, SitePackagesDiscoveryError::NoPyvenvCfgFile(..)),
             "Got {err:?}",
         );
+    }
+
+    #[test]
+    fn can_find_site_packages_directory_no_virtual_env_at_origin_self_environment() {
+        // Test that ty can discover dependencies in a system Python environment
+        // that it's installed into (issue #2068).
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::SelfEnvironment,
+            virtual_env: None,
+        };
+        test.run();
     }
 
     #[test]
