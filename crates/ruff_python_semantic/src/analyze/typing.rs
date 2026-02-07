@@ -817,19 +817,17 @@ impl TypeChecker for MappingChecker {
             || semantic.match_typing_expr(value, "Dict")
             || semantic.match_typing_expr(value, "Mapping")
             || semantic.match_typing_expr(value, "MutableMapping")
-            || semantic.resolve_qualified_name(value).is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    [
-                        "collections",
-                        "defaultdict" | "OrderedDict" | "Counter" | "ChainMap"
-                    ] | [
-                        "collections",
-                        "abc",
-                        "Mapping" | "MutableMapping"
-                    ]
-                )
-            })
+            || semantic
+                .resolve_qualified_name(value)
+                .is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        [
+                            "collections",
+                            "defaultdict" | "OrderedDict" | "Counter" | "ChainMap"
+                        ] | ["collections", "abc", "Mapping" | "MutableMapping"]
+                    )
+                })
     }
 
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
@@ -841,15 +839,17 @@ impl TypeChecker for MappingChecker {
             return false;
         };
         semantic.match_builtin_expr(func, "dict")
-            || semantic.resolve_qualified_name(func).is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    [
-                        "collections",
-                        "defaultdict" | "OrderedDict" | "Counter" | "ChainMap"
-                    ]
-                )
-            })
+            || semantic
+                .resolve_qualified_name(func)
+                .is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        [
+                            "collections",
+                            "defaultdict" | "OrderedDict" | "Counter" | "ChainMap"
+                        ]
+                    )
+                })
     }
 }
 
