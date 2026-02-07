@@ -11,7 +11,7 @@ use anyhow::{Result, anyhow};
 use crate::rules::perflint::helpers::comment_strings_in_range;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::{Binding, BindingKind, analyze::typing::is_list};
+use ruff_python_semantic::{Binding, analyze::typing::is_list};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 /// ## What it does
@@ -198,11 +198,6 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
-    // Check if binding is a parameter
-    if matches!(list_binding.kind, BindingKind::Argument) {
-        return;
-    }
-
     // Avoid if the list is used in the conditional test, e.g.,
     //
     // ```python
@@ -245,7 +240,6 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // leak outside the loop.
     for target in targets {
         let ast::Expr::Name(ast::ExprName {
-            id: _target_id,
             range: target_range,
             ..
         }) = target
@@ -262,6 +256,8 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             return;
         };
 
+        // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
+        // then it is intended to be used elsewhere outside the for loop.
         if target_binding.is_global() || target_binding.is_nonlocal() {
             return;
         }
@@ -352,6 +348,22 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         },
         *range,
     );
+
+    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
+    // `manual-list-copy` (PERF402) doesn't cover.
+    if !for_stmt.is_async && if_test.is_none() {
+        if let Some(arg_name) = arg.as_name_expr() {
+            if targets.iter().any(|target| {
+                target
+                    .as_name_expr()
+                    .is_some_and(|name| name.id == arg_name.id)
+            }) {
+                if comprehension_type == ComprehensionType::ListComprehension {
+                    return;
+                }
+            }
+        }
+    }
 
     // TODO: once this fix is stabilized, change the rule to always fixable
     if is_fix_manual_list_comprehension_enabled(checker.settings()) {

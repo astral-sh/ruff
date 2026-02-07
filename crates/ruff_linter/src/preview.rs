@@ -266,7 +266,6 @@ pub(crate) const fn is_py315_support_enabled(settings: &LinterSettings) -> bool 
     settings.preview.is_enabled()
 }
 
-
 // https://github.com/astral-sh/ruff/pull/23046
 pub(crate) const fn is_mutable_default_in_dataclass_field_enabled(
     settings: &LinterSettings,
@@ -281,7 +280,7 @@ pub(crate) const fn is_standalone_mock_non_existent_enabled(settings: &LinterSet
 
 // https://github.com/astral-sh/ruff/pull/23013
 pub(crate) const fn is_up024_precise_highlighting_enabled(settings: &LinterSettings) -> bool {
-settings.preview.is_enabled()
+    settings.preview.is_enabled()
 }
 
 // https://github.com/astral-sh/ruff/pull/22450

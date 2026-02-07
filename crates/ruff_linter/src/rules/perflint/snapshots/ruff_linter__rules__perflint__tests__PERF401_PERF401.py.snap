@@ -363,6 +363,18 @@ PERF401 Use a list comprehension to create a transformed list
 help: Replace for loop with list comprehension
 
 PERF401 Use `list.extend` to create a transformed list
+   --> PERF401.py:355:13
+    |
+353 |     for item in data:
+354 |         if check(item):
+355 |             exceptions.append(ValidationError(item))    # OK
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+356 |
+357 | def build_properties():
+    |
+help: Replace for loop with list.extend
+
+PERF401 Use `list.extend` to create a transformed list
    --> PERF401.py:362:9
     |
 360 |         properties.append("a")
