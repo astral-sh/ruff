@@ -1057,6 +1057,15 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns whether this type is marked as deprecated via `@warnings.deprecated`.
+    pub fn is_deprecated(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
+            Type::ClassLiteral(c) => c.deprecated(db).is_some(),
+            _ => false,
+        }
+    }
+
     /// If the type is a specialized instance of the given `KnownClass`, returns the specialization.
     pub(crate) fn known_specialization(
         &self,
