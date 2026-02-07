@@ -116,8 +116,7 @@ pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: Text
     let last_token_is_comment = checker
         .tokens()
         .iter()
-        .rev()
-        .find(|tok| !tok.kind().is_any_newline())
+        .rfind(|tok| !tok.kind().is_any_newline())
         .is_some_and(|tok| tok.kind() == TokenKind::Comment);
 
     let new_content = match (spans_multiple_lines, last_token_is_comment) {
