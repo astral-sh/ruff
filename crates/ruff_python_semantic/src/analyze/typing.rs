@@ -409,14 +409,23 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
         | Expr::Set(_)
         | Expr::ListComp(_)
         | Expr::DictComp(_)
-        | Expr::SetComp(_)
-        | Expr::Generator(_) => true,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().any(|e| is_mutable_expr(e, semantic))
-        }
-        Expr::Named(ast::ExprNamed { value, .. }) => is_mutable_expr(value, semantic),
+        | Expr::SetComp(_) => true,
         Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(map_subscript(func), semantic),
         _ => false,
+    }
+}
+
+/// Return `true` if `expr` is an expression that resolves to a mutable value,
+/// including additional patterns like generators, tuples containing mutable elements,
+/// and walrus (`:=`) expressions.
+pub fn is_mutable_expr_extended(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::Generator(_) => true,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().any(|e| is_mutable_expr_extended(e, semantic))
+        }
+        Expr::Named(ast::ExprNamed { value, .. }) => is_mutable_expr_extended(value, semantic),
+        _ => is_mutable_expr(expr, semantic),
     }
 }
 

@@ -163,3 +163,35 @@ B039 Do not use mutable data structures for `ContextVar` defaults
 42 | # Bad (generator, walrus, tuple-with-mutable)
    |
 help: Replace with `None`; initialize with `.set()``
+
+B039 Do not use mutable data structures for `ContextVar` defaults
+  --> B039.py:43:26
+   |
+42 | # Bad (generator, walrus, tuple-with-mutable)
+43 | ContextVar("cv", default=(x for x in "cv"))
+   |                          ^^^^^^^^^^^^^^^^^
+44 | ContextVar("cv", default=(x := []))
+45 | ContextVar("cv", default=([],))
+   |
+help: Replace with `None`; initialize with `.set()``
+
+B039 Do not use mutable data structures for `ContextVar` defaults
+  --> B039.py:44:27
+   |
+42 | # Bad (generator, walrus, tuple-with-mutable)
+43 | ContextVar("cv", default=(x for x in "cv"))
+44 | ContextVar("cv", default=(x := []))
+   |                           ^^^^^^^
+45 | ContextVar("cv", default=([],))
+   |
+help: Replace with `None`; initialize with `.set()``
+
+B039 Do not use mutable data structures for `ContextVar` defaults
+  --> B039.py:45:26
+   |
+43 | ContextVar("cv", default=(x for x in "cv"))
+44 | ContextVar("cv", default=(x := []))
+45 | ContextVar("cv", default=([],))
+   |                          ^^^^^
+   |
+help: Replace with `None`; initialize with `.set()``
