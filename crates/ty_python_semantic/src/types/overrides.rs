@@ -27,9 +27,9 @@ use crate::{
         class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
-            INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE,
-            INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD, report_invalid_method_override,
-            report_overridden_final_method,
+            INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
+            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD,
+            report_invalid_method_override, report_overridden_final_method,
         },
         enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
