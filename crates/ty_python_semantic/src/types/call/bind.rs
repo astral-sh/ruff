@@ -3563,7 +3563,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         } else {
             CallArguments::none()
         };
-
+        let num_synthetic_args = self
+            .arguments
+            .iter()
+            .filter(|(arg, _)| matches!(arg, Argument::Synthetic))
+            .count();
+        let max_arg_index = self.arguments.len().saturating_sub(1 + num_synthetic_args);
         // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
@@ -3585,22 +3590,38 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 if let [binding] = callable_binding.overloads() {
                     // This is not an overloaded function, so we can propagate its errors to the
                     // outer bindings.
-                    self.errors.extend(binding.errors.iter().cloned());
+                    self.errors.extend(binding.errors.iter().cloned().map(|e| {
+                        e.maybe_apply_argument_index_offset(argument_index, max_arg_index)
+                    }));
                 } else {
                     let index = callable_binding
                         .matching_overload_before_type_checking
                         .unwrap_or(0);
                     // TODO: We should also update the specialization for the `ParamSpec` to reflect
                     // the matching overload here.
-                    self.errors
-                        .extend(callable_binding.overloads()[index].errors.iter().cloned());
+                    self.errors.extend(
+                        callable_binding.overloads()[index]
+                            .errors
+                            .iter()
+                            .cloned()
+                            .map(|e| {
+                                e.maybe_apply_argument_index_offset(argument_index, max_arg_index)
+                            }),
+                    );
                 }
             }
             MatchingOverloadIndex::Single(index) => {
                 // TODO: We should also update the specialization for the `ParamSpec` to reflect the
                 // matching overload here.
-                self.errors
-                    .extend(callable_binding.overloads()[index].errors.iter().cloned());
+                self.errors.extend(
+                    callable_binding.overloads()[index]
+                        .errors
+                        .iter()
+                        .cloned()
+                        .map(|e| {
+                            e.maybe_apply_argument_index_offset(argument_index, max_arg_index)
+                        }),
+                );
             }
             MatchingOverloadIndex::Multiple(_) => {
                 if !matches!(
@@ -3614,7 +3635,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .unwrap()
                             .errors
                             .iter()
-                            .cloned(),
+                            .cloned()
+                            .map(|e| {
+                                e.maybe_apply_argument_index_offset(argument_index, max_arg_index)
+                            }),
                     );
                 }
             }
@@ -4308,6 +4332,59 @@ pub(crate) enum BindingError<'db> {
     CalledTopCallable(Type<'db>),
     /// The `@dataclass` decorator was applied to an invalid target.
     InvalidDataclassApplication(InvalidDataclassTarget),
+}
+
+impl BindingError<'_> {
+    pub(crate) fn maybe_apply_argument_index_offset(
+        mut self,
+        offset: Option<usize>,
+        max_arg_index: usize,
+    ) -> Self {
+        if let Some(offset) = offset {
+            self.apply_argument_index_offset(offset, max_arg_index);
+        }
+        self
+    }
+    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize, max_arg_index: usize) {
+        match self {
+            BindingError::InvalidArgumentType { argument_index, .. }
+            | BindingError::InvalidKeyType { argument_index, .. }
+            | BindingError::UnknownArgument { argument_index, .. }
+            | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
+            | BindingError::ParameterAlreadyAssigned { argument_index, .. }
+            | BindingError::SpecializationError { argument_index, .. } => {
+                if let Some(i) = argument_index {
+                    let new_index = *i + offset;
+                    if new_index > max_arg_index {
+                        *argument_index = None;
+                    } else {
+                        *i = new_index;
+                    }
+                }
+            }
+
+            BindingError::TooManyPositionalArguments {
+                first_excess_argument_index,
+                ..
+            } => {
+                if let Some(i) = first_excess_argument_index {
+                    let new_index = *i + offset;
+                    if new_index > max_arg_index {
+                        *first_excess_argument_index = None;
+                    } else {
+                        *i = new_index;
+                    }
+                }
+            }
+
+            BindingError::CalledTopCallable(..)
+            | BindingError::InternalCallError(..)
+            | BindingError::InvalidDataclassApplication(..)
+            | BindingError::MissingArguments { .. }
+            | BindingError::UnmatchedOverload
+            | BindingError::PropertyHasNoSetter(..) => {}
+        }
+    }
 }
 
 /// The target of an invalid `@dataclass` application.
