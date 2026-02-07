@@ -193,6 +193,7 @@ Variable.get(key="key", default_var="deprecated")
 Variable.get("key", default="default")
 Variable.get(key="key", default="default")
 Variable.get("key")
+Variable.get("key", deserialize_json=True)
 
 
 # airflow.providers.standard.operators.python (provide_context parameter removed)
