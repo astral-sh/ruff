@@ -89,6 +89,10 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
         return;
     }
 
+    if !typing::is_known_to_be_mapping(checker.semantic(), value) {
+        return;
+    }
+
     // Extract the exact range of the left and right expressions.
     let left_range =
         parenthesized_range(left.into(), parent, checker.tokens()).unwrap_or(left.range());
@@ -118,7 +122,8 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
                     return false;
                 };
                 typing::is_dict(binding, checker.semantic())
-            });
+            }) || matches!(value.as_ref(), Expr::Dict(_) | Expr::DictComp(_));
+
             if is_dict {
                 Applicability::Safe
             } else {

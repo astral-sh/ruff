@@ -54,6 +54,19 @@ pub fn is_known_to_be_of_type_dict(semantic: &SemanticModel, expr: &ExprName) ->
     is_dict(binding, semantic)
 }
 
+pub fn is_known_to_be_mapping(semantic: &SemanticModel, expr: &Expr) -> bool {
+    if MappingChecker::match_initializer(expr, semantic) {
+        return true;
+    }
+    if let Some(name) = expr.as_name_expr() {
+        let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+            return false;
+        };
+        return is_mapping(binding, semantic);
+    }
+    false
+}
+
 pub fn match_annotated_subscript<'a>(
     expr: &Expr,
     semantic: &SemanticModel,
@@ -795,6 +808,51 @@ impl BuiltinTypeChecker for DictChecker {
     const EXPR_TYPE: PythonType = PythonType::Dict;
 }
 
+struct MappingChecker;
+
+impl TypeChecker for MappingChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        let value = map_subscript(annotation);
+        semantic.match_builtin_expr(value, "dict")
+            || semantic.match_typing_expr(value, "Dict")
+            || semantic.match_typing_expr(value, "Mapping")
+            || semantic.match_typing_expr(value, "MutableMapping")
+            || semantic.resolve_qualified_name(value).is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    [
+                        "collections",
+                        "defaultdict" | "OrderedDict" | "Counter" | "ChainMap"
+                    ] | [
+                        "collections",
+                        "abc",
+                        "Mapping" | "MutableMapping"
+                    ]
+                )
+            })
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        if matches!(initializer, Expr::Dict(_) | Expr::DictComp(_)) {
+            return true;
+        }
+
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+        semantic.match_builtin_expr(func, "dict")
+            || semantic.resolve_qualified_name(func).is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    [
+                        "collections",
+                        "defaultdict" | "OrderedDict" | "Counter" | "ChainMap"
+                    ]
+                )
+            })
+    }
+}
+
 struct SetChecker;
 
 impl BuiltinTypeChecker for SetChecker {
@@ -1050,6 +1108,15 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
     }
 
     check_type::<DictChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered a mapping.
+pub fn is_mapping(binding: &Binding, semantic: &SemanticModel) -> bool {
+    if is_dict(binding, semantic) {
+        return true;
+    }
+
+    check_type::<MappingChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered an integer.

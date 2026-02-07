@@ -63,3 +63,17 @@ from builtins import dict as SneakyDict
 
 d = SneakyDict()
 key in d.keys()  # SIM118
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/4481
+class FooNoIter:
+    def __init__(self) -> None:
+        self._keys = [1,2,3]
+
+    def keys(self) -> list[int]:
+        return self._keys
+
+
+foo_no_iter = FooNoIter()
+
+for k in foo_no_iter.keys():
+    print(k)
