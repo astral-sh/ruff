@@ -54,7 +54,7 @@ pub fn format_code_blocks(
     let mut state = MarkdownState::On;
     let mut changed = false;
     let mut formatted = String::with_capacity(source.len());
-    let mut last_match = TextSize::new(0);
+    let mut last_match = TextSize::ZERO;
 
     let mut lines = source.universal_newlines().peekable();
     while let Some(line) = lines.next() {
