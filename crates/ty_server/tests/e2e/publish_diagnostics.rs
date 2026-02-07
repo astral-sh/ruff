@@ -326,8 +326,6 @@ def foo() -> str:
         },
     };
     server.send_notification::<DidOpenTextDocument>(params);
-    let _close_diagnostics = server.await_notification::<PublishDiagnostics>();
-
     let diagnostics = server.await_notification::<PublishDiagnostics>();
 
     insta::assert_debug_snapshot!(diagnostics);

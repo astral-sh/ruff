@@ -2,6 +2,7 @@ use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::{DidOpenTextDocumentParams, TextDocumentItem};
 
 use crate::TextDocument;
+use crate::document::LanguageId;
 use crate::server::Result;
 use crate::server::api::diagnostics::publish_diagnostics_if_needed;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
@@ -30,10 +31,12 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                 },
         } = params;
 
-        let document = session.open_text_document(
-            TextDocument::new(uri, text, version).with_language_id(&language_id),
-        );
+        let text_doc = TextDocument::new(uri, text, version).with_language_id(&language_id);
+        if matches!(text_doc.language_id(), Some(LanguageId::Other)) {
+            return Ok(());
+        }
 
+        let document = session.open_text_document(text_doc);
         publish_diagnostics_if_needed(&document, session, client);
 
         Ok(())

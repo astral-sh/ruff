@@ -24,7 +24,7 @@ use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
-use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
 use ty_python_semantic::MisconfigurationMode;
@@ -530,12 +530,12 @@ impl Session {
 
         if let Some(global_options) = global_options {
             let global_settings = global_options.into_settings();
-            if global_settings.diagnostic_mode().is_workspace() {
-                for project in self.projects.values_mut() {
-                    project.db.set_check_mode(CheckMode::AllFiles);
-                }
-            }
             self.global_settings = Arc::new(global_settings);
+        }
+        if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
+            for project in self.projects.values_mut() {
+                project.db.set_check_mode(check_mode);
+            }
         }
 
         self.register_capabilities(client);

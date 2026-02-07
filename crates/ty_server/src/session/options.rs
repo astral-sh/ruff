@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use ty_combine::Combine;
 use ty_ide::{CompletionSettings, InlayHintSettings};
+use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
@@ -367,6 +368,17 @@ impl DiagnosticMode {
     /// Returns `true` if the diagnostic mode is set to check only currently open files.
     pub(crate) const fn is_open_files_only(self) -> bool {
         matches!(self, DiagnosticMode::OpenFilesOnly)
+    }
+
+    /// Returns this diagnostic mode as a check mode.
+    ///
+    /// This returns `None` when diagnostics are disabled.
+    pub(crate) const fn to_check_mode(self) -> Option<CheckMode> {
+        match self {
+            DiagnosticMode::Off => None,
+            DiagnosticMode::OpenFilesOnly => Some(CheckMode::OpenFiles),
+            DiagnosticMode::Workspace => Some(CheckMode::AllFiles),
+        }
     }
 
     pub(crate) const fn is_off(self) -> bool {
