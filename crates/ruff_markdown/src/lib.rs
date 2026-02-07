@@ -160,18 +160,14 @@ fn format_pycon_block(
             let start = line.start();
             let mut end = line.full_end();
             unformatted.push_str(&source[TextRange::new(line.start() + offset, line.full_end())]);
-            while let Some(next_line) = lines.peek() {
-                if next_line.starts_with(CONTINUATION) {
-                    end = next_line.full_end();
-                    unformatted.push_str(&source[TextRange::new(next_line.start() + offset, end)]);
-                    lines.next();
-                } else if next_line.trim_end() == CONTINUATION_BLANK {
-                    end = next_line.full_end();
-                    unformatted.push_str(&source[TextRange::new(next_line.end(), end)]);
-                    lines.next();
+            while let Some(next_line) = lines.next_if(|line| line.starts_with(CONTINUATION_BLANK)) {
+                end = next_line.full_end();
+                let start = if next_line.trim_end() == CONTINUATION_BLANK {
+                    next_line.end()
                 } else {
-                    break;
-                }
+                    next_line.start() + offset
+                };
+                unformatted.push_str(&source[TextRange::new(start, end)]);
             }
             let options = settings.to_format_options(PySourceType::Python, &unformatted, path);
             // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
