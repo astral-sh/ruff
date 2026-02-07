@@ -137,7 +137,7 @@ use crate::types::{
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
-use crate::{Db, FxIndexSet, FxOrderSet, Program};
+use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet, Program};
 
 mod annotation_expression;
 mod type_expression;
@@ -462,6 +462,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn scope(&self) -> ScopeId<'db> {
         self.scope
+    }
+
+    fn settings(&self) -> &AnalysisSettings {
+        self.db().analysis_settings(self.file())
     }
 
     /// If the current scope is a class body scope of a dataclass-like class, populate
@@ -8752,13 +8756,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let settings = self.db().analysis_settings(self.file());
-
         if let Some(module_name) = &module_name
-            && settings
+            && (self
+                .settings()
                 .allowed_unresolved_imports
                 .matches(module_name)
                 .is_include()
+                || self
+                    .settings()
+                    .replace_imports_with_any
+                    .matches(module_name)
+                    .is_include())
         {
             return;
         }
@@ -8878,6 +8886,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
+
+        if self
+            .settings()
+            .replace_imports_with_any
+            .matches(&full_module_name)
+            .is_include()
+        {
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                &DeclaredAndInferredType::are_the_same_type(Type::any()),
+            );
+            return;
+        }
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
@@ -9079,6 +9101,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
+        if self
+            .settings()
+            .replace_imports_with_any
+            .matches(&module_name)
+            .is_include()
+        {
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                &DeclaredAndInferredType::are_the_same_type(Type::any()),
+            );
+            return;
+        }
+
         let Some(module) = resolve_module(self.db(), self.file(), &module_name) else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
@@ -9218,9 +9254,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let settings = self.db().analysis_settings(self.file());
-
-        if settings
+        if self
+            .settings()
             .allowed_unresolved_imports
             .matches(full_submodule_name.as_ref().unwrap_or(&module_name))
             .is_include()
@@ -9285,6 +9320,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .insert(self, Type::unknown());
             return;
         };
+
         let Some(module) = resolve_module(self.db(), self.file(), &thispackage_name) else {
             self.add_binding(import_from.into(), definition)
                 .insert(self, Type::unknown());
@@ -9336,9 +9372,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_binding(import_from.into(), definition)
             .insert(self, Type::unknown());
 
-        let settings = self.db().analysis_settings(self.file());
-
-        if settings
+        if self
+            .settings()
             .allowed_unresolved_imports
             .matches(&full_submodule_name)
             .is_include()

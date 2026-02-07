@@ -82,6 +82,16 @@
             "$ref": "#/definitions/string"
           }
         },
+        "replace-imports-with-any": {
+          "description": "A list of module glob patterns whose imports should be replaced with `typing.Any`.\n\nUnlike `allowed-unresolved-imports`, this setting replaces the module's type information\nwith `typing.Any` even if the module can be resolved. Import diagnostics are\nunconditionally suppressed for matching modules.\n\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.\n\nWhen multiple patterns match, later entries take precedence.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/string"
+          }
+        },
         "respect-type-ignore-comments": {
           "description": "Whether ty should respect `type: ignore` comments.\n\nWhen set to `false`, `type: ignore` comments are treated like any other normal\ncomment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).\n\nSetting this option can be useful when using ty alongside other type checkers or when\nyou prefer using `ty: ignore` over `type: ignore`.\n\nDefaults to `true`.",
           "type": [
