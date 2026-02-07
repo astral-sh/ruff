@@ -474,7 +474,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Function calls are not allowed in type expressions"),
+                    format_args!("Function calls are not allowed in type expressions (except for Blender properties)"),
                 );
                 Type::unknown()
             }

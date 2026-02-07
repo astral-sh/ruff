@@ -4941,20 +4941,11 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
-        int
+        assert_snapshot!(test.hover(), @"
+        Unknown
         ---------------------------------------------
         ```python
-        foo()
-        ```
-
-        ---------------------------------------------
-        ```python
-        int
-        ```
-        ---
-        ```python
-        foo()
+        Unknown
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4968,6 +4959,46 @@ def function():
           |   source
           |
         ");
+    }
+
+    #[test]
+    fn hover_call_expression_annotation_other_than_blender_property_docstring() {
+        let test = cursor_test(
+            r#"
+            def foo() -> int:
+                return 1
+
+            class A:
+                a: foo()
+                """existing docs"""
+
+            A.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        existing docs
+
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---
+        existing docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:9:3
+          |
+        7 |     """existing docs"""
+        8 |
+        9 | A.a
+          |   ^- Cursor offset
+          |   |
+          |   source
+          |
+        "#);
     }
 
     impl CursorTest {

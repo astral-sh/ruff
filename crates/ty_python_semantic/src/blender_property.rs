@@ -56,9 +56,8 @@ pub(crate) fn get_call_expression_docstring(
     match args_len {
         0 => {
             // Print on one line.
-            call_docstring.push_str("(");
             call_docstring.push_str(&source[call_expr.func.range()]);
-            call_docstring.push_str(")");
+            call_docstring.push_str("()");
         }
         1 => {
             // Still print on one line.
