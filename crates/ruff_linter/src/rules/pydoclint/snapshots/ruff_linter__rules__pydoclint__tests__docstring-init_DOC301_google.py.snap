@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC301 `__init__` should not have a docstring
+  --> DOC301_google.py:6:9
+   |
+ 4 |       # DOC301
+ 5 |       def __init__(self, a: int, b: int) -> None:
+ 6 | /         """
+ 7 | |         Initialize class.
+ 8 | |
+ 9 | |         Args:
+10 | |             a (int): Some integer.
+11 | |             b (int): Another integer.
+12 | |         """
+   | |___________^
+13 |           self.a = a
+14 |           self.b = b
+   |
+help: Please combine `__init__` docstring with the docstring of the class
