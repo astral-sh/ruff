@@ -3929,13 +3929,14 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
         as it is a protocol with non-method members"
     ));
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    let interface = protocol.interface(db);
     if let [single_member] = non_method_members {
         let mut sub = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "A protocol class cannot be used in `issubclass` checks \
             if it has non-method members",
         );
-        if let Some(definition) = single_member.definition() {
+        if let Some(definition) = interface.member_definition(db, single_member.name()) {
             let file = definition.file(db);
             let module = parsed_module(db, file).load(db);
             let span = Span::from(definition.focus_range(db, &module));
@@ -3957,10 +3958,11 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
                 format_enumeration(non_method_members.iter().map(ProtocolMember::name))
             ),
         );
-        if let Some((name, definition)) = non_method_members
-            .iter()
-            .find_map(|member| Some((member.name(), member.definition()?)))
-        {
+        if let Some((name, definition)) = non_method_members.iter().find_map(|member| {
+            interface
+                .member_definition(db, member.name())
+                .map(|def| (member.name(), def))
+        }) {
             let file = definition.file(db);
             let module = parsed_module(db, file).load(db);
             let span = Span::from(definition.focus_range(db, &module));

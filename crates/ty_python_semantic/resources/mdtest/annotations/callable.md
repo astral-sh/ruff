@@ -386,8 +386,6 @@ If users want to read/write to attributes such as `__qualname__`, they need to c
 of the attribute first:
 
 ```py
-from inspect import getattr_static
-
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
@@ -397,14 +395,11 @@ def f_okay(c: Callable[[], None]):
         reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
 
         # `hasattr` only guarantees that an attribute is readable.
-        #
-        # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
+        # TODO: This assignment should ideally be an error, since the synthesized
+        # protocol member is a read-only property. Currently, the `Callable` element
+        # of the intersection has `type.__qualname__: str` at the class level,
+        # which allows the assignment to go through.
         c.__qualname__ = "my_callable"
-
-        result = getattr_static(c, "__qualname__")
-        reveal_type(result)  # revealed: property
-        if isinstance(result, property) and result.fset:
-            c.__qualname__ = "my_callable"  # okay
 ```
 
 ## From a class

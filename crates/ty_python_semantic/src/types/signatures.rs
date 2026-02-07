@@ -2705,6 +2705,12 @@ pub(crate) enum ParameterForm {
     Type,
 }
 
+impl ParameterForm {
+    pub(crate) const fn is_value(self) -> bool {
+        matches!(self, ParameterForm::Value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

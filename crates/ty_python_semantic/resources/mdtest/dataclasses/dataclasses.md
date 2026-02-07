@@ -1492,9 +1492,7 @@ reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 But calling `asdict` on the class object is not allowed:
 
 ```py
-# TODO: this should be a invalid-argument-type error, but we don't properly check the
-# types (and more importantly, the `ClassVar` type qualifier) of protocol members yet.
-asdict(Foo)
+asdict(Foo)  # error: [invalid-argument-type]
 ```
 
 ## `dataclasses.KW_ONLY`
