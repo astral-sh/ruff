@@ -915,7 +915,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                    PredicateNode::ReturnsNever(_)
+                    | PredicateNode::StarImportPlaceholder(_)
+                    | PredicateNode::ContextManagerExit { .. } => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
                     }
@@ -2074,6 +2076,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 is_async,
                 ..
             }) => {
+                let mut with_exit_reachability = self.current_use_def_map().reachability;
+
                 for item @ ast::WithItem {
                     range: _,
                     node_index: _,
@@ -2081,9 +2085,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     optional_vars,
                 } in items
                 {
+                    let context_manager = self.add_standalone_expression(context_expr);
                     self.visit_expr(context_expr);
                     if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
@@ -2093,8 +2097,29 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             context_manager,
                         );
                     }
+
+                    // Context managers may silence exceptions.
+                    // Please refer `ReachabilityConstraints::analyze_single` for more details.
+                    let predicate = PredicateOrLiteral::Predicate(Predicate {
+                        node: PredicateNode::ContextManagerExit {
+                            context_expr: context_manager,
+                            is_async: *is_async,
+                        },
+                        is_positive: true,
+                    });
+                    let predicate_id = self.add_predicate(predicate);
+                    with_exit_reachability = self
+                        .current_reachability_constraints_mut()
+                        .add_atom(predicate_id);
                 }
+
+                let pre_with_state = self.flow_snapshot();
                 self.visit_body(body);
+                let post_with_state = self.flow_snapshot();
+
+                self.flow_restore(pre_with_state);
+                self.record_negated_reachability_constraint(with_exit_reachability);
+                self.flow_merge(post_with_state);
             }
 
             ast::Stmt::For(

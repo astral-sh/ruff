@@ -115,6 +115,10 @@ pub(crate) enum PredicateNode<'db> {
     ReturnsNever(CallableAndCallExpr<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
+    ContextManagerExit {
+        context_expr: Expression<'db>,
+        is_async: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
