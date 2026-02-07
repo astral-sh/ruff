@@ -309,6 +309,13 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        // A structural type (callable or protocol) is never redundant with a nominal type,
+        // and vice versa. These are fundamentally different kinds of types and should not
+        // be simplified away in unions.
+        if self.is_structural() != other.is_structural() {
+            return false;
+        }
+
         is_redundant_with_impl(db, self, other)
     }
 
