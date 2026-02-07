@@ -69,7 +69,7 @@ exit_code: 1
       "tool": {
         "driver": {
           "informationUri": "https://github.com/astral-sh/ruff",
-          "name": "ruff",
+          "name": "Ruff",
           "rules": [],
           "version": "[VERSION]"
         }

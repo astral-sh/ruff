@@ -3237,7 +3237,6 @@ dependencies = [
  "unicode-normalization",
  "unicode-width",
  "unicode_names2",
- "url",
 ]
 
 [[package]]
