@@ -139,6 +139,8 @@ use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
+use crate::blender_property::as_blender_property;
+
 mod annotation_expression;
 mod type_expression;
 
@@ -8295,12 +8297,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
-        // If this is an annotation-only statement (no RHS value) and the annotation is a
-        // call expression, infer the call's return type instead of treating it as an invalid
-        // type expression. This allows patterns like `a: foo()` to resolve to the return
-        // type of `foo()` instead of `Unknown`.
+        // Infer the type of blender property by infering the return type if call expression.
+        // Thus the type inference is delegated to a stub file of bpy.props.
         let mut declared = if value.is_none()
-            && let Some(call_expr) = annotation.as_call_expr()
+            && let Some(call_expr) = as_blender_property(annotation)
         {
             let return_ty = self.infer_call_expression(call_expr, TypeContext::default());
             self.store_expression_type(annotation, return_ty);

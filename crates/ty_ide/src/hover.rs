@@ -4711,7 +4711,224 @@ def function():
     }
 
     #[test]
-    fn hover_call_expression_annotation() {
+    fn hover_blender_property_no_arguments() {
+        let test = cursor_test(
+            r#"
+            def IntProperty(
+                *,
+                name: str | None = "",
+                description: str | None = "",
+                default: int = 0,
+                min: int | None = None,
+                max: int | None = None,
+            ) -> int:
+                return default
+
+            class A:
+                a: IntProperty()
+
+            A.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        int
+        ---------------------------------------------
+        ```python
+        IntProperty()
+        ```
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        ```python
+        IntProperty()
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:15:3
+           |
+        13 |     a: IntProperty()
+        14 |
+        15 | A.a
+           |   ^- Cursor offset
+           |   |
+           |   source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_blender_property_one_argument() {
+        let test = cursor_test(
+            r#"
+            def IntProperty(
+                *,
+                name: str | None = "",
+                description: str | None = "",
+                default: int = 0,
+                min: int | None = None,
+                max: int | None = None,
+            ) -> int:
+                return default
+
+            class A:
+                a: IntProperty(name="test")
+
+            A.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        int
+        ---------------------------------------------
+        ```python
+        IntProperty(name="test")
+        ```
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        ```python
+        IntProperty(name="test")
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:15:3
+           |
+        13 |     a: IntProperty(name="test")
+        14 |
+        15 | A.a
+           |   ^- Cursor offset
+           |   |
+           |   source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_blender_property_multiple_arguments() {
+        let test = cursor_test(
+            r#"
+            def IntProperty(
+                *,
+                name: str | None = "",
+                description: str | None = "",
+                default: int = 0,
+                min: int | None = None,
+                max: int | None = None,
+            ) -> int:
+                return default
+
+            class A:
+                a: IntProperty(min=0, max=100)
+
+            A.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        int
+        ---------------------------------------------
+        ```python
+        IntProperty(
+            min=0,
+            max=100,
+        )
+        ```
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        ```python
+        IntProperty(
+            min=0,
+            max=100,
+        )
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:15:3
+           |
+        13 |     a: IntProperty(min=0, max=100)
+        14 |
+        15 | A.a
+           |   ^- Cursor offset
+           |   |
+           |   source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_blender_property_multiple_arguments_existing_docstring() {
+        let test = cursor_test(
+            r#"
+            def IntProperty(
+                *,
+                name: str | None = "",
+                description: str | None = "",
+                default: int = 0,
+                min: int | None = None,
+                max: int | None = None,
+            ) -> int:
+                return default
+
+            class A:
+                a: IntProperty(min=0, max=100)
+                """existing docs"""
+
+            A.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        int
+        ---------------------------------------------
+        ```python
+        IntProperty(
+            min=0,
+            max=100,
+        )
+        ```
+
+        existing docs
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        ```python
+        IntProperty(
+            min=0,
+            max=100,
+        )
+        ```  
+          
+        existing docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:16:3
+           |
+        14 |     """existing docs"""
+        15 |
+        16 | A.a
+           |   ^- Cursor offset
+           |   |
+           |   source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_call_expression_annotation_other_than_blender_property() {
         let test = cursor_test(
             r#"
             def foo() -> int:
@@ -4727,14 +4944,18 @@ def function():
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
+        ```python
         foo()
+        ```
 
         ---------------------------------------------
         ```python
         int
         ```
         ---
+        ```python
         foo()
+        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:8:3
@@ -4747,50 +4968,6 @@ def function():
           |   source
           |
         ");
-    }
-
-    #[test]
-    fn hover_call_expression_annotation_with_existing_docstring() {
-        let test = cursor_test(
-            r#"
-            def foo() -> int:
-                return 1
-
-            class A:
-                a: foo()
-                """existing docs"""
-
-            A.a<CURSOR>
-        "#,
-        );
-
-        assert_snapshot!(test.hover(), @r#"
-        int
-        ---------------------------------------------
-        existing docs
-
-        foo()
-
-        ---------------------------------------------
-        ```python
-        int
-        ```
-        ---
-        existing docs  
-          
-        foo()
-        ---------------------------------------------
-        info[hover]: Hovered content is
-         --> main.py:9:3
-          |
-        7 |     """existing docs"""
-        8 |
-        9 | A.a
-          |   ^- Cursor offset
-          |   |
-          |   source
-          |
-        "#);
     }
 
     impl CursorTest {

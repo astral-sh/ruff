@@ -100,3 +100,5 @@ impl Default for AnalysisSettings {
         }
     }
 }
+
+pub mod blender_property;

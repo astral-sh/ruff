@@ -2,7 +2,6 @@ use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_db::source::source_text;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
@@ -10,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
+use crate::blender_property::{as_blender_property, get_call_expression_docstring};
 use crate::node_key::NodeKey;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::{FileScopeId, ScopeId};
@@ -122,59 +122,22 @@ impl<'db> Definition<'db> {
                 let existing_docstring = attribute_docstring(&module, assign_node)
                     .map(|docstring_expr| docstring_expr.value.to_str().to_owned());
 
-                // If this is an annotation-only statement with a call expression,
-                // synthesize/append the call source text into the docstring.
+                // If this is an annotation-only blender property definition,
+                // prepend the call expression to the docstring so the user
+                // can see both the inferred type and the original definition.
                 let annotation_expr = assign_def.annotation(&module);
-                if assign_def.value(&module).is_none() && annotation_expr.is_call_expr() {
-                    let source = source_text(db, file);
-
-                    // If we can inspect the call node, pretty-print arguments
-                    // one-per-line when there is more than one argument.
-                    annotation_expr.as_call_expr().and_then(|call| {
-                        let args_len = call.arguments.args.len() + call.arguments.keywords.len();
-                        let mut out = String::new();
-                        out.push_str("```python\n");
-                        match args_len {
-                            0 => out.push_str(&source[annotation_expr.range()]),
-                            1 => {
-                                // Reformat the call with one argument still on one line.
-                                out.push_str(&source[call.func.range()]);
-                                out.push_str("(");
-                                if call.arguments.args.len() == 1 {
-                                    out.push_str(&source[call.arguments.args[0].range()]);
-                                } else {
-                                    out.push_str(&source[call.arguments.keywords[0].range()]);
-                                }
-                                out.push(')');
-                            }
-                            _ => {
-                                // Reformat the call with one argument per line.
-                                out.push_str(&source[call.func.range()]);
-                                out.push_str("(\n");
-                                for arg in call.arguments.args.iter() {
-                                    out.push_str("    ");
-                                    out.push_str(&source[arg.range()]);
-                                    out.push_str(",\n");
-                                }
-                                for kw in call.arguments.keywords.iter() {
-                                    out.push_str("    ");
-                                    out.push_str(&source[kw.range()]);
-                                    out.push_str(",\n");
-                                }
-                                out.push(')');
-                            }
+                if assign_def.value(&module).is_none()
+                    && let Some(call) = as_blender_property(annotation_expr)
+                {
+                    let mut call_expr_docstring = get_call_expression_docstring(call, db, file);
+                    match existing_docstring {
+                        Some(doc) => {
+                            call_expr_docstring.push_str("\n\n");
+                            call_expr_docstring.push_str(&doc);
+                            Some(call_expr_docstring)
                         }
-                        out.push_str("\n```");
-                        match existing_docstring {
-                            Some(doc) => {
-                                // annotated-call above existing attribute docstring
-                                out.push_str("\n\n");
-                                out.push_str(&doc);
-                                Some(out)
-                            }
-                            None => Some(out),
-                        }
-                    })
+                        None => Some(call_expr_docstring),
+                    }
                 } else {
                     existing_docstring
                 }
